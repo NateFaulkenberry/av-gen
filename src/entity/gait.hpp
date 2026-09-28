@@ -174,7 +174,7 @@ inline constexpr float kTurnKeep = 0.5f;
 
 [[nodiscard]] bool gaitLocomotor(Activity activity);
 
-// The state machine's three bytes. Owned by the entity, reset on a seek with everything else.
+// The state machine's four bytes. Owned by the entity, reset on a seek with everything else.
 class Gait {
 public:
     // The activity to *play*, given what the behaviour or action layer proposed, how fast the body
@@ -224,6 +224,9 @@ private:
     std::uint32_t changes_ = 0;
     bool moving_ = false;
     bool running_ = false;
+    // ADR-982: the body has come to rest (speed at or under `kTurnRestSpeed`) since it last stepped,
+    // so the next time it travels is a START rather than a hover at the band.
+    bool restedSinceStep_ = true;
 };
 
 } // namespace avgen::entity

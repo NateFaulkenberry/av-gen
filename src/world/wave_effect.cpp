@@ -2,6 +2,7 @@
 
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_trigger.hpp"
 
 #include "core/log.hpp"
 
@@ -558,25 +559,20 @@ bool isWave(const EffectInstance& e) {
     return schema != nullptr && schema->resolve.bucket == EffectBucket::Surface;
 }
 
-} // namespace
-
-std::optional<ResolvedWave> resolveWave(const EffectInstance& instance, const EffectContext& ctx) {
-    if (!instance.enabled || !isWave(instance)) {
-        return std::nullopt;
-    }
+// One front of `instance`, living in `window`: nothing when it is not alive at `ctx.seconds`. The
+// whole of what a wave is at an instant, given when its activation opened -- which is what lets
+// `resolveWaveFronts` ask it once per trigger event (ADR-981) with no second copy of the rules.
+std::optional<ResolvedWave> resolveFront(const EffectInstance& instance, const EffectContext& ctx,
+                                         const ActivationWindow& window) {
     const WaveEffect& e = instance.wave;
-    const auto window = activeWindow(instance, ctx);
-    if (!window) {
-        return std::nullopt;
-    }
     // Time since the activation opened, minus the delay. Everything below is a function of this
     // and of the authored numbers: no state, no history, no frame counter.
     const Timing& timing = instance.timing;
-    const double local = ctx.seconds - window->start - timing.delay;
+    const double local = ctx.seconds - window.start - timing.delay;
     if (local < 0.0) {
         return std::nullopt;
     }
-    const double windowLength = window->end - window->start - timing.delay;
+    const double windowLength = window.end - window.start - timing.delay;
     const double lifetime = timing.lifetime > 0.0 ? timing.lifetime : windowLength;
     if (std::isfinite(lifetime) && local >= lifetime) {
         return std::nullopt;
@@ -607,11 +603,11 @@ std::optional<ResolvedWave> resolveWave(const EffectInstance& instance, const Ef
     r.frontDistance = front;
     r.elapsed = local;
     const glm::vec3* accent = nullptr;
-    if (!resolveEndpoint(instance, e.source, ctx, window->span, r.origin, &accent)) {
+    if (!resolveEndpoint(instance, e.source, ctx, window.span, r.origin, &accent)) {
         return std::nullopt; // a FocusHero source with nothing spotlit is not an error, it is inactive
     }
     r.axis = e.propagation.kind == PropagationKind::DirectionalWave
-                 ? resolveAxis(instance, ctx, window->span, r.origin)
+                 ? resolveAxis(instance, ctx, window.span, r.origin)
                  : glm::vec3(0.0f, 1.0f, 0.0f);
     // A hero lends its accent to an effect that did not state a colour of its own. "Did not
     // state" is the appearance still being the default white, which is what the Rainbow style
@@ -623,31 +619,95 @@ std::optional<ResolvedWave> resolveWave(const EffectInstance& instance, const Ef
     return r;
 }
 
+} // namespace
+
+std::optional<ResolvedWave> resolveWave(const EffectInstance& instance, const EffectContext& ctx) {
+    if (!instance.enabled || !isWave(instance)) {
+        return std::nullopt;
+    }
+    const auto window = activeWindow(instance, ctx);
+    if (!window) {
+        return std::nullopt;
+    }
+    return resolveFront(instance, ctx, *window);
+}
+
+std::size_t resolveWaveFronts(const EffectInstance& instance, const EffectContext& ctx, std::span<ResolvedWave> out) {
+    if (out.empty() || !instance.enabled || !isWave(instance)) {
+        return 0;
+    }
+    // ADR-981. A trigger with a lifetime: each event is its own front, from the newest back, for as
+    // long as its own lifetime lasts. Until this, the activation window was the LATEST event's and
+    // nothing else, so the next trigger removed the previous ring in the frame it fired -- on
+    // Glowmere Valley 3's hero pulses (a 4.5 s ring, a trigger every 1.85 s bar) every ring vanished
+    // 40% of the way out. The newest front's window is exactly the one `resolveActivationWindow`
+    // gives, so a pulse whose rings never overlap is the pulse it always was.
+    const Timing& timing = instance.timing;
+    if (instance.activation == Activation::Trigger && timing.lifetime > 0.0 && ctx.triggers != nullptr) {
+        std::array<double, kMaxWaveFronts> events{};
+        const std::string_view owner = instance.owner.kind == EffectTarget::Entity
+                                           ? std::string_view(instance.owner.name)
+                                           : std::string_view();
+        const std::size_t ask = std::min(events.size(), out.size());
+        const std::size_t n =
+            ctx.triggers->lastTriggers(timing.trigger, owner, ctx.seconds, std::span<double>(events.data(), ask));
+        std::size_t written = 0;
+        for (std::size_t k = 0; k < n && written < out.size(); ++k) {
+            const double end = events[k] + timing.delay + timing.lifetime;
+            if (ctx.seconds >= end) {
+                break; // one lifetime for every event: the older ones are over too
+            }
+            if (const auto r = resolveFront(instance, ctx, ActivationWindow{events[k], end, nullptr})) {
+                out[written++] = *r;
+            }
+        }
+        return written;
+    }
+    if (const auto r = resolveWave(instance, ctx)) {
+        out[0] = *r;
+        return 1;
+    }
+    return 0;
+}
+
 std::size_t resolveWaves(std::span<const EffectInstance> effects, const EffectContext& ctx,
                          std::span<ResolvedWave> out, std::span<const std::uint32_t> order,
                          std::span<EffectStatus> status) {
     std::size_t written = 0;
     const std::size_t n = order.empty() ? effects.size() : order.size();
-    for (std::size_t walk = 0; walk < n; ++walk) {
-        const std::size_t at = order.empty() ? walk : order[walk];
-        if (at >= effects.size() || !isWave(effects[at])) {
-            continue;
-        }
-        const EffectInstance& e = effects[at];
-        EffectStatus said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
-        if (const auto r = resolveWave(e, ctx)) {
-            // ADR-702: the ninth live wave used to be dropped by a bare `break`, and the header
-            // above said it was "dropped with a warning". It is now dropped AND reported, per
-            // instance, where the Effects panel draws it.
-            if (written < out.size()) {
-                out[written++] = *r;
-                said = EffectStatus::Drawn;
-            } else {
-                said = EffectStatus::Dropped;
+    std::array<ResolvedWave, kMaxWaveFronts> fronts{};
+    // Two passes (ADR-981): every instance's newest front first, then the earlier fronts, so a slot a
+    // new pulse needs is never held by an old ring on its way out. The fronts are a pure function of
+    // the second, so asking twice costs arithmetic and changes nothing.
+    for (int pass = 0; pass < 2; ++pass) {
+        for (std::size_t walk = 0; walk < n; ++walk) {
+            const std::size_t at = order.empty() ? walk : order[walk];
+            if (at >= effects.size() || !isWave(effects[at])) {
+                continue;
             }
-        }
-        if (at < status.size()) {
-            status[at] = said;
+            const EffectInstance& e = effects[at];
+            const std::size_t live = resolveWaveFronts(e, ctx, fronts);
+            if (pass == 1) {
+                for (std::size_t k = 1; k < live && written < out.size(); ++k) {
+                    out[written++] = fronts[k];
+                }
+                continue;
+            }
+            EffectStatus said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
+            if (live > 0) {
+                // ADR-702: the ninth live wave used to be dropped by a bare `break`, and the header
+                // above said it was "dropped with a warning". It is now dropped AND reported, per
+                // instance, where the Effects panel draws it.
+                if (written < out.size()) {
+                    out[written++] = fronts[0];
+                    said = EffectStatus::Drawn;
+                } else {
+                    said = EffectStatus::Dropped;
+                }
+            }
+            if (at < status.size()) {
+                status[at] = said;
+            }
         }
     }
     return written;

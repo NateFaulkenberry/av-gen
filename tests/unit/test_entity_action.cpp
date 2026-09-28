@@ -891,6 +891,105 @@ TEST_CASE("a character hovering at the walk/run threshold does not flicker", "[e
     CHECK(flicker.changes() > 500);
 }
 
+// ---- ADR-982: a start from rest steps as soon as the body is not standing --------------------------
+
+namespace {
+
+// Glowmere Valley 3's Sage: `moveEnter` is 0.1875 s of its own acceleration, `moveExit` half of it, and a
+// long dwell.
+entity::GaitSettings sageGait() {
+    entity::GaitSettings g;
+    g.walkSpeed = 3.0652f;
+    g.runSpeed = 7.3889f;
+    g.runEnter = 4.8f;
+    g.runExit = 3.1f;
+    g.moveEnter = 0.651f;
+    g.moveExit = 0.3255f;
+    g.accel = 3.472f;
+    g.decel = 4.774f;
+    g.minDwell = 0.6f;
+    return g;
+}
+
+} // namespace
+
+TEST_CASE("ADR-982: a body setting off from rest walks once it is over moveExit, not moveEnter",
+          "[entity][gait][adr982]") {
+    const entity::GaitSettings g = sageGait();
+    const double dt = 1.0 / 60.0;
+    entity::Gait gait;
+    // Standing for a second, then the mover asks for 3 m/s and the body accelerates towards it.
+    for (int i = 0; i < 60; ++i) {
+        gait.select(g, entity::Activity::Idle, 0.0f, 0.0f, dt);
+    }
+    REQUIRE(gait.current() == entity::Activity::Idle);
+    float speed = 0.0f;
+    int walkedAt = -1;
+    int overEnterAt = -1;
+    for (int i = 1; i <= 60; ++i) {
+        speed = entity::Gait::approach(speed, 3.0f, g.accel, g.decel, dt);
+        if (overEnterAt < 0 && speed > g.moveEnter) {
+            overEnterAt = i;
+        }
+        if (gait.select(g, entity::Activity::Walk, speed, 0.0f, dt) == entity::Activity::Walk && walkedAt < 0) {
+            walkedAt = i;
+        }
+    }
+    INFO("walked at frame " << walkedAt << ", the band's upper edge crossed at frame " << overEnterAt);
+    REQUIRE(walkedAt > 0);
+    // The frame the speed first exceeds moveExit (0.3255 at 3.472 m/s^2: the sixth), and the old rule
+    // would have waited for moveEnter (the twelfth): the control that the fixture exercises the band.
+    CHECK(walkedAt == 6);
+    CHECK(overEnterAt == 12);
+}
+
+TEST_CASE("ADR-982: a start inside the dwell still steps at once", "[entity][gait][adr982]") {
+    // Walk, stop dead, and set off again 0.2 s later: `minDwell` 0.6 would hold the standing clip for
+    // 0.4 s more while the body gathers pace. Coming to rest is what makes it a start.
+    const entity::GaitSettings g = sageGait();
+    const double dt = 1.0 / 60.0;
+    entity::Gait gait;
+    for (int i = 0; i < 60; ++i) {
+        gait.select(g, entity::Activity::Walk, 2.0f, 0.0f, dt);
+    }
+    REQUIRE(gait.current() == entity::Activity::Walk);
+    for (int i = 0; i < 12; ++i) { // 0.2 s at rest
+        gait.select(g, entity::Activity::Idle, 0.0f, 0.0f, dt);
+    }
+    REQUIRE(gait.current() == entity::Activity::Idle);
+    REQUIRE(gait.dwell() < g.minDwell);
+    float speed = 0.0f;
+    int steppedAt = -1;
+    for (int i = 1; i <= 30 && steppedAt < 0; ++i) {
+        speed = entity::Gait::approach(speed, 3.0f, g.accel, g.decel, dt);
+        if (gait.select(g, entity::Activity::Walk, speed, 0.0f, dt) == entity::Activity::Walk) {
+            steppedAt = i;
+        }
+    }
+    CHECK(steppedAt == 6);
+}
+
+TEST_CASE("ADR-982: a body hovering at the band gets no start, so the dwell still bounds it",
+          "[entity][gait][adr982]") {
+    // Walking, then a speed that jitters about moveExit and never comes to rest: not a start. The
+    // gait may leave the walk, but the dwell holds every change, exactly as before.
+    const entity::GaitSettings g = sageGait();
+    const double dt = 1.0 / 60.0;
+    entity::Gait gait;
+    for (int i = 0; i < 60; ++i) {
+        gait.select(g, entity::Activity::Walk, 2.0f, 0.0f, dt);
+    }
+    const std::uint32_t before = gait.changes();
+    for (int i = 0; i < 600; ++i) { // ten seconds
+        const float jitter = g.moveExit + (i % 2 == 0 ? 0.08f : -0.08f);
+        gait.select(g, entity::Activity::Walk, jitter, 0.0f, dt);
+    }
+    // Ten seconds of a 0.6 s dwell allows at most 17 changes; a hover the start rule caught would
+    // re-enter the walk every frame it rose over the band.
+    INFO(gait.changes() - before << " changes");
+    CHECK(gait.changes() - before <= 2);
+}
+
 TEST_CASE("a gait still changes when the speed really changes", "[entity][gait]") {
     // The other half of the hysteresis contract: a band that never lets go is a latch, and a
     // character that never breaks into a run is as wrong as one that flickers.

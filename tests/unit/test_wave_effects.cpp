@@ -21,6 +21,7 @@
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "world/wave_effect.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -625,15 +626,20 @@ TEST_CASE("no more than the GPU limit of effects is ever written", "[world][effe
     const auto heroes = twoHeroes();
     const std::vector<world::ShotSpan> none;
     std::vector<world::EffectInstance> many;
-    for (int i = 0; i < 12; ++i) {
+    // More live instances than there are slots, whatever the slot count is (ADR-981 took it 8 -> 16;
+    // a fixed twelve would have stopped exceeding it and passed by filling nothing).
+    const int count = static_cast<int>(world::kMaxGpuWaves) + 4;
+    for (int i = 0; i < count; ++i) {
         world::EffectInstance e = wave("e" + std::to_string(i));
         e.wave.propagation.direction = world::DirectionMode::Explicit;
         e.timing.fadeIn = 0.0;
         many.push_back(e);
     }
     world::WaveFrame frame{};
-    world::buildWaveFrame(many, contextAt(1.0, none, heroes, scene), frame);
+    std::vector<world::EffectStatus> status(many.size(), world::EffectStatus::Dormant);
+    world::buildWaveFrame(many, contextAt(1.0, none, heroes, scene), frame, {}, status);
     CHECK(frame.count == world::kMaxGpuWaves);
+    CHECK(std::count(status.begin(), status.end(), world::EffectStatus::Dropped) == 4);
 }
 
 TEST_CASE("a style configures parameters and nothing else", "[world][effects][presets]") {
@@ -971,4 +977,151 @@ TEST_CASE("a pulse's beat response is an ordinary modulation route", "[world][ef
     CHECK(routes[0].source == "beat.pulse");
     CHECK(routes[0].target == "fx/hero-pulse/intensity");
     CHECK(routes[0].amount > 0.0f);
+}
+
+// ---- ADR-981: a trigger keeps every ring it fired, each for its own lifetime ----------------------
+
+namespace {
+
+// Glowmere Valley 3's hero pulse, as `tools/gv3/look.py` sets it up -- a ring from its owner on a cue
+// marker every bar, 4.5 s of life, 13 m/s -- reduced to what the rule is about.
+world::EffectInstance barPulse(const std::string& id, double lifetime = 4.5) {
+    world::EffectInstance e = wave(id);
+    e.activation = world::Activation::Trigger;
+    e.timing.trigger.source = world::TriggerSource::TimelineMarker;
+    e.timing.trigger.name = "hero pulse " + id;
+    e.timing.delay = 0.0;
+    e.timing.fadeIn = 0.15;
+    e.timing.fadeOut = 1.2;
+    e.timing.lifetime = lifetime;
+    e.timing.repeatSeconds = 0.0;
+    e.wave.propagation.speed = 13.0f;
+    e.wave.propagation.range = 58.0f;
+    return e;
+}
+
+constexpr double kBar = 4.0 * 60.0 / 130.0; // one bar at 130 BPM: a marker every 1.846 s
+
+// Eight markers a bar apart from 1.0 s, for each id.
+world::TriggerClock barClock(const std::vector<std::string>& ids) {
+    world::TriggerClock clock;
+    std::vector<world::TriggerMarker> markers;
+    for (const std::string& id : ids) {
+        for (int k = 0; k < 8; ++k) {
+            markers.push_back(world::TriggerMarker{1.0 + (k * kBar), "hero pulse " + id});
+        }
+    }
+    clock.setMarkers(markers);
+    return clock;
+}
+
+} // namespace
+
+TEST_CASE("ADR-981: a pulse fired again keeps the ring it fired before", "[world][effects][timing][adr981]") {
+    const FakeScene scene;
+    const auto heroes = twoHeroes();
+    const std::vector<world::ShotSpan> none;
+    const world::EffectInstance pulse = barPulse("p");
+    const world::TriggerClock clock = barClock({"p"});
+    const auto at = [&](double t) {
+        world::EffectContext ctx = contextAt(t, none, heroes, scene);
+        ctx.triggers = &clock;
+        return ctx;
+    };
+    std::array<world::ResolvedWave, world::kMaxWaveFronts> fronts{};
+
+    SECTION("before the second marker there is one ring") {
+        REQUIRE(world::resolveWaveFronts(pulse, at(1.5), fronts) == 1);
+        CHECK_THAT(fronts[0].frontDistance, WithinRel(13.0f * 0.5f, 1e-4f));
+    }
+    SECTION("the second marker starts a ring beside the first, which runs on untouched") {
+        const double t = 1.0 + kBar + 0.5;
+        REQUIRE(world::resolveWaveFronts(pulse, at(t), fronts) == 2);
+        // Newest first: the new ring half a second out, the old one where it would have been anyway.
+        CHECK_THAT(fronts[0].frontDistance, WithinRel(13.0f * 0.5f, 1e-4f));
+        CHECK_THAT(fronts[1].frontDistance, WithinRel(13.0f * static_cast<float>(kBar + 0.5), 1e-4f));
+        // At full strength: not reset, not faded by the new one.
+        CHECK(fronts[1].envelope == 1.0f);
+        // The control: before ADR-981 the old ring did not exist at this second. The single-front
+        // resolver is that rule, and it sees only the new ring.
+        const auto single = world::resolveWave(pulse, at(t));
+        REQUIRE(single.has_value());
+        CHECK_THAT(single->frontDistance, WithinRel(13.0f * 0.5f, 1e-4f));
+    }
+    SECTION("the newest ring is exactly the one the single-front resolver gives") {
+        for (const double t : {1.2, 3.4, 5.1, 7.9, 12.6}) {
+            REQUIRE(world::resolveWaveFronts(pulse, at(t), fronts) >= 1);
+            const auto single = world::resolveWave(pulse, at(t));
+            REQUIRE(single.has_value());
+            CHECK(single->frontDistance == fronts[0].frontDistance);
+            CHECK(single->envelope == fronts[0].envelope);
+            CHECK(single->elapsed == fronts[0].elapsed);
+        }
+    }
+    SECTION("an old ring fades over its own last second and then is gone") {
+        // The first ring lives [1.0, 5.5) and starts fading at 4.3; rings from 2.846 and 4.692 are up.
+        REQUIRE(world::resolveWaveFronts(pulse, at(5.2), fronts) == 3);
+        CHECK(fronts[2].envelope > 0.0f);
+        CHECK(fronts[2].envelope < 0.5f);
+        CHECK(fronts[1].envelope == 1.0f);
+        CHECK(world::resolveWaveFronts(pulse, at(5.51), fronts) == 2);
+    }
+    SECTION("a pulse with no lifetime lives until the next trigger, as it always did") {
+        const world::EffectInstance open = barPulse("p", 0.0);
+        CHECK(world::resolveWaveFronts(open, at(1.0 + kBar + 0.5), fronts) == 1);
+    }
+    SECTION("no clock, no rings") {
+        CHECK(world::resolveWaveFronts(pulse, contextAt(3.4, none, heroes, scene), fronts) == 0);
+    }
+}
+
+TEST_CASE("ADR-981: a new pulse takes a slot before an old ring does", "[world][effects][gpu][adr981]") {
+    const FakeScene scene;
+    const auto heroes = twoHeroes();
+    const std::vector<world::ShotSpan> none;
+    // Ten pulses, each with two live rings at 3.346 s: twenty fronts for sixteen slots.
+    std::vector<world::EffectInstance> pulses;
+    std::vector<std::string> ids;
+    for (int i = 0; i < 10; ++i) {
+        ids.push_back("p" + std::to_string(i));
+        pulses.push_back(barPulse(ids.back()));
+    }
+    const world::TriggerClock clock = barClock(ids);
+    world::EffectContext ctx = contextAt(1.0 + kBar + 0.5, none, heroes, scene);
+    ctx.triggers = &clock;
+    std::array<world::ResolvedWave, world::kMaxGpuWaves> out{};
+    std::vector<world::EffectStatus> status(pulses.size(), world::EffectStatus::Dormant);
+    REQUIRE(world::resolveWaves(pulses, ctx, out, {}, status) == world::kMaxGpuWaves);
+    CHECK(std::count(status.begin(), status.end(), world::EffectStatus::Drawn) == 10);
+    // Every pulse's NEW ring is drawn; the six old rings that fit are the ones left over.
+    for (const world::EffectInstance& p : pulses) {
+        const bool newest = std::any_of(out.begin(), out.end(), [&](const world::ResolvedWave& r) {
+            return r.effect == &p && std::abs(r.frontDistance - 6.5f) < 1e-3f;
+        });
+        CHECK(newest);
+    }
+}
+
+TEST_CASE("ADR-981: overlapping rings are a pure function of the second", "[world][effects][determinism][adr981]") {
+    const FakeScene scene;
+    const auto heroes = twoHeroes();
+    const std::vector<world::ShotSpan> none;
+    const std::array effects{barPulse("a"), barPulse("b")};
+    const world::TriggerClock clock = barClock({"a", "b"});
+    const auto frameAt = [&](double t, world::WaveFrame& frame) {
+        world::EffectContext ctx = contextAt(t, none, heroes, scene);
+        ctx.triggers = &clock;
+        world::buildWaveFrame(effects, ctx, frame);
+    };
+    world::WaveFrame realtime{};
+    world::WaveFrame offline{};
+    for (int i = 0; i <= 120 * 9; ++i) {
+        frameAt(i / 120.0, realtime);
+    }
+    for (int i = 0; i <= 30 * 9; ++i) {
+        frameAt(i / 30.0, offline);
+    }
+    REQUIRE(realtime.count == offline.count);
+    CHECK(realtime.count > 2); // two pulses with overlapping rings at 9 s, or this proves nothing
+    CHECK(std::memcmp(realtime.effects, offline.effects, sizeof(realtime.effects)) == 0);
 }

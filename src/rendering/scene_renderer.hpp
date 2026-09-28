@@ -354,7 +354,7 @@ struct FrameUniforms {
     // last, for the reason every block above was.
     glm::vec4 fogSky{0.0f};
 };
-// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
+// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
@@ -383,12 +383,12 @@ static_assert(offsetof(FrameUniforms, wind) == 576);
 static_assert(offsetof(FrameUniforms, lights) == 640);
 static_assert(offsetof(FrameUniforms, waveCount) == 1152);
 static_assert(offsetof(FrameUniforms, waves) == 1168);
-static_assert(offsetof(FrameUniforms, atmosCount) == 2320);
-static_assert(offsetof(FrameUniforms, comets) == 2336);
-static_assert(offsetof(FrameUniforms, auroras) == 3296);
-// ADR-939: 3744 + 2 x 16. The aurora block grew one vec4 (its glints' depth), so everything after
+static_assert(offsetof(FrameUniforms, atmosCount) == 3472); // ADR-981: 16 waves, +1152
+static_assert(offsetof(FrameUniforms, comets) == 3488);
+static_assert(offsetof(FrameUniforms, auroras) == 4448);
+// ADR-939: 3744 + 2 x 16 (ADR-981: +1152 for the eight more wave slots). The aurora block grew one vec4 (its glints' depth), so everything after
 // `auroras` moved by one vec4 per aurora; the WGSL mirror moved with it (test_renderer_layout_guards).
-static_assert(offsetof(FrameUniforms, skyGround) == 3776);
+static_assert(offsetof(FrameUniforms, skyGround) == 4928);
 
 struct ObjectUniforms {
     glm::mat4 model;

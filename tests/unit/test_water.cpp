@@ -491,3 +491,190 @@ TEST_CASE("the CPU cost of a floating layer", "[.water-cost][unit][water]") {
                               << " bodies in " << ms << " ms per frame (" << out.size() << " placed)");
     CHECK(ms < 5.0); // a floating layer that costs more than this is not a floating layer any more
 }
+
+// ---- ADR-980: the water sheet meets the bank where the world does -------------------------------
+
+namespace {
+
+// A steep stream between rising banks, like Glowmere Valley 3's falls: the level falls 0.8 m for
+// every metre down +z along a straight channel at x = 0, and a flat feature carries the ground 3 m
+// above the level on either side, so the water ends at a real bank rather than at the edge of the
+// river's reach. The channel is 3 m deep at its centre and meets the level 4 m out.
+constexpr float kSteepDrop = 0.8f;
+float steepLevel(float z) { return 45.0f - kSteepDrop * (z + 60.0f); }
+
+world::WorldMap steepStream() {
+    world::WorldMap map;
+    map.name = "steep";
+    map.size = {96.0f, 96.0f};
+    map.layers = {{0.02f, 0.0f, 0.0f, 0.0f}};
+    world::Feature banks;
+    banks.name = "banks";
+    banks.kind = world::FeatureKind::Flat;
+    banks.width = 60.0f;
+    banks.falloff = 0.5f;
+    banks.flatten = 1.0f;
+    banks.roughness = 0.0f;
+    banks.smoothing = 0;
+    banks.path = {{0.0f, steepLevel(-60.0f) + 3.0f, -60.0f}, {0.0f, steepLevel(60.0f) + 3.0f, 60.0f}};
+    world::Feature run;
+    run.name = "run";
+    run.kind = world::FeatureKind::River;
+    run.width = 8.0f;
+    run.amplitude = 3.0f;
+    run.falloff = 1.0f;
+    run.flatten = 0.0f;
+    run.roughness = 0.0f;
+    run.smoothing = 0;
+    run.water = true;
+    run.path = {{0.0f, steepLevel(-60.0f), -60.0f}, {0.0f, steepLevel(60.0f), 60.0f}};
+    map.features = {banks, run};
+    map.prepare();
+    return map;
+}
+
+world::TerrainSettings glowmereGrid() {
+    world::TerrainSettings settings;
+    settings.chunkSize = 24.0f;
+    settings.resolution = 20; // 1.2 m cells, Glowmere's
+    return settings;
+}
+
+bool worldWet(const world::WorldMap& map, glm::vec2 p) {
+    const float surface = map.waterSurface(p);
+    return surface > -999.0f && map.height(p) < surface;
+}
+
+} // namespace
+
+TEST_CASE("ADR-980: a dry corner on a steep course sits at its own row's level, not the row upstream",
+          "[unit][water][adr980]") {
+    const world::WorldMap map = steepStream();
+    const world::TerrainSettings settings = glowmereGrid();
+    const float step = settings.chunkSize / static_cast<float>(settings.resolution);
+    int dryCorners = 0;
+    float worst = 0.0f;
+    float oldWorst = 0.0f; // what the old rule, the highest wet neighbour, gives the same corners
+    for (const glm::ivec2 coord : world::chunkGrid(map, settings)) {
+        const scene::MeshData mesh = world::buildChunkWater(map, settings, coord);
+        if (!mesh.valid()) {
+            continue;
+        }
+        std::vector<bool> used(mesh.vertices.size(), false);
+        for (const std::uint32_t i : mesh.indices) {
+            used[i] = true;
+        }
+        for (std::size_t k = 0; k < mesh.vertices.size(); ++k) {
+            const scene::Vertex& v = mesh.vertices[k];
+            if (!used[k] || v.uv.x > 0.0f) {
+                continue; // not drawn, or wet
+            }
+            const glm::vec2 p(v.position.x, v.position.z);
+            if (worldWet(map, p)) {
+                continue;
+            }
+            ++dryCorners;
+            worst = std::max(worst, std::fabs(v.position.y - steepLevel(p.y)));
+            float highest = -1e9f;
+            for (int dz = -1; dz <= 1; ++dz) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const glm::vec2 q = p + glm::vec2(static_cast<float>(dx), static_cast<float>(dz)) * step;
+                    if ((dx != 0 || dz != 0) && worldWet(map, q)) {
+                        highest = std::max(highest, map.waterSurface(q));
+                    }
+                }
+            }
+            if (highest > -1e8f) {
+                oldWorst = std::max(oldWorst, highest - steepLevel(p.y));
+            }
+        }
+    }
+    INFO(dryCorners << " dry corners; worst departure from their own level " << worst << " m; the old rule's "
+                    << oldWorst << " m");
+    REQUIRE(dryCorners > 40);
+    // The control: on this course the old rule lifted the edge by most of a cell's descent (0.96 m).
+    CHECK(oldWorst > 0.6f);
+    CHECK(worst < 0.1f);
+}
+
+TEST_CASE("ADR-980: a still pool's dry corners are at the pool's level, exactly", "[unit][water][adr980]") {
+    // The case the old rule was right about, and must still be right about bit for bit: every wet
+    // point is at one level, so the fit is that level.
+    world::WorldMap map;
+    map.name = "pool";
+    map.size = {96.0f, 96.0f};
+    map.baseHeight = 5.0f; // the ground stands above the pool, so it ends at a bank
+    map.layers = {{0.02f, 1.5f, 0.0f, 0.0f}};
+    world::Feature pool;
+    pool.name = "pool";
+    pool.kind = world::FeatureKind::Flat;
+    pool.width = 18.0f;
+    pool.falloff = 1.0f;
+    pool.flatten = 1.0f;
+    pool.roughness = 0.1f;
+    pool.smoothing = 0;
+    pool.water = true;
+    pool.waterDepth = 1.5f;
+    pool.path = {{0.0f, 2.0f, 0.0f}};
+    map.features = {pool};
+    map.prepare();
+    const world::TerrainSettings settings = glowmereGrid();
+    const float level = map.waterSurface(glm::vec2(0.0f));
+    REQUIRE(level > 0.0f);
+    int drawn = 0;
+    for (const glm::ivec2 coord : world::chunkGrid(map, settings)) {
+        const scene::MeshData mesh = world::buildChunkWater(map, settings, coord);
+        if (!mesh.valid()) {
+            continue;
+        }
+        for (const std::uint32_t i : mesh.indices) {
+            CHECK(mesh.vertices[i].position.y == level);
+            ++drawn;
+        }
+    }
+    CHECK(drawn > 100);
+}
+
+TEST_CASE("ADR-980: two chunks that share a border give its corners one height", "[unit][water][adr980]") {
+    // A dry corner on a chunk's edge is fitted to the neighbourhood on BOTH sides of the seam, from
+    // either chunk; the old rule saw only its own chunk's half, so the two copies could disagree.
+    const world::WorldMap map = steepStream();
+    world::TerrainSettings settings = glowmereGrid();
+    settings.chunkSize = 16.8f; // 14 cells, so seams cross the channel and run along its banks
+    settings.resolution = 14;
+    const int res = settings.resolution;
+    const int side = res + 1;
+    int shared = 0;
+    float worst = 0.0f;
+    for (const glm::ivec2 coord : world::chunkGrid(map, settings)) {
+        for (const glm::ivec2 d : {glm::ivec2(1, 0), glm::ivec2(0, 1)}) {
+            const scene::MeshData a = world::buildChunkWater(map, settings, coord);
+            const scene::MeshData b = world::buildChunkWater(map, settings, coord + d);
+            if (!a.valid() || !b.valid()) {
+                continue;
+            }
+            std::vector<bool> usedA(a.vertices.size(), false);
+            std::vector<bool> usedB(b.vertices.size(), false);
+            for (const std::uint32_t i : a.indices) {
+                usedA[i] = true;
+            }
+            for (const std::uint32_t i : b.indices) {
+                usedB[i] = true;
+            }
+            for (int k = 0; k <= res; ++k) {
+                // A's far edge against B's near edge.
+                const int ia = d.x == 1 ? (k * side + res) : (res * side + k);
+                const int ib = d.x == 1 ? (k * side) : k;
+                if (!usedA[static_cast<std::size_t>(ia)] || !usedB[static_cast<std::size_t>(ib)]) {
+                    continue;
+                }
+                ++shared;
+                worst = std::max(worst, std::fabs(a.vertices[static_cast<std::size_t>(ia)].position.y -
+                                                  b.vertices[static_cast<std::size_t>(ib)].position.y));
+            }
+        }
+    }
+    INFO(shared << " shared border corners, worst disagreement " << worst << " m");
+    REQUIRE(shared > 20);
+    CHECK(worst < 1e-3f);
+}

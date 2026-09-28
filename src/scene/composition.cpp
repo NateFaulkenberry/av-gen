@@ -9302,7 +9302,12 @@ void Composition::updateTerrainLod() {
             // recorded rather than deleted because a comment that contradicts the code thirty lines
             // above it is a specific kind of trap: it reads as authority, and the next person to
             // touch terrain LOD would have plumbed in a viewport that was already there.
-            const int lod = lodEnabled ? world::chunkLod(settings, distance, projScale) : 0;
+            int lod = lodEnabled ? world::chunkLod(settings, distance, projScale) : 0;
+            // ADR-980: a chunk that carries water keeps its ground fine enough that the drawn bank
+            // meets the drawn sheet where the world's does; a coarse bank pokes up through the river.
+            if (chunk.water != kInvalidMesh) {
+                lod = std::min(lod, world::kWaterChunkMaxLod);
+            }
             const MeshId mesh = chunk.meshes[static_cast<std::size_t>(std::clamp(lod, 0, kMaxTerrainLodIndex))];
             if (mesh != kInvalidMesh) {
                 e.mesh = mesh;

@@ -56,8 +56,9 @@ SINK = 0.10  # metres a stem's lowest ground-contact point is sunk below the sur
 # are 16 m wide because at 12 their water narrowed to 8 m on the steepest pitch, and there the nav
 # grid's sampled walks disagreed with the world: the grid is then not trusted, and every walkability
 # query in the film stays analytic. Their amplitude is 4 m because where the falls meet the river the
-# two surfaces blend by weight, and a shallower bed let the blend fall below it (a dry gap). A low
-# ridge puts the north-east shoulder's crest inside the world, where the boundary had cut it flat.
+# two surfaces blend by weight, and a shallower bed let the blend fall below it (a dry gap); since the
+# art pass the two meet on the valley floor (JUNCTION_ALONG), where their levels agree. A low ridge puts
+# the north-east shoulder's crest inside the world, where the boundary had cut it flat.
 # South: the banks end at their eleventh point (z 244), so beyond it only the corridor flattens (0.55)
 # and the southern rim stands at 45% of its height across the end; a low sill and a ridge on the
 # south-east shoulder close the rest. The river keeps its whole course -- that course is what holds
@@ -75,6 +76,18 @@ NORTH_FALLS = {"name": "glowmere-falls", "kind": "river",
                "path": [[-58.0, 48.0, -352.0], [-58.0, 43.5, -322.0], [-58.0, 24.0, -300.0], [-58.0, 12.8, -286.0]],
                "width": 16.0, "amplitude": 4.0, "falloff": 0.85, "flatten": 0.85, "roughness": 0.1,
                "water": True, "waterDepth": 0.0, "smoothing": 3}  # ends on the river's new head, level for level
+# Where the falls hand over to the river (the art pass, 2026-09-28; the owner: the hill water "does not
+# properly connect to the existing river"). The two surfaces blend by weight wherever both reach, and a
+# river reaches `width` metres past its first point in every direction: with the river starting at the
+# falls' foot, its 26 m cap reached up the head's face to z -312, where the falls stand 15-20 m above the
+# river's 12.8. The blend dragged the falls' water 1.6-3.8 m below the falls' own level from z -308 to
+# -292, and on the steepest pitch that left it 1 m deep and 8 m wide (`avgen_water_probe`, the
+# cross-sections in art-pass/PROGRESS.md): a neck the shore fade turns half transparent, between the
+# falls above and a basin below. So the river now starts a quarter of the way down its own first
+# segment, on the valley floor, and the falls run on to meet it there, level for level: the cap reaches
+# only the falls' last, gentle metres. The river's course beyond mid(P1, P2) (z -187) is the same curve,
+# so the filmed valley is untouched; its flow speed stays pinned below.
+JUNCTION_ALONG = 0.25
 NORTH_EAST_SHOULDER = {"name": "north-east-shoulder", "kind": "ridge",
                        "path": [[20.0, 0.0, -298.0], [60.0, 0.0, -300.0], [110.0, 0.0, -298.0]],
                        "width": 32.0, "amplitude": 16.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
@@ -146,13 +159,19 @@ def close_ends(scene, report):
     source_speed = flow_speed(river)
     banks["path"] = [list(p) for p in NORTH_BANKS_HEAD] + banks["path"][1:SOUTH_BANKS_POINTS]
     river["path"] = river["path"][1:]
-    world["features"].extend(copy.deepcopy(list(ADDED)))
+    added = copy.deepcopy(list(ADDED))
+    # The junction (JUNCTION_ALONG): the river starts on its own first segment, and the falls end there.
+    a, b = river["path"][0], river["path"][1]
+    junction = [round(a[k] + (b[k] - a[k]) * JUNCTION_ALONG, 4) for k in range(3)]
+    river["path"][0] = junction
+    next(f for f in added if f["name"] == NORTH_FALLS["name"])["path"].append(junction)
+    world["features"].extend(added)
     flow = terrain["terrain"].setdefault("flow", {})
     if flow.get("speedOverride", 0.0) == 0.0:
         flow["speedOverride"] = source_speed
-    report.append(f"valley ends closed: the north head, with the river now starting at its foot and "
-                  f"'glowmere-falls' coming down it; the south's banks ending at z 244, a low sill; "
-                  f"the river's flow held at the source course's {source_speed:.4f} m/s")
+    report.append(f"valley ends closed: the north head, 'glowmere-falls' coming down it into the river on the "
+                  f"valley floor at ({junction[0]:.1f}, {junction[2]:.1f}); the south's banks ending at z 244, a "
+                  f"low sill; the river's flow held at the source course's {source_speed:.4f} m/s")
 
 
 def mushrooms(scene):

@@ -30,16 +30,33 @@ void Gait::reset() {
     changes_ = 0;
     moving_ = false;
     running_ = false;
+    restedSinceStep_ = true;
 }
 
 Activity Gait::select(const GaitSettings& settings, Activity proposed, float speed, float turnRate,
                       double dt) {
     dwell_ += dt;
 
+    // ADR-982: a START is not a hover. The band below exists for a body whose speed sits on the
+    // boundary -- steering round a trunk, walking a slope -- and it does that job. But a body that
+    // came to rest and now sets off crosses the band once, upward, and every frame it spends inside
+    // it plays a STANDING clip while the ground goes by: planted feet sliding. Glowmere Valley 3's
+    // aliens enter at `moveEnter` = 0.1875 s of their own acceleration, and with a turn on the spot
+    // and the dwell on top, measured (`avgen_foot_probe`), Rook's feet slid 0.4-0.5 m over 0.38 s of
+    // `Idle` and `Idle_turn` before its walk began. So a standing gait that has rested since its
+    // last step enters the stepping one as soon as the body is over `moveExit` -- no longer standing
+    // by its own definition -- and the dwell does not hold it back. A body jittering about the band
+    // never comes to rest, so it never meets this rule, and the hysteresis and dwell still bound it.
+    if (speed <= kTurnRestSpeed) {
+        restedSinceStep_ = true;
+    }
+    const bool standing = gait_ == Activity::Idle || gait_ == Activity::Turn;
+    const bool starting = standing && restedSinceStep_ && speed > settings.moveExit;
+
     // The bands, read in the direction the body is actually going. `moving_` and `running_` are
     // the memory that makes them bands rather than thresholds.
     const float moveThreshold = moving_ ? settings.moveExit : settings.moveEnter;
-    moving_ = speed > moveThreshold;
+    moving_ = speed > moveThreshold || starting;
     if (moving_) {
         const float runThreshold = running_ ? settings.runExit : settings.runEnter;
         running_ = speed > runThreshold;
@@ -81,13 +98,17 @@ Activity Gait::select(const GaitSettings& settings, Activity proposed, float spe
     // The dwell. A change is refused while the current gait is younger than `minDwell`, which is
     // what stops a body accelerating across the band from switching twice in three frames. Not
     // applied to the first decision after a reset (dwell_ starts at 0 and the gait starts Idle,
-    // so a character that begins walking begins walking).
-    if (changes_ > 0 && dwell_ < static_cast<double>(settings.minDwell)) {
+    // so a character that begins walking begins walking), nor to a start from rest (ADR-982, above).
+    const bool stepping = wanted == Activity::Walk || wanted == Activity::Run;
+    if (changes_ > 0 && dwell_ < static_cast<double>(settings.minDwell) && !(starting && stepping)) {
         return gait_;
     }
     gait_ = wanted;
     dwell_ = 0.0;
     ++changes_;
+    if (stepping) {
+        restedSinceStep_ = false;
+    }
     return gait_;
 }
 
