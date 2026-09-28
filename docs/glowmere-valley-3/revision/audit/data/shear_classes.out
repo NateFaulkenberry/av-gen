@@ -1,0 +1,19 @@
+smoothed centreline: 104 nodes, length 757.9 m, descent 26.0 m, course speed 0.412 m/s, halfWidth 26.0 m
+per-node turn: max 5.16 deg, mean |turn| 2.38 deg, nodes with |turn| > 2 deg: 48
+t = 33.7 s (today: offset = dir*speed*t, unbounded)
+  pool     n=   375  median   5.57  p95  12.53  max  15.63
+  segment  n=  7740  median   1.32  p95   1.65  max   2.25
+  smooth   n= 45857  median   1.18  p95   1.40  max   1.67
+t = 171.25 s (today: offset = dir*speed*t, unbounded)
+  pool     n=   375  median  28.11  p95  64.05  max  77.76
+  segment  n=  7740  median   3.32  p95   5.03  max   7.82
+  smooth   n= 45857  median   2.15  p95   3.77  max  12.32
+t = 214.6 s (today: offset = dir*speed*t, unbounded)
+  pool     n=   375  median  35.36  p95  80.20  max  97.36
+  segment  n=  7740  median   4.04  p95   6.20  max   9.61
+  smooth   n= 45857  median   2.51  p95   4.61  max  15.69
+any t, two-phase offset with an 8 s period (worst phase)
+  pool     n=   375  median   1.64  p95   3.45  max   4.16
+  segment  n=  7740  median   1.07  p95   1.15  max   1.28
+  smooth   n= 45857  median   1.04  p95   1.09  max   1.11
+wrote shear_map_171s.png (top-down, +z up; red = river/pool switch, amber = segment switch, blue = smooth bank shear, brighter = stronger)

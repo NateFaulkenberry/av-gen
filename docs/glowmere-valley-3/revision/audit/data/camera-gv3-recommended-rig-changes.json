@@ -1,0 +1,86 @@
+{
+ "s03": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s09": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s10": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s13": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true,
+  "followLagSeconds": "(delete)"
+ },
+ "s18": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true,
+  "followLagSeconds": "(delete)"
+ },
+ "s19": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true,
+  "followLagSeconds": "(delete)"
+ },
+ "s20": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s24": {
+  "followSmoothSeconds": 0.6,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 0.0
+ },
+ "s25": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.2,
+  "followLead": 1.0,
+  "followOffset": [
+   -7.0,
+   4.8,
+   2.5
+  ]
+ },
+ "s27": {
+  "followSmoothSeconds": 0.6,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 0.0
+ },
+ "s28": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s36": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true
+ },
+ "s38": {
+  "followSmoothSeconds": 0.3,
+  "followVerticalSmoothSeconds": 1.0,
+  "followLead": 1.0,
+  "followGround": true,
+  "followLagSeconds": "(delete)"
+ }
+}

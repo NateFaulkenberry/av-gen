@@ -1,0 +1,804 @@
+# Phase 3, gv3-world: the world edge and the offline configuration
+
+Stream gv3-world. Branch `gv3/world`, worktree `av-gen-gv3-world`, from `gv3/production` `334c4cf6`.
+Engine: the shared build `040d6644` for the analysis, then `ec515c8b` (main plus characters) for
+every trace and render up to W4. The world code (`src/world/`) is identical in the two builds except
+`effects/history_bank`, so the terrain measurements hold on both. **From W5 on: engine-3
+(`876a11e2`, render's ADR-917 to 919 and the gpu-lock fix), with `gv3/production` `37c1b65d` merged
+in (the cast recipe and the UFO set pieces, `ufo.py`).**
+
+**Where it stands.** W2 and W3 are the first closure, which the stills and a stricter check then
+failed (W4). The closure in the branch is W5's. W6 is the check on the merged cast.
+
+Files:
+- `tools/gv3/world.py`: `close_ends`, `Field`, and the `--check` CLI;
+- `tools/gv3/offline.py`: new;
+- about ten lines of `tools/make_glowmere_valley_3.py`, in four places: the usage line, the
+  `--final` and `--final-trace` flags, `world.close_ends(scene, report)` moved ahead of `Ground`, and
+  the call to `offline.apply`.
+
+## W0: what the edge is, measured
+
+**The geometry.** The WorldMap is a 640 m square. The terrain mesh stops at its chunk grid, which
+is 14 chunks of 48 m: [-320, 352] on both axes (`terrain.cpp` `chunkGrid`). The valley's corridor
+(300 m wide), river and banks all ran from z -352 to +352. So at both ends, the flattened valley
+floor reached the edge low:
+- north: 10-20 m, across x -130..20;
+- south: -7..+5 m, across x -80..90.
+
+The walls on either side stand 90-110 m high. Every wide looking up or down the valley met a flat
+line of sky. In the south, that line was *below* eye level.
+
+**The check.** `python3 tools/gv3/world.py --check [--trace cast.json]` marches 96 columns per view
+over the world's heightfield. The heightfield is the engine's own heights (`avgen_world_preview`
+probes) on a 2 m grid.
+
+A column shows an **open end** when all of these hold:
+- its skyline is ground within 6 m of the grid's boundary;
+- that ground is gentle (rise under 0.2 per metre over the last 20 m);
+- it is low (under 5 degrees above the eye);
+- it is inside the frame.
+
+That is the valley running out of the world. It excludes a wall's top cut by the boundary: those are
+high and steep, and read as a hilltop from anywhere below. Both are in the first pass's film, and
+nobody reads the second kind as an edge. (W4 adds a second condition: sky seen at or below the
+horizon, wherever the skyline is.)
+
+**The baseline** (the camera at every frame of the film, from `avgen_cast_trace --camera`, sampled
+every 0.5 s): **275 of 452 views show an open end, in 21 of 40 shots.**
+- North, the valley floor: s06, s09, s10, s12, s13, s14, s17, s18, s20, s21, s33, s37, s39 and s01's
+  right edge.
+- South: s04, s07, s08, s11, s22, s23 and s28.
+
+The brief's six wides are all in the first list. So are follow shots that nobody lists: s09, s10,
+s13, s18. The first pass's own stills agree, for example `revision/audit/reports/render-post.md`'s
+frames at 24.5, 62 and 78 s.
+
+## W1: why ridges alone cannot close it, and what can move
+
+The engine's height (`world_map.cpp` `heightUncached`):
+
+    h = mix(noise * roughness + sum(ridge raises), flattenTarget, flattenWeight)
+
+and then the water cuts. Within about 54 m of the river, the banks (flatten 0.8) and the corridor
+(0.55) together weigh 1 or more. **A ridge crossing the river is erased there**, whatever its
+amplitude. So each end has to be closed by changing what flattens it.
+
+Four constraints decide where each change can go.
+
+1. **The altitude every biome reads.** The terrain material and the default biomes read altitude as
+   (h - min) / (max - min) over a 97 x 97 survey of the map (`WorldMap::prepare`). If either extreme
+   moved, every plant's biome weight would move, and plants would appear and vanish all over the
+   valley.
+   - The minimum is the river bed at (19.8, 316.7), -12.977 m.
+   - The maximum is the north-west rim at (-310.1, -296.9), 118.893 m.
+   - A first candidate that re-levelled the corridor moved the maximum to 121.7 m and 2,060 survey
+     points. The corridor is therefore never touched. It is 300 m wide, and its far end reaches the
+     north-west corner.
+2. **The filmed valley.** A path's control point P_j reshapes its smoothed curve from
+   mid(P_j-2, P_j-1) to mid(P_j+1, P_j+2): three passes of Chaikin, checked numerically. A point's
+   level reads the curve only within 10 m of its nearest point.
+   - Re-levelling the banks' second point (z -286) moved the ground 1.7 cm at (-80, -136), where
+     bull-1 and horse-20 graze. Rejected.
+   - Every edit is made at or beyond the path's second point from its end.
+3. **The cast.** bull-10 and bull-21 graze at z -287..-245, x -100..-67: in the valley's north end,
+   300 m or more from any camera. The characters stream does not re-home them (only horse-2, horse-20,
+   horse-22, cow-12 and cow-23 go to the meadows). Nobody else goes north of z -145 or south of z 92,
+   apart from the saucer, which flies.
+4. **Scatter order (what cannot be helped).** Scatter rows run north to south (`ecology.cpp`). A
+   plant's hue jitter, glow multiplier and whether it is one of the specimens that stay dark are
+   keyed on its *index* in its layer (`procedural.cpp`, `materialVariation`). Its position, scale and
+   yaw are keyed on its cell. So any change to how many plants the northern rows accept re-deals the
+   glow for every plant south of them: the same plants in the same places, a different lottery for
+   which of them shine. This cannot be avoided by any closure of the north end in the terrain. The
+   per-layer counts are in W3.
+
+## W2: the first closure (commit `25c227dc`; replaced in W5)
+
+**North** (`world.py` `NORTH_*`):
+- **Banks:** the banks' first point is replaced by two, at levels 70 and 62. The band therefore
+  climbs north of the river's source instead of running flat to the edge.
+- **River:** in `25c227dc` the river started at its second point, (-58, 12.8, -286), in a pool at
+  the foot of the climb. That joined the valley's halves for the navigator (W2b, W2c). Since
+  `7259efad` it keeps its whole course, with its first point moved to (40, 15, -350), so its gorge
+  through the head turns east out of sight.
+- **Head ridge:** `north-head`, width 70, amplitude 70, spans the V from x -140 to 50 along
+  z -292..-306.
+- **Shoulder:** `north-shoulder`, width 50, amplitude 30, covers the east shoulder the head ridge
+  left open. A single feature has one amplitude, and carrying the head ridge further east lifted the
+  east wall above the survey's maximum, to 143.8 m.
+
+**South** (`SOUTH_*`):
+- **Banks:** the banks end at their eleventh point, (45, -4.6, 244). Beyond it only the corridor
+  flattens (0.55), so a ridge stands at 45% of its height.
+- **Sill:** `south-sill`, width 60, amplitude 70, spans the end from x -110 to 200 along z 328..342.
+  Its crest is about 17 m inside the edge, and the ground falls behind it.
+- **River:** the river keeps its whole course. That course is what holds the survey's minimum. It
+  leaves through a gorge in the sill. The gorge runs 14 degrees west of south and the cameras look 5
+  to 12 degrees east of it, so its walls close every line of sight within the sill.
+- A first sill that ran to x -200 lifted the south-west corner to 131 m. It was shortened.
+
+**Measured** (`world.py --check`):
+
+| | baseline | closed |
+|---|---|---|
+| views with an open end (traced camera, every 0.5 s) | 275 of 452, 21 shots | **0 of 452** |
+| views with an open end (fixed and keyed rigs, 5 per shot) | 60 of 120, 14 shots | 0 of 120 |
+| survey minimum | -12.977 | -12.977 (moves 0.058 mm, computed, see below) |
+| survey maximum | 118.893 | 118.893 (bit-identical: no edited feature reaches it) |
+| ground, z -190 to 170, 2 m grid | | unchanged to the mm everywhere |
+| every rig key GV3 writes | | byte-identical (the generator's output differs only in the 3 new features and the 2 edited paths) |
+
+**The survey minimum, exactly.** Trimming the south banks takes their level out of the flatten
+average at the minimum point, so the target there rises 0.95 m. But the point is 0.13 m from the
+river's centreline. The river's weight there is 0.99994, so the cut passes on only 6 x 10^-5 of it:
+the minimum moves by 0.058 mm (-12.977452 to -12.977394). That shifts the altitude every biome reads
+by 4 x 10^-7 of its range. The expected number of plants that change anywhere in the world is about
+0.1. The maximum does not move at all.
+
+**Other checks on the closed world:**
+- `avgen_world_preview --seams`: 0 ground and 0 water seams.
+- Slope p99 rose from 0.27 to 0.49 (the new head and sill). Biome shares moved: scree 13 -> 17%,
+  forest 32 -> 30%, rim 11 -> 10%.
+
+## W2b: the cast and the camera (found at the checkpoint; the cause and the fix are in W2c)
+
+`avgen_cast_trace --camera` over the whole film, on engine `ec515c8b`, baseline against closed
+(`build/gv3/world/cast-base.json` against `cast-v1.json`; the script is in the stream's scratchpad,
+`world/trace_diff.py`).
+
+| Entity | Max divergence | Mean | First divergence |
+|---|---|---|---|
+| bull-10 | 19.0 m | 12.0 m | 0.00 s (expected: grazes beside the new pool) |
+| bull-21 | 23.1 m | 7.5 m | 0.00 s (expected, same place) |
+| ember | 97.9 m | 40.5 m | 17.00 s |
+| rook | 101.8 m | 39.7 m | 13.50 s |
+| sage | 23.8 m | 4.5 m | 18.00 s |
+| tide | 47.2 m | 6.5 m | 121.00 s |
+| vane | 23.3 m | 5.7 m | 61.50 s |
+| horse-2 | 0.031 m | 0.001 m | 201.50 s |
+| horse-22 | 0.009 m | 0.000 m | 204.00 s |
+| the other 7 animals and the saucer | 0 | 0 | never |
+
+- **The camera moves in 4,042 of 13,531 frames, by up to 77 m.** Shot indices 8, 12, 17, 18, 19, 24,
+  27, 35 and 37 are affected: s09, s13, s18, s19, s20, s25, s28, s36 and s38, every shot that follows
+  an alien.
+- **The aliens walk nowhere near the edited ground.** Their whole ranges lie inside z -100..91, and
+  every height there is unchanged to the millimetre. So something global carries the edit into their
+  decisions.
+- **Suspects, not yet tested:**
+  1. The nav grid's connectivity. The baseline log says "the walkable ground is in 4 disconnected
+     pieces; 9805 of 20214 walkable cells (49%) cannot be reached from the largest", and new steep
+     ground at the ends changes the pieces.
+  2. The water the aliens are drawn to (07-technical §7.3): the river's north end is now a pool.
+  3. The scatter's index-keyed glow (W1, point 4), if an alien's attention reads lit specimens.
+- **Why it matters.** The first pass framed these follow shots against the baseline trace. The
+  characters stream (ec515c8b) and gv3-cast will re-trace the cast anyway, but a distant terrain edit
+  should not reroute the aliens.
+
+## W2c: the river's divide (commit `7259efad`), a real defect of v1 but not the cause of W2b
+
+The nav grid's own log line gave it away:
+- **baseline:** "the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%)
+  cannot be reached from the largest";
+- **v1:** "8 of 20179 walkable cells (0%) cannot be reached".
+
+The navigator walks anything up to `maxSlope` 0.55 (about 63 degrees). So **only water divides the
+valley**, and the river, edge to edge, is what kept its two banks apart. Ending the river in a pool
+inside the world opened a walkable way round its head, and the render log shows the navigator's
+grid no longer trusted: "the grid will NOT answer for this world's terrain -- it disagreed with the
+world after 52 sampled walk(s)". The baseline's grid is trusted, with 951 walks agreed. That was
+worth fixing on its own account. **It was not the cause of W2b**, though: with the divide
+restored, the whole-film trace diverges exactly as before, to the millimetre (W2d).
+
+**The fix.** The river keeps its whole course. Only its first point moves, from (-44, 15, -352) to
+(40, 15, -350). The gorge it cuts through the head then turns 45 degrees east of north, away from every
+line of sight up the valley.
+- With the first point left where it was, the straight gorge showed the edge in s12 and s37 (10
+  views).
+- With it at (10, -352), one view of s37 still did.
+- At (40, -350), none.
+
+The nav grid is divided again: "5 disconnected pieces; 9820 of 20153 walkable cells (49%)". The extra
+small piece is at the north end, between the bent gorge and the edge.
+
+`world.py --check` now also asserts that **the river runs edge to edge**. The nav grid is trusted
+again (951 sampled walks agreed, as in the baseline).
+
+## W2d: why the aliens take other routes (the engine's interest registry)
+
+The whole-film trace of v2a (`cast-v2a.json`) diverges from the baseline **identically to v1**: Ember
+97.9393 m, Rook 101.8224 m, first at 13.5 and 17.0 s. So the cause is something v1 and v2a share.
+
+Thirty-second traces reproduce it; the baseline's 30 s trace equals the full one's first 30 s
+exactly. Each variant below is compared with the baseline:
+
+| Variant | Aliens diverge in 30 s | Nav grid |
+|---|---|---|
+| north only (banks' head, river head, head ridge, shoulder) | no (only bull-10/21) | 4 pieces, 9795 of 20210 stranded |
+| south only (banks end at P10, sill) | no | 5 pieces, 9830 of 20157 |
+| north + sill | no (only bull-10/21) | 5 pieces, 9832 of 20163 |
+| **north + south banks' trim** | **yes, as v2a** | 5 pieces, 9821 of 20151 |
+| v2a (all) | yes | 5 pieces, 9820 of 20153 |
+
+**The mechanism** is `Explore`, the aliens' purposeful travel (`behaviors.cpp` `pickGoal`):
+- It takes **a weighted draw over every candidate in the world's interest registry**: heroes, the
+  craft, and the nav grid's shore and vista points (`nav_grid.cpp` `extractInterestPoints`).
+- Shore points are every dry cell beside water, scanned in row order. Vistas are the prominent
+  points, sorted by prominence.
+- A draw is a roll against the running sum of the candidates' weights. Change the list anywhere, even
+  by points too far away to be chosen, and the same roll can land on a different candidate. Its own
+  comment warns that changing the draw "would change every route in Glowmere".
+- North alone and south alone happen not to flip a draw in the first 30 s; together they do. They
+  would flip one later in the film too, and so would almost any edit that moves shore or vista points.
+
+**What this means:**
+- Closing the valley necessarily changes the registry: the head and the sill are prominent, and the
+  south banks' trim changes the walkable shore along the south river.
+- So **the aliens take other routes from 13.5 s on**, though no ground they walk on changed.
+- **Every alien follow shot has to be framed against a trace of the closed world:** s09, s13, s18,
+  s19, s20, s25, s28, s36 and s38.
+- gv3-cast's re-homing and the characters stream's behaviour already re-deal the cast. So the
+  practical rule is an order: trace the cast on a build that includes this branch before gv3-cut
+  settles its follow framings.
+- **An engine defect worth recording:** a world edit anywhere re-routes every character that
+  explores. It is the same class as the scatter's index-keyed glow (W1, point 4).
+- **Not fixed here:** the draw lives in `src/entity/`, outside this stream's files.
+
+**Which shots it breaks.** `tools/gv3/framing.py` projects each shot's subject through its rig. I ran
+it on the baseline trace and on v2a's (both on ec515c8b):
+- **s25, "Ember watches from across the water": Ember is out of frame for the whole shot.** In the
+  baseline she was in frame 100% of it, at (-0.47, -0.79), already in the corner. The rig rides
+  behind Ember but looks at a fixed point, the saucer's station, so a different route puts her
+  outside the lens. **s25 needs moving** (gv3-cut's rig, against a closed-world trace).
+- s13, s19 and s38 keep their subjects in frame; the subject moves by 0.01-0.06 of the frame.
+- Every other shot's framing is identical.
+- No fixed or keyed camera moved, and no ground under a camera changed.
+
+**The saucer.** Over the closed world's ground, along its whole traced path (452 samples):
+- its lowest pass over edited ground is 100.1 m, at 149 s, over the sill;
+- its lowest point anywhere is still 23.4 m, at 175.5 s, over unchanged ground.
+
+From s22's camera, at 149 s it is about 15 degrees above the sill's crest, so "comes over the rim"
+still reads.
+
+## W3: renders and the scatter (the first closure)
+
+**Stills.** Scratch copies of the project live in `build/gv3w/<variant>/world/`, one per variant:
+- `base`: the 334c4cf6 world;
+- `v1`: the pool-ended river;
+- `v2a`: the committed closure;
+- `v1s`: v1 with the final's shadows only;
+- `v1m*` and `v2ae*`: the march tests.
+
+`materials`, `lightrigs`, `entities` and `assets` are symlinks, and the song's path is absolute.
+
+At s14 (78 s), the closure plus the final's shadows (`v1s`) against the baseline:
+- the V now ends at a dark saddle, with the aurora above it;
+- the sky and the river measure the same (37.8 and 57.5);
+- the walls are 5 levels darker, where the moon's shadows now reach them;
+- the V's glow drops from 106 to 90, where the saddle replaces the brightest band.
+
+At s39 (214 s) the last wide closes the same way, and rhymes with s14.
+
+The before and after pairs for s06, s07, s12, s14, s21, s22, s23, s33, s34, s37 and s39 are in
+`build/gv3w/jobs2a.txt`. Their sheets go to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/world/`,
+and their Critic jobs to session gv3-world, track world-edge.
+
+**The scatter's glow re-deal, counted** (the render log's "placed N instances", baseline -> closed):
+
+| Layer | Baseline | Closed | | Layer | Baseline | Closed |
+|---|---|---|---|---|---|---|
+| canopy | 551 | 514 | | ferns | 1951 | 1812 |
+| canopy-broad | 349 | 328 | | grass | 55515 | 52845 |
+| twisted | 485 | 469 | | fan-plants | 330 | 308 |
+| twisted-low | 314 | 308 | | flowers | 226 | 221 |
+| pine-upper | 469 | 469 | | fungi | 1131 | 1001 |
+| pine-rim | 327 | 339 | | shelf-fungi | 243 | 230 |
+| deadwood | 254 | 249 | | boulders | 500 | 579 |
+| deadwood-rim | 128 | 131 | | pebbles | 59 | 62 |
+| bushes | 2070 | 1954 | | beacons | 53 | 50 |
+
+The steeper new ends lose meadow and forest plants and gain rock and rim pines. Those losses are 300 m
+or more from any camera.
+
+The consequence in the valley is the index re-deal (W1, point 4). Every layer except `pine-upper`
+changes its count, and nearly all of that change is in the northern rows, which come first. So nearly
+every plant's glow, brightness and hue jitter in the valley is drawn anew. Its position, size and yaw
+are not.
+
+A grove still at 110 s (s18) shows both effects together:
+- the bushes glow differently;
+- Sage stands elsewhere (W2d).
+
+## W4: what the first closure's stills showed, and a stricter check
+
+The before and after sheets (W3) showed the first closure passing its own check and still failing the
+eye:
+- **North**: the banks' head made a flat-topped block across the valley, 28-41 m, and the head ridge's
+  east end with the shoulder made a bare hill beside it: (69, -300) rose 47 m, to 99 m. In s14, s21 and
+  s39 the V ended in a dam with a mountain on its right.
+- **South**: the 70 m sill stood as dark masses, and the river's gorge through it was a slot with
+  near-vertical walls, lit by the aurora's horizon glow (s07, s22, s23).
+
+**The check was blind to both.** It knew one way the world can show its edge: gentle ground cut by the
+boundary. It could not see sky *below* the horizon through a gorge, where the skyline is the gorge's
+floor far away, nor a head lower than a crane's eye. `world.py` now also flags any column whose lowest
+visible sky is at or under 0.5 degrees, wherever its skyline lies (`a3914829`). It also reports how
+far the closure raises each shot's skyline over the source world.
+
+The first closure, measured again (the same trace, 452 views):
+
+| | first closure |
+|---|---|
+| views with an open end | **100, in 8 shots** |
+| south, through the river's gorge (sky at -2.6 to -0.2 degrees) | s07 8/8 views, s13 15/15, s18 30/30, s22 15/15, s23 14/14, s24 3/8 |
+| north: the head's west side at 23-34 m, below s37's 31 m eye, and the bent gorge | s12 7/14, s37 8/15 |
+| largest skyline rise over the source | s10 11.8, s23 10.5, s24 10.3, s18 9.8, s11 9.2, s13 9.1 degrees |
+
+**Why the first closure built hills.** Among the source's open-end columns (the old test, 1,729 of
+them), the valley's floor runs out at 0.5-2.5 degrees above the eye: x -108 to -2 in the north, 14-23
+m high. Above about 2.5 degrees they are something else: the east wall's shoulders, cut by the
+boundary at x 15 to 202 and 29-62 m high, 20-44 m above the eye. In s14 at 78 s, one of them is a crest lined
+with trees and reads as an ordinary hilltop. The old test's 5 degree limit caught them too, and the
+first closure closed them with the +47 m hill and a sill that ran to x 200. The redesign keeps the
+test as it is and gives those shoulders small crests of their own.
+
+## W5: the closure redone (commits `8953e8b3`, `055b2192`)
+
+Measured the same way throughout: the engine's heights, the same traced camera, and the stills. The
+harness is in the stream's scratchpad (`redesign.py`, `try2.py`).
+
+**North: a head with falls.**
+
+| Variant | Open ends, north | Largest rise, north | What the stills showed |
+|---|---|---|---|
+| first closure | s12 7, s37 8 views | 11.8 | the dam and the hill |
+| the river climbs the head at full width, to 39 m at the edge | 0 | 5.4 | from both cranes the climbing water is a lit slab 30-44 m wide (s12 at 64 s) |
+| the same with the head raised 8 or 16 m | 0 | 6.1-6.9 | the slab narrows only to 26 or 22 m, and the head gets blockier |
+| **the river begins at the head's foot; a 16 m stream comes down it** | **0** | **5.7** | a narrow cleft at the top with a strip of falling water |
+
+What is in the branch (`world.py`, `NORTH_*`):
+- **The head.** The banks' first point is replaced by two, at levels 64 and 58. The flattened floor
+  rises into a saddle about 40 m high between the walls. The walls' slopes run down into it: in s14,
+  s21 and s39 the V now ends in a low saddle with the aurora above it.
+- **The river** now begins at its own second point, (-58, 12.8, -286), at the foot of the head.
+- **`glowmere-falls`**, a river feature 16 m wide, comes down the head from beyond the edge into the
+  river's head, level for level. It carries the water edge to edge, so the navigator's divide holds:
+  5 pieces, 48% of walkable cells unreachable from the largest, against the source's 4 and 49%. The
+  notch it cuts at the top of the head is 36 m high, above the horizon of every camera in the film
+  (s37's crane, 31 m, is the highest).
+- Its bed is 4 m deep. Where the falls meet the river the two water surfaces blend by weight, and a
+  shallower bed (1.2-1.6 m) let the blend fall below it: a dry gap in the falls.
+- It is 16 m wide because at 12 m its water narrowed to 8 m on the steepest pitch. There the nav
+  grid's sampled walks disagreed with the world: "the grid will NOT answer for this world's terrain
+  -- it disagreed with the world after 280 sampled walk(s); every walkability query stays analytic".
+  Isolated headless (`avgen --audit-routes`, which builds the grid without the GPU):
+  - the south's changes alone are trusted (944 walks);
+  - the north's alone are not;
+  - the north without the falls is trusted (980) but loses the divide;
+  - the falls at 16 or 20 m are trusted (971 walks), with the divide.
+- **`north-east-shoulder`**, a ridge of amplitude 16 (it stands 3-10 m) along z -298..-300 from x 20
+  to 110, puts that shoulder's crest inside the world. Its skyline had been cut flat by the boundary.
+
+**South: the rim, a low sill, and the river's mouth.**
+
+| Variant | Open ends, south | Largest rise, south |
+|---|---|---|
+| first closure (a sill of amplitude 70) | s07, s13, s18, s22, s23, s24 through the gorge | 10.5 |
+| the banks ending at z 244 alone: the southern rim then stands at 45% | the gorge; the south-west and south-east shoulders | 4.8 |
+| **the same with a sill and a south-east shoulder ridge, both of amplitude 16 (about 7 m standing)** | **the gorge only** | **6.1** |
+| the same with a sill of amplitude 28 | the gorge only | 7.1 |
+| a knoll of amplitude 22 or 34 on the west bank beside the gorge | the gorge, 1-2 columns fewer | 7.5-8.5 |
+| the river's course bent west or east beyond z 329 | the gorge, no fewer (west) or more (east) | |
+
+**The river's mouth is the one opening left, and within this stream's constraints it cannot close.**
+- The river's course up to z 329 is what holds the survey's minimum: the river bed at (19.8, 316.7).
+  So the river must reach the south edge, and it cuts a gorge through whatever stands there.
+- The cameras that see out of it (s07, s13, s18, s22, s23 and s24, all on the west side looking
+  south-south-east) look over the west bank at z 200-300. That bank is flattened entirely (flatten
+  weight 1 or more within about 54 m of the banks' last point at (45, 244)). After it, their lines of
+  sight run inside the river's own flattened and cut channel to the edge.
+- To block those lines, the ground along them would have to stand 17-27 m higher, measured ray by ray.
+  That is a new hill in the valley's south-west.
+- The knoll and the bends in the table are the attempts that were left.
+- The mouth shows up to 10 of 96 columns, as a slot of the aurora's glow between the gorge's walls,
+  at about -2.5 to +0.5 degrees. The check now tells these columns apart from every other open end:
+  those whose rays leave the terrain within 32 m of where the water does. Everything else must still
+  be zero.
+
+**The river's flow speed, a defect found on the way.** The engine derives a river's speed from its
+whole course, 12 x descent / length (`terrain_water.cpp` `flowSpeed`), and the water's ripples scroll
+at it in every shot. So editing either end of the course changes the water everywhere:
+- the source: 758 m, 26 m of descent, **0.4116 m/s**;
+- the first closure: 797 m, **0.39 m/s**. Every river shot's water ran 5% slower, and nobody saw it;
+- the river climbing the head would have been 0.90 m/s.
+
+`close_ends` now pins the terrain's `flow.speedOverride` at the source course's speed, which it
+computes the engine's way (in float32). The log reads 0.41 m/s for both the river (692 m, 23.8 m) and
+the falls (66 m, 35.2 m). The generator's call became `world.close_ends(scene, report)` for this.
+
+**The check on the committed closure** (the same trace as W2, `ec515c8b`'s cast):
+
+    survey minimum: -12.977 -> -12.977 (unchanged to the mm, the probe's precision)
+    survey maximum: 118.893 -> 118.893 (unchanged to the mm, the probe's precision)
+    ground from z -190 to 170: largest change 0.000 m
+    water runs edge to edge (the navigator's divide), glowmere-falls -> glowmere-run-2: yes
+    seams (avgen_world_preview --seams): ground 0 cell(s), water 0 cell(s)
+    views with an open end: 0
+    views that see out of the river's mouth at (11, 352): 85 in 6 shots (s07 8/8, s13 15/15,
+      s18 30/30, s22 15/15, s23 14/14, s24 3/8; up to 10 of 96 columns)
+    largest skyline rise over the source world (degrees): s23 6.1, s10 5.7, s18 5.6, s24 5.5, s11 5.2, s13 5.2
+
+## W6: the merged cast on engine-3 (the coordinator's re-check)
+
+`gv3/production` `37c1b65d` is merged in, bringing gv3-cast's recipe and the five UFO set pieces
+(`ufo.py`, compiled into the project after the generator). The film was traced whole twice on
+engine-3 (`avgen_cast_trace --seconds 226 --fps 60 --hz 20 --camera`, about 22 and 27 minutes of
+CPU on a loaded machine):
+- `build/gv3/world/cast-e3base.json`: the merged film, the source world;
+- `build/gv3/world/cast-e3final.json`: the same with this branch's closure.
+
+**The check on the closed film's own trace** (`world.py --check --trace cast-e3final.json`): PASS.
+- survey minimum and maximum unchanged to the mm; the ground from z -190 to 170 unchanged;
+- water edge to edge (the falls into the river); 0 ground and 0 water seams;
+- 0 views of 453 with an open end;
+- the river's mouth: 84 views in 6 shots (s07 8/8, s13 15/15, s18 24/30, s22 15/15, s23 14/14,
+  s24 8/8; up to 10 of 96 columns);
+- largest skyline rise over the source: s09 6.6, s23 6.1, s13 5.7, s24 5.5, s18 5.3, s11 5.2 degrees.
+
+**The nav grid** in the closed film: "the grid answers the terrain half of a straight walk for this
+world; 971 sampled walks agreed with the world exactly", and "5 disconnected pieces; 9782 of 20189
+walkable cells (48%) cannot be reached from the largest". The source: 951 walks, 4 pieces, 49%.
+
+**The set pieces all happen** (`ufo.py --trace-file`, which refuses a set piece that did not):
+
+| Set piece | Source world | Closed world |
+|---|---|---|
+| E1 far survey (6-23 s) | as planned | the same beats; the scout approaches over the head at 110 m instead of 91 |
+| E2 flyby | as planned | the same |
+| **E3 far lift** (bar 37, lift 66.97 s, in s12's crane) | takes **bull-10** at (-79, 17, -266) | takes **bull-21** at (-84, 18, -252), the same beats. The bulls graze at the foot of the new head and walk differently from 0 s |
+| E4 river pair | cow-23 and cow-12 | the same animals, within 1.7 m |
+| E5 centrepiece | horse-11 on the drop | the same; the saucer's approach from the south end is 30 m higher (126 m), clearing the rim |
+
+**Who watches the beams** (the cut's reaction shots read these):
+
+| | Source world | Closed world |
+|---|---|---|
+| E3 | Tide, 76.3-79.8 s, 230 m away | nobody |
+| E4 | Sage, 108.3-112.45 s | Rook 111.2-112.6; Sage 113.05-117.3 and 118.1-119.1; Ember 103.65-107.6 and 111.4-114.25 |
+| E5 | Rook, Sage, Ember, Vane | Rook 174.0-176.65, Ember 171.25-176.75, Vane 172.1-180.05; Sage no longer |
+
+s28, "Vane sees it" (174.02-174.94), still has Vane watching.
+
+**The crafts over the new ground** (the closed trace, the ground from the closed world's heights):
+- the scout's lowest pass over edited ground is 26.1 m, at 73.4 s, leaving E3's lift site (the ground
+  there moved 0.8 m);
+- the saucer's is 99.4 m, at 148.35 s, over the south sill on E5's approach;
+- anywhere, their lowest are unchanged ground: 21.9 m (the scout at E4) and 23.3 m (the saucer at E5).
+
+**The cast diverges as W2d said it would.**
+
+| Body | Max | Mean | First divergence |
+|---|---|---|---|
+| bull-10, bull-21 | 25.8, 26.2 m | 13.4, 12.8 m | 0 s (they graze on the new head's foot) |
+| Rook | 111.4 m | 49.5 m | 11.2 s |
+| Tide | 77.2 m | 28.3 m | 11.45 s |
+| Sage | 59.7 m | 14.4 m | 62.1 s |
+| Ember | 44.0 m | 16.2 m | 51.8 s |
+| Vane | 27.0 m | 6.2 m | 96.3 s |
+| the scout, the saucer | 21.2, 30.5 m | 11.6, 1.4 m | 6.15, 148.25 s (the approaches above) |
+| cow-12, cow-23, cow-19, horse-20, cow-3 | 14.2, 3.0, 0.6, 1.9, 0.03 m | | 54, 93, 189, 204, 93 s |
+| bull-1, bull-18, horse-2, horse-11, horse-22 | 0 | 0 | never |
+
+The camera moves in 4,264 of 13,561 frames, by up to 35 m, in the follow shots s10, s13, s18, s19,
+s20, s24, s25, s28, s36 and s38.
+
+**The follow shots** (`tools/gv3/framing.py`, subject projected through the rig; it cannot see
+occlusion):
+- every follow subject is in frame for 100% of its shot in the closed world;
+- **s25**, "Ember watches from across the water", is now the other way round: in the merged
+  source world Ember is out of frame for the whole shot, in the closed world she is in it (at
+  -0.77, -0.70, in the corner). s25 wants framing against the closed world either way;
+- s13, s18, s19 and s38 keep their subjects in frame, moved by 0.01-0.17 of the frame;
+- but the stills show what the projection cannot. **At 70 s, s13 frames Rook behind a fern** in the
+  closed world (the camera sits behind the leaf, looking at the river), where the source frames him
+  clear against the valley. And **at 110 s, s18** shows Sage facing the lens with the E4 beam out of
+  frame, where the source showed Sage walking toward the lit beam.
+  (`edge-before-after-south.png` has s18; the s13 pair is `build/gv3w/stills/e3*-1920x1080-70.0`.)
+
+So the order stands: **gv3-cut frames the follow shots, and gv3-cast reads the watches, against a
+trace of the closed film** (`cast-e3final.json` is one, on engine-3).
+
+**The Critic** (session gv3-world, track world-edge; twelve stills each, the source world against
+the closed; intent-only inputs): jobs `job_1a0e45a0fcb16f06c` and `job_1a0e45a133159488a`, compared
+in `cmp_1a0e45a8640cb85e1`.
+- "No dimension moved beyond the noise band." Every dimension is unchanged, and the one finding
+  persists in both: s07 "much darker than the rest of the film" (low).
+- Pixels: a mean delta E of 7.0 over the film, and 26% of pixels changed by more than 5. Most of that
+  is the follow shots' other framings and the glow re-deal (W1, point 4), not the ends: s13 at 70 s
+  measures +47% mean luma (the fern), and s18 at 110 s -18% (the beam out of frame).
+
+## F1: the offline configuration (commit `e95db493`)
+
+`python3 tools/make_glowmere_valley_3.py --final [--final-trace cast.json]` applies
+`tools/gv3/offline.py`. Nothing else does: previews keep their settings.
+
+| Setting | Preview (as generated) | Final |
+|---|---|---|
+| render | 1920x1080 x2, offline, limits unlimited, h264 q90 | **3840x2160 x2, offline, limits tier, prores422 q95**, `build/gv3/final/glowmere-valley-3-2160p.mov` |
+| shadow cascades | 3 (the scene's count beats the tier's) | 0 = the offline tier's 4 |
+| `scene/shadowRange` | 0 = ADR-112's automatic, about 77 m | 160 m base; **300 m, step-keyed at the installed cut times, on shots whose frame is a fifth or more ground beyond 160 m** (measured by rays over the heightfield; with the trace, 21 of 40 shots: s02, s04-s14, s17-s19, s22, s23, s30, s33, s37, s39) |
+| terrain `shadowDistance` | 150 m | 320 m |
+| `nodes/valley/terrainViewDistance` / `terrainLod` | 640 m / on | 1000 m / off (LOD 0, 1.2 m quads, everywhere) |
+| fog march: `scene/volumeMaxDistance`, `volumeSteps`, `volumeJitter`, `horizonDensity` | 0 (off), 12, 1.0, 0 | 220, 32, 0.5, 1.0 |
+| `scene/volumeScattering` | 0.5, inert while the march is off | 0.5 (calibration pending) |
+| the arc's `scene/volumeDensity` | look.py's keys | **untouched**: extinction is density x absorption and in-scattering density x scattering (`volume.wgsl`), so the veil stays the previews' and only the march's light is set |
+| 17 rigs' `animation.updateHz` | 30 | 0 (every frame) |
+
+Verified in the generated project: every value lands. The 17 shadow-range keys fall exactly on the
+installed cut times, which already include the one-frame lead.
+
+## F2: 4K ranges, the log lines, the cost (engine ec515c8b)
+
+All ranges are 3840x2160 x2, ProRes 422, with `AVGEN_SHADOW_STATS=1`, rendered under the GPU lock:
+- v2afinal: the closed world with `offline.py` as committed;
+- v2a: the preview configuration forced to the same size, the cost baseline.
+
+**The log lines render-post.md names**:
+
+| Line | v2afinal | Verdict |
+|---|---|---|
+| render scale | "render scale 2.00: scene target 7680x4320 -> output 3840x2160" | as specified |
+| limits | "procedural distance cull off, **LOD rungs kept**, rig pose rate off, entity behaviour bands off" | as specified (ADR-191's offline default) |
+| shadows | "4 view(s) (4 cascade) at 4096x4096; range 300.00 m, fade from 246.00 m, coarsest texel 0.0796 m" on s14; 0.104 m on s18; 0.139 m on s33 | 4 cascades; 300 m reached on the wides. The preview configuration logs "range 77.28 m" |
+| entities | "full 19, coarse 0, skipped 0" | every body at full rate |
+| rigs | "posed 17, rate-limited 17" | **cannot say 0 on a range render** (below) |
+
+**Rigs.** The counter is the worst frame of the job. The job's first frame re-evaluates every rig at
+the time the warm-up tick already posed, so it holds, and a range render always reports
+"rate-limited N" once, whatever `updateHz` is. The 1080p still shows it bare: its one frame reported
+"posed 0, rate-limited 17". With the rate ladder lifted, `SkinnedRig::rateFor(0)` is `updateHz` 0,
+and `sampleTime` then advances every frame (`animation.cpp`). So the rigs are posed every frame, but
+this counter cannot show it. render-post's "rate-limited 0" is not an observable check for a range.
+
+**Pop-in.** In s14's slow truck, I measured the frame-to-frame change of the far field, with the elder
+masked out:
+- final: median 0.529, p95 0.850;
+- preview configuration: median 0.573, p95 1.003;
+- spikes: both have them on the same frames (38, 52, 66, 68, 93: the beat's pulses), none in the
+  final alone.
+
+No pop-in; the far field is steadier with the LOD ladder kept.
+
+**Cost** (render time per frame; the whole job adds 12-20 s of load):
+
+| Range | Configuration | s/frame | Peak memory footprint |
+|---|---|---|---|
+| s14 wide, 76-78 s | final | 1.516 | 9.17 GiB |
+| s18 grove follow, 108-110 s | final | 1.863 | 9.11 GiB |
+| s33 drop, 178-180 s | final | 1.638 | 9.37 GiB |
+| s14 wide, 76-78 s | preview configuration at 4K | 0.524 | 9.08 GiB |
+
+The final is GPU-bound: the render thread waited 145-207 s of each range for the GPU. At its mean,
+1.67 s per frame, the whole film (13,530 frames) is **about 6.3 hours**. The preview configuration at
+4K would be about 2.0 hours, which is 3.4x the first pass's 1080p x2 final (152 ms per frame) for 4x
+the pixels.
+
+**The fog march is not a quality setting in this scene: it halves the picture.** The same instant
+of s14, in the closed world at 1080p:
+
+| Region mean luma | no march | 220 m march, scattering 0.25 | 0.5 | 1.0 |
+|---|---|---|---|---|
+| whole frame | 51.8 | 26.0 | 28.3 | 33.0 |
+| walls | 45 | 23 | 25 | 29 |
+| mid valley | 58.9 | 21.1 | 24.4 | 31.3 |
+
+The Critic, comparing the two 4K clips (`cmp_1a0e3c773be264b12`, session gv3-world, track final-4k):
+- mean luma 0.202 -> 0.109 (-46%);
+- contrast -22%;
+- mean delta E 16, with 97% of pixels changed by more than 5;
+- jitter +27%, shimmer +11%.
+
+**Why.** The closed form (the previews) fills distance with `fogColor`, which is navy:
+`lit * T + fogColor * (1 - T)`. The march fills its 220 m with in-scattered moonlight instead, which is
+far darker. It also runs over the sky, which the closed form never fogs (`applyFog` is called for
+surfaces only). Raising the scattering cannot match the previews without turning the air the moon's
+colour.
+
+## F3: the final keeps the previews' fog (commit `c350391b`)
+
+`offline.py` no longer marches the fog. What the final changes is now only what makes the same
+picture finer:
+- resolution, supersampling and the codec;
+- the limits;
+- the shadows' reach and cascades;
+- the terrain's LOD;
+- the rigs' rate.
+
+The atmosphere stays the previews': the closed form, which is exact and noise-free.
+
+**What gv3-look needs to know** (not applied here, not yet measured end to end). A march can be made
+to carry the closed form's navy fill exactly. Set `scene/volumeEmission` equal to
+`scene/volumeAbsorption`:
+- the march's per-step emission is then density x emission x `fogColor` (`volume.wgsl`);
+- the closed form is `lit * T + fogColor * (1 - T)`;
+- the two are the same integral.
+
+Its noise (`volumeNoise` 0.45) and local-light scattering (`volumeLocalLights` 1) would then come on
+top, and would be seen in the previews first. Measured, on the closed world at 1080p x2:
+
+| Mean luma | no march | recipe, scattering 0 | 0.25 | 0.5 |
+|---|---|---|---|---|
+| s14 whole frame | 52.2 | 52.5 | 54.7 | 56.9 |
+| s14 walls / mid valley / river | 45.3 / 59.5 / 57.7 | 45.1 / 59.6 / 58.0 | 47 / 62.7 / 60.1 | 49 / 65.9 / 62.3 |
+| s14 sky above the V | 37.8 | 44.9 | 46.4 | 47.9 |
+| s14 the aurora's glow in the V | 90.0 | 80.5 | 82.9 | 85.3 |
+| s18 (the grove) whole frame | 48.3 | 47.9 | | 51.0 |
+
+At scattering 0 the recipe matches the previews on the ground to within 0.3 levels (s14, mean
+|difference| 1.67). **It does not match the sky.** The march veils the sky with its 220 m of navy,
+which the closed form never does:
+- the sky above the V rises 7 levels;
+- the aurora's glow in the V falls 9.5.
+
+Each 0.25 of scattering then adds about 2.5 levels of moonlit air. So even the matched march changes
+the aurora, which confirms that it is a decision for gv3-look, taken in the previews.
+
+The 4K cost of the final without a march is being re-measured with an exclusive GPU (the lock raced
+from 13:00; see the coordinator's note).
+
+## F4: the final as it now stands, against the preview, at 4K (s14, 77 s)
+
+The same instant, 3840x2160 x2:
+
+| Mean luma | preview configuration | final (`c350391b`) | final with the march (`e95db493`) |
+|---|---|---|---|
+| sky top | 47.9 | 47.9 | 36.5 |
+| walls | 44.7 | 44.7 | 24.3 |
+| the saddle in the V | 89.7 | 89.7 | 51.0 |
+| mid valley | 59.2 | 59.1 | 24.2 |
+| whole frame | 52.9 | 52.8 | 28.6 |
+
+The final now differs from the preview by 0.13 levels on average. 0.63% of its pixels change by more
+than 8 levels, all in the mid and far valley (rows 810-1620 of 2160), which is where the
+configuration acts:
+- the moon's shadows now fall there, since the log reads "4 view(s) (4 cascade) at 4096x4096; range
+  300.00 m";
+- the elder, 150 m out, gains a shadowed stem;
+- far plants go through the LOD ladder, where "limits unlimited" drew full meshes.
+
+The same picture, finer (`build/gv3w/k4/diff-preview-vs-final2-77.png`).
+
+## F5: the final's cost, measured on an exclusive GPU
+
+The final as it now stands (`c350391b`, no march), 3840x2160 x2, ProRes 422.
+- The runner (`build/gv3w/k4x.sh`) waits for no other GPU process, watches through each render, and
+  marks any overlap. Its first try overlapped gv3-look's render and was discarded.
+- The three ranges below ran alone.
+
+| Range | s/frame | Whole job | Peak memory footprint |
+|---|---|---|---|
+| s14 wide, 76-78 s | **0.398** | 62 s | 8.95 GiB |
+| s18 grove follow, 108-110 s | **0.517** | 78 s | 8.89 GiB |
+| s33 drop, 178-180 s | **0.454** | 71 s | 9.03 GiB |
+
+**The whole film:** 13,530 frames at the mean, 0.456 s, is about 6,200 s. **About 1.7 hours,** or
+1.5-2.0 hours depending on the mix of shots, plus about 15 s to load.
+
+**The final is cheaper than the preview configuration at 4K** (0.524 s/frame on s14). The reason is
+`limits: tier` (ADR-191): it keeps the LOD ladder, where the previews' `limits: unlimited` draws every
+far instance at full detail.
+
+The march that F3 removed was what made the first measurement 1.52 s/frame.
+
+## F6: the final on engine-3 (the coordinator's split of render's values, and the re-measure)
+
+**What `offline.py` applies, against render's split.** Render's report (`stream-reports/render.md`):
+- five values that are the same in the preview and the final now belong to gv3-look's `look.BASE`:
+  `post/referenceHeight` 1080, motion blur `maxRadius` 60 and `samples` 32, `scene/fogSky` 1.0,
+  `scene/fogSkyDistance` 0;
+- these render-post.md recommendations are unnecessary: bloom levels 8, stretch x2, tile 40, a
+  resolution-dependent look, `volumeSteps` 32 at offline, a fixed 8x anisotropy, and gaps 6, 7 and
+  3's radii.
+
+`offline.py` applies **none of them**, so nothing is dropped. The march (`volumeSteps` 32) left it in
+F3, and the rest were never in it. It keeps only what is final-only:
+- the render block (3840x2160 x2, the offline tier, `limits: tier`, ProRes 422);
+- the shadows' reach and cascades;
+- the terrain's LOD and view distance;
+- the rigs' rate.
+
+**The final as generated now** (`--final --final-trace cast-e3final.json`, the closed film): "final:
+3840x2160 x2, tier offline, limits tier, prores422; shadows 160 m (300 m on 18 wides: s02, s04, s05,
+s06, s08, s09, s11, s13, s14, s17, s18, s19, s23, s25, s29, s30, s38, s39), terrain LOD 0 to 1000 m,
+the fog as previewed, 17 rigs posed every frame". gv3-look's five values are not in `gv3/production`
+`37c1b65d` yet, so the measured project (`build/gv3w/e3final4k/`) has them applied by hand, to measure
+the final that will be rendered.
+
+**The cost on engine-3: not measured yet.** Between 15:58 and 17:40 the GPU never went quiet for 90
+s: navfix's suite and gv3-int's renders held it, and a 1080p job of mine timed out after an hour in
+the lock's queue. The ranges are ready and keep trying on their own:
+- `build/gv3w/k4wait3h.sh build/gv3w/k4z-jobs.txt`, started 17:41, gives up at 20:41;
+- it waits outside the lock for 90 s with no avgen, avgen_render_tests, avgen_tests or ctest running
+  (by executable name), takes the lock for one range, re-checks, and marks any overlap SHARED;
+- results in `build/gv3w/k4wait3h.out`, and each range's log (with `AVGEN_SHADOW_STATS=1` and
+  `time -l`) in `build/gv3w/k4/e3final4k-<start>-<end>.mov.log`.
+
+To read them: s/frame is the log's "render complete: N frames in Ts" over N; the film is 13,530
+frames. The log lines to look for are the coordinator's: "post chain 4320 lines at reference height
+1080 ... box-filtered 2 octave(s) down", "texture filtering at 16x", "sky's cube from 256 to 1024",
+and "project 'glowmere-valley-3.json' loaded" with no scene-load failure. Until then the figures are
+render's: about 0.34 s a frame, 77-80 minutes for the film. F5's 0.40-0.52 s a frame were
+engine `ec515c8b` and the first closure.
+
+**gv3-look's `scene/fogSky` 1.0 changes how the ends look.** Distance fades into the sky behind it,
+aurora included, so the head, the sill and the mouth's slot will read softer than in W5's stills,
+which were taken without it. The pairs to look at again with `look.BASE` in: s14, s22, s23 and s37.
+
+## For the coordinator and the other streams
+
+**Order of merging**
+- The closed world changes the aliens' routes (W2d, and W6 on the merged cast). **Trace the cast, and
+  frame the alien follow shots, on a build that includes this branch.** W6 lists the follow shots
+  whose subject the closed world moves out of frame.
+- gv3-cast's set pieces: E3 ("far up the valley", region (-60, -250), radius 45) sits at the foot of
+  the new head. W6 says whether each set piece still happens in the closed world.
+- After any change to the cut or the cast, run
+  `python3 tools/gv3/world.py --check --trace <a cast trace of that cut>`. It asserts:
+  - no open end in any view, the river's mouth reported apart (W5);
+  - the survey held;
+  - the filmed ground unchanged;
+  - the water running edge to edge (the falls into the river);
+  - no seam in the ground or the water.
+- After any change to the world, read the nav grid's line in a render log (or, without the GPU,
+  `avgen --project <p> --audit-routes /dev/null`): it must say "the grid answers the terrain half of a
+  straight walk for this world". "The grid will NOT answer" means a walkability disagreement (W5).
+
+**The final render**
+- Generate with `python3 tools/make_glowmere_valley_3.py --final --final-trace <cast trace of the
+  final cut>`, then `python3 tools/gv3/ufo.py` as the generator's last step. The trace lets followed
+  shots get the 300 m shadows too; without it they keep 160 m.
+- It writes `build/gv3/final/glowmere-valley-3-2160p.mov`.
+- Check the log for the lines in F6. `avgen --render` exits 0 with bare sky when the scene fails to
+  load, so check "project 'glowmere-valley-3.json' loaded" and its warnings too.
+- Ignore "rate-limited N" (F2).
+
+**For gv3-look**
+- Nothing in `offline.py` changes the look. The fog, the post and the exposure are what the previews
+  have, and none of render's preview-and-final values are in it (F6).
+- A marched atmosphere is a decision for the previews (F3): `scene/volumeEmission` =
+  `scene/volumeAbsorption` for the ground to match. The sky still gets veiled.
+- The river's water moves at the source's 0.4116 m/s again: the first closure had slowed it 5%
+  (W5).
+
+## Defects found, not fixed (outside this stream's files)
+1. **Explore's destination draw is world-global** (`behaviors.cpp` `pickGoal`, `nav_grid.cpp`
+   `extractInterestPoints`). Any edit that moves a shore or vista point anywhere can re-route every
+   exploring character, and with them every follow shot.
+2. **Scatter variation is keyed on the index in the layer** (`procedural.cpp`). Any change to an
+   upstream row's count re-deals every later plant's glow, brightness, hue jitter and dark/lit
+   lottery.
+3. **A river's flow speed is its whole course's grade** (`terrain_water.cpp` `flowSpeed`: 12 x
+   descent / length). An edit at either end of a river changes how fast its water moves in every
+   shot. The first closure slowed the film's water 5% and no check saw it.
+4. **Overlapping waters blend their surfaces by weight** (`WorldMap::waterSurface`). Where a narrow
+   stream joins a river, the blend can fall below the stream's own bed, and the stream runs dry for a
+   stretch. The falls needed a 4 m bed to stay wet.
+5. **A narrow water feature can cost the nav grid its trust.** With the falls 12 m wide (8 m of water
+   at the narrowest), the 4 m grid and the world disagreed on a sampled walk; without the falls, or
+   with them 16 m wide, they agree. Untrusted, every walkability query in the film stays analytic, and
+   the engine says so at info level only.
+6. **The render job's "rate-limited" counter** includes the job's first frame, which always holds
+   (the warm-up already posed that time). So every range render warns "the rig ladder reached the
+   deliverable" even with `updateHz` 0.
+7. **The march fogs the sky, and the closed form never does** (ADR-705's one law, but only for
+   surfaces). With `volumeEmission` 0 the march also has no `fogColor` fill. Switching the march on
+   therefore changes a night scene's look drastically.
+8. **World features have no editor in the app.** The walls, rims, river and the new head, falls, sill
+   and shoulders can only be changed in the scene file, and the terrain's `flow.speedOverride` has no
+   control either (the owner's visible-means-controllable rule). The water's visible speed can still
+   be adjusted, through `nodes/valley/water/flowSpeed`.
+9. **Scatter covers only the WorldMap's square**, while the mesh runs 32 m past it on +x and +z. The
+   south sill's crest and the east edge grow nothing.
+10. **The GPU-lock race from 13:00** was fixed in main (`876a11e2`).
