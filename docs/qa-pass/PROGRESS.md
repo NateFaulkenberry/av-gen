@@ -18,6 +18,19 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - W2: triage of the red CPU run (`4a138886`) and the failing nightly sanitizer stages.
 - W3: integration of GV3 r7b from the Desktop into `examples/world/`.
 
+## Queued after this pass: GV3 targeted art pass
+- **Brief:** `docs/glowmere-valley-3/art-pass/00-brief.md`, the owner's words, 2026-09-28.
+- **Water references:** `~/Desktop/av-gen-review/20-gv3-art-pass/reference/`, not in the repository.
+- **Gate:** it launches only when W1 (perf) and W3 (clean) are complete and merged, so it starts from the cleaned
+  GV3 in `examples/world/` and the fixed engine.
+- **The agent:** one agent, the `gv3-art-pass` type (`~/.claude/agents/gv3-art-pass.md`: `model: opus`,
+  `effort: max`). It needs a Claude Code restart to load, because this was the first file in `~/.claude/agents/`.
+  Without the restart, fall back to `model: opus` and tell the owner.
+- **Where it works:** its own worktree from main after the merge, with notes in
+  `docs/glowmere-valley-3/art-pass/PROGRESS.md`.
+- **It is a feature pass:** the UFO warp and the pulse lifecycle are new behaviour. That is allowed there, not
+  in the QA pass. It gets W1's performance envelope, so the warp's frame cost is measured.
+
 ## Findings
 - The repository's GV3 (`334c4cf6`, the Phase 3 foundation) is older than the r7b project on the Desktop, which is
   the one the owner opens.
