@@ -218,3 +218,31 @@ aurora again, and the small violet mushrooms come back (41.1: 17 -> 83 pixels). 
 
 The trace logs no "no way across" line with which to count the errands the coordinator expected; what can be
 seen is their effect: the reversals and the pacing are gone, and the aliens who went to watch E5 now go to it.
+
+## Round 3: the whole film with round 2's fixes (`r3`, engine-4; render 19:28-19:55, 13,530 frames, GPU errors 0)
+Generated from `aff43de7`: audit 90/90 routes, 130/130 tracks, 0 unknown parameters. CPU suites of other
+streams ran beside the render (`r3/render-r3.log`); the coordinator's rule is that they no longer hold the lock.
+- Pulses on frames (`r3/pulse/report.txt`) and the Critic (`job_1a0e55294f206d8e8`): see 04-iterations.md.
+  The five heroes that did not register sit on sparse lanes; a cap ladder (`vC4`) showed the caps are not what
+  reads, so no change there.
+- E4 at 1080p (`r3/e4-1080p.png`): no crossing now, but 57.1 still saw the pair one behind the other (the
+  engine spreads a pair east-west and 57.1 looked west). Re-framed from the south (`vK1`, `61e9dbf0`).
+- The elder's light (`vS`): at the cap, x5 on the kick moved the ground 1-3%; 7 m lower it lights the stem
+  and a ring of ferns (`61e9dbf0`).
+- The small mushrooms' ground light (`vG`, the owner's "more light on the ground"): x1.4-10 gain with a 300 m
+  range moved the wides' ground 0-6%; only the patch nearest the lens pools. The ecology lights are chosen
+  nearest-first within a ~200-light budget (the trees' faint glow takes the slots) and the ground program
+  ignores `groundGlow`: an engine item, sent to the coordinator.
+- E5 on engine-4 at approach 18 left Vane running through 95.1; at 100 m (r4 trace) she stops facing the
+  saucer and watches 172.55-180.05, with rook, sage and ember (`779875d5`).
+- Close approaches under 1.4 m: ember-rook 0.76 m at 64.8 s (off screen in 35.1); on r5 cow-19-ember
+  1.26 m at 181.65 s in 99.1, on screen 95 m off at 10 px.
+- 71.1 at 1080p showed the river's mouth as a hard slot behind the elder; raised to 40 m so the frame's top
+  edge meets the valley floor before the mouth (`5825af56`, verified on r6 clips).
+
+## Round 5: the final candidate (`r5`; render 20:24-20:56, GPU errors 0; Critic `job_1a0e583fde98f962e`)
+Against r3: musical synchronization 0.777 -> 0.885, effects 0.881 -> 0.945, technical quality 0.882 -> 0.923,
+lighting 0.822 -> 0.845; issues 0/8/50/45. The elder's kick z 28-29, the lantern's clap 10-13, the bloom 10.6,
+the spire 5-6 (observed now), the veil's spores 4.4; the umbra, cairn, ridge, scree and ember weak (z 2-3.7).
+Novelty 29.3 s held, 2 shots static from the first frame. Trace: follow stability 21 of 22 (95.3's ADR-913
+exception); E1-E5 play, E4 takes cow-12 and cow-23, E5's watchers vane, ember, rook, sage.
