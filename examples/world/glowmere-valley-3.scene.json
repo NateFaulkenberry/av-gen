@@ -56,6 +56,29 @@
       "reactionProfile": ""
     },
     {
+      "name": "scout",
+      "position": [
+        -140.0,
+        169.13,
+        -360.0
+      ],
+      "yaw": 0.0,
+      "scale": 1.0,
+      "radius": 4.92,
+      "height": 4.26,
+      "importance": 0.4,
+      "focalWeight": 0.5,
+      "preferredCameraDistance": 20.4,
+      "preferredCameraElevation": -4.0,
+      "activationRadius": 260.0,
+      "colorAccent": [
+        0.16,
+        0.66,
+        1.0
+      ],
+      "reactionProfile": ""
+    },
+    {
       "name": "elder-2-cap",
       "position": [
         -14.473,
@@ -89,7 +112,7 @@
       "scale": 1.0,
       "radius": 2.73,
       "height": 6.5,
-      "importance": 0.478,
+      "importance": 0.4785,
       "focalWeight": 0.85,
       "preferredCameraDistance": 20.2,
       "preferredCameraElevation": 8.0,
@@ -112,7 +135,7 @@
       "scale": 1.0,
       "radius": 1.76,
       "height": 4.2,
-      "importance": 0.457,
+      "importance": 0.3925,
       "focalWeight": 0.8,
       "preferredCameraDistance": 13.0,
       "preferredCameraElevation": 8.0,
@@ -135,7 +158,7 @@
       "scale": 1.0,
       "radius": 3.78,
       "height": 9.0,
-      "importance": 0.435,
+      "importance": 0.457,
       "focalWeight": 0.75,
       "preferredCameraDistance": 27.9,
       "preferredCameraElevation": 8.0,
@@ -158,7 +181,7 @@
       "scale": 1.0,
       "radius": 1.43,
       "height": 3.4,
-      "importance": 0.414,
+      "importance": 0.371,
       "focalWeight": 0.7,
       "preferredCameraDistance": 10.5,
       "preferredCameraElevation": 8.0,
@@ -181,7 +204,7 @@
       "scale": 1.0,
       "radius": 2.31,
       "height": 5.5,
-      "importance": 0.392,
+      "importance": 0.4355,
       "focalWeight": 0.65,
       "preferredCameraDistance": 17.1,
       "preferredCameraElevation": 8.0,
@@ -204,7 +227,7 @@
       "scale": 1.0,
       "radius": 3.15,
       "height": 7.5,
-      "importance": 0.371,
+      "importance": 0.414,
       "focalWeight": 0.6,
       "preferredCameraDistance": 23.2,
       "preferredCameraElevation": 8.0,
@@ -227,7 +250,7 @@
       "scale": 1.0,
       "radius": 2.1,
       "height": 5.0,
-      "importance": 0.349,
+      "importance": 0.3495,
       "focalWeight": 0.55,
       "preferredCameraDistance": 15.5,
       "preferredCameraElevation": 8.0,
@@ -250,7 +273,7 @@
       "scale": 1.0,
       "radius": 2.6,
       "height": 6.2,
-      "importance": 0.327,
+      "importance": 0.328,
       "focalWeight": 0.5,
       "preferredCameraDistance": 19.2,
       "preferredCameraElevation": 8.0,
@@ -273,7 +296,7 @@
       "scale": 1.0,
       "radius": 1.68,
       "height": 4.0,
-      "importance": 0.306,
+      "importance": 0.3065,
       "focalWeight": 0.45,
       "preferredCameraDistance": 12.4,
       "preferredCameraElevation": 8.0,
@@ -1383,7 +1406,12 @@
     "ecologyLight": 1.4,
     "ecologyGlowCell": 9.0,
     "volumeLocalLights": 1.0,
-    "fogHeightAmount": 1.0
+    "fogHeightAmount": 1.0,
+    "fogSky": 0.5,
+    "fogSkyDistance": 0.0,
+    "ecologyLightRange": 300.0,
+    "ecologyPoolFaintest": 6.5,
+    "ecologyPoolReach": 6.0
   },
   "nodes": [
     {
@@ -1434,7 +1462,6 @@
             0.075
           ],
           "roughness": 0.17,
-          "shoreFade": 1.6,
           "emissiveColor": [
             0.0,
             0.0,
@@ -1443,7 +1470,7 @@
           "emissiveIntensity": 0.0,
           "clarity": 1.25,
           "maxOpacity": 0.93,
-          "edgeFade": 0.8,
+          "edgeFade": 1.6,
           "fresnel": 0.22,
           "reflection": 2.6,
           "reflectionTint": [
@@ -1479,11 +1506,20 @@
             0.95,
             1.0
           ],
-          "swell": 0.0
+          "swell": 0.0,
+          "tears": 0.35,
+          "tearShear": 6.4,
+          "tearCoverage": 0.8,
+          "tearCell": 3.2,
+          "tearSpacing": 20.0,
+          "tearStretch": 4.0,
+          "tearDirection": "wind",
+          "tearDrift": 0.15,
+          "tearWind": 0.6
         },
         "flow": {
           "speedScale": 1.0,
-          "speedOverride": 0.0,
+          "speedOverride": 0.41164249181747437,
           "bankShear": 0.7,
           "meander": 0.18,
           "stillFactor": 0.12,
@@ -1548,7 +1584,7 @@
           "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 9.0,
-            "mass": 40.0,
+            "mass": 6.0,
             "damping": 0.7,
             "windSensitivity": 1.4,
             "bendLimit": 0.12,
@@ -1602,7 +1638,7 @@
           "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
-            "mass": 40.0,
+            "mass": 6.0,
             "damping": 0.7,
             "windSensitivity": 1.4,
             "bendLimit": 0.12,
@@ -1656,7 +1692,7 @@
           "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
-            "mass": 40.0,
+            "mass": 6.0,
             "damping": 0.7,
             "windSensitivity": 1.4,
             "bendLimit": 0.12,
@@ -1711,7 +1747,7 @@
           "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
-            "mass": 40.0,
+            "mass": 6.0,
             "damping": 0.7,
             "windSensitivity": 1.4,
             "bendLimit": 0.12,
@@ -1766,7 +1802,7 @@
           "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 12.0,
-            "mass": 55.0,
+            "mass": 9.0,
             "damping": 0.75,
             "windSensitivity": 1.2,
             "bendLimit": 0.1,
@@ -1821,7 +1857,7 @@
           "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 12.0,
-            "mass": 55.0,
+            "mass": 9.0,
             "damping": 0.75,
             "windSensitivity": 1.2,
             "bendLimit": 0.1,
@@ -2056,7 +2092,7 @@
             "damping": 0.95,
             "windSensitivity": 0.95,
             "bendLimit": 0.42,
-            "tipAmplitude": 0.12,
+            "tipAmplitude": 0.2,
             "gustResponse": 1.15,
             "bendCurve": 1.7,
             "amplitudeVariance": 0.38,
@@ -2117,7 +2153,7 @@
             "damping": 0.95,
             "windSensitivity": 1.0,
             "bendLimit": 0.5,
-            "tipAmplitude": 0.13,
+            "tipAmplitude": 0.22,
             "gustResponse": 1.3,
             "bendCurve": 1.5,
             "amplitudeVariance": 0.4,
@@ -2178,12 +2214,13 @@
           "hueRandom": 0.02,
           "castsShadow": true,
           "motion": {
-            "stiffness": 3.0,
-            "mass": 1.5,
+            "stiffness": 2.4,
+            "mass": 1.2,
             "damping": 0.9,
-            "windSensitivity": 0.65,
+            "windSensitivity": 0.9,
             "bendLimit": 0.16,
-            "tipAmplitude": 0.08
+            "tipAmplitude": 0.2,
+            "gustResponse": 1.2
           },
           "minHeightAboveWater": 0.4,
           "maxHeightAboveWater": 7.5,
@@ -2229,7 +2266,7 @@
             "damping": 0.92,
             "windSensitivity": 0.9,
             "bendLimit": 0.45,
-            "tipAmplitude": 0.12,
+            "tipAmplitude": 0.18,
             "gustResponse": 1.2,
             "bendCurve": 2.2,
             "amplitudeVariance": 0.45,
@@ -2286,7 +2323,7 @@
           "viewDistance": 130.0,
           "minScreenRadius": 6.0,
           "castsShadow": true,
-          "hueField": 0.16,
+          "hueField": 0.07,
           "hueFieldScale": 28.0,
           "hueRandom": 0.035,
           "emissiveRandom": 0.65,
@@ -2306,7 +2343,9 @@
           "chromaDriftSpeed": 0.05,
           "minHeightAboveWater": 0.1,
           "maxHeightAboveWater": 6.0,
-          "heightAboveWaterFeather": 1.2
+          "heightAboveWaterFeather": 1.2,
+          "emissiveField": "elder-rings",
+          "emissiveFieldAmount": 8.0
         },
         {
           "name": "shelf-fungi",
@@ -2359,7 +2398,9 @@
           "chromaDriftSpeed": 0.04,
           "minHeightAboveWater": 0.8,
           "maxHeightAboveWater": 11.0,
-          "heightAboveWaterFeather": 2.0
+          "heightAboveWaterFeather": 2.0,
+          "emissiveField": "elder-rings",
+          "emissiveFieldAmount": 5.0
         },
         {
           "name": "boulders",
@@ -2482,7 +2523,9 @@
           "chromaDriftSpeed": 0.025,
           "minHeightAboveWater": 0.4,
           "maxHeightAboveWater": 9.0,
-          "heightAboveWaterFeather": 1.5
+          "heightAboveWaterFeather": 1.5,
+          "emissiveField": "drop-ring",
+          "emissiveFieldAmount": 3.5
         }
       ],
       "world": {
@@ -2612,11 +2655,6 @@
             "kind": "river",
             "path": [
               [
-                -44.0,
-                15.0,
-                -352.0
-              ],
-              [
                 -58.0,
                 12.8,
                 -286.0
@@ -2691,9 +2729,14 @@
             "kind": "flat",
             "path": [
               [
-                -44.0,
-                16.8,
+                -58.0,
+                64.0,
                 -352.0
+              ],
+              [
+                -58.0,
+                58.0,
+                -316.0
               ],
               [
                 -58.0,
@@ -2744,16 +2787,6 @@
                 45.0,
                 -4.6000000000000005,
                 244.0
-              ],
-              [
-                24.0,
-                -6.8,
-                300.0
-              ],
-              [
-                11.0,
-                -9.2,
-                352.0
               ]
             ],
             "width": 90.0,
@@ -3134,6 +3167,128 @@
             "water": true,
             "waterDepth": 1.3,
             "smoothing": 0
+          },
+          {
+            "name": "glowmere-falls",
+            "kind": "river",
+            "path": [
+              [
+                -58.0,
+                48.0,
+                -352.0
+              ],
+              [
+                -58.0,
+                43.5,
+                -322.0
+              ],
+              [
+                -58.0,
+                24.0,
+                -300.0
+              ],
+              [
+                -58.0,
+                12.8,
+                -286.0
+              ]
+            ],
+            "width": 16.0,
+            "amplitude": 4.0,
+            "falloff": 0.85,
+            "flatten": 0.85,
+            "roughness": 0.1,
+            "water": true,
+            "waterDepth": 0.0,
+            "smoothing": 3
+          },
+          {
+            "name": "north-east-shoulder",
+            "kind": "ridge",
+            "path": [
+              [
+                20.0,
+                0.0,
+                -298.0
+              ],
+              [
+                60.0,
+                0.0,
+                -300.0
+              ],
+              [
+                110.0,
+                0.0,
+                -298.0
+              ]
+            ],
+            "width": 32.0,
+            "amplitude": 16.0,
+            "falloff": 1.0,
+            "roughness": 1.0,
+            "smoothing": 3
+          },
+          {
+            "name": "south-sill",
+            "kind": "ridge",
+            "path": [
+              [
+                -120.0,
+                0.0,
+                334.0
+              ],
+              [
+                -60.0,
+                0.0,
+                339.0
+              ],
+              [
+                0.0,
+                0.0,
+                341.0
+              ],
+              [
+                60.0,
+                0.0,
+                339.0
+              ],
+              [
+                120.0,
+                0.0,
+                334.0
+              ]
+            ],
+            "width": 40.0,
+            "amplitude": 16.0,
+            "falloff": 1.0,
+            "roughness": 1.0,
+            "smoothing": 3
+          },
+          {
+            "name": "south-east-shoulder",
+            "kind": "ridge",
+            "path": [
+              [
+                100.0,
+                0.0,
+                322.0
+              ],
+              [
+                150.0,
+                0.0,
+                322.0
+              ],
+              [
+                200.0,
+                0.0,
+                318.0
+              ]
+            ],
+            "width": 30.0,
+            "amplitude": 16.0,
+            "falloff": 1.0,
+            "roughness": 1.0,
+            "smoothing": 3
           }
         ]
       },
@@ -3445,6 +3600,135 @@
           0.0
         ],
         "seed": 20260911,
+        "velocityStretch": 4.5,
+        "attractorPosition": [
+          0.0,
+          -2.05,
+          0.0
+        ]
+      },
+      "visible": false,
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "name": "scout",
+      "kind": "procedural",
+      "position": [
+        -140.0,
+        170.0,
+        -360.0
+      ],
+      "rotation": [
+        3.5,
+        -24.0,
+        -5.0
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "procedural": {
+        "source": {
+          "kind": "mesh",
+          "asset": "../../assets/imported/ufo.gltf"
+        },
+        "sourceTransform": {
+          "scale": [
+            0.0347,
+            0.0347,
+            0.0347
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.052,
+            0.058,
+            0.076
+          ],
+          "roughness": 0.3,
+          "metallic": 0.88,
+          "emissiveColor": [
+            0.1,
+            0.52,
+            1.0
+          ],
+          "emissiveIntensity": 0.0
+        }
+      },
+      "visible": true
+    },
+    {
+      "name": "scout-beam",
+      "kind": "particles",
+      "parent": "scout",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "particles": {
+        "capacity": 32768,
+        "spawnRate": 0.0,
+        "shape": "disc",
+        "position": [
+          0.0,
+          -2.05,
+          0.0
+        ],
+        "extent": [
+          7.8,
+          7.8,
+          7.8
+        ],
+        "direction": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "spread": 0.042,
+        "lifetimeMin": 3.6,
+        "lifetimeMax": 5.0,
+        "speedMin": 8.5,
+        "speedMax": 12.5,
+        "gravity": [
+          0.0,
+          -0.35,
+          0.0
+        ],
+        "drag": 0.05,
+        "turbulence": 0.16,
+        "turbulenceScale": 0.08,
+        "turbulenceSpeed": 0.15,
+        "sizeStart": 0.656,
+        "sizeEnd": 0.074,
+        "blend": "additive",
+        "emissive": 0.45,
+        "colorStart": [
+          0.26,
+          0.78,
+          1.0,
+          0.13
+        ],
+        "colorEnd": [
+          0.1,
+          0.95,
+          0.86,
+          0.0
+        ],
+        "seed": 20260927,
         "velocityStretch": 4.5,
         "attractorPosition": [
           0.0,
@@ -3844,7 +4128,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -3923,7 +4209,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4080,7 +4368,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4159,7 +4449,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4238,7 +4530,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4395,7 +4689,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4474,7 +4770,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4553,7 +4851,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4710,7 +5010,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4789,7 +5091,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -4868,7 +5172,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5025,7 +5331,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5104,7 +5412,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5183,7 +5493,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5340,7 +5652,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5419,7 +5733,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5498,7 +5814,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5655,7 +5973,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5734,7 +6054,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5813,7 +6135,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -5970,7 +6294,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6049,7 +6375,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6128,7 +6456,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6285,7 +6615,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6364,7 +6696,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6443,7 +6777,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6600,7 +6936,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6679,7 +7017,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6758,7 +7098,9 @@
           "windSensitivity": 0.16,
           "bendLimit": 0.015,
           "tipAmplitude": 0.01
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -6915,7 +7257,9 @@
           "windSensitivity": 0.5,
           "bendLimit": 0.09,
           "tipAmplitude": 0.06
-        }
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
       }
     },
     {
@@ -8527,9 +8871,9 @@
       "kind": "gltf",
       "name": "horse-2",
       "position": [
-        -97.04000091552734,
-        19.8799991607666,
-        -73.0999984741211
+        74.0,
+        7.991,
+        13.0
       ],
       "rotation": [
         0.0,
@@ -8557,9 +8901,9 @@
       "kind": "gltf",
       "name": "horse-20",
       "position": [
-        -106.0,
-        15.699999809265137,
-        -132.0
+        90.0,
+        9.043,
+        26.0
       ],
       "rotation": [
         0.0,
@@ -8647,9 +8991,9 @@
       "kind": "gltf",
       "name": "cow-23",
       "position": [
-        -146,
-        40.07,
-        -78
+        -76.0,
+        5.622,
+        70.0
       ],
       "rotation": [
         0.0,
@@ -8677,9 +9021,9 @@
       "kind": "gltf",
       "name": "bull-10",
       "position": [
-        -82.0,
-        17.450000762939453,
-        -270.0
+        -12.0,
+        12.806,
+        -128.0
       ],
       "rotation": [
         0.0,
@@ -8737,9 +9081,9 @@
       "kind": "gltf",
       "name": "horse-22",
       "position": [
-        -89,
-        19.88,
-        -67
+        60.0,
+        8.83,
+        0.0
       ],
       "rotation": [
         0.0,
@@ -8767,9 +9111,9 @@
       "kind": "gltf",
       "name": "cow-12",
       "position": [
-        -154.0,
-        40.06999969482422,
-        -84.0
+        -66.0,
+        7.254,
+        0.0
       ],
       "rotation": [
         0.0,
@@ -8895,6 +9239,61 @@
         "volumeGlow": 0.0,
         "fogCoupling": 0.8
       }
+    },
+    {
+      "name": "elder-rings",
+      "kind": "field",
+      "position": [
+        -12.0,
+        0.0,
+        52.0
+      ],
+      "field": {
+        "name": "elder-rings",
+        "kind": "wave",
+        "waveGeometry": "radial",
+        "waveShape": "pulse",
+        "wavelength": 40.0,
+        "waveSpeed": 20.0,
+        "waveWidth": 0.0,
+        "falloff": {
+          "kind": "smoothstep",
+          "inner": 10.0,
+          "outer": 45.0
+        },
+        "trigger": {
+          "source": "beat",
+          "everyN": 4,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "drop-ring",
+      "kind": "field",
+      "position": [
+        -12.0,
+        0.0,
+        52.0
+      ],
+      "field": {
+        "name": "drop-ring",
+        "kind": "wave",
+        "waveGeometry": "radial",
+        "waveShape": "pulse",
+        "wavelength": 60.0,
+        "waveSpeed": 40.0,
+        "waveWidth": 0.0,
+        "falloff": {
+          "kind": "smoothstep",
+          "inner": 220.0,
+          "outer": 340.0
+        },
+        "trigger": {
+          "source": "marker",
+          "name": "drop"
+        }
+      }
     }
   ],
   "post": {
@@ -8907,7 +9306,8 @@
     "bloomRadius": 1.15,
     "bloomLevels": 6,
     "bloomEmissionWeight": 0.75,
-    "antialias": 0.75
+    "antialias": 0.75,
+    "referenceHeight": 1080.0
   },
   "materialPrograms": [
     "../materials/glowmere-painted-frond.material.json",
@@ -8926,13 +9326,13 @@
     "regionScale": 70.0,
     "regionAmount": 0.5,
     "regionDrift": 0.03,
-    "turbulence": 0.22,
+    "turbulence": 0.45,
     "turbulenceScale": 13.0,
     "turbulenceSpeed": 0.7,
-    "gustAmount": 0.52,
-    "gustScale": 38.0,
-    "gustSpeed": 4.0,
-    "gustSharpness": 1.3,
+    "gustAmount": 0.9,
+    "gustScale": 26.0,
+    "gustSpeed": 8.0,
+    "gustSharpness": 2.0,
     "flutterScale": 2.4,
     "simBudget": 520
   },
@@ -8986,49 +9386,58 @@
       ],
       "seed": 771155,
       "cullDistance": 900.0,
-      "reactions": [
+      "reactions": []
+    },
+    {
+      "name": "scout",
+      "profile": "../entities/craft-lights.profile.json",
+      "node": "scout",
+      "tags": [
+        "ufo",
+        "vehicle"
+      ],
+      "seed": 20261012,
+      "fullDetailDistance": 420.0,
+      "coarseInterval": 0.1,
+      "cullDistance": 900.0,
+      "behaviors": [
         {
-          "signal": "audio.bass",
-          "target": "spawnRate",
-          "depth": 900.0,
-          "chain": {
-            "attackMs": 60.0,
-            "curve": "power",
-            "curveAmount": 1.5,
-            "decayMs": 420.0
-          }
+          "kind": "hover",
+          "amplitude": 0.51,
+          "rate": 0.071,
+          "tilt": 1.7
         },
         {
-          "signal": "audio.rms",
-          "target": "emissive",
-          "depth": 1.5,
-          "chain": {
-            "attackMs": 90.0,
-            "decayMs": 520.0
-          }
+          "kind": "drift",
+          "radius": 1.44,
+          "rate": 0.04
         },
         {
-          "signal": "audio.onset",
-          "target": "size",
-          "depth": 0.45,
-          "chain": {
-            "attackMs": 5.0,
-            "decayMs": 220.0,
-            "envelope": "peakhold",
-            "envelopeFallPerSecond": 5.0,
-            "envelopeHoldMs": 15.0
-          }
+          "kind": "bank",
+          "degrees": 5.0,
+          "responseMs": 1500.0
         },
         {
-          "signal": "audio.lowMid",
-          "target": "speed",
-          "depth": 0.25,
-          "chain": {
-            "attackMs": 140.0,
-            "decayMs": 700.0
-          }
+          "kind": "spin",
+          "signal": "",
+          "baseRate": 0.4518,
+          "impulse": 0.0,
+          "damping": 0.5,
+          "maxRate": 30.0
         }
-      ]
+      ],
+      "reactions": []
+    },
+    {
+      "name": "scout-beam",
+      "node": "scout-beam",
+      "tags": [
+        "world_effect",
+        "beam"
+      ],
+      "seed": 771256,
+      "cullDistance": 900.0,
+      "reactions": []
     },
     {
       "name": "rook",
@@ -9055,7 +9464,9 @@
         "moveEnter": 0.9028,
         "moveExit": 0.4514,
         "accel": 4.8151,
-        "decel": 6.6207
+        "decel": 6.6207,
+        "turnRadius": 1.5,
+        "turnRate": 100.0
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -9071,7 +9482,9 @@
         "jump": "Jumping",
         "jumpRunning": "Jump_running",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "inspect": "Take_from_floor",
+        "tinker": "Button_push"
       },
       "behaviors": [
         {
@@ -9093,7 +9506,8 @@
             },
             "memory": {
               "recoverSeconds": 150.0,
-              "habituationSeconds": 6.0
+              "habituationSeconds": 6.0,
+              "eventSeconds": 20.0
             }
           },
           "considerers": [
@@ -9105,13 +9519,34 @@
               "kind": "react",
               "name": "beam",
               "events": [
-                "abduction/beam"
+                "setpiece/e4-river-pair/beam"
               ],
               "weight": 1.5,
               "approach": 18.0,
               "flee": 10.0,
               "dwell": 4.0,
-              "fadeSeconds": 12.0
+              "fadeSeconds": 12.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ]
+            },
+            {
+              "kind": "react",
+              "name": "centrepiece",
+              "events": [
+                "setpiece/e5-centrepiece/beam"
+              ],
+              "weight": 1.5,
+              "approach": 100.0,
+              "flee": 10.0,
+              "dwell": 6.0,
+              "fadeSeconds": 10.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ],
+              "activity": "observe"
             },
             {
               "kind": "social",
@@ -9136,13 +9571,17 @@
                 "character": 0.9,
                 "water": 0.8
               },
-              "activity": "observe",
+              "activity": "inspect",
               "approach": 8.0,
-              "dwell": 3.0,
+              "dwell": 2.4,
               "minRange": 8.0,
               "maxRange": 150.0,
               "noveltyRadius": 26.0,
-              "noveltyPenalty": 0.1
+              "noveltyPenalty": 0.1,
+              "speedRange": [
+                0.9,
+                1.3
+              ]
             },
             {
               "kind": "holdPost",
@@ -9157,7 +9596,8 @@
               "name": "idle",
               "weight": 0.05
             }
-          ]
+          ],
+          "maxStillSeconds": 7.0
         },
         {
           "kind": "lookAt",
@@ -9166,7 +9606,7 @@
         },
         {
           "kind": "liveliness",
-          "bounce": 0.22,
+          "bounce": 0.18,
           "stride": 5.78,
           "sway": 3.0,
           "nod": 2.0
@@ -9217,12 +9657,14 @@
         "runSpeed": 7.3861,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 3.0169,
-        "runExit": 1.9826,
+        "runEnter": 4.8,
+        "runExit": 3.1,
         "moveEnter": 0.5172,
         "moveExit": 0.2586,
         "accel": 2.7583,
-        "decel": 3.7927
+        "decel": 3.7927,
+        "turnRadius": 1.5,
+        "turnRate": 100.0
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -9238,7 +9680,9 @@
         "jump": "Jumping",
         "jumpRunning": "Jump_running",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "inspect": "Take_from_floor",
+        "tinker": "Button_push"
       },
       "behaviors": [
         {
@@ -9260,7 +9704,8 @@
             },
             "memory": {
               "recoverSeconds": 150.0,
-              "habituationSeconds": 6.0
+              "habituationSeconds": 6.0,
+              "eventSeconds": 20.0
             }
           },
           "considerers": [
@@ -9272,13 +9717,34 @@
               "kind": "react",
               "name": "beam",
               "events": [
-                "abduction/beam"
+                "setpiece/e4-river-pair/beam"
               ],
               "weight": 1.5,
               "approach": 18.0,
               "flee": 10.0,
               "dwell": 4.0,
-              "fadeSeconds": 12.0
+              "fadeSeconds": 12.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ]
+            },
+            {
+              "kind": "react",
+              "name": "centrepiece",
+              "events": [
+                "setpiece/e5-centrepiece/beam"
+              ],
+              "weight": 1.5,
+              "approach": 100.0,
+              "flee": 10.0,
+              "dwell": 6.0,
+              "fadeSeconds": 10.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ],
+              "activity": "observe"
             },
             {
               "kind": "social",
@@ -9305,11 +9771,15 @@
               },
               "activity": "observe",
               "approach": 7.0,
-              "dwell": 6.0,
-              "minRange": 7.0,
+              "dwell": 3.5,
+              "minRange": 14.0,
               "maxRange": 120.0,
               "noveltyRadius": 22.0,
-              "noveltyPenalty": 0.14
+              "noveltyPenalty": 0.14,
+              "speedRange": [
+                0.8,
+                1.2
+              ]
             },
             {
               "kind": "holdPost",
@@ -9324,7 +9794,8 @@
               "name": "idle",
               "weight": 0.05
             }
-          ]
+          ],
+          "maxStillSeconds": 8.0
         },
         {
           "kind": "lookAt",
@@ -9353,17 +9824,7 @@
         "hertz": 3.0,
         "occlusionTestsPerSecond": 0.0
       },
-      "reactions": [
-        {
-          "signal": "audio.lowMid",
-          "target": "liveliness/sway",
-          "depth": 6.0,
-          "chain": {
-            "attackMs": 400.0,
-            "decayMs": 2200.0
-          }
-        }
-      ]
+      "reactions": []
     },
     {
       "name": "sage",
@@ -9385,13 +9846,15 @@
         "runSpeed": 7.3889,
         "rateMin": 0.08,
         "rateMax": 1.75,
-        "runEnter": 3.6619,
-        "runExit": 2.4955,
+        "runEnter": 4.8,
+        "runExit": 3.1,
         "moveEnter": 0.651,
         "moveExit": 0.3255,
         "accel": 3.472,
         "decel": 4.774,
-        "minDwell": 0.6
+        "minDwell": 0.6,
+        "turnRadius": 1.5,
+        "turnRate": 100.0
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -9407,7 +9870,9 @@
         "jump": "Jumping",
         "jumpRunning": "Jump_running",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "inspect": "Take_from_floor",
+        "tinker": "Button_push"
       },
       "behaviors": [
         {
@@ -9429,7 +9894,8 @@
             },
             "memory": {
               "recoverSeconds": 150.0,
-              "habituationSeconds": 6.0
+              "habituationSeconds": 6.0,
+              "eventSeconds": 20.0
             }
           },
           "considerers": [
@@ -9441,13 +9907,34 @@
               "kind": "react",
               "name": "beam",
               "events": [
-                "abduction/beam"
+                "setpiece/e4-river-pair/beam"
               ],
               "weight": 1.5,
               "approach": 18.0,
               "flee": 10.0,
               "dwell": 4.0,
-              "fadeSeconds": 12.0
+              "fadeSeconds": 12.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ]
+            },
+            {
+              "kind": "react",
+              "name": "centrepiece",
+              "events": [
+                "setpiece/e5-centrepiece/beam"
+              ],
+              "weight": 1.5,
+              "approach": 100.0,
+              "flee": 10.0,
+              "dwell": 6.0,
+              "fadeSeconds": 10.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ],
+              "activity": "observe"
             },
             {
               "kind": "social",
@@ -9463,11 +9950,12 @@
             {
               "kind": "holdPost",
               "name": "grove",
-              "weight": 0.42,
+              "weight": 0.1,
               "post": "",
               "tolerance": 9.0,
               "pull": 0.18,
-              "activity": "observe"
+              "activity": "observe",
+              "duration": 4.0
             },
             {
               "kind": "interest",
@@ -9483,19 +9971,24 @@
               },
               "activity": "observe",
               "approach": 6.0,
-              "dwell": 6.0,
+              "dwell": 4.5,
               "minRange": 6.0,
               "maxRange": 70.0,
-              "homeRadius": 50.0,
+              "homeRadius": 30.0,
               "noveltyRadius": 14.0,
-              "noveltyPenalty": 0.3
+              "noveltyPenalty": 0.3,
+              "speedRange": [
+                0.7,
+                1.05
+              ]
             },
             {
               "kind": "idle",
               "name": "idle",
               "weight": 0.05
             }
-          ]
+          ],
+          "maxStillSeconds": 8.0
         },
         {
           "kind": "lookAt",
@@ -9511,9 +10004,9 @@
             "rook",
             "ember"
           ],
-          "observeChance": 0.55,
-          "minDwell": 3.0,
-          "maxDwell": 6.0,
+          "observeChance": 0.25,
+          "minDwell": 1.2,
+          "maxDwell": 3.4,
           "alertThreshold": 0.3,
           "reactionDecay": 1.2,
           "reactionCooldown": 15.0
@@ -9577,7 +10070,9 @@
         "moveEnter": 0.8006,
         "moveExit": 0.4003,
         "accel": 4.2699,
-        "decel": 5.8711
+        "decel": 5.8711,
+        "turnRadius": 1.5,
+        "turnRate": 100.0
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -9593,7 +10088,9 @@
         "jump": "Jumping",
         "jumpRunning": "Jump_running",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "inspect": "Take_from_floor",
+        "tinker": "Button_push"
       },
       "behaviors": [
         {
@@ -9615,7 +10112,8 @@
             },
             "memory": {
               "recoverSeconds": 150.0,
-              "habituationSeconds": 6.0
+              "habituationSeconds": 6.0,
+              "eventSeconds": 20.0
             }
           },
           "considerers": [
@@ -9627,13 +10125,34 @@
               "kind": "react",
               "name": "beam",
               "events": [
-                "abduction/beam"
+                "setpiece/e4-river-pair/beam"
               ],
               "weight": 1.5,
               "approach": 18.0,
               "flee": 10.0,
               "dwell": 4.0,
-              "fadeSeconds": 12.0
+              "fadeSeconds": 12.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ]
+            },
+            {
+              "kind": "react",
+              "name": "centrepiece",
+              "events": [
+                "setpiece/e5-centrepiece/beam"
+              ],
+              "weight": 1.5,
+              "approach": 100.0,
+              "flee": 10.0,
+              "dwell": 6.0,
+              "fadeSeconds": 10.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ],
+              "activity": "observe"
             },
             {
               "kind": "social",
@@ -9658,13 +10177,17 @@
                 "water": 0.9,
                 "vista": 0.8
               },
-              "activity": "observe",
+              "activity": "tinker",
               "approach": 8.0,
-              "dwell": 2.5,
+              "dwell": 1.6,
               "minRange": 8.0,
               "maxRange": 150.0,
               "noveltyRadius": 26.0,
-              "noveltyPenalty": 0.12
+              "noveltyPenalty": 0.12,
+              "speedRange": [
+                0.9,
+                1.35
+              ]
             },
             {
               "kind": "holdPost",
@@ -9679,7 +10202,8 @@
               "name": "idle",
               "weight": 0.05
             }
-          ]
+          ],
+          "maxStillSeconds": 6.0
         },
         {
           "kind": "lookAt",
@@ -9688,7 +10212,7 @@
         },
         {
           "kind": "liveliness",
-          "bounce": 0.32,
+          "bounce": 0.17,
           "stride": 5.35,
           "sway": 5.0,
           "nod": 3.0
@@ -9708,17 +10232,6 @@
         "occlusionTestsPerSecond": 0.0
       },
       "reactions": [
-        {
-          "signal": "audio.bass",
-          "target": "liveliness/bounce",
-          "depth": 0.45,
-          "chain": {
-            "attackMs": 60.0,
-            "curve": "power",
-            "curveAmount": 1.5,
-            "decayMs": 380.0
-          }
-        },
         {
           "signal": "audio.rms",
           "target": "decide/roam/weight",
@@ -9765,7 +10278,9 @@
         "moveEnter": 0.8006,
         "moveExit": 0.4003,
         "accel": 4.2699,
-        "decel": 5.8711
+        "decel": 5.8711,
+        "turnRadius": 1.5,
+        "turnRate": 100.0
       },
       "fullDetailDistance": 120.0,
       "coarseInterval": 0.1,
@@ -9781,7 +10296,9 @@
         "jump": "Jumping",
         "jumpRunning": "Jump_running",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "inspect": "Take_from_floor",
+        "tinker": "Button_push"
       },
       "behaviors": [
         {
@@ -9803,7 +10320,8 @@
             },
             "memory": {
               "recoverSeconds": 150.0,
-              "habituationSeconds": 6.0
+              "habituationSeconds": 6.0,
+              "eventSeconds": 20.0
             }
           },
           "considerers": [
@@ -9815,13 +10333,34 @@
               "kind": "react",
               "name": "beam",
               "events": [
-                "abduction/beam"
+                "setpiece/e4-river-pair/beam"
               ],
               "weight": 1.5,
               "approach": 18.0,
               "flee": 10.0,
               "dwell": 4.0,
-              "fadeSeconds": 12.0
+              "fadeSeconds": 12.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ]
+            },
+            {
+              "kind": "react",
+              "name": "centrepiece",
+              "events": [
+                "setpiece/e5-centrepiece/beam"
+              ],
+              "weight": 6.0,
+              "approach": 100.0,
+              "flee": 10.0,
+              "dwell": 6.0,
+              "fadeSeconds": 10.0,
+              "speedRange": [
+                0.9,
+                1.1
+              ],
+              "activity": "observe"
             },
             {
               "kind": "social",
@@ -9848,11 +10387,15 @@
               },
               "activity": "observe",
               "approach": 7.0,
-              "dwell": 8.0,
+              "dwell": 3.5,
               "minRange": 7.0,
-              "maxRange": 130.0,
+              "maxRange": 60.0,
               "noveltyRadius": 20.0,
-              "noveltyPenalty": 0.14
+              "noveltyPenalty": 0.14,
+              "speedRange": [
+                0.8,
+                1.15
+              ]
             },
             {
               "kind": "holdPost",
@@ -9867,7 +10410,8 @@
               "name": "idle",
               "weight": 0.05
             }
-          ]
+          ],
+          "maxStillSeconds": 9.0
         },
         {
           "kind": "lookAt",
@@ -9876,7 +10420,7 @@
         },
         {
           "kind": "liveliness",
-          "bounce": 0.32,
+          "bounce": 0.17,
           "stride": 5.35,
           "sway": 5.0,
           "nod": 3.0
@@ -9896,17 +10440,6 @@
         "occlusionTestsPerSecond": 0.0
       },
       "reactions": [
-        {
-          "signal": "audio.bass",
-          "target": "liveliness/bounce",
-          "depth": 0.45,
-          "chain": {
-            "attackMs": 60.0,
-            "curve": "power",
-            "curveAmount": 1.5,
-            "decayMs": 380.0
-          }
-        },
         {
           "signal": "audio.rms",
           "target": "decide/watch/weight",
@@ -9948,7 +10481,9 @@
           "pauseMin": 1.08,
           "runSpeed": 3.0911,
           "speed": 1.9319,
-          "turnRate": 76.3
+          "turnRate": 76.3,
+          "maxSlope": 10.0,
+          "turnRadius": 2.0
         },
         {
           "kind": "ground",
@@ -9978,7 +10513,8 @@
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
-        "walkSpeed": 3.2375
+        "walkSpeed": 3.2375,
+        "pivotRadius": 1.1
       },
       "name": "bull-1",
       "node": "bull-1",
@@ -10009,7 +10545,9 @@
           "pauseMin": 1.08,
           "runSpeed": 3.0911,
           "speed": 1.9319,
-          "turnRate": 76.3
+          "turnRate": 76.3,
+          "maxSlope": 10.0,
+          "turnRadius": 2.0
         },
         {
           "bodyRadius": 1.46,
@@ -10039,7 +10577,8 @@
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
-        "walkSpeed": 3.2375
+        "walkSpeed": 3.2375,
+        "pivotRadius": 1.1
       },
       "name": "bull-18",
       "node": "bull-18",
@@ -10070,7 +10609,9 @@
           "pauseMin": 1.08,
           "runSpeed": 3.0911,
           "speed": 1.9319,
-          "turnRate": 76.3
+          "turnRate": 76.3,
+          "maxSlope": 10.0,
+          "turnRadius": 2.0
         },
         {
           "bodyRadius": 1.46,
@@ -10100,7 +10641,8 @@
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
-        "walkSpeed": 3.2375
+        "walkSpeed": 3.2375,
+        "pivotRadius": 1.1
       },
       "name": "bull-21",
       "node": "bull-21",
@@ -10123,15 +10665,17 @@
         },
         {
           "arrive": 0.79,
-          "homeRadius": 19.54,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 10.66,
+          "maxRange": 12.0,
           "minRange": 2.78,
           "pauseMax": 5.03,
           "pauseMin": 1.03,
           "runSpeed": 2.2202,
           "speed": 1.3876,
-          "turnRate": 94.4
+          "turnRate": 94.4,
+          "maxSlope": 10.0,
+          "turnRadius": 2.2
         },
         {
           "kind": "ground",
@@ -10161,7 +10705,8 @@
         "runEnter": 2.2202,
         "runExit": 1.5956,
         "runSpeed": 3.1577,
-        "walkSpeed": 3.1577
+        "walkSpeed": 3.1577,
+        "pivotRadius": 1.2
       },
       "name": "horse-2",
       "node": "horse-2",
@@ -10184,15 +10729,17 @@
         },
         {
           "arrive": 0.79,
-          "homeRadius": 19.54,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 10.66,
+          "maxRange": 12.0,
           "minRange": 2.78,
           "pauseMax": 5.03,
           "pauseMin": 1.03,
           "runSpeed": 2.2202,
           "speed": 1.3876,
-          "turnRate": 94.4
+          "turnRate": 94.4,
+          "maxSlope": 10.0,
+          "turnRadius": 2.2
         },
         {
           "bodyRadius": 1.26,
@@ -10222,7 +10769,8 @@
         "runEnter": 2.2202,
         "runExit": 1.5956,
         "runSpeed": 3.1577,
-        "walkSpeed": 3.1577
+        "walkSpeed": 3.1577,
+        "pivotRadius": 1.2
       },
       "name": "horse-20",
       "node": "horse-20",
@@ -10253,7 +10801,9 @@
           "pauseMin": 1.13,
           "runSpeed": 2.5554,
           "speed": 1.5973,
-          "turnRate": 110.0
+          "turnRate": 110.0,
+          "maxSlope": 10.0,
+          "turnRadius": 1.8
         },
         {
           "kind": "ground",
@@ -10283,7 +10833,8 @@
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
-        "walkSpeed": 3.0122
+        "walkSpeed": 3.0122,
+        "pivotRadius": 1.0
       },
       "name": "cow-3",
       "node": "cow-3",
@@ -10314,7 +10865,9 @@
           "pauseMin": 1.13,
           "runSpeed": 2.5554,
           "speed": 1.5973,
-          "turnRate": 110.0
+          "turnRate": 110.0,
+          "maxSlope": 10.0,
+          "turnRadius": 1.8
         },
         {
           "bodyRadius": 1.21,
@@ -10344,7 +10897,8 @@
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
-        "walkSpeed": 3.0122
+        "walkSpeed": 3.0122,
+        "pivotRadius": 1.0
       },
       "name": "cow-19",
       "node": "cow-19",
@@ -10367,15 +10921,17 @@
         },
         {
           "arrive": 0.57,
-          "homeRadius": 15.5,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 13.02,
+          "maxRange": 12.0,
           "minRange": 2.48,
           "pauseMax": 3.45,
           "pauseMin": 1.13,
           "runSpeed": 2.5554,
           "speed": 1.5973,
-          "turnRate": 110.0
+          "turnRate": 110.0,
+          "maxSlope": 10.0,
+          "turnRadius": 1.8
         },
         {
           "bodyRadius": 1.21,
@@ -10405,7 +10961,8 @@
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
-        "walkSpeed": 3.0122
+        "walkSpeed": 3.0122,
+        "pivotRadius": 1.0
       },
       "name": "cow-23",
       "node": "cow-23",
@@ -10428,15 +10985,17 @@
         },
         {
           "arrive": 0.54,
-          "homeRadius": 16.96,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 11.8,
+          "maxRange": 12.0,
           "minRange": 2.38,
           "pauseMax": 6.05,
           "pauseMin": 0.9,
           "runSpeed": 3.2732,
           "speed": 2.0456,
-          "turnRate": 69.2
+          "turnRate": 69.2,
+          "maxSlope": 10.0,
+          "turnRadius": 2.0
         },
         {
           "kind": "ground",
@@ -10466,7 +11025,8 @@
         "runEnter": 3.2732,
         "runExit": 2.3523,
         "runSpeed": 3.2375,
-        "walkSpeed": 3.2375
+        "walkSpeed": 3.2375,
+        "pivotRadius": 1.1
       },
       "name": "bull-10",
       "node": "bull-10",
@@ -10497,7 +11057,9 @@
           "pauseMin": 1.6,
           "runSpeed": 2.6066,
           "speed": 1.6291,
-          "turnRate": 81.5
+          "turnRate": 81.5,
+          "maxSlope": 10.0,
+          "turnRadius": 2.2
         },
         {
           "kind": "ground",
@@ -10527,7 +11089,8 @@
         "runEnter": 2.6066,
         "runExit": 1.8732,
         "runSpeed": 3.1577,
-        "walkSpeed": 3.1577
+        "walkSpeed": 3.1577,
+        "pivotRadius": 1.2
       },
       "name": "horse-11",
       "node": "horse-11",
@@ -10550,15 +11113,17 @@
         },
         {
           "arrive": 0.65,
-          "homeRadius": 20.35,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 14.0,
+          "maxRange": 12.0,
           "minRange": 2.63,
           "pauseMax": 6.24,
           "pauseMin": 1.6,
           "runSpeed": 2.6066,
           "speed": 1.6291,
-          "turnRate": 81.5
+          "turnRate": 81.5,
+          "maxSlope": 10.0,
+          "turnRadius": 2.2
         },
         {
           "kind": "ground",
@@ -10588,7 +11153,8 @@
         "runEnter": 2.6066,
         "runExit": 1.8732,
         "runSpeed": 3.1577,
-        "walkSpeed": 3.1577
+        "walkSpeed": 3.1577,
+        "pivotRadius": 1.2
       },
       "name": "horse-22",
       "node": "horse-22",
@@ -10611,15 +11177,17 @@
         },
         {
           "arrive": 0.81,
-          "homeRadius": 15.49,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 14.99,
+          "maxRange": 12.0,
           "minRange": 2.34,
           "pauseMax": 5.61,
           "pauseMin": 1.0,
           "runSpeed": 1.9831,
           "speed": 1.2394,
-          "turnRate": 75.5
+          "turnRate": 75.5,
+          "maxSlope": 10.0,
+          "turnRadius": 1.8
         },
         {
           "kind": "ground",
@@ -10649,7 +11217,8 @@
         "runEnter": 1.9831,
         "runExit": 1.4254,
         "runSpeed": 3.0122,
-        "walkSpeed": 3.0122
+        "walkSpeed": 3.0122,
+        "pivotRadius": 1.0
       },
       "name": "cow-12",
       "node": "cow-12",
@@ -10665,8 +11234,13 @@
   "navBodyRadius": 1.2998,
   "worldEvents": [
     {
-      "name": "abduction/beam",
-      "radius": 150.0,
+      "name": "setpiece/e4-river-pair/beam",
+      "radius": 80.0,
+      "magnitude": 1.0
+    },
+    {
+      "name": "setpiece/e5-centrepiece/beam",
+      "radius": 250.0,
       "magnitude": 1.0
     }
   ],
@@ -10681,629 +11255,26 @@
             "entity": "visitor-beam"
           }
         ]
-      }
-    ],
-    "scenarios": [
+      },
       {
-        "name": "abduction",
-        "actor": "saucer",
-        "seed": 20260915,
-        "autoStart": true,
-        "maxCycles": 1,
-        "searchInterval": 0.5,
-        "params": [
-          {
-            "name": "restSeconds",
-            "value": 26.576,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "flybySeconds",
-            "value": 3.2,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "awaySeconds",
-            "value": 0.1,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "holdSeconds",
-            "value": 118.396,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "hoverHeight",
-            "value": 23.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "cruiseClearance",
-            "value": 34.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "travelSpeed",
-            "value": 30.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "approachSeconds",
-            "value": 21.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "aimSeconds",
-            "value": 0.8,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "hoverSeconds",
-            "value": 2.4,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamSeconds",
-            "value": 1.1,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamFadeSeconds",
-            "value": 0.15,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "abductSeconds",
-            "value": 4.91,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "liftHeight",
-            "value": -3.5502,
-            "min": -20.0,
-            "max": 20.0
-          },
-          {
-            "name": "animalSpin",
-            "value": 90.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "animalWobble",
-            "value": 0.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "animalWobbleRate",
-            "value": 1.35,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "animalGait",
-            "value": 0.7003,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "craftWobble",
-            "value": 0.3,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "craftWobbleRate",
-            "value": 0.45,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamSpawnRate",
-            "value": 4200.0,
-            "min": 0.0,
-            "max": 8400.0
-          },
-          {
-            "name": "beamEmissive",
-            "value": 0.7,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamSize",
-            "value": 1.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamRestRate",
-            "value": 0.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamRestEmissive",
-            "value": 0.45,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "beamDrainSeconds",
-            "value": 5.0,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "fadeDelaySeconds",
-            "value": 3.51,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "fadeSeconds",
-            "value": 1.4,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "gapSeconds",
-            "value": 3.7,
-            "min": 0.0,
-            "max": 1000.0
-          },
-          {
-            "name": "leaveSeconds",
-            "value": 8.0,
-            "min": 0.0,
-            "max": 1000.0
-          }
-        ],
-        "beats": [
-          {
-            "name": "rest",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "hide",
-                    "name": "unseen"
-                  },
-                  {
-                    "kind": "wait",
-                    "name": "rest",
-                    "duration": {
-                      "param": "restSeconds"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "flyby"
-          },
-          {
-            "name": "flyby",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "moveTo",
-                    "name": "enter",
-                    "point": [
-                      220.0,
-                      78.0,
-                      70.0
-                    ],
-                    "duration": 0.05
-                  },
-                  {
-                    "kind": "show",
-                    "name": "seen"
-                  },
-                  {
-                    "kind": "moveTo",
-                    "name": "cross",
-                    "point": [
-                      -240.0,
-                      86.0,
-                      80.0
-                    ],
-                    "duration": {
-                      "param": "flybySeconds"
-                    }
-                  },
-                  {
-                    "kind": "hide",
-                    "name": "gone"
-                  }
-                ]
-              }
-            ],
-            "then": "away"
-          },
-          {
-            "name": "away",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "moveTo",
-                    "name": "withdraw",
-                    "point": [
-                      60.0,
-                      150.0,
-                      330.0
-                    ],
-                    "duration": {
-                      "param": "awaySeconds"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "hold"
-          },
-          {
-            "name": "hold",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "wait",
-                    "name": "hold",
-                    "duration": {
-                      "param": "holdSeconds"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "acquire"
-          },
-          {
-            "name": "acquire",
-            "find": [
-              {
-                "bind": "target",
-                "name": "horse-11",
-                "claim": true
-              }
-            ],
-            "cues": [],
-            "then": "approach",
-            "otherwise": "acquire"
-          },
-          {
-            "name": "approach",
-            "cues": [
-              {
-                "role": "actor.beam",
-                "steps": [
-                  {
-                    "kind": "hide",
-                    "name": "beamOff"
-                  }
-                ]
-              },
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "show",
-                    "name": "arrive"
-                  },
-                  {
-                    "kind": "lookAt",
-                    "name": "aim",
-                    "to": "target",
-                    "duration": {
-                      "param": "aimSeconds"
-                    }
-                  },
-                  {
-                    "kind": "moveTo",
-                    "name": "approach",
-                    "to": "target",
-                    "height": {
-                      "param": "hoverHeight"
-                    },
-                    "aboveGround": true,
-                    "speed": {
-                      "param": "travelSpeed"
-                    },
-                    "duration": {
-                      "param": "approachSeconds"
-                    },
-                    "clearance": {
-                      "param": "cruiseClearance"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "beam"
-          },
+        "name": "scout",
+        "body": "scout",
+        "parts": [
           {
             "name": "beam",
-            "stillRoles": [
-              "actor"
-            ],
-            "cues": [
-              {
-                "role": "target",
-                "steps": [
-                  {
-                    "kind": "follow",
-                    "name": "caught",
-                    "relative": true,
-                    "hold": true,
-                    "duration": {
-                      "param": "hoverSeconds"
-                    }
-                  }
-                ]
-              },
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "follow",
-                    "name": "hover",
-                    "relative": true,
-                    "hold": true,
-                    "duration": {
-                      "param": "hoverSeconds"
-                    },
-                    "wobble": {
-                      "param": "craftWobble"
-                    },
-                    "wobbleRate": {
-                      "param": "craftWobbleRate"
-                    }
-                  }
-                ]
-              },
-              {
-                "role": "actor.beam",
-                "steps": [
-                  {
-                    "kind": "show",
-                    "name": "beamOn"
-                  },
-                  {
-                    "kind": "set",
-                    "name": "beamRise",
-                    "target": "spawnRate",
-                    "to": {
-                      "param": "beamSpawnRate"
-                    },
-                    "duration": {
-                      "param": "beamSeconds"
-                    }
-                  },
-                  {
-                    "kind": "set",
-                    "name": "beamGlow",
-                    "target": "emissive",
-                    "to": {
-                      "param": "beamEmissive"
-                    },
-                    "duration": 0.2
-                  }
-                ]
-              },
-              {
-                "role": "actor.beam",
-                "steps": [
-                  {
-                    "kind": "set",
-                    "name": "beamWidth",
-                    "target": "size",
-                    "from": 0.0,
-                    "to": {
-                      "param": "beamSize"
-                    },
-                    "duration": {
-                      "param": "beamSeconds"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "abduct"
-          },
-          {
-            "name": "abduct",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "follow",
-                    "name": "hold",
-                    "relative": true,
-                    "hold": true,
-                    "duration": {
-                      "param": "abductSeconds"
-                    },
-                    "wobble": {
-                      "param": "craftWobble"
-                    },
-                    "wobbleRate": {
-                      "param": "craftWobbleRate"
-                    }
-                  }
-                ]
-              },
-              {
-                "role": "target",
-                "steps": [
-                  {
-                    "kind": "moveTo",
-                    "name": "lift",
-                    "to": "actor.beam",
-                    "anchor": "drawn",
-                    "place": "drawn",
-                    "height": {
-                      "param": "liftHeight"
-                    },
-                    "duration": {
-                      "param": "abductSeconds"
-                    },
-                    "spin": {
-                      "param": "animalSpin"
-                    },
-                    "wobble": {
-                      "param": "animalWobble"
-                    },
-                    "wobbleRate": {
-                      "param": "animalWobbleRate"
-                    },
-                    "rate": {
-                      "param": "animalGait"
-                    }
-                  }
-                ]
-              },
-              {
-                "role": "target",
-                "steps": [
-                  {
-                    "kind": "wait",
-                    "name": "rise",
-                    "duration": {
-                      "param": "fadeDelaySeconds"
-                    }
-                  },
-                  {
-                    "kind": "set",
-                    "name": "fade",
-                    "target": "opacity",
-                    "from": 1.0,
-                    "to": 0.0,
-                    "duration": {
-                      "param": "fadeSeconds"
-                    },
-                    "ease": true
-                  },
-                  {
-                    "kind": "retire",
-                    "name": "vanish"
-                  }
-                ]
-              }
-            ],
-            "then": "depart"
-          },
-          {
-            "name": "depart",
-            "release": true,
-            "cues": [
-              {
-                "role": "actor.beam",
-                "steps": [
-                  {
-                    "kind": "hide",
-                    "name": "beamOut"
-                  },
-                  {
-                    "kind": "set",
-                    "name": "beamFall",
-                    "target": "spawnRate",
-                    "to": {
-                      "param": "beamRestRate"
-                    },
-                    "duration": 0.0
-                  },
-                  {
-                    "kind": "set",
-                    "name": "beamCut",
-                    "target": "size",
-                    "to": 0.0,
-                    "duration": {
-                      "param": "beamFadeSeconds"
-                    }
-                  },
-                  {
-                    "kind": "set",
-                    "name": "beamDim",
-                    "target": "emissive",
-                    "to": {
-                      "param": "beamRestEmissive"
-                    },
-                    "duration": 0.3
-                  }
-                ]
-              },
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "wait",
-                    "name": "beat",
-                    "duration": {
-                      "param": "gapSeconds"
-                    }
-                  }
-                ]
-              }
-            ],
-            "then": "leave"
-          },
-          {
-            "name": "leave",
-            "cues": [
-              {
-                "role": "actor",
-                "steps": [
-                  {
-                    "kind": "moveTo",
-                    "name": "ascend",
-                    "point": [
-                      -250.0,
-                      420.0,
-                      -320.0
-                    ],
-                    "duration": {
-                      "param": "leaveSeconds"
-                    }
-                  },
-                  {
-                    "kind": "hide",
-                    "name": "departed"
-                  }
-                ]
-              }
-            ]
+            "entity": "scout-beam"
           }
         ]
       }
-    ]
+    ],
+    "scenarios": []
   },
   "cameraDirection": {
     "cameras": [
       {
         "id": 1,
         "name": "Main",
-        "autoDirector": false
+        "autoDirector": true
       },
       {
         "id": 2,
@@ -11345,59 +11316,27 @@
       },
       {
         "id": 4,
-        "name": "s03 Ember walks the west bank",
+        "name": "s03 E1: the elder, and far beyond it a beam lights over a fi",
         "slug": "s03",
         "placement": "free",
         "position": [
-          0.0,
-          10.0,
-          0.0
+          30.0,
+          4.176,
+          150.0
         ],
         "target": [
-          0.0,
-          0.0,
-          0.0
+          -31.8,
+          14.7,
+          -40.2
         ],
-        "fov": 37.8493,
-        "focalLength": 35.0,
-        "autoDirector": false,
-        "aimNode": "ember",
-        "aimOffset": [
-          0.0,
-          1.9,
-          0.0
-        ],
-        "followNode": "ember",
-        "followOffset": [
-          4.5,
-          2.4,
-          5.5
-        ],
-        "followClearance": 1.2
-      },
-      {
-        "id": 5,
-        "name": "s04 The lantern from the hollow, ferns in front",
-        "slug": "s04",
-        "placement": "free",
-        "position": [
-          -70.0,
-          10.265,
-          -41.0
-        ],
-        "target": [
-          -46.0,
-          11.0,
-          -28.0
-        ],
-        "fov": 46.3972,
-        "focalLength": 28.0,
+        "fov": 26.9915,
+        "focalLength": 50.0,
         "autoDirector": false
       },
       {
-        "id": 6,
-        "name": "s05 The white horse grazing, the elder behind it",
-        "slug": "s05",
+        "id": 5,
+        "name": "s04 The white horse grazing under the elder's cap",
+        "slug": "s04",
         "placement": "free",
         "position": [
           22.0,
@@ -11409,39 +11348,80 @@
           0.0,
           0.0
         ],
-        "fov": 43.6028,
-        "focalLength": 30.0,
+        "fov": 24.616,
+        "focalLength": 55.0,
         "autoDirector": false,
         "aimNode": "horse-11",
         "aimOffset": [
           0.0,
-          8.6,
+          5.0,
           0.0
-        ]
+        ],
+        "followSmoothSeconds": 0.0,
+        "followVerticalSmoothSeconds": 0.0,
+        "followLead": 0.0
+      },
+      {
+        "id": 6,
+        "name": "s05 The lantern from the hollow, ferns in front",
+        "slug": "s05",
+        "placement": "free",
+        "position": [
+          -70.0,
+          10.265,
+          -41.0
+        ],
+        "target": [
+          -44.8,
+          13.1,
+          -25.6
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
       },
       {
         "id": 7,
-        "name": "s06 Long-lens wide: the elder against the valley",
+        "name": "s06 The bloom by the river, breathing",
         "slug": "s06",
         "placement": "free",
         "position": [
-          -14.0,
-          3.385,
-          165.0
+          -40.0,
+          4.948,
+          130.0
         ],
         "target": [
-          -12.0,
-          10.0,
-          52.0
+          -60.0,
+          9.0,
+          118.0
         ],
-        "fov": 16.0714,
-        "focalLength": 85.0,
+        "fov": 37.8493,
+        "focalLength": 35.0,
         "autoDirector": false
       },
       {
         "id": 8,
-        "name": "s07 A shape crosses the sky over the elder",
+        "name": "s07 The elder's cap from the north, its rim against the star",
         "slug": "s07",
+        "placement": "free",
+        "position": [
+          -10.0,
+          6.724,
+          36.0
+        ],
+        "target": [
+          -13.0,
+          17.0,
+          48.0
+        ],
+        "fov": 61.9275,
+        "focalLength": 20.0,
+        "autoDirector": false
+      },
+      {
+        "id": 9,
+        "name": "s08 E2: a shape crosses the sky over the elder",
+        "slug": "s08",
         "placement": "free",
         "position": [
           -24.0,
@@ -11449,18 +11429,18 @@
           -58.0
         ],
         "target": [
-          -12.0,
+          17.8552,
           39.2916,
-          52.0
+          44.4311
         ],
         "fov": 53.1301,
         "focalLength": 24.0,
         "autoDirector": false
       },
       {
-        "id": 9,
-        "name": "s08 The return: settling toward the pool and the elder",
-        "slug": "s08",
+        "id": 10,
+        "name": "s09 The return: settling toward the pool and the elder",
+        "slug": "s09",
         "placement": "free",
         "position": [
           -62.0,
@@ -11477,9 +11457,28 @@
         "autoDirector": false
       },
       {
-        "id": 10,
-        "name": "s09 Following Ember through the ferns",
-        "slug": "s09",
+        "id": 11,
+        "name": "s10 The first wave runs through the mushrooms toward us",
+        "slug": "s10",
+        "placement": "free",
+        "position": [
+          14.0,
+          9.04,
+          34.0
+        ],
+        "target": [
+          -12.0,
+          5.0,
+          52.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 12,
+        "name": "s11 Rook investigates a flickering cluster",
+        "slug": "s11",
         "placement": "free",
         "position": [
           0.0,
@@ -11494,24 +11493,85 @@
         "fov": 37.8493,
         "focalLength": 35.0,
         "autoDirector": false,
-        "aimNode": "ember",
+        "aimNode": "rook",
         "aimOffset": [
           0.0,
-          1.9,
+          1.3,
           0.0
         ],
-        "followNode": "ember",
+        "followNode": "rook",
         "followOffset": [
-          -5.0,
-          2.3,
-          -4.0
+          -4.5,
+          2.2,
+          5.5
         ],
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 11,
-        "name": "s10 Tide, still, in the north",
-        "slug": "s10",
+        "id": 13,
+        "name": "s12 The herd grazing on the east meadow",
+        "slug": "s12",
+        "placement": "free",
+        "position": [
+          98.0,
+          12.412,
+          -10.0
+        ],
+        "target": [
+          60.0,
+          9.0,
+          20.0
+        ],
+        "fov": 33.3985,
+        "focalLength": 40.0,
+        "autoDirector": false
+      },
+      {
+        "id": 14,
+        "name": "s13 The lantern, close, flaring on the clap",
+        "slug": "s13",
+        "placement": "free",
+        "position": [
+          -35.0,
+          8.648,
+          -12.0
+        ],
+        "target": [
+          -45.0,
+          10.5,
+          -26.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 15,
+        "name": "s14 A travel down the east bank, the elder across the water",
+        "slug": "s14",
+        "placement": "free",
+        "position": [
+          32.0,
+          6.434,
+          98.0
+        ],
+        "target": [
+          -12.0,
+          10.0,
+          52.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 16,
+        "name": "s15 Vane crosses the east meadow, the elder beyond",
+        "slug": "s15",
         "placement": "free",
         "position": [
           0.0,
@@ -11523,46 +11583,69 @@
           0.0,
           0.0
         ],
-        "fov": 33.3985,
-        "focalLength": 40.0,
+        "fov": 37.8493,
+        "focalLength": 35.0,
         "autoDirector": false,
-        "aimNode": "tide",
+        "aimNode": "vane",
         "aimOffset": [
-          0.0,
-          1.8,
-          0.0
+          -12.0,
+          1.2,
+          2.0
         ],
-        "followNode": "tide",
+        "followNode": "vane",
         "followOffset": [
-          5.745333323392335,
-          2.2,
-          4.820907072649044
+          12.12,
+          8.0,
+          7.0
         ],
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 12,
-        "name": "s11 Vane by the river, watching the elder",
-        "slug": "s11",
+        "id": 17,
+        "name": "s16 The spire on the east bank",
+        "slug": "s16",
         "placement": "free",
         "position": [
-          22.0,
-          10.795,
-          -18.0
+          55.8237,
+          12.835,
+          -104.7644
         ],
         "target": [
-          1.4,
-          12.4,
-          19.5
+          67.7,
+          13.5,
+          -103.7
         ],
-        "fov": 26.9915,
-        "focalLength": 50.0,
+        "fov": 53.1301,
+        "focalLength": 24.0,
         "autoDirector": false
       },
       {
-        "id": 13,
-        "name": "s12 The first crane: up out of the ferns, up the valley",
-        "slug": "s12",
+        "id": 18,
+        "name": "s17 The cairn on the spur, its spores in the air",
+        "slug": "s17",
+        "placement": "free",
+        "position": [
+          -125.0,
+          25.97,
+          -45.0
+        ],
+        "target": [
+          -150.0,
+          35.0,
+          -60.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 19,
+        "name": "s18 E3: the crane rises to reveal a column of light up the v",
+        "slug": "s18",
         "placement": "free",
         "position": [
           -8.0,
@@ -11570,18 +11653,46 @@
           33.0
         ],
         "target": [
-          5.0,
+          -10.0,
           6.0,
-          -120.0
+          -150.0
         ],
         "fov": 53.1301,
         "focalLength": 24.0,
         "autoDirector": false
       },
       {
-        "id": 14,
-        "name": "s13 Rook climbs the west slope, the valley below",
-        "slug": "s13",
+        "id": 20,
+        "name": "s19 E3: an animal lifted into the column, far up the valley",
+        "slug": "s19",
+        "placement": "free",
+        "position": [
+          -30.0,
+          14.281,
+          -70.0
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "fov": 13.6855,
+        "focalLength": 100.0,
+        "autoDirector": false,
+        "aimNode": "scout",
+        "aimOffset": [
+          0.0,
+          -13.0,
+          0.0
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
+      },
+      {
+        "id": 21,
+        "name": "s20 Tide, and the column far up the valley beyond",
+        "slug": "s20",
         "placement": "free",
         "position": [
           0.0,
@@ -11593,28 +11704,77 @@
           0.0,
           0.0
         ],
-        "fov": 46.3972,
-        "focalLength": 28.0,
+        "fov": 53.1301,
+        "focalLength": 24.0,
         "autoDirector": false,
-        "aimNode": "rook",
+        "aimNode": "scout",
         "aimOffset": [
           0.0,
-          1.6,
+          -26.0,
           0.0
         ],
-        "followNode": "rook",
+        "followNode": "tide",
         "followOffset": [
-          -4.0,
-          1.4,
-          -8.0
+          4.5,
+          10.0,
+          25.6
         ],
-        "followLagSeconds": 0.3,
-        "followClearance": 1.0
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.2,
+        "followLead": 1.0
       },
       {
-        "id": 15,
-        "name": "s14 The first grand wide: the lit valley, far and low",
-        "slug": "s14",
+        "id": 22,
+        "name": "s21 E3: the animal fades into the scout",
+        "slug": "s21",
+        "placement": "free",
+        "position": [
+          -125.0,
+          21.858,
+          -150.0
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "fov": 19.4552,
+        "focalLength": 70.0,
+        "autoDirector": false,
+        "aimNode": "scout",
+        "aimOffset": [
+          0.0,
+          -9.0,
+          0.0
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
+      },
+      {
+        "id": 23,
+        "name": "s22 The ridge mushroom high in the north-east",
+        "slug": "s22",
+        "placement": "free",
+        "position": [
+          108.0,
+          16.151,
+          -166.0
+        ],
+        "target": [
+          131.0,
+          24.0,
+          -189.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 24,
+        "name": "s23 The first grand wide: the lit valley, far and low",
+        "slug": "s23",
         "placement": "free",
         "position": [
           -6.0,
@@ -11631,9 +11791,28 @@
         "autoDirector": false
       },
       {
-        "id": 16,
-        "name": "s15 Spores falling from the bloom",
-        "slug": "s15",
+        "id": 25,
+        "name": "s24 The valley floor lit, low and wide",
+        "slug": "s24",
+        "placement": "free",
+        "position": [
+          60.0,
+          4.228,
+          140.0
+        ],
+        "target": [
+          -30.0,
+          8.0,
+          20.0
+        ],
+        "fov": 53.1301,
+        "focalLength": 24.0,
+        "autoDirector": false
+      },
+      {
+        "id": 26,
+        "name": "s25 Spores falling from the bloom",
+        "slug": "s25",
         "placement": "free",
         "position": [
           -54.0,
@@ -11641,22 +11820,41 @@
           125.0
         ],
         "target": [
-          -62.0,
-          10.5,
-          118.0
+          -59.3,
+          11.2,
+          117.7
         ],
         "fov": 53.1301,
         "focalLength": 24.0,
         "autoDirector": false
       },
       {
-        "id": 17,
-        "name": "s16 Under the elder: the gold gills",
-        "slug": "s16",
+        "id": 27,
+        "name": "s26 The veil at the water's edge",
+        "slug": "s26",
+        "placement": "free",
+        "position": [
+          88.0,
+          1.592,
+          207.0
+        ],
+        "target": [
+          77.5,
+          3.2,
+          198.7
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 28,
+        "name": "s27 Under the elder: the gold gills",
+        "slug": "s27",
         "placement": "free",
         "position": [
           -15.0,
-          5.269,
+          4.869,
           59.0
         ],
         "target": [
@@ -11669,9 +11867,47 @@
         "autoDirector": false
       },
       {
-        "id": 18,
-        "name": "s17 A slow orbit of the elder, Vane nearby",
-        "slug": "s17",
+        "id": 29,
+        "name": "s28 The scree on the west slope, lit",
+        "slug": "s28",
+        "placement": "free",
+        "position": [
+          -150.0,
+          17.776,
+          110.0
+        ],
+        "target": [
+          -177.0,
+          25.0,
+          96.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 30,
+        "name": "s29 The ember mushroom on the east terrace, lit",
+        "slug": "s29",
+        "placement": "free",
+        "position": [
+          155.0,
+          10.786,
+          160.0
+        ],
+        "target": [
+          176.0,
+          14.0,
+          150.0
+        ],
+        "fov": 26.9915,
+        "focalLength": 50.0,
+        "autoDirector": false
+      },
+      {
+        "id": 31,
+        "name": "s30 An orbit of the elder",
+        "slug": "s30",
         "placement": "free",
         "position": [
           0.0,
@@ -11698,12 +11934,185 @@
           7.5,
           13.680805733026748
         ],
-        "followClearance": 2.0
+        "followClearance": 2.0,
+        "followSmoothSeconds": 0.0,
+        "followVerticalSmoothSeconds": 0.0,
+        "followLead": 0.0
       },
       {
-        "id": 19,
-        "name": "s18 Sage in the grove, among the fireflies",
-        "slug": "s18",
+        "id": 32,
+        "name": "s31 Cows on the west meadow, the lantern beyond",
+        "slug": "s31",
+        "placement": "free",
+        "position": [
+          -100.0,
+          11.752,
+          30.0
+        ],
+        "target": [
+          -62.0,
+          9.0,
+          -8.0
+        ],
+        "fov": 33.3985,
+        "focalLength": 40.0,
+        "autoDirector": false
+      },
+      {
+        "id": 33,
+        "name": "s32 The bloom from across the river",
+        "slug": "s32",
+        "placement": "free",
+        "position": [
+          -35.0,
+          4.888,
+          150.0
+        ],
+        "target": [
+          -59.0,
+          9.0,
+          118.0
+        ],
+        "fov": 26.9915,
+        "focalLength": 50.0,
+        "autoDirector": false
+      },
+      {
+        "id": 34,
+        "name": "s33 E4: the scout settles over the meadow beyond the elder",
+        "slug": "s33",
+        "placement": "free",
+        "position": [
+          -24.0,
+          1.536,
+          120.0
+        ],
+        "target": [
+          -55.375,
+          14.375,
+          17.675
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 35,
+        "name": "s34 E4: a cow lifted into the column",
+        "slug": "s34",
+        "placement": "free",
+        "position": [
+          -70.0,
+          9.586,
+          52.0
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false,
+        "aimNode": "scout",
+        "aimOffset": [
+          0.0,
+          -10.0,
+          0.0
+        ],
+        "followSmoothSeconds": 1.0,
+        "followVerticalSmoothSeconds": 1.5,
+        "followLead": 0.0
+      },
+      {
+        "id": 36,
+        "name": "s35 E4: Sage watches the cow rise",
+        "slug": "s35",
+        "placement": "free",
+        "position": [
+          -114.45,
+          15.245,
+          19.6
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false,
+        "aimNode": "scout",
+        "aimOffset": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "followSmoothSeconds": 1.0,
+        "followVerticalSmoothSeconds": 1.5,
+        "followLead": 0.0
+      },
+      {
+        "id": 37,
+        "name": "s36 The herd on the east meadow",
+        "slug": "s36",
+        "placement": "free",
+        "position": [
+          100.0,
+          12.595,
+          30.0
+        ],
+        "target": [
+          70.0,
+          11.0,
+          10.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 38,
+        "name": "s37 The umbra, listening",
+        "slug": "s37",
+        "placement": "free",
+        "position": [
+          -75.0,
+          5.521,
+          180.0
+        ],
+        "target": [
+          -64.0,
+          7.0,
+          167.0
+        ],
+        "fov": 53.1301,
+        "focalLength": 24.0,
+        "autoDirector": false
+      },
+      {
+        "id": 39,
+        "name": "s38 The elder's spores drifting in its gold",
+        "slug": "s38",
+        "placement": "free",
+        "position": [
+          -36.0,
+          3.386,
+          70.0
+        ],
+        "target": [
+          -12.0,
+          12.0,
+          52.0
+        ],
+        "fov": 26.9915,
+        "focalLength": 50.0,
+        "autoDirector": false
+      },
+      {
+        "id": 40,
+        "name": "s39 Sage in the grove, among the fireflies",
+        "slug": "s39",
         "placement": "free",
         "position": [
           0.0,
@@ -11730,46 +12139,54 @@
           3.0,
           -5.0
         ],
-        "followLagSeconds": 0.4,
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 20,
-        "name": "s19 Walking with Vane under the elder",
-        "slug": "s19",
+        "id": 41,
+        "name": "s40 The lantern from the north",
+        "slug": "s40",
         "placement": "free",
         "position": [
-          0.0,
-          10.0,
-          0.0
+          -50.0,
+          11.472,
+          -48.0
         ],
         "target": [
-          0.0,
-          0.0,
-          0.0
+          -45.0,
+          11.0,
+          -26.0
         ],
-        "fov": 33.3985,
-        "focalLength": 40.0,
-        "autoDirector": false,
-        "aimNode": "vane",
-        "aimOffset": [
-          0.0,
-          1.9,
-          0.0
-        ],
-        "followNode": "vane",
-        "followOffset": [
-          -6.0,
-          2.4,
-          2.0
-        ],
-        "followLagSeconds": 0.3,
-        "followClearance": 1.2
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
       },
       {
-        "id": 21,
-        "name": "s20 Low behind Vane, the aurora beyond",
-        "slug": "s20",
+        "id": 42,
+        "name": "s41 The elder through a long lens from the north, from above",
+        "slug": "s41",
+        "placement": "free",
+        "position": [
+          -20.0,
+          49.788,
+          -60.0
+        ],
+        "target": [
+          -12.0,
+          10.0,
+          52.0
+        ],
+        "fov": 16.0714,
+        "focalLength": 85.0,
+        "autoDirector": false
+      },
+      {
+        "id": 43,
+        "name": "s42 Behind Vane, the aurora beyond",
+        "slug": "s42",
         "placement": "free",
         "position": [
           0.0,
@@ -11793,24 +12210,28 @@
         "followNode": "vane",
         "followOffset": [
           0.6,
-          1.7,
+          2.6,
           5.2
         ],
-        "followClearance": 1.0
+        "followClearance": 1.0,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 22,
-        "name": "s21 The aurora over the valley",
-        "slug": "s21",
+        "id": 44,
+        "name": "s43 The aurora over the valley",
+        "slug": "s43",
         "placement": "free",
         "position": [
           -30.0,
-          5.212,
+          4.712,
           150.0
         ],
         "target": [
           -10.0,
-          40.0,
+          22.0,
           -80.0
         ],
         "fov": 46.3972,
@@ -11818,9 +12239,83 @@
         "autoDirector": false
       },
       {
-        "id": 23,
-        "name": "s22 Locked off: the saucer comes over the rim",
-        "slug": "s22",
+        "id": 45,
+        "name": "s44 Across the valley to the west slope, under the aurora",
+        "slug": "s44",
+        "placement": "free",
+        "position": [
+          70.0,
+          18.53,
+          -40.0
+        ],
+        "target": [
+          -150.0,
+          40.0,
+          -10.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 46,
+        "name": "s45 The spire under the aurora, from the east",
+        "slug": "s45",
+        "placement": "free",
+        "position": [
+          85.0,
+          13.478,
+          -95.0
+        ],
+        "target": [
+          68.0,
+          14.0,
+          -104.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 47,
+        "name": "s46 Tide looks up",
+        "slug": "s46",
+        "placement": "free",
+        "position": [
+          0.0,
+          10.0,
+          0.0
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "fov": 53.1301,
+        "focalLength": 24.0,
+        "autoDirector": false,
+        "aimNode": "tide",
+        "aimOffset": [
+          0.0,
+          3.2,
+          0.0
+        ],
+        "followNode": "tide",
+        "followOffset": [
+          2.0,
+          1.2,
+          3.0
+        ],
+        "followClearance": 1.0,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
+      },
+      {
+        "id": 48,
+        "name": "s47 E5: locked off, the saucer comes over the rim",
+        "slug": "s47",
         "placement": "free",
         "position": [
           -26.0,
@@ -11837,9 +12332,9 @@
         "autoDirector": false
       },
       {
-        "id": 24,
-        "name": "s23 The saucer comes on beyond the elder's cap",
-        "slug": "s23",
+        "id": 49,
+        "name": "s48 E5: the saucer comes on beyond the elder's cap",
+        "slug": "s48",
         "placement": "free",
         "position": [
           -8.0,
@@ -11856,14 +12351,14 @@
         "autoDirector": false
       },
       {
-        "id": 25,
-        "name": "s24 From under the elder: the saucer over its rim",
-        "slug": "s24",
+        "id": 50,
+        "name": "s49 From under the elder: the saucer over its rim",
+        "slug": "s49",
         "placement": "free",
         "position": [
-          -18.0,
-          3.832,
-          45.0
+          -19.0,
+          3.485,
+          43.0
         ],
         "target": [
           0.0,
@@ -11878,38 +12373,44 @@
           0.0,
           -4.0,
           0.0
-        ]
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
       },
       {
-        "id": 26,
-        "name": "s25 Ember watches from across the water",
-        "slug": "s25",
+        "id": 51,
+        "name": "s50 Ember on the west bank, the saucer settling over the eld",
+        "slug": "s50",
         "placement": "free",
         "position": [
-          0.0,
-          10.0,
-          0.0
+          -106.0,
+          12.792,
+          36.0
         ],
         "target": [
-          8.4,
-          8.0,
-          71.4
+          0.0,
+          0.0,
+          0.0
         ],
-        "fov": 46.3972,
-        "focalLength": 28.0,
+        "fov": 41.1121,
+        "focalLength": 32.0,
         "autoDirector": false,
-        "followNode": "ember",
-        "followOffset": [
-          -7.0,
-          3.6,
-          2.5
+        "aimNode": "ember",
+        "aimOffset": [
+          13.0,
+          5.0,
+          6.0
         ],
-        "followClearance": 1.2
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.2,
+        "followLead": 0.5,
+        "followGround": true
       },
       {
-        "id": 27,
-        "name": "s26 The beam lights",
-        "slug": "s26",
+        "id": 52,
+        "name": "s51 E5: the beam lights",
+        "slug": "s51",
         "placement": "free",
         "position": [
           -58.0,
@@ -11917,23 +12418,32 @@
           84.0
         ],
         "target": [
-          4.0,
-          16.0,
-          70.0
+          0.0,
+          0.0,
+          0.0
         ],
         "fov": 53.1301,
         "focalLength": 24.0,
-        "autoDirector": false
+        "autoDirector": false,
+        "aimNode": "visitor",
+        "aimOffset": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
       },
       {
-        "id": 28,
-        "name": "s27 Up the beam from beside the horse",
-        "slug": "s27",
+        "id": 53,
+        "name": "s52 E5: up the beam from beside the horse",
+        "slug": "s52",
         "placement": "free",
         "position": [
-          -1.0,
-          5.608,
-          80.0
+          -8.0,
+          5.446,
+          83.0
         ],
         "target": [
           0.0,
@@ -11948,12 +12458,15 @@
           0.0,
           -3.0,
           0.0
-        ]
+        ],
+        "followSmoothSeconds": 1.0,
+        "followVerticalSmoothSeconds": 1.5,
+        "followLead": 0.0
       },
       {
-        "id": 29,
-        "name": "s28 Vane sees it",
-        "slug": "s28",
+        "id": 54,
+        "name": "s53 Vane sees it",
+        "slug": "s53",
         "placement": "free",
         "position": [
           0.0,
@@ -11980,16 +12493,20 @@
           2.2,
           3.5
         ],
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 30,
-        "name": "s29 The horse rises, glowing, side on",
-        "slug": "s29",
+        "id": 55,
+        "name": "s54 E5: the horse rises, glowing, side on",
+        "slug": "s54",
         "placement": "free",
         "position": [
-          -14.0,
-          12.318,
+          -22.5,
+          8.825,
           75.0
         ],
         "target": [
@@ -12005,12 +12522,15 @@
           0.0,
           1.0,
           0.0
-        ]
+        ],
+        "followSmoothSeconds": 0.5,
+        "followVerticalSmoothSeconds": 0.0,
+        "followLead": 0.0
       },
       {
-        "id": 31,
-        "name": "s30 The elder beside the beam",
-        "slug": "s30",
+        "id": 56,
+        "name": "s55 E5: the elder beside the beam",
+        "slug": "s55",
         "placement": "free",
         "position": [
           -62.0,
@@ -12027,9 +12547,9 @@
         "autoDirector": false
       },
       {
-        "id": 32,
-        "name": "s31 The horse under the saucer",
-        "slug": "s31",
+        "id": 57,
+        "name": "s56 E5: the horse under the saucer",
+        "slug": "s56",
         "placement": "free",
         "position": [
           10.0,
@@ -12037,37 +12557,55 @@
           118.0
         ],
         "target": [
-          8.5,
-          24.0,
-          71.4
+          0.0,
+          0.0,
+          0.0
         ],
         "fov": 19.4552,
         "focalLength": 70.0,
-        "autoDirector": false
+        "autoDirector": false,
+        "aimNode": "visitor",
+        "aimOffset": [
+          0.0,
+          -4.5,
+          0.0
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
       },
       {
-        "id": 33,
-        "name": "s32 The horse fades into the saucer",
-        "slug": "s32",
+        "id": 58,
+        "name": "s57 E5: the horse fades into the saucer",
+        "slug": "s57",
         "placement": "free",
         "position": [
-          40.0,
-          11.127,
-          78.0
+          -25.0,
+          1.807,
+          95.0
         ],
         "target": [
-          8.5,
-          25.0,
-          71.4
+          0.0,
+          0.0,
+          0.0
         ],
-        "fov": 19.4552,
-        "focalLength": 70.0,
-        "autoDirector": false
+        "fov": 26.9915,
+        "focalLength": 50.0,
+        "autoDirector": false,
+        "aimNode": "visitor",
+        "aimOffset": [
+          0.0,
+          -3.5,
+          0.0
+        ],
+        "followSmoothSeconds": 0.6,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 0.0
       },
       {
-        "id": 34,
-        "name": "s33 The drop: the valley lights up, wide and fast",
-        "slug": "s33",
+        "id": 59,
+        "name": "s58 The drop: the valley lights up, wide and fast",
+        "slug": "s58",
         "placement": "free",
         "position": [
           -70.0,
@@ -12084,9 +12622,9 @@
         "autoDirector": false
       },
       {
-        "id": 35,
-        "name": "s34 The saucer leaves over the north rim, the elder below",
-        "slug": "s34",
+        "id": 60,
+        "name": "s59 E5: the saucer leaves over the north rim, the elder belo",
+        "slug": "s59",
         "placement": "free",
         "position": [
           15.0,
@@ -12103,9 +12641,9 @@
         "autoDirector": false
       },
       {
-        "id": 36,
-        "name": "s35 The umbra lit, its spores in the air",
-        "slug": "s35",
+        "id": 61,
+        "name": "s60 The umbra lit, its spores in the air",
+        "slug": "s60",
         "placement": "free",
         "position": [
           -54.0,
@@ -12113,18 +12651,56 @@
           178.0
         ],
         "target": [
-          -66.0,
-          10.0,
-          166.0
+          -64.2,
+          8.4,
+          166.7
         ],
         "fov": 53.1301,
         "focalLength": 24.0,
         "autoDirector": false
       },
       {
-        "id": 37,
-        "name": "s36 Ember looks up",
-        "slug": "s36",
+        "id": 62,
+        "name": "s61 The ember mushroom on the east terrace, lit",
+        "slug": "s61",
+        "placement": "free",
+        "position": [
+          165.0,
+          11.8,
+          158.0
+        ],
+        "target": [
+          175.7,
+          14.0,
+          149.8
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 63,
+        "name": "s62 The cairn lit",
+        "slug": "s62",
+        "placement": "free",
+        "position": [
+          -135.0,
+          35.977,
+          -78.0
+        ],
+        "target": [
+          -150.0,
+          35.0,
+          -59.0
+        ],
+        "fov": 26.9915,
+        "focalLength": 50.0,
+        "autoDirector": false
+      },
+      {
+        "id": 64,
+        "name": "s63 Ember looks up",
+        "slug": "s63",
         "placement": "free",
         "position": [
           0.0,
@@ -12151,12 +12727,111 @@
           2.2,
           4.0
         ],
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 38,
-        "name": "s37 Crane up past the elder's cap and out over the valley",
-        "slug": "s37",
+        "id": 65,
+        "name": "s64 The spire lit, from the north-west",
+        "slug": "s64",
+        "placement": "free",
+        "position": [
+          62.0,
+          13.612,
+          -112.0
+        ],
+        "target": [
+          67.7,
+          14.0,
+          -103.7
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 66,
+        "name": "s65 The horses in the rebuilt light",
+        "slug": "s65",
+        "placement": "free",
+        "position": [
+          80.0,
+          11.104,
+          40.0
+        ],
+        "target": [
+          72.0,
+          9.0,
+          12.0
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 67,
+        "name": "s66 The veil lit",
+        "slug": "s66",
+        "placement": "free",
+        "position": [
+          81.9,
+          2.312,
+          210.9
+        ],
+        "target": [
+          77.5,
+          3.0,
+          198.7
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 68,
+        "name": "s67 The scree lit on the west slope",
+        "slug": "s67",
+        "placement": "free",
+        "position": [
+          -160.0,
+          15.921,
+          80.0
+        ],
+        "target": [
+          -176.0,
+          25.0,
+          96.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 69,
+        "name": "s68 A wave of light through the mushrooms, from the east",
+        "slug": "s68",
+        "placement": "free",
+        "position": [
+          30.0,
+          6.964,
+          70.0
+        ],
+        "target": [
+          -12.0,
+          5.0,
+          52.0
+        ],
+        "fov": 46.3972,
+        "focalLength": 28.0,
+        "autoDirector": false
+      },
+      {
+        "id": 70,
+        "name": "s69 Crane up past the elder's cap and out over the valley",
+        "slug": "s69",
         "placement": "free",
         "position": [
           -24.0,
@@ -12173,9 +12848,9 @@
         "autoDirector": false
       },
       {
-        "id": 39,
-        "name": "s38 Vane walks to where the horse was taken",
-        "slug": "s38",
+        "id": 71,
+        "name": "s70 Tide walks the north end toward the lit spire",
+        "slug": "s70",
         "placement": "free",
         "position": [
           0.0,
@@ -12187,28 +12862,50 @@
           0.0,
           0.0
         ],
-        "fov": 37.8493,
-        "focalLength": 35.0,
+        "fov": 53.1301,
+        "focalLength": 24.0,
         "autoDirector": false,
-        "aimNode": "vane",
+        "aimNode": "tide",
         "aimOffset": [
-          0.0,
-          2.2,
-          0.0
+          8.0,
+          1.2,
+          -6.0
         ],
-        "followNode": "vane",
+        "followNode": "tide",
         "followOffset": [
-          -5.0,
-          2.4,
-          4.0
+          -4.33,
+          3.4,
+          2.5
         ],
-        "followLagSeconds": 0.3,
-        "followClearance": 1.2
+        "followClearance": 1.2,
+        "followSmoothSeconds": 0.3,
+        "followVerticalSmoothSeconds": 1.0,
+        "followLead": 1.0,
+        "followGround": true
       },
       {
-        "id": 40,
-        "name": "s39 The last wide: the elder and the valley rebuilt",
-        "slug": "s39",
+        "id": 72,
+        "name": "s71 The valley rebuilt, from high on the north-east slope",
+        "slug": "s71",
+        "placement": "free",
+        "position": [
+          65.4,
+          22.579,
+          -37.4
+        ],
+        "target": [
+          -12.0,
+          10.0,
+          52.0
+        ],
+        "fov": 37.8493,
+        "focalLength": 35.0,
+        "autoDirector": false
+      },
+      {
+        "id": 73,
+        "name": "s72 The last wide: the elder and the valley rebuilt",
+        "slug": "s72",
         "placement": "free",
         "position": [
           -2.0,
@@ -12225,14 +12922,14 @@
         "autoDirector": false
       },
       {
-        "id": 41,
-        "name": "s40 The elder alone, then black",
-        "slug": "s40",
+        "id": 74,
+        "name": "s73 The elder alone, then black",
+        "slug": "s73",
         "placement": "free",
         "position": [
-          -17.0,
-          4.526,
-          60.0
+          -2.0,
+          7.99,
+          44.0
         ],
         "target": [
           -12.0,
@@ -12267,7 +12964,7 @@
         "end": 15.232564,
         "transition": "cut",
         "locked": true,
-        "label": "s03 Ember walks the west bank"
+        "label": "s03 E1: the elder, and far beyond it a beam lights over a field"
       },
       {
         "camera": 5,
@@ -12275,7 +12972,7 @@
         "end": 18.924872,
         "transition": "cut",
         "locked": true,
-        "label": "s04 The lantern from the hollow, ferns in front"
+        "label": "s04 The white horse grazing under the elder's cap"
       },
       {
         "camera": 6,
@@ -12283,290 +12980,554 @@
         "end": 22.617179,
         "transition": "cut",
         "locked": true,
-        "label": "s05 The white horse grazing, the elder behind it"
+        "label": "s05 The lantern from the hollow, ferns in front"
       },
       {
         "camera": 7,
         "start": 22.617179,
-        "end": 26.309487,
+        "end": 24.463333,
         "transition": "cut",
         "locked": true,
-        "label": "s06 Long-lens wide: the elder against the valley"
+        "label": "s06 The bloom by the river, breathing"
       },
       {
         "camera": 8,
+        "start": 24.463333,
+        "end": 26.309487,
+        "transition": "cut",
+        "locked": true,
+        "label": "s07 The elder's cap from the north, its rim against the stars"
+      },
+      {
+        "camera": 9,
         "start": 26.309487,
         "end": 30.001795,
         "transition": "cut",
         "locked": true,
-        "label": "s07 A shape crosses the sky over the elder"
-      },
-      {
-        "camera": 9,
-        "start": 30.001795,
-        "end": 37.38641,
-        "transition": "cut",
-        "locked": true,
-        "label": "s08 The return: settling toward the pool and the elder"
+        "label": "s08 E2: a shape crosses the sky over the elder"
       },
       {
         "camera": 10,
-        "start": 37.38641,
-        "end": 44.771026,
+        "start": 30.001795,
+        "end": 33.694103,
         "transition": "cut",
         "locked": true,
-        "label": "s09 Following Ember through the ferns"
+        "label": "s09 The return: settling toward the pool and the elder"
       },
       {
         "camera": 11,
-        "start": 44.771026,
-        "end": 52.155641,
+        "start": 33.694103,
+        "end": 37.38641,
         "transition": "cut",
         "locked": true,
-        "label": "s10 Tide, still, in the north"
+        "label": "s10 The first wave runs through the mushrooms toward us"
       },
       {
         "camera": 12,
-        "start": 52.155641,
-        "end": 59.540256,
+        "start": 37.38641,
+        "end": 41.078718,
         "transition": "cut",
         "locked": true,
-        "label": "s11 Vane by the river, watching the elder"
+        "label": "s11 Rook investigates a flickering cluster"
       },
       {
         "camera": 13,
-        "start": 59.540256,
-        "end": 66.924872,
+        "start": 41.078718,
+        "end": 44.771026,
         "transition": "cut",
         "locked": true,
-        "label": "s12 The first crane: up out of the ferns, up the valley"
+        "label": "s12 The herd grazing on the east meadow"
       },
       {
         "camera": 14,
-        "start": 66.924872,
-        "end": 74.309487,
+        "start": 44.771026,
+        "end": 46.617179,
         "transition": "cut",
         "locked": true,
-        "label": "s13 Rook climbs the west slope, the valley below"
+        "label": "s13 The lantern, close, flaring on the clap"
       },
       {
         "camera": 15,
-        "start": 74.309487,
-        "end": 81.694103,
+        "start": 46.617179,
+        "end": 52.155641,
         "transition": "cut",
         "locked": true,
-        "label": "s14 The first grand wide: the lit valley, far and low"
+        "label": "s14 A travel down the east bank, the elder across the water"
       },
       {
         "camera": 16,
-        "start": 81.694103,
-        "end": 85.38641,
+        "start": 52.155641,
+        "end": 55.847949,
         "transition": "cut",
         "locked": true,
-        "label": "s15 Spores falling from the bloom"
+        "label": "s15 Vane crosses the east meadow, the elder beyond"
       },
       {
         "camera": 17,
-        "start": 85.38641,
-        "end": 89.078718,
+        "start": 55.847949,
+        "end": 59.540256,
         "transition": "cut",
         "locked": true,
-        "label": "s16 Under the elder: the gold gills"
+        "label": "s16 The spire on the east bank"
       },
       {
         "camera": 18,
-        "start": 89.078718,
-        "end": 103.847949,
+        "start": 59.540256,
+        "end": 63.232564,
         "transition": "cut",
         "locked": true,
-        "label": "s17 A slow orbit of the elder, Vane nearby"
+        "label": "s17 The cairn on the spur, its spores in the air"
       },
       {
         "camera": 19,
-        "start": 103.847949,
-        "end": 118.617179,
+        "start": 63.232564,
+        "end": 66.924872,
         "transition": "cut",
         "locked": true,
-        "label": "s18 Sage in the grove, among the fireflies"
+        "label": "s18 E3: the crane rises to reveal a column of light up the valley"
       },
       {
         "camera": 20,
-        "start": 118.617179,
-        "end": 133.38641,
+        "start": 66.924872,
+        "end": 68.771026,
         "transition": "cut",
         "locked": true,
-        "label": "s19 Walking with Vane under the elder"
+        "label": "s19 E3: an animal lifted into the column, far up the valley"
       },
       {
         "camera": 21,
-        "start": 133.38641,
-        "end": 140.771026,
+        "start": 68.771026,
+        "end": 70.617179,
         "transition": "cut",
         "locked": true,
-        "label": "s20 Low behind Vane, the aurora beyond"
+        "label": "s20 Tide, and the column far up the valley beyond"
       },
       {
         "camera": 22,
-        "start": 140.771026,
-        "end": 148.155641,
+        "start": 70.617179,
+        "end": 72.463333,
         "transition": "cut",
         "locked": true,
-        "label": "s21 The aurora over the valley"
+        "label": "s21 E3: the animal fades into the scout"
       },
       {
         "camera": 23,
+        "start": 72.463333,
+        "end": 74.309487,
+        "transition": "cut",
+        "locked": true,
+        "label": "s22 The ridge mushroom high in the north-east"
+      },
+      {
+        "camera": 24,
+        "start": 74.309487,
+        "end": 78.001795,
+        "transition": "cut",
+        "locked": true,
+        "label": "s23 The first grand wide: the lit valley, far and low"
+      },
+      {
+        "camera": 25,
+        "start": 78.001795,
+        "end": 81.694103,
+        "transition": "cut",
+        "locked": true,
+        "label": "s24 The valley floor lit, low and wide"
+      },
+      {
+        "camera": 26,
+        "start": 81.694103,
+        "end": 83.540256,
+        "transition": "cut",
+        "locked": true,
+        "label": "s25 Spores falling from the bloom"
+      },
+      {
+        "camera": 27,
+        "start": 83.540256,
+        "end": 85.38641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s26 The veil at the water's edge"
+      },
+      {
+        "camera": 28,
+        "start": 85.38641,
+        "end": 87.232564,
+        "transition": "cut",
+        "locked": true,
+        "label": "s27 Under the elder: the gold gills"
+      },
+      {
+        "camera": 29,
+        "start": 87.232564,
+        "end": 88.155641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s28 The scree on the west slope, lit"
+      },
+      {
+        "camera": 30,
+        "start": 88.155641,
+        "end": 89.078718,
+        "transition": "cut",
+        "locked": true,
+        "label": "s29 The ember mushroom on the east terrace, lit"
+      },
+      {
+        "camera": 31,
+        "start": 89.078718,
+        "end": 92.771026,
+        "transition": "cut",
+        "locked": true,
+        "label": "s30 An orbit of the elder"
+      },
+      {
+        "camera": 32,
+        "start": 92.771026,
+        "end": 96.463333,
+        "transition": "cut",
+        "locked": true,
+        "label": "s31 Cows on the west meadow, the lantern beyond"
+      },
+      {
+        "camera": 33,
+        "start": 96.463333,
+        "end": 98.309487,
+        "transition": "cut",
+        "locked": true,
+        "label": "s32 The bloom from across the river"
+      },
+      {
+        "camera": 34,
+        "start": 98.309487,
+        "end": 103.847949,
+        "transition": "cut",
+        "locked": true,
+        "label": "s33 E4: the scout settles over the meadow beyond the elder"
+      },
+      {
+        "camera": 35,
+        "start": 103.847949,
+        "end": 107.540256,
+        "transition": "cut",
+        "locked": true,
+        "label": "s34 E4: a cow lifted into the column"
+      },
+      {
+        "camera": 36,
+        "start": 107.540256,
+        "end": 111.232564,
+        "transition": "cut",
+        "locked": true,
+        "label": "s35 E4: Sage watches the cow rise"
+      },
+      {
+        "camera": 37,
+        "start": 111.232564,
+        "end": 114.924872,
+        "transition": "cut",
+        "locked": true,
+        "label": "s36 The herd on the east meadow"
+      },
+      {
+        "camera": 38,
+        "start": 114.924872,
+        "end": 118.617179,
+        "transition": "cut",
+        "locked": true,
+        "label": "s37 The umbra, listening"
+      },
+      {
+        "camera": 39,
+        "start": 118.617179,
+        "end": 121.38641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s38 The elder's spores drifting in its gold"
+      },
+      {
+        "camera": 40,
+        "start": 121.38641,
+        "end": 126.001795,
+        "transition": "cut",
+        "locked": true,
+        "label": "s39 Sage in the grove, among the fireflies"
+      },
+      {
+        "camera": 41,
+        "start": 126.001795,
+        "end": 129.694103,
+        "transition": "cut",
+        "locked": true,
+        "label": "s40 The lantern from the north"
+      },
+      {
+        "camera": 42,
+        "start": 129.694103,
+        "end": 133.38641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s41 The elder through a long lens from the north, from above"
+      },
+      {
+        "camera": 43,
+        "start": 133.38641,
+        "end": 137.078718,
+        "transition": "cut",
+        "locked": true,
+        "label": "s42 Behind Vane, the aurora beyond"
+      },
+      {
+        "camera": 44,
+        "start": 137.078718,
+        "end": 140.771026,
+        "transition": "cut",
+        "locked": true,
+        "label": "s43 The aurora over the valley"
+      },
+      {
+        "camera": 45,
+        "start": 140.771026,
+        "end": 144.463333,
+        "transition": "cut",
+        "locked": true,
+        "label": "s44 Across the valley to the west slope, under the aurora"
+      },
+      {
+        "camera": 46,
+        "start": 144.463333,
+        "end": 146.309487,
+        "transition": "cut",
+        "locked": true,
+        "label": "s45 The spire under the aurora, from the east"
+      },
+      {
+        "camera": 47,
+        "start": 146.309487,
+        "end": 148.155641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s46 Tide looks up"
+      },
+      {
+        "camera": 48,
         "start": 148.155641,
         "end": 155.540256,
         "transition": "cut",
         "locked": true,
-        "label": "s22 Locked off: the saucer comes over the rim"
+        "label": "s47 E5: locked off, the saucer comes over the rim"
       },
       {
-        "camera": 24,
+        "camera": 49,
         "start": 155.540256,
         "end": 162.924872,
         "transition": "cut",
         "locked": true,
-        "label": "s23 The saucer comes on beyond the elder's cap"
+        "label": "s48 E5: the saucer comes on beyond the elder's cap"
       },
       {
-        "camera": 25,
+        "camera": 50,
         "start": 162.924872,
         "end": 166.617179,
         "transition": "cut",
         "locked": true,
-        "label": "s24 From under the elder: the saucer over its rim"
+        "label": "s49 From under the elder: the saucer over its rim"
       },
       {
-        "camera": 26,
+        "camera": 51,
         "start": 166.617179,
         "end": 170.309487,
         "transition": "cut",
         "locked": true,
-        "label": "s25 Ember watches from across the water"
+        "label": "s50 Ember on the west bank, the saucer settling over the elder beyond"
       },
       {
-        "camera": 27,
+        "camera": 52,
         "start": 170.309487,
         "end": 172.155641,
         "transition": "cut",
         "locked": true,
-        "label": "s26 The beam lights"
+        "label": "s51 E5: the beam lights"
       },
       {
-        "camera": 28,
+        "camera": 53,
         "start": 172.155641,
         "end": 174.001795,
         "transition": "cut",
         "locked": true,
-        "label": "s27 Up the beam from beside the horse"
+        "label": "s52 E5: up the beam from beside the horse"
       },
       {
-        "camera": 29,
+        "camera": 54,
         "start": 174.001795,
         "end": 174.924872,
         "transition": "cut",
         "locked": true,
-        "label": "s28 Vane sees it"
+        "label": "s53 Vane sees it"
       },
       {
-        "camera": 30,
+        "camera": 55,
         "start": 174.924872,
         "end": 175.847949,
         "transition": "cut",
         "locked": true,
-        "label": "s29 The horse rises, glowing, side on"
+        "label": "s54 E5: the horse rises, glowing, side on"
       },
       {
-        "camera": 31,
+        "camera": 56,
         "start": 175.847949,
         "end": 176.771026,
         "transition": "cut",
         "locked": true,
-        "label": "s30 The elder beside the beam"
+        "label": "s55 E5: the elder beside the beam"
       },
       {
-        "camera": 32,
+        "camera": 57,
         "start": 176.771026,
         "end": 177.232564,
         "transition": "cut",
         "locked": true,
-        "label": "s31 The horse under the saucer"
+        "label": "s56 E5: the horse under the saucer"
       },
       {
-        "camera": 33,
+        "camera": 58,
         "start": 177.232564,
         "end": 177.694103,
         "transition": "cut",
         "locked": true,
-        "label": "s32 The horse fades into the saucer"
+        "label": "s57 E5: the horse fades into the saucer"
       },
       {
-        "camera": 34,
+        "camera": 59,
         "start": 177.694103,
         "end": 181.38641,
         "transition": "cut",
         "locked": true,
-        "label": "s33 The drop: the valley lights up, wide and fast"
+        "label": "s58 The drop: the valley lights up, wide and fast"
       },
       {
-        "camera": 35,
+        "camera": 60,
         "start": 181.38641,
+        "end": 183.232564,
+        "transition": "cut",
+        "locked": true,
+        "label": "s59 E5: the saucer leaves over the north rim, the elder below"
+      },
+      {
+        "camera": 61,
+        "start": 183.232564,
         "end": 185.078718,
         "transition": "cut",
         "locked": true,
-        "label": "s34 The saucer leaves over the north rim, the elder below"
+        "label": "s60 The umbra lit, its spores in the air"
       },
       {
-        "camera": 36,
+        "camera": 62,
         "start": 185.078718,
+        "end": 186.924872,
+        "transition": "cut",
+        "locked": true,
+        "label": "s61 The ember mushroom on the east terrace, lit"
+      },
+      {
+        "camera": 63,
+        "start": 186.924872,
         "end": 188.771026,
         "transition": "cut",
         "locked": true,
-        "label": "s35 The umbra lit, its spores in the air"
+        "label": "s62 The cairn lit"
       },
       {
-        "camera": 37,
+        "camera": 64,
         "start": 188.771026,
+        "end": 190.617179,
+        "transition": "cut",
+        "locked": true,
+        "label": "s63 Ember looks up"
+      },
+      {
+        "camera": 65,
+        "start": 190.617179,
         "end": 192.463333,
         "transition": "cut",
         "locked": true,
-        "label": "s36 Ember looks up"
+        "label": "s64 The spire lit, from the north-west"
       },
       {
-        "camera": 38,
+        "camera": 66,
         "start": 192.463333,
+        "end": 194.309487,
+        "transition": "cut",
+        "locked": true,
+        "label": "s65 The horses in the rebuilt light"
+      },
+      {
+        "camera": 67,
+        "start": 194.309487,
+        "end": 196.155641,
+        "transition": "cut",
+        "locked": true,
+        "label": "s66 The veil lit"
+      },
+      {
+        "camera": 68,
+        "start": 196.155641,
+        "end": 198.001795,
+        "transition": "cut",
+        "locked": true,
+        "label": "s67 The scree lit on the west slope"
+      },
+      {
+        "camera": 69,
+        "start": 198.001795,
         "end": 199.847949,
         "transition": "cut",
         "locked": true,
-        "label": "s37 Crane up past the elder's cap and out over the valley"
+        "label": "s68 A wave of light through the mushrooms, from the east"
       },
       {
-        "camera": 39,
+        "camera": 70,
         "start": 199.847949,
+        "end": 203.540256,
+        "transition": "cut",
+        "locked": true,
+        "label": "s69 Crane up past the elder's cap and out over the valley"
+      },
+      {
+        "camera": 71,
+        "start": 203.540256,
         "end": 207.232564,
         "transition": "cut",
         "locked": true,
-        "label": "s38 Vane walks to where the horse was taken"
+        "label": "s70 Tide walks the north end toward the lit spire"
       },
       {
-        "camera": 40,
+        "camera": 72,
         "start": 207.232564,
+        "end": 214.617179,
+        "transition": "cut",
+        "locked": true,
+        "label": "s71 The valley rebuilt, from high on the north-east slope"
+      },
+      {
+        "camera": 73,
+        "start": 214.617179,
         "end": 222.001795,
         "transition": "cut",
         "locked": true,
-        "label": "s39 The last wide: the elder and the valley rebuilt"
+        "label": "s72 The last wide: the elder and the valley rebuilt"
       },
       {
-        "camera": 41,
+        "camera": 74,
         "start": 222.001795,
         "end": 225.5,
         "transition": "cut",
         "locked": true,
-        "label": "s40 The elder alone, then black"
+        "label": "s73 The elder alone, then black"
       }
     ],
     "default": 2,
-    "nextId": 42
+    "nextId": 75
   }
 }
