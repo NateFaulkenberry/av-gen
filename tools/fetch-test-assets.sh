@@ -16,6 +16,7 @@
 #      would track is refused, loudly: a link there is one `git add -A` from publishing the asset.
 #
 # It only fills gaps, like tools/link-worktree-assets.sh: a real file already at a path is left alone.
+# A path this repository tracks is skipped (the checkout has it from git), never linked or refused.
 #
 # Authentication, first match wins:
 #   AVGEN_TEST_ASSETS_TOKEN   a fine-grained PAT with Contents: read on the asset repository (CI secret)
@@ -116,9 +117,16 @@ git -C "$dir" clean -fdq
 
 # ---- link ------------------------------------------------------------------------------------------
 # Every asset in the repository sits under assets/ with the same relative path it has here.
-linked=0; present=0; refused=()
+linked=0; present=0; tracked=0; refused=()
 while IFS= read -r rel; do
     dest="$root/assets/$rel"
+    # A path this repository TRACKS is never linked: the checkout already has the file from git, so
+    # the private copy is redundant (e.g. the three CC0 Quaternius fixtures, tracked since 2026-09-28,
+    # which an asset repository built before then still carries). Skipping it cannot stage anything.
+    if git -C "$root" ls-files --error-unmatch -- "assets/$rel" >/dev/null 2>&1; then
+        tracked=$((tracked + 1))
+        continue
+    fi
     if ! git -C "$root" check-ignore -q "assets/$rel"; then
         refused+=("assets/$rel")
         continue
@@ -142,7 +150,7 @@ if [[ ${#refused[@]} -gt 0 ]]; then
 fi
 verb=linked; [[ "$check_only" == true ]] && verb="would link"
 ref=$(git -C "$dir" rev-parse HEAD)
-echo "fetch-test-assets: $repo@${ref:0:12} -> $dir; $verb $linked file(s), $present already present"
+echo "fetch-test-assets: $repo@${ref:0:12} -> $dir; $verb $linked file(s), $present already present, $tracked tracked here (skipped)"
 if [[ -n "${GITHUB_ENV:-}" ]]; then
     echo "AVGEN_TEST_ASSETS_REV=$ref" >> "$GITHUB_ENV"
 fi

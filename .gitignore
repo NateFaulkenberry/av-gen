@@ -18,7 +18,26 @@ cmake-build-*/
 # fetcher are committed; ~110 MB of textures and meshes are not.
 /assets/nature/
 /assets/terrain/
-/assets/quaternius
+# The Quaternius packs are CC0 1.0 (assets/quaternius/License_Standard.txt; assets/imported/ATTRIBUTION.md)
+# and gitignored for size, not licence -- EXCEPT the three test fixtures below, with their textures and
+# the pack's licence file (owner's decision, QA pass 2026-09-28). The GPU LOD, visibility, ecology and
+# emission cases and a handful of CPU cases load them; tracked, those CPU cases run on every push.
+# Keep the negations narrow: one line per file, never a glob.
+/assets/quaternius/*
+!/assets/quaternius/License_Standard.txt
+!/assets/quaternius/glTF/
+/assets/quaternius/glTF/*
+!/assets/quaternius/glTF/CommonTree_1.gltf
+!/assets/quaternius/glTF/CommonTree_1.bin
+!/assets/quaternius/glTF/Bark_NormalTree.png
+!/assets/quaternius/glTF/Bark_NormalTree_Normal.png
+!/assets/quaternius/glTF/Leaves_NormalTree_C.png
+!/assets/quaternius/glTF/Rock_Medium_1.gltf
+!/assets/quaternius/glTF/Rock_Medium_1.bin
+!/assets/quaternius/glTF/Rocks_Diffuse.png
+!/assets/quaternius/glTF/Mushroom_Common.gltf
+!/assets/quaternius/glTF/Mushroom_Common.bin
+!/assets/quaternius/glTF/Mushrooms.png
 # Skies (ADR-049): the .hdr files are hundreds of megabytes; assets/hdri/manifest.json records
 # which ones and at what resolution, and the fetcher restores them.
 /assets/hdri/*.hdr
