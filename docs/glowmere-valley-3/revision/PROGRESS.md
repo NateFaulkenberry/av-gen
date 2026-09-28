@@ -8,6 +8,16 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **01:15: r6 (the final candidate) is in the review folder** (`r6-preview-960x540.mov`, `README-r6-preview.md`,
+  sheets in `r6/`). `gv3/integrate` `292cc758` is merged into `gv3/production`.
+  - Settings: ground pools (range 300, faintest 6.5, reach 6, ecology light x3); aurora glints 0.85 (the duplicate
+    resolved); 59.1 re-framed on sage.
+  - **Ground pools:** the ground at a kick x1.05-1.07 -> x1.08-1.17; violet pixels 2-3x. The look changes: the
+    foreground fields and the elder's stem glow violet, and animals take the tint.
+  - **Critic, r6b against r5:** sync 0.885 -> 0.943, effects 0.945 -> 0.975, pacing 1.000; technical quality
+    0.923 -> 0.825 and lighting 0.845 -> 0.789 (clipping in the pooled shots, up to 1.6%, and bright areas off the
+    subject). If the owner finds it too strong: `scene/ecologyLight` x2, or reach 4.
+  - **The final command:** `python3 tools/make_glowmere_valley_3.py --final --final-trace build/gv3/int/r6b/cast.json && python3 tools/gv3/ufo.py`
 - **MERGED (00:05): main is `ad5623d2`, with every engine fix, ecolight included.** Integration suites: CPU 3,835 of
   3,835; GPU 548 cases, 547 passed, 1 skipped. Pushed; merged into `gv3/production` (`879cd647`).
   **`av-gen-engine-6` is the final engine** (BUILD-READY).
