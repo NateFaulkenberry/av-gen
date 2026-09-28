@@ -13,9 +13,10 @@
 //   across    a goal across a river that runs edge to edge is `Nearest`, one waypoint on the dry
 //             near bank, across from the goal  |  the planner's own verdict on the same pair is
 //             `Unreachable`, and the straight line crosses water past the wade limit
-//   round     the same river ending inside the world: the banks join round its head, one region,
-//             and the answer is the straight line exactly as before  |  (ADR-933 is what stops a
-//             body pacing there)
+//   round     the same river ending inside the world: the banks join round its head, one region, so
+//             ADR-932 does not touch it -- and since ADR-936 the answer is the planner's route round
+//             the head, dry of the channel  |  the straight line, which crosses water no walker here
+//             may enter
 //   move      a `move` to the far bank walks to the bank dry, fails "unreachable", and the face after
 //             it turns the body to the goal  |  the old straight line, through a provider that
 //             answers as `NavigatorPath` did: the body wades in to its limit and gives up "stuck"
@@ -218,11 +219,12 @@ TEST_CASE("a goal across a river that runs edge to edge routes to the near bank,
     CHECK(straight == std::vector<glm::vec2>{kEast});
 }
 
-TEST_CASE("a river that ends inside the world divides nothing, and the route stays the straight line",
-          "[entity][route][adr932]") {
+TEST_CASE("a river that ends inside the world divides nothing, and the route goes round its head",
+          "[entity][route][adr932][adr936]") {
     // The same channel, ending at z = 40: the banks join round its head, as GV3's did in gv3-world's
-    // W2 until its river was run edge to edge again. One region, so this ADR does not touch it; a body
-    // sent across walks into the water as it always did, and ADR-933 is what stops it pacing there.
+    // W2. One region, so ADR-932 does not touch it: the answer is `Ready`. Until ADR-936 it was the
+    // straight line, and a body sent across walked into the water to its wade limit; now it is the
+    // planner's route round the head.
     const world::WorldMap map = riverWorld(40.0f);
     world::Ecology ecology;
     const entity::Navigator nav = wader(map, ecology);
@@ -230,9 +232,22 @@ TEST_CASE("a river that ends inside the world divides nothing, and the route sta
     REQUIRE(nav.grid()->connected(kWest, kEast));
     REQUIRE_FALSE(nav.pathClear(kWest, kEast));
     const entity::NavigatorPath path(&nav);
+    // Control: the straight line crosses water deeper than these walkers wade.
+    REQUIRE(path.crossesDeepWater(kWest, kEast));
     std::vector<glm::vec2> route;
     CHECK(path.route(kWest, kEast, route) == entity::RouteStatus::Ready);
-    CHECK(route == std::vector<glm::vec2>{kEast});
+    REQUIRE(route.size() > 1);
+    CHECK(route.back() == kEast);
+    // Every leg of it is dry of the channel, and it goes round the head, not across.
+    glm::vec2 from = kWest;
+    float north = -1e9f;
+    for (const glm::vec2& p : route) {
+        INFO("leg to (" << p.x << ", " << p.y << ")");
+        CHECK_FALSE(path.crossesDeepWater(from, p));
+        north = std::max(north, p.y);
+        from = p;
+    }
+    CHECK(north > 40.0f);
 }
 
 TEST_CASE("a move to the far bank walks to the bank, says it could not get there, and looks across",

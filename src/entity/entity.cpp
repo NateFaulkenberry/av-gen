@@ -1918,6 +1918,8 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         // "previous" was the action's new speed and a replayed body started every walk without
         // its ramp: a scrub 1.7 cm off a play in the Glowmere film (Phase D §63, measured).
         const float speedBefore = entity.state_.speed;
+        // ADR-935: where it was drawn at the end of the last step, taken where `update` takes it.
+        const glm::vec2 drawnBefore = drawnAcross(entity);
         entity.motion_ = MotionOffset{};
         entity.state_.hasLookTarget = false;
         entity.state_.reaction = 0.0f;
@@ -2024,6 +2026,7 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         if (!(entity.director_.active && entity.director_.performance)) { // ADR-758
             limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
         }
+        restIfStill(entity, drawnBefore, stepDt); // ADR-935, exactly where `update` applies it
         rescaleIntent(entity.state_);
         // The facing, canonicalised once after everything that steers has had its turn --
         // exactly where `update` does it. Without it a replayed yaw is the total a body has
@@ -2321,6 +2324,51 @@ void EntityWorld::rescaleIntent(EntityState& state) {
     }
 }
 
+// ADR-935. Where the body is drawn, across the ground: the simulation's place plus the offsets its
+// behaviours drew it at, since a craft's `hover` and `drift` move the node and not the body.
+glm::vec2 EntityWorld::drawnAcross(const Entity& entity) {
+    const glm::vec3 at = entity.state_.travel + entity.motion_.position;
+    return glm::vec2(at.x, at.z);
+}
+
+// ADR-935: **a body the step did not move publishes no speed.**
+//
+// `speed` is what the gait picks a clip from and what the pose layer matches strides to, and until
+// this nothing held it to the body. Two ways it lied, both measured on GV3:
+//
+//  * **It latched.** `EntityState` persists and only a mover writes `speed`, so a step in which
+//    nothing moves the body keeps the last number written. A decider's option with no actions --
+//    `holdPost` inside its ring, `idle` -- hands the body to behaviours that do not move it. ADR-620's
+//    limiter had turned the move's arrival (0) into one step of deceleration, 0.584 -> 0.474 m/s,
+//    and nothing wrote again: rook played its walk on the spot for 6.5 s (195.45-201.95 s). A move
+//    that gives up "stuck" writes its last travel and fails in the same step, so a body with no
+//    ramp at all kept walking at that pace for as long as it stood. And a set piece's hold owns the
+//    body and names no speed while `wander` yields to it: the horse walked on the spot for 3.3 s as
+//    the saucer's beam came on.
+//  * **It ramped where the body had stopped dead.** A move that ends on its first step -- refused, or
+//    already there -- stops a walking body within one step, and the limiter then ran the legs down
+//    over the next half second of standing still: 0.4-0.8 s on the spot after each such errand.
+//
+// One fact in both: the speed says the body is walking and the ground says it is not, and the
+// ground is right. So after every writer and the limiter, a body whose drawn place did not move
+// across the ground this step has a speed of zero, and the next step's limiter starts from there.
+//
+// **Exact equality, not a threshold.** A body that anything moved by any amount moved, and one that
+// nothing touched is bit-identical to where it was. A floor on the measured speed would catch a body
+// setting off from rest at its gait's `accel` -- 0.08 m/s on its first step -- and hold it there.
+//
+// **A director that names a speed keeps it.** `DirectorMotion::hasSpeed` is a staging step's `rate`:
+// an animal carried up a beam has its legs going over ground it is not crossing, which is what the
+// set piece asked for. A director that names none is holding the body, and the rule applies.
+void EntityWorld::restIfStill(Entity& entity, glm::vec2 drawnBefore, double dt) {
+    if (dt <= 0.0 || (entity.director_.active && entity.director_.hasSpeed)) {
+        return;
+    }
+    if (drawnAcross(entity) == drawnBefore) {
+        entity.state_.speed = 0.0f;
+    }
+}
+
 void EntityWorld::applyNodeOffsets(Entity& e) {
     const glm::vec3 offset = e.motion_.position + e.state_.travel;
     if (e.positionParam_ != nullptr) {
@@ -2559,6 +2607,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // ADR-620: the speed this body had last step, so the authored accel/decel can be applied
         // to whatever the behaviours ask for this one.
         const float speedBefore = entity.state_.speed;
+        // ADR-935: where it was drawn at the end of the last step, before this one clears the offsets.
+        const glm::vec2 drawnBefore = drawnAcross(entity);
         entity.motion_ = MotionOffset{};
         entity.state_.hasLookTarget = false;
         entity.state_.reaction = 0.0f;
@@ -2723,6 +2773,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         if (!(entity.director_.active && entity.director_.performance)) { // ADR-758
             limitSpeedToGait(entity.desc_.gait, speedBefore, ctx.dt, entity.state_.speed);
         }
+        // ADR-935: and a body nothing moved is not walking, whatever was last written or ramped.
+        // Before the intent is rescaled, so the vector form says so too.
+        restIfStill(entity, drawnBefore, dt);
         rescaleIntent(entity.state_);
         // The body's facing, not the total it has turned. Canonicalised here, once, after everything
         // that steers has had its turn and before anything reads it -- the node's rotation, the

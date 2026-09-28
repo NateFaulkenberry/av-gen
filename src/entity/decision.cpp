@@ -168,6 +168,61 @@ glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
     return glm::vec3(at.x, to.y, at.y);
 }
 
+// ADR-936: where a walk from `here` meant to end at `stand` can end, or false when nowhere near it
+// can. Asked of the world's own path provider, so a considerer offers only what the walk it pushes
+// will be allowed to do: the end must be ground a walker can stand on, and `reaches` -- `route`'s own
+// refusals, without the route -- must not put it across a divide. Where `stand` itself is not
+// standable (inside a hero's footprint, in the scatter round it, under water), the nearest standable
+// point within `tolerance` of it takes its place: rings a metre apart, twelve bearings a ring, and in
+// the first ring that has any, the one nearest the walker, so it stops on its own side of the thing.
+// Arriving within `tolerance` of `stand` is what the walk means by arriving, so that is the same errand.
+bool reachableStand(const DecisionContext& ctx, glm::vec3 here, glm::vec3& stand, float tolerance) {
+    if (ctx.world == nullptr) {
+        return true;
+    }
+    const IPathProvider& path = ctx.world->pathProvider();
+    const glm::vec2 from(here.x, here.z);
+    glm::vec2 at(stand.x, stand.z);
+    if (!path.walkable(at)) {
+        constexpr int kBearings = 12;
+        constexpr float kTurn = 6.28318530717958647692f / static_cast<float>(kBearings);
+        bool found = false;
+        glm::vec2 best(0.0f);
+        for (float r = 1.0f; r <= tolerance + 1e-4f && !found; r += 1.0f) {
+            float nearest = std::numeric_limits<float>::max();
+            for (int k = 0; k < kBearings; ++k) {
+                const float a = kTurn * static_cast<float>(k);
+                const glm::vec2 p = at + glm::vec2(std::sin(a), std::cos(a)) * r;
+                const float d = glm::length(p - from);
+                if (d < nearest && path.walkable(p)) {
+                    nearest = d;
+                    best = p;
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            return false;
+        }
+        at = best;
+    }
+    if (!path.reaches(from, at)) {
+        return false;
+    }
+    stand.x = at.x;
+    stand.z = at.y;
+    return true;
+}
+
+// ADR-944: the body a goal candidate is, when it is one the world has -- a percept or an interest point
+// of kind `Character` that names an entity. Null for every place.
+const Entity* bodyOf(const DecisionContext& ctx, const GoalCandidate& candidate) {
+    if (candidate.kind != InterestKind::Character || candidate.name.empty() || ctx.world == nullptr) {
+        return nullptr;
+    }
+    return ctx.world->find(candidate.name);
+}
+
 // FNV-1a over a name, for the (seed, tick, option) draws. A string rather than an index, because an
 // option's index in this tick's list moves when the body moves and its name does not.
 std::uint32_t nameHash(std::string_view name) {
@@ -188,11 +243,22 @@ bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& t
             continue;
         }
         if (a->target.kind != TargetKind::Point) {
-            goes = true; // it follows a body somewhere: it moves, to nowhere this can name
+            // It follows a body somewhere. ADR-944: an `interest` errand to a body says where the body
+            // is (`target`, taken when the option was built) and that it is one (`kind`), and is held
+            // to the habits there, as its walk to a point was before. Anything else that follows a
+            // body -- a greeting -- moves, to nowhere this can name.
+            if (a->target.kind == TargetKind::EntityRef && o.hasTarget &&
+                o.kind == static_cast<std::uint8_t>(InterestKind::Character)) {
+                end = glm::vec2(o.target.x, o.target.z);
+                tolerance = a->tolerance > 0.0f ? a->tolerance : kMoveTolerance;
+                goes = glm::length(end - glm::vec2(here.x, here.z)) > tolerance + 0.5f;
+                return true;
+            }
+            goes = true;
             return false;
         }
         end = glm::vec2(a->target.point.x, a->target.point.z);
-        tolerance = a->tolerance > 0.0f ? a->tolerance : 0.75f;
+        tolerance = a->tolerance > 0.0f ? a->tolerance : kMoveTolerance;
         goes = glm::length(end - glm::vec2(here.x, here.z)) > tolerance + 0.5f;
         return true;
     }
@@ -1112,6 +1178,36 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     if (scratch_.empty()) {
         return;
     }
+    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+    // ADR-936: only places the walk can end at are offered. Each candidate's stand-off is asked the
+    // action tier's own questions -- can a walker stand there, and is it on this side of every
+    // divide -- before it is an option, so a roam errand is never chosen only to end at a river bank
+    // (ADR-932's walk to the nearest point) or fail on its first step ("unreachable"): GV3's ember
+    // did the second four times running at 24-33 s, at bloom hero parts and glow patches whose
+    // stand-offs were not ground a body can stand on. The move's own `tolerance`, which is what
+    // arriving means to it, is how far the stand-off may move onto standable ground.
+    const float tolerance = approach_ > 0.0f ? std::max(approach_ * 0.5f, 0.75f) : kMoveTolerance;
+    stands_.clear();
+    bodies_.clear();
+    {
+        std::size_t kept = 0;
+        for (std::size_t i = 0; i < scratch_.size(); ++i) {
+            // ADR-944: a body is walked to where it is, so what must be reachable is the ground it
+            // stands on now -- no stand-off to move, because the walk ends wherever it has got to.
+            const Entity* body = bodyOf(ctx, scratch_[i]);
+            glm::vec3 stand = body != nullptr ? scratch_[i].position : standOff(here, scratch_[i].position, approach_);
+            if (!reachableStand(ctx, here, stand, body != nullptr ? 0.0f : tolerance)) {
+                continue;
+            }
+            scratch_[kept++] = scratch_[i];
+            stands_.push_back(stand);
+            bodies_.push_back(body);
+        }
+        scratch_.resize(kept);
+    }
+    if (scratch_.empty()) {
+        return;
+    }
     // Two passes, because the spans handed out in `Option::actions` must survive the whole of this
     // call and a vector that grows moves its storage. The same reason `NavDebug`'s spans are
     // published after the route is built rather than while it is.
@@ -1122,19 +1218,34 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     std::vector<std::pair<std::size_t, std::size_t>> ranges;
     ranges.reserve(scratch_.size());
     const float w = weight();
-    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
     // ADR-909: this body's walk speed, which a `speedRange` multiplies. Looked up once.
     const SpeedRange range = pace_.live();
     const float walkSpeed = range.set() ? walkSpeedOf(ctx) : 0.0f;
-    for (const GoalCandidate& candidate : scratch_) {
+    for (std::size_t c = 0; c < scratch_.size(); ++c) {
+        const GoalCandidate& candidate = scratch_[c];
+        const Entity* body = bodies_[c];
         const std::size_t first = actions_.size();
         ActionDesc walk;
         walk.kind = ActionKind::Move;
         walk.name = std::string(candidate.name);
-        walk.target.kind = TargetKind::Point;
-        walk.target.point = standOff(here, candidate.position, approach_);
-        if (approach_ > 0.0f) {
-            walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+        if (body != nullptr) {
+            // ADR-944: to the body, wherever it goes -- a `move` to an entity re-aims its end at it
+            // every step -- and over when the walker is within `approach` of it, never inside the two
+            // bodies' own room. Aimed at a stand-off from where the body stood when the choice was
+            // made, the walk went on to that point after the body had moved into its line: GV2's
+            // vane chose to watch ember at 33.3 s, ember walked across and stopped, and vane walked
+            // through it (0.26 m apart at 45.0 s). `social`'s greeting has walked this way since
+            // Phase D, for the same reason.
+            walk.target.kind = TargetKind::EntityRef;
+            walk.target.name = std::string(candidate.name);
+            const float room = (ctx.state != nullptr ? ctx.state->radius : 0.0f) + body->state().radius;
+            walk.tolerance = std::max({approach_, kMoveTolerance, room});
+        } else {
+            walk.target.kind = TargetKind::Point;
+            walk.target.point = stands_[c];
+            if (approach_ > 0.0f) {
+                walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+            }
         }
         if (walkSpeed > 0.0f) {
             // Keyed on the place rather than the name, which a derived point is only given below:
@@ -1151,9 +1262,15 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
             attend.activity = activity_;
             attend.duration = dwell_;
             // The candidate itself, not `walk.target.point` -- that is the stand-off the body ends
-            // the walk on, and a look at your own feet is not a look (ADR-300).
-            attend.target.kind = TargetKind::Point;
-            attend.target.point = candidate.position;
+            // the walk on, and a look at your own feet is not a look (ADR-300). A body is looked at
+            // where it is now (ADR-944), as `investigate` and `social` look at one.
+            if (body != nullptr) {
+                attend.target.kind = TargetKind::EntityRef;
+                attend.target.name = std::string(candidate.name);
+            } else {
+                attend.target.kind = TargetKind::Point;
+                attend.target.point = candidate.position;
+            }
             actions_.push_back(std::move(attend));
         }
         ranges.emplace_back(first, actions_.size() - first);

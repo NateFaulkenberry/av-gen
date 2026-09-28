@@ -440,6 +440,11 @@ struct Track {
     std::size_t decisions = 0;
     std::size_t percepts = 0;
     float nearest = 1e9f;          // closest approach to any other body
+    // ADR-944: while this body walks an errand to another body (an `interest` option named for it),
+    // how near it came to that body, and the two bodies' room (their radii) at that moment.
+    float nearestSubject = 1e9f;
+    float subjectRoom = 0.0f;
+    std::string subjectAt;         // which body, and when
     std::map<std::string, int> chosen;
     std::map<std::string, int> activity;
 };
@@ -522,6 +527,19 @@ std::map<std::string, Track> play(double seconds, std::uint32_t seedShift, doubl
                 t.decisions = dbg.decisions;
                 if (!dbg.chosen.empty()) {
                     t.chosen[std::string(dbg.chosen)] += 1;
+                    // An errand named for another body is an `interest` errand to it (ADR-944), and
+                    // what is asserted is its walk: a body that has stopped to watch is not walking
+                    // into anyone, whatever the one it watches does (a bull wanders on into it).
+                    if (const entity::Entity* subject = comp->entityWorld().find(dbg.chosen);
+                        subject != nullptr && subject != e.get() && e->state().speed > 0.3f) {
+                        const glm::vec3 q = subject->state().position();
+                        const float d = glm::length(glm::vec2(p.x - q.x, p.z - q.z));
+                        if (d < t.nearestSubject) {
+                            t.nearestSubject = d;
+                            t.subjectRoom = e->state().radius + subject->state().radius;
+                            t.subjectAt = fmt::format("{} at {:.2f} s", subject->name(), time.renderTime);
+                        }
+                    }
                 }
             }
         }
@@ -634,6 +652,28 @@ TEST_CASE("The multicam's five deciders move, and they do not walk through each 
         // ADR-340's `bodyRadius`, and this is the arm it earns: 0.9 m each, so two of them stand
         // 1.8 m apart. The pre-fix measurement was 0.238 m.
         CHECK(t.nearest > 1.2f);
+        // ADR-944, on both seeds. An errand to a body walks to where the body is and stops outside
+        // it, so no body errand comes nearer its subject than their two bodies' room; and no two
+        // bodies come within 1.0 m -- a walk through one. Aimed at a point where the watched body
+        // had stood, vane walked through ember at seed+0 (0.26 m) and at seed+900001 (0.73 m). What
+        // this bar does not stop is two walkers crossing close, which only mutual avoidance would
+        // (seed+900001 grazes 1.13 m as ember leaves a glow past vane standing at it): the 1.2 m bar
+        // above holds at seed+0, as it did before ADR-944.
+        const Track& v = varied.at(name);
+        INFO(name << " at seed+" << kSeedShift << ": came within " << v.nearest << " m of another body; "
+                  << "within " << v.nearestSubject << " m of an errand's subject (" << v.subjectAt
+                  << ", room " << v.subjectRoom << " m); at seed+0 within " << t.nearestSubject << " m ("
+                  << t.subjectAt << ", room " << t.subjectRoom << " m)");
+        for (const Track* seeded : {&t, &v}) {
+            CHECK(seeded->nearest > 1.0f);
+            if (seeded->subjectRoom > 0.0f) {
+                CHECK(seeded->nearestSubject >= seeded->subjectRoom);
+            }
+        }
+        WARN(fmt::format("{}: nearest body {:.2f} m (seed+0), {:.2f} m (seed+{}); nearest an errand's subject "
+                         "{:.2f} m ({}), {:.2f} m ({})",
+                         name, t.nearest, v.nearest, kSeedShift, t.nearestSubject, t.subjectAt, v.nearestSubject,
+                         v.subjectAt));
         // Nobody drowns. The wade depth is 0.8536 m and the channel is 2.6-3.65 m deep, so a body
         // in the river is a body the navigator let walk into a wall.
         CHECK(t.deepest < 0.8536f);
