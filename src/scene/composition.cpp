@@ -2167,6 +2167,7 @@ void Composition::publishCinematicSignals(signals::SignalBus& bus) {
             CinematicSlot slot;
             slot.name = e->name();
             const std::string base = "character." + slot.name + ".";
+            slot.visibilitySignal = base + "visibility";
             slot.ids = {bus.declare(base + "isHero"), bus.declare(base + "inShot"),
                         bus.declare(base + "distanceToCamera", 0.0f, 10000.0f), bus.declare(base + "visibility"),
                         bus.declare(base + "screenImportance")};
@@ -2237,7 +2238,15 @@ void Composition::publishCinematicSignals(signals::SignalBus& bus) {
                     const char* v = std::getenv("AVGEN_DIAG_NO_SIGHTLINE");
                     return v != nullptr && v[0] == '1';
                 }();
-                if (field.map != nullptr && !skipSightline) {
+                // ADR-951: the sightline is the only expensive signal here -- nine rays marched every
+                // 2 m, so its cost grows with the distance to every character in frame, and on
+                // Glowmere Valley 3's wides it was most of the frame (docs/qa-pass/perf.md). It is
+                // computed only once something has asked the bus for this character's
+                // `visibility`. Nothing in a shipped project does (ADR-834, "Not done"); a route, a
+                // reaction or the route panel that names it makes it computed from then on. An
+                // unsought visibility reads 0.
+                const bool sought = bus.sought(slot.visibilitySignal);
+                if (field.map != nullptr && sought && !skipSightline) {
                     world::SubjectCapsule subject;
                     subject.position = base;
                     subject.height = slot.height;
@@ -2246,7 +2255,7 @@ void Composition::publishCinematicSignals(signals::SignalBus& bus) {
                     out.visibility = world::heroSightline(field, camera.position, subject, 2.0f).visible;
                     ++probe2::frame().sightlines;                                  // diagnostic
                     probe2::frame().sightlineMetres += glm::length(base - camera.position); // diagnostic
-                } else {
+                } else if (field.map == nullptr || skipSightline) {
                     out.visibility = 1.0f;
                 }
             }

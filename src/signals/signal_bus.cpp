@@ -23,11 +23,17 @@ void SignalBus::setEventKind(SignalId id, bool isEvent) {
 }
 
 std::optional<SignalId> SignalBus::find(std::string_view name) const {
-    const auto it = index_.find(std::string(name));
+    std::string key(name);
+    const auto it = index_.find(key);
+    sought_.insert(std::move(key));
     if (it == index_.end()) {
         return std::nullopt;
     }
     return it->second;
+}
+
+bool SignalBus::sought(std::string_view name) const {
+    return sought_.contains(std::string(name));
 }
 
 void SignalBus::setLabel(SignalId id, std::string label) {

@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace avgen::signals {
@@ -30,7 +31,15 @@ class SignalBus {
 public:
     // Idempotent: declaring an existing name returns its id (range/event flags are not changed).
     SignalId declare(std::string name, float minValue = 0.0f, float maxValue = 1.0f, bool isEvent = false);
+    // Also records that `name` was asked for, hit or miss (see `sought`).
     [[nodiscard]] std::optional<SignalId> find(std::string_view name) const;
+    // ADR-951: whether anything has ever looked `name` up with `find`. Every consumer of a bus signal
+    // -- a route's source or depth, a reaction, a behaviour, staging, a scene state, a source's
+    // trigger, the route panel -- reaches its value through `find`, so a producer whose signal is
+    // expensive can skip computing one nobody has asked for. Asked-for is sticky: once sought, a name
+    // stays sought for the life of the bus. A miss counts, because a consumer bound before the
+    // producer first declares its signal has still asked for it. Main thread only, like the bus.
+    [[nodiscard]] bool sought(std::string_view name) const;
     // Re-states whether a declared signal is an event -- for a producer whose kind changed after the
     // name was first declared (a timeline source switched to event mode, ADR-900).
     void setEventKind(SignalId id, bool isEvent);
@@ -56,6 +65,7 @@ private:
     std::vector<float> values_;
     std::vector<std::uint8_t> events_;
     std::unordered_map<std::string, SignalId> index_;
+    mutable std::unordered_set<std::string> sought_; // ADR-951: every name `find` has been asked for
 };
 
 } // namespace avgen::signals

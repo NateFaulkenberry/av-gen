@@ -2062,6 +2062,7 @@ private:
         CinematicSignals value;
         std::array<signals::SignalId, 5> ids{};
         float height = 0.0f; // the body's height, measured once
+        std::string visibilitySignal; // `character.<name>.visibility`, for ADR-951's `sought` check
     };
     std::vector<CinematicSlot> cinematic_;
     const signals::SignalBus* cinematicBus_ = nullptr;

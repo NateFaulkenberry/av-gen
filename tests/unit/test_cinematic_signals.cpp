@@ -51,6 +51,9 @@ TEST_CASE("the camera's subject is the hero, in the shot, and important", "[enti
     REQUIRE(engine.loadProject(multicam()).has_value());
     engine.setDetailLimits(scene::DetailLimits::unlimited());
     followRook(engine);
+    // ADR-951: visibility is computed only for a character something has asked the bus about, the
+    // way a route naming it as a source does at bind time.
+    (void)engine.signals().find("character.rook.visibility");
     for (int i = 0; i <= 120; ++i) {
         frame(engine, i);
     }
@@ -115,4 +118,38 @@ TEST_CASE("where the camera is does not change what the characters do", "[entity
         INFO(name);
         CHECK(welded.at(name) == p); // exactly: the signals are published, never read by the step
     }
+}
+
+// ADR-951. The sightline behind `visibility` is marched only for a character whose visibility
+// something has sought on the bus. The control is the same run with it sought: the computed value is
+// real (Rook, framed by his own camera, is visible), so the unsought zero is the gate and not a
+// sightline that happens to be blocked. Every other signal is published either way.
+TEST_CASE("visibility is marched only once something asks for it", "[entity][cinematic][adr834][adr951]") {
+    if (!present()) {
+        SKIP("Glowmere assets are not present");
+    }
+    const auto run = [](bool ask) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(multicam()).has_value());
+        engine.setDetailLimits(scene::DetailLimits::unlimited());
+        followRook(engine);
+        if (ask) {
+            (void)engine.signals().find("character.rook.visibility");
+        }
+        for (int i = 0; i <= 30; ++i) {
+            frame(engine, i);
+        }
+        return engine.composition()->cinematicSignals("rook");
+    };
+    const auto unsought = run(false);
+    const auto sought = run(true);
+    INFO("sought visibility " << sought.visibility << ", unsought " << unsought.visibility);
+    REQUIRE(sought.inShot);
+    CHECK(sought.visibility > 0.5f);   // the control: a real, computed visibility
+    CHECK(unsought.visibility == 0.0f); // not marched
+    // Everything that costs nothing is still published, identically.
+    CHECK(unsought.inShot == sought.inShot);
+    CHECK(unsought.isHero == sought.isHero);
+    CHECK(unsought.distanceToCamera == sought.distanceToCamera);
+    CHECK(unsought.screenImportance == sought.screenImportance);
 }

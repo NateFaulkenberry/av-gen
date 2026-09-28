@@ -204,3 +204,117 @@ Full table (ms are the run's median wall frame; GPU is the nosight arm's GPU fra
 | 71 | 209.1 | 75.2 | 13.3 | 48.3 | 25.7 | 17.2 | 6.5 | 125 | 270 | 407640 | 1879 | 206 | 8 | s71 The valley rebuilt, from high on the north-east slope |
 | 72 | 216.5 | 253.0 | 4.0 | 160.5 | 21.7 | 13.4 | 13.5 | 276 | 290 | 349898 | 820 | 206 | 8 | s72 The last wide: the elder and the valley rebuilt |
 | 73 | 222.9 | 50.2 | 19.9 | 36.7 | 24.8 | 15.2 | 2.9 | 147 | 237 | 356962 | 998 | 133 | 9 | s73 The elder alone, then black |
+
+## 1. Baseline: GV3 r7b, GV3 committed, GV2 multicam, grove (1280x720 and 640x360)
+
+`build/qa-runs/baseline.sh` -> `tools/perf_sweep.py points ... --reps 3`, 2026-09-28 11:40-12:40, headless offline
+clock, 42 frames (12 warm-up) from each point's second, interleaved per point across three arms (base `77ea4247`;
+fix950; gate951, which is fix950 plus ADR-951). **Contention:** W3's full CPU suite (`avgen_tests`, 2 processes)
+ran throughout (max 1-min load 12.0 at 720p, 7.8 at 360p), recorded per run; spreads are 1-14% except grove at
+360p (18-19%). 0 GPU errors and a camera log naming the intended shot on every run (GV2 multicam's t=9 is a
+free-roam camera and grove has no cut, so they log no shot label).
+
+**The small scene is `grove`**: 31 nodes, no entities, no cut; the same renderer path (terrain, scatter, clustered
+lighting, post, volumetrics) at a tenth of the geometry, so it separates "the engine is slow" from "this project
+is slow". It runs at 61 FPS (720p) and 94 FPS (360p) on every arm.
+
+Draws, triangles, instances, lights and casters are exact (ADR-145) and identical across arms, which is the proof
+that the arms render the same frame. "engine update" is `Engine::update` on the last frame (`cpu(scene)`);
+"renderer CPU" is the renderer's CPU frame, which includes `queueWait` on the GPU. Per-pass GPU medians and every
+counter are in the JSON.
+
+**1280x720** (3 repeats; wall = median of the three runs' p50, with min-max; p95/p99 are the median run's; GPU and engine update are medians)
+
+| point | arm | wall p50 (min-max) | p95 | p99 | FPS | GPU p50 | renderer CPU p50 | engine update | draws | shadow draws | tris | visible inst | clustered lights | shadow casters |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| GV3 r7b s66 "The veil lit" (worst wide) | base | 402.8 (399.8-406.1) | 466.9 | 474.1 | 2.5 | 37.4 | 42.9 | 366.5 | 326 | 37 | 613593 | 2415 | 206 | 60 |
+| GV3 r7b s66 "The veil lit" (worst wide) | fix950 | 254.7 (253.8-259.0) | 271.0 | 277.6 | 3.9 | 34.1 | 39.8 | 217.0 | 326 | 37 | 613593 | 2415 | 206 | 60 |
+| GV3 r7b s66 "The veil lit" (worst wide) | gate951 | 33.4 (32.6-34.7) | 41.5 | 42.5 | 30.0 | 24.3 | 29.6 | 3.2 | 326 | 37 | 613593 | 2415 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | base | 330.5 (317.8-338.4) | 346.8 | 354.2 | 3.0 | 40.2 | 45.7 | 282.0 | 306 | 44 | 584653 | 2706 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | fix950 | 201.0 (200.6-212.7) | 225.1 | 231.8 | 5.0 | 33.2 | 38.6 | 164.5 | 306 | 44 | 584653 | 2706 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | gate951 | 32.2 (31.3-32.4) | 41.1 | 41.6 | 31.0 | 22.7 | 28.6 | 3.1 | 306 | 44 | 584653 | 2706 | 206 | 60 |
+| GV3 r7b s26 "veil at the water's edge" | base | 359.3 (355.7-364.6) | 399.6 | 399.8 | 2.8 | 34.2 | 40.2 | 355.5 | 302 | 35 | 559622 | 1946 | 206 | 54 |
+| GV3 r7b s26 "veil at the water's edge" | fix950 | 234.3 (231.8-238.8) | 286.2 | 288.5 | 4.3 | 35.8 | 41.3 | 207.7 | 302 | 35 | 559622 | 1946 | 206 | 54 |
+| GV3 r7b s26 "veil at the water's edge" | gate951 | 32.1 (30.1-32.3) | 40.6 | 42.8 | 31.2 | 22.8 | 28.2 | 3.3 | 302 | 35 | 559622 | 1946 | 206 | 54 |
+| GV3 r7b s27 "under the elder: gills" (close) | base | 33.0 (31.0-33.6) | 50.2 | 52.0 | 30.3 | 15.1 | 20.1 | 9.4 | 196 | 72 | 135415 | 20 | 38 | 59 |
+| GV3 r7b s27 "under the elder: gills" (close) | fix950 | 26.4 (24.6-26.9) | 33.8 | 39.5 | 37.9 | 14.3 | 19.3 | 5.6 | 196 | 72 | 135415 | 20 | 38 | 59 |
+| GV3 r7b s27 "under the elder: gills" (close) | gate951 | 23.4 (23.0-25.3) | 27.9 | 28.3 | 42.8 | 14.6 | 19.6 | 3.7 | 196 | 72 | 135415 | 20 | 38 | 59 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | base | 27.2 (27.2-28.8) | 30.4 | 31.8 | 36.7 | 18.9 | 23.7 | 3.5 | 171 | 28 | 328615 | 456 | 1 | 23 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | fix950 | 28.0 (26.9-29.2) | 34.0 | 36.6 | 35.7 | 19.2 | 24.0 | 3.7 | 171 | 28 | 328615 | 456 | 1 | 23 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | gate951 | 27.1 (26.7-28.6) | 28.5 | 29.5 | 36.9 | 18.6 | 23.3 | 3.5 | 171 | 28 | 328615 | 456 | 1 | 23 |
+| GV3 committed s14 "first grand wide" | base | 248.7 (247.0-250.5) | 264.3 | 337.3 | 4.0 | 28.1 | 33.7 | 216.7 | 255 | 21 | 382525 | 561 | 95 | 42 |
+| GV3 committed s14 "first grand wide" | fix950 | 149.5 (147.9-149.8) | 167.7 | 177.2 | 6.7 | 24.5 | 29.7 | 118.0 | 255 | 21 | 382525 | 561 | 95 | 42 |
+| GV3 committed s14 "first grand wide" | gate951 | 24.5 (23.7-24.6) | 28.0 | 29.4 | 40.8 | 16.8 | 22.0 | 2.4 | 255 | 21 | 382525 | 561 | 95 | 42 |
+| GV3 committed s16 "gills" (close) | base | 22.0 (21.9-23.4) | 29.3 | 30.2 | 45.5 | 14.4 | 19.1 | 8.3 | 207 | 70 | 134202 | 32 | 87 | 57 |
+| GV3 committed s16 "gills" (close) | fix950 | 21.4 (20.7-23.6) | 27.0 | 27.4 | 46.8 | 12.9 | 17.5 | 4.5 | 207 | 70 | 134202 | 32 | 87 | 57 |
+| GV3 committed s16 "gills" (close) | gate951 | 22.8 (22.0-23.0) | 27.0 | 27.1 | 43.9 | 14.8 | 19.7 | 2.7 | 207 | 70 | 134202 | 32 | 87 | 57 |
+| GV3 committed s01 "Nocturne" | base | 218.0 (216.0-226.6) | 286.1 | 288.2 | 4.6 | 28.1 | 33.2 | 182.1 | 273 | 60 | 506089 | 1852 | 160 | 60 |
+| GV3 committed s01 "Nocturne" | fix950 | 146.0 (145.3-148.1) | 165.3 | 180.3 | 6.8 | 28.8 | 34.5 | 109.6 | 273 | 60 | 506089 | 1852 | 160 | 60 |
+| GV3 committed s01 "Nocturne" | gate951 | 25.9 (25.4-27.8) | 30.6 | 31.5 | 38.7 | 17.9 | 22.9 | 2.5 | 273 | 60 | 506089 | 1852 | 160 | 60 |
+| GV2 multicam t=2 Valley Wide | base | 66.3 (64.9-66.7) | 84.3 | 85.2 | 15.1 | 19.2 | 24.7 | 41.7 | 258 | 44 | 447125 | 1042 | 115 | 43 |
+| GV2 multicam t=2 Valley Wide | fix950 | 39.7 (39.5-39.8) | 49.4 | 49.6 | 25.2 | 19.8 | 24.9 | 14.8 | 258 | 44 | 447125 | 1042 | 115 | 43 |
+| GV2 multicam t=2 Valley Wide | gate951 | 28.0 (27.4-28.8) | 31.4 | 37.1 | 35.8 | 19.2 | 24.2 | 3.6 | 258 | 44 | 447125 | 1042 | 115 | 43 |
+| GV2 multicam t=9 Hero Free Roam | base | 50.5 (50.4-51.9) | 56.3 | 57.7 | 19.8 | 22.3 | 27.3 | 22.8 | 189 | 32 | 276851 | 1512 | 171 | 33 |
+| GV2 multicam t=9 Hero Free Roam | fix950 | 38.8 (38.2-40.8) | 49.7 | 50.2 | 25.7 | 22.6 | 27.7 | 10.6 | 189 | 32 | 276851 | 1512 | 171 | 33 |
+| GV2 multicam t=9 Hero Free Roam | gate951 | 31.7 (30.4-32.4) | 45.6 | 48.6 | 31.5 | 23.3 | 28.1 | 3.2 | 189 | 32 | 276851 | 1512 | 171 | 33 |
+| GV2 multicam t=27 Valley Wide | base | 68.7 (64.7-69.0) | 78.2 | 82.7 | 14.6 | 20.1 | 27.2 | 40.9 | 254 | 43 | 434840 | 922 | 88 | 43 |
+| GV2 multicam t=27 Valley Wide | fix950 | 39.9 (39.4-40.5) | 46.3 | 46.5 | 25.1 | 19.9 | 24.8 | 15.2 | 254 | 43 | 434840 | 922 | 88 | 43 |
+| GV2 multicam t=27 Valley Wide | gate951 | 27.8 (27.2-28.2) | 32.0 | 33.9 | 36.0 | 19.3 | 24.1 | 3.5 | 254 | 43 | 434840 | 922 | 88 | 43 |
+| grove (small scene) t=2 | base | 16.4 (14.4-17.5) | 17.5 | 18.3 | 60.9 | 14.0 | 15.9 | 0.4 | 43 | 0 | 29408 | 286 | 0 | 0 |
+| grove (small scene) t=2 | fix950 | 16.8 (15.8-17.3) | 18.3 | 18.5 | 59.5 | 14.4 | 16.3 | 0.5 | 43 | 0 | 29408 | 286 | 0 | 0 |
+| grove (small scene) t=2 | gate951 | 15.6 (14.1-17.0) | 18.9 | 20.1 | 63.9 | 13.1 | 15.1 | 0.4 | 43 | 0 | 29408 | 286 | 0 | 0 |
+
+**640x360** (3 repeats; wall = median of the three runs' p50, with min-max; p95/p99 are the median run's; GPU and engine update are medians)
+
+| point | arm | wall p50 (min-max) | p95 | p99 | FPS | GPU p50 | renderer CPU p50 | engine update | draws | shadow draws | tris | visible inst | clustered lights | shadow casters |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| GV3 r7b s66 "The veil lit" (worst wide) | base | 390.3 (385.8-395.4) | 405.3 | 407.9 | 2.6 | 26.3 | 31.7 | 366.2 | 326 | 37 | 525410 | 2293 | 206 | 60 |
+| GV3 r7b s66 "The veil lit" (worst wide) | fix950 | 247.4 (242.3-249.1) | 253.0 | 253.4 | 4.0 | 27.0 | 32.5 | 217.2 | 326 | 37 | 525410 | 2293 | 206 | 60 |
+| GV3 r7b s66 "The veil lit" (worst wide) | gate951 | 25.0 (23.6-25.8) | 29.0 | 29.5 | 39.9 | 15.4 | 21.0 | 3.5 | 326 | 37 | 525410 | 2293 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | base | 313.3 (304.8-315.2) | 321.6 | 329.8 | 3.2 | 27.5 | 32.9 | 279.9 | 306 | 44 | 510497 | 2598 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | fix950 | 195.2 (192.5-195.4) | 216.6 | 231.3 | 5.1 | 26.0 | 31.3 | 161.6 | 306 | 44 | 510497 | 2598 | 206 | 60 |
+| GV3 r7b s24 "valley floor, low and wide" | gate951 | 24.4 (23.8-25.1) | 27.2 | 29.7 | 41.1 | 15.8 | 20.7 | 2.9 | 306 | 44 | 510497 | 2598 | 206 | 60 |
+| GV3 r7b s26 "veil at the water's edge" | base | 344.5 (336.7-344.8) | 385.5 | 391.2 | 2.9 | 22.2 | 27.9 | 354.0 | 309 | 35 | 456353 | 1841 | 206 | 54 |
+| GV3 r7b s26 "veil at the water's edge" | fix950 | 217.4 (216.9-218.3) | 233.7 | 234.3 | 4.6 | 22.0 | 27.5 | 206.0 | 309 | 35 | 456353 | 1841 | 206 | 54 |
+| GV3 r7b s26 "veil at the water's edge" | gate951 | 24.2 (24.0-26.7) | 27.5 | 28.2 | 41.4 | 15.9 | 20.7 | 3.0 | 309 | 35 | 456353 | 1841 | 206 | 54 |
+| GV3 r7b s27 "under the elder: gills" (close) | base | 30.0 (27.7-31.4) | 42.3 | 42.5 | 33.4 | 10.0 | 14.9 | 9.9 | 196 | 72 | 124768 | 20 | 38 | 59 |
+| GV3 r7b s27 "under the elder: gills" (close) | fix950 | 20.9 (20.8-21.2) | 36.8 | 42.3 | 47.9 | 8.7 | 13.4 | 5.5 | 196 | 72 | 124768 | 20 | 38 | 59 |
+| GV3 r7b s27 "under the elder: gills" (close) | gate951 | 17.2 (16.7-19.1) | 23.9 | 24.6 | 58.0 | 8.5 | 13.3 | 3.7 | 196 | 72 | 124768 | 20 | 38 | 59 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | base | 24.7 (23.0-24.8) | 30.9 | 34.0 | 40.5 | 15.9 | 21.0 | 3.6 | 184 | 28 | 252205 | 443 | 1 | 23 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | fix950 | 24.1 (23.1-25.1) | 27.3 | 28.7 | 41.4 | 15.7 | 20.5 | 3.6 | 184 | 28 | 252205 | 443 | 1 | 23 |
+| GV3 r7b s17 "cairn on the spur" (no characters) | gate951 | 24.1 (23.3-24.1) | 27.9 | 30.5 | 41.6 | 15.3 | 20.3 | 3.7 | 184 | 28 | 252205 | 443 | 1 | 23 |
+| GV3 committed s14 "first grand wide" | base | 234.2 (233.8-237.9) | 252.7 | 354.9 | 4.3 | 15.6 | 21.0 | 216.2 | 265 | 21 | 312549 | 537 | 95 | 42 |
+| GV3 committed s14 "first grand wide" | fix950 | 140.4 (138.6-144.9) | 149.1 | 168.0 | 7.1 | 16.1 | 21.4 | 118.8 | 265 | 21 | 312549 | 537 | 95 | 42 |
+| GV3 committed s14 "first grand wide" | gate951 | 23.5 (22.0-24.4) | 27.5 | 28.6 | 42.6 | 15.7 | 20.9 | 2.3 | 265 | 21 | 312549 | 537 | 95 | 42 |
+| GV3 committed s16 "gills" (close) | base | 17.6 (17.2-18.1) | 22.5 | 22.8 | 56.9 | 9.6 | 14.5 | 8.4 | 207 | 70 | 125272 | 32 | 87 | 57 |
+| GV3 committed s16 "gills" (close) | fix950 | 17.0 (16.9-17.7) | 22.4 | 22.5 | 58.9 | 9.7 | 14.2 | 4.5 | 207 | 70 | 125272 | 32 | 87 | 57 |
+| GV3 committed s16 "gills" (close) | gate951 | 16.8 (16.8-17.6) | 22.7 | 22.8 | 59.4 | 9.1 | 13.7 | 2.7 | 207 | 70 | 125272 | 32 | 87 | 57 |
+| GV3 committed s01 "Nocturne" | base | 210.0 (209.5-210.5) | 226.6 | 237.1 | 4.8 | 20.0 | 25.4 | 181.4 | 275 | 60 | 438027 | 1744 | 160 | 60 |
+| GV3 committed s01 "Nocturne" | fix950 | 135.3 (135.0-135.4) | 142.9 | 144.2 | 7.4 | 18.2 | 23.6 | 108.0 | 275 | 60 | 438027 | 1744 | 160 | 60 |
+| GV3 committed s01 "Nocturne" | gate951 | 23.8 (23.8-24.2) | 29.6 | 30.3 | 42.0 | 16.0 | 21.0 | 2.5 | 275 | 60 | 438027 | 1744 | 160 | 60 |
+| GV2 multicam t=2 Valley Wide | base | 67.3 (65.1-68.8) | 71.3 | 73.9 | 14.9 | 19.9 | 25.2 | 41.6 | 265 | 44 | 371713 | 958 | 115 | 43 |
+| GV2 multicam t=2 Valley Wide | fix950 | 39.1 (38.9-39.6) | 44.8 | 46.6 | 25.6 | 18.4 | 23.7 | 14.9 | 265 | 44 | 371713 | 958 | 115 | 43 |
+| GV2 multicam t=2 Valley Wide | gate951 | 25.7 (24.7-26.3) | 27.9 | 29.0 | 38.9 | 17.0 | 21.9 | 3.6 | 265 | 44 | 371713 | 958 | 115 | 43 |
+| GV2 multicam t=9 Hero Free Roam | base | 50.0 (47.5-50.3) | 58.8 | 67.9 | 20.0 | 20.9 | 25.7 | 22.9 | 203 | 32 | 206189 | 1396 | 171 | 33 |
+| GV2 multicam t=9 Hero Free Roam | fix950 | 32.9 (32.2-32.9) | 39.0 | 40.7 | 30.4 | 17.0 | 21.9 | 10.6 | 203 | 32 | 206189 | 1396 | 171 | 33 |
+| GV2 multicam t=9 Hero Free Roam | gate951 | 26.2 (23.8-26.3) | 27.6 | 28.3 | 38.1 | 16.1 | 22.6 | 3.2 | 203 | 32 | 206189 | 1396 | 171 | 33 |
+| GV2 multicam t=27 Valley Wide | base | 65.1 (63.7-67.1) | 77.4 | 81.7 | 15.4 | 18.8 | 23.7 | 41.2 | 263 | 43 | 363812 | 835 | 88 | 43 |
+| GV2 multicam t=27 Valley Wide | fix950 | 38.5 (38.4-40.3) | 45.5 | 54.7 | 26.0 | 19.1 | 24.2 | 15.0 | 263 | 43 | 363812 | 835 | 88 | 43 |
+| GV2 multicam t=27 Valley Wide | gate951 | 25.1 (24.1-25.5) | 28.7 | 30.0 | 39.8 | 16.0 | 21.3 | 3.6 | 263 | 43 | 363812 | 835 | 88 | 43 |
+| grove (small scene) t=2 | base | 10.6 (10.6-10.7) | 13.4 | 13.6 | 94.2 | 8.3 | 10.2 | 0.5 | 43 | 0 | 29408 | 286 | 0 | 0 |
+| grove (small scene) t=2 | fix950 | 10.8 (10.6-10.9) | 12.8 | 14.9 | 92.2 | 8.4 | 10.4 | 0.4 | 43 | 0 | 29408 | 286 | 0 | 0 |
+| grove (small scene) t=2 | gate951 | 11.0 (10.9-11.1) | 13.1 | 14.1 | 90.9 | 8.5 | 10.6 | 0.4 | 43 | 0 | 29408 | 286 | 0 | 0 |
+
+**Reading.**
+- Base: GV3 r7b's wides are **2.5-3.0 FPS at 720p and 2.6-3.2 at 360p** - resolution-independent, because
+  88-98% of the frame is `Engine::update`. The committed GV3 is the same (4.0-4.8 FPS on its wides), and so is GV2
+  multicam, less severely (15 FPS on its wides against 20 on its hero shot): same world, fewer characters in its
+  wides.
+- Close-ups (s27, committed s16) and empty shots (s17) run at 30-57 FPS on base, because their engine update is
+  3.5-9.4 ms.
+- With ADR-950 + ADR-951 every GV3 point is 30-43 FPS at 720p and 40-58 FPS at 360p. At 720p a GV3 wide is then
+  GPU-bound (24 ms GPU of a 33 ms wall; `queueWait` 26 ms), at 360p it is CPU-bound at ~24 ms (GPU 15 ms).
+- Residual view-dependent GPU cost (720p, gate arm): the scene pass is 19.3 ms on the s66 wide against 6.5 ms on the
+  s27 close-up (614k against 135k submitted triangles, 2,415 against 20 visible procedural instances, 206 against 38
+  clustered lights). That is the renderer's known fragment/quad-overdraw cost of dense foliage at distance
+  (`docs/renderer-upgrade/README.md`), not a defect.

@@ -40,9 +40,7 @@ The test pins that premise: `sample(p).height` and `sample(p).waterSurface` equa
 
 The frame-level effect on Glowmere Valley 3 is in `docs/qa-pass/perf.md`.
 
-## Not done
+## Not done here
 
-The visibility signal is still computed for every in-shot character every frame, although nothing in
-any shipped project reads it (ADR-834: "Routing them into anything in a shipped scene" is not done).
-Computing it only when something consumes it would remove the rest of this cost, but it changes what the
-signal reads when nothing consumes it, so it is the owner's decision, recorded in the QA pass report.
+The visibility signal is still computed for every in-shot character every frame, although nothing in any
+shipped project reads it. ADR-951 computes it only once something asks for it.
