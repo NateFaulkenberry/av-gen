@@ -1,0 +1,84 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "astronaut-musicians",
+ "_note": "Prototype (docs/prototypes/astronaut-musicians/). Each performer is two nodes on one transform: the astronaut (skinned, one retargeted Mixamo clip) and its props, both exported in the performer's own frame, so what was validated in Blender lines up here. The GLBs are not in the repository: tools/make_astronaut_musicians.py builds them from the owner's source files.",
+ "camera": {
+  "mode": 1,
+  "position": [0.0, 1.95, 5.6],
+  "target": [0.0, 0.78, 0.0],
+  "fov": 34.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.35,
+  "background": [0.016, 0.018, 0.024],
+  "fogColor": [0.02, 0.022, 0.03],
+  "volumeDensity": 0.0,
+  "volumeMaxDistance": 0.0,
+  "sky": {
+   "zenithColor": [0.30, 0.35, 0.46],
+   "horizonColor": [0.32, 0.33, 0.36],
+   "groundColor": [0.02, 0.021, 0.024],
+   "haze": 0.2,
+   "sunColor": [1.0, 0.95, 0.88],
+   "sunIntensity": 18.0,
+   "sunSize": 0.35,
+   "sunGlow": 0.6,
+   "intensity": 0.5
+  }
+ },
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [0.0, -0.06, 0.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [9.0, 0.12, 6.0], "subdivisions": 2, "bevel": 0.02, "bevelSegments": 2},
+    "distribution": {"kind": "single"},
+    "material": {
+     "baseColor": [0.055, 0.058, 0.064],
+     "emissiveColor": [0, 0, 0],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "keys_astronaut",
+   "kind": "gltf",
+   "asset": "../../assets/musicians/astronaut_keys.glb",
+   "position": [-1.5, 0.0, 0.0],
+   "rotation": [0, 12, 0],
+   "scale": [1.0, 1.0, 1.0],
+   "animation": {"state": "Piano", "blend": 0.0}
+  },
+  {
+   "name": "keys_set",
+   "kind": "gltf",
+   "asset": "../../assets/musicians/keyboard_set.glb",
+   "position": [-1.5, 0.0, 0.0],
+   "rotation": [0, 12, 0],
+   "scale": [1.0, 1.0, 1.0]
+  },
+  {
+   "name": "drums_astronaut",
+   "kind": "gltf",
+   "asset": "../../assets/musicians/astronaut_drums.glb",
+   "position": [1.5, 0.0, 0.0],
+   "rotation": [0, -12, 0],
+   "scale": [1.0, 1.0, 1.0],
+   "animation": {"state": "Drums", "blend": 0.0}
+  },
+  {
+   "name": "drums_kit",
+   "kind": "gltf",
+   "asset": "../../assets/musicians/drum_kit.glb",
+   "position": [1.5, 0.0, 0.0],
+   "rotation": [0, -12, 0],
+   "scale": [1.0, 1.0, 1.0]
+  }
+ ]
+}
