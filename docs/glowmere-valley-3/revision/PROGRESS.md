@@ -885,6 +885,9 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the Camera Travel Beam (the light sweep on camera changes) visible.** When a pulse causes a
   problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
   visible, not dropped.
+- **(2026-09-28) ONE ANIMAL PER ABDUCTION, in every UFO abduction.** Other animals stand clearly apart from the
+  beam. E4 goes from two cows to one; the other cow is spread away. Memory note: `av-gen-one-animal-per-abduction`.
+- **(2026-09-28) Hero pulses on the ten hero mushrooms and the five aliens only, never on the UFOs.**
 - **(2026-09-28) THE HERO PULSE = GV2 multicam's `groundPulse` "Hero Pulse" effects:** a ring that swells out from
   each hero across the ground, on the beat. Never delete them. The owner asked for them several times before the
   revision understood.
