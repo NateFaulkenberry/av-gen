@@ -4,17 +4,32 @@ Agent 2's working notes for the QA pass. Branch `qa/ci`, worktree `../av-gen-qa-
 successor can resume from here. The plan is `PLAN.md` (W2); the brief is `00-brief.md`.
 
 ## Status
-- 2026-09-28: triage done and fixed; workflows restructured; private-asset tooling written (not enabled);
-  commits `2e6c5bbb` (pushed) and `e9681785` (local until the first CPU run reports). Waiting on:
-  CI 36434148550, Sanitizers 36434165586 (asan+ubsan+tsan), TSan whole-suite probe 36434180499, and the
-  local GPU open-trace (for the minimal asset set).
+2026-09-28, end of Agent 2's session. All work is committed and pushed on `qa/ci` (see the hand-back for
+the sha). Push CI is GREEN on `qa/ci` twice (36434148550 on `2e6c5bbb`, 36437357981 on `7b86e797`:
+3576 passed, 0 failed, 240 skipped, 0 excluded, 8m 11s). Nothing is merged; the coordinator merges.
 
-## Resume here (for a successor)
-1. `gh run view <id>` for the three runs above; the ASan jobs' durations decide whether the 5-job matrix
-   can shrink (the farm films now skip on hosted runners, so the heavy parts should be near-empty).
-2. The GPU trace: `scratchpad/trace/gpu-open.txt` (paths opened under assets/) -> `tools/ci/test-assets.list`.
-3. Coverage-gap survey (Explore agent) -> add tests only for real risks.
-4. Update docs/development/ci.md "Sanitizers", "Timings", "TSan subset", "Open decisions".
+## Resume here (for a fresh CI-monitor agent)
+**Runs still in flight when this session ended** (all on `qa/ci`; results stay on GitHub):
+
+| Run | What | Expected |
+|---|---|---|
+| 36434165586 | Sanitizers, `sanitizer=both` on `2e6c5bbb` (the OLD 7-shard ASan matrix; dispatch "both" = asan+ubsan+tsan) | TSan PASS (done: 243 cases, 0 reports, 11 timing assertions not gated, 40 min). ASan heavy-2/heavy-3 PASS (done; heavy-3's 1/7 rest shard = 32 min). Still running: heavy-1 (the non-farm writeback/benchmark cases, estimated ~3 h), rest-a/rest-b (3/7 shards each), and UBSan (whole default set, one job: started 14:12 UTC, 40 min build; RISK: it may hit the 330 min test ceiling -- if it TIMEOUTs, split UBSan into two jobs of 3 shards via `tools/ci/run-suite.sh`, e.g. an `ubsan:a/b` split like asan's). Any `SANITIZER FAILURE` is a real finding: triage it. |
+| 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | Probably TIMEOUT at 300 min, which answers "can full TSan run nightly in one job": no. If it finishes, read its duration and reports; if it has race reports, those are real. Either way record the result in docs/development/ci.md "TSan subset". |
+| 36444149446 | CI on `f987998c` (then later pushes) | green, like the two before. |
+
+**Then:**
+1. Once 36434165586 ends: fill docs/development/ci.md "Timings" with the measured ASan/UBSan/TSan job
+   times, and check the rebalanced ASan matrix (committed after that run started: 11 rest shards,
+   `tools/ci/run-suite.sh` `asan_job`) with a fresh dispatch: `gh workflow run sanitizers.yml --ref qa/ci
+   -f sanitizer=asan`. With the farm films skipping, the 5 ASan jobs may be consolidatable to 3.
+2. The nightly schedule only runs from `main`, so the new sanitizer layout first runs nightly after merge.
+3. Unverified: the private-asset jobs (`cpu-assets`, `gpu`, the private-repo workflow) have never run on
+   GitHub -- they are gated off until the owner acts (docs/development/gpu-ci-private-assets.md). The
+   scripts were tested offline end to end. `tools/ci/prune-caches.sh` has only been exercised for its
+   listing call; it first runs for real on a `main` report job.
+4. Unverified: the asset-free delete regression was not shown failing against the pre-fix code.
+5. Coverage gaps left for the owner/W3 (below): G2 (a failed load half-replaces the project and a save
+   then overwrites the previous file) and G3 (a missing scene file keeps the previous composition).
 
 ## 1. Triage of the red runs
 
@@ -154,4 +169,5 @@ Survey by a read-only agent, then each finding verified by a failing test before
   git history (`4bdc42ff`), removal needs a history rewrite.
 
 ## Log
-- 2026-09-28: triage; fixes; workflow restructure; private-asset tooling.
+- 2026-09-28: triage; fixes; workflow restructure; private-asset tooling; asset trace and list;
+  G1/G5 crash fixes; ASan matrix rebalance; session ended with sanitizer runs in flight.
