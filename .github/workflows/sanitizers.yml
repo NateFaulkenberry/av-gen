@@ -90,8 +90,8 @@ jobs:
       matrix:
         job: [heavy-1, heavy-2, heavy-3, rest-a, rest-b]
     env:
-      # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
-      # fails this job. Assertion failures under Debug+ASan are listed, not gated (wall-clock
+      # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout, an unexercised case or
+      # an exit code the XML does not explain fails this job. Assertion failures under Debug+ASan are listed, not gated (wall-clock
       # ceilings an -O0 instrumented build cannot meet); the Release run gates correctness.
       # ASan halts on its first report; the cases after it in that process are reported as never
       # run. detect_stack_use_after_return: the class of bug ADR-941 fixed, which ASan missed with

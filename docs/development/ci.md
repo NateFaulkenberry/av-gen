@@ -181,8 +181,10 @@ report     one row per sanitizer in the run summary; prunes caches on main
   nothing extra there, and any `runtime error:` line still fails that job.
 - **TSan:** `--preset tsan` over the concurrency set (below), **every night** since 2026-09-28. It was
   Sundays only while the ASan run held all five macOS slots for 4-5 h.
-- **Gating:** `--gate sanitizer` for all three. A sanitizer report, a crash, a timeout or an
-  unexercised case fails the job; plain assertion failures are listed but do not gate (they were
+- **Gating:** `--gate sanitizer` for all three. A sanitizer report, a crash, a timeout, an
+  unexercised case or an exit code the Catch2 XML does not explain (since 2026-09-28; before, the
+  sanitizer gate ignored it) fails the job. Catch2's exit 4 ("every case ran was skipped", what a
+  plan process whose cases all need absent assets returns) agrees with its XML and is not flagged. Plain assertion failures are listed but do not gate (they were
   `[performance]` wall-clock ceilings and 10 s job waits that an -O0 instrumented build cannot meet).
   The Release run gates correctness. Each report appears in the summary as `SANITIZER FAILURE` with
   its type, first frame and a stack excerpt, and every job uploads its shard logs and XML
@@ -362,7 +364,10 @@ Why this runner:
 | **Push → verdict, wall clock** | **~25-37 min** | **~9-10 min** (run 36066934636: 9m 06s) |
 | GPU job (informational, main/nightly) | ~15 min (853 s for `avgen_render_tests`) | same |
 | TSan build + 226-case subset | 25 min build + 27 min tests | n/a |
-| ASan/UBSan build + tests (2026-09-26/27) | 38 min build; the old 7 parts ran 12:16-20:51 UTC with 4 timeouts | 5 min build; the plan's 5 jobs, about 4-5 h expected (not yet measured) |
+| ASan/UBSan build + tests (2026-09-26/27) | 38 min build; the old 7 parts ran 12:16-20:51 UTC with 4 timeouts | n/a |
+| ASan, 5 jobs over 7 rest shards (run 36434165586, 2026-09-28, farm films skipping) | 42 min build (cold); jobs: rest-a 175 min and rest-b 174 min (3 rest shards each), heavy-1 103 min (two non-farm cases: the pre-ADR-262 benchmark case 102 min, the writeback case 72 min), heavy-3 33 min (1 rest shard), heavy-2 1.5 min. Critical path build + rest = ~3 h 37 min; wall clock 4 h 36 min because heavy-1 waited 1 h 36 min for a macOS slot. 0 reports | n/a (caches are saved from main only) |
+| UBSan alone, whole default set (same run) | 40 min build + 204 min tests = 3 h 48 min job; 3838/3838 ran, 0 reports | n/a |
+| TSan, concurrency set (same run) | 82 min job (build plus about 40 min of tests); 243 cases, 0 reports | n/a |
 
 Runs: cold [36060799310](https://github.com/NateFaulkenberry/av-gen/actions/runs/36060799310), warm
 [36066934636](https://github.com/NateFaulkenberry/av-gen/actions/runs/36066934636).
@@ -390,6 +395,11 @@ reference, if it were private (macOS billed at 10× Linux):
 > milliseconds (`testsupport::skipUnlessFarmAssetsPresent()`). The plan still names them, because it is
 > right wherever the assets are present, but on the hosted nightly the `heavy-*` jobs finish quickly
 > and the run is bounded by the rest shards. The measurements below are from before that change.
+> Measured after it (run 36434165586): the longest cases left in the rest are 44-50 min each under ASan
+> with three processes sharing the runner (the sightline pass on the real project 50 min, every example
+> loads 47 min, a fired section event 46 min, the wanderer's feet 46 min, Rook's benchmark run 44 min,
+> the UFO stack demo 35 min, the multicam deciders 31 min), so "nothing in the rest over about 26 min"
+> no longer holds; they fit easily, and no timeout came near.
 
 The ASan/UBSan run covers the default CPU set, the same set as the per-push job, minus:
 
@@ -520,8 +530,8 @@ That is 226 cases, which took 27 minutes on 3 shards (run 36060803359). Result:
   - a Glowmere LOD case;
   - an audio case.
 
-The TSan job therefore uses `--gate sanitizer`. **Only a race report, a crash, a timeout or an
-unexercised case fails it**, and assertion failures are listed but do not gate. The subset is
+The TSan job therefore uses `--gate sanitizer`. **Only a race report, a crash, a timeout, an
+unexercised case or an unexplained exit code fails it**, and assertion failures are listed but do not gate. The subset is
 labelled `SUBSET` in its summary. It is not whole-suite TSan coverage and must not be quoted as
 such.
 
@@ -583,7 +593,7 @@ such.
 - `tools/ci/catch2_run.py`:
   - runs a Catch2 binary in shards and reads its XML and exit codes;
   - writes `result.json` and `summary.md`, emits annotations, and fails the step on any failure,
-    crash, timeout, sanitizer report or unexercised case;
+    crash, timeout, sanitizer report, unexercised case or exit code its XML does not explain;
   - `run --plan <file>` runs one job of the sanitizer plan: a part's named processes (`--part`)
     and/or rest shards (`--shards`, `--shard-total`, `--shard-first`);
   - its `plan-check` subcommand proves a plan runs every case of a binary exactly once;

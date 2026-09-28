@@ -4,28 +4,35 @@ Agent 2's working notes for the QA pass. Branch `qa/ci`, worktree `../av-gen-qa-
 successor can resume from here. The plan is `PLAN.md` (W2); the brief is `00-brief.md`.
 
 ## Status
-2026-09-28, end of Agent 2's session. All work is committed and pushed on `qa/ci` (see the hand-back for
-the sha). Push CI is GREEN on `qa/ci` twice (36434148550 on `2e6c5bbb`, 36437357981 on `7b86e797`:
-3576 passed, 0 failed, 240 skipped, 0 excluded, 8m 11s). Nothing is merged; the coordinator merges.
+2026-09-28, CI-monitor session (Agent 2's successor). Everything is committed and pushed on `qa/ci`.
+Push CI GREEN on `df333c8c` (36464437262: CPU job 6 min). Nothing is merged; the coordinator merges.
 
 ## Resume here (for a fresh CI-monitor agent)
-**Runs still in flight when this session ended** (all on `qa/ci`; results stay on GitHub):
+**Runs** (all on `qa/ci`; results stay on GitHub; artifacts via `gh run download <id> -p 'sanitizer-logs-*'`):
 
-| Run | What | Expected |
+| Run | What | Result / expected |
 |---|---|---|
-| 36434165586 | Sanitizers, `sanitizer=both` on `2e6c5bbb` (the OLD 7-shard ASan matrix; dispatch "both" = asan+ubsan+tsan) | TSan PASS (done: 243 cases, 0 reports, 11 timing assertions not gated, 40 min). ASan heavy-2/heavy-3 PASS (done; heavy-3's 1/7 rest shard = 32 min). UBSan PASS (done: whole default set, 3838/3838 ran, 0 reports, 7 timing assertions not gated, 204 min of tests after a 40 min cold build; fits the 330 min ceiling with ~2 h margin). Still running: heavy-1 (the non-farm writeback/benchmark cases, estimated ~3 h) and rest-a/rest-b (3/7 shards each). Any `SANITIZER FAILURE` is a real finding: triage it. |
-| 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | Probably TIMEOUT at 300 min, which answers "can full TSan run nightly in one job": no. If it finishes, read its duration and reports; if it has race reports, those are real. Either way record the result in docs/development/ci.md "TSan subset". |
-| 36444149446 | CI on `f987998c` (then later pushes) | green, like the two before. |
+| 36434165586 | Sanitizers `both` on `2e6c5bbb` (the OLD 7-rest-shard ASan matrix) | **DONE, SUCCESS, 0 sanitizer reports anywhere.** ASan build 42 min; rest-a 175 min, rest-b 174 min (3/7 shards each), heavy-1 103 min, heavy-3 33 min, heavy-2 1.5 min; UBSan 3 h 48 min (3838/3838); TSan subset 82 min. Only timing assertions failed (not gated). Timings are in docs/development/ci.md. |
+| 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | Still running at the time of writing; expected TIMEOUT at 300 min (by ~20:10 UTC). Record in docs/development/ci.md "TSan subset". |
+| 36468754635 | Sanitizers `asan` on `df333c8c`: the REBALANCED matrix (11 rest shards) | dispatched 18:57 UTC; check job times vs the old run, then decide 5 -> 3 jobs. |
+
+**Finding from 36434165586 (fixed, `tools/ci/catch2_run.py`):** each heavy job's summary said "exit 4 but
+Catch2 counted 0 failed cases" yet the job passed. Two things: (a) exit 4 is Catch2 v3.3+'s "every case
+was skipped" (the farm-film processes), which agrees with the XML, so it was a false disagreement; (b) the
+`--gate sanitizer` verdict ignored disagreements entirely, so an unexplained non-zero exit (a signal, or a
+sanitizer report in a form the parser misses) could pass a sanitizer job. Now `all_skipped()` recognises
+exit 4 exactly (0 passed, 0 failed, >0 skipped), and the sanitizer gate fails on any other disagreement.
+Checked by replaying `summarise` on the run's own artifacts (heavy-1/2/3 now clean; rest-a/b, UBSan, TSan
+unchanged) and on synthetic statuses (exit 1 with 0 failures still flagged; exit 4 with a pass flagged).
 
 **Then:**
-1. Once 36434165586 ends: fill docs/development/ci.md "Timings" with the measured ASan/UBSan/TSan job
-   times, and check the rebalanced ASan matrix (committed after that run started: 11 rest shards,
-   `tools/ci/run-suite.sh` `asan_job`) with a fresh dispatch: `gh workflow run sanitizers.yml --ref qa/ci
-   -f sanitizer=asan`. With the farm films skipping, the 5 ASan jobs may be consolidatable to 3.
+1. Timings from 36434165586: DONE (docs/development/ci.md "Timings"). Still to do: read 36468754635 (the
+   rebalanced matrix, `tools/ci/run-suite.sh` `asan_job`), add its times, and decide whether the 5 ASan
+   jobs consolidate to 3 (analysis under "ASan consolidation" below, once the run is in).
 2. The nightly schedule only runs from `main`, so the new sanitizer layout first runs nightly after merge.
 3. Unverified: the private-asset jobs (`cpu-assets`, `gpu`, the private-repo workflow) have never run on
    GitHub -- they are gated off until the owner acts (docs/development/gpu-ci-private-assets.md). The
-   scripts were tested offline end to end. `tools/ci/prune-caches.sh` has only been exercised for its
+   scripts were tested offline end to end. The owner has PARKED steps 4-6 (see "Private assets / GPU CI"). `tools/ci/prune-caches.sh` has only been exercised for its
    listing call; it first runs for real on a `main` report job.
 4. Unverified: the asset-free delete regression was not shown failing against the pre-fix code.
 5. Coverage gaps left for the owner/W3 (below): G2 (a failed load half-replaces the project and a save
