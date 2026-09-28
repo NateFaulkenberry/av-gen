@@ -118,6 +118,18 @@ Known from the GV3 wrap-up, and not yet triaged:
 2. `--export-bundle` drops `lightRig`.
 3. `--export-bundle` without `--headless` opens the windowed app.
 
+- **Found and fixed by W2** (each with a regression test that failed first):
+  1. `scene.delete_node` / `scene.set_parent` from the assistant skipped `Engine::rebind()`. Routes kept a dangling
+     pointer, and the app segfaulted on the next frame.
+  2. A known project key with the wrong type (e.g. `"format": 1`) threw out of `loadProject` and terminated the app.
+     It is now a load error.
+  3. The flaky "Cancellation stops execution" test: one pump drained the whole queue on a loaded runner. The test
+     now pumps one item at a time; 40 of 40 runs passed.
+  4. A stale sha256 for `glowmere-valley.wav` in the manifest.
+- **Found by W2, NOT fixed:**
+  - G2: a load that fails part-way leaves the project half-replaced, and Cmd+S then overwrites the previous file.
+  - G3: a missing scene file keeps the previous composition installed.
+
 ## Performance Regressions
 GV2 multicam wide, 720p:
 
@@ -137,13 +149,29 @@ GV2 multicam wide, 720p:
    ecology lights. It may be an accepted look change. Open.
 
 ## CI Status
-| Check | State (2026-09-28) |
+W2 checkpointed 2026-09-28 at `qa/ci` `bfa795b4`, pushed, not merged. Details and the monitor's resume point:
+`../av-gen-qa-ci/docs/qa-pass/ci.md`.
+
+| Check | State |
 |---|---|
-| PR/push CI (`ci.yml`) | RED: CPU tests failed on `4a138886`; the run on `77ea4247` is in progress |
-| GPU CI | informational only (hosted VM); nothing authoritative |
-| ASan/UBSan (`sanitizers.yml`, nightly) | RED: stages 0, 1, 5 and main failed on 2026-09-27 |
-| TSan | Sundays only; not run recently |
-| Nightly/extended | `ci.yml` nightly exists |
+| Push CI (`ci.yml`) | GREEN on qa/ci (36434148550, 36437357981). The CPU gate takes about 8 min, down from 22. 36444149446 and 36461173197 are in progress |
+| Hosted GPU | informational only; the hosted Metal device cannot compile the pipelines |
+| Self-hosted GPU (`gpu` job) | written, gated off; waiting on the owner's actions below |
+| `cpu-assets` (nightly, private assets) | written, gated off |
+| ASan (nightly, 5 jobs, 11 rest shards) | heavy-2 and heavy-3 PASS; heavy-1 and rest-a/b still running (36434165586) |
+| UBSan (now its own job, `halt_on_error=1`) | running (36434165586); risk of hitting the 330 min limit, in which case split it |
+| TSan (now nightly, concurrency set) | PASS: 243 cases, 0 reports, 40 min. The whole-suite probe 36434180499 will probably time out |
+
+**What changed:**
+- one composite build action;
+- `tools/ci/run-suite.sh`, one command that runs what CI runs;
+- caches saved only from main, plus a prune script (the repository was at 10.7 of 10 GB);
+- the scores regenerated on CI, which un-skips 26 cases; the exceptions file is now empty;
+- the farm-asset cases skip cleanly through one shared guard.
+
+**Minimal private asset set** (`tools/ci/test-assets.list`, measured with an open() tracer): the GPU suite needs 63
+files (65 MB); the CPU Glowmere tier adds 133 files (44 MB), plus optionally the Tree of Life (152 MB). That is
+against 1.4 GB in `assets/`.
 
 ## Remaining Problems
 - **Committed renders:** `examples/treeisland/renders` has 28 PNGs (51 MB) committed despite its `.gitignore` rule.
@@ -154,6 +182,19 @@ GV2 multicam wide, 720p:
   3.24 m/s ... rate matching is on and saturated". This fits the owner's report of pre-footstep sliding.
 
 ## Decisions Required From Human
+- **GPU CI setup (owner actions),** from `docs/development/gpu-ci-private-assets.md` on qa/ci:
+  1. run `tools/ci/make-test-assets-repo.sh`;
+  2. `gh repo create ... --private --push`;
+  3. pin the sha in `tools/ci/test-assets.lock`;
+  4. add a read-only deploy key as secret `AVGEN_TEST_ASSETS_SSH_KEY`;
+  5. `gh variable set AVGEN_TEST_ASSETS true`;
+  6. register a self-hosted runner labelled `avgen-gpu`.
+  The runner is recommended on the PRIVATE repository, because a fork PR can run its own workflow file on a public
+  repo's self-hosted runner.
+  **Decisions:** whether the songs go into the private repository; where the runner lives; whether to track three
+  CC0 Quaternius fixtures (about 4 MB).
+- **Farm GLBs in public history** (`4bdc42ff`): removing them needs a history rewrite. The owner earlier chose not
+  to; this is recorded here only for completeness.
 - **ADR-951** makes an unread `character.<name>.visibility` signal read 0 instead of a computed value. No shipped
   project reads it. Reverting commit `97925c18` alone restores the old behaviour. Accept?
 - **The aurora's audio sensitivity** is 0 in the parameter (the one that wins) and 1.0 in the block, so as rendered
