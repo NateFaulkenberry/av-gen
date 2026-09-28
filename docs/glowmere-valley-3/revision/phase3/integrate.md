@@ -265,3 +265,18 @@ audit 90/90 routes, 130/130 tracks, 0 unknown parameters. Render 00:43-01:07 (r6
 - **Critic** r6b `job_1a0e668cdca4609c3` against r5: musical sync 0.885 -> 0.943, effects 0.945 -> 0.975,
   pacing 1.000; technical quality 0.923 -> 0.825 and lighting 0.845 -> 0.789 (clipping in pooled shots, up to
   1.6% of pixels; bright secondary masses), cinematography -4.0. Elder's kick z 39, lantern 14, bloom 9.6.
+
+## Round 7: the Hero Pulse restored, one animal per abduction (project for review; not rendered for review)
+- **Hero Pulse** (`5d9e7bb1`): GV2 multicam's `groundPulse` effects, which the first pass had
+  removed (`REMOVED_EFFECT_TYPES`), carried over on the ten mushrooms and five aliens (not the saucer, the owner),
+  GV2's look whole. heroFocus needs Song-mode spans, so each fires on "hero pulse <hero>" markers on the downbeats of
+  shots where it is the subject or in frame within 160 m (two per shot at most): 140 rings, the elder 53, the lantern
+  37. On frames (a superseded whole-film render made before the one-animal change) the ring swells from the hero across
+  the ground in s01, 11.1, 25.1 and the wides 41.1 and 117.1; close up it floods the foliage near the lens at its peak.
+- **One animal per abduction** (the owner): E4 lifts cow-12 alone; cow-23 re-homed beside cow-19, bull-10 (6.5 m from
+  E3's beam on r6b) to bull-1's slope. `beamclear.py` on the r7b trace: the nearest other animal to any beam, beam to
+  depart, is 50 m (E4: cow-3), 80 m (E5: cow-19), 145 m (E3: bull-1). 57.1 holds the single cow rising.
+- r7b checks (CPU): audit 105/105 routes, 130/130 tracks, 18/18 effects; E1-E5 play; E4 watched by rook, sage, ember,
+  vane; E5 by vane, tide, sage, rook; stability 20/22 (38.1 eye height 2.14 cm, 95.3); close approaches under 1.4 m
+  two, off screen. At the owner's request no further renders: the project is in the review folder
+  (`project-for-review/`).
