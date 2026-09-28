@@ -459,9 +459,12 @@ def e4_pair_lifted(t0, t1, g):
     # scout has no hero record and the Critic takes the saucer's larger bounds. Over water, so no undergrowth can stand in the
     # lens: iteration 3's eye on the dry ground north-east of the meadow was inside a plant whose
     # leaves filled the frame (and its 40 mm cut the scout's top).
-    r = aim_at(28.0, g(-27, 17, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
+    # From the south now, 44 m off: the engine spreads a lifted pair along east-west, so the old eye
+    # east of the station saw the two cows one behind the other, touching (the owner's "stuck together";
+    # gv3-int r3 at 1080p). From the south they rise side by side, either side of the beam (batch vK1).
+    r = aim_at(28.0, g(-70, 52, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="28 mm, 4 m over the river 42 m east, live aim", movement="still", music="the lift on bar 57",
+                   camera="28 mm, 4 m up, 44 m south of the station, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 

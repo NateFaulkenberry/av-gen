@@ -273,9 +273,12 @@ HERO_PARTS = {"gills": (1.0, 0.0, 0.0), "under": (1.0, 35.0, 15.0), "cap": (0.3,
 HERO_SPORES = (1.0, 90.0, 60.0)
 HERO_DEPTH_MIN = 0.7                        # the quietest section still pulses at 70% (was 0.188, then 0.5)
 # The elder's own light throws its heartbeat on the ground and the plants round it: the spill that
-# makes the pulse read in the wides, where the gills are a few pixels. It rests at half the rig's 3.0 and
-# flares to x5 on the kick.
-ELDER_LIGHT = {"rest": 1.5, "amount": 6.0}
+# makes the pulse read in the wides, where the gills are a few pixels. The rig hangs it 0.2 m under the
+# composition's focal point, which is the cap, 12 m up: from there, at x5 on the kick, the ground round
+# the elder moved 1-3% (gv3-int r3). 7 m lower (the rig's distance below the focal point: the light at
+# the stem, 5 m over the ground) it lights the stem and a ring of ferns round it (vS: the lower half of
+# s01's frame 0.176 -> 0.238 from 1.5 to 7.5). It rests at half the rig's 3.0 and flares to x4 on the kick.
+ELDER_LIGHT = {"rest": 1.5, "amount": 5.0, "distance": 7.0}
 _DEPTH = {"depthSource": "section.energy", "depthMin": HERO_DEPTH_MIN, "depthMax": 1.0}
 _CHAIN = {"attackMs": 5.0, "envelope": "none", "remapEnabled": False, "curve": "linear", "threshold": "none"}
 
@@ -484,6 +487,7 @@ def install(project, tuned):
     # And the elder's light rests lower, so its kick throws a ring of light round it (the Lights panel's
     # elder-practical intensity; the rig's own 3.0 is GV2's, shared, and not edited).
     project["parameters"]["lightrig/GlowmereValley/elder-practical/intensity"] = ELDER_LIGHT["rest"]
+    project["parameters"]["lightrig/GlowmereValley/elder-practical/distance"] = ELDER_LIGHT["distance"]
     plans = [p for p in project.get("directingPlans", []) if p.get("id") != tuned["plan"]["id"]]
     project["directingPlans"] = plans + [tuned["plan"]]
 
