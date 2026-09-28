@@ -8,6 +8,15 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **21:20: behave is DONE** (`35b94e53`, suite 3,813 tests, 0 failed) and **merged into `integrate/revision`**
+  (`ae99ff8c`; the ADR index conflict was resolved, rows in order). cihealth + behave are building, then the full
+  CPU suite, the GPU suite, main, and engine-5 for gv3-int's final re-trace.
+  - GV3: aliens stuck 5.0 -> 0.0 s, animals 11.6 -> 2.0 s, failed errands 17 -> 2. The closest approach in the
+    go-and-see variant is 1.45 m (0 under 1.4 m).
+  - Open (recorded): mutual avoidance (walkers crossing); a chase until "stuck"; ember's shallows pocket; the empty
+    option never re-plans; the stuck metric counts the first 0.5 s of lifts.
+  - UI gap: `interest.approach` is JSON-only; it now sets how near an alien goes to what it chose to see.
+  - uireach merges separately when it finishes.
 - **21:00: gv3-int rounds 3-4; round 5, the final candidate, is generating** (a whole-film render and a Critic job,
   about 60 min).
   - **E5 at approach 100 m works** (`779875d5`): vane stops facing the saucer and watches 172.55-180.05; 95.1 passes
