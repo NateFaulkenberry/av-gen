@@ -84,6 +84,27 @@ lets one turn land" is what was wrong.
   piece does not crash, without any asset" (set-piece lab; roles are `target1..N`). NOT demonstrated
   against the pre-fix code.
 
+## Coverage gaps (deliverable 6)
+Survey by a read-only agent, then each finding verified by a failing test before any fix:
+- **G5, FIXED (crash).** `scene.delete_node` / `scene.set_parent` (src/ai/engine_tools.cpp) destroyed a
+  node's parameters without `Engine::rebind()`; routes/tracks kept raw pointers to freed memory. Release
+  repro: dangling `targetParam` and SIGSEGV on the next frame. Now both re-bind. Test: test_ai_tools.cpp
+  "Deleting or re-parenting a node through the assistant re-binds the routes that drive it".
+- **G1, FIXED (crash).** `Engine::loadProject`/`loadFile` used `.value()`/`.get<T>()`, which throw
+  `json::type_error` on a wrong-typed key; uncaught -> terminate. 4 of 6 damaged files threw
+  (`format: 1`, numeric scene kind, numeric `control.tempoSource`, string shot-span time). Function-try-
+  blocks turn it into a load error; `Application::opensADifferentProject` no longer uses `.value()`.
+  Test: tests/integration/test_project_malformed.cpp.
+- **G2, NOT fixed, for the owner/W3 (data loss).** A load that fails part-way (layers, params, control,
+  timeline, songPlan, states, director: engine.cpp ~3020-3258) leaves the engine half-replaced while
+  `projectPath_` still names project A; `Application::performOpen` only shows a status line, so Cmd+S
+  writes the half-loaded B over A. Needs a transactional load: a design change, not a QA fix.
+- **G3, NOT fixed (data loss).** A missing `assets.scene` file only warns (engine.cpp ~2802-2819) and keeps
+  the PREVIOUS project's composition installed; the next save writes A's scene path into B.
+  Related to W3's "a project whose scene fails to load falls back ... with no visible error".
+- **G4, low risk.** `outputs` has no round-trip test (dropped silently if not an array). Not added.
+- Invalid references: already well covered (route liveness, camera collections, staging refusals).
+
 ## Workflow structure (after)
 - `ci.yml`: build -> cpu-tests (gate) | gpu-hosted (informational, main/nightly/dispatch) | cpu-assets
   (gate; nightly/dispatch; `vars.AVGEN_TEST_ASSETS`) | report (+ cache prune on main). `gpu` job:

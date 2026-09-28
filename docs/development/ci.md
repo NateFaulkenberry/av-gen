@@ -159,28 +159,38 @@ the commit message.
 
 ### `Sanitizers` (`.github/workflows/sanitizers.yml`): nightly on main, and dispatch
 
-- **ASan/UBSan:**
-  - `--preset asan`, which is Debug + `-fsanitize=address,undefined` on engine targets and tools,
-    built once;
-  - the CPU suite runs in five jobs laid out by a plan, `tools/ci/sanitizer-plan.txt`: two jobs of
-    named processes for the heavy cases and the cases that share a film, and three jobs of rest
-    shards for every other case. Every default case runs exactly once, except two that no hosted
-    job can finish, which are skipped by name and listed in every summary. See
-    [The sanitizer partition](#the-sanitizer-partition).
-  - It gates on sanitizer reports, crashes, timeouts and unexercised cases (`--gate sanitizer`).
-    Assertion failures under Debug+ASan are listed, not gated. In run 36087867052 all 11 of them
-    were `[performance]` wall-clock ceilings and 10 s job waits that an -O0 instrumented build
-    cannot meet, plus asset cases. Test correctness is gated by the Release CI run.
-  - ASan halts at its first report. UBSan reports every site and carries on, but any
-    `runtime error:` line fails the job.
-  - Each report appears in the summary as `SANITIZER FAILURE`, with its type, first frame and a
-    stack excerpt.
-- **TSan:** `--preset tsan` over the concurrency subset (below). Runs weekly (Sunday) and on dispatch.
-- **Capacity:** a sanitizer run's five test jobs take the whole free-account macOS concurrency (5
-  jobs) for 4-5 h, so push CI queues behind it; on Sundays TSan is a sixth job and waits for a
-  slot. The other four jobs finish in about 2-4 h and hand their slots back while the film job
-  runs on. That is why it runs at night (07:17 UTC), and why a dispatch during working hours will
-  delay everyone's pushes.
+```
+asan-build ─▶ asan-tests (5 jobs, tools/ci/sanitizer-plan.txt)   ASan, with UBSan's checks (recoverable)
+ubsan      (own build; the whole default set, 3 shards)          UBSan alone, fatal on the first report
+tsan       (own build; the concurrency set, 3 shards)            TSan, every night
+report     one row per sanitizer in the run summary; prunes caches on main
+```
+
+- **ASan:** `--preset asan` (Debug + `-fsanitize=address,undefined`), built once, then five jobs laid
+  out by `tools/ci/sanitizer-plan.txt` (see [The sanitizer partition](#the-sanitizer-partition)).
+  `ASAN_OPTIONS` adds `detect_stack_use_after_return=1`: the stack-use-after-return ADR-941 fixed was
+  invisible to ASan without it. LeakSanitizer is off (unsupported by Apple clang on macOS).
+- **UBSan: its own job, not only the checks inside the ASan build.** Why:
+  - without ASan's shadow memory a Debug build runs a few times slower than Release rather than
+    ~56x, so the WHOLE default set fits in one job, including the two cases the ASan plan must skip;
+  - an ASan halt ends its process, so a UBSan report later in that process was never reached;
+  - its verdict is its own row, not a line inside an ASan summary;
+  - `UBSAN_OPTIONS=halt_on_error=1` makes a report kill its process with a non-zero exit, which
+    `catch2_run.py` reads as a failure on its own, besides the `runtime error:` line it also gates on.
+  The ASan build keeps UBSan's checks (recoverable, `halt_on_error=0`) as a second net: they cost
+  nothing extra there, and any `runtime error:` line still fails that job.
+- **TSan:** `--preset tsan` over the concurrency set (below), **every night** since 2026-09-28. It was
+  Sundays only while the ASan run held all five macOS slots for 4-5 h.
+- **Gating:** `--gate sanitizer` for all three. A sanitizer report, a crash, a timeout or an
+  unexercised case fails the job; plain assertion failures are listed but do not gate (they were
+  `[performance]` wall-clock ceilings and 10 s job waits that an -O0 instrumented build cannot meet).
+  The Release run gates correctness. Each report appears in the summary as `SANITIZER FAILURE` with
+  its type, first frame and a stack excerpt, and every job uploads its shard logs and XML
+  (`sanitizer-logs-*`, 14 days).
+- **Exclusions:** none by name any more in `tools/ci/hosted-runner-exceptions.txt` (the two crash
+  exclusions were fixed and removed on 2026-09-28). The ASan plan skips two cases it cannot finish;
+  UBSan runs them.
+- **Locally:** `tools/ci/run-suite.sh ubsan --build`, `tsan --build`, `asan:<job> --build`.
 
 ## What the categories mean
 
@@ -375,6 +385,12 @@ reference, if it were private (macOS billed at 10× Linux):
 
 ## The sanitizer partition
 
+> **Since 2026-09-28 the heavy parts are mostly asset-bound.** Every film this section measures needs
+> the farm GLBs, which left the tree in `4a138886`; on a hosted runner those cases now SKIP in
+> milliseconds (`testsupport::skipUnlessFarmAssetsPresent()`). The plan still names them, because it is
+> right wherever the assets are present, but on the hosted nightly the `heavy-*` jobs finish quickly
+> and the run is bounded by the rest shards. The measurements below are from before that change.
+
 The ASan/UBSan run covers the default CPU set, the same set as the per-push job, minus:
 
 - the two documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`), as on every push;
@@ -488,7 +504,7 @@ GPU tests are not run under ASan. Measured locally, that is about six cases an h
 
 ## TSan subset
 
-A full TSan sweep of the CPU suite has been running locally for over 15 hours, so it does not fit
+Nightly since 2026-09-28 (it was Sundays only). A full TSan sweep of the CPU suite has been running locally for over 15 hours, so it does not fit
 a hosted job's 6-hour limit. The job runs the tags whose cases start threads (`TSAN_SUBSET` in
 `sanitizers.yml`):
 
@@ -524,39 +540,39 @@ such.
 
 ## Open decisions and follow-ups
 
-1. **Assets (owner's decision).** 1.4 GB locally under `assets/`. Nothing has been published.
-   The options, cheapest first:
-   - (a) accept the gap and keep running asset-bound tags locally;
-   - (b) a private, access-controlled asset bundle fetched with a read-only secret. This means a
-     secret, and it means the workflow must never run for forks;
-   - (c) a self-hosted Apple Silicon runner that already has the assets. This also fixes the GPU.
-2. **GPU.** Only a self-hosted runner on real Apple Silicon makes `avgen_render_tests`
-   authoritative remotely. Until then it is local.
-3. **Two test defects** exposed by the runner: `test_body_compensation.cpp:433` (segfault) and
-   the `test_ai_tools.cpp:780` abort. Each should SKIP or fail cleanly without its asset, after
-   which its exclusion can go. The first now skips (20de27ac, 2026-09-25), so its exclusion is
-   probably stale; take it out after one run shows the case skipping on the runner.
-4. **Tests that write into `examples/world`** during a run (`test_glowmere_multicam*`,
+1. **The private test assets and the GPU runner (owner's decision).** Designed and implemented,
+   switched off: [gpu-ci-private-assets.md](gpu-ci-private-assets.md) has the design, the security
+   reasoning and the exact steps. Until then the asset-bound cases are local-only, and a GPU verdict
+   comes from `tools/ci/run-suite.sh gpu` on a real Mac.
+2. **The song**, and **the farm GLBs still in public history** (`4bdc42ff`): both in that document's
+   "Decisions" section.
+3. **Tests that write into `examples/world`** during a run (`test_glowmere_multicam*`,
    `test_motion_matching_default_off`). They are harmless on CI but racy between concurrent
    local agents.
-5. **The two cases the sanitizer plan skips** (the farm locomotion case, the five characters over
-   two seeds) are not checked by ASan at all. They need a sanitizer-sized variant from their
-   owners, a shorter run when `__has_feature(address_sanitizer)`, before they can come back.
-6. **The sanitizer run's margin.** The film in `test_abduction_sequence.cpp` is the floor, at
-   245-300 min of the 330 min ceiling, and no partition can shorten it. Two levers remain, each the
-   owner's call:
-   - a shorter film under sanitizers;
-   - building the `asan` preset at `-O1` instead of Debug's `-O0`. ASan's own documentation
-     recommends `-O1`, and it would likely be several times faster; that has not been measured.
-
-   With margin in hand, `detect_stack_use_after_return=1` would let ASan catch the mistake ADR-941
-   fixed directly; today only UBSan's bool check caught it, and only by luck.
+4. **The two cases the sanitizer plan skips** (the farm locomotion case, the five characters over
+   two seeds) are not checked by ASan. Both now also need the farm GLBs, so on a hosted runner they
+   skip before any simulation; UBSan runs whatever the runner can. On an asset-carrying runner they
+   still need a sanitizer-sized variant, a shorter run when `__has_feature(address_sanitizer)`.
+5. **ASan at `-O1`.** ASan's documentation recommends `-O1`; the preset is Debug `-O0`. It would
+   likely be several times faster (not measured). Only worth doing if the nightly margin shrinks again.
+6. **Three CC0 fixtures could be tracked.** The GPU LOD, visibility, ecology and emission cases load
+   `CommonTree_1`, `Rock_Medium_1` and `Mushroom_Common` from the Quaternius pack (CC0; about 4 MB with
+   their textures). They are gitignored only because the pack is large; tracking those three would let
+   the CPU cases that use them run on every push, and shrink the private set.
 
 ## Files
 
 - `.github/workflows/ci.yml`, `.github/workflows/sanitizers.yml`
 - `tools/ci/sanitizer-plan.txt`: the ASan/UBSan partition; which process runs each heavy case,
   the rest filter, and the two skipped cases, each with its measurement.
+- `.github/actions/cmake-preset/action.yml`: the shared build setup (Xcode check, CPM and ccache
+  restore, `build.sh`, cache save on `main` only).
+- `tools/ci/run-suite.sh`: every suite, as CI runs it; the one command for running CI locally.
+- `tools/ci/generate-audio.sh`: regenerates `assets/audio/*.wav` and checks them against the manifest.
+- `tools/ci/prune-caches.sh`: keeps the newest Actions cache per key prefix on `main`.
+- `tools/fetch-test-assets.sh`, `tools/ci/test-assets.lock`, `tools/ci/test-assets.list`,
+  `tools/ci/make-test-assets-repo.sh`, `tools/ci/private-repo-gpu-workflow.yml`: the private test
+  assets ([gpu-ci-private-assets.md](gpu-ci-private-assets.md)).
 - `tools/ci/build.sh`: configure and build a preset, with timings, the ccache report and a
   `meta.json`.
 - `tools/ci/catch2_run.py`:

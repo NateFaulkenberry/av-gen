@@ -54,15 +54,19 @@ PLAN=tools/ci/sanitizer-plan.txt
 # Every tag whose cases start threads (census in docs/development/ci.md, "TSan"). Tags only, OR-ed.
 TSAN_FILTER="[jobs],[job],[motionthreads],[threading],[worldbuilder],[ring],[analysis],[motionlib],[ai],[transport]"
 
-# The ASan/UBSan matrix: job -> plan part, rest shards run here, total rest shards, first shard.
-# Three processes per job: the hosted runner has 3 vCPUs. See tools/ci/sanitizer-plan.txt.
+# The ASan matrix: job -> plan part, rest shards run here, total rest shards, first shard.
+# About three busy processes per job: the hosted runner has 3 vCPUs. See tools/ci/sanitizer-plan.txt.
+# Rebalanced 2026-09-28: without the farm GLBs (4a138886) the heavy-2 and heavy-3 parts skip in
+# milliseconds on a hosted runner, and heavy-1 keeps ~3 Release-minutes (~2.8 h under ASan) of cases
+# that need no asset. The rest (~12.4 Release-minutes, 11.6-22.5 ASan process-hours at the measured
+# 56x-109x) now spreads over 11 shards instead of 7: about 1-2 h each.
 asan_job() {
     case "$1" in
-        heavy-1) echo "heavy-1 0 0 0" ;;
-        heavy-2) echo "heavy-2 0 0 0" ;;
-        heavy-3) echo "heavy-3 1 7 0" ;;
-        rest-a)  echo "- 3 7 1" ;;
-        rest-b)  echo "- 3 7 4" ;;
+        heavy-1) echo "heavy-1 0 11 0" ;;
+        heavy-2) echo "heavy-2 3 11 0" ;;
+        heavy-3) echo "heavy-3 2 11 3" ;;
+        rest-a)  echo "- 3 11 5" ;;
+        rest-b)  echo "- 3 11 8" ;;
         *) echo "run-suite: unknown ASan job '$1' (heavy-1 heavy-2 heavy-3 rest-a rest-b)" >&2; exit 2 ;;
     esac
 }
