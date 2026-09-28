@@ -13,9 +13,8 @@ based on `77ea4247` (+ `f417728b`, the QA docs).
 `tools/make_gv3_state_arms.py`) + `4754bf69` and the final docs commit. Not pushed, not merged. No C++ change since
 `97925c18`.
 
-**ADR-951's status.** The coordinator relayed that the owner accepted ADR-951. The W1 agent did not change the
-ADR's status line on the strength of a relayed message; the coordinator or the owner should change "Status" in
-`docs/decisions/ADR-951-*.md` and its row in `docs/decisions/README.md` to Accepted.
+**ADR-951's status.** The owner accepted it directly to the coordinator on 2026-09-28, and the coordinator
+recorded it: the ADR's status line and its README row now say Accepted.
 
 **Tests** on the head build (C++ = `97925c18`; CMake reconfigured and every target rebuilt at 14:40), run one after
 the other under gpu-lock, with the `_qa-*` scratch projects moved out of `examples/` for the duration:

@@ -1,7 +1,7 @@
 # ADR-951: A character's visibility is marched only once something asks for it
 
-**Status:** Accepted by the QA pass; **needs the owner's acknowledgement** (it changes what an unread signal
-reads). Revert this one commit to restore ADR-834's always-on behaviour.
+**Status:** Accepted; the owner accepted it on 2026-09-28. It changes what an unread signal reads. Revert this
+one commit to restore ADR-834's always-on behaviour.
 **Date:** 2026-09-28
 **Found by:** the QA pass's Glowmere Valley 3 investigation (`docs/qa-pass/perf.md`, W1)
 **Amends:** ADR-834 (characters' cinematic signals). **Follows:** ADR-950.
