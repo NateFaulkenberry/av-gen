@@ -3,6 +3,19 @@
 The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's detailed notes live in
 `perf.md`, `ci.md` and `clean.md`, on each agent's branch until they merge.
 
+## Restart plan (2026-09-28, the owner's "option 2")
+- **The checkpoint:** the owner is restarting Claude Code and clearing the session mid-pass. W1 (perf) and W2 (ci)
+  were told to checkpoint: commit, write a cold "Resume here" in `perf.md` / `ci.md`, and hand back. W3 is done.
+- **After the restart, immediately:**
+  1. Confirm the Blender MCP tools are loaded.
+  2. Launch the `astronaut-prototype` agent in its own worktree from main.
+  3. Launch a new W1 agent resuming from `../av-gen-qa-perf/docs/qa-pass/perf.md`.
+- **Later:** a CI monitor agent resuming from `../av-gen-qa-ci/docs/qa-pass/ci.md`, for the sanitizer runs in flight
+  on qa/ci.
+- **After W1 is done and qa/perf is merged:** the `gv3-art-pass` agent.
+- **Limit:** 3 concurrent agents.
+- The same plan is in memory note `av-gen-restart-handoff-2026-09-28`.
+
 ## Current Status
 2026-09-28:
 - Phase 0 is complete: the inventory and the plan are in `PLAN.md`.
