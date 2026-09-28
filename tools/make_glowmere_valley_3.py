@@ -324,6 +324,12 @@ def main():
     if not args.scout:
         # The Camera Travel Beam on the camera changes that open a phrase (look.apply_travel_beam).
         beam_cuts = look.apply_travel_beam(project, shots)
+        pulses = look.apply_hero_pulses(project, scene, shots)
+        by = {}
+        for _, n in pulses:
+            by[n] = by.get(n, 0) + 1
+        report.append(f"hero pulse (GV2 multicam's, on markers): {len(pulses)} rings, "
+                      + ", ".join(f"{n} {c}" for n, c in sorted(by.items(), key=lambda kv: -kv[1])))
         report.append(f"travel beam: fires on {len(beam_cuts)} cuts, "
                       + ", ".join(f"{sid} (bar {b}, {t:.2f} s)" for t, sid, b in beam_cuts))
 
