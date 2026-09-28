@@ -170,3 +170,115 @@ TEST_CASE("the question names the project and the thing about to happen", "[unsa
     CHECK(ui::unsavedChangesQuestion(CloseIntent::Quit, {}) ==
           "Save changes to this project before quitting?");
 }
+
+// ---- when the periodic sample runs (ADR-952) ---------------------------------------------------
+//
+// ADR-440's sample is a full serialisation, ~36 ms on Glowmere Valley 3, and the owner decided on
+// 2026-09-28 that it does not run while the transport plays. What must not follow from that is a
+// stale "clean": touches are still recorded while playing, and the first idle frame after a stop
+// samples at once. Each "does not sample" below is paired with the frame that does, from the same
+// schedule, so a schedule that never sampled would fail rather than pass (ADR-182).
+
+using ui::DirtySampleSchedule;
+
+namespace {
+
+// Drives the schedule the way `Application` does, one call per 16 ms frame, and counts the samples
+// it asks for. `sampleCostMs` is what each one "costs", so the throttle is the real one.
+int framesOfSampling(DirtySampleSchedule& s, double& nowMs, int frames, bool playing,
+                     bool widgetActive = false, double sampleCostMs = 36.0) {
+    int samples = 0;
+    for (int i = 0; i < frames; ++i) {
+        nowMs += 16.0;
+        if (s.due(nowMs, playing, widgetActive, /*editsDirty=*/false)) {
+            ++samples;
+            s.sampled(nowMs, sampleCostMs);
+        }
+    }
+    return samples;
+}
+
+} // namespace
+
+TEST_CASE("the dirty sample does not run while the transport is playing", "[unsaved][project][adr952]") {
+    DirtySampleSchedule s;
+    double now = 0.0;
+    s.restart(now); // a project was just opened
+
+    // The control first: paused for 10 s at 36 ms a sample is one sample every 360 ms -- the ~2.6 a
+    // second W1 measured on GV3 (docs/qa-pass/perf.md).
+    const int paused = framesOfSampling(s, now, 625, /*playing=*/false);
+    CHECK(paused >= 25);
+    CHECK(paused <= 30);
+
+    // The same 10 s playing: none at all.
+    CHECK(framesOfSampling(s, now, 625, /*playing=*/true) == 0);
+}
+
+TEST_CASE("the dirty sample runs on the first idle frame after playback stops",
+          "[unsaved][project][adr952]") {
+    DirtySampleSchedule s;
+    double now = 0.0;
+    s.restart(now);
+    REQUIRE(framesOfSampling(s, now, 30, /*playing=*/true) == 0);
+
+    // A short playback (480 ms) and a stop: due at once, not after the throttle.
+    now += 16.0;
+    CHECK(s.due(now, /*playing=*/false, false, false));
+    s.sampled(now, 36.0);
+
+    // ...once. The frame after it is back on the ordinary throttle.
+    now += 16.0;
+    CHECK_FALSE(s.due(now, false, false, false));
+
+    // A stop under a held widget waits for the widget, then samples on the first frame it can.
+    REQUIRE(framesOfSampling(s, now, 30, /*playing=*/true) == 0);
+    now += 16.0;
+    CHECK_FALSE(s.due(now, /*playing=*/false, /*widgetActive=*/true, false));
+    now += 16.0;
+    CHECK(s.due(now, false, false, false));
+}
+
+TEST_CASE("a touch during playback is kept for the sample or close that follows it",
+          "[unsaved][project][adr952]") {
+    // The failure this guards is the one that loses work: the sample skipped, and the touch that
+    // would have told it the change was the user's forgotten with it.
+    DirtySampleSchedule s;
+    double now = 0.0;
+    s.restart(now);
+    REQUIRE(framesOfSampling(s, now, 60, /*playing=*/true) == 0);
+    CHECK_FALSE(s.touched()); // the control: playing alone is not a touch
+
+    // A slider dragged mid-playback, then released, then more playback.
+    REQUIRE(framesOfSampling(s, now, 10, /*playing=*/true, /*widgetActive=*/true) == 0);
+    REQUIRE(framesOfSampling(s, now, 300, /*playing=*/true) == 0);
+    // What a close mid-playback passes to `Engine::projectDirty`.
+    CHECK(s.touched());
+
+    // And the stop sample is attributed to it too.
+    now += 16.0;
+    REQUIRE(s.due(now, false, false, false));
+    CHECK(s.touched());
+    s.sampled(now, 36.0);
+    CHECK_FALSE(s.touched()); // the window restarts after a sample
+
+    // An edit history with unsaved commands counts as a touch while playing, as it does paused.
+    now += 16.0;
+    CHECK_FALSE(s.due(now, /*playing=*/true, false, /*editsDirty=*/true));
+    CHECK(s.touched());
+}
+
+TEST_CASE("a close measured on demand restarts the window, playing or not",
+          "[unsaved][project][adr952]") {
+    DirtySampleSchedule s;
+    double now = 0.0;
+    s.restart(now);
+    REQUIRE(framesOfSampling(s, now, 30, /*playing=*/true, /*widgetActive=*/true) == 0);
+    REQUIRE(s.touched());
+    // `Application::requestClose` measured, and the answer was Cancel: the baseline moved, so the
+    // click that raised the prompt is not an edit to what the engine writes next.
+    s.restart(now);
+    CHECK_FALSE(s.touched());
+    // Still playing: still no periodic sample.
+    CHECK(framesOfSampling(s, now, 120, /*playing=*/true) == 0);
+}

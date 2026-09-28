@@ -367,9 +367,10 @@ private:
     // Anything that touched the application since the last dirty sample -- a pointer, a key, a menu
     // pick, a drop. Not a dirty flag: it never decides that something changed, only whether a
     // measured change could be the user's. See `Engine::sampleProjectDirty`.
-    bool touchedSinceDirtySample_ = false;
-    std::chrono::steady_clock::time_point lastDirtySample_{};
-    double lastDirtySampleMs_ = 0.0;
+    //
+    // The schedule holds that window, the throttle, and ADR-952's rule that the periodic sample does
+    // not run while the transport is playing (see ui/unsaved_changes.hpp).
+    ui::DirtySampleSchedule dirtySchedule_;
     void sampleProjectDirtyIfIdle();
     void rememberProject(const std::filesystem::path& path); // recent list + window title
     // Input diagnostics (AVGEN_UI_SELFTEST=1): raw SDL mouse events seen this run.
