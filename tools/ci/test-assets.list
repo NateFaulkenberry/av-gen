@@ -11,7 +11,7 @@
 #
 # Tier 1, the GPU suite: 63 files, 64.7 MB. Tier 2 adds what the Glowmere-tier CPU cases need:
 # 139 files, 195.8 MB, of which the Tree of Life island meshes are most.
-# Re-measure after changing the suites: the trace recipe is in docs/qa-pass/ci.md.
+# Re-measure after changing the suites: tools/ci/opentrace.c has the recipe.
 
 # ---- tier 1: avgen_render_tests -------------------------------------------------------------------
 aliens/alien-diver.glb

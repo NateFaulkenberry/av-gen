@@ -84,6 +84,32 @@ lets one turn land" is what was wrong.
   piece does not crash, without any asset" (set-piece lab; roles are `target1..N`). NOT demonstrated
   against the pre-fix code.
 
+## Test asset audit (deliverable 5)
+**Method (repeatable).** `tools/ci/opentrace.c`: a dylib interposing `open`/`fopen` (read opens only),
+logging paths under `/assets/`, `Desktop/` or with a media extension to `$OPENTRACE_OUT`. Build:
+`clang -dynamiclib -O2 -o opentrace.dylib opentrace.c`. Run: `env DYLD_INSERT_LIBRARIES=... OPENTRACE_OUT=...
+./build/release/tests/<binary> ...`. GOTCHAS: SIP strips `DYLD_*` when a protected binary is exec'd, so put
+`env` LAST before the test binary (`tools/gpu-lock.sh env DYLD...=... ./bin`, `nice -n 10 env ... ./bin`;
+`env ... nice ./bin` silently traces nothing). Loaders canonicalise symlinks, so map opens under BOTH the
+worktree and the primary checkout back to `assets/<rel>`.
+
+**Result.** GPU suite (549 cases, 19 min, under the lock): 5 aliens, 3 farm, 55 Quaternius (CC0) +
+glowmere-valley.wav (generated) + ~/Desktop/Rebuild.mp3. The 280 CPU cases CI skips/fails for assets
+(3 niced shards): + 1 alien, 6 farm, 55 Quaternius, 55 Kenney city, 15 nature, 1 HDRI, 6 treeisle (152 MB),
+night-shift.wav (generated), ~/Desktop/MP3/bass.mp3. -> `tools/ci/test-assets.list` (202 files, 249 MB;
+~110 MB without the island). With assets: CPU 263 pass / 17 skip / 0 fail; GPU 548 pass / 1 skip / 0 fail.
+The 17 skips need motion packs absent even on the owner's machine: NO machine runs them.
+
+**Tiers.**
+- unit: tiny fixtures already dominate (tests/data, gltf_fixture.hpp, tracked examples). New: the
+  set-piece lab now also carries the delete-while-running ASan regression.
+- integration: tracked example projects (procedural); the repository's two scores are generated on CI.
+- GPU: CommonTree_1 / Rock_Medium_1 / Mushroom_Common are deliberately production fixtures (§29 in those
+  tests: chosen for origin/bounds properties); CC0, ~4 MB -> recommend tracking them (owner).
+- Glowmere validation: GV2 / multicam films (aliens, farm, Quaternius, song) -> cpu-assets / private repo.
+Replaced with fixtures: the delete regression (asset-free twin). Not replaced: the abduction films (their
+subject IS the shipped film; a fixture version would test a different film).
+
 ## Coverage gaps (deliverable 6)
 Survey by a read-only agent, then each finding verified by a failing test before any fix:
 - **G5, FIXED (crash).** `scene.delete_node` / `scene.set_parent` (src/ai/engine_tools.cpp) destroyed a
