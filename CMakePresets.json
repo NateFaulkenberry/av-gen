@@ -15,19 +15,22 @@
     { "name": "release", "inherits": "base", "displayName": "Release", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
     { "name": "relwithdebinfo", "inherits": "base", "displayName": "RelWithDebInfo", "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" } },
     { "name": "asan", "inherits": "base", "displayName": "Debug + ASan/UBSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_ASAN": "ON" } },
-    { "name": "tsan", "inherits": "base", "displayName": "Debug + TSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_TSAN": "ON" } }
+    { "name": "tsan", "inherits": "base", "displayName": "Debug + TSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_TSAN": "ON" } },
+    { "name": "ubsan", "inherits": "base", "displayName": "Debug + UBSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_UBSAN": "ON" } }
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
     { "name": "release", "configurePreset": "release" },
     { "name": "relwithdebinfo", "configurePreset": "relwithdebinfo" },
     { "name": "asan", "configurePreset": "asan" },
-    { "name": "tsan", "configurePreset": "tsan" }
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "ubsan", "configurePreset": "ubsan" }
   ],
   "testPresets": [
     { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
     { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
     { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
-    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true } }
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true } },
+    { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } }
   ]
 }

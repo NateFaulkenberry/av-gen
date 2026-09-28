@@ -24,6 +24,7 @@
 #include "entity/navigation.hpp"
 #include "scene/composition.hpp"
 #include "world/camera_clearance.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -697,6 +698,9 @@ TEST_CASE("A starred character is not a wall around itself", "[glowmere][multica
 
 TEST_CASE("The film's five characters all walk, at more than one seed",
           "[glowmere][multicam][entity]") {
+    // The film's valley holds its farm animals; without their GLBs two of the five bodies are
+    // measured in a different valley (hosted runner after 4a138886: 3.2 m and 9.4 m).
+    testsupport::skipUnlessFarmAssetsPresent();
     // 150 s rather than the film's 226: long enough that a body which is going to freeze has
     // frozen (the three that did froze from frame one and never moved), short enough to run twice.
     for (std::uint32_t shift : {0u, 900001u}) {

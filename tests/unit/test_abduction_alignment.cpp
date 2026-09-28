@@ -42,6 +42,7 @@
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
 #include "stage/staging.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -63,9 +64,7 @@ fs::path sceneFile() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
 }
 
-bool farmAssetsPresent() {
-    return fs::is_regular_file(fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm" / "cow.glb");
-}
+using testsupport::farmAssetsPresent;
 
 const scene::ParticleSystem* beamOf(const scene::Scene& s) {
     for (const auto& ps : s.particles) {
@@ -576,6 +575,7 @@ TEST_CASE("A step's anchor and hold round-trip, and default to what existed",
 // does.
 TEST_CASE("The abducted animal lights up, and the glow is spent before it arrives",
           "[stage][abduction][glow]") {
+    testsupport::skipUnlessFarmAssetsPresent();
     Run run(sceneFile());
     run.play(120.0);
     REQUIRE_FALSE(run.lifts.empty());

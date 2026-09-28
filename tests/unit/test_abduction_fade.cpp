@@ -48,6 +48,7 @@
 #include "rendering/shadow_math.hpp"
 #include "scene/composition.hpp"
 #include "stage/staging.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -68,9 +69,7 @@ fs::path filmProject() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
 }
 
-bool farmAssetsPresent() {
-    return fs::is_regular_file(fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm" / "cow.glb");
-}
+using testsupport::farmAssetsPresent;
 
 // The bound animal's own meshes, on one frame.
 struct Drawn {

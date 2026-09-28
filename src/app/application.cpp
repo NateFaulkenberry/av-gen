@@ -2213,7 +2213,11 @@ bool Application::opensADifferentProject(const std::filesystem::path& path) {
     if (!doc.is_object()) {
         return false;
     }
-    return doc.value("format", std::string()) != scene::Composition::kFormatName;
+    // Not `.value("format", ...)`: it throws when the key holds a non-string (`"format": 1`), and this
+    // runs before every interactive open. A non-string format is not a scene, so it is "different".
+    const auto format = doc.find("format");
+    return format == doc.end() || !format->is_string() ||
+           format->get<std::string>() != scene::Composition::kFormatName;
 }
 
 namespace {

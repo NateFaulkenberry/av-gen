@@ -23,6 +23,9 @@
 #   * Cases that cannot finish in a hosted job at all are skipped, with the measurement that says so.
 
 rest | rest | ~[.]
+# How many rest shards each job runs is in tools/ci/run-suite.sh (`asan_job`), the one place the matrix
+# is defined. Since 4a138886 every film below needs the farm GLBs, so on a hosted runner the heavy-2 and
+# heavy-3 parts skip in milliseconds and the jobs are balanced on their rest shards instead.
 # `~[.]`: every case a default run has. The old [stage] parts selected by `[stage]`, which also takes
 # the hidden probe "probe: the animal, the beam and the lag" ([.][beam][probe][stage]): they ran it for
 # 94 min although no default run has it.
@@ -67,7 +70,7 @@ heavy-2 | director | the lab follows the same sequencing contract
 heavy-2 | abduct | the UFO abducts several animals, choosing each one from the scene
 heavy-2 | abduct | An abducted animal is inside the beam for the whole lift
 
-# ---- heavy-3: two more abduction simulations and four half-hour cases, beside one rest shard ----------
+# ---- heavy-3: two more abduction simulations and four half-hour cases (rest shards: tools/ci/run-suite.sh)
 # 119 min, and 49-106 min: about 225 min.
 heavy-3 | hidden | An animal that is already hidden is never abducted again
 heavy-3 | hidden | the same scene and seed abduct the same animals in the same order

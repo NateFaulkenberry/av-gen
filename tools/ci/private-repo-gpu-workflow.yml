@@ -1,0 +1,91 @@
+# TEMPLATE for the PRIVATE repository NateFaulkenberry/av-gen-test-assets, not a workflow of av-gen.
+# tools/ci/make-test-assets-repo.sh copies it there as .github/workflows/gpu.yml.
+#
+# The recommended home for the self-hosted Apple-GPU runner (docs/development/gpu-ci-private-assets.md,
+# "Where the runner is registered"). GitHub advises self-hosted runners only for private repositories:
+# anyone can open a pull request against a public one, and a pull request can rewrite the workflow that
+# picks the runner. Registered HERE, no one outside can reach it: this repository is private, has no
+# forks, and its workflows only ever check out av-gen's PUBLIC code at a ref its owner chose.
+#
+# It needs no secret: the assets are this repository's own checkout, and av-gen is public.
+name: av-gen GPU suite (self-hosted)
+
+on:
+  schedule:
+    - cron: "13 8 * * *"      # nightly, after av-gen's own nightly CI
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "av-gen ref to test (branch, tag or sha)"
+        default: main
+      test_filter:
+        description: "Catch2 filter (empty = the whole GPU suite)"
+        default: ""
+  # To run on every av-gen main push, add `repository_dispatch: { types: [av-gen-main] }` here and a
+  # step in av-gen that calls it with a token scoped to this repository (not set up; see the doc).
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu
+  cancel-in-progress: false
+
+jobs:
+  gpu:
+    runs-on: [self-hosted, macOS, ARM64, avgen-gpu]
+    timeout-minutes: 180
+    env:
+      AVGEN_REF: ${{ inputs.ref || 'main' }}
+      TEST_FILTER: ${{ inputs.test_filter }}
+      CCACHE_DIR: ${{ github.workspace }}/../avgen-ccache
+      RESULTS: ${{ github.workspace }}/../avgen-ci-results
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: The assets (this repository)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: test-assets
+          persist-credentials: false
+      - name: av-gen (public)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NateFaulkenberry/av-gen
+          ref: ${{ env.AVGEN_REF }}
+          path: av-gen
+          persist-credentials: false
+      - name: Link the assets into av-gen
+        # --ref HEAD: the assets this workflow was started from, not av-gen's pin (this IS the repository).
+        run: av-gen/tools/fetch-test-assets.sh --dir "$GITHUB_WORKSPACE/test-assets" --ref HEAD
+      - name: Build (Release)
+        working-directory: av-gen
+        run: |
+          rm -rf "$RESULTS" && mkdir -p "$RESULTS"
+          tools/ci/build.sh release "$RESULTS/build" -DCPM_SOURCE_CACHE="$GITHUB_WORKSPACE/../avgen-cpm"
+      - name: GPU suite
+        working-directory: av-gen
+        run: |
+          tools/ci/run-suite.sh gpu --bin build/release/tests --out "$RESULTS/gpu" \
+              ${TEST_FILTER:+--filter "$TEST_FILTER"}
+      - name: CPU suite with the assets
+        if: always()
+        working-directory: av-gen
+        run: |
+          tools/ci/run-suite.sh cpu-assets --bin build/release/tests --out "$RESULTS/cpu-assets" \
+              ${TEST_FILTER:+--filter "$TEST_FILTER"}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          # Text only, and into THIS private repository's run: never an image of the models.
+          name: results
+          path: |
+            ${{ env.RESULTS }}/*/*.json
+            ${{ env.RESULTS }}/*/*.md
+            ${{ env.RESULTS }}/*/*.xml
+            ${{ env.RESULTS }}/*/*.log
+          retention-days: 14
+      - name: Summary
+        if: always()
+        run: cat "$RESULTS"/*/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

@@ -1745,6 +1745,11 @@ void registerParameterTools(ToolRegistry& registry) {
             for (auto it = doomed.rbegin(); it != doomed.rend(); ++it) {
                 comp->removeNode(*it);
             }
+            // The removed nodes' parameters are gone, and the modulator's routes and the timeline's
+            // tracks hold raw pointers to them until they are re-resolved. `Engine::removeNode` and
+            // the editor's delete both re-bind; without it the next frame wrote through freed memory
+            // (test_ai_tools.cpp, "Deleting or re-parenting a node through the assistant ...").
+            ctx.engine().rebind();
             const std::size_t after = comp->nodes().size();
             return ToolResult::ok(json{{"name", name},
                                        {"removed", before - after},
@@ -1805,6 +1810,9 @@ void registerParameterTools(ToolRegistry& registry) {
             }
             detached->parent = parent;
             const auto added = comp->addNode(std::move(*detached));
+            // Detaching destroyed the node's parameters and adding made new ones: re-resolve every
+            // route and track that pointed at the old ones (see scene.delete_node).
+            engine.rebind();
             if (!added) {
                 return ToolResult::failure(ToolErrorCode::Unavailable, added.error().message);
             }

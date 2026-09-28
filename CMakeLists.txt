@@ -30,6 +30,9 @@ option(AVGEN_DAWN_FROM_SOURCE "Build Dawn from source instead of using the prebu
 option(AVGEN_ALLOC_COUNTERS "Count heap allocations per thread (replaces global new/delete)" OFF)
 option(AVGEN_ENABLE_ASAN "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(AVGEN_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+# UBSan on its own, without ASan's shadow memory: its own nightly job over the whole default set
+# (docs/development/ci.md, "Sanitizers"). AVGEN_ENABLE_ASAN already includes these checks.
+option(AVGEN_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer alone" OFF)
 option(AVGEN_WARNINGS_AS_ERRORS "Treat warnings as errors for engine targets" OFF)
 # Transitional (ADR-023): link the test-only scene::makeSourceMesh stub from tests/support while the
 # CPU side of scene/procedural.hpp lives on another branch. Off once both branches are merged.

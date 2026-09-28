@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -112,6 +113,30 @@ inline std::filesystem::path glowmereBenchmarkProject() {
 
 inline void skipUnlessGlowmereBenchmarkAssetsPresent() {
     skipUnlessProjectAssetsPresent(glowmereBenchmarkProject());
+}
+
+// The nine farm animals Glowmere Valley 2 and its multicam scatter over the valley. The pack is
+// purchased and not for distribution, so since 4a138886 the GLBs are gitignored like the aliens: a
+// GitHub-hosted runner never has them, and a self-hosted runner has them only from the private
+// test-asset repository (docs/development/gpu-ci-private-assets.md). Without them the animals load as
+// nodes with no mesh and no rig, the abduction director has nothing it can lift, and a case about the
+// abduction film measures a different film. All nine are required: the scenes place every species.
+inline bool farmAssetsPresent() {
+    namespace fs = std::filesystem;
+    static constexpr const char* kSpecies[] = {"bull", "chick", "chicken", "cow", "goat",
+                                               "horse", "pig", "rooster", "sheep"};
+    const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm";
+    std::error_code ec;
+    return std::all_of(std::begin(kSpecies), std::end(kSpecies), [&](const char* species) {
+        return fs::is_regular_file(dir / (std::string(species) + ".glb"), ec);
+    });
+}
+
+inline void skipUnlessFarmAssetsPresent() {
+    if (!farmAssetsPresent()) {
+        SKIP("assets/farm is not present (purchased, gitignored; tools/fetch-test-assets.sh links it "
+             "from the private test-asset repository)");
+    }
 }
 
 } // namespace avgen::testsupport

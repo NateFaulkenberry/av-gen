@@ -2607,7 +2607,7 @@ void Engine::markProjectSaved() {
 
 // ---- loading a project, and starting a new one ------------------------------------------------
 
-Result<void> Engine::loadProject(const std::filesystem::path& path) {
+Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ---- the stages, and what they cost -----------------------------------------------------
     //
     // The list is fixed and known before the first byte is read, which is what makes "stage 3 of 9"
@@ -3394,6 +3394,11 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
               presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size(), projectWarnings_.size());
     return {};
+} catch (const nlohmann::json::exception& e) {
+    // A key of the wrong type (`"format": 1`) makes `.value()`/`.get<T>()` throw; nothing above
+    // this caught it, so a damaged file terminated the application instead of failing to open
+    // (tests/integration/test_project_malformed.cpp).
+    return fail("'{}' is not a valid project: {}", path.string(), e.what());
 }
 
 void Engine::newProject() {
@@ -4008,7 +4013,7 @@ Result<void> Engine::loadEnvironment(const std::filesystem::path& path) {
     return {};
 }
 
-Result<void> Engine::loadFile(const std::filesystem::path& path) {
+Result<void> Engine::loadFile(const std::filesystem::path& path) try {
     std::string ext = path.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (ext == ".gltf" || ext == ".glb") {
@@ -4037,6 +4042,11 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) {
         return std::unexpected(duration.error());
     }
     return {};
+} catch (const nlohmann::json::exception& e) {
+    // A key of the wrong type (`"format": 1`) makes `.value()`/`.get<T>()` throw; nothing above
+    // this caught it, so a damaged file terminated the application instead of failing to open
+    // (tests/integration/test_project_malformed.cpp).
+    return fail("'{}' is not a valid project or scene: {}", path.string(), e.what());
 }
 
 Engine::~Engine() {

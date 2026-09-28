@@ -49,6 +49,7 @@ SAN_PATTERNS = [
     ("UndefinedBehaviorSanitizer", re.compile(r"(?:^|\s)(\S+:\d+:\d+): runtime error: (.*)$")),
 ]
 MAX_FAILURE_DETAILS = 25
+ALL_SKIPPED_EXIT_CODE = 4   # Catch2 v3.3+: every case that ran was skipped
 
 
 # ------------------------------------------------------------------------------------------------
@@ -447,13 +448,7 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
 
     # Exit codes and the XML must agree. A disagreement is reported, never resolved in favour of
     # "passed" (docs/testing.md entries 5 and 18).
-    disagreements = []
-    for st in shard_status:
-        t = st.get("catch2_totals")
-        if t and st["returncode"] == 0 and t["failures"] > 0:
-            disagreements.append(f"shard {st['index']}: exit 0 but Catch2 counted {t['failures']} failed cases")
-        if t and st["returncode"] > 0 and t["failures"] == 0 and not st["timed_out"]:
-            disagreements.append(f"shard {st['index']}: exit {st['returncode']} but Catch2 counted 0 failed cases")
+    disagreements = [d for d in (exit_disagreement(st) for st in shard_status) if d]
 
     unexercised = (listed - cases_seen) if listed is not None else None
     if not listed:
@@ -461,7 +456,7 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
                              "selection is a mistake, not a pass")
     ok = (counts["failed"] == 0 and not crashes and not timeouts and not san_reports
           and not disagreements and (unexercised is None or unexercised == 0)
-          and all(st["returncode"] == 0 or shard_explained(st, asset_failures_by_shard.get(st["index"], 0))
+          and all(st["returncode"] == 0 or all_skipped(st) or shard_explained(st, asset_failures_by_shard.get(st["index"], 0))
                   for st in shard_status))
     slowest.sort(reverse=True)
     result = {
@@ -484,6 +479,33 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
     (out / "result.json").write_text(json.dumps(result, indent=2))
     (out / "summary.md").write_text(render_binary_md(result, level=2))
     return result
+
+
+def all_skipped(st: dict) -> bool:
+    """The shard exited with Catch2's all-skipped code, and its XML agrees: nothing passed or
+    failed, and something was skipped."""
+    t = st.get("catch2_totals")
+    return bool(st["returncode"] == ALL_SKIPPED_EXIT_CODE and not st["timed_out"] and t
+                and t.get("successes", 0) == 0 and t.get("failures", 0) == 0 and t.get("skips", 0) > 0)
+
+
+def exit_disagreement(st: dict) -> str | None:
+    """Where a shard's exit code and its Catch2 XML disagree, say how; None when they agree.
+
+    Catch2 (v3.3 onwards) exits 4 when every case it ran was skipped, with nothing failed or passed
+    -- a sanitizer-plan process whose cases all need absent assets does exactly that. That exit
+    agrees with the XML, so it is not a disagreement. Any other non-zero exit with no failed case is
+    one: a signal, or a sanitizer report the log parser did not recognise."""
+    t = st.get("catch2_totals")
+    if not t:
+        return None
+    if st["returncode"] == 0 and t["failures"] > 0:
+        return f"shard {st['index']}: exit 0 but Catch2 counted {t['failures']} failed cases"
+    if st["returncode"] > 0 and t["failures"] == 0 and not st["timed_out"]:
+        if all_skipped(st):
+            return None
+        return f"shard {st['index']}: exit {st['returncode']} but Catch2 counted 0 failed cases"
+    return None
 
 
 def shard_explained(st: dict, known_failed: int) -> bool:
@@ -765,8 +787,12 @@ def cmd_run(args) -> int:
         # TSan: the job exists to find races. Assertion failures under a 5-15x slowdown are mostly
         # wall-clock waits and ceilings that do not hold; they are listed, loudly, but only a
         # sanitizer report, a crash, a timeout or an unexercised case decides the verdict.
+        # An exit code the XML does not explain also gates: a sanitizer report in a form the log
+        # parser misses still makes the process exit non-zero, and the exit code is the one signal
+        # that catches every way a run can lie (docs/testing.md). Assertion failures exit 42 with
+        # failures counted, so they never land here.
         r["ok"] = bool(not r["sanitizer_reports_total"] and not r["crashes"] and not r["timeouts"]
-                       and not r["unexercised"] and r["listed"])
+                       and not r["unexercised"] and not r["disagreements"] and r["listed"])
     (Path(args.out) / "result.json").write_text(json.dumps(r, indent=2))
     (Path(args.out) / "summary.md").write_text(render_binary_md(r, level=2))
     print_console(r, Path(args.out))
@@ -922,7 +948,8 @@ def main() -> int:
     r.add_argument("--expected-label", default="", help="caveat shown beside the suite name")
     r.add_argument("--report-only", action="store_true")
     r.add_argument("--gate", choices=["all", "sanitizer"], default="all",
-                   help="sanitizer: only sanitizer reports, crashes, timeouts and unexercised cases fail")
+                   help="sanitizer: only sanitizer reports, crashes, timeouts, unexercised cases and "
+                        "unexplained exit codes fail")
     r.add_argument("--exceptions", default="", help="tools/ci/hosted-runner-exceptions.txt")
     r.add_argument("--plan", default="",
                    help="tools/ci/sanitizer-plan.txt: run --part's named processes, then --shards rest shards "
