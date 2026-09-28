@@ -18,6 +18,7 @@
 #include "control/midi.hpp"
 #include "core/log.hpp"
 #include "platform/window.hpp"
+#include "scene/authored_cut.hpp"
 #include "scene/composition.hpp"
 #include "app/job_system.hpp"
 #include "ui/style.hpp"
@@ -4366,6 +4367,27 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                                 "so these cuts and the event cameras are ignored. Direct in Edited\n"
                                 "sequence or Song to cut on them again.");
         }
+        // ADR-947: who each shot is about, which is what a Hero Pulse (Ground Pulse on a hero, "fires
+        // when the cut holds it") and a Travel Beam ("sweeps toward the hero the cut hands off to")
+        // read the cut as holding. Said on the row so an artist can see which hero a shot focuses on,
+        // and set here because a still camera framing a mushroom has no aim node to say it.
+        const bool directorSchedule = !engine.shotSpans().empty();
+        ImGui::TextDisabled(directorSchedule
+                                ? "Focus: the Auto-director's schedule decides which hero each moment\n"
+                                  "holds, so the 'focuses on' below is not what effects read."
+                                : "Focus: the hero each cut holds -- its Hero Pulse fires for the shot,\n"
+                                  "and a Travel Beam sweeps toward it at the cut.");
+        // The names a shot can focus on: the heroes, and every entity carrying an effect.
+        std::vector<std::string> focusNames;
+        for (const world::HeroPoint& h : comp->heroes()) {
+            focusNames.push_back(h.name);
+        }
+        for (const world::EffectInstance& e : engine.effects()) {
+            if (e.owner.kind == world::EffectTarget::Entity &&
+                std::find(focusNames.begin(), focusNames.end(), e.owner.name) == focusNames.end()) {
+                focusNames.push_back(e.owner.name);
+            }
+        }
         const std::vector<seq::Shot>& pieceShots = engine.sequence().shots;
         for (std::size_t i = 0; i < direction.shots.size(); ++i) {
             const scene::CameraShot& shot = direction.shots[i];
@@ -4411,6 +4433,40 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                                   "That is this cut's own start, which need not be a sequencer\n"
                                   "shot's start -- the two lists are different things.",
                                   shot.startSeconds);
+            }
+            // "Focuses on": the shot's own subject, or the camera's (aim, else follow) in brackets.
+            {
+                const scene::CameraRig* rig = direction.find(shot.camera);
+                const std::string cameraSubject = rig != nullptr ? std::string(scene::cameraSubject(*rig)) : std::string();
+                const std::string preview =
+                    !shot.subject.empty() ? "focuses on " + shot.subject
+                    : !cameraSubject.empty() ? "focuses on " + cameraSubject + " (camera)"
+                                             : std::string("focuses on nothing");
+                ImGui::Indent();
+                ImGui::SetNextItemWidth(220.0f);
+                if (ImGui::BeginCombo("##focus", preview.c_str())) {
+                    const std::string follow = cameraSubject.empty() ? std::string("the camera's subject (none)")
+                                                                     : "the camera's subject (" + cameraSubject + ")";
+                    if (ImGui::Selectable(follow.c_str(), shot.subject.empty())) {
+                        direction.shots[i].subject.clear();
+                        changed = true;
+                        editLabel = "Focus shot on its camera's subject";
+                    }
+                    for (const std::string& name : focusNames) {
+                        if (ImGui::Selectable(name.c_str(), shot.subject == name)) {
+                            direction.shots[i].subject = name;
+                            changed = true;
+                            editLabel = "Focus shot on " + name;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Which hero this shot is about. A Hero Pulse on that hero fires while the shot\n"
+                            "is live, and a Travel Beam sweeps toward it at the cut. Left on 'the camera's\n"
+                            "subject', it is what the camera aims at, else what it follows.");
+                }
+                ImGui::Unindent();
             }
             ImGui::SameLine();
             if (ImGui::SmallButton("x")) {

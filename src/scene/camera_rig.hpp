@@ -354,6 +354,12 @@ struct CameraShot {
     // stays one sentence: an event takes the frame unless the shot the playhead is in is locked.
     bool locked = false;
     std::string label;         // optional, for the sequencer lane
+    // ADR-947: who this shot is about, when that is not who its camera aims at or follows -- a still
+    // camera framing a mushroom has no aim node, yet the shot is about the mushroom. Empty means
+    // "the camera's subject" (`scene::shotSubject`: aim node, else follow node). It changes nothing
+    // about the camera; it is what `HeroFocus` and `CameraTravel` effects read the cut as holding.
+    // Shown and edited as "Focuses on" on the camera track (Cameras section).
+    std::string subject;
 
     // Who wrote this shot (ADR-249).
     //

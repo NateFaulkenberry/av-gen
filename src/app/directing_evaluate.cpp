@@ -4,6 +4,7 @@
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
 #include "directing/resolver.hpp"
+#include "scene/authored_cut.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
 
@@ -156,10 +157,10 @@ json shotsDocument(const scene::CameraDirection& direction) {
                  {"start", s.startSeconds},
                  {"end", s.endSeconds},
                  {"label", s.label.empty() && rig != nullptr ? rig->name : s.label}};
-        if (rig != nullptr && !rig->aimNode.empty()) {
-            one["subject"] = rig->aimNode;
-        } else if (rig != nullptr && !rig->followNode.empty()) {
-            one["subject"] = rig->followNode;
+        // ADR-947: the one rule for who a shot is about -- its own "Focuses on", else the camera's
+        // aim node, else its follow node -- shared with the effects that gate on the cut.
+        if (const std::string_view subject = scene::shotSubject(direction, s); !subject.empty()) {
+            one["subject"] = std::string(subject);
         }
         shots.push_back(std::move(one));
     }

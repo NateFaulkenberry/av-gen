@@ -812,15 +812,17 @@ std::optional<Finding> SceneLivenessFacts::effectNeverFires(const world::EffectI
             break;
         case world::Activation::CameraTravel:
             if (in_.shots.empty()) {
-                never("camera travel needs the director's shot spans, and the project carries none "
-                      "(cameraShotSpans)");
+                never("camera travel needs a cut, and the project has neither the director's shot spans "
+                      "(cameraShotSpans) nor shots on its camera track");
             } else if (std::none_of(in_.shots.begin(), in_.shots.end(), [](const world::ShotSpan& s) { return s.travel; })) {
-                never(fmt::format("none of the project's {} shot span(s) is a camera travel", in_.shots.size()));
+                never(fmt::format("none of the project's {} shot span(s) is a camera travel (on an authored cut: "
+                                  "no cut hands off to a shot with a subject)", in_.shots.size()));
             }
             break;
         case world::Activation::HeroFocus: {
             if (in_.shots.empty()) {
-                never("hero focus needs the director's shot spans, and the project carries none (cameraShotSpans)");
+                never("hero focus needs a cut, and the project has neither the director's shot spans "
+                      "(cameraShotSpans) nor shots on its camera track");
                 break;
             }
             // Who the effect fires for: a wave whose source follows focus fires for any spotlit hero;

@@ -79,7 +79,8 @@ EffectSchema buildSchema() {
     s.primaryCost = CostFragment;
     s.addLabel = "Travel Beam";
     s.addTip = "A front that sweeps ahead of the camera towards the subject it is travelling to.\n"
-               "Fires while the director's cut is moving between subjects.";
+               "Fires while the cut is moving between subjects: the Auto-director's travels, or for\n"
+               "2.5 s after a camera-track cut to a shot with a subject (Cameras panel).";
     s.targets = targetBit(EffectTarget::World) | targetBit(EffectTarget::Camera);
     s.styles = kStyles;
     s.routes = kRoutes;

@@ -584,6 +584,16 @@ public:
     // steering or parked. Empty means no cut was ever made, and those effects never activate.
     void setShotSpans(std::vector<world::ShotSpan> spans) { shotSpans_ = std::move(spans); }
     [[nodiscard]] std::span<const world::ShotSpan> shotSpans() const { return shotSpans_; }
+    // ADR-947: the cut that `HeroFocus` and `CameraTravel` effects actually gate on. The director's
+    // focus schedule above when there is one -- Song mode and every baked cut, unchanged -- and
+    // otherwise the composition's authored camera track read as one (`scene::authoredShotSpans`):
+    // each shot holds its subject (its "Focuses on", else its camera's aim node, else its follow
+    // node) and each cut to a new camera travels to it. Empty under a continuous take, which owns the
+    // frame, and with neither. Derived from the camera track and cached until the track changes, so
+    // a seek sees exactly the spans a play does.
+    [[nodiscard]] std::span<const world::ShotSpan> effectShots() const;
+    // Which of the two `effectShots` is: true when it is the authored camera track's.
+    [[nodiscard]] bool effectShotsFromAuthoredCut() const;
 
     // ADR-582: the half of a director's cut that *steers the camera*, taken off the camera and kept.
     //
@@ -1101,6 +1111,16 @@ private:
     // instead of sixty times a second. Cleared whenever the effect list changes.
     std::vector<std::string> reportedDeadFields_;
     std::vector<world::ShotSpan> shotSpans_;
+    // ADR-947: `effectShots`' authored-cut spans and the camera track (plus scene generation and
+    // continuous-take flag) they were derived from. Rebuilt on the first read after either changes.
+    struct AuthoredCutCache {
+        bool valid = false;
+        std::uint64_t generation = 0;
+        bool continuousTake = false;
+        scene::CameraDirection direction;
+        std::vector<world::ShotSpan> spans;
+    };
+    mutable AuthoredCutCache authoredCut_;
     ParkedDirectorsCut parkedCut_;      // ADR-582: the steering half of a cut, kept while parked
     std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
