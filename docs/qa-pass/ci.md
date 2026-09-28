@@ -13,8 +13,8 @@ Push CI GREEN on `df333c8c` (36464437262: CPU job 6 min). Nothing is merged; the
 | Run | What | Result / expected |
 |---|---|---|
 | 36434165586 | Sanitizers `both` on `2e6c5bbb` (the OLD 7-rest-shard ASan matrix) | **DONE, SUCCESS, 0 sanitizer reports anywhere.** ASan build 42 min; rest-a 175 min, rest-b 174 min (3/7 shards each), heavy-1 103 min, heavy-3 33 min, heavy-2 1.5 min; UBSan 3 h 48 min (3838/3838); TSan subset 82 min. Only timing assertions failed (not gated). Timings are in docs/development/ci.md. |
-| 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | Still running at the time of writing; expected TIMEOUT at 300 min (by ~20:10 UTC). Record in docs/development/ci.md "TSan subset". |
-| 36468754635 | Sanitizers `asan` on `df333c8c`: the REBALANCED matrix (11 rest shards) | dispatched 18:57 UTC; check job times vs the old run, then decide 5 -> 3 jobs. |
+| 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | **DONE: TIMEOUT (the expected answer).** 5 h 44 min job; all 3 shards killed at 300 min with 1680/3838 cases run; 0 race reports, 0 crashes. Whole-suite TSan does not fit one nightly job (~11-12 h of 3-shard time). Recorded in docs/development/ci.md "TSan subset". |
+| 36469640514 | Sanitizers `asan` on `8df83f4c`: the REBALANCED matrix (11 rest shards) and the new exit-code gate | dispatched ~19:05 UTC (36468754635 on df333c8c was cancelled for it); check job times vs the old run, confirm heavy jobs whose film process exits 4 still PASS, then decide 5 -> 3 jobs. |
 
 **Finding from 36434165586 (fixed, `tools/ci/catch2_run.py`):** each heavy job's summary said "exit 4 but
 Catch2 counted 0 failed cases" yet the job passed. Two things: (a) exit 4 is Catch2 v3.3+'s "every case

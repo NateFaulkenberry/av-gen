@@ -515,7 +515,17 @@ GPU tests are not run under ASan. Measured locally, that is about six cases an h
 ## TSan subset
 
 Nightly since 2026-09-28 (it was Sundays only). A full TSan sweep of the CPU suite has been running locally for over 15 hours, so it does not fit
-a hosted job's 6-hour limit. The job runs the tags whose cases start threads (`TSAN_SUBSET` in
+a hosted job's 6-hour limit.
+
+**Measured on the runner (run 36434180499, 2026-09-28, dispatch `test_filter='~[.]'`, the whole default
+set in one job, 3 shards): TIMEOUT.** All three shards were killed at the 300 min ceiling with 1680 of
+3838 cases run (44%); 0 ThreadSanitizer reports and 0 crashes in what did run, 4 timing assertions and
+10 absent-asset failures. The shards died inside long single-process simulations (`three abductions,
+one craft ...`, `Every example in the index exists and loads`, `the engine's own writeback does not dirty
+an untouched project`). At that rate the whole set needs roughly 11-12 h of 3-shard time, so **whole-suite
+TSan cannot run nightly in one hosted job**; it would take about three jobs of 3 shards each (a partition
+like the ASan plan), which is not worth the macOS slots while the subset keeps finding nothing. The
+subset below stays the nightly TSan. The job runs the tags whose cases start threads (`TSAN_SUBSET` in
 `sanitizers.yml`):
 
 `[jobs] [job] [motionthreads] [threading] [worldbuilder] [ring] [analysis] [motionlib] [ai] [transport]`
