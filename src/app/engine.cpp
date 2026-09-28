@@ -2677,6 +2677,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
     projectWarnings_.clear();
+    projectSceneError_.clear();
     // ADR-902: binds in the middle of the load check routes against the bus and parameters alone;
     // the scene's facts are read once the scene is whole. Restored on every way out.
     livenessReady_ = false;
@@ -2714,6 +2715,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
         projectWarnings_.push_back(std::move(message));
+    };
+    auto sceneFailed = [&](const std::string& message) {
+        projectSceneError_ = message;
+        warn("scene: " + message);
     };
     // Resolves an asset reference (string or object form); a missing file is searched for under
     // the project folder by name, size and content hash and relinked with a warning.
@@ -2800,7 +2805,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
                 if (gltfScene() == nullptr || gltfScene()->path() != scenePath) {
                     if (auto r = loadScene(scenePath); !r) {
-                        warn("scene: " + r.error().message);
+                        sceneFailed(r.error().message);
                     }
                 }
             } else if (kind == "composition" && sceneRef.contains("path")) {
@@ -2816,7 +2821,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 // a hero. Nodes are the most structural thing a project can say, so they go first.
                 if (auto r = loadComposition(scenePath, doc.value("sceneNodes", nlohmann::json())); !r) {
                     environmentPath_ = previousEnvironment;
-                    warn("scene: " + r.error().message);
+                    sceneFailed(r.error().message);
                 } else {
                     sceneEnvironment = environmentPath_;
                 }
@@ -2828,7 +2833,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 registry_.setBaseDirectory(dir);
                 auto comp = scene::Composition::fromJson(sceneRef["inline"], registry_);
                 if (!comp) {
-                    warn("scene: " + comp.error().message);
+                    sceneFailed(comp.error().message);
                 } else {
                     const float masterGain = modulator_.masterGain;
                     detachSceneParameters();
@@ -2848,7 +2853,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                     }
                 }
             } else {
-                warn("scene: unknown kind '" + kind + "'");
+                sceneFailed("unknown kind '" + kind + "'");
             }
         }
         stage(4);
@@ -3443,6 +3448,7 @@ void Engine::newProject() {
     }
     projectPath_.clear();
     projectWarnings_.clear();
+    projectSceneError_.clear();
     transport_.clearLoop();
     refreshTransport();
     transport_.stop();
@@ -3578,13 +3584,19 @@ Result<void> Engine::bundleInto(const std::filesystem::path& projectFile,
         // The light rig is an asset path in the environment block, and it was missed here exactly
         // as it was missed in `saveComposition`: two copiers, the same omission, found twice. A
         // scene bundled without it opens in the new location with no lighting.
-        if (doc.contains("environment") && doc["environment"].is_object() &&
-            doc["environment"].contains("lightRig") && doc["environment"]["lightRig"].is_string()) {
-            auto copied = copyFile(resolveFrom(doc["environment"]["lightRig"].get<std::string>(), srcDir));
+        // The parser also accepts the rig at the top level (Composition::fromJson), and the
+        // Glowmere scenes put it there: a bundle that rewrote only the environment's copy left
+        // `"lightRig": "../lightrigs/..."` pointing outside the bundle (QA pass, 2026-09-28).
+        for (nlohmann::json* holder : {&doc, doc.contains("environment") ? &doc["environment"] : nullptr}) {
+            if (holder == nullptr || !holder->is_object() || !holder->contains("lightRig") ||
+                !(*holder)["lightRig"].is_string() || (*holder)["lightRig"].get<std::string>().empty()) {
+                continue;
+            }
+            auto copied = copyFile(resolveFrom((*holder)["lightRig"].get<std::string>(), srcDir));
             if (!copied) {
                 return std::unexpected(copied.error());
             }
-            doc["environment"]["lightRig"] = copied->filename().generic_string();
+            (*holder)["lightRig"] = copied->filename().generic_string();
         }
         // Entity profiles. `visitor` in the Tree of Life scenes names one, and a bundle without it
         // reports "cannot open entity profile" on open -- which is what caught this.
