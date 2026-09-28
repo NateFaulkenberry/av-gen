@@ -37,6 +37,7 @@ public:
     glm::vec3 half{3.0f, 1.0f, 3.0f};
     bool hasVelocity = false;
     glm::vec3 velocity{0.0f};
+    bool visible = true; // ADR-983
 
     [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
         if (name != "ufo") {
@@ -57,6 +58,7 @@ public:
         out.hasBounds = true;
         out.firstEntity = 3;
         out.entityCount = 2;
+        out.visible = visible;
         return true;
     }
     [[nodiscard]] bool nodeVelocity(std::string_view name, glm::vec3& out) const override {
@@ -353,4 +355,68 @@ TEST_CASE("a procedural node's drawn view has bounds, so an effect on it can fit
     CHECK(glm::length(view.boundsMax - bounds.max) < 1e-4f);
     const glm::vec3 centre = 0.5f * (view.boundsMin + view.boundsMax);
     CHECK(glm::length(centre - glm::vec3(5.0f, 12.0f, -40.0f)) < 2.0f);
+}
+
+TEST_CASE("ADR-983: no field bends the view around a hidden owner", "[effects][distortion][adr983]") {
+    // GV3's crafts are hidden between their set pieces (staging's `hide`), and a hidden node keeps its
+    // transform and its bounds: a Space Warp on the saucer bent an empty patch of sky wherever the
+    // saucer waited, unseen. The four types whose field is AROUND the owner as it now stands draw
+    // nothing while it is hidden; they are back the frame it is shown.
+    FakeScene scene;
+    scene.hasVelocity = true;
+    scene.velocity = glm::vec3(25.0f, 0.0f, 0.0f); // fast enough for a wake
+    for (const world::EffectKind kind : {world::EffectKind::SpaceWarp, world::EffectKind::GravitationalLens,
+                                         world::EffectKind::HeatShimmer, world::EffectKind::VelocityDistortion}) {
+        world::EffectInstance e = world::makeEffect(kind, "field");
+        e.id = "field";
+        e.owner = world::EffectOwner::entity("ufo");
+        e.activation = world::Activation::Always;
+        e.timing.fadeIn = 0.0;
+        e.timing.fadeOut = 0.0;
+        const std::vector<world::EffectInstance> effects{e};
+        INFO("kind " << world::effectSchema(kind)->key);
+        scene.visible = true;
+        const Built shown = build(effects, contextAt(4.0, &scene));
+        CHECK(shown.frame.count >= 1);
+        CHECK(shown.status[0] == world::EffectStatus::Drawn);
+        scene.visible = false;
+        const Built hidden = build(effects, contextAt(4.0, &scene));
+        CHECK(hidden.frame.count == 0);
+        CHECK(hidden.status[0] == world::EffectStatus::Dormant);
+    }
+}
+
+TEST_CASE("ADR-983: a hidden node's drawn view says it is hidden", "[effects][distortion][composition][adr983]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(std::filesystem::temp_directory_path());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+    scene::CompositionNode node;
+    node.name = "craft";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "craft";
+    node.procedural.source.kind = scene::PrimitiveKind::Box;
+    node.procedural.distribution.kind = scene::DistributionKind::Single;
+    node.transform.position = glm::vec3(5.0f, 12.0f, -40.0f);
+    REQUIRE(comp.addNode(std::move(node)));
+    params.resetFinals();
+    comp.update(FrameTime{});
+    world::NodeView view;
+    REQUIRE(comp.nodeView("craft", view));
+    CHECK(view.visible);
+
+    params.findAs<bool>("nodes/craft/visible")->setBase(false);
+    params.resetFinals();
+    comp.update(FrameTime{1.0 / 60.0, 1.0 / 60.0, 1});
+    REQUIRE(comp.nodeView("craft", view));
+    CHECK_FALSE(view.visible);
+    CHECK(view.hasBounds); // still somewhere, with a size: which is why a warp needs to be told
+
+    params.findAs<bool>("nodes/craft/visible")->setBase(true);
+    params.resetFinals();
+    comp.update(FrameTime{2.0 / 60.0, 1.0 / 60.0, 2});
+    REQUIRE(comp.nodeView("craft", view));
+    CHECK(view.visible);
 }

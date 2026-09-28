@@ -274,8 +274,8 @@ std::size_t spaceWarpProxies(const EffectInstance& e, const EffectContext& ctx, 
     case EffectTarget::World: break;
     case EffectTarget::Entity: {
         NodeView view;
-        if (ctx.scene == nullptr || !ctx.scene->nodeView(e.owner.name, view)) {
-            return 0; // no drawn owner this frame: nothing to warp around
+        if (ctx.scene == nullptr || !ctx.scene->nodeView(e.owner.name, view) || !view.visible) {
+            return 0; // no drawn owner this frame (none, or hidden: ADR-983): nothing to warp around
         }
         if (view.hasBounds) {
             centre = 0.5f * (view.boundsMin + view.boundsMax) + offset;

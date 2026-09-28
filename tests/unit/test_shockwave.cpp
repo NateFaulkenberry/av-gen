@@ -114,6 +114,15 @@ public:
         out = at(t);
         return true;
     }
+    // ADR-983: where the current placement began; below 0, never placed.
+    double placedSince = -1.0;
+    [[nodiscard]] bool nodePlacedSince(std::string_view, double& out) const override {
+        if (placedSince < 0.0) {
+            return false;
+        }
+        out = placedSince;
+        return true;
+    }
 };
 
 } // namespace
@@ -212,6 +221,33 @@ TEST_CASE("Velocity Distortion: a wake along the recorded path, and none from a 
         }
     }
     owner.speed = 1.0f; // under the 2 m/s floor
+    CHECK(build(e, 3.0, &owner).frame.count == 0);
+}
+
+TEST_CASE("ADR-983: a wake reaches back no further than its owner's placement", "[shockwave][wake][adr983]") {
+    // A body put somewhere (a hidden craft shown at its entry point, ADR-911) did not fly the path its
+    // history holds before that; a wake laid along it drew a lens tube across the sky, back along the
+    // hidden move, for a second after the craft appeared.
+    FlyingOwner owner;
+    owner.now = 3.0;
+    world::EffectInstance e = world::makeEffect(world::EffectKind::VelocityDistortion, "wake");
+    e.id = "wake";
+    e.owner = world::EffectOwner::entity("craft");
+    const Built whole = build(e, 3.0, &owner);
+    REQUIRE(whole.frame.count >= 4);
+
+    owner.placedSince = 2.7; // shown 0.3 s ago, having been elsewhere
+    const Built fresh = build(e, 3.0, &owner);
+    REQUIRE(fresh.frame.count >= 1);
+    CHECK(fresh.frame.count < whole.frame.count);
+    for (std::size_t i = 0; i < fresh.frame.count; ++i) {
+        const world::DistortionProxy& p = fresh.frame.proxies[i];
+        INFO("segment " << i);
+        // Every segment is centred on the path flown SINCE the placement (x from 27 to 30).
+        CHECK(p.centre.x >= owner.speed * 2.7f - 1e-3f);
+    }
+
+    owner.placedSince = 3.0; // shown this instant
     CHECK(build(e, 3.0, &owner).frame.count == 0);
 }
 

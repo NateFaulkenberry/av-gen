@@ -187,6 +187,11 @@ struct NodeView {
     // its other material parts. Zero count for a node that has none.
     std::uint32_t firstProcedural = 0;
     std::uint32_t proceduralCount = 0;
+    // ADR-983: whether the node is drawn at all this frame -- it and every ancestor visible, as the
+    // last flattening had them. A hidden node still has a transform and bounds; a field that bends
+    // the view AROUND its owner (Space Warp, Gravitational Lens, Heat Shimmer, a Velocity
+    // Distortion's wake) bends it around nothing when the owner is hidden, so those draw none.
+    bool visible = true;
 };
 
 // Wave 3 (phase 2). What a Light-owned effect can learn about its light, as the frame places it: an
@@ -220,6 +225,12 @@ public:
     // ADR-703. The node's velocity in metres per second, deterministic under seek (a function of the
     // simulation steps, not of wall-clock frame deltas). Optional: false when unknown.
     [[nodiscard]] virtual bool nodeVelocity(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
+    // ADR-983. The earliest instant the node's CURRENT placement reaches back to (ADR-911: a body put
+    // somewhere -- a hidden craft shown at its entry point -- does not continue the path it had
+    // before), within the history held. A reader of the node's past (a wake laid along the path)
+    // reads no further back than this. Optional: false when unknown, and the reader then reads
+    // whatever `nodeDrawnPosition` answers.
+    [[nodiscard]] virtual bool nodePlacedSince(std::string_view name, double& out) const { (void)name; (void)out; return false; }
     // Wave 2. Where the node's origin was DRAWN at an earlier instant `t`: HIST's sample there (which
     // is the pre-offset, simulated path -- that is what keeps it exact under seek) with the node's
     // XFORM offset re-applied as it was at `t`. What a Trail's body must follow so that it meets the

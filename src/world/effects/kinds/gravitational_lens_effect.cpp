@@ -185,8 +185,8 @@ std::size_t gravitationalLensProxies(const EffectInstance& e, const EffectContex
     case EffectTarget::World: break;
     case EffectTarget::Entity: {
         NodeView view;
-        if (!kinds::ownerCentre(e, ctx, offset, centre, ownerRadius, view)) {
-            return 0; // no drawn owner this frame: no mass to bend around
+        if (!kinds::ownerCentre(e, ctx, offset, centre, ownerRadius, view) || !view.visible) {
+            return 0; // no drawn owner this frame (none, or hidden: ADR-983): no mass to bend around
         }
         break;
     }

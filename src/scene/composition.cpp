@@ -4034,6 +4034,7 @@ bool Composition::nodeView(std::string_view node, world::NodeView& out) const {
     const NodeRange& range = ranges_[index];
     out = world::NodeView{};
     out.world = range.world.matrix();
+    out.visible = range.visible;
     out.firstEntity = static_cast<std::uint32_t>(range.firstEntity);
     out.entityCount = static_cast<std::uint32_t>(range.entityCount);
     for (std::size_t e = range.firstEntity;
@@ -7998,6 +7999,7 @@ void Composition::applyParameters() {
         const Transform full = compose(root, nodeT);
         range.world = full;
         range.worldValid = true;
+        range.visible = visible;
 
         // The lights the node's asset brought in. Applied here, per frame, rather than at rebuild:
         // `rebuild` repopulates `scene_.lights` wholesale, so a value written onto a light was

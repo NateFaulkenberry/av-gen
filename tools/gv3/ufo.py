@@ -84,6 +84,19 @@ WATCH_MIN = 0.5
 WATCH_AFTER = 20.0
 
 
+# The crafts' warp (cast.CRAFT_WARP, cast.CRAFT_WAKE: the art pass, item 4) goes quiet while its craft's
+# beam is on -- the brief: the warp must not "obscure the abducted character", "interfere with the lift
+# beam" or "visually confuse the beam and warp effects". Every set piece that lights a beam gets, for each
+# field on its craft, a cue to 0 on its `beam` moment and one back on its `depart` (when the beam goes
+# out). They are derived from the project's own effects when the plan is compiled (`warp_cues`), so the
+# value a cue restores is the value the effect has, and a set piece added to the plan is covered.
+WARP_TYPES = ("spaceWarp", "velocityDistortion")
+BEAM_TEMPLATES = ("survey", "abduction")
+WARP_QUIET_SECONDS = 0.5   # out as the beam lights (the beam itself takes `beamSeconds` to form)
+WARP_BACK_SECONDS = 1.2    # and back as the beam goes out
+COMPILED_PLAN = BUILD / "ufo.plan.compiled.json"
+
+
 def event_name(key, moment):
     """The world and bus event a set piece raises at a moment (ADR-930): `setpiece/<key>/<moment>`."""
     return f"setpiece/{key}/{moment}"
@@ -98,10 +111,51 @@ def dump(obj):
 
 
 # ---- 1. compile --------------------------------------------------------------------------------------
+def craft_bodies(project, project_path):
+    """{staging actor name: the body it flies}, from the project's staging or else its scene's."""
+    actors = (project.get("staging") or {}).get("actors")
+    if not actors:
+        scene_path = pathlib.Path(project_path).parent / project["assets"]["scene"]["path"]["path"]
+        actors = json.loads(scene_path.read_text()).get("staging", {}).get("actors", [])
+    return {a["name"]: a["body"] for a in actors}
+
+
+def warp_cues(the_plan, project, project_path):
+    """The plan with the crafts' warp cues (see WARP_TYPES above) and the subjects they name added."""
+    out = json.loads(json.dumps(the_plan))
+    bodies = craft_bodies(project, project_path)
+    params = project.get("parameters", {})
+    fields = {}
+    for e in project.get("effects", []):
+        owner = e.get("owner", {})
+        if e.get("type") in WARP_TYPES and owner.get("kind") == "entity":
+            strength = params.get(f"fx/{e['id']}/strength", e["parameters"]["strength"])
+            fields.setdefault(owner["name"], []).append((e["id"], e["type"], float(strength)))
+    aliases = {s["alias"] for s in out.get("subjects", [])}
+    cues = [c for c in out.get("cues", []) if not c.get("key", "").endswith(("-quiet", "-back"))]
+    for sp in out.get("setPieces", []):
+        body = bodies.get(sp["craft"])
+        if sp.get("template") not in BEAM_TEMPLATES or body not in fields:
+            continue
+        if body not in aliases:
+            out.setdefault("subjects", []).append({"alias": body, "text": body})
+            aliases.add(body)
+        for effect_id, kind, strength in fields[body]:
+            ref = {"owner": body, "type": kind, "id": effect_id}
+            cues.append({"key": f"{sp['key']}-{effect_id}-quiet", "effect": dict(ref), "field": "strength",
+                         "on": event_name(sp["key"], "beam"), "value": 0.0, "rampSeconds": WARP_QUIET_SECONDS})
+            cues.append({"key": f"{sp['key']}-{effect_id}-back", "effect": dict(ref), "field": "strength",
+                         "on": event_name(sp["key"], "depart"), "value": strength, "rampSeconds": WARP_BACK_SECONDS})
+    out["cues"] = cues
+    return out
+
+
 def compile_plan(project_path, scratch):
     """The plan compiled against the project and saved to `scratch`; returns the plan report."""
     report_trace = scratch.with_suffix(".report.json")
-    cmd = [str(TOOL), "--project", str(project_path), "--plan", str(PLAN), "--save-project", str(scratch),
+    COMPILED_PLAN.parent.mkdir(parents=True, exist_ok=True)
+    COMPILED_PLAN.write_text(dump(warp_cues(plan(), json.loads(pathlib.Path(project_path).read_text()), project_path)))
+    cmd = [str(TOOL), "--project", str(project_path), "--plan", str(COMPILED_PLAN), "--save-project", str(scratch),
            "--seconds", "0.05", "--fps", f"{FPS:g}", "--hz", f"{FPS:g}", "--out", str(report_trace)]
     run = subprocess.run(cmd, capture_output=True, text=True)
     if run.returncode not in (0, 2) or not report_trace.exists():

@@ -65,6 +65,41 @@ HORSE_GLOW = {
                    "rimColor": [1.0, 0.78, 0.42], "rimPower": 2.5, "spill": False, "recolour": 0.0},
 }
 
+# The crafts' warp (the art pass, item 4: "make the UFO feel like it is manipulating spacetime rather than
+# simply flying through the scene"). Two fields on each craft, both DF types: they bend what is behind
+# them and draw nothing of their own, so the saucer's own look is untouched.
+#   * A Space Warp AROUND the craft. At rest only its lens pull, a slow curl and a slight twist act: a
+#     quiet bend of the sky and the valley round the hull. In flight its bow wave and stretch act too,
+#     both weighted by the craft's own speed (the producer's, from HIST, full at `speedForFull`), so
+#     the field leans into the motion and trails behind the craft. No speed ROUTE: `entity.<name>.speed`
+#     reads the hidden move to each entry point (a tenth of a second at thousands of m/s), and a
+#     smoothed route would carry that into the frames after the craft appears.
+#   * A Velocity Distortion's wake ALONG the path it has just flown: a slow ripple of refraction in a
+#     tube behind it, from `minSpeed` up, calming with age -- the space it dragged, not a particle trail.
+# Neither exists while its craft is hidden (ADR-983), and neither reads a placement as motion. Both go
+# quiet while the craft's beam is on: `ufo.py` gives every set piece with a beam two cues per field, to
+# 0 on its `beam` moment and back to the value below on its `depart`, so the lift is the only thing
+# moving under the craft (the brief: the warp "must not obscure the abducted character").
+CRAFT_WARP = {
+    "type": "spaceWarp", "name": "Spacetime warp",
+    "parameters": {
+        "strength": 0.4, "boundsScale": 2.2, "radius": 8.0, "radialWeight": 0.15, "bowWeight": 1.0,
+        "swirl": 0.06, "turbulence": 0.1, "chroma": 0.06, "rimColor": [0.55, 0.85, 1.0], "rimIntensity": 0.0,
+        "falloff": 1.6, "edgeSoftness": 0.45, "velocityStretch": 1.0, "speedForFull": 18.0,
+        "turbulenceScale": 2.0, "turbulenceSpeed": 0.35, "rimWidth": 0.08,
+        "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0,
+    },
+}
+CRAFT_WAKE = {
+    "type": "velocityDistortion", "name": "Spacetime wake",
+    "parameters": {
+        "strength": 0.7, "persistence": 1.2, "width": 1.2, "rippleFrequency": 1.2, "rippleSpeed": 0.6,
+        "chroma": 0.06, "minSpeed": 6.0, "speedForFull": 40.0, "edgeSoftness": 0.5,
+    },
+}
+CRAFT_FIELDS = (("warp", CRAFT_WARP), ("wake", CRAFT_WAKE))
+
+
 # ---- the aliens ------------------------------------------------------------------------------------
 ALIENS = ("rook", "tide", "sage", "ember", "vane")
 # Every alien turns on a 1.5 m circle while it walks, and its gait may turn as fast as that circle
@@ -475,6 +510,26 @@ def horse_light(project):
     tl["tracks"] = [t for t in tl.get("tracks", []) if not t["target"].startswith(f"fx/{HORSE_GLOW['id']}/")]
 
 
+# ---- the crafts' warp ------------------------------------------------------------------------------
+def craft_warps(project):
+    """A Space Warp and a wake on each craft (CRAFT_WARP, CRAFT_WAKE), always on, as the project's own
+    effects; `ufo.py` quiets them under every beam."""
+    ids = []
+    added = []
+    for body in ("visitor", SCOUT):
+        for suffix, spec in CRAFT_FIELDS:
+            ids.append(f"{body}-{suffix}")
+            added.append({
+                "id": f"{body}-{suffix}", "type": spec["type"], "name": spec["name"],
+                "owner": {"kind": "entity", "name": body},
+                "enabled": True, "order": 0, "style": "", "activation": "always",
+                "timing": {"delay": 0.0, "lifetime": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "windowStart": 0.0,
+                           "windowSeconds": 6.0, "repeatSeconds": 0.0},
+                "parameters": copy.deepcopy(spec["parameters"]),
+            })
+    project["effects"] = [e for e in project.get("effects", []) if e["id"] not in ids] + added
+
+
 # ---- entry point -----------------------------------------------------------------------------------
 def apply(project, scene):
     from .ground import Ground
@@ -484,3 +539,4 @@ def apply(project, scene):
     aliens(project, scene)
     animals(project, scene, Ground(world))
     horse_light(project)
+    craft_warps(project)

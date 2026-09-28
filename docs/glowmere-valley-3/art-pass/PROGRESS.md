@@ -8,7 +8,7 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 - **Status (2026-09-28, evening):** milestone 1 committed (`cdbcf63f`: items 1-3, ADRs 980-982, the two probes).
   The aurora addendum is in `look.py` (data only, committed after milestone 1); its sky measurement waits for the
-  render batch (step 6). Next: the UFO warp (step 3 of the plan below).
+  render batch (step 6). The UFO warp is in (ADR-983 + `cast.py`/`ufo.py`), look unverified. Next: hero mushrooms.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
   -DCPM_SOURCE_CACHE=/Users/natefaulkenberry/Documents/GitHub/av-gen/.cache/cpm`, then `cmake --build build/release`.
   Assets are linked (`../av-gen/tools/link-worktree-assets.sh ../av-gen-art`, 1,803 links).
@@ -169,13 +169,30 @@ of the head get their jitter re-dealt. Positions, sizes and yaws do not move.
   wide, the 76.634 s beat) and the drop (s33, s36), r7b against this pass; state max and p99 of the consecutive-frame
   change and the swell's size over a bar.
 
+## UFO warp (item 4): ADR-983 + data, done; look to verify in the render batch
+
+- **Data** (`tools/gv3/cast.py` CRAFT_WARP / CRAFT_WAKE, `craft_warps`): on each craft (`visitor`, `scout`) a Space
+  Warp ("Spacetime warp": strength 0.4, lens pull 0.15, bow 1.0, swirl 0.06, turbulence 0.1 at 0.35, chroma 0.06, no
+  rim, 2.2x the owner's bounds, stretch 1.0, full at 18 m/s) and a Velocity Distortion ("Spacetime wake": strength
+  0.7, 1.2 s, width 1.2x, ripples 1.2 at 0.6 Hz, chroma 0.06, from 6 m/s, full at 40 m/s). At rest only the lens,
+  curl and twist act; in flight the bow, stretch and wake (all weighted by the craft's HIST speed; deliberately NO
+  speed route: `entity.<name>.speed` reads the hidden transit).
+- **Beams:** `tools/gv3/ufo.py warp_cues` adds to the compiled plan (`build/gv3/ufo.plan.compiled.json`), for every
+  set piece with a beam (survey, abduction), two cues per field: strength -> 0 on `beam` (0.5 s), back to the
+  effect's own strength on `depart` (1.2 s); plus subject aliases `visitor`, `scout`. 16 cues; the horse's two stay.
+- **Engine (ADR-983):** `NodeView::visible` (Composition records it per frame); Space Warp, Gravitational Lens, Heat
+  Shimmer and the wake draw nothing around a hidden owner; HIST velocity/acceleration never difference across a
+  placement (the craft read ~5,000 m/s on the frame it appeared); `HistoryBank::placementStart` +
+  `EffectSceneQuery::nodePlacedSince` stop a wake at the placement. Tests `[adr983]` (4 cases) pass; `[hist]`,
+  `[distortion]`, `[shockwave]`, `[follow]`, `[xform]`, `*placement*` pass.
+- **To verify (render batch):** E2 flyby (s08, 26.6-29.9), E5 approach (s47-s50), E5 beam and lift quiet (s51-s57),
+  E5 depart (s58-s59), one scout moment (E4 approach, s31-s33). Tune once if needed, then leave it to the Critic.
+
 ## Plan (the rest, in order)
 
 1. ~~Commit milestone 1 (water, pulses, gait, the two probes, ADRs 980-982).~~ Done, `cdbcf63f`.
 2. ~~Aurora bass pulse + resolve the aurora's duplicate block values (`look.py`; data only).~~ Done; measure in 6.
-3. UFO warp: Space Warp ("UFO Warp" style) + a wake on `visitor` and `scout`, speed-routed; a hidden owner warps
-   nothing (engine: `NodeView` visibility, ADR-983); suppressed during every beam/lift (timeline keys from the plan's
-   moments).
+3. ~~UFO warp~~ done in code and data (above); verify in 6.
 4. Hero mushrooms: the search's two next farthest-point picks (`test_mushroom_search.cpp` kWinners 10 -> 12; the
    record gains two, the first ten byte-identical); placed by GV3's generator with GV2's hero recipe (four parts,
    spores, a `heroes` entry, a Hero Pulse, their reactivity lanes); shots adjusted where they belong.

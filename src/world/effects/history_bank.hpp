@@ -123,11 +123,20 @@ public:
     [[nodiscard]] bool sampleAt(std::string_view node, double t, HistorySample& out) const;
     [[nodiscard]] bool sampleAt(std::size_t ring, double t, HistorySample& out) const;
     // Metres per second at the newest sample: a backward difference over one grid step. False with
-    // no sample; zero with one.
+    // no sample; zero with one. ADR-983: never across a placement -- the difference reaches back no
+    // further than the newest sample's placement began (`placementStart`), so a body put somewhere
+    // (a hidden craft shown at its entry point) is at rest on the frame it appears, not travelling
+    // at the thousands of metres per second its hidden move took.
     [[nodiscard]] bool velocity(std::string_view node, glm::vec3& out) const;
     [[nodiscard]] bool velocity(std::size_t ring, glm::vec3& out) const;
-    // Metres per second squared at the newest sample, over `kAccelBaseline`.
+    // Metres per second squared at the newest sample, over `kAccelBaseline` (within the placement,
+    // as `velocity`).
     [[nodiscard]] bool acceleration(std::size_t ring, glm::vec3& out) const;
+    // ADR-983. The instant of the oldest sample the ring holds of the newest sample's placement: how
+    // far back the node's path continues. The oldest sample held when no placement changed inside
+    // the ring. False with no sample.
+    [[nodiscard]] bool placementStart(std::string_view node, double& out) const;
+    [[nodiscard]] bool placementStart(std::size_t ring, double& out) const;
 
     // ---- the checkpoint half (ADR-700) ---------------------------------------------------------
     struct Snapshot {
@@ -163,6 +172,8 @@ private:
     [[nodiscard]] const HistorySample& at(const Ring& r, std::size_t i) const {
         return r.buffer[(r.head + i) % r.buffer.size()];
     }
+    // ADR-983: the index of the oldest sample of the newest sample's placement (`count` > 0).
+    [[nodiscard]] std::size_t placementFirst(const Ring& r) const;
     void trim(Ring& r);
 
     std::vector<Ring> rings_;

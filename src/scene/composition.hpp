@@ -2275,6 +2275,9 @@ private:
         // that never left its authored spot looked perfect.
         Transform world;
         bool worldValid = false;
+        // ADR-983: the node's own visibility as that flattening used it (it and every ancestor), for
+        // `nodeView`: an effect around a hidden owner has nothing to be around.
+        bool visible = true;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restRoughness;
         // The opacity the asset was built with, captured the first time a node's `opacity`
