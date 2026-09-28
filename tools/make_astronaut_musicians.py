@@ -890,7 +890,7 @@ def place_drum_kit(pieces, t):
     c = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, 0.0))
     th.data.transform(Matrix.Translation(c) @ Matrix.Scale(1.2, 4) @ Matrix.Translation(-c))
     seat_lo, seat_hi = part_bounds(th, lambda mn, mx, n: mx.z > 0.3)   # the seat + its post
-    base_lo, base_hi = part_bounds(th, lambda mn, mx, n: mx.z <= 0.3)  # the tripod
+    _base_lo, base_hi = part_bounds(th, lambda mn, mx, n: mx.z <= 0.3)  # the tripod
     telescope(th, base_hi.z + 0.02, t["seat_top"] - seat_hi.z)
     seat_lo, seat_hi = part_bounds(th, lambda mn, mx, n: mx.z > 0.3)
     th_native = Vector(((seat_lo.x + seat_hi.x) / 2, (seat_lo.y + seat_hi.y) / 2, 0.0))
@@ -1084,13 +1084,12 @@ def build(src_dir):
 
     # --- pianist: ground, then hold both hands on one key plane
     _act, lift_p, _ = grounded_retarget(piano_src, rig, mesh, "Piano")
-    act, plane, cal = calibrate_hands(piano_src, rig, mesh, "Piano", skip=PIANO_SKIP, lift=lift_p)
+    _act, plane, cal = calibrate_hands(piano_src, rig, mesh, "Piano", skip=PIANO_SKIP, lift=lift_p)
     key_top = plane - KEY_BELOW_FINGERTIPS
     kb = load_keyboard(src_dir, keys)
     xs = [v.co.x for v in kb.data.vertices]
     kb.location = (KB_X - 0.5 * (min(xs) + max(xs)), KB_FRONT_Y - keyboard_front_edge(kb),
                    key_top - keyboard_key_top(kb))
-    ys = [v.co.y for v in kb.data.vertices]
     stand, theta = load_stand(src_dir, keys, kb.location.z, scale=STAND_SCALE)
     stand.location = (KB_X, STAND_Y, 0.0)
     bx, by = BENCH_CENTRE
@@ -1107,7 +1106,7 @@ def build(src_dir):
                          "hip_scale": round(cal["hip_scale"], 4)}
 
     # --- drummer: ground, turn the right leg out, raise the left hand; sticks; kit from the strikes
-    act_d, lift_d, ik_d = grounded_retarget(drums_src, drig, dmesh, "Drums", leg_turnout=DRUM_TURNOUT,
+    _act_d, lift_d, ik_d = grounded_retarget(drums_src, drig, dmesh, "Drums", leg_turnout=DRUM_TURNOUT,
                                             hand_height_ik=("l",), hand_offsets={"l": DRUM_LEFT_RAISE})
     gl = solve_grip(drig, "l", *GRIP_L)
     gr = solve_grip(drig, "r", *GRIP_R)
