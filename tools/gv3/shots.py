@@ -532,10 +532,14 @@ def lantern_from_the_north(t0, t1, g):
 
 @at("71.1")
 def elder_from_the_north(t0, t1, g):
-    # The elder through a long lens from the north, the southern sky over it.
-    r = moving(t0, t1, 85.0, g(-20, -60, 4.0), g(-17, -60, 4.0), [-12.0, 10.0, 52.0])
-    return r, dict(lead="hero", purpose="The elder through a long lens from the north", subject="the elder",
-                   camera="85 mm, 112 m north", movement="slow lateral", music="2 bars to the lead")
+    # The elder through a long lens from the north, 40 m up, looking down on it against the lit valley
+    # floor. From 4 m (r1-r3) the elder stood in front of the river's mouth, 4 deg apart on one bearing: a
+    # vertical-walled slot of sky behind the cap (world.py: up to 18 of 96 columns; at 1080p on r3 a hard
+    # cyan slot). From 40 m every column of the frame's top edge meets the valley floor 233-269 m out,
+    # short of the mouth's 412 m (a ray march on the terrain, gv3-int r5).
+    r = moving(t0, t1, 85.0, g(-20, -60, 40.0), g(-17, -60, 40.0), [-12.0, 10.0, 52.0])
+    return r, dict(lead="hero", purpose="The elder through a long lens from the north, from above", subject="the elder",
+                   camera="85 mm, 112 m north, 40 m up", movement="slow lateral", music="2 bars to the lead")
 
 
 # ==== 8 lead forward (bars 73-80): the aurora carries the lead ==========================================
