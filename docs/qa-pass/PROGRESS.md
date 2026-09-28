@@ -43,7 +43,7 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   assets linked; the plan.
 
 ## In Progress
-- W1: the GV3 performance baseline and the shot sweep.
+- W1: checkpointed for the restart (`cd1db417`). Open: the clean baseline retake, the regression-2 bisect, the GPU cost on wides one feature at a time, the editor `ui.build` p90 spike of about 36 ms, and `avgen_render_tests`.
 - W2: triage of the red CPU run (`4a138886`) and the failing nightly sanitizer stages.
 - W3 is DONE and merged into qa/coord (`3b3d323c`). Its full serial CPU suite on `qa/clean` passed: 3,843 cases,
   3,823 passed, 19 skipped, and 1 failed as expected (the `[!shouldfail]` slope lean); 9,124,064 assertions passed.
@@ -78,20 +78,39 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   `ci.yml`. An authoritative GPU job needs real Apple GPU hardware.
 
 ## Performance Baselines
-Interim from W1, measured while the other agents were loading the machine, so these are ratios and not
-baselines. Headless, 640x360, the 73 shots of GV3 r7b:
+W1's interim, checkpointed 2026-09-28 at `qa/perf` `cd1db417`, not merged. Its full CPU suite exits 0.
+`avgen_render_tests` has NOT been run on it yet; that is owed before merge. Details: `perf.md`.
 
-| | base | ADR-950 fix | sightline off |
-|---|---:|---:|---:|
-| median frame | 57.7 ms | 41.7 ms | 21.0 ms |
-| shots under 10 FPS | 20 | 13 | 0 |
-| worst shot (66) | 389 ms | 252 ms | 26.8 ms |
+**Why GV3's wides collapse.** ADR-834 (`29e6918e`, 2026-09-25) runs `world::heroSightline` every frame for every
+in-frame character. Each call is 9 rays, sampling the terrain every 2 m. The only output is
+`character.<name>.visibility`, which nothing shipped reads.
+- **Evidence:**
+  - 7,436 of 7,437 main-thread samples fall in it;
+  - engine-update ms against (characters x metres) gives r = 0.975 over the 73 shots;
+  - it runs even while the editor is paused (75 ms per frame on a paused wide), which is the "navigation is
+    slow" complaint.
 
-- **The cost is on the CPU, in `heroSightline` (ADR-834).** Each in-shot character is marched to every frame, and
-  the frame cost against characters x distance gives r = 0.975. With the sightline off, the GPU frame is at most
-  17.2 ms in any shot.
-- **ADR-950:** the ground query asks for 2 values instead of a full sample. The output is bit-identical and 3.6x
-  cheaper per sightline.
+**Worst wide (s66), 1280x720 headless, 3 repeats:**
+
+| build | frame | FPS |
+|---|---:|---:|
+| main `77ea4247` | 402.8 ms | 2.5 |
+| + ADR-950 (the ground query asks for 2 values; bit-identical) | 254.7 ms | 3.9 |
+| + ADR-951 (the visibility sightline runs only when the signal is read) | 33.4 ms | 30 |
+
+- **With the fixes:** GV3 runs at 30-43 FPS at 720p and 40-58 FPS at 360p on every measured shot; the live
+  editor's playing wide goes from 322 ms to 9 ms.
+- **What is left is ordinary renderer cost.** The wide is GPU-bound at about 24 ms: the scene pass is 19.3 ms
+  (614k triangles), against 6.5 ms (135k) on a close-up. grove runs at 61 FPS at 720p on every build.
+- **Caveat:** every absolute number was measured while other agents' CPU suites were running (the load is recorded
+  per run). The clean baseline retake is owed.
+
+**Verdicts:**
+- **A, complexity:** not the collapse. What remains is the known renderer cost, which scales with triangles on wides.
+- **B, project state:** NO. Ten removal arms (hero pulses, all effects, staging and plans, routes, automation, scout
+  and fields, all entities, the hidden 32k beam pools, ground pools back to GV2's) moved nothing beyond the spread
+  on the fixed build. The hidden beam pools are not simulated. The static report finds no duplicate or dead state.
+- **C, regression:** YES, in two steps. See Performance Regressions.
 
 ## Bugs Found
 Known from the GV3 wrap-up, and not yet triaged:
@@ -100,7 +119,22 @@ Known from the GV3 wrap-up, and not yet triaged:
 3. `--export-bundle` without `--headless` opens the windowed app.
 
 ## Performance Regressions
-(pending W1)
+GV2 multicam wide, 720p:
+
+| build | frame | engine update | GPU |
+|---|---:|---:|---:|
+| `3e09f9e1` (before ADR-834) | 25.6 ms | 3.2 ms | 17.2 ms |
+| `29e6918e` (the ADR-834 merge) | 47.4 ms | 23.6 ms | 17.9 ms |
+| `77ea4247` (main) | 65.7 ms | 40.6 ms | 20.0 ms |
+| main + ADR-950/951 | 28.0 ms | 3.6 ms | |
+
+1. **ADR-834's per-frame sightline** (+20 ms of engine update; draws and triangles identical). FIXED by ADR-950 and
+   ADR-951.
+2. **Each sightline got about 1.7x more expensive after ADR-834** (another +17 ms). Suspect: ADR-893's terrain
+   changes. It is neutralised by 951, which removes the calls, but it is NOT bisected. Bisect worktrees:
+   `0b623b88`, `22ce5c3d`, `ad5623d2`; script `build/qa-runs/hypC2.sh`.
+3. **The GPU scene pass is +2.5-3 ms (+18%)** while clustered lights went from 206 to 88-115. Suspect: ADR-945's
+   ecology lights. It may be an accepted look change. Open.
 
 ## CI Status
 | Check | State (2026-09-28) |
@@ -120,4 +154,7 @@ Known from the GV3 wrap-up, and not yet triaged:
   3.24 m/s ... rate matching is on and saturated". This fits the owner's report of pre-footstep sliding.
 
 ## Decisions Required From Human
-(none open)
+- **ADR-951** makes an unread `character.<name>.visibility` signal read 0 instead of a computed value. No shipped
+  project reads it. Reverting commit `97925c18` alone restores the old behaviour. Accept?
+- **The aurora's audio sensitivity** is 0 in the parameter (the one that wins) and 1.0 in the block, so as rendered
+  the aurora ignores the audio. Is that intended?
