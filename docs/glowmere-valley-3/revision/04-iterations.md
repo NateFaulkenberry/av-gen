@@ -74,3 +74,48 @@ By category (r1b where routes matter):
   grey ellipse in a 24 mm corner; 95.3's horse washed out inside the beam; 19.1 and 25.1 pushed into plants;
   29.1's trees hiding the elder; 31.1's spire lost on a lit hillside; 59.1's Sage walking out of the frame.
 - **Decided:** round 2 fixes these in data (below, and `phase3/integrate.md`).
+
+## Rounds 2-5 (gv3-int, engine-4)
+
+Round 2 fixed r1's findings in data and answered the owner's r1 feedback; each fix was judged on
+rendered candidates or step-keyed A/B clips before it went into the generator (`phase3/integrate.md`).
+Round 3 was the first whole film with all of it. Round 4 was a trace only (E5's approach). Round 5 is the
+final candidate.
+
+- **Jobs** (session `gv3-revision`, track `film`): r3 `job_1a0e55294f206d8e8`, routes mapped as for r1b.
+
+| Dimension | iteration 0 | r1b | r3 |
+|---|---|---|---|
+| character staging | 0.866 | 0.917 | 0.938 |
+| cinematography | 0.754 | 0.887 | 0.854 |
+| composition | 0.636 | 0.653 | 0.648 |
+| effects | 0.942 | 0.876 | 0.881 |
+| lighting | 0.872 | 0.796 | **0.822** |
+| motion | 0.703 | 0.834 | 0.767 |
+| musical synchronization | 0.887 | 0.767 | 0.777 |
+| pacing | 0.983 | 0.969 | **0.995** |
+| technical quality | 0.787 | 0.805 | **0.882** |
+| temporal coherence | 0.843 | 0.929 | 0.921 |
+| visual coherence | 0.912 | 0.962 | 0.969 |
+| visual hierarchy | 0.713 | 0.645 | 0.664 |
+| issues (critical/high/medium/low) | 0/9/50/30 | 0/8/67/40 | 0/8/62/45 |
+
+- **Hero pulses** (the owner: restore them; make them dramatic, +40-60% on the gill and underside pixels at
+  the peak). The Critic's route-locked z: the elder's kick 16-17 (r1b 7-9), the lantern's clap 5, the bloom's
+  downbeat 4.4 (r1b: no response), the scree's kick 3; the umbra weak (2.7). The cairn, spire, veil, ridge and
+  ember are not measurable: they sit on sparse lanes (6-37 events). On frames (`pulse.py`, luma 50 ms after
+  each hit against 300 ms after, r1 -> r3): the elder's gills in s01 p90 x1.00 -> x1.38, in 9.1 x1.01 -> x1.49,
+  47.1's close-up x1.01 -> x1.24 (mean x1.36; clipped gill pixels at the peak 18% -> 3%); lantern x1.52, scree
+  x1.60, ridge x1.46, umbra mean x1.44. In the wides the gills are a few pixels (+1%).
+- **Small mushrooms** (the owner: pulse to the beat): violet pixels at a kick against 300 ms later: 5.1
+  +26%, 9.1 +35%; in the wides almost nothing left to pulse (41.1: 57 violet pixels, r1 13). The owner's answer,
+  "more light on the ground", cannot be reached in data: the ecology lights are chosen nearest-first and the
+  ground program ignores `groundGlow` (x10 gain moved the wides' ground 0-6%). An engine item.
+- **Camera Travel Beam** restored on the 22 phrase cuts, coloured through the song.
+- **E4's cows**: crossing mid-lift fixed (named, east first), and 57.1 re-framed from the south so they rise
+  side by side.
+- **Pacing:** novelty 92.6 s held after the last new information -> 39.9 s; static from the first frame 18 -> 5.
+- **Motion/cinematography down:** the Critic reads the travel beam's sweeps and the flashes as camera wobble
+  (the shots newly "shaky"/"wobble" are mostly beam cuts and big-gill shots); the engine's camera paths are
+  the same rigs and pass the trace's stability check (19 of 22, 20 of 22 on r4).
+- **The air** at fogSky 0.5, **the post** kept (ACES), **one moon** (env/rotation 0).
