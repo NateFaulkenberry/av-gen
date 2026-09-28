@@ -127,8 +127,10 @@ of it).
   drop's p99 is a cut at its 83rd frame and pulses every 14 frames that both renders share, which are
   routed, not the aurora's own). Below the sky band the open window is unchanged to 0.01 of a
   level on average; in the plateau and the drop 1.9% and 3.6% of the pixels move by more than 2 levels (at
-  most 62): the haze at the horizon -- GV3's fog takes the sky's radiance (ADR-918), and the glints are in
-  it -- and the glints' bloom along the tree line. To keep v5's average glint brightness,
+  most 63): the haze at the horizon -- GV3's fog takes the sky's radiance (ADR-918), and the glints are in
+  it -- the glints' bloom along the tree line, and the glints themselves, streaks along the curtains' rays.
+  All of it is this change: the same build rendering the drop window twice gives byte-identical frames
+  (120 of 120). To keep v5's average glint brightness,
   now steady, set "Glints" (`fx/aurora/sparkle`) to about 0.85 (0.3 x 2.8, measured in display luma, so an
   estimate to confirm on frames); at 0.3 the sky is steadier and a little darker. Evidence:
   `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/uireach-work/gv3-sky-before-after/`.

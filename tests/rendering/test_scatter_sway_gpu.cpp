@@ -83,8 +83,10 @@ void dump(const std::string& name, const gpu::Image8& a, const gpu::Image8& b) {
 }
 
 // Ferns on a flat meadow in a breeze, their response the GV3 fan plants' before gv3-look retuned them
-// (tip 0.08, catching 0.65 of the wind, stiffness 2.4 and a 1.2 kg tip). No skybox: its stars twinkle
-// with time, and the "stands still" arm compares two seconds.
+// (tip 0.08, catching 0.65 of the wind, stiffness 2.4 and a 1.2 kg tip). The "stands still" arm compares
+// two seconds, so nothing else may move with time: no skybox (its stars twinkle), and the camera does not
+// orbit (a composition camera's `orbitSpeed` defaults to 0.12 rad/s, integrated over the elapsed time --
+// the first two runs of that arm measured the camera turning, 61,506 pixels, not the ferns).
 struct Meadow {
     fs::path path;
     assets::AssetRegistry registry{testsupport::processTempDir()};
@@ -95,7 +97,8 @@ struct Meadow {
     explicit Meadow(const fs::path& fern) {
         std::string text = R"({
           "format": "avgen-scene", "version": 1, "name": "sway-gpu",
-          "camera": { "mode": 1, "position": [0.0, 2.0, 7.5], "target": [0.0, 0.5, 0.0], "fov": 42.0 },
+          "camera": { "mode": 1, "position": [0.0, 2.0, 7.5], "target": [0.0, 0.5, 0.0], "fov": 42.0,
+                      "orbitSpeed": 0.0 },
           "lights": [ { "name": "key", "type": "directional", "role": "key", "direction": [0.35, -0.8, -0.45],
                         "color": [1.0, 0.95, 0.85], "intensity": 2.4 } ],
           "environment": { "background": [0.02, 0.03, 0.05], "skybox": false },
