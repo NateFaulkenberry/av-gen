@@ -33,6 +33,13 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
     - Steps 4-6 are pending: the deploy key and secret, the variables, and the runner.
     - Decided: the runner will live on the private repository. `Rebuild.mp3` may go into it (the owner's own
       song); it is not wired in yet.
+- **The astronaut prototype is DONE:** `proto/astronaut-musicians` `7f1dc21d`, not pushed or merged. It needed no
+  engine change.
+  - The owner flagged helmets crumpling. The cause was the rig's automatic weights (the helmet was 37% head and the
+    rest neck, arms and clavicles). The fix is a rigid helmet plus half neck stiffness, taking the drummer from
+    7.66 cm to 0 and the pianist from 8.90 cm to 0.
+  - Report: `~/Desktop/av-gen-review/21-astronaut-musicians/REPORT.md`.
+  - Owner decisions pending: the texture, the keyboard, the drummer's corrections, and the CGTrader licences.
 - **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status
