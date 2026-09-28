@@ -121,6 +121,15 @@ REACTION_DROPS = {
     # saucer's own beam carries the reactive beam, close, in E5; the scout's reads as an event by its
     # shape and its motion. As copies they also put two beams on the same four sources.
     "scout-beam": (None, "a far craft's beam reads by its shape; the saucer's beam carries the music in E5"),
+    # The saucer's beam in E5 does not carry the music either. Judged whole (gv3-int r1b, the routes
+    # mapped to their bodies), none of its four links shows a response over 1,015 on-screen frames: bass ->
+    # rate z 1.0, level -> emission z 0.1, onset -> size z 0.1, low-mid -> speed z 1.2. What the level link
+    # does do is brighten it: +1.5 on the set piece's own brightness of 0.7, so through the loud riser the
+    # beam ran at two to three times its base, and 95.3's horse, seen through it, was a pale ghost in a
+    # clipped cyan fog (12.7% of the frame). The beam's brightness, density and width are the set piece's
+    # own, steady ("beam brightness (x)" in the Director panel's UFO set-piece rows); the riser's music is
+    # carried by the cutting, the roll on the fungi and the elder.
+    "visitor-beam": (None, "no visible response in the film; its level link overexposed the riser's beam"),
     # An idle alien swaying with the low-mid reads as dancing, which the aliens' behaviour (brief
     # section 10) does not ask for, and no framing the cut gives tide shows it (the evaluator, before
     # and after gv3-cast). The aliens keep their other musical links, on what they decide rather than
@@ -194,43 +203,147 @@ def wave_tracks():
 # ---- EDIT --------------------------------------------------------------------------------------------
 # Changes to the planner's items, matched by item key (fnmatch patterns). Each names what it changes
 # and why. `chain` entries merge into the route's chain; everything else replaces a route field.
-EDITS = [
-    # The heartbeat, kept from the first pass (plan section 1): the elder's gold on the kicks the track
-    # actually plays -- none in the pull-back or on the four gap beats, half strength in the muffled
-    # break, 20 ms ahead of each hit -- rather than the detector's low onsets, which fire 0-18 ms late
-    # and add four false hits on the gap beats, the valley's held breaths. A short fall, as the first
-    # pass measured it working: gone within the beat, the next kick lands on a dark gill.
-    #
-    # And at the plan's strength: +60% in the grooves, up to +100% in the drop (plan section 5). The
-    # proposal's +0.60 is scaled by the section's depth (0.19-1.0), so it peaked at x1.23 in the cold
-    # open and x1.4 in the grooves -- half the first pass's measured heartbeat (x1.6 on every kick):
-    # +2.1% of the elder's region in the open where the first pass had +4.1%, and +1.7% in s08
-    # against +3.5%, which the evaluator no longer counted as a response (v3-A, v3-B). At 1.0 it
-    # peaks x1.39 in the cold open, x1.63-1.67 in the grooves, x1.92 at the arrival and x2.0 in the drop.
-    ("kick.elder-2-gills", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 140.0}},
-     "the scored kicks (20 ms lead, silent gaps), falling within the beat, at the plan's +60% to +100%"),
-    ("kick.elder-2-under", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 170.0}},
-     "the scored kicks; the underside a little slower than the gills, so the pulse spreads"),
-    ("kick.elder-2-cap", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 200.0}},
-     "the scored kicks; the cap last and slowest"),
-    ("kick.elder-2-spores", {"source": "timeline.kick"}, "the scored kicks"),
-    ("kick.elder-practical", {"source": "timeline.kick"}, "the scored kicks: the light the elder throws echoes its heartbeat"),
-    # The clap, the lantern's layer (plan section 5: "a short emissive flare, its own colour"), on the
-    # claps the track plays (look.claps) rather than the analyser's snare band, which is the clap only
-    # in the bare sections and a 3.4-3.8 Hz flicker of shakers and synth in the lift, the arrival, the
-    # plateau and the drop. Stronger than proposed (+0.465): the lantern's close-ups are medium shots
-    # (6% of s04's frame), and at x1.29 in the riff it did not register there (v3-A); at 0.75 it
-    # flares x1.47 in the riff and x1.75 in the drop, under the elder's heartbeat.
-    ("clap.lantern-gills", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, a clear flare"),
-    ("clap.lantern-under", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, 35 ms after the gills"),
-    ("clap.lantern-cap", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, 70 ms after the gills"),
-    ("clap.lantern-spores", {"source": "timeline.clap"}, "the scored claps"),
-    # The beacons echo the lantern's clap 60 ms later, across the valley.
-    ("clap.beacons", {"source": "timeline.clap"}, "the scored claps: the lamps echo the lantern"),
+#
+# ---- the heroes' pulses (the owner, on r1: "restore the hero pulses in the mushrooms", "make it way
+# more dramatic / noticeable"; recorded as a standing preference for GV3) --------------------------------
+# Every hero answers the drums on its own lane, so the valley answers them across the frame without a
+# lockstep: the elder the kick (the heartbeat the film has always had), the lantern the clap, and the
+# rest the downbeat, beat 3 and the off-beats, each lane's second hero a little later. The lanes are the
+# score's own hits (look.lane: where the kick plays, so they fall silent in the pull-back and on the four
+# held beats, and at half strength in the muffled break), 20 ms ahead of each hit.
+#
+# Why they were not seen (gv3-int r1): the planner gave only the elder and the lantern a rhythm -- the
+# bloom a slow bar swell, the cairn the phrase, the spire and the veil slow levels, the umbra a breath,
+# ember, ridge and scree only the section changes -- and even the elder's heartbeat did not read close
+# up: its gills rest at the tone curve's shoulder, a flat peach on and off the kick (the gold pixels'
+# luma x0.98-1.00 at 50 ms against 300 ms after a kick, in 121.1, 65.1 and 47.1), so +60-100% had no
+# headroom. So the undersides now rest darker (HERO_PULSE) and flare far higher: the boost is
+# rest + amount x depth x the hit, the depth the section's energy between HERO_DEPTH_MIN and 1.
+#
+# Calibrated on the picture (gv3-int round 2). The first attempt (rest 0.4, +2.2, falls of 260-340 ms)
+# moved the elder's gill pixels +1-3% (p90) and +7-11% (mean) in s01 and 9.1: two causes, both measured.
+# (1) A route's fall is a time constant, not a length: 260 ms leaves 32% of a hit 300 ms later and 18%
+# when the next kick lands 0.46 s after it, so the gills never came down between kicks. (2) The boost
+# does not reach the picture linearly: stepping each hero's gills and underside through x0.05-3.2 on
+# frames (the ladder variant `vL`, build/gv3/int/vL/ladder-sheet.png) put the elder's close-up gills at
+# p90 luma 0.47 at x0.1, 0.67 at x0.2 and 0.76 at x0.4 -- already the tone curve's shoulder, past which
+# they only turn peach and clip (15% of them at x0.8, 30% at x3.2). So each hero rests where it is lit
+# but dim and flares to where it is brightest before it clips, its own numbers because the heroes'
+# materials differ by 20x (the elder's gills emit 3.0, the veil's 0.22), and each lane's fall lets the
+# glow come down before its next hit.
+HERO_LANES = {
+    #  hero        lane (a scored timeline source)   extra delay (ms)
+    "elder-2": ("timeline.kick", 0.0),
+    "lantern": ("timeline.clap", 0.0),
+    "bloom": ("timeline.downbeat", 0.0),
+    "umbra": ("timeline.offbeat", 0.0),
+    "spire": ("timeline.beat3", 0.0),
+    "cairn": ("timeline.offbeat", 40.0),
+    "veil": ("timeline.beat3", 50.0),
+    "ember": ("timeline.downbeat", 60.0),
+    "ridge": ("timeline.clap", 80.0),
+    "scree": ("timeline.kick", 90.0),
+}
+# The gills' and underside's emissiveBoost at rest and at a full-depth hit (the ladder: where each is
+# dim but lit, and where it is brightest short of clipping). The p90 luma of the lit pixels rest ->
+# peak on the ladder: elder 0.47 -> 0.76 (+60%, close-up), lantern 0.37 -> 0.63, bloom 0.27 -> 0.41,
+# umbra 0.38 -> 0.55, spire 0.31 -> 0.46, cairn 0.33 -> 0.65, veil 0.40 -> 0.56, ember 0.41 -> 0.69,
+# ridge 0.19 -> 0.35, scree 0.48 -> 0.71.
+HERO_PULSE = {
+    #  hero        rest   peak
+    "elder-2": (0.10, 0.60),
+    "lantern": (0.20, 3.2),
+    "bloom": (0.12, 3.2),
+    "umbra": (0.20, 3.2),
+    "spire": (0.20, 3.2),
+    "cairn": (0.20, 1.6),
+    "veil": (0.20, 3.2),
+    "ember": (0.20, 1.0),
+    "ridge": (0.20, 3.2),
+    "scree": (0.20, 1.6),
+}
+# Each lane's fall (the time constant, ms): the glow is down to 5% three of them after the hit, so a
+# kick every 0.46 s comes down in 0.3 s; the claps and off-beats (every 0.92 s) ring a little longer,
+# and the once-a-bar lanes longest -- the "250-350 ms tail" the owner asked for, as seen, not as typed.
+LANE_FALL = {"kick": 100.0, "clap": 150.0, "offbeat": 150.0, "beat3": 220.0, "downbeat": 220.0}
+# Per part: (the share of the hero's rise, its own stagger, the extra fall). The gills first and
+# fastest, the underside 35 ms later, the cap 70 ms later and gentler (it rests at 1: it is the
+# mushroom's colour, and adds a third of the hero's rise at most).
+HERO_PARTS = {"gills": (1.0, 0.0, 0.0), "under": (1.0, 35.0, 15.0), "cap": (0.3, 70.0, 30.0)}
+HERO_SPORES = (1.0, 90.0, 60.0)
+HERO_DEPTH_MIN = 0.7                        # the quietest section still pulses at 70% (was 0.188, then 0.5)
+# The elder's own light throws its heartbeat on the ground and the plants round it: the spill that
+# makes the pulse read in the wides, where the gills are a few pixels. The rig hangs it 0.2 m under the
+# composition's focal point, which is the cap, 12 m up: from there, at x5 on the kick, the ground round
+# the elder moved 1-3% (gv3-int r3). 7 m lower (the rig's distance below the focal point: the light at
+# the stem, 5 m over the ground) it lights the stem and a ring of ferns round it (vS: the lower half of
+# s01's frame 0.176 -> 0.238 from 1.5 to 7.5). It rests at half the rig's 3.0 and flares to x4 on the kick.
+ELDER_LIGHT = {"rest": 1.5, "amount": 5.0, "distance": 7.0}
+_DEPTH = {"depthSource": "section.energy", "depthMin": HERO_DEPTH_MIN, "depthMax": 1.0}
+_CHAIN = {"attackMs": 5.0, "envelope": "none", "remapEnabled": False, "curve": "linear", "threshold": "none"}
+
+
+def hero_rest(hero, part):
+    """A hero part's resting emissiveBoost: HERO_PULSE's rest for the gills and underside, 1 otherwise."""
+    return HERO_PULSE[hero][0] if part in ("gills", "under") else 1.0
+
+
+def _hero_edits():
+    out = []
+    for hero, (source, lane_delay) in HERO_LANES.items():
+        lane = source.split(".", 1)[1]
+        rest, peak = HERO_PULSE[hero]
+        for part, (share, stagger, fall) in HERO_PARTS.items():
+            amount = round(share * (peak - rest), 3)
+            out.append((f"*.{hero}-{part}",
+                        dict(_DEPTH, source=source, op="add", amount=amount, polarity="unipolar",
+                             chain=dict(_CHAIN, decayMs=LANE_FALL[lane] + fall, delayMs=lane_delay + stagger)),
+                        f"the {lane} lane, +{amount:g} at full depth over a resting {hero_rest(hero, part):g}"))
+        amount, stagger, fall = HERO_SPORES
+        out.append((f"*.{hero}-spores",
+                    dict(_DEPTH, source=source, op="multiply", amount=amount, polarity="unipolar",
+                         chain=dict(_CHAIN, decayMs=LANE_FALL[lane] + fall, delayMs=lane_delay + stagger)),
+                    f"the {lane} lane"))
+    out.append(("kick.elder-practical",
+                dict(_DEPTH, source="timeline.kick", amount=ELDER_LIGHT["amount"],
+                     chain=dict(_CHAIN, decayMs=LANE_FALL["kick"] + 10.0)),
+                f"the scored kicks: the light the elder throws carries its heartbeat onto the ground round it, "
+                f"x{(ELDER_LIGHT['rest'] + ELDER_LIGHT['amount']) / ELDER_LIGHT['rest']:g} at a full-depth kick"))
+    return out
+
+
+# ---- the small glowing mushrooms (the owner: "a bunch of tiny glowing mushrooms all over glowmere, can
+# we make those pulse to the beat") ------------------------------------------------------------------
+# A valley-wide pulse on the beat through every small mushroom layer, staggered by layer so it reads as
+# the valley rather than a strobe: the fungi (violet, 1,001 of them) on the kick, the shelf fungi (teal)
+# on the off-beats, the beacons (cyan lamps) on the clap. They had only the detector's onsets at
+# +0.18-0.35 (which gv3-look found did not read at 540p) and the elder's rings, which fade out by 45 m.
+# The light the layers cast follows their gain (ADR-905), so the ground round them pulses with them.
+# The elder's rings and the drop's ring stay on top (their fields multiply the same emission).
+# Measured at +1.6 with a 260 ms fall (r2b): in 5.1 and 9.1 the violet fungi's pixels grew 22-26% at a
+# kick, their luma x1.01-1.12; in the grand wides the fog left 13-53 violet pixels in the whole frame to
+# pulse (the air at half brings back 83 in 41.1). So a bigger hit on each lane's fall (LANE_FALL), which
+# lets each come down before the next: the kick's fungi from a trough of about x1.5 to x1 between kicks.
+SCATTER_PULSES = {
+    #  item            lane                 amount  delay
+    "kick.fungi": ("timeline.kick", 3.0, 60.0),
+    "hats.shelf-fungi": ("timeline.offbeat", 2.4, 0.0),
+    "clap.beacons": ("timeline.clap", 2.2, 60.0),
+    "hats.flowers": ("timeline.offbeat", 0.9, 30.0),
+}
+
+
+def _scatter_edits():
+    return [(item, dict(_DEPTH, source=source, amount=amount, op="add", polarity="unipolar",
+                        chain=dict(_CHAIN, decayMs=LANE_FALL[source.split(".", 1)[1]], delayMs=delay)),
+             f"the {source.split('.', 1)[1]} lane, +{amount:g} at full depth")
+            for item, (source, amount, delay) in SCATTER_PULSES.items()]
+
+
+EDITS = _hero_edits() + _scatter_edits() + [
     # The seams thin in the quiet sections but never vanish: the proposal's x0.70 floor took the tears
     # below their safe range (the validator's OVER_SATURATED warning); x0.80 keeps 0.28.
     ("section.water-tears", {"chain": {"remapOutMin": 0.8}}, "the quiet sections' floor held inside the tears' safe range"),
-    # (The bloom's two-bar breath is phased onto the bass glide in SOURCE_PARAMETERS.)
 ]
 # Items taken out, and why. Each is something the film already does another way.
 DROPS = {
@@ -366,6 +479,15 @@ def install(project, tuned):
     project["sources"] = [s for s in project.get("sources", []) if (s["kind"], s["name"]) not in names] + \
         tuned["sources"]
     project.setdefault("parameters", {}).update(tuned["parameters"])
+    # The heroes' undersides rest darker, so each hit flares out of the dark (HERO_PULSE): the parameter
+    # an artist sees as the part's emissive boost in the Parameters panel, under nodes/<hero>-<part>.
+    for hero in HERO_LANES:
+        for part in ("gills", "under"):
+            project["parameters"][f"nodes/{hero}-{part}/emissiveBoost"] = hero_rest(hero, part)
+    # And the elder's light rests lower, so its kick throws a ring of light round it (the Lights panel's
+    # elder-practical intensity; the rig's own 3.0 is GV2's, shared, and not edited).
+    project["parameters"]["lightrig/GlowmereValley/elder-practical/intensity"] = ELDER_LIGHT["rest"]
+    project["parameters"]["lightrig/GlowmereValley/elder-practical/distance"] = ELDER_LIGHT["distance"]
     plans = [p for p in project.get("directingPlans", []) if p.get("id") != tuned["plan"]["id"]]
     project["directingPlans"] = plans + [tuned["plan"]]
 

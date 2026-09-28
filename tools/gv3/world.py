@@ -536,11 +536,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Check the closed valley: the survey, the filmed ground, the edge")
     parser.add_argument("--check", action="store_true", help="run the checks (the default)")
     parser.add_argument("--trace", help="an avgen_cast_trace --camera JSON, to check every sampled frame")
+    parser.add_argument("--project", help="the generated project to check (default: examples/world/glowmere-valley-3.json); "
+                                          "its scene is the one it names, beside it")
     args = parser.parse_args()
     root = pathlib.Path(__file__).resolve().parents[2]
     source = json.loads((root / "examples/world/glowmere-valley-2-multicam.scene.json").read_text())
-    scene = json.loads((root / "examples/world/glowmere-valley-3.scene.json").read_text())
-    project = json.loads((root / "examples/world/glowmere-valley-3.json").read_text())
+    project_path = pathlib.Path(args.project) if args.project else root / "examples/world/glowmere-valley-3.json"
+    project = json.loads(project_path.read_text())
+    scene = json.loads((project_path.parent / project["assets"]["scene"]["path"]["path"]).read_text())
 
     def world_of(s):
         return next(n["world"] for n in s["nodes"] if "world" in n)

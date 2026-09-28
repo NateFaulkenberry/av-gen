@@ -321,6 +321,11 @@ def main():
             print("cut:", p, file=sys.stderr)
         return 1
     install_cut(project, scene, shots)
+    if not args.scout:
+        # The Camera Travel Beam on the camera changes that open a phrase (look.apply_travel_beam).
+        beam_cuts = look.apply_travel_beam(project, shots)
+        report.append(f"travel beam: fires on {len(beam_cuts)} cuts, "
+                      + ", ".join(f"{sid} (bar {b}, {t:.2f} s)" for t, sid, b in beam_cuts))
 
     render = project.setdefault("render", {})
     # The render path resolves against the project's folder. Into build/, which git ignores: the film
