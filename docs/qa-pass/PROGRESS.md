@@ -48,6 +48,15 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - **It is a feature pass:** the UFO warp and the pulse lifecycle are new behaviour. That is allowed there, not
   in the QA pass. It gets W1's performance envelope, so the warp's frame cost is measured.
 
+## Queued after this pass: astronaut musician prototype (runs in parallel with the art pass)
+- **Brief:** `docs/prototypes/astronaut-musicians/00-brief.md`, the owner's words, 2026-09-28.
+- **The agent:** one dedicated agent, the `astronaut-prototype` type (`~/.claude/agents/`: opus, effort max).
+- **Launch gate:** the QA pass is complete, then the owner restarts Claude Code, then the coordinator confirms the
+  Blender MCP tools are present. Blender MCP is NOT registered yet: the Blender add-on is installed, but Claude Code
+  has no server configured. The registration steps are in the brief's header.
+- **Assets:** `~/Desktop/musician_assets/`. Their licences are unknown, so they are never committed.
+- **GV3 is untouched by this task.**
+
 ## Findings
 - The repository's GV3 (`334c4cf6`, the Phase 3 foundation) is older than the r7b project on the Desktop, which is
   the one the owner opens.
