@@ -62,6 +62,13 @@ cmake-build-*/
 # on disk. A worktree without them resolves the animals as missing assets and says so.
 /assets/farm/*.glb
 
+# The astronaut musician prototype (docs/prototypes/astronaut-musicians/): four GLBs built from the
+# owner's source files by tools/make_astronaut_musicians.py. The sources' licences are not all
+# established (assets/musicians/ATTRIBUTION.md) and the repository is public: never commit, cache or
+# upload the GLBs or anything else derived from those files.
+/assets/musicians/*.glb
+/assets/musicians/*.blend
+
 # Render evidence produced for a change's review (ADR-246's movies and stills, and whatever the
 # next one needs). 80 MB for one feature and regenerable from the queue file beside it, which is
 # the part worth keeping -- so the queue is committed with the ADR and the pixels are not.
