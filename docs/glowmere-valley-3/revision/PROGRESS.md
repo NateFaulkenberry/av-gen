@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **21:40: gv3-int is DONE; THE REVIEW CANDIDATE r5 IS IN THE REVIEW FOLDER** (`revision/integrate/r5-preview-960x540.mov`,
+  `README-r5-preview.md`, sheets in `r2-r5/`). `gv3/integrate` `b5bd8bc7` is merged into `gv3/production` (`f5885b45`).
+  - **Critic, whole film, iteration 0 -> r5:**
+    - technical quality 0.787 -> 0.923; character staging 0.866 -> 0.939; cinematography 0.754 -> 0.852;
+      motion 0.703 -> 0.762; pacing 0.983 -> 0.995; effects 0.942 -> 0.945; musical sync 0.887 -> 0.885;
+    - lighting 0.872 -> 0.845; visual hierarchy 0.713 -> 0.664;
+    - issues 0/9/50/30 -> 0/8/50/45.
+    - Novelty held 92.6 s (r1) -> 29.3 s. The elder's route z is 28-29.
+  - **The final command:** `python3 tools/make_glowmere_valley_3.py --final --final-trace build/gv3/int/r5/cast.json && python3 tools/gv3/ufo.py`.
+  - **Before the 4K final:** engine-5 (behave, suites running) changes the aliens, so re-trace. ecolight (the ground
+    glow the owner chose) is still in progress. The final waits for both plus the owner's review of r5.
 - **21:20: behave is DONE** (`35b94e53`, suite 3,813 tests, 0 failed) and **merged into `integrate/revision`**
   (`ae99ff8c`; the ADR index conflict was resolved, rows in order). cihealth + behave are building, then the full
   CPU suite, the GPU suite, main, and engine-5 for gv3-int's final re-trace.
