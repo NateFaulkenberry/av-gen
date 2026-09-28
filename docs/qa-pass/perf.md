@@ -3,54 +3,47 @@
 Agent 1's working notes. Kept current so a successor can resume. Worktree `../av-gen-qa-perf`, branch `qa/perf`,
 based on `77ea4247` (+ `f417728b`, the QA docs).
 
-## Resume here (second W1 agent, 2026-09-28 ~15:40)
+## Resume here (W1 complete, 2026-09-28 ~16:45)
 
-**State of the branch.** `qa/perf` = `f417728b` (QA docs) + `edf62e2d` (ADR-950, tools, diagnostics) + `97925c18`
-(ADR-951) + `cd1db417` (first checkpoint) + `af512f8b` (clean baseline; `no-ecolight` arm and `--prefix` in
-`tools/make_gv3_state_arms.py`) + later docs commits. Nothing pushed. No C++ change since `97925c18`.
+**W1 is done.** Nothing is owed. The final verdicts are at the end of this file; the owner's summary is
+`docs/qa-pass/perf-summary.md`.
 
-**ADR-951's status.** The coordinator relayed that the owner accepted ADR-951. The W1 agent did not edit the ADR's
-status line on the strength of a relayed message; the coordinator or the owner should change
-`docs/decisions/ADR-951-*.md` ("Status") and its row in `docs/decisions/README.md` to Accepted.
+**The branch.** `qa/perf` = `f417728b` (QA docs) + `edf62e2d` (ADR-950, tools, diagnostics) + `97925c18` (ADR-951)
++ `cd1db417` (first checkpoint) + `af512f8b` (clean baseline; `no-ecolight` arm and `--prefix` in
+`tools/make_gv3_state_arms.py`) + `4754bf69` and the final docs commit. Not pushed, not merged. No C++ change since
+`97925c18`.
 
-**Scratch, never commit** (all `??` or gitignored):
-- `examples/world/_qa-gv3-r7b{,.scene}.json` (r7b), `_qa-b-*` (hypothesis-B arms plus `no-ecolight`),
-  `_qa-c-gv2mc-{control,no-ecolight}` (GV2 multicam arms for the bisect). **During a test-suite run they are moved
-  to `build/qa-hold/`** (a CPU test scans `examples/**/*.scene.json`); move them back afterwards. Remove at the end
-  with `tools/make_gv3_state_arms.py examples/world/_qa-gv3-r7b.json --clean` (the `_qa-b-` arms),
-  `... --clean --prefix _qa-c-gv2mc-`, and `rm examples/world/_qa-gv3-r7b*.json`.
-- `build/qa-bins/`: frozen binaries. **A binary reads shaders from its own source tree at run time** (the path
-  is compiled in), so a frozen binary from a bisect worktree is only valid while that worktree is still at its
-  commit: `avgen-3e09f9e1` (worktree now elsewhere: invalid), `avgen-29e6918e` (q-834, now at `83a12334`:
-  invalid), `avgen-0b623b88` (q-pre834: valid), `avgen-22ce5c3d` (q-0916: valid), `avgen-ad5623d2` (q-945, now at
-  `3f720bfa`: invalid). The `avgen-base-*`, `fix950*` and `gate951` binaries read `av-gen-qa-perf/shaders`,
-  which is unchanged since `77ea4247`: valid.
-- `build/qa-runs/`: raw results and batch scripts (`baseline.sh`, `hypB.sh`, `hypC.sh`, `hypC2.sh`, `hypC3.sh
-  <out> name=worktree ...`, `gpuattr.sh`, `uibuild.sh`, `live.sh`, `builds.sh`, `builds2.sh <worktree...>`,
-  `suites.sh`, `wait-quiet.sh`).
+**ADR-951's status.** The coordinator relayed that the owner accepted ADR-951. The W1 agent did not change the
+ADR's status line on the strength of a relayed message; the coordinator or the owner should change "Status" in
+`docs/decisions/ADR-951-*.md` and its row in `docs/decisions/README.md` to Accepted.
 
-**Bisect worktrees now:** q-834 at `83a12334` (built), q-pre834 at `0b623b88` (built), q-0916 at `22ce5c3d`
-(built), q-945 at `3f720bfa` (built). Remove all four with `git worktree remove` when done.
+**Tests** on the head build (C++ = `97925c18`; CMake reconfigured and every target rebuilt at 14:40), run one after
+the other under gpu-lock, with the `_qa-*` scratch projects moved out of `examples/` for the duration:
+- `avgen_tests`: **exit 0**; 3,843 cases, 3,823 passed, 19 skipped, 1 failed as expected (the `[!shouldfail]`
+  slope lean, `test_character_lab_slopes.cpp:187`, "with expansion" present); 9,124,072 assertions
+  (`build/qa-runs/cpu-suite-final.log`).
+- `avgen_render_tests`: **exit 0**; 549 cases, 548 passed, 1 skipped (`test_texture_share.cpp:243`); 617,315
+  assertions (`build/qa-runs/gpu-suite-final.log`).
 
-**Checklist.**
-- [x] 1. Baseline: clean retake done (section 1, "Clean retake").
-- [x] 2. Per-shot sweep (section 2).
-- [x] 3. Attribution: the sightline (sections "First probe", 2, 6); the residual GPU cost on the fixed build
-  (section 3: the scene pass, no single feature).
-- [x] 4. Complexity report (section 4).
-- [x] 5. Hypothesis B (section 5).
-- [~] 6. Hypothesis C: step 1 (ADR-834) and step 2's engine-update part (`0fd83284`, ADR-893/894) and its ADR-945
-  GPU part are attributed. **Open:** +1.0 ms of scene pass somewhere in the 21 commits `0b623b88..22ce5c3d`.
-  `hypC3-r1` measured `3f720bfa` (the midpoint) while the owner was using the machine and is not usable for
-  sub-ms GPU; re-run `hypC3.sh hypC3-r1b c0b623b88=av-gen-qa-bisect-q-pre834 c3f720bfa=av-gen-qa-bisect-q-945
-  c22ce5c3d=av-gen-qa-bisect-q-0916` when quiet, then halve again with q-834 and q-945 (their old commits are done).
-- [x] 7. Editor (section 7): navigation and the `ui.build` spike (ADR-440's sampler) explained.
-- [~] 8. Fixes ADR-950 and ADR-951. Test suites on the head build: see "Tests" below.
+**Cleaned up.** The `_qa-b-*` and `_qa-c-gv2mc-*` arms are removed (regenerate with
+`tools/make_gv3_state_arms.py <project> [--only ...] [--prefix ...]`). The four bisect worktrees are removed, so
+the frozen bisect binaries in `build/qa-bins/` (`avgen-3e09f9e1`, `-29e6918e`, `-0b623b88`, `-22ce5c3d`,
+`-ad5623d2`) no longer have their shader trees and must not be run again (**a binary reads shaders from its own
+source tree at run time**). The `avgen-base-*`, `fix950*` and `gate951` binaries read this worktree's `shaders/`,
+unchanged since `77ea4247`, and remain valid. **Kept:** `examples/world/_qa-gv3-r7b{,.scene}.json` (untracked; r7b
+as measured, the scripts reference it; `examples/world/glowmere-valley-3.json` on `qa/coord` is the same project
+with a relative song path). Delete it before any merge-time test run, or leave it: it is untracked and never
+committed.
 
-**Measurement rules as practised here.** Use `tools/perf_sweep.py`: gpu-lock, arms interleaved, the camera label as
-state proof, the GPU-error count, and the load and other `avgen*` processes recorded per run. Report the median of
-3 with min-max. Headless is the offline loop; `--profile-cpu` (with `--start-at`) is the live editor. Sub-ms GPU
-differences need a quiet machine: the owner's own use (browser, video) moves GPU timings as much as a test suite.
+**Scripts and raw results** are in `build/qa-runs/` (gitignored): `baseline.sh`, `hypB.sh`, `hypC.sh`, `hypC2.sh`,
+`hypC3.sh <out> name=worktree ...`, `gpuattr.sh`, `uibuild.sh`, `live.sh`, `builds.sh`, `builds2.sh`, `suites.sh`,
+`wait-quiet.sh`, and every `*.json` / `*.log`.
+
+**Measurement rules as practised here.** `tools/perf_sweep.py`: gpu-lock, arms interleaved, the camera label as
+state proof, the GPU-error count, and the load and other `avgen*` processes recorded per run. Median of 3 (5 for
+sub-ms GPU) with min-max. Headless is the offline loop; `--profile-cpu` (with `--start-at`) is the live editor.
+Sub-ms GPU differences need a quiet machine: the owner's own use (browser, video) moved GPU timings as much as a
+test suite did (`hypC3-r1`'s GPU numbers are discarded for that reason; only its CPU ratio is used).
 
 ## 4. Structural complexity: GV2 multicam against GV3 r7b (static)
 
@@ -604,8 +597,23 @@ round-tripped through the arm generator, `noeco` the same with the ecology light
     gone (13.4 -> 13.5). Fewer lights (206 -> 115) cost more because each pool light now reaches twice its pool's
     radius and so covers far more froxels and fragments. This is the look the owner asked for in ADR-945 (glow
     pools in the wides), so it is recorded as a **cost of an accepted look change, not a defect**.
-  - **+1.0 ms of scene pass between `0b623b88` and `22ce5c3d`** (12.3 -> 13.4 with the ecology lights off), in
-    one of those 21 commits. Not yet narrowed; see "Resume here". 1 ms of a 19 ms GPU frame.
+  - **+1.1 ms of scene pass between `0b623b88` and `22ce5c3d`** (12.2 -> 13.4 with the ecology lights off). Narrowed
+    with `hypC3.sh` (5 interleaved repeats per round, no other `avgen*` process, max load 5.8; raw
+    `build/qa-runs/hypC3-r1b.json`, `hypC3-r2.json`). Scene pass with the ecology lights off:
+
+    | build | r1b | r2 |
+    |---|---:|---:|
+    | `0b623b88` | 12.3 | 12.2 |
+    | `d202eb53` (signals, routes and their integration) | | 12.5 |
+    | `7b030ac4` (ADR-903 to 906, emission) | | 13.0 |
+    | `3f720bfa` (song, camera, reactivity, water) | 13.1 | |
+    | `22ce5c3d` | 13.5 | 13.4 |
+
+    It is a creep, not one step: about +0.3 ms up to `d202eb53` (at the edge of the noise), **+0.5 ms at the
+    emission merge `7b030ac4`** (the largest single step), nothing measurable to `3f720bfa`, and +0.4 ms somewhere
+    in `3f720bfa..22ce5c3d` (set pieces, characters, render, navfix, behave, uireach). Each part is below 0.5 ms
+    of a 19 ms GPU frame at identical triangles; they were not narrowed further, and none is treated as a
+    defect: they are the shading cost of features the revision added.
 
 ## 7. The live editor
 
@@ -652,23 +660,31 @@ table gives the main-thread FRAME p50 and `engine.update` p50 (ms), median of 3.
   playhead holds a frame with more characters in view at distance. On gate951 the two are equal (16.7 ms,
   vsync). Not investigated further.
 
-## Verdicts so far
+## Verdicts (final)
 
-- **A (scene complexity or renderer limit):**
-  - It is not the collapse. With the sightline gone, every GV3 shot is 30-43 FPS at 720p and 40-58 FPS at 360p
-    headless.
-  - What remains is the renderer's view-dependent cost: the scene pass is 19 ms on a wide against 6.5 ms on a
-    close-up at 720p, with 614k against 135k triangles.
-  - The envelope: at 720p a GV3 wide is GPU-bound at about 24 ms of GPU (about 30-40 FPS).
-- **B (bad project state):**
-  - No. Ten removal arms were measured, and none moved the frame beyond the spread except removing the characters
-    themselves.
-  - The static report finds no duplicate, dead or orphaned state. The world is GV2 multicam's.
-- **C (engine regression):**
-  - Yes, and it is the cause. ADR-834 (`29e6918e`, 2026-09-25) added a per-frame, per-in-shot-character
-    sightline whose cost is linear in distance (r = 0.975 across 73 shots).
-  - A further step between `29e6918e` and `77ea4247` made each sightline about 1.7x dearer (to bisect), and a
-    separate step added about +2.5-3 ms of GPU (to bisect).
-- **Fixes:** on s66 at 720p, headless, 402.8 ms against 33.4 ms.
-  - ADR-950 accounts for 402.8 -> 254.7 ms (-148 ms, bit-identical).
-  - ADR-951 accounts for 254.7 -> 33.4 ms (-221 ms). It needs the owner's acknowledgement.
+The owner-facing summary is `docs/qa-pass/perf-summary.md` (copied to `~/Desktop/av-gen-review/19-qa-pass/`).
+Numbers below are the clean retake (section 1) unless stated.
+
+- **A (scene complexity or renderer limit): not the collapse; it is what remains.**
+  - With the sightline gone, GV3 r7b's wides are 31-33 FPS at 720p and 43-52 FPS at 360p headless; close-ups
+    63-67 FPS at 720p.
+  - A fixed wide is GPU-bound at 720p: s66 is 23.5 ms of GPU in a 32.2 ms frame, 18.6 ms of it the scene pass,
+    against 3.4 ms on the s27 close-up (614k against 135k triangles). No optional feature owns it (section 3:
+    each kill switch saves 0.6-1.9 ms). The scene pass is about 9.4 ms fixed plus about 10 ms per megapixel;
+    extrapolated, a GV3 wide at 1080p is near 24 FPS on this machine.
+- **B (bad or stale project state): no.** Ten removal arms (section 5), none outside the control's spread on the
+  fixed build; only removing the characters moved the old build, for the sightline's sake. The static report finds
+  no duplicate, dead or orphaned state; the world is GV2 multicam's.
+- **C (engine regression): yes, and it is the cause.** On the same GV2 multicam file (section 6):
+  - ADR-834 (`29e6918e`): a per-frame sightline per in-shot character, cost linear in distance (r = 0.975 across
+    73 shots). Engine update 3.2 -> 21.7 ms.
+  - ADR-893/894 (`0fd83284`, merged in `0b623b88`): each terrain height query dearer, each sightline 1.79x.
+    Engine update 21.7 -> 38.8 ms. Neutralised by ADR-951 (3.3 ms after the fix against 3.2 before ADR-834).
+  - GPU +1.9 ms (+11%) at identical geometry: ADR-945's glow pools +1.3 ms (an accepted look change) and a
+    +1.1 ms creep across `0b623b88..22ce5c3d`, largest step +0.5 ms at the emission merge `7b030ac4`.
+- **Fixes:** GV3 r7b s66 at 720p headless, 376.2 ms -> 32.2 ms (clean retake; the contended first take read
+  402.8 -> 33.4).
+  - ADR-950 (`edf62e2d`): 376.2 -> 235.4 ms, bit-identical output.
+  - ADR-951 (`97925c18`): 235.4 -> 32.2 ms. An unread `character.<name>.visibility` now reads 0.
+- **Editor:** the same fix takes a paused wide from 81.8 ms to 16.7 ms (vsync). A separate two-frame hitch about
+  2.6 times a second is ADR-440's unsaved-changes sampler (section 7); not changed, listed for the owner.
