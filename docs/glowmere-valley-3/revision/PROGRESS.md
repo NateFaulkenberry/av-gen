@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **MERGED (22:30): main is `22ce5c3d`**, now with cihealth (ADR-940-941, the sanitizer partition), behave
+  (ADR-935-936, 944) and uireach (ADR-937-939, the ADR-933 amendment).
+  - Suites: GPU 546/547 (1 skipped). CPU 3,830/3,831: uireach's retry-memory test lost its control arm to behave's
+    ADR-936. It was fixed in the test only (`22ce5c3d`: the fixture supplies the stall, as `test_urgent_retries`
+    does). Re-run on the fix: `[adr933]`, `[adr936]`, `[adr944]` and `[hygiene]` pass (20 cases), and both
+    retry-memory ctest entries pass.
+  - Pushed (`983221a9..22ce5c3d`) and merged into `gv3/production` (`4919a413`).
+  - **`av-gen-engine-5` is BUILT** at `22ce5c3d`, with `BUILD-READY`.
+  - **The 4K final waits for:** ecolight (the ground glow), and the owner's review of r5. Then: switch to the final
+    engine; re-trace (behave changes the aliens); re-check; set `fx/aurora/sparkle` to about 0.85 (steady glints);
+    the `--final` generation and the 4K render.
 - **22:00: uireach is DONE** (`7f20403a`) and **merged** (`9f6f0674`; ADR index rows 933-944 in order).
   **`integrate/revision` = main + cihealth + behave + uireach.** It is built (3,831 tests). **Suites (22:45):**
   - GPU: 547 cases, 546 passed, 1 skipped, exit 0; overlap was CPU only.
