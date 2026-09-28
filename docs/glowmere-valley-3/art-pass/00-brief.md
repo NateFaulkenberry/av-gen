@@ -332,3 +332,21 @@ Minimize rendering. Prefer inspection and targeted verification wherever possibl
 If the final result is strong and the requested changes are satisfied, **stop**. Do not invent additional art changes simply because the critic can identify things that could theoretically be improved.
 
 This is a refinement pass on an already successful GV3 — preserve the good work and make these specific areas production-ready.
+
+---
+
+## Addendum (owner, 2026-09-28): the aurora answers the bass
+
+The QA pass's state audit found that the aurora's audio sensitivity is 0 in what renders (`fx/aurora/audioSensitivity`,
+`tools/gv3/look.py`). The owner's decision: **the aurora should react to the audio, with a similar low-energy bass
+pulse.**
+
+Context for the implementer. `look.py` records why the response was zeroed. The aurora's built-in audio response
+and its spectrum shape read the analyser every frame, unsmoothed, and made the sky jump up to 44% between two frames
+on a kick. Do not simply set those back to their old values. Give the aurora a slow, low-energy pulse on the bass
+instead, in the style of the project's other smoothed bass routes (for example `audio.bass ->
+nodes/valley/water/ripple` with an attack and a decay, in `look.py`). It should be a gentle swell and fall of the
+curtain's brightness and/or lift that you can read over the bass, never a frame-to-frame flicker. Also keep the
+existing slow `lead.aurora` response. Measure the frame-to-frame change of the sky over the arrival wide and the
+drop, as `look.py` did, and state the numbers. Resolve the aurora's duplicate block and parameter values (the audit's
+table) so that the Effects panel and what renders agree.

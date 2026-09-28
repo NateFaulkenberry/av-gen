@@ -22,6 +22,13 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   - The `astronaut-prototype` agent, in `../av-gen-astro` (branch `proto/astronaut-musicians` from main `77ea4247`, with the ignored assets symlinked per file).
   - A resumed W1 agent, in `../av-gen-qa-perf`, working from perf.md's "Resume here".
   - The CI monitor, in `../av-gen-qa-ci`. At launch, qa/ci was at `f20739dd`. On run 36434165586, TSan, UBSan, the ASan build, heavy-2 and heavy-3 had passed; heavy-1, rest-a and rest-b were still running. Run 36434180499 was still running.
+- **Owner decisions, 2026-09-28:**
+  - ADR-951 is accepted (W1 was told).
+  - The aurora should react to the audio with a similar low-energy bass pulse. This is added to the art-pass brief
+    as an addendum, because it is a look change. It is not a revert of the per-frame response, which made the sky
+    jump on the kick.
+  - The owner asked for detailed steps to set up the private asset repository for GPU CI. They were given in chat;
+    the source is `docs/development/gpu-ci-private-assets.md` on qa/ci.
 - **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status
