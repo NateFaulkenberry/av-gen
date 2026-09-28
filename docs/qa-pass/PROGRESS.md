@@ -10,6 +10,9 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - Each starts with measurement or triage only. No changes are made before its baseline is recorded.
 
 ## Completed
+- 2026-09-28, **the old worktrees removed** (owner's decision): all 17 GV3-era worktrees. Each had a clean tracked
+  tree, and their branches are kept. gv3-int's review snapshots from r1 to r7b and the cast trace (2.0 GB) were
+  moved to `~/Documents/GitHub/av-gen-archive/gv3-int-review-snapshots/` first.
 - 2026-09-28, **W3 cleanup** (`qa/clean` `b8edd995`, merged into qa/coord `3b3d323c`):
   - **GV3 r7b installed** as `examples/world/glowmere-valley-3{,.scene}.json`, with the song path relative. It
     loads with 0 errors: 105/105 routes, 130/130 tracks, 18/18 effects, 73 shots. Main's generator reproduces it
@@ -95,7 +98,4 @@ Known from the GV3 wrap-up, and not yet triaged:
   3.24 m/s ... rate matching is on and saturated". This fits the owner's report of pre-footstep sliding.
 
 ## Decisions Required From Human
-- **Old worktrees:** 15 of the 17 GV3-era worktrees have their HEAD already in main. `av-gen-gv3` and
-  `av-gen-gv3-world` each hold 1-2 commits of notes only. Removing a worktree also deletes its `build/`, and
-  `av-gen-gv3-int/build/gv3/int/` holds every review snapshot from r1 to r7b and the cast trace. Should they be
-  removed, and should that snapshot directory be kept?
+(none open)
