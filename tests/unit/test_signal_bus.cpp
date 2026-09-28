@@ -147,3 +147,20 @@ TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[s
     CHECK_FALSE(bus.event(audio.onset));
     CHECK_FALSE(bus.event(audio.beat));
 }
+
+// ADR-951: `sought` answers "has any consumer looked this name up", which is what lets an expensive
+// producer (a character's sightline) skip a signal nobody reads. A miss counts -- a route bound
+// before its producer first declares has still asked -- and being sought is sticky.
+TEST_CASE("SignalBus remembers which names were sought, hits and misses", "[signals][adr951]") {
+    avgen::signals::SignalBus bus;
+    const auto id = bus.declare("character.rook.visibility");
+    bus.declare("character.rook.inShot");
+    CHECK_FALSE(bus.sought("character.rook.visibility")); // declaring is not asking
+    bus.set(id, 0.5f);
+    CHECK_FALSE(bus.sought("character.rook.visibility")); // nor is producing
+    REQUIRE(bus.find("character.rook.visibility").has_value());
+    CHECK(bus.sought("character.rook.visibility"));
+    CHECK_FALSE(bus.sought("character.rook.inShot"));     // only the name asked for
+    CHECK_FALSE(bus.find("character.tide.visibility").has_value());
+    CHECK(bus.sought("character.tide.visibility"));       // a miss is still a request
+}

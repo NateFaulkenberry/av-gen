@@ -116,6 +116,7 @@ struct AppOptions {
     // *scene* document (ADR-245) and therefore cannot be persisted by saving the project.
     std::optional<std::filesystem::path> saveScene;
     bool autoplay = false;
+    std::optional<double> startAt; // --start-at: live editor only, seek before the first frame
     int frames = -1; // exit after this many frames (-1 = run until closed)
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
     // Performance work (docs/application-performance.md). --ui-script drives the editor with a

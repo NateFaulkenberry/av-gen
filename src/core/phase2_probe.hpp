@@ -39,6 +39,10 @@ struct Frame {
     double updModulationMs = 0.0;
     double updControllerMs = 0.0; // controller_->update(): the scene, incl. ensureBuilt/flatten
     double updOtherMs = 0.0;
+    // ...and inside it, ADR-834's per-character sightlines (QA pass W1): how many were marched and
+    // how far, so a frame's cost can be tied to what the camera saw.
+    std::uint64_t sightlines = 0;
+    double sightlineMetres = 0.0;
 
     // ---- SceneRenderer::uploadMeshes ---------------------------------------------------------
     // The all-or-nothing GPU re-upload. Counted, not only timed: "render.record spiked" is a
