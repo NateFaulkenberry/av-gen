@@ -117,7 +117,10 @@ BASE = {
 }
 
 # Effects the film does not use, and why.
-REMOVED_EFFECTS = {}
+REMOVED_EFFECTS = {
+    # The owner: the hero pulse on the ten hero mushrooms and the five aliens, "NOT the UFO".
+    "visitor-hero-pulse": "the saucer is no hero of the ground; the owner wants the pulse on the mushrooms and aliens only",
+}
 
 # The Camera Travel Beam (ADR-207, ADR-702), restored at the owner's request after r1: "the world effect
 # that we used to have, the light pulse that swept across the world during camera changes". The first
@@ -165,9 +168,24 @@ TRAVEL_BEAM_ARC = {
     "lead-forward": ((0.20, 1.00, 0.55), (0.70, 1.00, 0.82)),     # the aurora carries the lead
     "drop": ((1.00, 0.62, 0.30), (1.00, 0.86, 0.66)),             # the valley rebuilt, gold
 }
-REMOVED_EFFECT_TYPES = {
-    "groundPulse": "fired only while the Song-mode shot spans spotlit a hero; the cut is authored now",
-}
+REMOVED_EFFECT_TYPES = {}
+
+# The Hero Pulse (GV2 multicam's `groundPulse` effects, one per hero: the ten mushrooms and the five
+# aliens; the saucer's is removed, REMOVED_EFFECTS): a ring of light that swells out from the hero across the ground and up the
+# plants round it. The owner asked for it several times ("the hero pulse that used to swell out from the
+# mushroom and across the ground"); the first pass removed it because its activation, `heroFocus`, reads
+# Song-mode shot spans, which GV3's authored cut does not have (the travel beam's gap). Until the engine
+# reads an authored cut, each fires on a trigger instead: a cue marker "hero pulse <hero>" on every
+# downbeat of a shot in which that hero is the subject or stands in the frame within HERO_PULSE_NEAR m.
+# GV2's look is kept whole (colour, rings, speed, range, response, sparkle); only the timing changes, so
+# the ring leaves the hero on the beat (no delay, a quick fade in) and runs its 58 m (4.5 s at 13 m/s),
+# and GV2's pump (`beat.pulse -> intensity` +8) rides the scored kick. The markers are on the Sequence
+# panel; each ring is the Effects panel's "Hero Pulse" on its hero.
+HERO_PULSE_MARKER = "hero pulse {}"
+HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.2, "lifetime": 4.5, "repeatSeconds": 0.0}
+HERO_PULSE_KICK = 8.0
+HERO_PULSE_NEAR = 160.0     # metres: a hero farther than this in the frame does not pulse (the grand wides are 120-150 m)
+HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the nearest)
 
 
 # The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
@@ -676,3 +694,68 @@ def apply_motifs(project, scene):
     reactivity.prepare(project, scene)
     print("  " + reactivity.apply(project, scene))
     return len(project["routes"])
+
+
+def _hero_positions(scene):
+    out = {}
+    for n in scene["nodes"]:
+        if n.get("name", "").endswith("-cap") and n.get("kind") == "procedural":
+            out[n["name"]] = n["position"]
+    return out
+
+
+def hero_pulse_plan(project, scene, shots):
+    """[(time, hero)]: the downbeats on which each hero's pulse fires (see HERO_PULSE_*)."""
+    from .framing import keyed, project as proj
+    effects = [e for e in project.get("effects", []) if e.get("type") == "groundPulse"]
+    owners = {e["owner"]["name"] for e in effects}
+    caps = _hero_positions(scene)
+    downbeats = [t - LEAD_SECONDS for t, _ in lane("downbeat")]
+    plan = []
+    for s in shots:
+        rig = s.rig
+        who = {}
+        for node in (rig.follow, rig.aim):
+            if node in owners:
+                who[node] = 0.0
+        if not rig.follow:
+            mid = 0.5 * (s.start + s.end)
+            eye = keyed(rig, "position", mid, rig.position)
+            aim = keyed(rig, "target", mid, rig.target)
+            if rig.aim in caps:
+                aim = caps[rig.aim]
+            for name, pos in caps.items():
+                if name not in owners:
+                    continue
+                p, z = proj(eye, aim, rig.focal, [pos[0], pos[1] + 2.0, pos[2]])
+                if p is not None and abs(p[0]) <= 0.95 and abs(p[1]) <= 0.95 and z <= HERO_PULSE_NEAR:
+                    who[name] = min(who.get(name, z), z)
+        chosen = sorted(who, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]
+        for t in downbeats:
+            if s.start - 0.02 <= t < s.end - 0.3:
+                plan += [(t, n) for n in chosen]
+    return plan
+
+
+def apply_hero_pulses(project, scene, shots):
+    """GV2's Hero Pulse on GV3's authored cut: each effect on its markers, the markers, the kick's pump."""
+    effects = [e for e in project.get("effects", []) if e.get("type") == "groundPulse"]
+    for e in effects:
+        e["activation"] = "trigger"
+        e["trigger"] = {"source": "marker", "name": HERO_PULSE_MARKER.format(e["owner"]["name"])}
+        e["timing"].update(HERO_PULSE_TIMING)
+        for k, v in HERO_PULSE_TIMING.items():
+            if k != "repeatSeconds":
+                project["parameters"][f"fx/{e['id']}/{k}"] = v
+        project["parameters"][f"fx/{e['id']}/repeat"] = 0.0
+    plan = hero_pulse_plan(project, scene, shots)
+    seq = project.setdefault("sequence", {})
+    names = {HERO_PULSE_MARKER.format(e["owner"]["name"]) for e in effects}
+    markers = [m for m in seq.get("markers", []) if m.get("name") not in names]
+    markers += [{"kind": "cue", "name": HERO_PULSE_MARKER.format(n), "time": round(t, 6)} for t, n in plan]
+    seq["markers"] = sorted(markers, key=lambda m: m["time"])
+    targets = {f"fx/{e['id']}/intensity" for e in effects}
+    project["routes"] = [r for r in project.get("routes", []) if r.get("target") not in targets]
+    for t in sorted(targets):
+        project["routes"].append(_route("timeline.kick", t, HERO_PULSE_KICK, "add", {"attackMs": 5.0, "decayMs": 200.0}))
+    return plan

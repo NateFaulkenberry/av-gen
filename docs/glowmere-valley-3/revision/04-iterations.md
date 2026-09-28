@@ -119,3 +119,11 @@ final candidate.
   (the shots newly "shaky"/"wobble" are mostly beam cuts and big-gill shots); the engine's camera paths are
   the same rigs and pass the trace's stability check (19 of 22, 20 of 22 on r4).
 - **The air** at fogSky 0.5, **the post** kept (ACES), **one moon** (env/rotation 0).
+
+## Rounds 6-7 (engine-6)
+- r6b (`job_1a0e668cdca4609c3`): glow pools under the violet fungi, aurora glints steady; against r5 musical sync
+  0.885 -> 0.943, effects 0.945 -> 0.975, technical quality 0.923 -> 0.825 and lighting 0.845 -> 0.789 (clipping in
+  pooled shots). 59.1 on Sage (Rook no longer goes to E4 on engine-6).
+- r7: the owner's Hero Pulse (GV2 multicam's ground rings, 15 heroes, not the saucer) and one animal per abduction.
+  Generated and traced (CPU); not rendered for review at the owner's request. A Critic job ran on a superseded r7
+  render made before the one-animal change; it is not the candidate.

@@ -208,7 +208,12 @@ REHOMED = {
     "horse-22": (60.0, 0.0),
     # the flat half of the 3.9 ha meadow by (-62, 36), west of the river (its edge at (-62, 36) is a bank)
     "cow-12": (-66.0, 0.0),
-    "cow-23": (-78.0, 6.0),
+    # The owner: "only one animal abducted at a time for ANY UFO abduction scene - spread these cows out".
+    # E4 takes cow-12 alone; cow-23 grazed 12 m from it, under the beam's edge, so it moves to the north
+    # meadow beside cow-19, 62 m from E4's column and 72 m from E5's. bull-10 grazed 6.5 m from E3's
+    # column (r6b) and moves to bull-1's slope, 125 m from it (beamclear.py on each round's trace).
+    "cow-23": (-76.0, 70.0),
+    "bull-10": (-12.0, -128.0),
 }
 REHOMED_TERRITORY = {"homeRadius": 16.0, "maxRange": 12.0}
 

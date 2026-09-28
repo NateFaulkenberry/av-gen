@@ -9,12 +9,8 @@
    "text": "horse-11"
   },
   {
-   "alias": "east-cow",
+   "alias": "e4-cow",
    "text": "cow-12"
-  },
-  {
-   "alias": "west-cow",
-   "text": "cow-23"
   }
  ],
  "setPieces": [
@@ -102,21 +98,17 @@
     }
    },
    "animals": [
-    "east-cow",
-    "west-cow"
+    "e4-cow"
    ],
    "set": {
-    "animals": 2,
+    "animals": 1,
     "approachSeconds": 7,
     "hoverHeight": 22,
     "approachBearing": 250,
     "liftSeconds": 8,
     "fadeDelaySeconds": 6.4,
     "fadeSeconds": 1.6,
-    "gatherRadius": 25,
-    "stackRadius": 4.0,
-    "stackStagger": 4.0,
-    "beamSize": 1.8
+    "gatherRadius": 25
    },
    "framingMetres": 70
   },
