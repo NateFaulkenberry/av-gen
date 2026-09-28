@@ -5329,6 +5329,22 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             p.emissiveFieldAmount = &params_->add(labelled(
                 floatDesc(s + "emissiveFieldAmount", layer.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 8.0f),
                 "light wave"));
+            // ADR-938: how the layer sways -- every member of its wind response, on every layer, so a
+            // plant that barely moves (GV3's fan plants, 0.9 cm in a gust at the source's stiffness)
+            // can be loosened where an artist sees it rather than in the scene file. Per frame:
+            // `motion` is not in the layer's structural hash, so a change replants nothing.
+            const std::string w = s + "sway/";
+            const std::span<const ScatterSwayControl> sway = scatterSwayControls();
+            for (std::size_t c = 0; c < sway.size(); ++c) {
+                const ScatterSwayControl& control = sway[c];
+                params::ParamDesc<float> d =
+                    labelled(floatDesc(w + control.leaf,
+                                       std::clamp(layer.motion.*control.member, control.hardMin, control.hardMax),
+                                       control.hardMin, control.hardMax, control.softMin, control.softMax),
+                             control.label);
+                d.flags.modulatable = control.routable;
+                p.sway[c] = &params_->add(std::move(d));
+            }
             node.scatterParams.push_back(p);
         }
     }
@@ -5452,7 +5468,36 @@ void nullWaterParameters(CompositionNode& node) {
     node.waterTearParams = {};
 }
 
+// ADR-938: the species' wind response as nine controls, leaves named as the scene file's `motion` keys.
+// The ranges hold every layer GV2 and GV3 author (tip masses from grass's 0.06 to deadwood's 60) inside
+// the hard range; the soft ranges are what a slider offers for a plant.
+constexpr ScatterSwayControl kScatterSway[] = {
+    {"windSensitivity", "catches the wind (0 = stands still)", &wind::VegetationMotion::windSensitivity,
+     0.0f, 10.0f, 0.0f, 2.0f, true},
+    {"tipAmplitude", "sway at the tip (x its height)", &wind::VegetationMotion::tipAmplitude, 0.0f, 2.0f, 0.0f,
+     0.6f, true},
+    {"gustResponse", "takes the gusts (x)", &wind::VegetationMotion::gustResponse, 0.0f, 10.0f, 0.0f, 3.0f, true},
+    {"stiffness", "stiffness (bends less, rings faster)", &wind::VegetationMotion::stiffness, 0.001f, 200.0f,
+     0.2f, 20.0f, false},
+    {"mass", "weight at the tip (rings slower)", &wind::VegetationMotion::mass, 0.0001f, 200.0f, 0.01f, 10.0f,
+     false},
+    {"damping", "settles (low keeps ringing, 1 stops at once)", &wind::VegetationMotion::damping, 0.02f, 4.0f,
+     0.05f, 1.5f, true},
+    {"bendLimit", "bends at most (x its height)", &wind::VegetationMotion::bendLimit, 0.0f, 2.0f, 0.0f, 1.0f,
+     true},
+    {"bendCurve", "bends along (1 = the whole stem, 3 = the tip)", &wind::VegetationMotion::bendCurve, 0.05f,
+     8.0f, 1.0f, 4.0f, true},
+    {"amplitudeVariance", "difference between plants (+- of its sway)",
+     &wind::VegetationMotion::amplitudeVariance, 0.0f, 1.0f, 0.0f, 1.0f, true},
+};
+static_assert(std::size(kScatterSway) ==
+              std::tuple_size_v<decltype(CompositionNode::ScatterLayerParameters::sway)>);
+
 } // namespace
+
+std::span<const ScatterSwayControl> scatterSwayControls() {
+    return kScatterSway;
+}
 
 void Composition::unregisterNodeParameters(CompositionNode& node) {
     if (params_ != nullptr) {
@@ -5494,10 +5539,12 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             node.windFlutterParam = nullptr;
             node.windLagParam = nullptr;
         }
-        // ADR-905: the scatter layers' lanes, by the exact paths they were registered at.
+        // ADR-905: the scatter layers' lanes, by the exact paths they were registered at -- and
+        // ADR-938's sway controls with them.
         for (const CompositionNode::ScatterLayerParameters& p : node.scatterParams) {
-            for (const params::IParameter* parameter :
-                 std::array<const params::IParameter*, 3>{p.emissionGain, p.hueOffset, p.emissiveFieldAmount}) {
+            std::vector<const params::IParameter*> owned{p.emissionGain, p.hueOffset, p.emissiveFieldAmount};
+            owned.insert(owned.end(), p.sway.begin(), p.sway.end());
+            for (const params::IParameter* parameter : owned) {
                 if (parameter != nullptr) {
                     const std::string path = parameter->path(); // copied: remove() destroys the owner
                     params_->remove(path);
@@ -8054,6 +8101,13 @@ void Composition::applyParameters() {
                 if (p.emissionGain != nullptr) layer.emissionGain = p.emissionGain->base();
                 if (p.hueOffset != nullptr) layer.hueOffset = p.hueOffset->base();
                 if (p.emissiveFieldAmount != nullptr) layer.emissiveFieldAmount = p.emissiveFieldAmount->base();
+                // ADR-938: and how it sways. `motion` is not in the layer's structural hash either.
+                const std::span<const ScatterSwayControl> sway = scatterSwayControls();
+                for (std::size_t c = 0; c < sway.size(); ++c) {
+                    if (p.sway[c] != nullptr) {
+                        layer.motion.*sway[c].member = p.sway[c]->base();
+                    }
+                }
             }
             for (const NodeRange::EcologyLayerRun& run : range.ecologyLayers) {
                 if (run.layer >= node.ecology.layers.size()) {
@@ -8069,11 +8123,24 @@ void Composition::applyParameters() {
                 const float hue = value(p != nullptr ? p->hueOffset : nullptr, layer.hueOffset);
                 const float field =
                     value(p != nullptr ? p->emissiveFieldAmount : nullptr, layer.emissiveFieldAmount);
+                // ADR-938: the species' wind response, from its sway controls' finals. Every part of
+                // the layer (bark, leaves) sways as one plant, so each gets the same numbers; the
+                // renderer resolves them into gains every frame (ADR-055), for Tier 0 and Tier 1 alike.
+                wind::VegetationMotion motion = layer.motion;
+                if (p != nullptr) {
+                    const std::span<const ScatterSwayControl> sway = scatterSwayControls();
+                    for (std::size_t c = 0; c < sway.size(); ++c) {
+                        motion.*sway[c].member = value(p->sway[c], layer.motion.*sway[c].member);
+                    }
+                }
                 for (std::size_t q = run.first; q < run.first + run.count && q < scene_.procedurals.size(); ++q) {
                     ProceduralGeometry& part = scene_.procedurals[q];
                     part.emissionGain = emissiveBoost * gain;
                     part.emissionHue = hue;
                     part.emissiveFieldAmount = field;
+                    const wind::SimLod simulate = part.motion.simulate;
+                    part.motion = motion;
+                    part.motion.simulate = simulate;
                 }
             }
         }

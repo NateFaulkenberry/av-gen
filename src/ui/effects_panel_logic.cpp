@@ -1,6 +1,7 @@
 #include "ui/effects_panel_logic.hpp"
 
 #include "app/engine.hpp"
+#include "params/modulation.hpp"
 #include "scene/composition.hpp"
 #include "ui/edit_history.hpp"
 #include "world/atmospherics.hpp"
@@ -200,6 +201,43 @@ std::string beatResponseTarget(std::string_view effectId, const world::EffectSch
 
 float beatResponseDepth(float amount, float softRange) {
     return std::clamp(amount, 0.0f, 1.0f) * std::max(softRange, 0.0f);
+}
+
+std::vector<EffectRouteLine> effectRoutesOn(std::span<const params::ModRoute> routes,
+                                            const world::EffectInstance& effect, const world::EffectSchema& schema) {
+    const std::string prefix = world::effectParameterPrefix(effect.id);
+    // The row's label for a leaf: the type's own rows, then the shared ones; the leaf itself if neither.
+    const auto labelOf = [&](std::string_view leaf) -> std::string {
+        for (const world::EffectField& f : schema.fields) {
+            if (leaf == f.leaf) {
+                return f.label;
+            }
+        }
+        for (const world::EffectField& f : world::sharedEffectFields()) {
+            if (leaf == f.leaf) {
+                return f.label;
+            }
+        }
+        return std::string(leaf);
+    };
+    std::vector<EffectRouteLine> out;
+    for (const params::ModRoute& r : routes) {
+        if (r.target.size() <= prefix.size() || r.target.compare(0, prefix.size(), prefix) != 0) {
+            continue;
+        }
+        const std::string_view leaf = std::string_view(r.target).substr(prefix.size());
+        if (leaf.find('/') != std::string_view::npos) {
+            continue; // a longer id that merely starts with this one's ("sky" and "sky/x" cannot both be)
+        }
+        EffectRouteLine line;
+        line.source = r.source;
+        line.target = r.target;
+        line.text = r.source + " -> " + labelOf(leaf);
+        line.enabled = r.enabled;
+        line.planned = !r.planItem.empty();
+        out.push_back(std::move(line));
+    }
+    return out;
 }
 
 Result<void> commitEffectEdit(app::Engine& engine, EditHistory* history, std::string label,

@@ -27,6 +27,9 @@
 namespace avgen::app {
 class Engine;
 }
+namespace avgen::params {
+struct ModRoute;
+}
 
 namespace avgen::ui {
 
@@ -137,6 +140,24 @@ bool resetEffectParameters(world::EffectInstance& effect);
 [[nodiscard]] std::string beatResponseTarget(std::string_view effectId, const world::EffectSchema& schema);
 // How much of the parameter's own soft range one unit of beat response is worth.
 [[nodiscard]] float beatResponseDepth(float amount, float softRange);
+
+// ---- routes onto the effect (ADR-939) --------------------------------------------------------------
+//
+// Every modulation route whose target is one of this effect's parameters, as its card lists them:
+// "audio.rms -> Brightness" -- the source, then the row's own label. An effect's routes are the
+// project's, not the effect's (the aurora's "Audio response" does not gate them), so the card names
+// them where the artist is looking: a sky that still pulses with the aurora's audio response at 0 is
+// then traceable from the aurora itself. In the modulator's order; disabled routes included and said.
+struct EffectRouteLine {
+    std::string source;
+    std::string target; // the full parameter path
+    std::string text;   // "<source> -> <row label>"
+    bool enabled = true;
+    bool planned = false; // made by a Director plan item (ADR-924)
+};
+[[nodiscard]] std::vector<EffectRouteLine> effectRoutesOn(std::span<const params::ModRoute> routes,
+                                                         const world::EffectInstance& effect,
+                                                         const world::EffectSchema& schema);
 
 // ---- the edits, with undo ------------------------------------------------------------------------
 

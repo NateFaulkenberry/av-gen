@@ -83,6 +83,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/ui/effects_panel_logic.cpp"
     # The Director panel's decisions (spec §35, ADR-762): item marks, grouped changes, the buttons.
     "${CMAKE_SOURCE_DIR}/src/ui/director_panel_logic.cpp"
+    # ADR-937: the Sequence panel's treatment editor -- which dials a treatment has, which can be
+    # edited in place, the edit and "edit a copy". Same reason as the panels above.
+    "${CMAKE_SOURCE_DIR}/src/ui/treatment_editor_logic.cpp"
     # ADR-520: the particle section's weather rows. Same reason, one panel over -- the table names
     # thirteen parameter paths by string and a wrong one draws an empty box instead of failing.
     "${CMAKE_SOURCE_DIR}/src/ui/particle_weather_rows.cpp"

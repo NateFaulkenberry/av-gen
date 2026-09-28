@@ -2609,6 +2609,16 @@ public:
         paths_ = {prefix + "hertz",         prefix + "dwellTicks",      prefix + "margin",
                   prefix + "memorySeconds", prefix + "stallSeconds",    prefix + "maxStillSeconds",
                   prefix + "loopSeconds",   prefix + "loopRadius",      prefix + "loopPenalty"};
+        // ADR-933, amended 2026-09-27: how long a place the body could not get to is left alone --
+        // the mind's `failSeconds`, read once from the file until now, so the knob that decides
+        // whether an alien paces a river bank was the one it could not be reached by. Only a decider
+        // with a mind registers it: nothing else makes urgent errands or remembers a failed plan, and
+        // a mindless decider would carry a slider that moves nothing.
+        if (aware_) {
+            failSeconds_ = &params.add(floatDesc(prefix + "failSeconds", memorySettings_.failSeconds, 0.0f, 600.0f,
+                                                 "won't try again where it couldn't get to for (s, 0 = tries at once)"));
+            paths_.push_back(prefix + "failSeconds");
+        }
         // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
         // scene file and the engine then read once from the JSON would be a decoration, not a
         // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
@@ -2679,6 +2689,16 @@ public:
         memory_.setSettings(PerceptMemory::Settings{
             memorySeconds_ != nullptr ? memorySeconds_->value() : memorySecondsDefault_,
             memoryCapacity_});
+        // ADR-933 amended: the retry memory's length from its parameter, every tick, so a slider, a key
+        // or a route moves it as surely as the file did. A pure function of the playhead, like every
+        // parameter, so a replay after a seek reads what the play read.
+        if (failSeconds_ != nullptr) {
+            const float failSeconds = std::max(0.0f, failSeconds_->value());
+            if (failSeconds != memorySettings_.failSeconds) {
+                memorySettings_.failSeconds = failSeconds;
+                objects_.setSettings(memorySettings_);
+            }
+        }
 
         DecisionContext dctx;
         dctx.time = ctx.time;
@@ -3432,6 +3452,9 @@ private:
     // remembers them. Members, so an ADR-700 checkpoint carries them.
     std::vector<Attempt> attempts_;
     static constexpr std::size_t kAttempts = 8;
+    // ADR-933 amended: `failSeconds` as a parameter, "won't try again where it couldn't get to for";
+    // null on a decider with no mind.
+    params::Parameter<float>* failSeconds_ = nullptr;
     // An urgent walk that has gone this long without getting nearer its goal when something else is
     // chosen was given up, not merely interrupted: a second is several strides, and a walk still
     // getting somewhere resets its count every step it does.

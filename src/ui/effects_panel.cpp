@@ -509,6 +509,30 @@ void EffectsSection::drawCardBody(app::Engine& engine, const world::EffectInstan
 
     drawBeatResponse(engine, effect);
 
+    // ADR-939: the routes that move this effect, named on its card. They are the project's and no
+    // switch on the card gates them -- the aurora's "Audio response" says so -- so a sky still moving
+    // with the music can be traced from here to the Modulation panel.
+    {
+        const std::vector<EffectRouteLine> routes = effectRoutesOn(engine.modulator().routes(), effect, *schema);
+        if (!routes.empty()) {
+            ImGui::TextColored(kMuted, "moved by %zu route%s:", routes.size(), routes.size() == 1 ? "" : "s");
+            if (ImGui::IsItemHovered()) {
+                tooltip("Modulation routes onto this effect's parameters. They are separate from the\n"
+                        "effect's own response to the music; edit, mute or delete them in the\n"
+                        "Modulation panel.");
+            }
+            constexpr std::size_t kShown = 6;
+            for (std::size_t i = 0; i < routes.size() && i < kShown; ++i) {
+                const EffectRouteLine& r = routes[i];
+                ImGui::TextColored(kMuted, "  %s%s%s", r.text.c_str(), r.enabled ? "" : "  (off)",
+                                   r.planned ? "  [plan]" : "");
+            }
+            if (routes.size() > kShown) {
+                ImGui::TextColored(kMuted, "  and %zu more (Modulation panel)", routes.size() - kShown);
+            }
+        }
+    }
+
     // ---- endpoints: what the effect is about ----
     if (schema->getSource != nullptr && schema->setSource != nullptr) {
         ImGui::SeparatorText("Source");
