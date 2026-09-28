@@ -7,6 +7,7 @@
 // what it does, and that the PARAMETER decides the behaviour: ADR-933's own stall fixture, with the file
 // and the parameter saying opposite things, does what the parameter says.
 
+#include "entity/action.hpp"
 #include "entity/character_quality.hpp"
 #include "entity/entity.hpp"
 #include "entity/mind.hpp"
@@ -22,6 +23,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace avgen;
 using testsupport::behavior;
@@ -65,6 +67,30 @@ entity::Navigator wader(const world::WorldMap& map, world::Ecology& ecology) {
     return nav;
 }
 
+// The route every same-region walk took before ADR-936 sent it round deep water: the straight line,
+// `Ready`, for any standable goal. ADR-933's own stall fixture installs it for the same reason (see
+// test_urgent_retries.cpp): the stall at the wade limit is the fixture, and what is under test is what
+// the retry memory does after it. Without it the integrated engine walks round the channel's head and
+// never stalls, so no arm -- file or parameter -- has a failure to remember.
+class StraightLine final : public entity::IPathProvider {
+public:
+    explicit StraightLine(const entity::Navigator* nav) : real_(nav) {}
+    [[nodiscard]] entity::RouteStatus route(glm::vec2, glm::vec2 to, std::vector<glm::vec2>& out) const override {
+        out.assign(1, to);
+        return entity::RouteStatus::Ready;
+    }
+    [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const override {
+        return real_.steer(from, to, lookahead);
+    }
+    [[nodiscard]] float groundHeight(glm::vec2 p) const override { return real_.groundHeight(p); }
+    [[nodiscard]] bool clear(glm::vec2 from, glm::vec2 to) const override { return real_.clear(from, to); }
+    [[nodiscard]] bool walkable(glm::vec2 p) const override { return real_.walkable(p); }
+    [[nodiscard]] bool refuge(glm::vec2 from, glm::vec2& out) const override { return real_.refuge(from, out); }
+
+private:
+    entity::NavigatorPath real_;
+};
+
 // ember's shape, as test_urgent_retries.cpp has it: a post, a reaction to a beam, nothing else to do.
 CastMember watcher(double failSecondsInTheFile, bool mind = true) {
     CastMember m;
@@ -100,6 +126,8 @@ struct Watched {
 // control where the file put it.
 Watched watchBeam(const entity::Navigator& nav, double failSecondsInTheFile, float parameter) {
     CastWorld w({watcher(failSecondsInTheFile)}, &nav);
+    StraightLine straight(&w.world.navigator());
+    w.world.setPathProvider(&straight);
     auto* p = w.params.findAs<float>("entity/watcher/decide/failSeconds");
     REQUIRE(p != nullptr);
     CHECK(p->base() == static_cast<float>(failSecondsInTheFile)); // the file's number is the default

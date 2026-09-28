@@ -178,7 +178,9 @@ the character is clicked, under "decide". Both on the Intermediate layer, where 
   | 0 | 30 | 1 | 2 | 2 in 2.4 s |
 
   The parameter decides, and the file only sets its default. (The first two rows are ADR-933's own
-  "now" and control, reproduced.)
+  "now" and control, reproduced.) As ADR-933's own stall case does since ADR-936 (which sends a
+  same-region walk round deep water, so nothing stalls), the fixture installs the old straight-line route:
+  the stall is the fixture, and the retry memory is what is under test.
 - The reach test does both panels' arithmetic (`parameterSubGroup`, `inspectorPlace`, `inspectorRowLabel`)
   and checks that a mindless decider registers no such parameter.
 
