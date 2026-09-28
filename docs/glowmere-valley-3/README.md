@@ -21,6 +21,34 @@ What the repository cannot carry, because it is licensed or copyrighted:
 - **The characters and animals**: `assets/aliens/alien-{scout,diver,elder,ranger,pilot}.glb` and
   `assets/farm/{horse,cow,bull}.glb`, the commercial packs Glowmere Valley 2 also needs. A worktree
   gets them from main's `tools/link-worktree-assets.sh <worktree>`, run from main.
+- **The plants and trees**: `assets/quaternius/` (CC0, gitignored as a bulk download like the other
+  asset packs; `assets/glowmere.manifest.json` names what the scene places).
+
+Without them the project still opens: each missing file is a load warning, and the song's absence
+means silence.
+
+### The committed project is r7b, and the generator reproduces it (QA pass, 2026-09-28)
+
+The two files in `examples/world/` are **r7b**, the revision the owner reviewed (the review folder's
+`project-for-review/`). They were produced, not copied: on the QA branch,
+
+```
+cmake --build build/release --target avgen_world_preview avgen_cast_trace   # the generator probes the ground
+python3 tools/make_glowmere_valley_3.py && python3 tools/gv3/ufo.py --no-trace
+```
+
+writes a scene byte-identical to r7b's and a project whose only difference is the song's path
+(`../../../../../Desktop/Rebuild.mp3`, the Glowmere family's convention, where the review copy had
+the absolute `/Users/<owner>/Desktop/Rebuild.mp3`). It also rewrites `03-directives.md` and
+`04-shot-plan.md`, identical to r7b's. Checked with `avgen --project ... --audit-routes`: 0 errors,
+routes 105/105, tracks 130/130, effects 18/18 live, 73 shots, 225.5 s, and an audit report identical
+to the review bundle's.
+
+- r7b is the **preview** mode. The 4K final (`--final --final-trace <cast.json>`) needs a whole-film
+  cast trace; r7b's is 6.4 MB of `avgen_cast_trace` output (`build/gv3/int/r7b/cast.json` in the gv3-int
+  worktree), a build artifact regenerated from the project by `avgen_cast_trace --project <p> --seconds 226 --fps 60 --hz 20 --camera --out <cast.json>` (17 minutes of CPU), so it is not committed.
+- The review folder's `bundle/` (an `--export-bundle` of r7b) is not in the repository: its `assets/`
+  holds copies of the purchased models and the song.
 
 Open `examples/world/glowmere-valley-3.json` and press play: the film opens on black and cuts in on
 the first kick at 0.48 s, so the paused first frame is black by design. Everything else (the world,

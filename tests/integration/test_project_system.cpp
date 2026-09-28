@@ -135,6 +135,33 @@ TEST_CASE("Missing project assets are warnings and the rest still loads", "[inte
     CHECK_FALSE(engine.hasAudio());
 }
 
+// QA pass 2026-09-28: GV3's scene, opened outside the repository, could not find an entity profile
+// named `../entities/...`; the load fell back to the orb and the one line saying why was the first
+// of a count of warnings. The engine now names the failed scene on its own, for the application to
+// report as such, and forgets it on the next load that succeeds.
+TEST_CASE("A project whose scene fails to load says so apart from its warnings",
+          "[integration][project]") {
+    Fixture f;
+    std::ofstream(f.dir / "media" / "lost.scene.json") << R"({"format":"avgen-scene","version":1,"name":"lost",
+        "entities":[{"name":"visitor","profile":"../entities/nowhere.profile.json"}],
+        "nodes":[{"name":"a","kind":"gltf","asset":"tri.glb"}]})";
+    const auto broken = f.dir / "lost.json";
+    std::ofstream(broken) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/lost.scene.json"}}})";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(broken).has_value());
+    CHECK(engine.composition() == nullptr);
+    CHECK_FALSE(engine.projectSceneError().empty());
+    CHECK(engine.projectSceneError().find("nowhere.profile.json") != std::string::npos);
+
+    const auto good = f.dir / "good.json";
+    std::ofstream(good) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/stage.json"}}})";
+    REQUIRE(engine.loadProject(good).has_value());
+    CHECK(engine.composition() != nullptr);
+    CHECK(engine.projectSceneError().empty());
+}
+
 TEST_CASE("A cue preset that overrides a scene value says so", "[integration][project][cues]") {
     // Cues recall presets into the base values (ADR-018), so from a cue onward the preset's value
     // is what the scene has -- whatever the scene file said. That precedence is right and it was
@@ -309,6 +336,42 @@ TEST_CASE("Bundles copy every referenced file and reopen from anywhere", "[integ
     REQUIRE(other.composition() != nullptr);
     CHECK(other.composition()->nodeCount() == 2);
     CHECK(other.shaderLayers().layers().size() == 1);
+    fs::remove_all(elsewhere);
+}
+
+// QA pass 2026-09-28: the parser accepts a light rig at the scene's top level as well as inside
+// `environment`, and the Glowmere scenes use the top level. The bundler rewrote only the
+// environment's copy, so GV3's bundle kept `"lightRig": "../lightrigs/..."` and opened unlit.
+TEST_CASE("Bundles carry a scene's top-level light rig", "[integration][project][lightrig]") {
+    Fixture f;
+    fs::create_directories(f.dir / "media" / "scenes");
+    fs::create_directories(f.dir / "media" / "lightrigs");
+    std::ofstream(f.dir / "media" / "lightrigs" / "stage.rig.json") << R"({
+        "format": "avgen-lightrig", "version": 1, "name": "StageRig",
+        "lights": [{"name": "key", "type": "directional", "role": "key",
+                    "azimuth": 30, "elevation": 40, "distance": 3.0, "intensity": 1.0}]})";
+    const auto sceneFile = f.dir / "media" / "scenes" / "rigged.scene.json";
+    std::ofstream(sceneFile) << R"({"format":"avgen-scene","version":1,"name":"rigged",
+        "lightRig":"../lightrigs/stage.rig.json","nodes":[{"name":"orb","kind":"orb"}]})";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(sceneFile).has_value());
+    REQUIRE(engine.composition() != nullptr);
+    REQUIRE(engine.composition()->lightRig() != nullptr);
+    const auto bundle = f.dir / "bundle";
+    REQUIRE(engine.exportBundle(bundle).has_value());
+    CHECK(fs::exists(bundle / "assets" / "stage.rig.json"));
+    CHECK(readJson(bundle / "assets" / "rigged.scene.json")["lightRig"] == "stage.rig.json");
+
+    const auto elsewhere = fs::temp_directory_path() /
+                           ("avgen_project_bundle_rig_" + std::to_string(static_cast<long long>(::getpid())));
+    fs::remove_all(elsewhere);
+    fs::rename(bundle, elsewhere);
+    fs::remove_all(f.dir / "media");
+    app::Engine other(app::EngineMode::Offline);
+    REQUIRE(other.loadProject(elsewhere / "project.json").has_value());
+    CHECK(other.projectWarnings().empty());
+    REQUIRE(other.composition() != nullptr);
+    CHECK(other.composition()->lightRig() != nullptr);
     fs::remove_all(elsewhere);
 }
 

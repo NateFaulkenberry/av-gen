@@ -213,6 +213,10 @@ public:
     void setLiveControl(bool enabled) { controlHub_.setLiveIo(enabled); }
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+    // Why the scene the last project names did not load, or empty. Also one of projectWarnings(), but
+    // it is not a warning like the others: the world is gone and the orb stands in for it, so the
+    // application reports it on its own rather than as the first of a count (QA pass, 2026-09-28).
+    [[nodiscard]] const std::string& projectSceneError() const { return projectSceneError_; }
 
     // ---- route and parameter liveness (ADR-902) ------------------------------------------------
     // What the liveness rules read about this engine's project -- its bus, parameters, sources,
@@ -1234,6 +1238,7 @@ private:
     // read.
     void noteBindingProblem(std::string message);
     std::vector<std::string> projectWarnings_;
+    std::string projectSceneError_;
     // ADR-902. At the end of a project load: every dead or hazardous route, track and effect,
     // logged once (the modulator's log-once set, shared with its bind), and every dead one added to
     // projectWarnings_ -- a binding that does nothing belongs where a person looks.

@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "app/cli_batch.hpp"
 #include "app/directing_evaluate.hpp"
 #include "app/directing_plan_file.hpp"
 #include "pathtrace/denoise.hpp"
@@ -150,6 +151,7 @@ std::string usageText() {
            "  --env <file>        load an equirectangular .hdr environment map\n"
            "  --composition <f>   load a scene composition file (avgen-scene JSON)\n"
            "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
+           "                      (headless)\n"
            "  --render <out>      offline render (headless) to a PNG sequence directory or a video file\n"
            "  --pathtrace <out.exr>  CPU path trace (headless, no GPU) of one frame to scene-linear EXR;\n"
            "                      takes its resolution from --size\n"
@@ -335,6 +337,9 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
     };
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (flagImpliesHeadless(arg)) {
+            options.headless = true;
+        }
         if (arg == "--help" || arg == "-h") {
             options.showHelp = true;
         } else if (arg == "--play") {
@@ -406,13 +411,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--render");
             if (!v) return std::unexpected(v.error());
             options.render = *v;
-            options.headless = true;
             ++i;
         } else if (arg == "--pathtrace") {
             auto v = need(i, "--pathtrace");
             if (!v) return std::unexpected(v.error());
             options.pathtrace = *v;
-            options.headless = true;
             ++i;
         } else if (arg == "--pt-samples") {
             auto v = need(i, "--pt-samples");
@@ -451,7 +454,6 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--queue");
             if (!v) return std::unexpected(v.error());
             options.queue = *v;
-            options.headless = true;
             ++i;
         } else if (arg == "--format") {
             auto v = need(i, "--format");
@@ -649,7 +651,6 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--ab");
             if (!v) return std::unexpected(v.error());
             options.abArm = *v;
-            options.headless = true;
             ++i;
         } else if (arg == "--quality-arm") {
             auto v = need(i, "--quality-arm");
@@ -2765,7 +2766,15 @@ void Application::rememberProject(const std::filesystem::path& path) {
     }
     if (panel_) {
         panel_->recentProjects = recent_.entries();
-        if (!engine_->projectWarnings().empty()) {
+        if (!engine_->projectSceneError().empty()) {
+            // Not "N project warning(s): ..." with the cause somewhere in the first of them: the
+            // whole world failed to load, and what is on screen is not the project's scene (QA
+            // pass, 2026-09-28: GV3 opened outside the repository showed the orb and no error).
+            log::error("project '{}': its scene did not load: {}", path.filename().string(),
+                       engine_->projectSceneError());
+            panel_->setStatus("The project's scene did not load (what is showing is not it): " +
+                              engine_->projectSceneError());
+        } else if (!engine_->projectWarnings().empty()) {
             panel_->setStatus(std::to_string(engine_->projectWarnings().size()) + " project warning(s): " +
                               engine_->projectWarnings().front());
         }

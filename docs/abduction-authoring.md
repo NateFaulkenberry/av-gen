@@ -173,8 +173,8 @@ having already been retired — which is not.
   a control arm. Read it when a number moves and you want to know which beat moved it.
 * `python3 tools/check_project_integrity.py` — and if you edited a scene,
   `python3 tools/refresh_scene_fingerprint.py examples/world/<scene>.scene.json` first. Editing a
-  scene makes every project that references it stale, including nine `_diag-water-*` files nobody
-  remembers.
+  scene makes every project that references it stale, including ones in other folders
+  (`examples/effects/ufo-stack.json` names the multicam scene).
 
 And the standing one, which is not a test: **render it and look.** A black frame and a nearly-black
 frame are identical in a hash, and an opacity that never reaches the blend pipeline is identical to
