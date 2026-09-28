@@ -8,6 +8,16 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **22:00: uireach is DONE** (`7f20403a`) and **merged** (`9f6f0674`; ADR index rows 933-944 in order).
+  **`integrate/revision` = main + cihealth + behave + uireach.** It is built (3,831 tests). **The CPU and GPU suites
+  are running side by side**; a GPU pass under CPU load stands. Then main, then engine-5.
+  - uireach: treatments editable in the Sequence panel (ADR-937); 9 sway parameters per scatter layer (ADR-938);
+    Audio response is the aurora's real master, with "High -> glints" (ADR-939); `failSeconds` is a control.
+  - **For GV3:** the glints now hold steady. Set `fx/aurora/sparkle` to about 0.85 to keep the old average; confirm
+    on frames.
+  - Open: effect parameters show code names in the Parameters panel; possible edge shimmer on static ferns (LOD
+    or noise keyed on the render second); GV3 stores the aurora's glints twice (0.5 in the block, 0.3 in the
+    parameter).
 - **21:40: gv3-int is DONE; THE REVIEW CANDIDATE r5 IS IN THE REVIEW FOLDER** (`revision/integrate/r5-preview-960x540.mov`,
   `README-r5-preview.md`, sheets in `r2-r5/`). `gv3/integrate` `b5bd8bc7` is merged into `gv3/production` (`f5885b45`).
   - **Critic, whole film, iteration 0 -> r5:**
