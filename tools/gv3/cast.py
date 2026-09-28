@@ -151,8 +151,16 @@ ALIEN_BOUNCE = {
 #                the aliens' own bank of the river, in the meadow they roam, and is heard by the ones
 #                near it (80 m: in iteration 1's film, ember, sage and tide).
 #   centrepiece  go and see as well: E5's beam is heard across the valley (the characters report's 250
-#                m), and every alien that hears it walks to within 18 m of the craft, faces it and
-#                watches; a cautious one (sage) steps back first. Until engine-4 this was "stop and
+#                m), and every alien that hears it hurries to within 100 m of the craft, faces it and
+#                watches; a cautious one (sage) steps back first. At 18 m (engine-4's first trace, gv3-int
+#                r2/r3) nobody got there in time: vane and rook were still running at the saucer through
+#                95.1 "Vane sees it" (vane 99 -> 68 m at 3.9 m/s from 172.5 s, 95.1's close follow failing
+#                the stability bar) and only sage, 135 m off, stood to watch. Vane is 92-102 m from the
+#                craft from the moment she hears it through 95.1, so 100 m stops her within two metres,
+#                facing it, a second before the shot; ember (59 m) watches where she stands, and tide,
+#                sage and rook (127-155 m) hurry 27-55 m to a vantage and watch the departure from there.
+#                (60-70 m, the coordinator's first suggestion, would have kept vane running until about
+#                181 s, after the horse is gone.) Until engine-4 this was "stop and
 #                watch where you stand" (an `approach` of 250 m, inside which everyone already stands):
 #                E5 is on the elder's bank, four aliens are across the river from it, and the action
 #                tier's route did not ask whether a goal was on the body's own piece of walkable ground
@@ -169,7 +177,7 @@ REACTIONS = {
     "beam":        ("e4-river-pair", 80.0,
                     {"approach": 18.0, "flee": 10.0, "dwell": 4.0, "fadeSeconds": 12.0, "weight": 1.5}),
     "centrepiece": ("e5-centrepiece", 250.0,
-                    {"approach": 18.0, "flee": 10.0, "dwell": 6.0, "fadeSeconds": 10.0, "weight": 1.5,
+                    {"approach": 100.0, "flee": 10.0, "dwell": 6.0, "fadeSeconds": 10.0, "weight": 1.5,
                      "activity": "observe"}),
 }
 
