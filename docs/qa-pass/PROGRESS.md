@@ -72,9 +72,13 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   (branch `qa/dirty-check`, from `4360244c`, taking ADR-952). Merge it into qa/coord once both suites pass.
 - **qa/coord `581c018c`: both suites pass after the merges.** `avgen_tests` exits 0 (3,846 cases: 3,826 passed,
   19 skipped, 1 failed as expected). `avgen_render_tests` exits 0 (549 cases: 548 passed, 1 skipped).
+- **ADR-952 is DONE and merged** (`qa/dirty-check` `1b74414c`). The unsaved-changes check waits while the
+  transport plays, and every discard path still serialises on demand. While playing, GV3's `ui.build` p95 dropped
+  from 35.4 to 0.86 ms and the frame p95 from 50.4 to 17.7 ms. Paused is unchanged, by the owner's choice. Both
+  suites exit 0 on its branch (3,851 CPU cases; 548 GPU passed and 1 skipped). Drift during playback now measures
+  zero paths; ADR-440 recorded 20.
 - **The GV3 art pass has launched:** worktree `../av-gen-art`, branch `gv3/art-pass`, from `581c018c`.
-- **Superseded:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main
-  waits for qa/ci.
+- **Superseded:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main waits for qa/ci.
 - **Superseded, kept for the record:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status
