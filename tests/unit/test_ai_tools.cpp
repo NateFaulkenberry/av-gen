@@ -1454,3 +1454,58 @@ TEST_CASE("A created node is inside the transaction that made it", "[ai][tools][
     REQUIRE(fog != nullptr);
     CHECK(fog->baseComponent(0) < 0.7f); // back to whatever the scene said, not 0.77
 }
+
+// scene.delete_node and scene.set_parent destroy a node's parameters (set_parent detaches and re-adds
+// the node, so they are made anew). The modulator and the timeline cache RAW pointers to the
+// parameters they drive, and only `Engine::rebind()` re-resolves them -- the editor's delete
+// (ui::deleteNodes) and `Engine::removeNode` call it; these two tools did not. A route aimed at the
+// node then wrote through a freed pointer on the next frame (the same family as the delete crash in
+// test_delete_nodes.cpp). Observable without ASan: after the tool, a route's cached target must be
+// the parameter the engine now has at that path, or null.
+TEST_CASE("Deleting or re-parenting a node through the assistant re-binds the routes that drive it",
+          "[ai][tools][node][regression]") {
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    REQUIRE(f.call("scene.create_node", json{{"name", "block-a"}, {"kind", "group"}}).success);
+    REQUIRE(f.call("scene.create_node", json{{"name", "block-b"}, {"kind", "group"}}).success);
+
+    const std::string target = "nodes/block-a/rotation";
+    REQUIRE(f.engine.params().find(target) != nullptr);
+    params::ModRoute route;
+    route.source = "audio.bass";
+    route.target = target;
+    route.amount = 0.5f;
+    f.engine.modulator().addRoute(std::move(route));
+    f.engine.rebind();
+
+    const auto routeTarget = [&]() -> params::IParameter* {
+        for (const params::ModRoute& r : f.engine.modulator().routes()) {
+            if (r.target == target) {
+                return r.targetParam;
+            }
+        }
+        FAIL("the route is gone");
+        return nullptr;
+    };
+    REQUIRE(routeTarget() == f.engine.params().find(target)); // the control: bound, and to the live one
+
+    const auto frame = [&] {
+        FrameTime time{};
+        time.deltaTime = 1.0 / 60.0;
+        f.engine.update(time);
+    };
+
+    SECTION("re-parenting makes the parameter anew; the route follows it") {
+        REQUIRE(f.call("scene.set_parent", json{{"name", "block-a"}, {"parent", "block-b"}}).success);
+        params::IParameter* live = f.engine.params().find(target);
+        REQUIRE(live != nullptr);
+        CHECK(routeTarget() == live);
+        frame();
+    }
+    SECTION("deleting the node leaves the route unbound, not pointing at freed memory") {
+        REQUIRE(f.call("scene.delete_node", json{{"name", "block-a"}}).success);
+        CHECK(f.engine.params().find(target) == nullptr);
+        CHECK(routeTarget() == nullptr);
+        frame();
+    }
+}
