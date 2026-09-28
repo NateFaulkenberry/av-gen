@@ -107,6 +107,26 @@ def no_entities(p, s):
     drop_refs(p, lambda t: t.startswith('entity/'))
 
 
+@arm
+def small_beams(p, s):
+    """The two hidden beam pools (visitor-beam, scout-beam: 32,768 each) at 256 particles (W3 audit #3)."""
+    for n in s['nodes']:
+        if n['name'] in ('visitor-beam', 'scout-beam'):
+            n['particles']['capacity'] = 256
+    for k in list(p.get('parameters', {})):
+        if k.startswith(('particles/visitor-beam/capacity', 'particles/scout-beam/capacity')):
+            p['parameters'][k] = 256
+
+
+@arm
+def eco_gv2(p, s):
+    """The ground pools at GV2 multicam's defaults: GV3's ecologyLightRange/PoolReach/PoolFaintest removed (W3 #5)."""
+    for k in ('ecologyLightRange', 'ecologyPoolReach', 'ecologyPoolFaintest'):
+        s['environment'].pop(k, None)
+    drop_refs(p, lambda t: t.split('/')[-1] in ('ecologyLightRange', 'ecologyPoolReach', 'ecologyPoolFaintest')
+              or t.startswith(('scene/glowPools', 'scene/glow-pools')))
+
+
 def write(src, name, p, s):
     base = os.path.join(os.path.dirname(src), f'_qa-b-{name}')
     scene_text = json.dumps(s, indent=1)
