@@ -14,7 +14,7 @@ Push CI GREEN on `df333c8c` (36464437262: CPU job 6 min). Nothing is merged; the
 |---|---|---|
 | 36434165586 | Sanitizers `both` on `2e6c5bbb` (the OLD 7-rest-shard ASan matrix) | **DONE, SUCCESS, 0 sanitizer reports anywhere.** ASan build 42 min; rest-a 175 min, rest-b 174 min (3/7 shards each), heavy-1 103 min, heavy-3 33 min, heavy-2 1.5 min; UBSan 3 h 48 min (3838/3838); TSan subset 82 min. Only timing assertions failed (not gated). Timings are in docs/development/ci.md. |
 | 36434180499 | TSan over the WHOLE default set (`test_filter='~[.]'`), a measurement | **DONE: TIMEOUT (the expected answer).** 5 h 44 min job; all 3 shards killed at 300 min with 1680/3838 cases run; 0 race reports, 0 crashes. Whole-suite TSan does not fit one nightly job (~11-12 h of 3-shard time). Recorded in docs/development/ci.md "TSan subset". |
-| 36469640514 | Sanitizers `asan` on `8df83f4c`: the REBALANCED matrix (11 rest shards) and the new exit-code gate | dispatched ~19:05 UTC (36468754635 on df333c8c was cancelled for it); check job times vs the old run, confirm heavy jobs whose film process exits 4 still PASS, then decide 5 -> 3 jobs. |
+| 36469640514 | Sanitizers `asan` on `8df83f4c`: the REBALANCED matrix (11 rest shards) and the new exit-code gate | **DONE, SUCCESS, 0 sanitizer reports, 0 disagreements** (the film/fade/abduct/hidden processes exited 4, all-skipped, and passed as intended). Build 19 min; heavy-1 80, heavy-2 95, heavy-3 75, rest-a 82, rest-b 147 min (rest 9/11 146 min). Critical path 2 h 46 min (was 3 h 37 min). (36468754635 on df333c8c was cancelled for this one.) |
 
 **Finding from 36434165586 (fixed, `tools/ci/catch2_run.py`):** each heavy job's summary said "exit 4 but
 Catch2 counted 0 failed cases" yet the job passed. Two things: (a) exit 4 is Catch2 v3.3+'s "every case
@@ -26,9 +26,10 @@ Checked by replaying `summarise` on the run's own artifacts (heavy-1/2/3 now cle
 unchanged) and on synthetic statuses (exit 1 with 0 failures still flagged; exit 4 with a pass flagged).
 
 **Then:**
-1. Timings from 36434165586: DONE (docs/development/ci.md "Timings"). Still to do: read 36468754635 (the
-   rebalanced matrix, `tools/ci/run-suite.sh` `asan_job`), add its times, and decide whether the 5 ASan
-   jobs consolidate to 3 (analysis under "ASan consolidation" below, once the run is in).
+1. DONE: timings from both ASan runs, the TSan probe and UBSan are in docs/development/ci.md ("Timings",
+   "TSan subset"). The 5 -> 3 ASan consolidation is ASSESSED, not done (docs/development/ci.md,
+   "Consolidating the ASan matrix to 3 jobs"): it fits (~3.5 h vs the 330 min ceiling) and frees two
+   macOS slots for push CI, but needs `--part` to take several parts; left to the owner.
 2. The nightly schedule only runs from `main`, so the new sanitizer layout first runs nightly after merge.
 3. Unverified: the private-asset jobs (`cpu-assets`, `gpu`, the private-repo workflow) have never run on
    GitHub -- they are gated off until the owner acts (docs/development/gpu-ci-private-assets.md). The
@@ -181,5 +182,8 @@ Survey by a read-only agent, then each finding verified by a failing test before
 - Still open: farm GLBs in public git history (`4bdc42ff`), removal needs a history rewrite.
 
 ## Log
+- 2026-09-28 (CI monitor): 36434165586 SUCCESS (0 reports); TSan whole-suite probe TIMEOUT (1680/3838,
+  0 reports); gate fix for unexplained exit codes + Catch2 exit 4; rebalanced ASan 36469640514 SUCCESS
+  (critical path 2 h 46 min); owner's GPU CI decisions recorded (parked), lock pinned to 61ff6dd.
 - 2026-09-28: triage; fixes; workflow restructure; private-asset tooling; asset trace and list;
   G1/G5 crash fixes; ASan matrix rebalance; session ended with sanitizer runs in flight.

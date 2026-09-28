@@ -366,7 +366,8 @@ Why this runner:
 | TSan build + 226-case subset | 25 min build + 27 min tests | n/a |
 | ASan/UBSan build + tests (2026-09-26/27) | 38 min build; the old 7 parts ran 12:16-20:51 UTC with 4 timeouts | n/a |
 | ASan, 5 jobs over 7 rest shards (run 36434165586, 2026-09-28, farm films skipping) | 42 min build (cold); jobs: rest-a 175 min and rest-b 174 min (3 rest shards each), heavy-1 103 min (two non-farm cases: the pre-ADR-262 benchmark case 102 min, the writeback case 72 min), heavy-3 33 min (1 rest shard), heavy-2 1.5 min. Critical path build + rest = ~3 h 37 min; wall clock 4 h 36 min because heavy-1 waited 1 h 36 min for a macOS slot. 0 reports | n/a (caches are saved from main only) |
-| UBSan alone, whole default set (same run) | 40 min build + 204 min tests = 3 h 48 min job; 3838/3838 ran, 0 reports | n/a |
+| ASan, the REBALANCED 5 jobs over 11 rest shards (run 36469640514, 2026-09-28) | 19 min build; jobs: heavy-1 80 min (its two non-farm cases, 79 and 54 min), heavy-2 95 min (3 rest shards), heavy-3 75 min (2 rest shards), rest-a 82 min, rest-b 147 min (rest 9/11 alone took 146 min: four 31-38 min cases drew into it). Critical path build + rest-b = 2 h 46 min, vs 3 h 37 min before; wall clock 3 h 08 min (heavy-3 waited 80 min for a slot). 479 macOS job-minutes. 0 reports | n/a |
+| UBSan alone, whole default set (same run as the 7-shard ASan row) | 40 min build + 204 min tests = 3 h 48 min job; 3838/3838 ran, 0 reports | n/a |
 | TSan, concurrency set (same run) | 82 min job (build plus about 40 min of tests); 243 cases, 0 reports | n/a |
 
 Runs: cold [36060799310](https://github.com/NateFaulkenberry/av-gen/actions/runs/36060799310), warm
@@ -511,6 +512,22 @@ here, with the reason.
 
 GPU tests are not run under ASan. Measured locally, that is about six cases an hour
 (docs/renderer-forensics-report.md), and the hosted GPU is not authoritative anyway.
+
+### Consolidating the ASan matrix to 3 jobs (assessed 2026-09-28, not done)
+
+With the farm films skipping on hosted runners, the heavy parts cost almost nothing except heavy-1's
+two non-farm cases (79 and 54 min). The measured rest is about 900 process-minutes (three processes to a
+3-vCPU runner); the old run's 3-of-7-shard jobs took 174-175 min each. So three jobs -- heavy-1's
+processes plus 1 rest shard of 7, and two jobs of 3 rest shards of 7 -- would each take about 3 h (the
+old rest-a/rest-b measurement), about 3 h 20 min to 3 h 40 min with the build, inside the 330 min
+ceiling with ~2.5 h to spare. **Trade-off:** 5 jobs finish about 50 min sooner but hold all five macOS
+slots; on 2026-09-28 that queued push CI for up to an hour (runs 36444149446, 36476858910). 3 jobs leave
+two slots for pushes. **What it needs:** `catch2_run.py --part` takes one part, so heavy-2's and heavy-3's
+named processes (asset-bound, milliseconds on a hosted runner, 3-4 h each with the farm GLBs) must go
+somewhere: either `--part` accepting a comma list, or folding them into heavy-1 in the plan (which is
+wrong on an asset-carrying runner, where three films in one job would exceed the ceiling). Plus
+`asan_job` and the workflow matrix. Recommended once the nightly has run from `main` a few times; it is
+a scheduling choice, not a correctness fix, so it is left to the owner.
 
 ## TSan subset
 
