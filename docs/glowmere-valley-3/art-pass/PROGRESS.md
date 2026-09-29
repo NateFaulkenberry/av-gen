@@ -6,10 +6,10 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, 22:15):** every item and the addendum are done in code and data and verified in three small
-  render batches (`verify/`, `verify2/`, `verify3/` in the review folder); frame costs measured; head `f2a01447`.
-  The final whole-film render (1080p x2, the song) is running under the GPU lock: step 4 of the plan below. Then the
-  Critic ONCE, both suites, the final report.
+- **Status (2026-09-28, 23:55):** the pass is complete. Every item and the addendum are done and verified; the Critic
+  ran once (on `f2a01447`'s final), its one necessary correction is in (`c20c182c`), and the owner's final is
+  rendered from that commit (`GV3-art-pass-final.mp4`, below). Left: both suites (running under the lock,
+  `scratchpad/art/suites.sh`, results in `suites.rc`), then the final report.
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -361,26 +361,59 @@ Outputs in `verify3/` (8 stills, all rc 0).
   findings the r7 job already had (clipping in the drop, routes that do not visibly move umbra/veil, camera
   jitter). The Critic runs once; the corrected final is not re-judged by it.
 
+## The final (the owner's morning render), after the correction
+
+- **`~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-final.mp4`**, rendered at `c20c182c` (clean tree) by
+  `tools/gpu-lock.sh scratchpad/art/final.sh`: `avgen --headless --project examples/world/glowmere-valley-3.json
+  --render <file> --size 1920x1080 --fps 60 --range 0:225.5 --supersample 2`, the project's own h264 q90 with the
+  song muxed. 1920x1080, 60 fps, 13,530 frames, 225.5 s, AAC 48 kHz stereo, 925.8 MB (32.8 Mb/s). Rendered
+  23:13:18-23:48:01, 2,083 s (34.7 min), rc 0, no error lines (the log's warnings are r7b's own: lodCount, the
+  nav-grid pieces, the farm animals' foot-slip notes, the dead-route false positives at load).
+  1080p because it fits easily: 35 minutes a pass.
+- The Critic's input is kept beside it as `GV3-art-pass-critic-input-f2a01447.mp4` (same settings, 2,076 s).
+- **The correction at film scale** (`scratchpad/art/shotluma.py`: 6 frames a shot, Rec. 709 luma of the decoded
+  frames and the share with a channel >= 250; on the Critic's input it tracks the Critic's own per-shot mean luma
+  at r = 0.995): film mean luma r7 (the Critic's r7 job) 0.231, first final 0.272, final 0.244; mean clipped share
+  3.74%, 2.96%, 2.32%; shots more than 20% brighter than r7: 23 -> 7 (s65 +31%, the opal's ring, and the
+  performers' shots s02/s04/s05/s10); shots clipping more than 3%: 36, 27, 21.
+- The ring transition at a retrigger (s16, 57.55-58.80 s, `scratchpad/art/frames2/ring-transition.png`): the old
+  ring's light is still on the ferns as the new one leaves the spire, then fades; nothing is cut.
+
+## The suites, and what they found (2026-09-29 00:08-01:45)
+
+- **First run** (`scratchpad/art/suites.sh` at `c20c182c`): GPU rc 42 (554 cases, 2 failed), CPU rc 42 (3,862 cases,
+  3 failed + the expected `[!shouldfail]`). Each traced and fixed:
+  1. GPU `a non-finite water setting is refused rather than floored`: the hand-kept poison list is counted
+     against `sizeof(WaterSettings)`, and `cascade` had none. Added (`kScalarFloats` 32).
+  2. GPU `the water surface and its bed keep their pixels under a small camera move` (water6_2): 1 pixel
+     strobing. NOT the cascade (it fails the same with the ADR-985 blocks stripped); ADR-980's fit on the QA
+     river's gentle banks (a diagnostic build with the old dry-corner answer passes). ADR-980 amended: the old
+     answer on water that does not descend, the fit only where the 5x5 window spans 0.6-1.5 m of descent. Re-probed:
+     the falls still fixed (none over 30 cm, worst 0.13 m).
+  3. CPU `removing a terrain node unregisters every water parameter it registered`: `water/cascade` was not on
+     the removal list. Added.
+  4. CPU `Rook's feet stay on the ground through the turn at 3 s` (ADR-829's guard, GV2): ADR-982 handed Rook his
+     walk mid-pivot (0.128 per posed frame). ADR-982 amended: from a turn only once it is over. GV3 re-measured:
+     median 0.018 m, p90 0.023 m per foot.
+  5. CPU `with the key absent, Glowmere behaves exactly as it did before ADR-623`: GV2's trace digest moved with
+     ADR-982 (a diagnostic build with the rule off gives the old digest exactly); re-pinned with the reason, as
+     three ADRs did before.
+- Meanwhile the shader's cascade rule became "20 degrees down its own flow" (bank slivers tilt across the flow;
+  ADR-985 amended), after the stripped-shader experiment above showed the slivers were not the strobing pixel
+  but were still not cascades.
+- Targeted re-runs pass: CPU `[adr982],[gait],[adr980],[water],[stride]` 81 cases; GPU `[cascade],[water],
+  [forensics]` 93 cases. Full suites again, then the final re-rendered from the fixed commit.
+
 ## Plan (the rest, in order)
 
 1. ~~Milestone 1 (water, pulses, gait, probes, ADRs 980-982)~~ `cdbcf63f`. ~~Aurora~~, ~~UFO warp~~, ~~heroes~~,
    ~~musicians + E5 (ADR-983, 984)~~, ~~batch 1 + its fixes~~ `7cb99c07`, ~~falls cascade (ADR-985)~~ `84258eeb`,
-   ~~batch 2~~, ~~frame-cost A/B~~ (`scratchpad/art/perf-ab.json`).
-2. Regenerate for the s04 ring rule (`look.hero_pulse_plan` "stage"), with `ufo.py` WITH its trace (it rewrites
-   `build/gv3/cast-ufo.json`, the Critic's cast); commit.
-3. Batch 3 (`scratchpad/art/batch3.sh`, 8 stills to `verify3/`): s04 at 16.0/17.3; the warp A/B (full vs
-   `_art-nowarp`) at the flyby 27.9, the hover 164, the leave 179.5.
-4. The final: `tools/gpu-lock.sh scratchpad/art/final.sh` -> `~/Desktop/av-gen-review/20-gv3-art-pass/
-   GV3-art-pass-final.mp4` (1920x1080, supersample 2, 60 fps, 0-225.5 s, h264 q90, the song muxed; ~35-45 min;
-   log `scratchpad/art/final-GV3-art-pass-final.log`). Check the log for scene-load warnings (a failed load
-   renders bare sky and exits 0).
-5. The Critic ONCE on that file: from `~/Documents/GitHub/creative-critic`, the adapter with `--cast
-   <worktree>/build/gv3/cast-ufo.json --video <final> --range 0:225.5 --width 1920 --height 1080 --out
-   work/gv3-art-pass`, then `critic submit --inputs work/gv3-art-pass/inputs.json --mode preview --session
-   gv3-art-pass --track film --wait --json --strict` (background). Map its findings to the brief's 8 aspects;
-   only a small, necessary correction, then re-render the final.
-6. `artvariant.py --clean x`; reconfigure; both suites by exit code (the CPU one under the lock too); final
-   PROGRESS, commit, report.
+   ~~batch 2~~, ~~frame-cost A/B~~, ~~s04's rings~~ `f2a01447`, ~~batch 3~~.
+2. ~~The first final and the Critic, once~~ (job `job_1a0eb13123079bf2e`); ~~its one correction~~ `c20c182c`,
+   checked with stills against r7b (`verify4/`).
+3. ~~The owner's final~~ from `c20c182c` (`GV3-art-pass-final.mp4`), measured shot by shot against r7.
+4. Both suites under the lock (`scratchpad/art/suites.sh` -> `suites.rc`), judged by exit code; then the final
+   report. Variant projects are already deleted.
 
 ## Log
 

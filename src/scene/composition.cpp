@@ -5608,7 +5608,8 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
                   "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
-                  "water/foam", "water/glowColor", "water/clarity", "water/maxOpacity", "water/fresnel",
+                  "water/foam", "water/cascade", "water/glowColor", "water/clarity", "water/maxOpacity",
+                  "water/fresnel",
                   "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
                   "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears/amount",
                   "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",

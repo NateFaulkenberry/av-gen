@@ -51,6 +51,19 @@ deep and 8 m wide -- half transparent under the 1.6 m shore fade -- between the 
    whether the chunk has any water.
 3. **A chunk that carries water never draws its ground coarser than LOD 1** (`kWaterChunkMaxLod`).
 
+**Amended the same day, after the full GPU suite.** The depth forensics' `water6_2` test ("the water surface and
+its bed keep their pixels under a small camera move") found one pixel of the QA scene's river changing hands
+twice under seven 2 cm camera steps: on a gently sloping bank the fit had moved the sheet's edge onto ground
+sloping almost in its own plane. A diagnostic build with the old answer passed it. So the fit is kept for water
+that actually descends: a dry corner takes the OLD answer -- the highest of its eight neighbours inside the chunk,
+bit for bit -- until its 5x5 window spans 0.6 m of descent (about 7 degrees on the 1.2 m grid), the fit (now held
+between the lowest and the highest wet neighbour) takes over by 1.5 m (about 17 degrees), blended between so a
+river that steepens does not step its edge. GV3's falls, 3-4 m across the window, are all fit; its valley river,
+7.8 degrees at the steepest, is the old rule, which never stood more than a few centimetres proud there. Re-probed
+(`avgen_water_probe`, LOD 0): the falls 3.2 m2 of false water, none of it over 30 cm, worst 0.13 m (r7b: 41 m2, 24
+over 30 cm, worst 1.61 m); the whole river 39.8 m2, 0.54 over 10 cm, none over 30 cm, worst 0.11 m -- the old
+rule's thin overhang, which the shader's shore fade hides. The `[adr980]` tests and `water6_2` pass.
+
 ## Consequences
 
 Glowmere Valley 3 with the falls' junction moved (`world.py` `JUNCTION_ALONG`):

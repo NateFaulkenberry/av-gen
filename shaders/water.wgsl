@@ -473,16 +473,19 @@ fn bedDepthAt(uv: vec2<f32>) -> f32 {
 // dark ceiling), its depth was read almost edge-on (so it thinned toward transparent, like a shore), its
 // light was a level pool's, and the XZ lattice of the tears stood up on it as rows of bricks.
 //
-// So a surface steeper than 12 degrees is shaded about its own plane, blended in up to 30 degrees so
-// nothing switches at a line: the face's normal comes from the position's derivatives (constant over a
-// triangle, and the water mesh's triangles are 1.2 m), the eye's side is the plane's, the depth is
-// measured across the sheet, the ripples are turned onto the slope, the tears fade out (a flat-water
-// look), and `cascade` lays whitewater on it -- streaks along the flow, running faster than the river.
+// So a surface steeper than 20 degrees DOWN ITS OWN FLOW is shaded about its own plane, blended in up to
+// 30 degrees so nothing switches at a line: the face's normal comes from the position's derivatives
+// (constant over a triangle, and the water mesh's triangles are 1.2 m), the eye's side is the plane's, the
+// depth is measured across the sheet, the ripples are turned onto the slope, the tears fade out (a
+// flat-water look), and `cascade` lays whitewater on it -- streaks along the flow, running faster than the
+// river. "Down its flow" because the mesh's bank has slivers of its own: the edge triangles between a wet
+// corner and a fitted dry one tilt ACROSS the flow, 13-14 degrees on the QA scene's river, and taken for a
+// cascade one of them changed its shoreline from frame to frame (the depth forensics' water6_2 test).
 //
-// Flat water never enters any of it: under 12 degrees `steep` is exactly 0 and every branch is skipped.
+// Flat water never enters any of it: `steep` is exactly 0 under 20 degrees and every branch is skipped.
 // test_water_cascade_gpu.cpp holds the renderer to that: flat water is, byte for byte, what the shader
 // with these blocks removed draws.
-const kCascadeFlatCos: f32 = 0.9781476;   // cos 12 degrees: flatter than this is a river, untouched
+const kCascadeFlatCos: f32 = 0.9396926;   // cos 20 degrees: flatter than this is a river, untouched
 const kCascadeSteepCos: f32 = 0.8660254;  // cos 30 degrees: steeper than this is all cascade
 const kCascadeGrain: f32 = 0.45;          // metres: the whitewater's grain across the flow
 const kCascadeComb: f32 = 0.2;            // metres between the samples a streak is combed from (under half
@@ -556,16 +559,20 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // below that travels, each at its own offset into it.
     let desync = flowDesync(in.worldPos.xz);
     // ---- cascade (ADR-985) begin ----
-    // The face's own up, from the derivatives (so here, in uniform control flow), and how steep it is:
-    // exactly 0 under 12 degrees, 1 past 30. A camera below a falls sees its upper side, so on a slope
-    // the eye's side of the surface is the plane's, not a comparison of heights.
+    // The face's own up, from the derivatives (so here, in uniform control flow), and how steep it is down
+    // its flow: exactly 0 under 20 degrees or across the flow, 1 past 30 along it. A camera below a falls
+    // sees its upper side, so on a slope the eye's side of the surface is the plane's, not a comparison of
+    // heights.
     let faceCross = cross(vec3<f32>(dPdx.x, dpdx(in.worldPos.y), dPdx.y),
                           vec3<f32>(dPdy.x, dpdy(in.worldPos.y), dPdy.y));
     let faceSide = faceCross * inverseSqrt(max(dot(faceCross, faceCross), 1e-30));
     let faceUp = select(faceSide, -faceSide, faceSide.y < 0.0);
     var steep = 0.0;
     if (faceUp.y < kCascadeFlatCos) {
-        steep = 1.0 - smoothstep(kCascadeSteepCos, kCascadeFlatCos, faceUp.y);
+        // The face's up leans toward its downhill side; a cascade's downhill is its flow.
+        let downhill = faceUp.xz * inverseSqrt(max(dot(faceUp.xz, faceUp.xz), 1e-12));
+        steep = (1.0 - smoothstep(kCascadeSteepCos, kCascadeFlatCos, faceUp.y)) *
+                smoothstep(0.5, 0.8, dot(downhill, dir));
     }
     let cascadeUp = normalize(mix(vec3<f32>(0.0, 1.0, 0.0), faceUp, steep));
     if (steep > 0.0) {

@@ -151,9 +151,10 @@ The reference's 1.2 m step reads only a few metres from the lens: for water seen
 
 ## Steep water
 
-Water on a slope steeper than 12 degrees -- a falls, a flume down a hillside -- is shaded about its own
-plane ([ADR-985](decisions/ADR-985-water-on-a-steep-course-is-a-cascade.md)), fully past 30 degrees and
-blended between, so nothing switches at a line. The face's slope comes from the surface's own derivatives
+Water whose surface falls more than 20 degrees along its own flow -- a falls, a flume down a hillside -- is
+shaded about its own plane ([ADR-985](decisions/ADR-985-water-on-a-steep-course-is-a-cascade.md)), fully past 30
+degrees and blended between, so nothing switches at a line. "Along its flow" because the mesh's bank has slivers
+that tilt across the flow, and those are not cascades. The face's slope comes from the surface's own derivatives
 (one value per triangle of the water mesh), and four things follow from it:
 
 - which side of the surface the camera is on is the plane's side, so a camera below a falls sees its upper
@@ -166,7 +167,7 @@ blended between, so nothing switches at a line. The face's slope comes from the 
 `cascade` adds whitewater: streaks along the flow, in the foam's colour and composited as foam is,
 running three times the water's own speed and thinning out with the shoreline. Where a streak is too
 fine to resolve the whitewater fades to its mean, so a distant falls is a pale ribbon rather than a crawl.
-Flat water never takes any of this path: under 12 degrees the surface is byte-identical to the shader
+Flat water never takes any of this path: under 20 degrees the surface is byte-identical to the shader
 without it, `cascade` included (`test_water_cascade_gpu.cpp`).
 
 ```json

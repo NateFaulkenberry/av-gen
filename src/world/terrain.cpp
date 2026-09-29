@@ -338,8 +338,42 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
         const double a = ((sy * ((m11 * m22) - (sxz * sxz))) - (sx * ((sxy * m22) - (sxz * szy))) +
                           (sz * ((sxy * sxz) - (m11 * szy)))) /
                          det;
+        // Held between the lowest and the highest wet neighbour, and used only where the water actually
+        // descends across the window. On a gentle river the old answer -- the highest of the corner's
+        // eight neighbours inside the chunk -- is already within centimetres of the plane, and the fit
+        // moved the sheet's edge onto a bank sloping almost in its own plane, where the two took turns
+        // over a pixel as the camera moved (the depth forensics' water6_2 test, on the QA river). So the
+        // old answer stands, bit for bit, until the window (4.8 m across on a 1.2 m grid) spans kFitFrom of
+        // descent -- about 7 degrees -- and the fit takes over by kFitFull, about 17 degrees; blended, so a
+        // river that steepens does not step its edge. A falls (GV3's: 30-44 degrees, 3-4 m across the
+        // window) is all fit; a valley river is the old rule, which never stood more than a few centimetres
+        // proud on one (`avgen_water_probe`).
+        constexpr float kFitFrom = 0.6f;
+        constexpr float kFitFull = 1.5f;
+        float old = -std::numeric_limits<float>::infinity();
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int ni = i + dx;
+                const int nj = j + dz;
+                if ((dx == 0 && dz == 0) || ni < 0 || nj < 0 || ni > res || nj > res) {
+                    continue;
+                }
+                const Point& n = at(ni, nj);
+                if (n.wet) {
+                    old = std::max(old, n.surface);
+                }
+            }
+        }
         const float spread = hi - lo;
-        return std::clamp(static_cast<float>(a), lo - spread, hi);
+        if (spread <= kFitFrom && std::isfinite(old)) {
+            return old;
+        }
+        const float fitted = std::clamp(static_cast<float>(a), lo, hi);
+        if (!std::isfinite(old)) {
+            return fitted; // its only wet neighbours are two cells off: the old rule gave it the bed
+        }
+        const float t = std::clamp((spread - kFitFrom) / (kFitFull - kFitFrom), 0.0f, 1.0f);
+        return old + ((fitted - old) * (t * t * (3.0f - (2.0f * t))));
     };
 
     mesh.name = fmt::format("water_{}_{}", coord.x, coord.y);

@@ -50,6 +50,16 @@ meets the band and the dwell exactly as before.
   would take foot locking (the §14/§15 `footLock` over contact tracks) on four-legged rigs -- a locomotion
   change, recorded for the owner rather than made here.
 
+**Amended the same day, after the full CPU suite.** `test_stride_warp`'s ADR-829 case -- GV2's Rook turns on
+the spot at 3.03 s and walks off at 3.30 s -- measured a foot moving 0.128 model units in one posed frame
+(its bound is 0.06; a start from a stand moves one about 0.04): the rule handed Rook his walk while he was still
+pivoting. So a start is taken from a turn on the spot only once the turn is over (`|turnRate| <= turnEnter`);
+from `Idle` as before. Re-measured on the art pass's GV3 (90 alien starts, the cast now walking round the new
+heroes and the performers): median 0.018 m, p90 0.023 m, max 0.185 m per foot, standing seconds median 0.083 s
+-- the medians as above; the worst is a turn that now finishes before its walk. And GV2's trace changed with the
+rule, as it had to: `test_motion_matching_default_off`'s digest is re-pinned with the reason, after a diagnostic
+build with the rule off gave back the old digest exactly.
+
 ## Found on the way, not changed
 
 The ground layers plant a foot at its REST height above the ground whenever the body is grounded

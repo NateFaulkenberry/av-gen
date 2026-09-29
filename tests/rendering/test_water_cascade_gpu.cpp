@@ -262,9 +262,10 @@ TEST_CASE("flat water is byte-identical to the shader with no cascade code",
 
 TEST_CASE("the QA scene's river is byte-identical to the shader with no cascade code wherever it is flat",
           "[gpu][renderer][water][cascade][identity]") {
-    // The shipped world's river is not flat everywhere: a few slivers of its mesh, at the bank, are steeper
-    // than 12 degrees and take the cascade path by design. So a third arm -- the live shader painting every
-    // pixel that path takes -- marks them, and every pixel the code changes must be one of those.
+    // The shipped world's river is not flat everywhere: a few slivers of its mesh, at the bank, tilt 13-14
+    // degrees across the flow. They no longer take the cascade path (it wants 20 degrees down the flow), but
+    // whether some other face ever does is the world's business: a third arm -- the live shader painting
+    // every pixel the path takes -- marks them, and every pixel the code changes must be one of those.
     if (!fs::is_regular_file(qaWaterScene())) {
         SKIP("the water QA scene is not present");
     }

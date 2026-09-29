@@ -50,7 +50,11 @@ Activity Gait::select(const GaitSettings& settings, Activity proposed, float spe
     if (speed <= kTurnRestSpeed) {
         restedSinceStep_ = true;
     }
-    const bool standing = gait_ == Activity::Idle || gait_ == Activity::Turn;
+    // From a turn on the spot only once the turn is over: a body still pivoting that is handed its walk
+    // switches clips mid-pivot, and GV2's Rook, turning at 3.03 s, moved a foot 0.13 model units in one
+    // posed frame when it did (test_stride_warp's ADR-829 case; a start from a stand moves one 0.04).
+    const bool standing =
+        gait_ == Activity::Idle || (gait_ == Activity::Turn && std::abs(turnRate) <= settings.turnEnter);
     const bool starting = standing && restedSinceStep_ && speed > settings.moveExit;
 
     // The bands, read in the direction the body is actually going. `moving_` and `running_` are

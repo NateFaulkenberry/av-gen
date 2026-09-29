@@ -52,7 +52,14 @@ namespace {
 // loop memory, the half-tolerance post return and a hurried reaction. No matcher code changed, the
 // scene still carries no key, and the control arm below still shows the key changes the trace. The
 // old value was 0x6e863d80f8c6146f.
-constexpr std::uint64_t kPreWiringDigest = 0x3375850dc3acc580ull;
+//
+// Re-pinned a fourth time, by ADR-982, for the same reason: a standing gait that has rested since its
+// last step now takes its walk as soon as the body is over `moveExit` (from a turn on the spot, once the
+// turn is over), so an alien setting off from rest starts its walk cycle a few frames sooner and its rig's
+// pose differs from then on. Checked by switching ADR-982's rule off in a diagnostic build: the trace
+// gave back 0x3375850dc3acc580 exactly. No matcher code changed, the scene still carries no key, and the
+// control arm below still shows the key changes the trace. The old value was 0x3375850dc3acc580.
+constexpr std::uint64_t kPreWiringDigest = 0x7e0ba810e539e375ull;
 
 fs::path glowmere() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";

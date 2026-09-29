@@ -86,8 +86,8 @@ struct WaterSettings {
     // unless something is driving it; it is a modulation target, not a look.
     float swell = 0.0f;
     // Whitewater on steep water (ADR-985): how bright the streaks a falls carries are, in the foam's
-    // colour. Only a surface steeper than 12 degrees has any (all of it past 30); flat water is
-    // untouched whatever this is. 0 = a steep reach shaded about its own plane with no whitewater.
+    // colour. Only a surface steeper than 20 degrees down its own flow has any (all of it past 30); flat
+    // water is untouched whatever this is. 0 = a steep reach shaded about its own plane with no whitewater.
     float cascade = 0.0f;
 
     // ---- tears (ADR-916) ------------------------------------------------------------------------

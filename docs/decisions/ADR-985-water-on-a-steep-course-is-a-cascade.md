@@ -36,12 +36,17 @@ Together: a flat panel with a brick wall on it.
 
 ## Decision
 
-A surface steeper than 12 degrees is shaded about its own plane, fully past 30 degrees and blended between so
-nothing switches at a line.
+A surface steeper than 20 degrees down its own flow is shaded about its own plane, fully past 30 degrees and
+blended between so nothing switches at a line. (First written as 12 degrees in any direction; the GPU suite's
+water6_2 forensics test then found one pixel of the QA scene's river changing hands twice under a 2 cm camera
+move: a bank sliver -- an edge triangle between a wet corner and a fitted dry one, tilted 13-14 degrees ACROSS
+the flow -- taken for a cascade, its shoreline read across the sheet. A cascade falls along its flow; the
+slivers tilt across it. The falls are 30-44 degrees along theirs, so they are unchanged.)
 
 1. **The face.** Its up comes from the position's screen derivatives (`cross(dpdx, dpdy)`, taken in uniform control
    flow beside the existing footprint derivatives; constant over a triangle, and the water mesh's triangles are
-   1.2 m). `steep` is exactly 0 under 12 degrees -- the branch that computes it is not entered -- and every change
+   1.2 m). `steep` is exactly 0 under 20 degrees -- the branch that computes it is not entered -- and is scaled
+   by how nearly the face's downhill direction is the flow's (0 at 60 degrees off it, 1 within 37); every change
    below is inside `if (steep > 0.0)`.
 2. **The eye's side** is the plane's: `dot(toEye, up) < 0`, so a camera below a falls sees its upper side.
 3. **The depth** is measured across the sheet: `thickness * |dot(v, up)|`.
@@ -63,8 +68,8 @@ Every addition sits between `cascade (ADR-985)` markers, so a test can strip the
 - **Flat water is untouched, byte for byte.** A flat synthetic sheet, two views, tears on and off, two seconds,
   `cascade` 1.5: identical to the shader with the blocks removed (8 of 8), and the same comparison on a 35-degree
   sheet differs (the control). The QA scene's real river: every pixel the code changes is one a third arm (the live
-  shader painting every pixel that takes the path) marks as steep -- three pixels on bank slivers steeper than 12
-  degrees in one pose, none elsewhere.
+  shader painting every pixel that takes the path) marks as steep. (At 12 degrees in any direction that was three
+  pixels of bank slivers in one pose, and the forensics suite caught one of them flickering; see the Decision.)
 - **The eye's height no longer cuts a falls in two.** A level camera looking up a 35-degree sheet: the log ratio of
   the rows just above and just below the eye's height is 0.007, against 1.023 without the code.
 - **The tears are gone from a slope past 30 degrees**: a trace of tears against a full set draws the same bytes;
