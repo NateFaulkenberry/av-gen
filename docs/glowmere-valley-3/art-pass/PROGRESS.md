@@ -6,10 +6,10 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, 23:55):** the pass is complete. Every item and the addendum are done and verified; the Critic
-  ran once (on `f2a01447`'s final), its one necessary correction is in (`c20c182c`), and the owner's final is
-  rendered from that commit (`GV3-art-pass-final.mp4`, below). Left: both suites (running under the lock,
-  `scratchpad/art/suites.sh`, results in `suites.rc`), then the final report.
+- **Status (2026-09-29, 02:35): COMPLETE.** Every item and the addendum are done and verified; the Critic ran once
+  (on `f2a01447`'s final), its one necessary correction is in (`c20c182c`); the first full suite run found five
+  defects of mine, all fixed at the cause (`6aa3701d`); both suites pass by exit code on `6aa3701d`; the owner's
+  final is rendered from `6aa3701d` (`GV3-art-pass-final.mp4`). Nothing is left but the coordinator's merge.
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -363,13 +363,15 @@ Outputs in `verify3/` (8 stills, all rc 0).
 
 ## The final (the owner's morning render), after the correction
 
-- **`~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-final.mp4`**, rendered at `c20c182c` (clean tree) by
-  `tools/gpu-lock.sh scratchpad/art/final.sh`: `avgen --headless --project examples/world/glowmere-valley-3.json
-  --render <file> --size 1920x1080 --fps 60 --range 0:225.5 --supersample 2`, the project's own h264 q90 with the
-  song muxed. 1920x1080, 60 fps, 13,530 frames, 225.5 s, AAC 48 kHz stereo, 925.8 MB (32.8 Mb/s). Rendered
-  23:13:18-23:48:01, 2,083 s (34.7 min), rc 0, no error lines (the log's warnings are r7b's own: lodCount, the
-  nav-grid pieces, the farm animals' foot-slip notes, the dead-route false positives at load).
-  1080p because it fits easily: 35 minutes a pass.
+- **`~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-final.mp4`**, rendered at **`6aa3701d`** (clean tree; the
+  commit both suites passed on) by `scratchpad/art/finish.sh` under `tools/gpu-lock.sh`: `avgen --headless --project
+  examples/world/glowmere-valley-3.json --render <file> --size 1920x1080 --fps 60 --range 0:225.5 --supersample 2`,
+  the project's own h264 q90 with the song muxed. 1920x1080, 60 fps, 13,530 frames, 225.5 s, AAC 48 kHz stereo,
+  926.0 MB (32.9 Mb/s). Rendered 2026-09-29 01:55:14-02:29:31, 2,057 s (34.3 min), rc 0, no error lines (the log's
+  warnings are r7b's own: lodCount, the nav-grid pieces, the farm animals' foot-slip notes, the dead-route false
+  positives at load). 1080p because it fits easily: 35 minutes a pass.
+- It replaced the same render from `c20c182c` (23:13-23:48); the suite-driven fixes between the two change the
+  film's measured look by at most 0.001 of a shot's mean luma (`shotluma-final.json` vs `shotluma-final3.json`).
 - The Critic's input is kept beside it as `GV3-art-pass-critic-input-f2a01447.mp4` (same settings, 2,076 s).
 - **The correction at film scale** (`scratchpad/art/shotluma.py`: 6 frames a shot, Rec. 709 luma of the decoded
   frames and the share with a channel >= 250; on the Critic's input it tracks the Critic's own per-shot mean luma
@@ -402,7 +404,12 @@ Outputs in `verify3/` (8 stills, all rc 0).
   ADR-985 amended), after the stripped-shader experiment above showed the slivers were not the strobing pixel
   but were still not cascades.
 - Targeted re-runs pass: CPU `[adr982],[gait],[adr980],[water],[stride]` 81 cases; GPU `[cascade],[water],
-  [forensics]` 93 cases. Full suites again, then the final re-rendered from the fixed commit.
+  [forensics]` 93 cases.
+- **Second full run** (`scratchpad/art/finish.sh`, under the lock, at `6aa3701d`, clean tree):
+  `build/release/tests/avgen_render_tests` **rc 0** (554 cases: 553 passed, 1 skipped -- the NDI runtime is not
+  installed; 617,466 assertions; 1,015 s). `build/release/tests/avgen_tests` **rc 0** (3,862 cases: 3,842 passed,
+  19 skipped, 1 failed as expected -- the one FAILED line is the `[!shouldfail]` slope lean,
+  `test_character_lab_slopes.cpp:187`; 9,143,399 assertions; 2,149 s).
 
 ## Plan (the rest, in order)
 
@@ -412,8 +419,8 @@ Outputs in `verify3/` (8 stills, all rc 0).
 2. ~~The first final and the Critic, once~~ (job `job_1a0eb13123079bf2e`); ~~its one correction~~ `c20c182c`,
    checked with stills against r7b (`verify4/`).
 3. ~~The owner's final~~ from `c20c182c` (`GV3-art-pass-final.mp4`), measured shot by shot against r7.
-4. Both suites under the lock (`scratchpad/art/suites.sh` -> `suites.rc`), judged by exit code; then the final
-   report. Variant projects are already deleted.
+4. ~~Both suites~~: failed once (five defects, fixed in `6aa3701d`), then both rc 0 on `6aa3701d`; ~~the final~~
+   re-rendered from `6aa3701d`. Done; the coordinator merges.
 
 ## Log
 
