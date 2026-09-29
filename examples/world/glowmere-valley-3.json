@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "6ca3d366d95d0ff863fa8971c9ffa8e14eed08efa668473996e87877dc7ee4b3",
-        "size": 334859
+        "sha256": "cc74095bdb3eb76f63daf41f948f913c3395d1ea287dfec3ae7e3c47554e8408",
+        "size": 334860
       }
     }
   },
@@ -6944,7 +6944,7 @@
     "nodes/elder-2-stem/opacity": 1.0,
     "nodes/elder-2-stem/position": [
       -12.0,
-      4.039,
+      3.4356,
       52.0
     ],
     "nodes/elder-2-stem/rotation": [

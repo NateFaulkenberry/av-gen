@@ -165,6 +165,39 @@ def build(name, index, where, height, anchor, unit_h, gill_r, ground, seed):
     return nodes, hero, (spore_radius, spore_rate, spore_capacity), structure
 
 
+def join_parts(project, scene, report):
+    """Every hero's four parts at one place (revision round 1, ADR-986).
+
+    GV2's projects stand the elder's stem 0.6034 m above its cap, underside and gills
+    (`nodes/elder-2-stem/position`): a hand fix for the gap the generator left between a curved stem's
+    top and the cap's underside. It did not close it -- the stem's side still stood 0.27 m clear of the
+    underside's opening -- and since ADR-986 the generator joins the two itself, so the stem goes back
+    to where the other three parts are. Called AFTER seating (`world.seat_heroes`), which seats a hero by
+    its stem's base: the cap, the underside and the gills keep the height they have always had, and the
+    stem's base goes a further 0.6 m into the ground under the elder's pool."""
+    params = project["parameters"]
+    groups = {}
+    for node in scene["nodes"]:
+        for role in PART_ROLES:
+            if node.get("kind") == "procedural" and node["name"].endswith("-" + role):
+                src = node.get("procedural", {}).get("source", {})
+                if src.get("kind") == "generated":
+                    groups.setdefault(node["name"][: -len(role) - 1], {})[role] = node
+    for name, parts in sorted(groups.items()):
+        cap = parts.get("cap")
+        if cap is None:
+            continue
+        where = params.get(f"nodes/{cap['name']}/position", cap["position"])
+        for role, node in parts.items():
+            key = f"nodes/{node['name']}/position"
+            here = params.get(key, node["position"])
+            if any(abs(a - b) > 1e-6 for a, b in zip(here, where)):
+                node["position"] = list(where)
+                if key in params:
+                    params[key] = list(where)
+                report.append(f"hero {name}: its {role} joined its cap (was {here[1] - where[1]:+.4f} m in y)")
+
+
 def apply(project, scene, ground, report):
     names = [f"{n}-{p}" for n, *_ in NEW_HEROES for p in PART_ROLES + ["spores"]]
     scene["nodes"] = [n for n in scene["nodes"] if n.get("name") not in names]

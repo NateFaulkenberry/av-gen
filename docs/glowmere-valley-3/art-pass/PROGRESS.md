@@ -6,10 +6,11 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 02:35): COMPLETE.** Every item and the addendum are done and verified; the Critic ran once
-  (on `f2a01447`'s final), its one necessary correction is in (`c20c182c`); the first full suite run found five
-  defects of mine, all fixed at the cause (`6aa3701d`); both suites pass by exit code on `6aa3701d`; the owner's
-  final is rendered from `6aa3701d` (`GV3-art-pass-final.mp4`). Nothing is left but the coordinator's merge.
+- **Status (2026-09-29, 08:00): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
+  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Round 0 (the pass) is
+  complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it is. Round 1 delivers
+  `GV3-art-pass-r1.mp4`, stills in `~/Desktop/av-gen-review/20-gv3-art-pass/r1/`, a "Revision round 1" section in
+  that folder's `REPORT.md`; the Critic runs up to about three passes this round (the owner's words).
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -410,6 +411,26 @@ Outputs in `verify3/` (8 stills, all rc 0).
   installed; 617,466 assertions; 1,015 s). `build/release/tests/avgen_tests` **rc 0** (3,862 cases: 3,842 passed,
   19 skipped, 1 failed as expected -- the one FAILED line is the `[!shouldfail]` slope lean,
   `test_character_lab_slopes.cpp:187`; 9,143,399 assertions; 2,149 s).
+
+## Revision round 1 (owner, 2026-09-29): tracking
+
+The owner's five items and the Critic addendum, verbatim, with the coordinator's notes: `00-brief.md`, last section.
+ADRs 986-989 remain for it. The order: stems (item 1) and the musicians' class (item 5, proved on its own commit),
+then foot locking (2), the warp rim (3), the rainbow lift (4), one verification batch, frame costs, then the Critic
+passes (up to about three) on the bland shots, both suites, the r1 render.
+
+1. **Stems and caps -- done in code (ADR-986), to see in the verification batch.** Measured with geometry
+   (`avgen_tests "probe: hero stem-to-cap gaps"`): ALL TWELVE heroes had a gap between the stem's top and the
+   underside's opening, 0.06-0.52 m at GV3's scale (sail 0.52, ridge 0.39, elder 0.27 even with GV2's hand-raised
+   stem, bloom 0.23, scree 0.22, lantern 0.18, umbra 0.18, cairn 0.11, opal 0.09, ember 0.08, veil 0.06, spire 0.06).
+   Cause: a curved stem's top ring is perpendicular to its tangent (up to 43 deg of lean) while the opening lies in
+   the cap's tilted plane; the alignment check compared centres only. Not the wind (sub-millimetre at the heroes'
+   motion values) and not per-instance variation (one `single` instance per part, all four at one transform but
+   the elder's stem). Fix in the generator: the stem's last three rings turn to the cap's axis onto the opening's
+   centre, and one more ring carries it inside the cap. After: 0.6-4 cm (0.04-0.08 stem radii), none through the
+   top; population median 0.45 -> 0.056 radii. GV3's elder stem joined to its cap (`heroes.join_parts`, after
+   seating: the cap keeps its height). New test `[adr986]`. The search no longer reproduces the record (its
+   population changed), so its test writes the canonical record only with `MUSHROOM_WRITE_RECORD=1`.
 
 ## Plan (the rest, in order)
 

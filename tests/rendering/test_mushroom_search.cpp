@@ -311,7 +311,15 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
         heroes.push_back(search::candidateToJson(schema, population[w]));
     }
     doc["heroes"] = std::move(heroes);
-    const fs::path record = fs::path(AVGEN_SOURCE_DIR) / "examples" / "organisms" / "glowmere2-heroes.json";
+    // The canonical record is what Glowmere's heroes ARE, by value; it is not rewritten by a run unless one
+    // asks (MUSHROOM_WRITE_RECORD=1). Since ADR-986 joined every stem to its cap, the population is not
+    // the one the record was selected from -- the gate now passes candidates it rejected for that very gap,
+    // and the stems' bounds feed the features -- so a re-run picks a different twelve from the second pick
+    // on, and writing them over the record would take away the heroes `tools/gv3/heroes.py` builds.
+    const bool canonical = std::getenv("MUSHROOM_WRITE_RECORD") != nullptr;
+    const fs::path record = canonical
+                                ? fs::path(AVGEN_SOURCE_DIR) / "examples" / "organisms" / "glowmere2-heroes.json"
+                                : outDir / "glowmere2-heroes.json";
     fs::create_directories(record.parent_path(), ec);
     std::ofstream(record) << doc.dump(1);
     std::printf("\n  sheet: %s\n  record: %s\n", (outDir / "mushroom-winners.png").string().c_str(),

@@ -297,6 +297,7 @@ def main():
     ground = Ground(world_block(scene))
     heroes.apply(project, scene, ground, report)  # the art pass's two new heroes, seated by world.apply
     world.apply(project, scene, ground, report)
+    heroes.join_parts(project, scene, report)  # after seating: every hero's parts at its cap's place (ADR-986)
     cast.apply(project, scene)
     musicians.apply(project, scene, ground, report)  # the art pass's performers (after the cast: an entity each)
     look.apply_base(project, scene)
