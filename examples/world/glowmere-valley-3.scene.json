@@ -12382,8 +12382,8 @@
         "slug": "s01",
         "placement": "free",
         "position": [
-          14.0,
-          5.529,
+          20.0,
+          5.563,
           88.0
         ],
         "target": [
@@ -12439,17 +12439,17 @@
         "slug": "s04",
         "placement": "free",
         "position": [
-          22.0,
-          7.953,
-          78.0
+          16.0,
+          10.078,
+          76.0
         ],
         "target": [
           -1.7,
-          11.486,
+          9.986,
           65.4
         ],
-        "fov": 24.616,
-        "focalLength": 55.0,
+        "fov": 33.3985,
+        "focalLength": 40.0,
         "autoDirector": false
       },
       {

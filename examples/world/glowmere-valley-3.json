@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "3bf117764c37f854943357607d7e4f4ae81982e84dbea4e8d7fc48d9542d272a",
-        "size": 334831
+        "sha256": "e705c03eb24b51673fe37f0035781c19bdf6c692d581130f05db3af8327c8042",
+        "size": 334832
       }
     }
   },
@@ -1727,14 +1727,14 @@
         "repeatSeconds": 0.0
       },
       "parameters": {
-        "strength": 0.4,
+        "strength": 0.8,
         "boundsScale": 2.2,
         "radius": 8.0,
         "radialWeight": 0.15,
         "bowWeight": 1.0,
-        "swirl": 0.06,
-        "turbulence": 0.1,
-        "chroma": 0.06,
+        "swirl": 0.1,
+        "turbulence": 0.18,
+        "chroma": 0.12,
         "rimColor": [
           0.55,
           0.85,
@@ -1743,7 +1743,7 @@
         "rimIntensity": 0.0,
         "falloff": 1.6,
         "edgeSoftness": 0.45,
-        "velocityStretch": 1.0,
+        "velocityStretch": 1.4,
         "speedForFull": 18.0,
         "turbulenceScale": 2.0,
         "turbulenceSpeed": 0.35,
@@ -1751,39 +1751,6 @@
         "offsetX": 0.0,
         "offsetY": 0.0,
         "offsetZ": 0.0
-      }
-    },
-    {
-      "id": "visitor-wake",
-      "type": "velocityDistortion",
-      "name": "Spacetime wake",
-      "owner": {
-        "kind": "entity",
-        "name": "visitor"
-      },
-      "enabled": true,
-      "order": 0,
-      "style": "",
-      "activation": "always",
-      "timing": {
-        "delay": 0.0,
-        "lifetime": 0.0,
-        "fadeIn": 0.0,
-        "fadeOut": 0.0,
-        "windowStart": 0.0,
-        "windowSeconds": 6.0,
-        "repeatSeconds": 0.0
-      },
-      "parameters": {
-        "strength": 0.7,
-        "persistence": 1.2,
-        "width": 1.2,
-        "rippleFrequency": 1.2,
-        "rippleSpeed": 0.6,
-        "chroma": 0.06,
-        "minSpeed": 6.0,
-        "speedForFull": 40.0,
-        "edgeSoftness": 0.5
       }
     },
     {
@@ -1808,14 +1775,14 @@
         "repeatSeconds": 0.0
       },
       "parameters": {
-        "strength": 0.4,
+        "strength": 0.8,
         "boundsScale": 2.2,
         "radius": 8.0,
         "radialWeight": 0.15,
         "bowWeight": 1.0,
-        "swirl": 0.06,
-        "turbulence": 0.1,
-        "chroma": 0.06,
+        "swirl": 0.1,
+        "turbulence": 0.18,
+        "chroma": 0.12,
         "rimColor": [
           0.55,
           0.85,
@@ -1824,7 +1791,7 @@
         "rimIntensity": 0.0,
         "falloff": 1.6,
         "edgeSoftness": 0.45,
-        "velocityStretch": 1.0,
+        "velocityStretch": 1.4,
         "speedForFull": 18.0,
         "turbulenceScale": 2.0,
         "turbulenceSpeed": 0.35,
@@ -1832,39 +1799,6 @@
         "offsetX": 0.0,
         "offsetY": 0.0,
         "offsetZ": 0.0
-      }
-    },
-    {
-      "id": "scout-wake",
-      "type": "velocityDistortion",
-      "name": "Spacetime wake",
-      "owner": {
-        "kind": "entity",
-        "name": "scout"
-      },
-      "enabled": true,
-      "order": 0,
-      "style": "",
-      "activation": "always",
-      "timing": {
-        "delay": 0.0,
-        "lifetime": 0.0,
-        "fadeIn": 0.0,
-        "fadeOut": 0.0,
-        "windowStart": 0.0,
-        "windowSeconds": 6.0,
-        "repeatSeconds": 0.0
-      },
-      "parameters": {
-        "strength": 0.7,
-        "persistence": 1.2,
-        "width": 1.2,
-        "rippleFrequency": 1.2,
-        "rippleSpeed": 0.6,
-        "chroma": 0.06,
-        "minSpeed": 6.0,
-        "speedForFull": 40.0,
-        "edgeSoftness": 0.5
       }
     },
     {
@@ -1889,11 +1823,11 @@
             1.0,
             0.8799999952316284
           ],
-          "edgeIntensity": 5.5,
-          "intensity": 3.2,
+          "edgeIntensity": 2.2,
+          "intensity": 1.4,
           "rainbow": true,
-          "rainbowBrightness": 0.9,
-          "rainbowSaturation": 0.62,
+          "rainbowBrightness": 0.75,
+          "rainbowSaturation": 0.55,
           "rainbowScale": 0.035,
           "rainbowSpeed": 0.34,
           "width": 1.0
@@ -1908,32 +1842,32 @@
           ],
           "falloff": 1.5,
           "forwardWeight": 1.0,
-          "frontWidth": 3.0,
+          "frontWidth": 2.2,
           "kind": "radial",
-          "range": 34.0,
+          "range": 22.0,
           "ringCount": 2.0,
-          "speed": 10.0,
+          "speed": 7.0,
           "startOffset": 0.0,
           "targetWeight": 1.2000000476837158,
-          "trailLength": 12.0,
+          "trailLength": 8.0,
           "velocityWeight": 0.6000000238418579,
-          "verticalExtent": 6.0,
+          "verticalExtent": 5.0,
           "verticalGrowth": 0.6499999761581421
         },
         "response": {
-          "emissive": 1.2,
-          "foliage": 1.7,
-          "ground": 0.8,
-          "surface": 0.6
+          "emissive": 0.8,
+          "foliage": 0.9,
+          "ground": 0.5,
+          "surface": 0.25
         },
         "source": {
           "kind": "owner"
         },
         "sparkle": {
-          "density": 1.1,
+          "density": 1.0,
           "enabled": true,
           "fadeDistance": 85.0,
-          "intensity": 2.0,
+          "intensity": 1.0,
           "seed": 2,
           "size": 0.20000000298023224,
           "speed": 0.6000000238418579
@@ -1979,13 +1913,13 @@
       "parameters": {
         "pattern": 0.0,
         "color": [
-          0.95,
-          0.35,
-          0.85
+          0.62,
+          0.45,
+          1.0
         ],
-        "intensity": 3.0,
+        "intensity": 1.4,
         "scale": 22.0,
-        "coverage": 0.34,
+        "coverage": 0.3,
         "colorVariation": 0.5,
         "breatheRate": 0.3,
         "breatheDepth": 0.7,
@@ -2016,11 +1950,11 @@
             1.0,
             0.8799999952316284
           ],
-          "edgeIntensity": 5.5,
-          "intensity": 3.2,
+          "edgeIntensity": 2.2,
+          "intensity": 1.4,
           "rainbow": true,
-          "rainbowBrightness": 0.9,
-          "rainbowSaturation": 0.62,
+          "rainbowBrightness": 0.75,
+          "rainbowSaturation": 0.55,
           "rainbowScale": 0.035,
           "rainbowSpeed": 0.26,
           "width": 1.0
@@ -2035,32 +1969,32 @@
           ],
           "falloff": 1.5,
           "forwardWeight": 1.0,
-          "frontWidth": 3.0,
+          "frontWidth": 2.2,
           "kind": "radial",
-          "range": 34.0,
+          "range": 22.0,
           "ringCount": 2.0,
-          "speed": 10.0,
+          "speed": 7.0,
           "startOffset": 0.0,
           "targetWeight": 1.2000000476837158,
-          "trailLength": 12.0,
+          "trailLength": 8.0,
           "velocityWeight": 0.6000000238418579,
-          "verticalExtent": 6.0,
+          "verticalExtent": 5.0,
           "verticalGrowth": 0.6499999761581421
         },
         "response": {
-          "emissive": 1.2,
-          "foliage": 1.7,
-          "ground": 0.8,
-          "surface": 0.6
+          "emissive": 0.8,
+          "foliage": 0.9,
+          "ground": 0.5,
+          "surface": 0.25
         },
         "source": {
           "kind": "owner"
         },
         "sparkle": {
-          "density": 1.1,
+          "density": 1.0,
           "enabled": true,
           "fadeDistance": 85.0,
-          "intensity": 2.0,
+          "intensity": 1.0,
           "seed": 2,
           "size": 0.20000000298023224,
           "speed": 0.6000000238418579
@@ -2110,15 +2044,55 @@
           0.95,
           0.78
         ],
-        "intensity": 3.0,
+        "intensity": 1.4,
         "scale": 22.0,
-        "coverage": 0.34,
+        "coverage": 0.3,
         "colorVariation": 0.5,
         "breatheRate": 0.3,
         "breatheDepth": 0.7,
         "waveSpeed": 0.45,
         "waveInterval": 5.54,
         "waveGain": 1.6
+      }
+    },
+    {
+      "id": "drummer-light",
+      "type": "glow",
+      "name": "The drummer's light",
+      "owner": {
+        "kind": "entity",
+        "name": "drummer"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "gain": 0.5,
+        "tint": [
+          1.0,
+          0.56,
+          0.2
+        ],
+        "glow": 0.0,
+        "rim": 0.0,
+        "rimColor": [
+          1.0,
+          0.78,
+          0.42
+        ],
+        "rimPower": 2.5,
+        "spill": false,
+        "recolour": 0.0
       }
     }
   ],
@@ -16648,6 +16622,7 @@
       1.94,
       1.94
     ],
+    "fx/drummer-light/gain": 0.5,
     "post/referenceHeight": 1080.0,
     "scene/fogSky": 0.5,
     "scene/fogSkyDistance": 0.0,
@@ -19160,7 +19135,7 @@
       "source": "timeline.kick",
       "target": "fx/drummer-aura/intensity",
       "component": -1,
-      "amount": 5.0,
+      "amount": 1.6,
       "op": "add",
       "polarity": "unipolar",
       "enabled": true,
@@ -19194,7 +19169,7 @@
       "source": "audio.mid",
       "target": "fx/keyboardist-aura/intensity",
       "component": -1,
-      "amount": 4.0,
+      "amount": 1.4,
       "op": "add",
       "polarity": "unipolar",
       "enabled": true,
@@ -19267,7 +19242,7 @@
       "source": "timeline.kick",
       "target": "fx/drummer-hero-pulse/intensity",
       "component": -1,
-      "amount": 8.0,
+      "amount": 1.5,
       "op": "add",
       "polarity": "unipolar",
       "enabled": true,
@@ -19319,7 +19294,7 @@
       "source": "timeline.kick",
       "target": "fx/keyboardist-hero-pulse/intensity",
       "component": -1,
-      "amount": 8.0,
+      "amount": 1.5,
       "op": "add",
       "polarity": "unipolar",
       "enabled": true,
@@ -19506,32 +19481,12 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse drummer",
-        "time": 0.46
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse keyboardist",
-        "time": 0.46
-      },
-      {
-        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 2.306154
       },
       {
         "kind": "cue",
         "name": "hero pulse lantern-cap",
-        "time": 2.306154
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse drummer",
-        "time": 2.306154
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse keyboardist",
         "time": 2.306154
       },
       {
@@ -19546,32 +19501,12 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse drummer",
-        "time": 4.152308
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse keyboardist",
-        "time": 4.152308
-      },
-      {
-        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 5.998462
       },
       {
         "kind": "cue",
         "name": "hero pulse lantern-cap",
-        "time": 5.998462
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse drummer",
-        "time": 5.998462
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse keyboardist",
         "time": 5.998462
       },
       {
@@ -21437,10 +21372,52 @@
     },
     "events": [
       {
+        "id": "ufo.drummer-glow",
+        "what": {
+          "amount": [
+            3.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "hold": 3.6,
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.3,
+          "target": "fx/drummer-light/glow"
+        },
+        "when": {
+          "kind": "time",
+          "time": 172.7559620928563
+        }
+      },
+      {
+        "id": "ufo.drummer-rim",
+        "what": {
+          "amount": [
+            5.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "hold": 3.6,
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.3,
+          "target": "fx/drummer-light/rim"
+        },
+        "when": {
+          "kind": "time",
+          "time": 172.7559620928563
+        }
+      },
+      {
         "id": "ufo.e1-far-survey-scout-warp-quiet",
         "what": {
           "amount": [
-            -0.4000000059604645,
+            -0.800000011920929,
             0.0,
             0.0,
             0.0
@@ -21477,50 +21454,10 @@
         }
       },
       {
-        "id": "ufo.e1-far-survey-scout-wake-quiet",
-        "what": {
-          "amount": [
-            -0.699999988079071,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 0.5,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 13.865092392734324
-        }
-      },
-      {
-        "id": "ufo.e1-far-survey-scout-wake-back",
-        "what": {
-          "amount": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 1.2,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 22.63175917861028
-        }
-      },
-      {
         "id": "ufo.e3-far-lift-scout-warp-quiet",
         "what": {
           "amount": [
-            -0.4000000059604645,
+            -0.800000011920929,
             0.0,
             0.0,
             0.0
@@ -21557,50 +21494,10 @@
         }
       },
       {
-        "id": "ufo.e3-far-lift-scout-wake-quiet",
-        "what": {
-          "amount": [
-            -0.699999988079071,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 0.5,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 65.58482684408071
-        }
-      },
-      {
-        "id": "ufo.e3-far-lift-scout-wake-back",
-        "what": {
-          "amount": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 1.2,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 71.8848268440807
-        }
-      },
-      {
         "id": "ufo.e4-river-pair-scout-warp-quiet",
         "what": {
           "amount": [
-            -0.4000000059604645,
+            -0.800000011920929,
             0.0,
             0.0,
             0.0
@@ -21637,50 +21534,10 @@
         }
       },
       {
-        "id": "ufo.e4-river-pair-scout-wake-quiet",
-        "what": {
-          "amount": [
-            -0.699999988079071,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 0.5,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 102.5041232741489
-        }
-      },
-      {
-        "id": "ufo.e4-river-pair-scout-wake-back",
-        "what": {
-          "amount": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 1.2,
-          "target": "fx/scout-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 111.90412341720004
-        }
-      },
-      {
         "id": "ufo.e5-centrepiece-visitor-warp-quiet",
         "what": {
           "amount": [
-            -0.4000000059604645,
+            -0.800000011920929,
             0.0,
             0.0,
             0.0
@@ -21710,46 +21567,6 @@
           "mode": "add",
           "seconds": 1.2,
           "target": "fx/visitor-warp/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 177.699295392811
-        }
-      },
-      {
-        "id": "ufo.e5-centrepiece-visitor-wake-quiet",
-        "what": {
-          "amount": [
-            -0.699999988079071,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 0.5,
-          "target": "fx/visitor-wake/strength"
-        },
-        "when": {
-          "kind": "time",
-          "time": 170.33929533082218
-        }
-      },
-      {
-        "id": "ufo.e5-centrepiece-visitor-wake-back",
-        "what": {
-          "amount": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "interp": "smooth",
-          "kind": "setParameter",
-          "mode": "add",
-          "seconds": 1.2,
-          "target": "fx/visitor-wake/strength"
         },
         "when": {
           "kind": "time",
@@ -42107,8 +41924,8 @@
           {
             "time": 0.0,
             "value": [
-              14.0,
-              5.529,
+              20.0,
+              5.563,
               88.0
             ],
             "interp": "linear"
@@ -42116,8 +41933,8 @@
           {
             "time": 7.847949,
             "value": [
-              4.0,
-              6.611,
+              10.0,
+              6.723,
               74.0
             ],
             "interp": "linear"
@@ -47987,6 +47804,32 @@
       "cues": [
         {
           "effect": {
+            "id": "drummer-light",
+            "owner": "drummer",
+            "type": "glow"
+          },
+          "field": "glow",
+          "holdSeconds": 3.6,
+          "key": "drummer-glow",
+          "on": "setpiece/e5-centrepiece/lift",
+          "rampSeconds": 1.3,
+          "value": 3.0
+        },
+        {
+          "effect": {
+            "id": "drummer-light",
+            "owner": "drummer",
+            "type": "glow"
+          },
+          "field": "rim",
+          "holdSeconds": 3.6,
+          "key": "drummer-rim",
+          "on": "setpiece/e5-centrepiece/lift",
+          "rampSeconds": 1.3,
+          "value": 5.0
+        },
+        {
+          "effect": {
             "id": "scout-warp",
             "owner": "scout",
             "type": "spaceWarp"
@@ -48007,31 +47850,7 @@
           "key": "e1-far-survey-scout-warp-back",
           "on": "setpiece/e1-far-survey/depart",
           "rampSeconds": 1.2,
-          "value": 0.4000000059604645
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e1-far-survey-scout-wake-quiet",
-          "on": "setpiece/e1-far-survey/beam",
-          "rampSeconds": 0.5,
-          "value": 0.0
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e1-far-survey-scout-wake-back",
-          "on": "setpiece/e1-far-survey/depart",
-          "rampSeconds": 1.2,
-          "value": 0.699999988079071
+          "value": 0.800000011920929
         },
         {
           "effect": {
@@ -48055,31 +47874,7 @@
           "key": "e3-far-lift-scout-warp-back",
           "on": "setpiece/e3-far-lift/depart",
           "rampSeconds": 1.2,
-          "value": 0.4000000059604645
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e3-far-lift-scout-wake-quiet",
-          "on": "setpiece/e3-far-lift/beam",
-          "rampSeconds": 0.5,
-          "value": 0.0
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e3-far-lift-scout-wake-back",
-          "on": "setpiece/e3-far-lift/depart",
-          "rampSeconds": 1.2,
-          "value": 0.699999988079071
+          "value": 0.800000011920929
         },
         {
           "effect": {
@@ -48103,31 +47898,7 @@
           "key": "e4-river-pair-scout-warp-back",
           "on": "setpiece/e4-river-pair/depart",
           "rampSeconds": 1.2,
-          "value": 0.4000000059604645
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e4-river-pair-scout-wake-quiet",
-          "on": "setpiece/e4-river-pair/beam",
-          "rampSeconds": 0.5,
-          "value": 0.0
-        },
-        {
-          "effect": {
-            "id": "scout-wake",
-            "owner": "scout",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e4-river-pair-scout-wake-back",
-          "on": "setpiece/e4-river-pair/depart",
-          "rampSeconds": 1.2,
-          "value": 0.699999988079071
+          "value": 0.800000011920929
         },
         {
           "effect": {
@@ -48151,31 +47922,7 @@
           "key": "e5-centrepiece-visitor-warp-back",
           "on": "setpiece/e5-centrepiece/depart",
           "rampSeconds": 1.2,
-          "value": 0.4000000059604645
-        },
-        {
-          "effect": {
-            "id": "visitor-wake",
-            "owner": "visitor",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e5-centrepiece-visitor-wake-quiet",
-          "on": "setpiece/e5-centrepiece/beam",
-          "rampSeconds": 0.5,
-          "value": 0.0
-        },
-        {
-          "effect": {
-            "id": "visitor-wake",
-            "owner": "visitor",
-            "type": "velocityDistortion"
-          },
-          "field": "strength",
-          "key": "e5-centrepiece-visitor-wake-back",
-          "on": "setpiece/e5-centrepiece/depart",
-          "rampSeconds": 1.2,
-          "value": 0.699999988079071
+          "value": 0.800000011920929
         }
       ],
       "id": "ufo",
@@ -48322,7 +48069,19 @@
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:0067bfde837226fd",
+          "fingerprint": "fnv1a64:21117781348513ef",
+          "id": "ufo.drummer-glow",
+          "item": "drummer-glow"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:71fdf18ee19adc41",
+          "id": "ufo.drummer-rim",
+          "item": "drummer-rim"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:9cc76d3115049fab",
           "id": "ufo.e1-far-survey-scout-warp-quiet",
           "item": "e1-far-survey-scout-warp-quiet"
         },
@@ -48334,19 +48093,7 @@
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:7aa212e7a2034892",
-          "id": "ufo.e1-far-survey-scout-wake-quiet",
-          "item": "e1-far-survey-scout-wake-quiet"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:b1a79c110e27c529",
-          "id": "ufo.e1-far-survey-scout-wake-back",
-          "item": "e1-far-survey-scout-wake-back"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:47e003a5636b5229",
+          "fingerprint": "fnv1a64:d2491e93c7022d2d",
           "id": "ufo.e3-far-lift-scout-warp-quiet",
           "item": "e3-far-lift-scout-warp-quiet"
         },
@@ -48358,19 +48105,7 @@
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:897a357db0827466",
-          "id": "ufo.e3-far-lift-scout-wake-quiet",
-          "item": "e3-far-lift-scout-wake-quiet"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:60abd13540817b43",
-          "id": "ufo.e3-far-lift-scout-wake-back",
-          "item": "e3-far-lift-scout-wake-back"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:2e6dd918e92e2f71",
+          "fingerprint": "fnv1a64:caef4d43c0cd56f7",
           "id": "ufo.e4-river-pair-scout-warp-quiet",
           "item": "e4-river-pair-scout-warp-quiet"
         },
@@ -48382,19 +48117,7 @@
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:772017d5069ccb70",
-          "id": "ufo.e4-river-pair-scout-wake-quiet",
-          "item": "e4-river-pair-scout-wake-quiet"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:ed9b97eb19b9ef01",
-          "id": "ufo.e4-river-pair-scout-wake-back",
-          "item": "e4-river-pair-scout-wake-back"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:8c27e21cb2357149",
+          "fingerprint": "fnv1a64:fad54c36003d5035",
           "id": "ufo.e5-centrepiece-visitor-warp-quiet",
           "item": "e5-centrepiece-visitor-warp-quiet"
         },
@@ -48403,18 +48126,6 @@
           "fingerprint": "fnv1a64:26c136337408dbb1",
           "id": "ufo.e5-centrepiece-visitor-warp-back",
           "item": "e5-centrepiece-visitor-warp-back"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:4f351072241e30c8",
-          "id": "ufo.e5-centrepiece-visitor-wake-quiet",
-          "item": "e5-centrepiece-visitor-wake-quiet"
-        },
-        {
-          "domain": "sequence.event",
-          "fingerprint": "fnv1a64:dc8cfd57f5faedbd",
-          "id": "ufo.e5-centrepiece-visitor-wake-back",
-          "item": "e5-centrepiece-visitor-wake-back"
         }
       ],
       "retimes": [],

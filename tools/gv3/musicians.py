@@ -70,23 +70,41 @@ CLEAR_SOFTNESS = 1.5
 # The hero pulse, in rainbow: the cut's own pulse (look.HERO_PULSE_*) sets its trigger and timing; these are its
 # look. Gentler than a mushroom's (intensity 5, 58 m): a performer's rings stay near the stage.
 PULSE_LOOK = {
-    "appearance": {"intensity": 3.2, "edgeIntensity": 5.5, "rainbow": True, "rainbowSaturation": 0.62,
-                   "rainbowBrightness": 0.9, "rainbowScale": 0.035},
-    "propagation": {"speed": 10.0, "range": 34.0, "frontWidth": 3.0, "trailLength": 12.0, "ringCount": 2.0,
-                    "verticalExtent": 6.0},
-    "response": {"ground": 0.8, "foliage": 1.7, "surface": 0.6, "emissive": 1.2},
-    "sparkle": {"enabled": True, "density": 1.1, "intensity": 2.0},
+    "appearance": {"intensity": 1.4, "edgeIntensity": 2.2, "rainbow": True, "rainbowSaturation": 0.55,
+                   "rainbowBrightness": 0.75, "rainbowScale": 0.035},
+    "propagation": {"speed": 7.0, "range": 22.0, "frontWidth": 2.2, "trailLength": 8.0, "ringCount": 2.0,
+                    "verticalExtent": 5.0},
+    "response": {"ground": 0.5, "foliage": 0.9, "surface": 0.25, "emissive": 0.8},
+    "sparkle": {"enabled": True, "density": 1.0, "intensity": 1.0},
 }
+# (The first render, 2026-09-28: at intensity 3.2, foliage 1.7 and the mushrooms' kick pump of +8, two rings
+# 20 m from the opening's lens washed its whole lower frame white-green. A performer's ring is a local breath
+# of colour through the plants round the stage, not a hero's flare across the valley.)
 PULSE_VARIATION = {"drummer": {"rainbowSpeed": 0.34}, "keyboardist": {"rainbowSpeed": 0.26}}
 # The suit's photophores: a Glowmere cyan-green at the centre of a wide hue spread, each cell on its own breath.
-SUIT = {"pattern": 0.0, "color": [0.15, 0.95, 0.78], "intensity": 3.0, "scale": 22.0, "coverage": 0.34,
+SUIT = {"pattern": 0.0, "color": [0.15, 0.95, 0.78], "intensity": 1.4, "scale": 22.0, "coverage": 0.3,
         "colorVariation": 0.5, "breatheRate": 0.3, "breatheDepth": 0.7, "waveSpeed": 0.45, "waveInterval": 5.54,
         "waveGain": 1.6}
-SUIT_VARIATION = {"drummer": {"color": [0.95, 0.35, 0.85]}, "keyboardist": {}}
+# The drummer's photophores centre on the valley's violet, the keyboardist's on its cyan-green: one palette,
+# two phases of it. (Pink at 3.0 with a +5 kick turned the whole drummer into a pink glow on every kick.)
+SUIT_VARIATION = {"drummer": {"color": [0.62, 0.45, 1.0]}, "keyboardist": {}}
 # What each suit answers: the drummer the scored kick, the keyboardist the lead; both the section's energy.
 SUIT_ROUTES = {
-    "drummer": ("timeline.kick", 5.0, 6.0, 280.0),
-    "keyboardist": ("audio.mid", 4.0, 60.0, 520.0),
+    "drummer": ("timeline.kick", 1.6, 6.0, 280.0),
+    "keyboardist": ("audio.mid", 1.4, 60.0, 520.0),
+}
+# The lift's light (E5): the horse's gold Glow, reused for the drummer -- dark at rest, raised on the lift by
+# the plan's two cues (ufo.plan.json `drummer-glow`, `drummer-rim`) and held while he rises and dissolves,
+# so a white suit in a cyan beam is a body and not a ghost (the first render: without it he was a pale shape
+# inside the column in s54). Its brightness is halved (look.BASE `fx/drummer-light/gain`), as the horse's was.
+LIFT_GLOW = {
+    "id": "drummer-light", "type": "glow", "name": "The drummer's light",
+    "owner": {"kind": "entity", "name": "drummer"},
+    "enabled": True, "order": 0, "style": "", "activation": "always",
+    "timing": {"delay": 0.0, "lifetime": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "windowStart": 0.0,
+               "windowSeconds": 6.0, "repeatSeconds": 0.0},
+    "parameters": {"gain": 1.0, "tint": [1.0, 0.56, 0.2], "glow": 0.0, "rim": 0.0,
+                   "rimColor": [1.0, 0.78, 0.42], "rimPower": 2.5, "spill": False, "recolour": 0.0},
 }
 
 
@@ -228,6 +246,8 @@ def effects(project):
                 "parameters": dict(SUIT, **SUIT_VARIATION[name])}
         ids |= {pulse["id"], suit["id"]}
         added += [pulse, suit]
+    ids.add(LIFT_GLOW["id"])
+    added.append(copy.deepcopy(LIFT_GLOW))
     project["effects"] = [e for e in fx if e.get("id") not in ids] + added
 
 

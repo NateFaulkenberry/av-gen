@@ -98,8 +98,11 @@ BASE = {
     "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
-    # (The horse's gold Glow went with the horse: the art pass's E5 lifts the drummer, who carries his own
-    # light, musicians.py.)
+    # The drummer's gold as the saucer lifts him (E5; the horse's light before the art pass, musicians.py
+    # LIFT_GLOW). Its cues -- self-glow 3 and rim 5, raised on the lift -- peak far too bright on a white body
+    # (25.7% of the frame clipped on the horse), and no cue keys the Glow's brightness, so halving it halves
+    # the peak and keeps the lift: when it rises, how long it holds, its colour.
+    "fx/drummer-light/gain": 0.5,
     # One moon. The sky's rotation is the HDRI's, and GV3 has no HDRI: the source (GV2) restated -0.568 rad
     # over the scene's 0. The visible procedural sky is looked up through it (sky_background.wgsl,
     # envRotate), but the skybox's crisp moon is drawn at the sky's own sun direction, un-rotated
@@ -185,6 +188,7 @@ HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the ne
 # local (34 m), so they fire when the performer is in frame within this, and they never take one of the two
 # places the mushrooms and aliens have -- 18 m from the elder, they would otherwise have taken half its rings.
 PERFORMER_PULSE_NEAR = 90.0
+PERFORMER_PULSE_KICK = 1.5  # their rings' pump on the scored kick (a mushroom's is HERO_PULSE_KICK, +8)
 
 
 # The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
@@ -816,8 +820,12 @@ def pulse_blackouts():
     e5 = next(p for p in plan["setPieces"] if p["key"] == "e5-centrepiece")
     back = float(e5.get("set", {}).get("returnSeconds", 0.0))
     lift = (music.bar(93) - 0.05, music.bar(97) + 0.05)
-    out = {name: lift for name in ("opal-cap", "sail-cap", "keyboardist", "drummer")}
-    out["drummer"] = (lift[0], music.bar(97) + back + 0.2)
+    out = {name: [lift] for name in ("opal-cap", "sail-cap", "keyboardist", "drummer")}
+    out["drummer"] = [(lift[0], music.bar(97) + back + 0.2)]
+    # The cold open (s01, to bar 5) is the elder's nocturne: the performers play in it, lit only by their
+    # suits, and their rings start with the riff.
+    for name in ("keyboardist", "drummer"):
+        out[name].append((-1.0, music.bar(5) - 0.05))
     return out
 
 
@@ -855,7 +863,7 @@ def hero_pulse_plan(project, scene, shots):
             if s.start - 0.02 <= t < s.end - 0.3:
                 # The nearest heroes in frame that may pulse now (a blacked-out one gives up its place), and
                 # the performers in frame beside them.
-                live = [n for n in who if not (n in blackout and blackout[n][0] <= t <= blackout[n][1])]
+                live = [n for n in who if not any(a <= t <= b for a, b in blackout.get(n, ()))]
                 heroes = [n for n in live if n not in performers]
                 plan += [(t, n) for n in sorted(heroes, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]]
                 plan += [(t, n) for n in sorted(n for n in live if n in performers)]
@@ -879,8 +887,11 @@ def apply_hero_pulses(project, scene, shots):
     markers = [m for m in seq.get("markers", []) if m.get("name") not in names]
     markers += [{"kind": "cue", "name": HERO_PULSE_MARKER.format(n), "time": round(t, 6)} for t, n in plan]
     seq["markers"] = sorted(markers, key=lambda m: m["time"])
+    from .musicians import GROUPS
+    performers = {f"fx/{g['name']}-hero-pulse/intensity" for g in GROUPS}
     targets = {f"fx/{e['id']}/intensity" for e in effects}
     project["routes"] = [r for r in project.get("routes", []) if r.get("target") not in targets]
     for t in sorted(targets):
-        project["routes"].append(_route("timeline.kick", t, HERO_PULSE_KICK, "add", {"attackMs": 5.0, "decayMs": 200.0}))
+        pump = PERFORMER_PULSE_KICK if t in performers else HERO_PULSE_KICK
+        project["routes"].append(_route("timeline.kick", t, pump, "add", {"attackMs": 5.0, "decayMs": 200.0}))
     return plan

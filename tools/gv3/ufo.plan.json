@@ -152,5 +152,32 @@
    "framingMetres": 30
   }
  ],
- "cues": []
+ "cues": [
+  {
+   "key": "drummer-glow",
+   "effect": {
+    "owner": "drummer",
+    "type": "glow",
+    "id": "drummer-light"
+   },
+   "field": "glow",
+   "on": "setpiece/e5-centrepiece/lift",
+   "value": 3.0,
+   "rampSeconds": 1.3,
+   "holdSeconds": 3.6
+  },
+  {
+   "key": "drummer-rim",
+   "effect": {
+    "owner": "drummer",
+    "type": "glow",
+    "id": "drummer-light"
+   },
+   "field": "rim",
+   "on": "setpiece/e5-centrepiece/lift",
+   "value": 5.0,
+   "rampSeconds": 1.3,
+   "holdSeconds": 3.6
+  }
+ ]
 }

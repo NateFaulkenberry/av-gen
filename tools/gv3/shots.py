@@ -98,8 +98,11 @@ def follow(focal, node, offset, aim_offset, clearance=1.2, smoothing="walker", a
 @at("open")
 def nocturne(t0, t1, g):
     # [s01] Out of black on the first kick, low among the ferns on the east bank, drifting toward the
-    # elder: one 4-bar move, a contrast with everything after it.
-    r = moving(t0, t1, 24.0, g(14, 88, 1.3), g(4, 74, 1.6), [-12.0, 12.5, 52.0], [-12.0, 12.0, 52.0])
+    # elder: one 4-bar move, a contrast with everything after it. The art pass moved it 6 m east: the
+    # astronaut musicians play under the elder (musicians.py), and the drift ended 4 m from the drummer's kit,
+    # with him filling a third of the frame; from here it passes 12 m from him, the pair seen playing on the
+    # way to the elder.
+    r = moving(t0, t1, 24.0, g(20, 88, 1.3), g(10, 74, 1.6), [-12.0, 12.5, 52.0], [-12.0, 12.0, 52.0])
     return r, dict(lead="hero", purpose="Nocturne: low through the ferns toward the elder", subject="the elder",
                    camera="24 mm, 1.3 m, east bank", movement="slow forward drift",
                    music="cut in on the first downbeat (0.480 s)", effects="heartbeat in the gills")
@@ -131,15 +134,15 @@ def e1_far_survey(t0, t1, g):
 @at("9.1")
 def musicians_under_the_cap(t0, t1, g):
     # [s05] The two astronaut musicians -- the drummer is what the valley will lose -- playing under the
-    # elder's cap, from the south-east through a 55 mm: the eye and lens the horse had here (iteration 2's 30 mm
-    # read as the east-bank travel's framing; iteration 4's north-east put the elder as near the lens as the
-    # subject). The art pass: the pair face each other north-south across 11 m (musicians.py), so from the east
-    # both stand in profile, the drummer right and the keyboardist left, the cap above them. A fixed frame: they
-    # do not move.
-    r = still(55.0, g(22, 78, 3.0), g(*MUSICIANS_MID, 6.0))
+    # elder's cap, from the south-east (the horse's shot before the art pass). The pair face each other
+    # north-south across 11 m (musicians.py), so from here both stand in profile, the cap beyond and above
+    # them. From the horse's eye (55 mm, 3 m up, 25-30 m off) the ferns between hid them to the chest and the
+    # frame was mostly cap (the first render); 6 m nearer, 5 m up and on a 40 mm, the eye looks over the ferns
+    # and holds them whole, feet to the cap. A fixed frame: they do not move.
+    r = still(40.0, g(16, 76, 5.0), g(*MUSICIANS_MID, 4.5))
     return r, dict(lead="hero", purpose="The astronaut musicians playing under the elder's cap",
                    subject="the musicians (the drummer is what the valley will lose)",
-                   camera="55 mm, 3 m, south-east, fixed", movement="still", music="2 bars")
+                   camera="40 mm, 5 m, south-east, fixed", movement="still", music="2 bars")
 
 
 @at("11.1")
