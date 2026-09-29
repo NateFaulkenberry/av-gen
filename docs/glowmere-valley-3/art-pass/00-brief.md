@@ -931,3 +931,19 @@ This should be implemented as part of the upcoming GV3 art pass, with the existi
   song), the previous final kept as it is; A/B stills in `r1/`; a "Revision round 1" section in the review folder's
   REPORT.md, naming the shots treated as bland with before/after stills; for each Critic pass, the scores against
   the previous pass and what changed in response.
+
+### Round 1 additions (owner, 2026-09-29, verbatim; recorded by the coordinator)
+
+**Item 6:**
+> I forget if I suggested that we increase alien foot height since it pointed out they barely leave the ground,
+> maybe we should try that too
+
+**Item 7:**
+> another thing we could have it look at - the aliens: when they turn their heads its not a smooth animation
+> currently, more a of snap into possition - wondering if we can smooth those movements at all
+
+**On the render clock**, after the art pass found that a render from 0 and a seek describe different films:
+> Ah just go with option A. Don't worry about before and after comparisons, let just move towards getting a render
+> ready for me to review
+
+The coordinator made that change as ADR-990 (`bce61fe9`), with the owner's direct approval.
