@@ -2672,6 +2672,12 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                                     const float duration = span.duration();
                                     layer.contactRemaining =
                                         std::max(duration - layer.contactElapsed, 0.0f);
+                                    // ADR-987: which span, for a stance lock to know its stance
+                                    // from the next one; and the rig's model space in the world,
+                                    // to hold a point in.
+                                    layer.contactSpan =
+                                        static_cast<int>(&span - track.spans.data());
+                                    layer.modelToWorld = world;
                                     break;
                                 }
                                 break;
@@ -2679,7 +2685,12 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                         }
                     }
                 }
-                if (haveGround && layer.kind == PoseLayerKind::Foot &&
+                // ADR-987: a stance lock holds its foot at the height the clip gives it and never
+                // asks the ground under it, so it is not sampled -- a whole-skeleton pose to model
+                // space and a terrain query per foot per frame, for an answer nobody reads.
+                const bool stanceLocked = layer.kind == PoseLayerKind::Foot && layer.footLock > 0.0f &&
+                                          layer.footLockMode == FootLockMode::Stance;
+                if (haveGround && layer.kind == PoseLayerKind::Foot && !stanceLocked &&
                     thisLayer < owner_.scene_.rigs[id].layers.chains().size()) {
                     const glm::ivec3 chain = owner_.scene_.rigs[id].layers.chains()[thisLayer];
                     if (chain.z >= 0) {
@@ -6303,7 +6314,9 @@ void Composition::rebuild() {
                         rig.contactJoints.push_back(ContactJoint{joint, ContactKind::Foot});
                     }
                     if (!rig.contactJoints.empty()) {
-                        const std::uint32_t cyclic = rig.analyse();
+                        ContactSettings contactSettings;
+                        contactSettings.mode = node.animation.contactMode;
+                        const std::uint32_t cyclic = rig.analyse(contactSettings);
                         if (cyclic == 0) {
                             log::warn("node '{}' rig '{}': none of its {} clip(s) came back cyclic, so "
                                       "phase matching has nothing to align to",
@@ -10078,6 +10091,15 @@ nlohmann::json Composition::toJson() const {
                         if (layer.footLock != 0.0f) {
                             l["footLock"] = layer.footLock;
                         }
+                        if (layer.footLockMode == FootLockMode::Stance) {
+                            l["footLockMode"] = "stance";
+                        }
+                        if (layer.keepSwing != 0.0f) {
+                            l["keepSwing"] = layer.keepSwing;
+                        }
+                        if (!layer.toeJoint.empty()) {
+                            l["toe"] = layer.toeJoint;
+                        }
                         if (glm::dot(layer.soleUp, layer.soleUp) > 0.0f) {
                             l["soleUp"] = vecToJson(layer.soleUp);
                         }
@@ -10112,6 +10134,9 @@ nlohmann::json Composition::toJson() const {
             }
             if (!node.animation.contacts.empty()) { // ADR-546
                 anim["contacts"] = node.animation.contacts;
+            }
+            if (node.animation.contactMode == ContactMode::Sweep) { // ADR-987
+                anim["contactMode"] = "sweep";
             }
             if (node.animation.matchPhase) { // ADR-547
                 anim["matchPhase"] = true;
@@ -11431,7 +11456,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 static constexpr std::string_view kAnimationKeys[] = {
                     "state", "blend",        "speed",  "updateHz",  "nearDistance",
                     "farHz",   "cullDistance", "layers",    "rootMotion",
-                    "bodyCompensation", "contacts", "matchPhase", "inertialize"};
+                    "bodyCompensation", "contacts", "contactMode", "matchPhase", "inertialize"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -11458,6 +11483,17 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     for (const json& entry : contacts) {
                         node.animation.contacts.push_back(entry.get<std::string>());
                     }
+                }
+                // ADR-987: "height" (the default) or "sweep".
+                if (anim.contains("contactMode")) {
+                    const json& mode = anim.at("contactMode");
+                    if (!mode.is_string() ||
+                        (mode.get<std::string>() != "height" && mode.get<std::string>() != "sweep")) {
+                        return fail("node '{}': animation 'contactMode' must be \"height\" or \"sweep\"",
+                                    node.name);
+                    }
+                    node.animation.contactMode =
+                        mode.get<std::string>() == "sweep" ? ContactMode::Sweep : ContactMode::Height;
                 }
                 node.animation.matchPhase = anim.value("matchPhase", false);
                 {
@@ -11739,14 +11775,43 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             // `contactElapsed`, `bodyVelocity`) unreachable from any scene. The
                             // default stays 0 -- off -- so nothing changes until an author asks.
                             auto lock = readFloat(entry, "footLock", 0.0f);
+                            // ADR-988: how much of the clip's foot in the air the plant keeps. 0, the
+                            // default, is every scene before it.
+                            auto swing = readFloat(entry, "keepSwing", 0.0f);
                             if (!align) return std::unexpected(align.error());
                             if (!offset) return std::unexpected(offset.error());
                             if (!reach) return std::unexpected(reach.error());
                             if (!lock) return std::unexpected(lock.error());
+                            if (!swing) return std::unexpected(swing.error());
+                            if (*swing < 0.0f || *swing > 1.0f) {
+                                return fail("node '{}': animation layer '{}': keepSwing must be 0 to 1",
+                                            node.name, layer.name);
+                            }
                             layer.footAlign = *align;
                             layer.groundOffset = *offset;
                             layer.extension = *reach;
                             layer.footLock = *lock;
+                            layer.keepSwing = *swing;
+                            if (entry.contains("toe")) {
+                                if (!entry.at("toe").is_string()) {
+                                    return fail("node '{}': animation layer '{}': toe must be a joint name",
+                                                node.name, layer.name);
+                                }
+                                layer.toeJoint = entry.at("toe").get<std::string>();
+                            }
+                            // ADR-987: what the lock holds the foot to. "velocity" (ADR-557, the
+                            // default) or "stance" (a walking foot held where it landed).
+                            if (entry.contains("footLockMode")) {
+                                const json& mode = entry.at("footLockMode");
+                                if (!mode.is_string() || (mode.get<std::string>() != "velocity" &&
+                                                          mode.get<std::string>() != "stance")) {
+                                    return fail("node '{}': animation layer '{}': footLockMode must be "
+                                                "\"velocity\" or \"stance\"",
+                                                node.name, layer.name);
+                                }
+                                layer.footLockMode = mode.get<std::string>() == "stance" ? FootLockMode::Stance
+                                                                                        : FootLockMode::Velocity;
+                            }
                             if (entry.contains("poleDirection")) {
                                 auto pole = readVec<3>(entry, "poleDirection", layer.poleDirection);
                                 if (!pole) return std::unexpected(pole.error());
@@ -11785,6 +11850,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 std::string_view{"poleDirection"}, std::string_view{"footAlign"},
                                 std::string_view{"groundOffset"},  std::string_view{"extension"},
                                 std::string_view{"soleUp"},        std::string_view{"footLock"},
+                                std::string_view{"footLockMode"},  std::string_view{"keepSwing"},
+                                std::string_view{"toe"},
                                 // Stride (Phase B §7)
                                 std::string_view{"joint"},     std::string_view{"origin"},
                                 std::string_view{"strideMin"}, std::string_view{"strideMax"},

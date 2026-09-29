@@ -51,7 +51,15 @@ struct ContactJoint {
     ContactKind kind = ContactKind::Foot;
 };
 
+// What "in contact" is read from (ADR-987). `Height`, the default: low and not changing height
+// (ADR-546). `Sweep`: moving back under the body, toward the rig's -Z, the stance of an IN-PLACE
+// walk cycle. The farm pack needs the second: its hooves scuff forward at their lowest in the swing and
+// lift while still pushing back at the end of the stance, so the height test found a quarter of each
+// stance, in pieces (the horse's right fore in two, the bull's left hind in none).
+enum class ContactMode : std::uint8_t { Height, Sweep };
+
 struct ContactSettings {
+    ContactMode mode = ContactMode::Height;
     // Sampling grid for the analysis, in hertz. 30 matches the alien pack's authored rate; a clip
     // sampled far off its own key rate invents motion between keys and then measures it.
     float sampleRate = 30.0f;

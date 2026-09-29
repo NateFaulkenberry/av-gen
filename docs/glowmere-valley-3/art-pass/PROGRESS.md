@@ -6,8 +6,12 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 08:00): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
-  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Round 0 (the pass) is
+- **Status (2026-09-29, 12:00): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
+  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1, 5 committed; items
+  2, 6, 7 done in code (ADR-987, 988, 989), committed together; next: item 3 (warp rim), item 4 (rainbow lift),
+  the verification batch, the Critic passes, suites, the r1 render. Items 6 and 7 came later from the coordinator
+  (relayed as the owner's); recording them in `00-brief.md` was refused by the permission system, so they are
+  described here only -- the coordinator or the owner can add them to the brief. Round 0 (the pass) is
   complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it is. Round 1 delivers
   `GV3-art-pass-r1.mp4`, stills in `~/Desktop/av-gen-review/20-gv3-art-pass/r1/`, a "Revision round 1" section in
   that folder's `REPORT.md`; the Critic runs up to about three passes this round (the owner's words).
@@ -446,6 +450,39 @@ passes (up to about three) on the bland shots, both suites, the r1 render.
    1,921 frames, `avgen_foot_probe --dump drummer:168:200 --pose-out`, new): bit-identical; seven rendered frames
    (172.9, 173.5, 175.2, 176.2, 177.3, 183.8, 198.8 s, 1280x720): byte-identical PNGs. Evidence in
    `scratchpad/r1/class/`.
+
+2. **Foot locking for four-legged rigs -- done in code (ADR-987).** A `Stance` foot lock (`footLockMode: "stance"`):
+   from the first posed frame of a contact span the hoof stays at the point in the world where the clip had it,
+   handed back to the clip over the span's last 30%; the point is remembered and trusted only by the next posed
+   frame of the same stance (a seek, cull or new stance holds from the clip's foot). A `sweep` contact mode (the
+   backward stroke). `AnimationPlayer::setSpeed(0)` now holds the clip where it is (it snapped every stop of an
+   `idleRate`-0 body to frame zero: hooves 0.37-1.37 m in one frame). GV3's farm animals: locked, walk speed their
+   mean stroke speed (horse 2.194, cow 3.286, bull 3.345 m/s, rateMax 1.6), posed every frame (`updateHz` 0; at
+   30 Hz a held hoof is drawn a frame's travel ahead and back). Whole film, the ten animals not taken, r0 film vs r1
+   film: held part of each stance 2.048 -> 0.032 m per metre walked; release part 0.629 -> 0.636; standing 16.95 ->
+   2.66 mm/frame (worst one-frame move 1.946 -> 0.206 m); starts 0.086 -> 0.045 m per metre of body; horse-2 straight
+   13.95 -> 0.18, turning 21.59 -> 0.26 mm/frame. Aliens identical; paths identical; GV2 digest 7e0ba810e539e375
+   unchanged. Cost: +0.48 ms/frame CPU (probe timing, whole film). The first, derived design (touchdown point moved
+   by authored speed x elapsed, turned by turn rate) threw a bull's hoof 1.16 m at a turn onset: rejected.
+   Instruments: `avgen_foot_probe` (stance, standing, jumps, `--feet-out`), `scratchpad/r1/probe_copy3.py`
+   (`--head`, `--no-lock`, `--no-swing`, `--keep-hz`), `scratchpad/r1/foot/table.py`, `split.py`.
+6. **Alien foot height (from the coordinator; round 0's decision 2) -- done in code (ADR-988).** Cause: the ground
+   foot layer plants every frame at the rest height with the sole laid flat (not the clips, not the scale).
+   `keepSwing` keeps the clip's foot in the air carried onto the ground (height above standing, measured across the
+   plane and in the body as the reach solve moved it; the sole turned by the plane's tilt), with a `toe` floor (the
+   foot taken back toward laid only as far as keeps the toe at its standing height). GV3's aliens: ankle median
+   step peak 0.267 -> 0.385-0.398 m (p90 0.49), toes 0.04 -> 0.09-0.10 (p90 0.30-0.32); frames with a foot > 2 cm
+   under the terrain 3,585 -> 5; on the flat the drawn foot is the clip's (walk: ankle 0.24 m, toes 0.26; run 0.65,
+   0.62 -- they never run in the film). Planted-ankle slide on the same frames +0.3-0.9%; ankle path median 2 mm.
+   Opt-in: GV2 digest unchanged. Drummer's pose 168-200 s bit-identical (every rig posed every frame, as the class
+   proof). Instruments: `[.probe][alien][swing]`, the probe's swing clearance.
+7. **Alien head turns (from the coordinator) -- done in code (ADR-989).** Cause: the look layer aims at the attended
+   subject every frame (attention moves in a step), and its `maxYaw` clamp flips across the body's back. An
+   entity `gaze`: a critically damped spring on the aim direction in the world (settle 0.35 s, 200 deg/s, eyes 2.6
+   m, within 70 deg of the facing, sided near the back), in the entity tier (checkpointed, both publish paths: a seek
+   lands it where a play does, test). Aliens' head in the world, posed steps: p99 671 -> 211 deg/s, worst 4,587 ->
+   1,653 (an authored startle), steps over 400 deg/s 405 -> 28 (15 startle, 4 a walking turn, 9 the film's first
+   0.17 s); accel p99 61,800 -> 3,050 deg/s^2. Feet and paths unchanged by it. `scratchpad/r1/head/headstats.py`.
 
 ## Plan (the rest, in order)
 

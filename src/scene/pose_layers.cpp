@@ -220,6 +220,36 @@ glm::quat aimRotation(const glm::vec3& from, const glm::vec3& to, float maxYaw, 
     return glm::normalize(glm::angleAxis(std::acos(d), axis * (1.0f / len)));
 }
 
+namespace {
+
+// ADR-988: the plant a ground layer asks for -- on the plane at the foot's standing height, plus the share
+// of the clip's own lift above that height the layer keeps. One function for the body's reach pass and the
+// solve, so the two cannot disagree about where a foot is going. `bodyDrop` is how far the body's reach
+// solve has moved the foot with the body this frame, vertically: the lift is the clip's, above where the
+// foot would stand in the body as it has been moved, and the body lowered to let a leg reach is not a foot
+// coming down.
+//
+// A foot that keeps the swing is carried onto the plane whole, so its height over it is ACROSS the plane,
+// along the normal -- which is how far its sole is below it once the foot is turned to the slope -- and
+// the vertical drop that puts it there is that over the normal's height. On the flat the two are one
+// number; on the 42-degree bank GV3's Sage walks, a vertical standing height put the sole 7 cm into it.
+// Capped at a 60-degree slope, where the plant stops pretending the ground can be stood on.
+glm::vec3 plantFoot(const PoseLayer& layer, const glm::vec3& tip, float standing, float bodyDrop) {
+    if (layer.keepSwing <= 0.0f) {
+        return plantOnPlane(tip, layer.groundPoint, layer.groundNormal, layer.groundOffset + standing);
+    }
+    const glm::vec3 n = safeNormalize(layer.groundNormal);
+    if (n.y < 1e-3f) {
+        return tip; // a wall: as `plantOnPlane` answers it
+    }
+    glm::vec3 target = plantOnPlane(tip, layer.groundPoint, layer.groundNormal, 0.0f);
+    const float lift = std::min(layer.keepSwing, 1.0f) * std::max(tip.y - (standing + bodyDrop), 0.0f);
+    target.y += layer.groundOffset + ((standing + lift) / std::max(n.y, 0.5f));
+    return target;
+}
+
+} // namespace
+
 glm::vec3 plantOnPlane(const glm::vec3& tip, const glm::vec3& planePoint, const glm::vec3& planeNormal,
                        float offset) {
     const glm::vec3 n = safeNormalize(planeNormal);
@@ -264,6 +294,8 @@ void PoseLayerStack::clear() {
     soleUp_.clear();
     restTipHeight_.clear();
     ikStatus_.clear();
+    toe_.clear();
+    toeStanding_.clear();
 }
 
 std::vector<std::string> PoseLayerStack::bind(std::vector<PoseLayer> layers, const Skeleton& skeleton,
@@ -285,6 +317,8 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     order_.clear();
     restTipHeight_.assign(layers_.size(), 0.0f);
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
+    toe_.assign(layers_.size(), -1);
+    toeStanding_.assign(layers_.size(), 0.0f);
     bodyResult_ = BodyCompensation{};
     bodyJoint_ = -1;
     if (bodySpec_.enabled) {
@@ -483,6 +517,23 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                                                    : glm::inverse(bind) * glm::vec3(0.0f, 1.0f, 0.0f);
                     soleUp_[i] = safeNormalize(authored);
                     restTipHeight_[i] = model_[static_cast<std::size_t>(tip)][3].y;
+                    // ADR-988: the toe the floor keeps out of the ground, which has to hang from the foot
+                    // for turning the foot to move it.
+                    if (!layer.toeJoint.empty()) {
+                        const int toe = skeleton.find(layer.toeJoint);
+                        if (toe < 0) {
+                            problems.push_back(fmt::format("layer '{}': this rig has no toe joint '{}'", layer.name,
+                                                           layer.toeJoint));
+                        } else if (!descends(toe, tip)) {
+                            problems.push_back(fmt::format(
+                                "layer '{}': its toe '{}' does not hang from its foot '{}', so turning the foot "
+                                "cannot lift it",
+                                layer.name, layer.toeJoint, layer.chainTip));
+                        } else {
+                            toe_[i] = toe;
+                            toeStanding_[i] = model_[static_cast<std::size_t>(toe)][3].y;
+                        }
+                    }
                     if (glm::dot(soleUp_[i], soleUp_[i]) < 0.5f) {
                         problems.push_back(fmt::format(
                             "layer '{}': joint '{}' has a degenerate rest transform, so there is no "
@@ -584,6 +635,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         chain_.size() != layers_.size() || chainLinked_.size() != layers_.size() ||
         ikStatus_.size() != layers_.size() ||
         soleUp_.size() != layers_.size() || restTipHeight_.size() != layers_.size() ||
+        toe_.size() != layers_.size() || toeStanding_.size() != layers_.size() ||
         stride_.size() != layers_.size() || order_.size() != layers_.size() ||
         pose.size() != skeleton.jointCount()) {
         return stats;
@@ -622,8 +674,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             if (layer.hasTarget) {
                 target = layer.target;
             } else if (layer.hasGround) {
-                target = plantOnPlane(tip, layer.groundPoint, layer.groundNormal,
-                                      layer.groundOffset + restTipHeight_[i]);
+                target = plantFoot(layer, tip, restTipHeight_[i], 0.0f); // before the body has moved
             } else {
                 continue; // asked for nothing; it cannot be short of anything
             }
@@ -651,6 +702,21 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             stats.bodyCompensations = 1;
         }
     }
+
+    // ADR-988. Whether a joint rode the body's reach translation above (it hangs from the body joint), and
+    // whether a joint is the tip of a ground layer that keeps the clip's swing.
+    const auto movedWithBody = [&](int joint) {
+        return bodyJoint_ >= 0 && glm::dot(bodyResult_.translation, bodyResult_.translation) > 0.0f &&
+               (joint == bodyJoint_ || descendsFrom(skeleton, joint, bodyJoint_));
+    };
+    const auto keepsLift = [&](int joint) {
+        for (std::size_t k = 0; k < layers_.size(); ++k) {
+            if (layers_[k].kind == PoseLayerKind::Foot && layers_[k].keepSwing > 0.0f && chain_[k].z == joint) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     // §5: pipeline order, not file order. `order_` is sorted by `poseLayerStage`.
     for (const std::uint32_t slot : order_) {
@@ -863,7 +929,10 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             //    there and clamped, and Rook's legs "snapped up" whenever a walk started slow (the
             //    owner's report, 2026-09-25). A planted foot has no swing, so it does not move now.
             const float lift = 1.0f + ((scale - 1.0f) * std::clamp(layer.strideLift, 0.0f, 1.0f));
-            const float stand = restTipHeight_[i];
+            // ADR-988: where the foot stands in the body as the reach solve has moved it -- for a foot whose
+            // ground layer keeps its lift, which is the only one whose height survives the plant. (Anywhere
+            // else the plant replaces the height, and this stays the rest pose's, to the bit.)
+            const float stand = restTipHeight_[i] + (keepsLift(ids.x) && movedWithBody(ids.x) ? bodyResult_.translation.y : 0.0f);
             const glm::vec3 wantedModel(jointModel.x, stand + ((jointModel.y - stand) * lift),
                                         originModel.z + (excursion.z * scale));
             // Blended by the layer's weight, like every other correction here, so a scene can fade
@@ -958,7 +1027,45 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // hand while the others plant; the plane is the per-frame form, and a layer with
             // neither has been given no work rather than asked to invent some.
             glm::vec3 target(0.0f);
-            if (layer.hasTarget) {
+            // ADR-987. A stance lock: from the first posed frame of a contact span the foot stays at the
+            // point in the world where the clip had it then, and over the span's last `kStanceRelease` it
+            // is handed back to the clip, at the height the clip gives it; outside the span the layer
+            // leaves the foot to the clip, lift and all, which is the whole point for a walk, whose swing
+            // is the clip's. Only the slide is taken away. See `PoseLayer::footLockMode` for why this
+            // one point is remembered, and what may trust it.
+            const bool stanceLock = layer.kind == PoseLayerKind::Foot && !layer.hasTarget && layer.hasGround &&
+                                    layer.footLock > 0.0f && layer.footLockMode == FootLockMode::Stance;
+            float stanceHold = 1.0f;
+            if (stanceLock) {
+                PoseLayer::StanceMemory& memory = layer.stance;
+                if (!layer.inContact) {
+                    memory.holding = false;
+                    result = LayerResolution::Inactive;
+                    continue;
+                }
+                // The same stance as the last frame this layer held: the same span, not begun again,
+                // and the next posed frame after it rather than one a seek, a step back or a cull
+                // arrived at.
+                const bool same = memory.holding && memory.span == layer.contactSpan &&
+                                  layer.contactElapsed + 1e-4f >= memory.elapsed && now > memory.time &&
+                                  now - memory.time <= kStanceGap;
+                if (!same) {
+                    memory.world = glm::vec3(layer.modelToWorld * glm::vec4(chain.tip, 1.0f));
+                }
+                memory.holding = true;
+                memory.span = layer.contactSpan;
+                memory.elapsed = layer.contactElapsed;
+                memory.time = now;
+                const glm::vec3 held = glm::vec3(glm::inverse(layer.modelToWorld) * glm::vec4(memory.world, 1.0f));
+                const float duration = std::max(layer.contactElapsed + layer.contactRemaining, 1e-4f);
+                const float along = std::clamp(layer.contactElapsed / duration, 0.0f, 1.0f);
+                const auto smooth = [](float t) { return t * t * (3.0f - (2.0f * t)); };
+                const float letGo =
+                    smooth(std::clamp((along - (1.0f - kStanceRelease)) / kStanceRelease, 0.0f, 1.0f));
+                const glm::vec3 anchor = glm::mix(held, chain.tip, letGo);
+                stanceHold = std::clamp(layer.footLock, 0.0f, 1.0f);
+                target = glm::vec3(anchor.x, chain.tip.y, anchor.z);
+            } else if (layer.hasTarget) {
                 target = layer.target;
             } else if (layer.kind == PoseLayerKind::Reach) {
                 // §23/§24. A reach with nowhere to reach is not a failure and not an invention:
@@ -968,8 +1075,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::NoTarget;
                 continue;
             } else if (layer.hasGround) {
-                target = plantOnPlane(chain.tip, layer.groundPoint, layer.groundNormal,
-                                      layer.groundOffset + restTipHeight_[i]);
+                target = plantFoot(layer, chain.tip, restTipHeight_[i], movedWithBody(ids.z) ? bodyResult_.translation.y : 0.0f);
             } else {
                 result = LayerResolution::NoTarget;
                 continue;
@@ -982,7 +1088,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // `-velocity * elapsed`, which needs no memory: `elapsed` comes from the contact track
             // the clip already carries, and the velocity from the seam. See `PoseLayer::footLock`
             // for why an accumulated anchor could not survive a scrub.
-            if (layer.footLock > 0.0f && layer.inContact) {
+            if (!stanceLock && layer.footLock > 0.0f && layer.inContact) {
                 // §15's approach and release. A lock that switched on at the span boundary is the
                 // "foot locked, then teleports" failure named outright in the spec, so both edges
                 // ease -- and the ease is over the *time to the edge*, not over the span's length,
@@ -1021,7 +1127,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::Degenerate;
                 continue;
             }
-            const float w = std::min(layerWeight, 1.0f);
+            const float w = std::min(layerWeight, 1.0f) * stanceHold;
             // The two increments are blended separately, not the composed pair. ADR-359: slerping
             // the mid's *total* rotation makes the knee's share of a half-weight solve depend on
             // the hip's, and it reads as the knee lagging the leg.
@@ -1102,12 +1208,54 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 const glm::vec3 have = safeNormalize(glm::mat3(tipWorld) * soleUp_[i]);
                 const glm::vec3 want = safeNormalize(layer.groundNormal);
                 if (glm::dot(have, have) > 0.5f && glm::dot(want, want) > 0.5f) {
-                    const glm::quat full = shortestArc(have, want, glm::vec3(1.0f, 0.0f, 0.0f));
-                    const glm::quat turn = align >= 1.0f ? full : glm::slerp(kIdentity, full, align);
+                    const glm::quat laid = shortestArc(have, want, glm::vec3(1.0f, 0.0f, 0.0f));
+                    // ADR-988. Keeping the clip's swing, the foot is turned by the plane's own tilt --
+                    // the arc from the flat the clip stands on (`soleUp` is up in the rest pose) to the
+                    // plane -- instead of having its sole laid on the plane: flat stays flat on a slope,
+                    // and a heel the clip raises stays raised. `keep` is how far from laid to carried.
+                    const float keep = std::min(std::max(layer.keepSwing, 0.0f), 1.0f);
+                    const glm::quat carried =
+                        keep > 0.0f ? shortestArc(glm::vec3(0.0f, 1.0f, 0.0f), want, glm::vec3(1.0f, 0.0f, 0.0f))
+                                    : laid;
+                    const glm::vec3 ankle(tipWorld[3]);
+                    const auto turnFor = [&](float k) {
+                        const glm::quat full = k > 0.0f ? glm::slerp(laid, carried, k) : laid;
+                        return align >= 1.0f ? full : glm::slerp(kIdentity, full, align);
+                    };
+                    float kept = keep;
+                    // ADR-988: the toe floor. A foot keeping the clip's swing points its toes where the clip
+                    // does, relative to the ankle; wherever the drawn ankle is lower than the clip's -- a
+                    // shortened stride, a leg at the end of its reach, a steep bank -- the clip's pointed toes
+                    // would be in the ground. So the foot is taken back toward laid, only as far as keeps the
+                    // toe at its standing height over the plane: the natural way down for a pointed foot,
+                    // where turning it up in its own vertical plane swings a toe the clip has pointed past
+                    // straight down over to the back of the ankle.
+                    if (keep > 0.0f && toe_[i] >= 0) {
+                        const auto toeIndex = static_cast<std::size_t>(toe_[i]);
+                        const glm::vec3 toeInFoot =
+                            glm::vec3(glm::inverse(model_[t]) * glm::vec4(glm::vec3(model_[toeIndex][3]), 1.0f));
+                        const float across = std::max(want.y, 0.5f);
+                        const auto under = [&](float k) {
+                            const glm::vec3 toe = glm::vec3(pre(ankle, turnFor(k), tipWorld) * glm::vec4(toeInFoot, 1.0f));
+                            const float floor = plantOnPlane(toe, layer.groundPoint, layer.groundNormal, 0.0f).y +
+                                                (toeStanding_[i] / across);
+                            return floor - toe.y;
+                        };
+                        if (under(keep) > 1e-4f) {
+                            float lo = 0.0f; // laid: the toe at its standing height, or as near as this ankle lets it
+                            float hi = keep;
+                            for (int step = 0; step < 12; ++step) {
+                                const float mid = 0.5f * (lo + hi);
+                                (under(mid) > 1e-4f ? hi : lo) = mid;
+                            }
+                            kept = lo;
+                        }
+                    }
+                    const glm::quat turn = turnFor(kept);
                     // The tip's *actual* place, not the solver's `tip`: at partial weight they are
                     // different points, and pivoting a rotation about a point the joint is not at
                     // translates it.
-                    const glm::mat4 aligned = pre(glm::vec3(tipWorld[3]), turn, tipWorld);
+                    const glm::mat4 aligned = pre(ankle, turn, tipWorld);
                     pose.local[t] = Transform::fromMatrix(glm::inverse(parentModel(t)) * aligned);
                 }
             }

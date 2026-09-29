@@ -172,6 +172,21 @@ ALIEN_BOUNCE = {
     "vane":  0.17,   # 0.098 m (5.35 m)
     "rook":  0.18,   # 0.096 m (5.78 m)
 }
+# Their feet leave the ground (revision round 1, item 6: "they barely leave the ground"; ADR-988). The ground
+# layers planted each foot at its standing height with its sole flat on every frame, so the drawn swing lifted
+# 6 mm and no heel ever rose, against the 0.24 m the Walking clip lifts the ankle and the 0.26 m it lifts the
+# toes. Keeping the clip's own foot in the air, carried onto the ground under it, gives the clip's step back; the
+# toes are kept out of the ground where the drawn ankle is lower than the clip's (a shortened stride, a leg at
+# the end of its reach, a steep bank).
+ALIEN_KEEP_SWING = 1.0
+# ...and their heads come round to what they look at (revision round 1, item 7: "when they turn their heads its not
+# a smooth animation currently, more a of snap into possition"; ADR-989). Their attention names a new subject in
+# one step, and the head was aimed at the subject on every frame, so it turned with it: a quarter turn in one
+# posed frame. A gaze settles on a new subject in 0.35 s at no more than 200 degrees a second, from the eyes'
+# height (the alien's head joint stands about 2.5 m up and its eyes 2.7 m at the cast's 1.94x); the body's own
+# turn, 100 degrees a second, follows it. It keeps within 70 degrees of the body's facing, inside the look layer's
+# own 75, whose clamp threw the head from one shoulder to the other when a subject crossed the body's back.
+ALIEN_GAZE = {"settle": 0.35, "maxTurnRate": 200.0, "eyeHeight": 2.6, "maxYaw": 70.0}
 
 # ---- what the aliens hear --------------------------------------------------------------------------
 # The UFO events the aliens react to (ADR-930: every set-piece moment is a world event), how far each
@@ -250,6 +265,34 @@ REHOMED = {
     "horse-11": (70.0, 34.0),
 }
 REHOMED_TERRITORY = {"homeRadius": 16.0, "maxRange": 12.0}
+# Their hooves are held where they land (revision round 1: "go ahead and foot lock 4 legged rigs"; ADR-987).
+# The pack's one Walk sweeps a stance hoof back unevenly -- six times faster at one moment than another --
+# and each hoof at its own average speed, so under a rate-matched body every hoof skated. A stance lock on
+# each leg keeps the hoof at the point in the world where the clip put it at touchdown, whatever the body
+# does meanwhile, and hands it back to the clip over the last 30% of the stroke, at the clip's height.
+# The stance is the hoof's backward stroke ("contactMode": "sweep"): the height test finds pieces of it on
+# this pack. The three species share one leg naming (UpperLeg -> LowerLeg -> Hoof, B hind, F fore).
+HOOF_LOCK = [
+    {"name": f"lock-{end}-{side}", "kind": "foot", "drive": "ground",
+     "chain": [f"UpperLeg{e}.{s}", f"LowerLeg{e}.{s}", f"Hoof{e}.{s}"],
+     "footAlign": 0.0, "footLock": 1.0, "footLockMode": "stance"}
+    for end, e in (("hind", "B"), ("fore", "F")) for side, s in (("left", "L"), ("right", "R"))
+]
+HOOVES = ["HoofB.L", "HoofB.R", "HoofF.L", "HoofF.R"]
+# ...and a rate their legs can keep up with. The pack's walk speeds (ADR-240) were measured on each hoof at
+# its lowest, the fastest moment of an uneven stroke; over the whole backward stroke the horse's hooves go
+# back at 1.131 model units a second, not 1.628, so a body rate-matched to 1.628 out-walked its legs by 44%:
+# a held hoof fell a third of a stroke behind the clip's by lift-off, and slid that far as it was let go. The
+# mean stroke speed over the four hooves (the contact analysis' sweep spans: `avgen_tests "probe: the farm
+# Walk's stances"`), at the cast's 1.94x, in m/s; the ceiling lifted so a run at 2.6 m/s is still matched.
+STROKE_SPEED = {"horse": 1.131 * 1.94, "cow": 1.694 * 1.94, "bull": 1.724 * 1.94}
+STROKE_RATE_MAX = 1.6
+# ...and posed on every frame of the film. A rig posed at 30 Hz in a 60 fps film is drawn with the pose it had
+# a frame ago on every other frame while its body moves on, so a hoof held in the world is drawn one frame's
+# travel ahead and back again: horse-2's held hooves moved 15.2 mm a frame on a straight walk at 30 Hz, the
+# body's own speed, and 0.18 mm at 60 Hz. 0 is every frame (offline); live playback keeps `farHz` beyond
+# `nearDistance`.
+ANIMAL_UPDATE_HZ = 0
 
 
 # ---- helpers ---------------------------------------------------------------------------------------
@@ -422,8 +465,14 @@ def add_scout(project, scene):
 def aliens(project, scene):
     """The characters stream's recommended settings, per alien, and the aliens' ears for E4 and E5."""
     ents = _entities(scene)
+    nodes = _nodes(scene)
     for name in ALIENS:
+        for layer in nodes[name].get("animation", {}).get("layers", []):
+            if layer.get("kind") == "foot" and layer.get("drive") == "ground":
+                layer["keepSwing"] = ALIEN_KEEP_SWING
+                layer["toe"] = "toes_01." + layer["chain"][2].rsplit(".", 1)[1]
         e = ents[name]
+        e["gaze"] = dict(ALIEN_GAZE)
         e["gait"].update(ALIEN_GAIT)
         if name in ALIEN_RUN_BAND:
             e["gait"]["runEnter"], e["gait"]["runExit"] = ALIEN_RUN_BAND[name]
@@ -487,6 +536,19 @@ def animals(project, scene, ground):
         w["maxSlope"] = ANIMAL_MAX_SLOPE
         w["turnRadius"] = radius
         e.setdefault("gait", {})["pivotRadius"] = pivot
+        anim = nodes[name].setdefault("animation", {})
+        anim["updateHz"] = ANIMAL_UPDATE_HZ
+        anim["contacts"] = list(HOOVES)
+        anim["contactMode"] = "sweep"
+        anim["layers"] = [dict(layer) for layer in HOOF_LOCK]
+        gait = e.setdefault("gait", {})
+        stroke = round(STROKE_SPEED[species], 4)
+        gait["walkSpeed"] = stroke
+        gait["runSpeed"] = stroke
+        gait["rateMax"] = STROKE_RATE_MAX
+        _set(project, name, "gait/walkSpeed", stroke)
+        _set(project, name, "gait/runSpeed", stroke)
+        _set(project, name, "gait/rateMax", STROKE_RATE_MAX)
         _set(project, name, "wander/maxSlope", ANIMAL_MAX_SLOPE)
         _set(project, name, "wander/turnRadius", radius)
         _set(project, name, "gait/pivotRadius", pivot)

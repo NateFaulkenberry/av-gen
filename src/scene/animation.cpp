@@ -250,6 +250,7 @@ bool AnimationPlayer::play(std::string_view name, double now, float blendSeconds
     current_.state = index;
     current_.start = now;
     current_.speed = states_[static_cast<std::size_t>(index)].speed;
+    current_.held = 0.0;
     current_.loop = -1; // ADR-821: a new play starts from the state's own looping
     blendStart_ = now;
     blendDuration_ = previous_.state < 0 ? 0.0f : std::max(0.0f, blendSeconds);
@@ -301,6 +302,14 @@ bool AnimationPlayer::play(std::string_view name, double now, float blendSeconds
 
 void AnimationPlayer::restart(double now) {
     current_.start = now;
+    current_.held = 0.0;
+}
+
+double AnimationPlayer::elapsed(const Playing& playing, double now) {
+    if (playing.speed == 0.0f) {
+        return playing.held;
+    }
+    return (now - playing.start) * static_cast<double>(playing.speed);
 }
 
 void AnimationPlayer::setSpeed(float speed, double now) {
@@ -308,9 +317,21 @@ void AnimationPlayer::setSpeed(float speed, double now) {
         return;
     }
     // Rebase so the local clip time is continuous: without this a speed change is a jump cut.
-    const double elapsed = (now - current_.start) * static_cast<double>(current_.speed);
+    //
+    // ADR-987: including a change to 0. This used to rebase `start` to `now` there, and a clock of
+    // (start, speed 0) reads its clip's first frame whatever it read a moment before: every stop of a
+    // body whose idle freezes its walk (the farm pack's `idleRate` 0, ADR-213: "a statue caught
+    // mid-stride") snapped its legs to frame zero -- a hoof 0.37 to 0.77 m in one frame, on the first
+    // stop measured -- and its next walk began from there. Speed 0 now holds the second it had.
+    const double at = elapsed(current_, now);
     current_.speed = speed;
-    current_.start = speed != 0.0f ? now - elapsed / static_cast<double>(speed) : now;
+    if (speed != 0.0f) {
+        current_.start = now - at / static_cast<double>(speed);
+        current_.held = 0.0;
+    } else {
+        current_.start = now;
+        current_.held = at;
+    }
 }
 
 std::string_view AnimationPlayer::currentState() const {
@@ -337,7 +358,7 @@ float AnimationPlayer::stateTime(double now) const {
     if (current_.state < 0) {
         return 0.0f;
     }
-    return static_cast<float>((now - current_.start) * static_cast<double>(current_.speed));
+    return static_cast<float>(elapsed(current_, now));
 }
 
 float AnimationPlayer::stateTime(const std::vector<AnimationClip>& clips, double now) const {
@@ -371,7 +392,7 @@ float AnimationPlayer::localTime(const Playing& playing, const std::vector<Anima
     // the top of every cycle, and a stride the feet crossed 3.2% slower than the file says.
     const float start = clip != nullptr ? clip->start : 0.0f;
     const float length = clip != nullptr ? clip->length() : 0.0f;
-    const auto raw = static_cast<float>((now - playing.start) * static_cast<double>(playing.speed));
+    const auto raw = static_cast<float>(elapsed(playing, now));
     return start + (looping(playing) ? wrapTime(raw, length) : std::clamp(raw, 0.0f, length));
 }
 

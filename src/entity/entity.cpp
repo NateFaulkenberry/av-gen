@@ -1161,6 +1161,99 @@ void Entity::publishLookSchedule() {
     locomotion_.hasLookTarget = state_.hasLookTarget;
 }
 
+// ADR-989. The gaze's origin: the body where it is drawn, raised to its eyes.
+glm::vec3 Entity::gazeOrigin() const {
+    return state_.position() + motion_.position + glm::vec3(0.0f, desc_.gaze.eyeHeight, 0.0f);
+}
+
+glm::vec3 Entity::publishedLookTarget() const {
+    if (desc_.gaze.settle <= 0.0f || !gaze_.valid) {
+        return state_.lookTarget;
+    }
+    const float c = std::cos(gaze_.pitch);
+    const glm::vec3 along(c * std::sin(gaze_.yaw), std::sin(gaze_.pitch), c * std::cos(gaze_.yaw));
+    return gazeOrigin() + along * gaze_.distance;
+}
+
+// ADR-989. A critically damped spring on the gaze's yaw and pitch, in the world, toward the subject's
+// direction from the eyes -- or the body's own facing, level, when it attends to nothing, so the next subject
+// is turned to from where the head is rather than from the last one. Integrated in closed form, so a step of
+// any length lands where the spring would; the rate limit, when there is one, caps each step's arc.
+void Entity::advanceGaze(float dt) {
+    const GazeSettings& settings = desc_.gaze;
+    if (settings.settle <= 0.0f) {
+        return;
+    }
+    const glm::vec3 origin = gazeOrigin();
+    float yaw = state_.yaw;
+    float pitch = 0.0f;
+    float distance = gaze_.valid ? gaze_.distance : 10.0f;
+    if (state_.hasLookTarget) {
+        const glm::vec3 d = state_.lookTarget - origin;
+        const float flat = std::sqrt((d.x * d.x) + (d.z * d.z));
+        if (flat > 1e-4f || std::abs(d.y) > 1e-4f) {
+            yaw = std::atan2(d.x, d.z);
+            pitch = std::atan2(d.y, std::max(flat, 1e-4f));
+            distance = std::max(glm::length(d), 0.1f);
+        }
+    }
+    constexpr float kPi = 3.14159265358979323846f;
+    const auto wrap = [&](float a) {
+        while (a > kPi) a -= 2.0f * kPi;
+        while (a < -kPi) a += 2.0f * kPi;
+        return a;
+    };
+    // The limit round the body: past it the subject is looked at from the limit on its own side, and near
+    // straight behind from the side the gaze is on (a look layer's own clamp answers a subject crossing the
+    // back by jumping from one limit to the other: measured, 150 degrees in one posed frame).
+    if (settings.maxYaw > 0.0f) {
+        const float limit = glm::radians(std::min(settings.maxYaw, 179.0f));
+        const float relative = wrap(yaw - state_.yaw);
+        if (std::abs(relative) > limit) {
+            float side = relative >= 0.0f ? 1.0f : -1.0f;
+            if (gaze_.valid && std::abs(relative) > kPi - glm::radians(30.0f)) {
+                side = wrap(gaze_.yaw - state_.yaw) >= 0.0f ? 1.0f : -1.0f;
+            }
+            yaw = wrap(state_.yaw + (side * limit));
+        }
+    }
+    if (!gaze_.valid) {
+        gaze_ = GazeState{yaw, pitch, 0.0f, 0.0f, distance, true};
+        return;
+    }
+    if (dt <= 0.0f) {
+        return;
+    }
+    // 95% of the way in `settle` seconds: (1 + wt) e^-wt = 0.05 at wt = 4.744.
+    const float omega = 4.744f / settings.settle;
+    const float decay = std::exp(-omega * dt);
+    const auto spring = [&](float& x, float& v, float target) {
+        const float y = x - target;
+        const float j = v + (y * omega);
+        x = target + ((y + (j * dt)) * decay);
+        v = (v - (j * omega * dt)) * decay;
+    };
+    const float yawBefore = gaze_.yaw;
+    const float pitchBefore = gaze_.pitch;
+    spring(gaze_.yaw, gaze_.yawRate, gaze_.yaw + wrap(yaw - gaze_.yaw)); // the short way round
+    spring(gaze_.pitch, gaze_.pitchRate, pitch);
+    if (settings.maxTurnRate > 0.0f) {
+        const float dy = wrap(gaze_.yaw - yawBefore);
+        const float dp = gaze_.pitch - pitchBefore;
+        const float arc = std::sqrt((dy * std::cos(pitchBefore)) * (dy * std::cos(pitchBefore)) + (dp * dp));
+        const float most = glm::radians(settings.maxTurnRate) * dt;
+        if (arc > most && arc > 1e-7f) {
+            const float keep = most / arc;
+            gaze_.yaw = yawBefore + (dy * keep);
+            gaze_.pitch = pitchBefore + (dp * keep);
+            gaze_.yawRate = dy * keep / dt;
+            gaze_.pitchRate = dp * keep / dt;
+        }
+    }
+    gaze_.yaw = wrap(gaze_.yaw);
+    gaze_.distance += (distance - gaze_.distance) * (1.0f - decay);
+}
+
 void Entity::advanceMotion(double time, float dt) {
     if (motionChain_ == nullptr || !desc_.proceduralMotion) {
         return;
@@ -2051,6 +2144,7 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         // after the measured velocity exactly as `update` orders them. `stepDt`, so the zero
         // step advances with no elapsed time, as the play's first frame does.
         entity.advanceMotion(now, static_cast<float>(stepDt));
+        entity.advanceGaze(static_cast<float>(stepDt)); // ADR-989, where `update` advances it
     }
     // ADR-671: and whatever has to see this step's settled bodies before the next begins.
     if (hooks != nullptr && hooks->after) {
@@ -2108,9 +2202,10 @@ void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
         // frame at that instant did.
         if (replayedNothing) {
             entity.advanceMotion(entity.locomotion_.time, 0.0f);
+            entity.advanceGaze(0.0f);
         }
         entity.locomotion_.reaction = entity.state_.reaction;
-        entity.locomotion_.lookTarget = entity.state_.lookTarget;
+        entity.locomotion_.lookTarget = entity.publishedLookTarget(); // ADR-989
         entity.publishLookSchedule();
         // ADR-359: the ground under this body, for a foot IK layer. Published here beside the look
         // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
@@ -2914,8 +3009,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
         // wrong here would be the same bug in the same struct twice.
         entity.advanceMotion(entity.locomotion_.time, static_cast<float>(ctx.dt));
+        entity.advanceGaze(static_cast<float>(ctx.dt)); // ADR-989: on both paths
         entity.locomotion_.reaction = entity.state_.reaction;
-        entity.locomotion_.lookTarget = entity.state_.lookTarget;
+        entity.locomotion_.lookTarget = entity.publishedLookTarget(); // ADR-989
         entity.publishLookSchedule();
         // ADR-359: the ground under this body, for a foot IK layer. Published here beside the look
         // target, and by the same rule -- the entity owns the smoothing, the layer owns the solve.
@@ -3589,6 +3685,25 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
                         desc.name);
         }
     }
+    // ADR-989. Absent is off; a malformed block is an error, like `jump`'s.
+    if (j.contains("gaze")) {
+        const auto& gj = j["gaze"];
+        if (!gj.is_object()) {
+            return fail("entity '{}': 'gaze' must be an object", desc.name);
+        }
+        const auto num = [&](const char* key, float& out) {
+            if (const auto it = gj.find(key); it != gj.end() && it->is_number()) {
+                out = it->get<float>();
+            }
+        };
+        num("settle", desc.gaze.settle);
+        num("maxTurnRate", desc.gaze.maxTurnRate);
+        num("eyeHeight", desc.gaze.eyeHeight);
+        num("maxYaw", desc.gaze.maxYaw);
+        if (desc.gaze.settle < 0.0f || desc.gaze.maxTurnRate < 0.0f || desc.gaze.maxYaw < 0.0f) {
+            return fail("entity '{}': 'gaze' needs settle, maxTurnRate and maxYaw >= 0", desc.name);
+        }
+    }
     // ADR-623. A malformed block is a load error, not a silent no-op: an author who wrote it meant
     // the matcher to run, and a character quietly left on its clips is the failure this project
     // keeps shipping.
@@ -4132,6 +4247,11 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         if (!jj.empty()) {
             j["jump"] = std::move(jj);
         }
+    }
+    // ADR-989: written when the body has a gaze, whole, so a save keeps what it means.
+    if (entity.gaze.settle > 0.0f) {
+        j["gaze"] = {{"settle", entity.gaze.settle}, {"maxTurnRate", entity.gaze.maxTurnRate},
+                     {"eyeHeight", entity.gaze.eyeHeight}, {"maxYaw", entity.gaze.maxYaw}};
     }
     // ADR-623. Written only when on, for the reason above; and every field, including the ones at
     // their defaults, because a reader that fills a default the writer dropped is how a save

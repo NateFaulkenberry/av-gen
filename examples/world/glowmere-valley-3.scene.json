@@ -8262,7 +8262,9 @@
               "leg_stretch.l",
               "foot.l"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.l"
           },
           {
             "name": "foot.r",
@@ -8273,7 +8275,9 @@
               "leg_stretch.r",
               "foot.r"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.r"
           },
           {
             "name": "stride.l",
@@ -8398,7 +8402,9 @@
               "leg_stretch.l",
               "foot.l"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.l"
           },
           {
             "name": "foot.r",
@@ -8409,7 +8415,9 @@
               "leg_stretch.r",
               "foot.r"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.r"
           },
           {
             "name": "stride.l",
@@ -8534,7 +8542,9 @@
               "leg_stretch.l",
               "foot.l"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.l"
           },
           {
             "name": "foot.r",
@@ -8545,7 +8555,9 @@
               "leg_stretch.r",
               "foot.r"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.r"
           },
           {
             "name": "stride.l",
@@ -8670,7 +8682,9 @@
               "leg_stretch.l",
               "foot.l"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.l"
           },
           {
             "name": "foot.r",
@@ -8681,7 +8695,9 @@
               "leg_stretch.r",
               "foot.r"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.r"
           },
           {
             "name": "stride.l",
@@ -8806,7 +8822,9 @@
               "leg_stretch.l",
               "foot.l"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.l"
           },
           {
             "name": "foot.r",
@@ -8817,7 +8835,9 @@
               "leg_stretch.r",
               "foot.r"
             ],
-            "footAlign": 1.0
+            "footAlign": 1.0,
+            "keepSwing": 1.0,
+            "toe": "toes_01.r"
           },
           {
             "name": "stride.l",
@@ -8893,7 +8913,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/bull.glb",
       "kind": "gltf",
@@ -8923,7 +9004,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/bull.glb",
       "kind": "gltf",
@@ -8953,7 +9095,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/bull.glb",
       "kind": "gltf",
@@ -8983,7 +9186,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
@@ -9013,7 +9277,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
@@ -9043,7 +9368,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
@@ -9073,7 +9459,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
@@ -9103,7 +9550,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
@@ -9133,7 +9641,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/bull.glb",
       "kind": "gltf",
@@ -9163,7 +9732,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
@@ -9193,7 +9823,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
@@ -9223,7 +9914,68 @@
         "nearDistance": 20.0,
         "speed": 1.0,
         "state": "Walk",
-        "updateHz": 30
+        "updateHz": 0,
+        "contacts": [
+          "HoofB.L",
+          "HoofB.R",
+          "HoofF.L",
+          "HoofF.R"
+        ],
+        "contactMode": "sweep",
+        "layers": [
+          {
+            "name": "lock-hind-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.L",
+              "LowerLegB.L",
+              "HoofB.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-hind-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegB.R",
+              "LowerLegB.R",
+              "HoofB.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-left",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.L",
+              "LowerLegF.L",
+              "HoofF.L"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          },
+          {
+            "name": "lock-fore-right",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "UpperLegF.R",
+              "LowerLegF.R",
+              "HoofF.R"
+            ],
+            "footAlign": 0.0,
+            "footLock": 1.0,
+            "footLockMode": "stance"
+          }
+        ]
       },
       "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
@@ -10661,7 +11413,13 @@
             "decayMs": 1800.0
           }
         }
-      ]
+      ],
+      "gaze": {
+        "settle": 0.35,
+        "maxTurnRate": 200.0,
+        "eyeHeight": 2.6,
+        "maxYaw": 70.0
+      }
     },
     {
       "name": "tide",
@@ -10850,7 +11608,13 @@
         "hertz": 3.0,
         "occlusionTestsPerSecond": 0.0
       },
-      "reactions": []
+      "reactions": [],
+      "gaze": {
+        "settle": 0.35,
+        "maxTurnRate": 200.0,
+        "eyeHeight": 2.6,
+        "maxYaw": 70.0
+      }
     },
     {
       "name": "sage",
@@ -11069,7 +11833,13 @@
             "envelopeHoldMs": 1100.0
           }
         }
-      ]
+      ],
+      "gaze": {
+        "settle": 0.35,
+        "maxTurnRate": 200.0,
+        "eyeHeight": 2.6,
+        "maxYaw": 70.0
+      }
     },
     {
       "name": "ember",
@@ -11277,7 +12047,13 @@
             "envelopeHoldMs": 1400.0
           }
         }
-      ]
+      ],
+      "gaze": {
+        "settle": 0.35,
+        "maxTurnRate": 200.0,
+        "eyeHeight": 2.6,
+        "maxYaw": 70.0
+      }
     },
     {
       "name": "vane",
@@ -11485,7 +12261,13 @@
             "envelopeHoldMs": 1400.0
           }
         }
-      ]
+      ],
+      "gaze": {
+        "settle": 0.35,
+        "maxTurnRate": 200.0,
+        "eyeHeight": 2.6,
+        "maxYaw": 70.0
+      }
     },
     {
       "behaviors": [
@@ -11534,12 +12316,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
-        "runSpeed": 3.2375,
-        "walkSpeed": 3.2375,
+        "runSpeed": 3.3446,
+        "walkSpeed": 3.3446,
         "pivotRadius": 1.1
       },
       "name": "bull-1",
@@ -11598,12 +12380,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
-        "runSpeed": 3.2375,
-        "walkSpeed": 3.2375,
+        "runSpeed": 3.3446,
+        "walkSpeed": 3.3446,
         "pivotRadius": 1.1
       },
       "name": "bull-18",
@@ -11662,12 +12444,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
-        "runSpeed": 3.2375,
-        "walkSpeed": 3.2375,
+        "runSpeed": 3.3446,
+        "walkSpeed": 3.3446,
         "pivotRadius": 1.1
       },
       "name": "bull-21",
@@ -11726,12 +12508,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.2202,
         "runExit": 1.5956,
-        "runSpeed": 3.1577,
-        "walkSpeed": 3.1577,
+        "runSpeed": 2.1941,
+        "walkSpeed": 2.1941,
         "pivotRadius": 1.2
       },
       "name": "horse-2",
@@ -11790,12 +12572,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.2202,
         "runExit": 1.5956,
-        "runSpeed": 3.1577,
-        "walkSpeed": 3.1577,
+        "runSpeed": 2.1941,
+        "walkSpeed": 2.1941,
         "pivotRadius": 1.2
       },
       "name": "horse-20",
@@ -11854,12 +12636,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
-        "runSpeed": 3.0122,
-        "walkSpeed": 3.0122,
+        "runSpeed": 3.2864,
+        "walkSpeed": 3.2864,
         "pivotRadius": 1.0
       },
       "name": "cow-3",
@@ -11918,12 +12700,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
-        "runSpeed": 3.0122,
-        "walkSpeed": 3.0122,
+        "runSpeed": 3.2864,
+        "walkSpeed": 3.2864,
         "pivotRadius": 1.0
       },
       "name": "cow-19",
@@ -11982,12 +12764,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
-        "runSpeed": 3.0122,
-        "walkSpeed": 3.0122,
+        "runSpeed": 3.2864,
+        "walkSpeed": 3.2864,
         "pivotRadius": 1.0
       },
       "name": "cow-23",
@@ -12046,12 +12828,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 3.2732,
         "runExit": 2.3523,
-        "runSpeed": 3.2375,
-        "walkSpeed": 3.2375,
+        "runSpeed": 3.3446,
+        "walkSpeed": 3.3446,
         "pivotRadius": 1.1
       },
       "name": "bull-10",
@@ -12110,12 +12892,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.6066,
         "runExit": 1.8732,
-        "runSpeed": 3.1577,
-        "walkSpeed": 3.1577,
+        "runSpeed": 2.1941,
+        "walkSpeed": 2.1941,
         "pivotRadius": 1.2
       },
       "name": "horse-11",
@@ -12174,12 +12956,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 2.6066,
         "runExit": 1.8732,
-        "runSpeed": 3.1577,
-        "walkSpeed": 3.1577,
+        "runSpeed": 2.1941,
+        "walkSpeed": 2.1941,
         "pivotRadius": 1.2
       },
       "name": "horse-22",
@@ -12238,12 +13020,12 @@
         "matchRate": true,
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
-        "rateMax": 1.0,
+        "rateMax": 1.6,
         "rateMin": 0.02,
         "runEnter": 1.9831,
         "runExit": 1.4254,
-        "runSpeed": 3.0122,
-        "walkSpeed": 3.0122,
+        "runSpeed": 3.2864,
+        "walkSpeed": 3.2864,
         "pivotRadius": 1.0
       },
       "name": "cow-12",

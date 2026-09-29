@@ -13,6 +13,10 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -601,6 +605,217 @@ TEST_CASE("the lock's drift under acceleration is 0.5*a*t^2, measured", "[footlo
         CHECK(worstDrift < predicted * 1.15f);
         CHECK(worstDrift > predicted * 0.35f);
     }
+}
+
+// ---- ADR-987: the stance lock ------------------------------------------------------------------
+
+namespace {
+
+// One leg under a stance lock, stepped frame by frame: the stack keeps what it held between frames, which is
+// the thing under test. The clip leaves the foot at the rig's origin throughout, so wherever the foot comes
+// out is the lock's doing.
+struct StanceLeg {
+    scene::Skeleton sk = legRig();
+    std::vector<scene::AnimationClip> clips;
+    scene::PoseLayerStack stack;
+
+    StanceLeg() {
+        scene::PoseLayer layer = lockedFoot(1.0f);
+        layer.footLockMode = scene::FootLockMode::Stance;
+        REQUIRE(stack.bind({layer}, sk, clips).empty());
+    }
+
+    // The foot in the rig's model space, after one posed frame at `now`.
+    glm::vec3 step(double now, bool inContact, int span, float elapsed, float remaining, const glm::mat4& toWorld) {
+        scene::PoseLayer& layer = stack.layers().front();
+        layer.inContact = inContact;
+        layer.contactSpan = span;
+        layer.contactElapsed = elapsed;
+        layer.contactRemaining = remaining;
+        layer.modelToWorld = toWorld;
+        scene::Pose pose;
+        scene::setRestPose(sk, pose);
+        stack.apply(sk, clips, now, pose);
+        std::vector<glm::mat4> model;
+        scene::poseToModel(sk, pose, model);
+        return glm::vec3(model[3][3]);
+    }
+};
+
+glm::mat4 bodyAt(float z, float yaw) {
+    return glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z)), yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+glm::vec3 inWorld(const glm::mat4& toWorld, const glm::vec3& p) { return glm::vec3(toWorld * glm::vec4(p, 1.0f)); }
+
+} // namespace
+
+TEST_CASE("a stance lock holds the foot where it landed in the world, the body walking and turning over it",
+          "[footlock][layers][adr987]") {
+    StanceLeg leg;
+    // Touchdown: the foot is where the clip has it.
+    const glm::mat4 w0 = bodyAt(0.0f, 0.0f);
+    CHECK(glm::length(leg.step(0.0, true, 0, 0.0f, 0.5f, w0)) < 1e-4f);
+    // The body walks on 0.05, then 0.1 and turns 0.1 rad -- the turn a derived anchor could not know
+    // about -- then stands and keeps turning. The foot stays put in the world, at the clip's height.
+    const glm::mat4 bodies[] = {bodyAt(0.05f, 0.0f), bodyAt(0.1f, 0.1f), bodyAt(0.1f, 0.2f)};
+    for (int k = 0; k < 3; ++k) {
+        const glm::mat4& w = bodies[k];
+        const glm::vec3 foot = leg.step((k + 1) / 60.0, true, 0, 0.05f * static_cast<float>(k + 1), 0.4f, w);
+        const glm::vec3 world = inWorld(w, foot);
+        INFO("frame " << k + 1 << ": foot in the world (" << world.x << ", " << world.y << ", " << world.z << ")");
+        CHECK(glm::length(glm::vec2(world.x, world.z)) < 2e-3f);
+        CHECK(foot.y == Approx(0.0f).margin(2e-3));
+    }
+}
+
+TEST_CASE("outside its contact span a stance lock leaves the foot to the clip", "[footlock][layers][adr987]") {
+    // The swing is the clip's, lift and all: the whole reason a walk is not locked like ADR-557's idle.
+    StanceLeg leg;
+    (void)leg.step(0.0, true, 0, 0.0f, 0.5f, bodyAt(0.0f, 0.0f));
+    const glm::vec3 foot = leg.step(1.0 / 60.0, false, -1, 0.0f, 0.0f, bodyAt(0.3f, 0.2f));
+    CHECK(glm::length(foot) < 1e-5f);
+}
+
+TEST_CASE("a stance lock hands the foot back to the clip over its release", "[footlock][layers][adr987]") {
+    // Held until the last 30% of the span; at lift-off the clip's again, with no step to teleport across;
+    // half way through the release between the two.
+    StanceLeg leg;
+    (void)leg.step(0.0, true, 0, 0.0f, 1.0f, bodyAt(0.0f, 0.0f));
+    const float held = leg.step(0.1, true, 0, 0.6f, 0.4f, bodyAt(0.06f, 0.0f)).z;    // 60% through
+    const float mid = leg.step(0.2, true, 0, 0.85f, 0.15f, bodyAt(0.06f, 0.0f)).z;   // half way through the release
+    const float lifted = leg.step(0.3, true, 0, 1.0f, 0.0f, bodyAt(0.06f, 0.0f)).z;  // at lift-off
+    INFO("held " << held << " mid " << mid << " lifted " << lifted);
+    CHECK(held == Approx(-0.06f).margin(2e-3));
+    CHECK(mid == Approx(-0.03f).margin(2e-3));
+    CHECK(lifted == Approx(0.0f).margin(1e-4));
+}
+
+TEST_CASE("what a stance lock held is trusted only by the next frame of the same stance",
+          "[footlock][layers][adr987]") {
+    // Each of these arrives at a frame the held point does not belong to, and must start holding from the
+    // clip's own foot there -- never from a point a seek or a cull abolished (ADR-557's objection to memory).
+    const auto fresh = [](double now, int span, float elapsed) {
+        StanceLeg leg;
+        (void)leg.step(1.0, true, 0, 0.1f, 0.4f, bodyAt(0.0f, 0.0f));
+        (void)leg.step(1.0 + (1.0 / 60.0), true, 0, 0.12f, 0.38f, bodyAt(0.04f, 0.0f)); // held: foot 0.04 back
+        return leg.step(now, true, span, elapsed, 0.3f, bodyAt(0.2f, 0.3f));
+    };
+    SECTION("the control: the next frame of the same stance holds") {
+        const glm::vec3 foot = fresh(1.0 + (2.0 / 60.0), 0, 0.14f);
+        CHECK(glm::length(inWorld(bodyAt(0.2f, 0.3f), foot) - glm::vec3(0.0f, foot.y, 0.0f)) < 2e-3f);
+        CHECK(glm::length(foot) > 0.15f);
+    }
+    SECTION("a seek back") { CHECK(glm::length(fresh(0.5, 0, 0.14f)) < 1e-4f); }
+    SECTION("a cull, or a seek on") { CHECK(glm::length(fresh(1.0 + scene::kStanceGap + 0.05, 0, 0.14f)) < 1e-4f); }
+    SECTION("the next stance") { CHECK(glm::length(fresh(1.0 + (2.0 / 60.0), 1, 0.01f)) < 1e-4f); }
+    SECTION("the same span, begun again") { CHECK(glm::length(fresh(1.0 + (2.0 / 60.0), 0, 0.01f)) < 1e-4f); }
+}
+
+// ---- ADR-988: a planted foot keeps the clip's swing ----------------------------------------------
+
+namespace {
+
+struct Planted {
+    glm::vec3 foot;
+    float soleDegrees; // the foot's up from the model's up
+};
+
+// The leg with the hip swung forward (the foot in the air, as a swing has it) and the foot itself turned by
+// `roll` about X (a heel the clip raises), planted by a ground layer on the flat keeping `keepSwing` of it.
+Planted plantedSwing(float hipSwing, float roll, float keepSwing) {
+    const scene::Skeleton sk = legRig();
+    const std::vector<scene::AnimationClip> clips;
+    scene::PoseLayer layer = lockedFoot(0.0f);
+    layer.keepSwing = keepSwing;
+    scene::PoseLayerStack stack;
+    REQUIRE(stack.bind({layer}, sk, clips).empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    pose.local[1].rotation = glm::angleAxis(hipSwing, glm::vec3(1.0f, 0.0f, 0.0f));
+    pose.local[3].rotation = glm::angleAxis(roll, glm::vec3(1.0f, 0.0f, 0.0f));
+    stack.apply(sk, clips, 0.0, pose);
+    std::vector<glm::mat4> model;
+    scene::poseToModel(sk, pose, model);
+    const glm::vec3 up = glm::normalize(glm::mat3(model[3]) * glm::vec3(0.0f, 1.0f, 0.0f));
+    return {glm::vec3(model[3][3]), glm::degrees(std::acos(std::clamp(up.y, -1.0f, 1.0f)))};
+}
+
+// Where the clip alone has the foot, for the same swing.
+glm::vec3 clipFoot(float hipSwing) {
+    const scene::Skeleton sk = legRig();
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    pose.local[1].rotation = glm::angleAxis(hipSwing, glm::vec3(1.0f, 0.0f, 0.0f));
+    std::vector<glm::mat4> model;
+    scene::poseToModel(sk, pose, model);
+    return glm::vec3(model[3][3]);
+}
+
+} // namespace
+
+TEST_CASE("a ground layer keeps the clip's foot in the air when asked", "[layers][foot][adr988]") {
+    const float swing = -0.3f; // the hip swung forward: the foot comes up off the ground, still in reach of it
+    const glm::vec3 clip = clipFoot(swing);
+    INFO("the clip's foot (" << clip.x << ", " << clip.y << ", " << clip.z << ")");
+    REQUIRE(clip.y > 0.03f);
+
+    // The control, and every scene before this: planted at its standing height, the swing flattened away.
+    const Planted flattened = plantedSwing(swing, 0.5f, 0.0f);
+    CHECK(flattened.foot.y == Approx(0.0f).margin(2e-3));
+    CHECK(flattened.soleDegrees < 1.0f); // and the heel the clip raised laid flat
+
+    // Kept: the clip's height above where it stands, and its sole's own turn, on the flat.
+    const Planted kept = plantedSwing(swing, 0.5f, 1.0f);
+    CHECK(kept.foot.y == Approx(clip.y).margin(2e-3));
+    CHECK(kept.foot.z == Approx(clip.z).margin(2e-3));
+    CHECK(kept.soleDegrees == Approx(glm::degrees(0.5f + swing)).margin(0.5));
+
+    // Half of it is half the lift.
+    const Planted half = plantedSwing(swing, 0.0f, 0.5f);
+    CHECK(half.foot.y == Approx(0.5f * clip.y).margin(3e-3));
+}
+
+TEST_CASE("a kept swing keeps the toes out of the ground", "[layers][foot][adr988]") {
+    // The leg with a toe 0.2 ahead of the ankle and 0.02 above the ground at rest, and the foot pitched 30
+    // degrees toe-down (a clip pointing its toes at lift-off) at an ankle the plant holds at its standing
+    // height -- so the toe is 0.08 under the ground unless the floor turns the foot up.
+    scene::Skeleton sk = legRig();
+    scene::Transform toe;
+    toe.position = glm::vec3(0.0f, 0.02f, 0.2f);
+    sk.joints.push_back(scene::Joint{"toe", 3, toe});
+    sk.palette.push_back(4);
+    sk.inverseBind.push_back(glm::mat4(1.0f));
+    const std::vector<scene::AnimationClip> clips;
+    const auto run = [&](const char* toeName) {
+        scene::PoseLayer layer = lockedFoot(0.0f);
+        layer.keepSwing = 1.0f;
+        layer.toeJoint = toeName;
+        scene::PoseLayerStack stack;
+        REQUIRE(stack.bind({layer}, sk, clips).empty());
+        scene::Pose pose;
+        scene::setRestPose(sk, pose);
+        pose.local[3].rotation = glm::angleAxis(0.5236f, glm::vec3(1.0f, 0.0f, 0.0f)); // toe down
+        stack.apply(sk, clips, 0.0, pose);
+        std::vector<glm::mat4> model;
+        scene::poseToModel(sk, pose, model);
+        return std::make_pair(glm::vec3(model[3][3]), glm::vec3(model[4][3]));
+    };
+    const auto [ankleWithout, toeWithout] = run("");
+    INFO("without the floor: toe at " << toeWithout.y);
+    CHECK(toeWithout.y < -0.05f); // THE CONTROL: the clip's toes, into the ground
+    const auto [ankle, toeAt] = run("toe");
+    INFO("with it: toe at " << toeAt.y);
+    CHECK(toeAt.y == Approx(0.02f).margin(1e-3));        // on the ground, at its own standing height
+    CHECK(glm::length(ankle - ankleWithout) < 1e-5f);   // and the ankle has not moved
+}
+
+TEST_CASE("a foot standing where it stands is planted the same either way", "[layers][foot][adr988]") {
+    // A stance foot is at its standing height and flat in the clip, so keeping the swing changes nothing.
+    const Planted before = plantedSwing(0.0f, 0.0f, 0.0f);
+    const Planted after = plantedSwing(0.0f, 0.0f, 1.0f);
+    CHECK(glm::length(before.foot - after.foot) < 1e-5f);
+    CHECK(std::abs(before.soleDegrees - after.soleDegrees) < 1e-3f);
 }
 
 TEST_CASE("an unlocked foot is the behaviour every scene had before", "[footlock][layers]") {

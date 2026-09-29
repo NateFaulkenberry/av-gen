@@ -16,13 +16,16 @@
 #include "params/parameter_set.hpp"
 #include "signals/signal_bus.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -1459,4 +1462,130 @@ TEST_CASE("a scrubbed frame publishes the action it is performing, not the gait'
     // publication gap and not a simulation one, which is the distinction that says where to fix it.
     CHECK(scrubbed.actor().actions().authority() == entity::Authority::Routine);
     CHECK(duringScrub == duringPlay);
+}
+
+// ---- ADR-989: a head comes round to what it looks at ------------------------------------------------
+
+namespace {
+
+// A body that attends to a point in the east for a second, then to one in the north: what the attention
+// system does whenever its focus moves on.
+entity::EntityDesc gazer(float settle) {
+    entity::EntityDesc d = heroDesc();
+    d.gaze.settle = settle;
+    d.gaze.maxTurnRate = 200.0f;
+    d.gaze.eyeHeight = 2.0f;
+    entity::ActionDesc east = action(entity::ActionKind::Pose, "east");
+    east.activity = "observe";
+    east.duration = 1.0;
+    east.target = pointTarget(glm::vec3(10.0f, 2.0f, 0.0f));
+    entity::ActionDesc north = action(entity::ActionKind::Pose, "north");
+    north.activity = "observe";
+    north.duration = 3.0;
+    north.target = pointTarget(glm::vec3(0.0f, 2.0f, 10.0f));
+    d.actions = {east, north};
+    return d;
+}
+
+// The bearing, in degrees about +Y from +Z, of what the head is aimed at, seen from the eyes.
+float bearing(entity::Entity& e) {
+    const glm::vec3 d = e.locomotion().lookTarget - (e.state().position() + glm::vec3(0.0f, 2.0f, 0.0f));
+    return glm::degrees(std::atan2(d.x, d.z));
+}
+
+// The engine's first frame is at 0 with no elapsed time (ADR-521), and a seek replays from that step too.
+void firstFrame(World& w) {
+    w.params.resetFinals();
+    entity::EntityUpdate u;
+    u.time = 0.0;
+    u.dt = 0.0;
+    u.bus = &w.bus;
+    w.world.update(u, w.params);
+}
+
+// The fastest the aim turns, in degrees a second, over `seconds` of 60 Hz steps.
+float fastestTurn(World& w, double seconds) {
+    float previous = bearing(w.actor());
+    float fastest = 0.0f;
+    for (int i = 0; i < static_cast<int>(seconds * 60.0 + 0.5); ++i) {
+        w.tick(1.0 / 60.0);
+        const float now = bearing(w.actor());
+        fastest = std::max(fastest, std::abs(now - previous) * 60.0f);
+        previous = now;
+    }
+    return fastest;
+}
+
+} // namespace
+
+TEST_CASE("ADR-989: without a gaze the head's aim jumps with the attention", "[entity][gaze][adr989]") {
+    // THE CONTROL, and every scene before: the subject changes in a step and so does the aim.
+    World w({gazer(0.0f)}, {{"hero", glm::vec3(0.0f)}});
+    firstFrame(w);
+    w.tick(0.9);
+    CHECK(bearing(w.actor()) == Catch::Approx(90.0f).margin(0.5f));
+    const float fastest = fastestTurn(w, 0.3);
+    INFO("fastest " << fastest << " deg/s");
+    CHECK(fastest > 5000.0f); // a quarter turn in one 60 Hz step
+    CHECK(bearing(w.actor()) == Catch::Approx(0.0f).margin(0.5f));
+}
+
+TEST_CASE("ADR-989: with a gaze the aim comes round within its rate and settles on the subject",
+          "[entity][gaze][adr989]") {
+    World w({gazer(0.35f)}, {{"hero", glm::vec3(0.0f)}});
+    firstFrame(w);
+    w.tick(0.9);
+    CHECK(bearing(w.actor()) == Catch::Approx(90.0f).margin(0.5f)); // settled on the first subject
+    const float fastest = fastestTurn(w, 1.5);
+    INFO("fastest " << fastest << " deg/s");
+    CHECK(fastest <= 201.0f); // never faster than its rate
+    CHECK(fastest > 150.0f);  // and a real turn, not a drift
+    CHECK(bearing(w.actor()) == Catch::Approx(0.0f).margin(0.25f)); // and on the subject
+}
+
+TEST_CASE("ADR-989: a seek lands the gaze where a play does", "[entity][gaze][adr989][seek]") {
+    // Mid-turn, where the spring's state is the whole answer: a seek replays every step from a checkpoint,
+    // and the gaze is state on the entity, so it is reconstructed rather than restarted.
+    World played({gazer(0.35f)}, {{"hero", glm::vec3(0.0f)}});
+    firstFrame(played);
+    played.tick(69.0 / 60.0);
+    World sought({gazer(0.35f)}, {{"hero", glm::vec3(0.0f)}});
+    sought.world.seek(69.0 / 60.0, &sought.params, nullptr, 1.0 / 60.0, entity::SeekBudget{.maxSeconds = 90.0});
+    const float mid = bearing(played.actor());
+    INFO("played " << mid << ", sought " << bearing(sought.actor()));
+    REQUIRE(mid > 5.0f); // the fixture is mid-turn
+    REQUIRE(mid < 85.0f);
+    CHECK(glm::length(played.actor().locomotion().lookTarget - sought.actor().locomotion().lookTarget) < 1e-4f);
+}
+
+TEST_CASE("ADR-989: a subject crossing the body's back does not throw the head to the other shoulder",
+          "[entity][gaze][adr989]") {
+    // Behind on the right, then just across the back to the left, then well round on the left.
+    entity::EntityDesc d = gazer(0.35f);
+    d.gaze.maxYaw = 70.0f;
+    const auto pose = [](const char* name, double seconds, float degrees) {
+        entity::ActionDesc a = action(entity::ActionKind::Pose, name);
+        a.activity = "observe";
+        a.duration = seconds;
+        const float r = glm::radians(degrees);
+        a.target = pointTarget(glm::vec3(10.0f * std::sin(r), 2.0f, 10.0f * std::cos(r)));
+        return a;
+    };
+    d.actions = {pose("behind-right", 1.0, 150.0f), pose("across-the-back", 1.0, -170.0f),
+                 pose("left", 1.5, -120.0f)};
+    World w({d}, {{"hero", glm::vec3(0.0f)}});
+    firstFrame(w);
+    w.tick(0.95);
+    CHECK(bearing(w.actor()) == Catch::Approx(70.0f).margin(0.5f)); // at the limit, on the subject's side
+    float lowest = 180.0f;
+    for (int i = 0; i < 60; ++i) { // the subject crosses the back: the head stays on the side it is on
+        w.tick(1.0 / 60.0);
+        lowest = std::min(lowest, bearing(w.actor()));
+    }
+    INFO("lowest while the subject was just across the back: " << lowest);
+    CHECK(lowest > 69.0f);
+    const float fastest = fastestTurn(w, 1.4); // then well round on the left: across the front, within the rate
+    INFO("fastest " << fastest);
+    CHECK(fastest <= 201.0f);
+    CHECK(bearing(w.actor()) == Catch::Approx(-70.0f).margin(0.5f));
 }

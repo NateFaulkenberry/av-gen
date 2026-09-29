@@ -308,7 +308,17 @@ std::vector<ContactTrack> detectContacts(const Skeleton& skeleton, const Animati
         // an apex the height test excludes. So the vertical pair is the test for both kinds of clip
         // and the horizontal one is used only where it means something -- see `horizontalMatters`.
         std::vector<char> flags(samples, 0);
-        for (std::size_t s = 0; s < samples; ++s) {
+        if (settings.mode == ContactMode::Sweep) {
+            // ADR-987. The stance of an in-place cycle is the foot going BACK under the body, toward
+            // the rig's -Z, however high it is: from the turn at the front of its swing to the turn at
+            // the back. Central differences, and a looping clip's ends wrap to each other.
+            for (std::size_t s = 0; s < samples; ++s) {
+                const std::size_t a = s == 0 ? (settings.looping && samples > 2 ? samples - 2 : 0) : s - 1;
+                const std::size_t b = s + 1 < samples ? s + 1 : (settings.looping && samples > 2 ? 1 : samples - 1);
+                flags[s] = p[b].z - p[a].z < 0.0f ? 1 : 0;
+            }
+        }
+        for (std::size_t s = 0; s < samples && settings.mode == ContactMode::Height; ++s) {
             const std::size_t a = s == 0 ? 0 : s - 1;
             const std::size_t b = s + 1 < samples ? s + 1 : samples - 1;
             const float span = static_cast<float>(b - a) * dt;

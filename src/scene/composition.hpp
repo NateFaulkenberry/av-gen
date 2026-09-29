@@ -192,6 +192,9 @@ struct NodeAnimation {
     // the first one the phase reference. Empty means no analysis, and phase matching then falls
     // back to frame zero -- the behaviour every scene had before this existed.
     std::vector<std::string> contacts;
+    // What their contact is read from (ADR-987): the default height test, or "sweep", the backward
+    // stroke of an in-place walk cycle.
+    ContactMode contactMode = ContactMode::Height;
     // Enter every state at the outgoing state's phase rather than at its clip's frame zero.
     bool matchPhase = false;
     // Seconds for an inertialized transition's offset to halve. 0 keeps the cross-fade.

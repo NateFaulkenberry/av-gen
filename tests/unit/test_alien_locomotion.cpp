@@ -1829,3 +1829,111 @@ TEST_CASE("an authored acceleration limits how fast a body may reach its speed",
     CHECK(worstRise <= riseBudget + 1e-3f);
     CHECK(worstFall <= fallBudget + 1e-3f);
 }
+
+// A probe (revision round 1, item 6; ADR-988): what the aliens' own locomotion clips do with a foot in the
+// air -- the ankle's and the toes' height above where they stand, and how far the sole turns from flat --
+// which the ground layer, planting every frame at the standing height with the sole laid on the ground, draws
+// none of.
+TEST_CASE("probe: the aliens' swing, height and sole", "[.probe][alien][swing]") {
+    if (!aliensPresent()) {
+        SKIP("the alien pack is not present");
+    }
+    for (const char* asset : {"alien-scout.glb", "alien-elder.glb"}) {
+        const scene::Scene s = loadAlien(asset);
+        const scene::SkinnedRig& rig = s.rigs.front();
+        const int foot = rig.skeleton.find("foot.l");
+        const int toes = rig.skeleton.find("toes_01.l");
+        REQUIRE(foot >= 0);
+        REQUIRE(toes >= 0);
+        scene::Pose pose;
+        scene::setRestPose(rig.skeleton, pose);
+        std::vector<glm::mat4> model;
+        scene::poseToModel(rig.skeleton, pose, model);
+        const glm::mat4 rest = model[static_cast<std::size_t>(foot)];
+        const float standFoot = rest[3].y;
+        const float standToes = model[static_cast<std::size_t>(toes)][3].y;
+        const glm::vec3 soleUp = glm::normalize(glm::inverse(glm::mat3(rest)) * glm::vec3(0.0f, 1.0f, 0.0f));
+        for (const char* name : {"Walking", "Running"}) {
+            const scene::AnimationClip& clip = clipNamed(rig, name);
+            std::printf("\n%s %s (%.3f s): stands at ankle %.3f, toes %.3f\n  t      ankle+  toes+  sole deg\n", asset, name,
+                        static_cast<double>(clip.length()), static_cast<double>(standFoot), static_cast<double>(standToes));
+            for (float t = 0.0f; t < clip.length(); t += 1.0f / 30.0f) {
+                scene::setRestPose(rig.skeleton, pose);
+                scene::sampleClip(clip, clip.start + t, pose);
+                scene::poseToModel(rig.skeleton, pose, model);
+                const glm::mat4& m = model[static_cast<std::size_t>(foot)];
+                const glm::vec3 up = glm::normalize(glm::mat3(m) * soleUp);
+                const float degrees = glm::degrees(std::acos(std::clamp(up.y, -1.0f, 1.0f)));
+                std::printf("  %.3f  %6.3f  %6.3f  %5.1f\n", static_cast<double>(t), static_cast<double>(m[3].y - standFoot),
+                            static_cast<double>(model[static_cast<std::size_t>(toes)][3].y - standToes),
+                            static_cast<double>(degrees));
+            }
+        }
+    }
+    std::fflush(stdout);
+}
+
+// A probe (revision round 1, item 6; ADR-988): an alien's ground layers on the flat, walking and running, with
+// the swing flattened (every scene before) and kept (GV3's aliens): the highest the ankle and the toes get above
+// where they stand over each clip's cycle. The aliens never run in GV3's film, so this is the run's number.
+TEST_CASE("probe: an alien's drawn swing on the flat, walking and running", "[.probe][alien][swing]") {
+    if (!aliensPresent()) {
+        SKIP("the alien pack is not present");
+    }
+    const scene::Scene s = loadAlien("alien-scout.glb");
+    const scene::SkinnedRig& rig = s.rigs.front();
+    const int ankle = rig.skeleton.find("foot.l");
+    const int toe = rig.skeleton.find("toes_01.l");
+    REQUIRE(ankle >= 0);
+    REQUIRE(toe >= 0);
+    scene::Pose pose;
+    scene::setRestPose(rig.skeleton, pose);
+    std::vector<glm::mat4> model;
+    scene::poseToModel(rig.skeleton, pose, model);
+    const float standAnkle = model[static_cast<std::size_t>(ankle)][3].y;
+    const float standToe = model[static_cast<std::size_t>(toe)][3].y;
+    for (const char* clipName : {"Walking", "Running"}) {
+        const scene::AnimationClip& clip = clipNamed(rig, clipName);
+        for (const float keep : {0.0f, 1.0f}) {
+            std::vector<scene::PoseLayer> layers;
+            for (const char* side : {"l", "r"}) {
+                scene::PoseLayer l;
+                l.name = std::string("foot.") + side;
+                l.kind = scene::PoseLayerKind::Foot;
+                l.drive = scene::PoseLayerDrive::Manual;
+                l.chainRoot = std::string("thigh_twist.") + side;
+                l.chainMid = std::string("leg_stretch.") + side;
+                l.chainTip = std::string("foot.") + side;
+                l.hasGround = true;
+                l.groundNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+                l.footAlign = 1.0f;
+                l.keepSwing = keep;
+                l.toeJoint = keep > 0.0f ? std::string("toes_01.") + side : std::string();
+                l.weight = 1.0f;
+                layers.push_back(l);
+            }
+            scene::PoseLayerStack stack;
+            REQUIRE(stack.bind(layers, rig.skeleton, rig.clips).empty());
+            float clipAnkle = 0.0f;
+            float clipToe = 0.0f;
+            float drawnAnkle = 0.0f;
+            float drawnToe = 0.0f;
+            for (float t = 0.0f; t < clip.length(); t += 1.0f / 60.0f) {
+                scene::setRestPose(rig.skeleton, pose);
+                scene::sampleClip(clip, clip.start + t, pose);
+                scene::poseToModel(rig.skeleton, pose, model);
+                clipAnkle = std::max(clipAnkle, model[static_cast<std::size_t>(ankle)][3].y - standAnkle);
+                clipToe = std::max(clipToe, model[static_cast<std::size_t>(toe)][3].y - standToe);
+                stack.apply(rig.skeleton, rig.clips, static_cast<double>(t), pose);
+                scene::poseToModel(rig.skeleton, pose, model);
+                drawnAnkle = std::max(drawnAnkle, model[static_cast<std::size_t>(ankle)][3].y - standAnkle);
+                drawnToe = std::max(drawnToe, model[static_cast<std::size_t>(toe)][3].y - standToe);
+            }
+            std::printf("%s keepSwing %.0f: clip lifts the ankle %.3f and the toes %.3f; drawn %.3f and %.3f (model units; "
+                        "x1.94 for GV3's metres)\n",
+                        clipName, static_cast<double>(keep), static_cast<double>(clipAnkle), static_cast<double>(clipToe),
+                        static_cast<double>(drawnAnkle), static_cast<double>(drawnToe));
+        }
+    }
+    std::fflush(stdout);
+}
