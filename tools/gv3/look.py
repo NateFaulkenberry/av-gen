@@ -383,6 +383,38 @@ def travel_beam_cuts(shots):
     return out
 
 
+# ---- a shot's own emphasis (revision round 1, the Critic's passes) -------------------------------------------
+# A parameter held at another value for exactly one shot, stepped at its cuts (the cut hides the step). s49,
+# from under the elder as the saucer comes over its rim, sits in the submerged break, whose automation dims every
+# emission to a quarter and the exposure by 2 EV: the Critic's "near-black even for a dark passage" (luma 0.036).
+# The shot is about the saucer and the elder's gills, and the gills read dull grey-green there; at 0.8 (the rest is
+# 0.1) they are the elder's gold again over the dark frame, the break still dark (luma 0.06-0.075, contrast
+# 0.10-0.13, nothing clipped; the kick lane still pumps them).
+SHOT_EMPHASIS = {
+    "s49": {"nodes/elder-2-gills/emissiveBoost": 0.8, "nodes/elder-2-under/emissiveBoost": 0.8},
+}
+
+
+def shot_emphasis(project, scene):
+    """SHOT_EMPHASIS as step tracks at each shot's cuts, from the parameter's own value. Called by the generator
+    once the cut is installed: it reads the shots' times."""
+    shots = {sh.get("label", "").split(" ")[0]: sh for sh in scene["cameraDirection"]["shots"]}
+    per = {}
+    for sid, params in SHOT_EMPHASIS.items():
+        for target, value in params.items():
+            per.setdefault(target, []).append((shots[sid]["start"], shots[sid]["end"], value))
+    tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
+    for target, spans in per.items():
+        base = project["parameters"][target]
+        keys = [{"time": 0.0, "value": [base], "interp": "step"}]
+        for start, end, value in sorted(spans):
+            keys.append({"time": round(start, 6), "value": [value], "interp": "step"})
+            keys.append({"time": round(end, 6), "value": [base], "interp": "step"})
+        tl["tracks"] = [t for t in tl.get("tracks", []) if t["target"] != target]
+        tl["tracks"].append({"target": target, "component": -1, "timeBase": "seconds", "mode": "replace",
+                             "loopLength": 0.0, "enabled": True, "keys": keys})
+
+
 def apply_travel_beam(project, shots):
     """The Camera Travel Beam on the chosen cuts (see TRAVEL_BEAM_*): the effect set to fire on its
     markers, the markers written, its parameters and its kick. Returns the cuts it answers."""

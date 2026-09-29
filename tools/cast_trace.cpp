@@ -52,14 +52,13 @@
 //     viewport.
 //
 // And a third, found by the GV3 art pass (revision round 1): **the step's delta is the render's.** A
-// render's `FixedStepClock` hands `update` the difference of two rounded instants, (k+1)/fps - k/fps,
-// which is not exactly 1/fps in the last bits; `EntityWorld::seekExact` and the default frames here
-// step exactly 1/fps. The instants are the same; the deltas are not. A body that decides amplifies
-// that: on GV3 the first alien moved 0.7 mm at 6.28 s and 114 m by 168 s, so from its seventh second
-// the default trace (and a seek, and a range render, which seeks) describes a different film from a
-// render of the whole. `--render-clock` steps as the render does and describes the rendered film; the
-// default is left as it was until the engine's two deltas are made one (an owner's decision: either
-// changes a film or a seek).
+// render's `FixedStepClock` handed `update` the difference of two rounded instants, (k+1)/fps - k/fps,
+// which is not exactly 1/fps in the last bits, while `EntityWorld::seekExact` and the frames here step
+// exactly 1/fps. A body that decides amplifies that: on GV3 the first alien moved 0.7 mm at 6.28 s and
+// 114 m by 168 s, so the trace described a different film from the render. ADR-990 made the clock hand
+// out 1/fps, so the default frames here are the render's again. `--render-clock` steps exactly as
+// `RenderJob` does (its warm-up frame and second seek, its clock, its viewport): the check that the two
+// agree, which on GV3 they do to the bit.
 //
 // ---- the camera track (`--camera`, ADR-911) ----------------------------------------------------
 //

@@ -8,12 +8,13 @@
 // instrument for "this change does not move that body", compared between two builds (revision round 1).
 //
 // Which film (revision round 1): by default the engine is stepped exactly 1/fps a frame, as a seek replays and as
-// `avgen_cast_trace` does. A render's `FixedStepClock` hands `update` the difference of two rounded instants
-// instead, and a body that decides amplifies that last bit into a different path (GV3: 0.7 mm at 6.28 s, 114 m
-// by 168 s). `--render-clock WxH` steps as `RenderJob` does -- its warm-up frame and second seek, its clock, its
-// viewport -- and measures the film as rendered; `--fixed-clock`, `--warm-up` and `--viewport WxH` are its three
-// parts, and `--instants` / `--delta-difference` spell a constant-step frame's instant, or its delta, the clock's
-// way. `--camera-out FILE [--track a,b]` writes the drawn camera (and those bodies) every frame.
+// `avgen_cast_trace` does. A render's `FixedStepClock` handed `update` the difference of two rounded instants
+// instead, and a body that decides amplified that last bit into a different path (GV3: 0.7 mm at 6.28 s, 114 m
+// by 168 s); ADR-990 made the clock hand out 1/fps. `--render-clock WxH` steps as `RenderJob` does -- its warm-up
+// frame and second seek, its clock, its viewport -- to check the two still agree; `--fixed-clock`, `--warm-up`
+// and `--viewport WxH` are its three parts, and `--instants` / `--delta-difference` spell a constant-step frame's
+// instant, or its delta, the old clock's way (`--delta-difference` reproduces the parted film).
+// `--camera-out FILE [--track a,b]` writes the drawn camera (and those bodies) every frame.
 //
 // It runs the real `app::Engine` in Offline mode, as `avgen_cast_trace` does, and after every frame reads
 // each character's DRAWN feet: the rig's evaluated pose through the skinned mesh's world transform. No

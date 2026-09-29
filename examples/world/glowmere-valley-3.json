@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "afa86f973f454d25914b891baf67410e01dea39b8f6e249e4a75be22c44721e4",
-        "size": 354580
+        "sha256": "1642870b49b9c1217009d8ce33db5e904e6f4cae61f584ca44e10719f78b7599",
+        "size": 354576
       }
     }
   },
@@ -20511,7 +20511,7 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse elder-2-cap",
+        "name": "hero pulse lantern-cap",
         "time": 166.613846
       },
       {
@@ -20521,7 +20521,7 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse elder-2-cap",
+        "name": "hero pulse lantern-cap",
         "time": 168.46
       },
       {
@@ -44354,6 +44354,68 @@
             "time": 155.540256,
             "value": [
               0.0
+            ],
+            "interp": "step"
+          }
+        ]
+      },
+      {
+        "target": "nodes/elder-2-gills/emissiveBoost",
+        "component": -1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 0.0,
+        "enabled": true,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 162.924872,
+            "value": [
+              0.8
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 166.617179,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          }
+        ]
+      },
+      {
+        "target": "nodes/elder-2-under/emissiveBoost",
+        "component": -1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 0.0,
+        "enabled": true,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 162.924872,
+            "value": [
+              0.8
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 166.617179,
+            "value": [
+              0.1
             ],
             "interp": "step"
           }

@@ -6,14 +6,15 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 13:40): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
+- **Status (2026-09-29, 15:30): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
   at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1-7 done and committed
-  (`9c86d2b1`, `e6e7719f`, `d18b64cf`, `1fa60913`); verification batch done; Critic pass 1 done (job
-  `job_1a0edf926f31b1a6b`). Bland shots chosen: s50, s29. Investigating s50 found an ENGINE DETERMINISM DEFECT
-  (below, "Found: a render is not the film its seeks and traces describe"); the coordinator chose option C for this
-  round (no engine change; reframe s50 against the film as rendered) and asked for the write-up, an audit of rounds
-  0 and 1 for the same trap (below), and every Critic input rendered from 0. Next: s50 reframe + s29 (targeted),
-  Critic pass 2 (the adapter fed the RENDER-CLOCK cast trace), frame costs, suites, the r1 render, REPORT.md.
+  (`9c86d2b1`, `e6e7719f`, `d18b64cf`, `1fa60913`); Critic passes 1 and 2 done. Investigating s50 found an engine
+  determinism defect (below, "Found: a render is not the film its seeks and traces describe"); the owner chose
+  option A, which the coordinator committed as `bce61fe9` (ADR-990): renders, seeks and traces are one film again.
+  s50 is back on its original rig; s49 gets the elder's gold gills (the second bland shot). Next: commit, Critic
+  pass 3 (rendered from 0), the full-vs-12 s render check with the new binary, frame costs, both suites (after a
+  reconfigure and full rebuild), `GV3-art-pass-r1.mp4`, REPORT.md. No before/after comparisons of old film
+  against new (the owner waived them).
   Items 6 and 7 came later from the coordinator (relayed as the owner's); recording them in `00-brief.md` was
   refused by the permission system, so they are described here only -- the coordinator or the owner can add them
   to the brief. Round 0 (the pass) is complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it
@@ -571,6 +572,34 @@ defect. Not fixed this round (the coordinator's decision: option C); for the own
 - **This round (option C):** tools only, defaults unchanged. `avgen_cast_trace --render-clock WxH` steps as
   `RenderJob` does and writes `"clock": "render"` (the default writes `"step"`); the probe has the same option and
   its parts. Used for the audit below, the s50 reframe and the Critic's cast from pass 2.
+- **The owner's decision, relayed by the coordinator (2026-09-29, 15:1x), in their words:** "Ah just go with
+  option A. Don't worry about before and after comparisons, let just move towards getting a render ready for me to
+  review". (Recorded here, not in `00-brief.md`: the permission system refused that kind of write for items 6
+  and 7.) The coordinator assigned ADR block 990-999 for it (ADR-990). **Not implemented:** the edit to
+  `src/core/time.cpp` (`FixedStepClock::tick`: `deltaTime = 1.0 / fps_`) was DENIED by the permission system
+  ("Modify Shared Resources"); not worked around, reported to the coordinator. It needs the owner's own approval.
+  **Then (15:10):** the owner confirmed it to the coordinator directly, and the coordinator made the change on this
+  branch: `bce61fe9` (ADR-990, `[adr990]` tests, the README row), and put items 6, 7 and the option-A words into
+  `00-brief.md` (`a073da7b`). My ADRs now go from 991.
+- **After ADR-990** (reconfigured, full rebuild): the default cast trace and a `--render-clock` trace of the same
+  project agree to the bit (every body, the camera), and the new film is exactly the old step world. So every
+  step-world measurement (the ADR tables of items 2, 6 and 7, `framing.py`, the generator's cast-based framing)
+  describes the film as rendered, and seeks and range renders are the film again. s50 went back to its original
+  rig (`git checkout 1fa60913 -- tools/gv3/shots.py`; the scene is byte-identical to `1fa60913`'s): in the new film
+  Ember walks toward the lens in her own lit ring, 0.15-0.25 of the frame, the elder and the saucer beyond; Sage
+  passes out at the left edge in the shot's first 1.5 s (a large partial figure, 6-7 m off). Seek stills
+  `scratchpad/r1/gen3/s50/sheet.png`.
+- **Searched for other deltas taken as differences of instants** (the coordinator's ask; none changed):
+  `MusicalEventDetector::update` (analysis-frame instants; the replay feeds it the same frames), `signals/source.cpp`
+  (a window start, `renderTime - deltaTime`), the particle spawn count and the procedural `prevInfo` (render only),
+  the live transport (wall clock or audio position; not reproducible by design). `RenderJob`, `FrameRange` and the
+  headless benchmark all take their delta from `FixedStepClock`. GV2's fingerprint traces a constant 1/60: A would
+  not move it.
+- **Also found (one observation, not investigated to a cause):** the pass-2 full render (`662bd4b6`) differs from a
+  0-8.25 s render of the same project and binary from frame 481 (8.017 s) on, across the frame (max 90-136 levels at
+  scattered pixels, means within 0.5%). Two 0-12 s renders are identical to each other, and the pass-1 film matches
+  the short renders until their last three frames (a range's end is drained differently). So one full render left an
+  otherwise repeatable path. Evidence: `scratchpad/r1/det/`, `scratchpad/r1/critic/p{1,2}-all.md5`.
 
 ### Audit: what rounds 0 and 1 derived from the step world (the coordinator's ask)
 
@@ -581,7 +610,12 @@ Re-checked with the render-clock trace and probe. Sound unless said otherwise.
   saucer), the stems (item 1), the rainbow lift (item 4: the drummer and the saucer identical), E5's timing (lifted
   172.783, gone 177.700, back 183.733: every set piece's beats identical), the hero sites and the new heroes' lens
   clearance and the musicians' placement (`hero_sites.py`, `place_search.py`: keyed eyes, never a trace; the closest
-  camera to either performer, 12.1 m, and to opal/sail, 15.1/26.3 m, are keyed shots, the same in both worlds).
+  camera to either performer, 12.1 m, and to opal/sail, 15.1/26.3 m, are keyed shots, the same in both worlds),
+  and the vegetation clearings (under the performers' footprints and round the new heroes: static placements,
+  checked with `avgen_scatter_probe`, nothing that moves).
+- **Round 1's A/B clips** (`r1/clips/`, range renders): each pair seeks into the same world, so each is a valid
+  A/B of its item, but a range render starts in the step world: s36's herd (111 s) is the film's (the animals
+  part after ~120 s), s65's horses (192 s) and the aliens' clips show the step world's positions, not the film's.
 - **Item 5 (the class):** renders against renders, and the performers' paths are identical in both worlds: sound.
 - **Measured in the step world, re-taken in the render's** (`scratchpad/r1/audit/m-*`; r0 = `19c215d3`'s project
   with the old player emulated, which reproduces round 0's step-world numbers exactly):
@@ -623,11 +657,31 @@ Re-checked with the render-clock trace and probe. Sound unless said otherwise.
   frame) on s50's two downbeats; Ember's own ring stays. Label/purpose: "Ember and Rook walk toward the elder as
   the saucer settles over it". Preview from 0 (640x360, `scratchpad/r1/gen2/preview-a.mp4`, s50 frames): luma
   0.17-0.24 (was 0.074), rms contrast 0.21-0.31 (0.12), clipped 0.04-1.2%.
+- (Superseded by ADR-990: the reframe above was for the film the old clock rendered; s50's original rig frames the
+  film as it now renders, and is back.)
+- **s49 (pass 2's pick, the Critic's "near-black even for a dark passage", 3.7 s):** the submerged break dims
+  every emission to a quarter and the exposure by 2 EV; the shot is "the saucer, the elder's gills" and the gills
+  read dull grey-green. `look.SHOT_EMPHASIS` / `shot_emphasis`: the elder's gills and underside `emissiveBoost`
+  0.1 -> 0.8 for exactly s49, stepped at its cuts. Seek stills at 0.1/0.3/0.5/0.8 (`scratchpad/r1/s49/gills-sheet
+  .png`; nothing in s49 decides): at 0.8 the gold canopy reads over the dark frame; luma 0.037-0.054 ->
+  0.060-0.075, rms contrast 0.058-0.093 -> 0.101-0.133, nothing new clipped (0.18% is the saucer's disc, as before).
 - **s29, tried and not kept:** a rule firing a hero's ring on beat 3 in a hero shot with no downbeat (only s29
   qualified) made the ember's ring flood the frame -- the camera is 23 m from it at 50 mm, the ring's 20 m trail
   covers the lower frame: clipped 9.4-14.7% (film mean 2.32%) at the ring's full strength and still 6.8-9.5% at a
   fifth of it (`scratchpad/r1/s29/strength-sheet.png`) -- the same reason round 0 kept the new heroes' rings off
   the near foreground. Reverted; s29 is left for pass 2 to re-rank with the corrected cast data.
+
+### Critic pass 2 (`662bd4b6`, the old clock's film, the adapter given a render-clock cast)
+
+- Render `scratchpad/r1/critic/p2.mp4` from 0 (2,109 s, rc 0). Job `job_1a0ee7558f804aa57`: 140 issues (10 high,
+  81 medium, 49 low), 69 strengths. Against pass 1: composition 0.717 -> 0.725, visual hierarchy 0.747 -> 0.756,
+  motion 0.873 -> 0.895, environment 0.932 -> 0.937, character staging 0.938 -> 0.940; cinematography 0.845 ->
+  0.840, effects 0.951 -> 0.940, visual coherence 0.885 -> 0.877; lighting, technical quality, colour unchanged.
+  7 findings resolved, 5 new (s50 "5 effects visible at once", s13/s63 "nearly the same framing", "4 consecutive
+  static shots", two wobbles). Film: mean luma 0.2458, clipped 2.329% (r0's final 2.318%, pass 1 2.321%): s50,
+  from near-black to lit, clipped 0.84% of its frame.
+- Its film is superseded by ADR-990 (the cast now walks the step world's paths). It chose the next bland shot:
+  s49, the Critic's only "near-black even for a dark passage" (3.7 s); s08 is the black-sky flyby, s29 is 0.92 s.
 
 ## Plan (the rest, in order)
 

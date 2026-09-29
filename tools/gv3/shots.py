@@ -643,22 +643,17 @@ def e5_under_the_cap(t0, t1, g):
 
 @at("91.1")
 def ember_watches(t0, t1, g):
-    # [s25] Ember, Rook a few metres behind her, walking south down the west side of the valley toward the
-    # elder as the saucer settles over it: a fixed eye 3.5 m up, 34 m behind her, with a live aim at Ember led
-    # a fifth of the way toward the saucer, so the pair walk the lower left third (Ember 0.19-0.20 of the
-    # frame's height, Rook 0.22-0.26, apart) and the saucer and the elder stand in the right third beyond them,
-    # the aim panning 10 deg with the walkers. 50 mm, to hold the elder and the saucer at 126 m.
-    # Placed on the film AS RENDERED (revision round 1): the render's clock parts the deciding cast from the
-    # constant-step cast trace from 6 s on (the art pass's PROGRESS.md, "a render is not the film its seeks and
-    # traces describe"), and the old eye (-106, 36), searched on that trace with Ember on the west bank, looked
-    # 80 m past her in the film into an empty dark field (the Critic's blandest shot). Positions from
-    # `avgen_cast_trace --render-clock 1920x1080`. `target` is the aim's mid-shot point in that film: the
-    # engine aims at the node; the hero pulse plan frames with it.
-    r = aim_at(50.0, g(-69, -36, 3.5), "ember", (8.1, 5.3, 17.2), "watch")
-    r.target = [-34.4, 13.0, 3.5]
-    return r, dict(lead="alien", purpose="Ember and Rook walk toward the elder as the saucer settles over it",
-                   subject="ember and rook, the saucer settling over the elder beyond",
-                   camera="50 mm, 3.5 m up, 34 m behind her, live aim", movement="a slow pan with the walkers",
+    # [s25] Ember on the west bank as the saucer settles across the water: a fixed eye up the bank
+    # behind her, 4 m over the ground, with a live aim at Ember led 15% of the way toward the saucer
+    # (the offset, the same to a metre on both casts), so she walks the lower frame and the saucer
+    # hangs above the far bank, beside the elder: 0.19-0.25 of the frame's height, 32 mm from 3 m up. Searched on both casts, where Ember walks different ways 26 m apart:
+    # both in frame the whole shot in each. (Iteration 2 rode over her shoulder with a fixed target:
+    # she stood in the bottom corner behind the ferns, and on gv3-cast's cast out of frame; an
+    # over-the-shoulder that holds the saucer puts the eye on the rising bank behind her.)
+    r = aim_at(32.0, g(-106, 36, 3.0), "ember", (13.0, 5.0, 6.0), "watch")
+    return r, dict(lead="alien", purpose="Ember on the west bank, the saucer settling over the elder beyond",
+                   subject="ember on the west bank, the saucer settling over the elder beyond",
+                   camera="32 mm, up the west bank 18 m behind her, live aim", movement="still",
                    music="2 bars to the riser")
 
 
