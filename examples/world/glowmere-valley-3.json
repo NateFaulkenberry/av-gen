@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "1642870b49b9c1217009d8ce33db5e904e6f4cae61f584ca44e10719f78b7599",
-        "size": 354576
+        "sha256": "afa86f973f454d25914b891baf67410e01dea39b8f6e249e4a75be22c44721e4",
+        "size": 354580
       }
     }
   },
@@ -20511,7 +20511,7 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse lantern-cap",
+        "name": "hero pulse elder-2-cap",
         "time": 166.613846
       },
       {
@@ -20521,7 +20521,7 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse lantern-cap",
+        "name": "hero pulse elder-2-cap",
         "time": 168.46
       },
       {

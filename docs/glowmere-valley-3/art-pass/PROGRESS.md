@@ -609,6 +609,26 @@ Re-checked with the render-clock trace and probe. Sound unless said otherwise.
     seek to the same world) but not the film's moment for aliens; the A/B evidence for items 6/7 was measured over
     the whole film instead, now in both worlds.
 
+### The bland shots, after pass 1
+
+- **s50, reframed on the film as rendered** (`shots.py ember_watches`; searched with `scratchpad/r1/s50/search*.py`
+  on the render-clock trace, heights from the engine): in the film Ember walks south at 3 m/s from (-39, -18) to
+  (-45, -10), Rook 6 m behind her, the saucer settling from (1, 34, 84) to (-2, 28.5, 71). New rig: 50 mm, eye
+  (-69, ground + 3.5, -36), live aim at Ember + (8.1, 5.3, 17.2) ("watch" smoothing, as before); `target` set to
+  the aim's mid-shot point so the pulse plan frames the view the film has. Through the traced camera: Ember x
+  -0.42 -> -0.22, 0.19-0.20 of the frame's height, Rook to her left (x -0.60 to -0.69, 0.22-0.26), apart; the
+  saucer (0.68, 0.56) -> (0.23, 0.46), the elder (0.64, 0.04) -> (0.25, 0.06); a 10-degree pan with the walkers.
+  Every body's path identical to the frame (the camera and the pulse markers do not reach the simulation: render-
+  clock trace before/after). The pulse plan now rings the elder (in frame) instead of the lantern (no longer in
+  frame) on s50's two downbeats; Ember's own ring stays. Label/purpose: "Ember and Rook walk toward the elder as
+  the saucer settles over it". Preview from 0 (640x360, `scratchpad/r1/gen2/preview-a.mp4`, s50 frames): luma
+  0.17-0.24 (was 0.074), rms contrast 0.21-0.31 (0.12), clipped 0.04-1.2%.
+- **s29, tried and not kept:** a rule firing a hero's ring on beat 3 in a hero shot with no downbeat (only s29
+  qualified) made the ember's ring flood the frame -- the camera is 23 m from it at 50 mm, the ring's 20 m trail
+  covers the lower frame: clipped 9.4-14.7% (film mean 2.32%) at the ring's full strength and still 6.8-9.5% at a
+  fifth of it (`scratchpad/r1/s29/strength-sheet.png`) -- the same reason round 0 kept the new heroes' rings off
+  the near foreground. Reverted; s29 is left for pass 2 to re-rank with the corrected cast data.
+
 ## Plan (the rest, in order)
 
 1. ~~Milestone 1 (water, pulses, gait, probes, ADRs 980-982)~~ `cdbcf63f`. ~~Aurora~~, ~~UFO warp~~, ~~heroes~~,

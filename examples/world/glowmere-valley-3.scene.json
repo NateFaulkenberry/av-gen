@@ -14258,27 +14258,27 @@
       },
       {
         "id": 51,
-        "name": "s50 Ember on the west bank, the saucer settling over the eld",
+        "name": "s50 Ember and Rook walk toward the elder as the saucer settl",
         "slug": "s50",
         "placement": "free",
         "position": [
-          -106.0,
-          12.792,
-          36.0
+          -69.0,
+          11.672,
+          -36.0
         ],
         "target": [
-          0.0,
-          0.0,
-          0.0
+          -34.4,
+          13.0,
+          3.5
         ],
-        "fov": 41.1121,
-        "focalLength": 32.0,
+        "fov": 26.9915,
+        "focalLength": 50.0,
         "autoDirector": false,
         "aimNode": "ember",
         "aimOffset": [
-          13.0,
-          5.0,
-          6.0
+          8.1,
+          5.3,
+          17.2
         ],
         "followSmoothSeconds": 0.6,
         "followVerticalSmoothSeconds": 1.2,
@@ -15218,7 +15218,7 @@
         "end": 170.309487,
         "transition": "cut",
         "locked": true,
-        "label": "s50 Ember on the west bank, the saucer settling over the elder beyond"
+        "label": "s50 Ember and Rook walk toward the elder as the saucer settles over it"
       },
       {
         "camera": 52,
