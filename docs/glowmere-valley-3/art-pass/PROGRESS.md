@@ -6,9 +6,12 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, evening):** milestone 1 committed (`cdbcf63f`: items 1-3, ADRs 980-982, the two probes).
-  The aurora addendum is in `look.py` (data only, committed after milestone 1); its sky measurement waits for the
-  render batch (step 6). The UFO warp is in (ADR-983 + `cast.py`/`ufo.py`), look unverified. Next: hero mushrooms.
+- **Status (2026-09-28, 21:00):** every item and the addendum are in code and data, committed (`ba508a3f`); the
+  verification render batch is queued under the GPU lock (`scratchpad/art/batch1.sh`, outputs in
+  `~/Desktop/av-gen-review/20-gv3-art-pass/verify/`). Then: look at every output, fix what they show (once), the
+  frame-cost A/B, the aurora measurement, the final 1080p render with the song, the Critic ONCE, both suites.
+- **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
+  never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
   -DCPM_SOURCE_CACHE=/Users/natefaulkenberry/Documents/GitHub/av-gen/.cache/cpm`, then `cmake --build build/release`.
   Assets are linked (`../av-gen/tools/link-worktree-assets.sh ../av-gen-art`, 1,803 links).
@@ -198,6 +201,40 @@ of the head get their jitter re-dealt. Positions, sizes and yaws do not move.
   `[distortion]`, `[shockwave]`, `[follow]`, `[xform]`, `*placement*` pass.
 - **To verify (render batch):** E2 flyby (s08, 26.6-29.9), E5 approach (s47-s50), E5 beam and lift quiet (s51-s57),
   E5 depart (s58-s59), one scout moment (E4 approach, s31-s33). Tune once if needed, then leave it to the Critic.
+
+## Hero mushrooms (item 5): done in data, to verify in the batch
+
+- `examples/organisms/glowmere2-heroes.json` now 12 winners (the search with `kWinners` 12: first ten byte-identical).
+  New: **opal** (#251, thickest cap, glowing dome, emission structure 2) and **sail** (#707, thin tilted plate, one
+  lobe, under-glow, structure 1). Sheet: `~/Desktop/av-gen-review/20-gv3-art-pass/mushroom-search-12-winners.png`.
+- `tools/gv3/heroes.py` builds them with GV2's recipe (4 generated parts, cool materials, spores at the probed gill
+  anchor, crown hero record, a Hero Pulse, under/gills `emissiveBoost` 0.2 like the ten) at opal (80, -5) 6.8 m and
+  sail (42, 43) 7.4 m: the central east had no hero. Sites scored by `scratchpad/hero_sites.py` (shots that see
+  them at 25-130 m, and the pulse rule's steals) and cleared of tall plants with `avgen_scatter_probe`. FEATURED
+  gets them last (no existing route changed: route diff = new targets only). Hero pulses: they add rings in
+  s11/s12 (herd) and elsewhere; the elder keeps its 53 rings; the lantern gives 2 (s03, s04) to the elder.
+
+## Musicians (addendum): done in data and engine (ADR-984), to verify in the batch
+
+- GLBs rebuilt with Blender 5.2 (the prototype's command + `--blend` into the review folder); `Flail` clip
+  authored in `make_astronaut_musicians.py` (`make_flail`: the drum clip's first pose, swings on incommensurate
+  rhythms, amplitude ramping 0.3 -> 1 over 2.5 s, 5 s, not looped). `astronaut_drums.glb` carries Drums + Flail.
+- `tools/gv3/musicians.py`: drummer at (-1.7, 70.9) facing north, keyboardist (-1.7, 59.9) facing south (11 m),
+  each group one transform x1.94 tilted to a fitted ground plane (2.3 / 4.3 deg); grass clearings under the
+  footprints; entities (clips: drummer walk/run/fall -> Flail; gait matchRate off) and heroes; aura = a rainbow
+  Ground Pulse as their hero pulse (own places beside the 2-nearest heroes, `look.PERFORMER_PULSE_NEAR` 90 m) +
+  Bioluminescence photophores on the suits (hue variation 0.5), routes: drummer <- timeline.kick, keyboardist <-
+  audio.mid, both x section.energy. Placement searched by `scratchpad/place_search.py` (no tall plant in a
+  footprint, >= 4 m from every camera eye; s01's path passes 4.2 m from the kit: WATCH s01 in the render).
+- E5: `ufo.plan.json` lifts `drummer` with `returnSeconds` 6.0; the trace: lifted 172.783, gone 177.700 (the drop
+  frame), back 183.733 (inside s60, which does not see the kit), 1 mm from his seat. horse-11 re-homed to the east
+  meadow (70, 34); the horse's Glow and its cues removed. s04 re-aimed at the pair (55 mm, fixed), s54 aims at the
+  drummer. Pulses are blacked out in the abduction (bar 93 -> drop) for the new heroes and both performers, and for
+  the drummer until he is back (`look.pulse_blackouts`), so E5's rings are r7b's exactly.
+- Framing check (`framing.py build/gv3/cast-ufo.json`): identical to r7b except s04 (no tracked subject now) and
+  s54 (drummer, 100% in frame, 0.31-0.33 of the frame).
+- Stage light: evaluated as a variant only (two soft 220 cd spots 9 m over the performers, no shadows); decide from
+  the A/B stills.
 
 ## Plan (the rest, in order)
 
