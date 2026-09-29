@@ -91,10 +91,15 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - **Pre-push check:** the only asset paths in the range are text (`assets/audio/manifest.json`,
   `assets/musicians/ATTRIBUTION.md`), and no binaries are added.
 - **The owner's local checkout was NOT touched.** It is behind origin/main until they pull.
-- **Follow-ups:**
-  - `qa/tidy` (in progress in `../av-gen-qa-tidy`): track the 3 CC0 Quaternius fixtures, remove the treeisland
-    PNGs, the `_vx2` arms and the dead arms, and fix the ci.md exclusions. It goes to main as a second push once
-    its suites pass.
+- **Second push: `9e503d31`, qa/tidy.**
+  - **Tracked:** 12 CC0 Quaternius files (12.7 MB, including textures; not 4 MB). 16 CPU cases go from skipped to
+    passing on a clean checkout.
+  - **Fixed along the way:** `fetch-test-assets.sh` now skips tracked paths, and `test_lod_ladder` skips when the
+    pack isn't fully present.
+  - **Removed:** the 9 `_vx2` arms; `check_project_integrity` reports 0 problems.
+  - **The treeisland audit** removed nothing: all 22 arms are referenced.
+  - **The 28 PNGs were KEPT:** ADR-372, 390, 393 and 450 cite them as evidence. That is for the owner to decide.
+  - **Push CI on main `9c35aee8`:** the build and the full CPU suite passed.
   - The GV3 art pass (`../av-gen-art`) merges after that.
 
 ## The final report
