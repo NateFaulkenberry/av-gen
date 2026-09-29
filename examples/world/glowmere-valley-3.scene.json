@@ -12261,7 +12261,9 @@
       "seed": 20260949,
       "tags": [
         "musician",
-        "astronaut"
+        "astronaut",
+        "performer",
+        "character"
       ],
       "gait": {
         "matchRate": false,
@@ -12299,7 +12301,9 @@
       "seed": 20260950,
       "tags": [
         "musician",
-        "astronaut"
+        "astronaut",
+        "performer",
+        "character"
       ],
       "gait": {
         "matchRate": false,

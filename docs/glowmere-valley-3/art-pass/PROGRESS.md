@@ -432,6 +432,21 @@ passes (up to about three) on the bland shots, both suites, the r1 render.
    seating: the cap keeps its height). New test `[adr986]`. The search no longer reproduces the record (its
    population changed), so its test writes the canonical record only with `MUSHROOM_WRITE_RECORD=1`.
 
+5. **Musician class -- done (data), proved unchanged.** What the round-0 report got wrong: the musicians were never
+   tagged "animal" (their tags were `musician`, `astronaut`); the Critic called them animals because its adapter
+   (`creative-critic/adapters/avgen/avgen_adapter.py`, `entity_kind`) defaults any body with no tag it knows to
+   "animal". And the abduction never piggybacked on a tag: E5 names its subject (`ufo.plan.json`
+   `"animals": ["drummer"]`), and a named subject is bound by name (`setpiece.cpp gather/abduction`: `q.name`, no
+   tag). The decision: the musicians' class is `performer`, with `character` beside it (the adapter's word for a
+   person; already every body's perception bit in the engine's tag mask), appended after their old tags so no
+   other tag's bit moves (`musicians.py`). No engine change; nothing in the engine asks for either tag.
+   **Proof, before (`9c86d2b1`) and after, same code:** `avgen_cast_trace` over the whole film (23 entities at 20 Hz,
+   5 set pieces): identical; E5 lifted 172.783 s, gone 177.700, back 183.750 at (-1.7, 5.162, 70.9) against
+   (-1.7, 5.163, 70.9) at the lift (1 mm); the drummer's whole pose (54 joints in the world, every frame 168-200 s,
+   1,921 frames, `avgen_foot_probe --dump drummer:168:200 --pose-out`, new): bit-identical; seven rendered frames
+   (172.9, 173.5, 175.2, 176.2, 177.3, 183.8, 198.8 s, 1280x720): byte-identical PNGs. Evidence in
+   `scratchpad/r1/class/`.
+
 ## Plan (the rest, in order)
 
 1. ~~Milestone 1 (water, pulses, gait, probes, ADRs 980-982)~~ `cdbcf63f`. ~~Aurora~~, ~~UFO warp~~, ~~heroes~~,

@@ -2,6 +2,10 @@
 // art pass, item 3: "a small amount of visible sliding before the first actual footstep/contact").
 //
 //   avgen_foot_probe --project p.json [--start S] [--seconds N] [--fps F] [--names a,b,...] [--out f.json]
+//                    [--dump name:t0:t1 [--pose-out poses.json]]
+//
+// `--pose-out` writes the dumped character's every joint, in the world, every frame of the dump's window: the
+// instrument for "this change does not move that body", compared between two builds (revision round 1).
 //
 // It runs the real `app::Engine` in Offline mode, as `avgen_cast_trace` does, and after every frame reads
 // each character's DRAWN feet: the rig's evaluated pose through the skinned mesh's world transform. No
@@ -66,6 +70,7 @@ struct Options {
     std::string out;
     std::string dump; // name:t0:t1 -- every frame of one character, for reading a start by eye
     std::string profile; // name -- its first clip sampled over its length, feet in model space
+    std::string poseOut; // with --dump: every joint of that character, in the world, every frame, to a file
 };
 
 bool parse(int argc, char** argv, Options& o) {
@@ -104,6 +109,10 @@ bool parse(int argc, char** argv, Options& o) {
             const char* v = next();
             if (v == nullptr) return false;
             o.dump = v;
+        } else if (a == "--pose-out") {
+            const char* v = next();
+            if (v == nullptr) return false;
+            o.poseOut = v;
         } else if (a == "--out") {
             const char* v = next();
             if (v == nullptr) return false;
@@ -136,6 +145,7 @@ struct Sample {
     float clipTime = 0.0f;  // the clip's local second
     std::vector<glm::vec3> feet;
     std::vector<float> height; // above the ground
+    std::vector<glm::vec3> joints; // --pose-out: every joint in the world
     bool posed = false;
 };
 
@@ -291,6 +301,11 @@ int main(int argc, char** argv) {
             }
             scene::poseToModel(rig.skeleton, rig.pose, model);
             Sample s;
+            if (!o.poseOut.empty() && o.dump.rfind(c.name + ":", 0) == 0) {
+                for (const glm::mat4& m : model) {
+                    s.joints.push_back(glm::vec3(toWorld * glm::vec4(glm::vec3(m[3]), 1.0f)));
+                }
+            }
             s.t = time.renderTime;
             const entity::LocomotionState& loco = e->locomotion();
             s.body = glm::vec3(toWorld[3]);
@@ -337,6 +352,31 @@ int main(int argc, char** argv) {
                 std::fprintf(stderr, "\n");
             }
         }
+    }
+    // --pose-out: the dumped character's every joint, every frame of its window, for comparing two builds.
+    if (!o.poseOut.empty() && !o.dump.empty()) {
+        const std::size_t a = o.dump.find(':');
+        const std::size_t b = o.dump.find(':', a + 1);
+        const std::string who = o.dump.substr(0, a);
+        const double t0 = std::atof(o.dump.substr(a + 1, b - a - 1).c_str());
+        const double t1 = std::atof(o.dump.substr(b + 1).c_str());
+        nlohmann::json poses = nlohmann::json::array();
+        for (const Character& c : cast) {
+            if (c.name != who) {
+                continue;
+            }
+            for (const Sample& s : c.samples) {
+                if (s.t < t0 || s.t > t1) {
+                    continue;
+                }
+                nlohmann::json js = nlohmann::json::array();
+                for (const glm::vec3& p : s.joints) {
+                    js.push_back({p.x, p.y, p.z});
+                }
+                poses.push_back({{"t", s.t}, {"clip", s.clip}, {"clipTime", s.clipTime}, {"joints", std::move(js)}});
+            }
+        }
+        std::ofstream(o.poseOut) << poses.dump() << "\n";
     }
     // ---- analysis -------------------------------------------------------------------------------
     nlohmann::json out;

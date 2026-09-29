@@ -199,9 +199,16 @@ def apply(project, scene, ground, report):
             params[f"nodes/{n['name']}/position"] = list(n["position"])
             params[f"nodes/{n['name']}/rotation"] = list(n["rotation"])
             params[f"nodes/{n['name']}/scale"] = list(n["scale"])
+        # Their class (revision round 1): "performer", and "character", the word the Creative Critic's adapter
+        # reads as a person -- with neither it took them for animals, its default for a body it cannot name.
+        # Appended after the tags they had, so no other tag's bit moves (tags are interned in entity order and
+        # these are the last two entities). Nothing in the engine asks for either: the abduction takes the
+        # drummer by NAME (ufo.plan.json's e5 "animals": ["drummer"] binds a named query, never the "animal"
+        # tag), and "character" is already every body's perception bit (EntityWorld's tag mask).
         scene.setdefault("entities", []).append({
             "name": g["name"], "node": g["name"], "seed": 20260928 + len(scene["entities"]),
-            "tags": ["musician", "astronaut"], "gait": dict(GAIT, blend=0.35), "clips": dict(CLIPS[g["name"]]),
+            "tags": ["musician", "astronaut", "performer", "character"], "gait": dict(GAIT, blend=0.35),
+            "clips": dict(CLIPS[g["name"]]),
             "fullDetailDistance": 120.0, "coarseInterval": 0.1, "cullDistance": 360.0,
             "behaviors": [], "reactions": [],
         })
