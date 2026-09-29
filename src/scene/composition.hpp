@@ -192,6 +192,9 @@ struct NodeAnimation {
     // the first one the phase reference. Empty means no analysis, and phase matching then falls
     // back to frame zero -- the behaviour every scene had before this existed.
     std::vector<std::string> contacts;
+    // What their contact is read from (ADR-987): the default height test, or "sweep", the backward
+    // stroke of an in-place walk cycle.
+    ContactMode contactMode = ContactMode::Height;
     // Enter every state at the outgoing state's phase rather than at its clip's frame zero.
     bool matchPhase = false;
     // Seconds for an inertialized transition's offset to halve. 0 keeps the cross-fade.
@@ -485,6 +488,7 @@ struct CompositionNode {
     params::Parameter<float>* waterFlowSpeedParam = nullptr;
     params::Parameter<float>* waterSwellParam = nullptr;
     params::Parameter<float>* waterFoamParam = nullptr;
+    params::Parameter<float>* waterCascadeParam = nullptr; // ADR-985
     // ADR-350. ADR-099 chose six water properties as "the ones worth moving". The water-world
     // spec's §17 and §23 ask for a different nine, and none of them were reachable: a scene could
     // not change how clear its water was, what colour it went with depth, or how much sky it
@@ -2275,6 +2279,9 @@ private:
         // that never left its authored spot looked perfect.
         Transform world;
         bool worldValid = false;
+        // ADR-983: the node's own visibility as that flattening used it (it and every ancestor), for
+        // `nodeView`: an effect around a hidden owner has nothing to be around.
+        bool visible = true;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restRoughness;
         // The opacity the asset was built with, captured the first time a node's `opacity`

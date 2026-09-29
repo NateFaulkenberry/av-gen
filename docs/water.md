@@ -76,6 +76,7 @@ for a brook.
 | `glow` / `glowColor` / `glowCoverage` / `glowScale` / `glowDepth` | bioluminescence under the surface |
 | `sparkle` / `sparkleColor` | glints riding the finest ripples |
 | `swell` | metres of whole-surface rise; 0 unless a signal is driving it |
+| `cascade` | whitewater on steep water (a falls), in the foam's colour; 0 = none. See [Steep water](#steep-water) |
 
 `glowCoverage` is a *threshold*, not a multiplier: turning it down removes patches instead of dimming
 the river, which is the difference between "something is glowing under there" and "the river is
@@ -147,6 +148,31 @@ couple of reference pixels, the whole band fades out. Close shots over a lit sur
 The reference's 1.2 m step reads only a few metres from the lens: for water seen from tens of metres
 (Glowmere Valley 3's framings), a step of about 3 m at a compression (`tearShear / tearCell`) of about
 2 keeps the packed stripes in the near water, and the seams become slick lines further out.
+
+## Steep water
+
+Water whose surface falls more than 20 degrees along its own flow -- a falls, a flume down a hillside -- is
+shaded about its own plane ([ADR-985](decisions/ADR-985-water-on-a-steep-course-is-a-cascade.md)), fully past 30
+degrees and blended between, so nothing switches at a line. "Along its flow" because the mesh's bank has slivers
+that tilt across the flow, and those are not cascades. The face's slope comes from the surface's own derivatives
+(one value per triangle of the water mesh), and four things follow from it:
+
+- which side of the surface the camera is on is the plane's side, so a camera below a falls sees its upper
+  side (it used to see the part above its own height as a ceiling from under the water);
+- the depth that decides colour, opacity and the shoreline is measured across the sheet, not straight
+  down (straight down, a falls seen from its foot read as a shore and went half transparent);
+- the ripples are turned onto the slope, so the moon and the sky light it as a slope;
+- the tears fade out: their lattice lies in XZ and stood up on a slope reads as brickwork.
+
+`cascade` adds whitewater: streaks along the flow, in the foam's colour and composited as foam is,
+running three times the water's own speed and thinning out with the shoreline. Where a streak is too
+fine to resolve the whitewater fades to its mean, so a distant falls is a pale ribbon rather than a crawl.
+Flat water never takes any of this path: under 20 degrees the surface is byte-identical to the shader
+without it, `cascade` included (`test_water_cascade_gpu.cpp`).
+
+```json
+"water": { "foamColor": [0.7, 0.88, 0.95], "cascade": 0.35 }
+```
 
 ## Flow
 

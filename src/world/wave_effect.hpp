@@ -52,11 +52,18 @@
 
 namespace avgen::world {
 
-// How many effects reach the GPU at once. Chosen the way `spatial::kMaxGpuFields` chose sixteen:
+// How many wave FRONTS reach the GPU at once. Chosen the way `spatial::kMaxGpuFields` chose sixteen:
 // large enough that nothing real hits it, small enough that the per-fragment loop has a bound
-// anybody can reason about. The ninth active wave is dropped and its status says so (`EffectStatus::Dropped`), which the
-// Effects panel shows on its card.
-inline constexpr std::size_t kMaxGpuWaves = 8;
+// anybody can reason about -- and the loop runs over the live count, so an empty slot costs nothing.
+// A front that does not fit is dropped: an instance whose NEWEST front does not fit is
+// `EffectStatus::Dropped` on the Effects panel's card.
+//
+// ADR-981: 16, from 8. A trigger-activated instance now keeps each earlier front alive for its own
+// lifetime (`resolveWaveFronts`), so one hero pulse fired every bar with a 4.5 s life is up to three
+// fronts, and Glowmere Valley 3 holds two such heroes on screen with a travel beam over them.
+inline constexpr std::size_t kMaxGpuWaves = 16;
+// ADR-981: the most fronts ONE instance keeps alive at once (the newest and up to three before it).
+inline constexpr std::size_t kMaxWaveFronts = 4;
 
 // ---- propagation -------------------------------------------------------------------------------
 
@@ -256,16 +263,26 @@ struct ResolvedWave {
     glm::vec3 color{0.0f};      // the colour actually used: the hero's accent when it had one
 };
 
-// Resolves ONE wave-type instance. Nothing when it is not alive this frame: disabled, outside its
-// activation window, faded to zero, its front between passes, or a focus/owner source with nothing
-// to stand on. Pure: the same instance, context and second always give the same record.
+// Resolves ONE wave-type instance's NEWEST front. Nothing when it is not alive this frame: disabled,
+// outside its activation window, faded to zero, its front between passes, or a focus/owner source
+// with nothing to stand on. Pure: the same instance, context and second always give the same record.
 [[nodiscard]] std::optional<ResolvedWave> resolveWave(const EffectInstance& effect, const EffectContext& context);
 
-// Every wave-type instance in `effects` (instances of other types are skipped), walked in `order`
-// -- indices into `effects`, the evaluation order `effectEvaluationOrder` computes; empty means list
-// order. Returns how many were written. An instance that is alive once `out` is full is DROPPED,
-// and says so: when `status` is non-empty (indexed like `effects`) every wave-type instance's entry
-// is written -- Disabled, Dormant, Drawn or Dropped -- and no other entry is touched.
+// ADR-981: every front of ONE instance that is alive this frame, newest first, up to `out.size()`
+// (at most `kMaxWaveFronts` are asked for). A `Trigger` activation with a lifetime gives each event
+// its own front, living its own lifetime with its own envelope: the next trigger no longer cuts the
+// last ring off mid-flight, it starts a new one beside it. Every other activation -- and a Trigger
+// with no lifetime, whose window is "until the next one" by definition -- has the one front
+// `resolveWave` gives. The newest front is exactly `resolveWave`'s. Pure, like it.
+std::size_t resolveWaveFronts(const EffectInstance& effect, const EffectContext& context, std::span<ResolvedWave> out);
+
+// Every live front of every wave-type instance in `effects` (instances of other types are skipped),
+// walked in `order` -- indices into `effects`, the evaluation order `effectEvaluationOrder` computes;
+// empty means list order. Each instance's NEWEST front first, in that order, then the earlier fronts
+// (ADR-981), so an old ring never takes a slot a new pulse needs. Returns how many were written. An
+// instance whose newest front is alive once `out` is full is DROPPED, and says so: when `status` is
+// non-empty (indexed like `effects`) every wave-type instance's entry is written -- Disabled, Dormant,
+// Drawn or Dropped -- and no other entry is touched.
 std::size_t resolveWaves(std::span<const EffectInstance> effects, const EffectContext& context,
                          std::span<ResolvedWave> out, std::span<const std::uint32_t> order = {},
                          std::span<EffectStatus> status = {});

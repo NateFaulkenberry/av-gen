@@ -107,7 +107,10 @@ BAR_WAVES = {"groove-2", "lift", "arrival", "melodic-plateau", "lead-forward", "
 # which gave the bar's swell to the spire, never more than 40 px, and the lead's slow level to the
 # umbra's one close-up. Ranked by the cut, the heroes with close-ups take the rhythmic layers.
 FEATURED = ["elder-2-cap", "lantern-cap", "bloom-cap", "umbra-cap", "cairn-cap", "spire-cap", "veil-cap",
-            "ridge-cap", "scree-cap", "ember-cap"]
+            "ridge-cap", "scree-cap", "ember-cap",
+            # The art pass's two (heroes.py), after the ten: the layers stay with the heroes the cut features, and
+            # these two relight on the section changes with the others beyond the rotation.
+            "opal-cap", "sail-cap"]
 
 
 # The scene's own audio links (an entity's `reactions`), judged with the film's routes. gv3-cast's

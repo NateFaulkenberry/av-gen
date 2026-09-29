@@ -236,21 +236,145 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
         float bed = 0.0f;
         bool wet = false;
     };
-    std::vector<Point> points(static_cast<std::size_t>(side) * side);
+    // ADR-980: the grid is sampled `kPad` cells past the chunk on every side, so a dry corner's level
+    // (below) is fitted to the same neighbourhood whichever of the two chunks sharing it builds it --
+    // a border corner that saw only its own chunk's half of the water would put a step in the sheet
+    // along the seam. Only the chunk's own grid decides whether the chunk has any water.
+    constexpr int kPad = 2;
+    const int ext = side + (2 * kPad);
+    std::vector<Point> points(static_cast<std::size_t>(ext) * ext);
+    const auto at = [&](int i, int j) -> Point& {
+        return points[(static_cast<std::size_t>(j + kPad) * ext) + static_cast<std::size_t>(i + kPad)];
+    };
     bool any = false;
-    for (int j = 0; j <= res; ++j) {
-        for (int i = 0; i <= res; ++i) {
+    for (int j = -kPad; j <= res + kPad; ++j) {
+        for (int i = -kPad; i <= res + kPad; ++i) {
             const glm::vec2 p = origin + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * step;
-            Point& q = points[static_cast<std::size_t>(j) * side + i];
+            Point& q = at(i, j);
             q.surface = map.waterSurface(p);
-            q.bed = stride > 0 ? field->at(i * stride, j * stride) : map.height(p);
+            // The field carries one border cell; the second padding cell asks the map.
+            const bool inField = stride > 0 && i * stride >= -1 && j * stride >= -1 &&
+                                 i * stride <= res * stride + 1 && j * stride <= res * stride + 1;
+            q.bed = inField ? field->at(i * stride, j * stride) : map.height(p);
             q.wet = std::isfinite(q.surface) && q.bed < q.surface;
-            any = any || q.wet;
+            if (i >= 0 && j >= 0 && i <= res && j <= res) {
+                any = any || q.wet;
+            }
         }
     }
     if (!any) {
         return mesh; // a dry chunk costs one grid of samples and no geometry at all
     }
+    // The level a DRY corner is given (ADR-980). A dry corner is still the corner of a drawn quad
+    // whose other corners are wet, so it needs a height, and the height is what decides where the
+    // sheet meets the bank: the sheet runs on past the shoreline and the ground cuts it off by depth.
+    //
+    // It used to be the HIGHEST of its wet neighbours' levels -- right for a lake, where every
+    // neighbour is at one level, and wrong for anything that descends. On a course that drops a metre
+    // per cell (Glowmere Valley 3's falls, 40 degrees on its steepest pitch), the highest neighbour is
+    // the one upstream, so every edge corner stood a cell's descent above its own row's water: the
+    // sheet's edge rose up to 1.6 m clear of the bank, row by row, which a low camera sees as a slab
+    // with stair-stepped sides (`avgen_water_probe`: 24 m2 of it more than 30 cm proud).
+    //
+    // Now it is the plane the water around it lies in, evaluated at the corner: the wet points of the
+    // 5x5 window, weighted by 1 / d^2 and fitted by least squares, with a small ridge on the two
+    // slopes so a row of neighbours that says nothing about one axis leaves that axis level. It is
+    // held to at most the highest wet neighbour (the old answer, so no corner can rise above where it
+    // was) and to at least as far below the lowest as the window's own spread. On a lake every wet
+    // point is at one level and so is the fit, bit for bit what the old rule gave.
+    const auto dryLevel = [&](int i, int j) {
+        double sw = 0.0;
+        double sx = 0.0;
+        double sz = 0.0;
+        double sxx = 0.0;
+        double sxz = 0.0;
+        double szz = 0.0;
+        double sy = 0.0;
+        double sxy = 0.0;
+        double szy = 0.0;
+        float lo = std::numeric_limits<float>::infinity();
+        float hi = -std::numeric_limits<float>::infinity();
+        for (int dz = -kPad; dz <= kPad; ++dz) {
+            for (int dx = -kPad; dx <= kPad; ++dx) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                const Point& n = at(i + dx, j + dz);
+                if (!n.wet) {
+                    continue;
+                }
+                const double w = 1.0 / static_cast<double>((dx * dx) + (dz * dz));
+                const auto x = static_cast<double>(dx);
+                const auto z = static_cast<double>(dz);
+                const auto y = static_cast<double>(n.surface);
+                sw += w;
+                sx += w * x;
+                sz += w * z;
+                sxx += w * x * x;
+                sxz += w * x * z;
+                szz += w * z * z;
+                sy += w * y;
+                sxy += w * x * y;
+                szy += w * z * y;
+                lo = std::min(lo, n.surface);
+                hi = std::max(hi, n.surface);
+            }
+        }
+        if (!(sw > 0.0)) {
+            return std::numeric_limits<float>::quiet_NaN(); // no wet point anywhere near
+        }
+        if (hi - lo <= 0.0f) {
+            return hi; // one level all round: a lake, exactly as before
+        }
+        // [sw sx sz; sx sxx+r sxz; sz sxz szz+r] (a b c) = (sy sxy szy); the level here is `a`.
+        const double r = 1e-3 * sw;
+        const double m11 = sxx + r;
+        const double m22 = szz + r;
+        const double det = (sw * ((m11 * m22) - (sxz * sxz))) - (sx * ((sx * m22) - (sxz * sz))) +
+                           (sz * ((sx * sxz) - (m11 * sz)));
+        if (std::fabs(det) < 1e-12) {
+            return static_cast<float>(sy / sw);
+        }
+        const double a = ((sy * ((m11 * m22) - (sxz * sxz))) - (sx * ((sxy * m22) - (sxz * szy))) +
+                          (sz * ((sxy * sxz) - (m11 * szy)))) /
+                         det;
+        // Held between the lowest and the highest wet neighbour, and used only where the water actually
+        // descends across the window. On a gentle river the old answer -- the highest of the corner's
+        // eight neighbours inside the chunk -- is already within centimetres of the plane, and the fit
+        // moved the sheet's edge onto a bank sloping almost in its own plane, where the two took turns
+        // over a pixel as the camera moved (the depth forensics' water6_2 test, on the QA river). So the
+        // old answer stands, bit for bit, until the window (4.8 m across on a 1.2 m grid) spans kFitFrom of
+        // descent -- about 7 degrees -- and the fit takes over by kFitFull, about 17 degrees; blended, so a
+        // river that steepens does not step its edge. A falls (GV3's: 30-44 degrees, 3-4 m across the
+        // window) is all fit; a valley river is the old rule, which never stood more than a few centimetres
+        // proud on one (`avgen_water_probe`).
+        constexpr float kFitFrom = 0.6f;
+        constexpr float kFitFull = 1.5f;
+        float old = -std::numeric_limits<float>::infinity();
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int ni = i + dx;
+                const int nj = j + dz;
+                if ((dx == 0 && dz == 0) || ni < 0 || nj < 0 || ni > res || nj > res) {
+                    continue;
+                }
+                const Point& n = at(ni, nj);
+                if (n.wet) {
+                    old = std::max(old, n.surface);
+                }
+            }
+        }
+        const float spread = hi - lo;
+        if (spread <= kFitFrom && std::isfinite(old)) {
+            return old;
+        }
+        const float fitted = std::clamp(static_cast<float>(a), lo, hi);
+        if (!std::isfinite(old)) {
+            return fitted; // its only wet neighbours are two cells off: the old rule gave it the bed
+        }
+        const float t = std::clamp((spread - kFitFrom) / (kFitFull - kFitFrom), 0.0f, 1.0f);
+        return old + ((fitted - old) * (t * t * (3.0f - (2.0f * t))));
+    };
 
     mesh.name = fmt::format("water_{}_{}", coord.x, coord.y);
     mesh.vertices.resize(static_cast<std::size_t>(side) * side);
@@ -260,40 +384,22 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
     for (int j = 0; j <= res; ++j) {
         for (int i = 0; i <= res; ++i) {
             const std::size_t k = static_cast<std::size_t>(j) * side + i;
-            const Point& q = points[k];
+            const Point& q = at(i, j);
             const glm::vec2 p = origin + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * step;
             // A dry corner still needs a position: it is a corner of a quad whose other corners are
-            // wet, and it sits at the neighbouring water level so the surface reaches the bank
-            // rather than folding down to meet the ground.
-            // A dry corner takes a wet neighbour's level, whatever `waterSurface` said about it.
-            // Testing for a non-finite surface was not enough: a world with no sea still reports
-            // its sea level, and that sentinel is a finite -1000, so dry corners were placed a
-            // kilometre underground and their quads came out as vertical fins hanging off the
-            // underside of the sheet. That was the artefact; everything else about the shoreline
-            // was a symptom of it.
+            // wet, and it sits at the level the water around it lies at (`dryLevel`, ADR-980) so the
+            // surface reaches the bank rather than folding down to meet the ground -- whatever
+            // `waterSurface` said about it. Testing for a non-finite surface was not enough: a world
+            // with no sea still reports its sea level, and that sentinel is a finite -1000, so dry
+            // corners were placed a kilometre underground and their quads came out as vertical fins
+            // hanging off the underside of the sheet.
             float surface = q.surface;
             if (!q.wet) {
-                // Take a wet neighbour's level, and never the bed. Falling back to the bed was what
-                // made the water climb the bank: a corner whose ground is above the waterline would
-                // lift its vertex with it, and the surface came out as a wall of vertical quads
-                // standing over the shore instead of a flat sheet the terrain cuts off.
-                surface = -std::numeric_limits<float>::infinity();
-                // Diagonals included: every corner of a quad touches every other, so a dry corner
-                // whose only wet neighbour is across the diagonal is exactly the case that would
-                // otherwise fall back to the bed and put a step in the surface.
-                for (const glm::ivec2 d : {glm::ivec2(1, 0), glm::ivec2(-1, 0), glm::ivec2(0, 1), glm::ivec2(0, -1),
-                                           glm::ivec2(1, 1), glm::ivec2(1, -1), glm::ivec2(-1, 1),
-                                           glm::ivec2(-1, -1)}) {
-                    const int ni = i + d.x;
-                    const int nj = j + d.y;
-                    if (ni < 0 || nj < 0 || ni > res || nj > res) {
-                        continue;
-                    }
-                    const Point& n = points[static_cast<std::size_t>(nj) * side + ni];
-                    if (n.wet) {
-                        surface = std::max(surface, n.surface);
-                    }
-                }
+                // Never the bed. Falling back to the bed was what made the water climb the bank: a
+                // corner whose ground is above the waterline would lift its vertex with it, and the
+                // surface came out as a wall of vertical quads standing over the shore instead of a
+                // flat sheet the terrain cuts off.
+                surface = dryLevel(i, j);
                 if (!std::isfinite(surface)) {
                     surface = q.bed; // no wet neighbour: this corner is in no emitted quad
                 }
@@ -342,7 +448,7 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
         for (int i = 0; i < res; ++i) {
             bool wet = false;
             for (const glm::ivec2 d : {glm::ivec2(0, 0), glm::ivec2(1, 0), glm::ivec2(0, 1), glm::ivec2(1, 1)}) {
-                wet = wet || points[static_cast<std::size_t>(j + d.y) * side + i + d.x].wet;
+                wet = wet || at(i + d.x, j + d.y).wet;
             }
             if (!wet) {
                 continue;

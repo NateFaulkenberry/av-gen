@@ -337,3 +337,65 @@ TEST_CASE("a beat's clock and a step's component round-trip through the scene fo
     bad["beats"][1]["cues"][2]["steps"][0]["component"] = 7;
     CHECK_FALSE(stage::scenarioFromJson(bad).has_value());
 }
+
+TEST_CASE("ADR-984: an abduction that gives its subject back dissolves it and puts it back after the beam",
+          "[stage][setpiece][adr984]") {
+    // GV3's drummer is lifted from his kit on the riser and is behind it again once no shot sees it.
+    stage::SetPieceSpec spec = abduction(1);
+    spec.overrides.emplace_back("returnSeconds", 6.0f);
+    spec.frameSeconds = 1.0 / 60.0;
+    auto s = stage::instanceSetPiece(spec);
+    REQUIRE(s.has_value());
+    const stage::BeatDesc* lift = beat(*s, "lift");
+    const stage::BeatDesc* depart = beat(*s, "depart");
+    REQUIRE(lift != nullptr);
+    REQUIRE(depart != nullptr);
+    // Nothing retires it; it is hidden once it has dissolved (not drawn at all while it waits)...
+    bool hides = false;
+    for (const stage::BeatDesc* b : {lift, depart}) {
+        for (const stage::CueDesc& c : b->cues) {
+            for (const stage::StepDesc& st : c.steps) {
+                CHECK(st.kind != stage::StepKind::Retire);
+                hides = hides || (b == lift && c.role == "target1" && st.kind == stage::StepKind::Hide);
+            }
+        }
+    }
+    CHECK(hides);
+    // ...and as the craft leaves, the subject waits the given seconds and is put back.
+    const stage::CueDesc* back = nullptr;
+    for (const stage::CueDesc& c : depart->cues) {
+        if (c.role == "target1") {
+            back = &c;
+        }
+    }
+    REQUIRE(back != nullptr);
+    REQUIRE(back->steps.size() == 2);
+    CHECK(back->steps[0].kind == stage::StepKind::Wait);
+    CHECK_FALSE(back->steps[0].duration.bound());
+    CHECK(back->steps[0].duration.literal == Approx(6.0f));
+    CHECK(back->steps[1].kind == stage::StepKind::Return);
+    // The set piece lasts until it has given it back.
+    const auto tl = stage::setPieceTimeline(spec);
+    REQUIRE(tl.has_value());
+    double departAt = 0.0;
+    for (const auto& [name, t] : tl->moments) {
+        if (name == "depart") {
+            departAt = t;
+        }
+    }
+    CHECK(tl->end >= departAt + 6.0);
+
+    // The partner: without it, the subject is retired as before and the departure carries no target cue.
+    auto kept = stage::instanceSetPiece(abduction(1));
+    REQUIRE(kept.has_value());
+    bool retires = false;
+    for (const stage::CueDesc& c : beat(*kept, "lift")->cues) {
+        for (const stage::StepDesc& st : c.steps) {
+            retires = retires || st.kind == stage::StepKind::Retire;
+        }
+    }
+    CHECK(retires);
+    for (const stage::CueDesc& c : beat(*kept, "depart")->cues) {
+        CHECK(c.role.rfind("target", 0) != 0);
+    }
+}

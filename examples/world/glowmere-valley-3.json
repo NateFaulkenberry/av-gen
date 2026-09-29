@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "1e4314a9522168cec11be7fe45020598413a5aad7a60c04812ca4d3910eb9871",
-        "size": 310775
+        "sha256": "b558e4b7020c421be3f8655dfb83c0b913dce00c6c11d79430ecf309b3e3c672",
+        "size": 354577
       }
     }
   },
@@ -47,7 +47,7 @@
         "appearance": {
           "edgeBrightness": 2.5999999046325684,
           "emission": 1.0,
-          "filaments": 0.949999988079071,
+          "filaments": 1.3,
           "horizonGlow": 0.6000000238418579,
           "intensity": 2.799999952316284,
           "lowColor": [
@@ -70,16 +70,16 @@
         },
         "audio": {
           "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
+          "beat": 0.0,
           "glints": 1.0,
           "high": 0.699999988079071,
           "lowMid": 0.550000011920929,
           "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
+          "sensitivity": 0.0,
+          "spectrumShape": 0.0
         },
         "rainbow": {
-          "brightness": 1.0,
+          "brightness": 0.7599999904632568,
           "enabled": false,
           "hueOffset": 0.0,
           "saturation": 0.8500000238418579,
@@ -96,14 +96,14 @@
           "baseHeight": -40.0,
           "complexity": 26.0,
           "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
+          "curtainHeight": 2300.0,
           "driftSpeed": 0.12999999523162842,
           "flowSpeed": 0.054999999701976776,
           "layerSpacing": 0.3400000035762787,
           "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
+          "turbulence": 0.68,
           "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
+          "waveAmplitude": 0.38,
           "waveScale": 2.4000000953674316
         }
       },
@@ -136,12 +136,12 @@
             1.0
           ],
           "edgeColor": [
-            0.9599999785423279,
-            0.8399999737739563,
+            0.8,
+            0.66,
             1.0
           ],
-          "edgeIntensity": 3.0,
-          "intensity": 1.899999976158142,
+          "edgeIntensity": 2.0,
+          "intensity": 1.4,
           "rainbow": false,
           "rainbowBrightness": 1.0,
           "rainbowSaturation": 0.8500000238418579,
@@ -285,8 +285,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -373,8 +373,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -461,8 +461,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -549,8 +549,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -637,8 +637,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -725,8 +725,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -813,8 +813,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -901,8 +901,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -989,8 +989,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1077,8 +1077,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1165,8 +1165,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1253,8 +1253,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1341,8 +1341,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1429,8 +1429,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1517,8 +1517,8 @@
       "timing": {
         "delay": 0.0,
         "fadeIn": 0.15,
-        "fadeOut": 1.2,
-        "lifetime": 4.5,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
         "repeatSeconds": 0.0,
         "windowSeconds": 6.0,
         "windowStart": 0.0
@@ -1530,12 +1530,188 @@
       }
     },
     {
-      "id": "horse-light",
-      "type": "glow",
-      "name": "The horse's light",
+      "activation": "trigger",
+      "enabled": true,
+      "id": "opal-cap-hero-pulse",
+      "name": "Hero Pulse",
+      "order": 0,
       "owner": {
         "kind": "entity",
-        "name": "horse-11"
+        "name": "opal-cap"
+      },
+      "parameters": {
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        }
+      },
+      "style": "Bioluminescent",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.15,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "type": "groundPulse",
+      "trigger": {
+        "source": "marker",
+        "name": "hero pulse opal-cap"
+      }
+    },
+    {
+      "activation": "trigger",
+      "enabled": true,
+      "id": "sail-cap-hero-pulse",
+      "name": "Hero Pulse",
+      "order": 0,
+      "owner": {
+        "kind": "entity",
+        "name": "sail-cap"
+      },
+      "parameters": {
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        }
+      },
+      "style": "Bioluminescent",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.15,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "type": "groundPulse",
+      "trigger": {
+        "source": "marker",
+        "name": "hero pulse sail-cap"
+      }
+    },
+    {
+      "id": "visitor-warp",
+      "type": "spaceWarp",
+      "name": "Spacetime warp",
+      "owner": {
+        "kind": "entity",
+        "name": "visitor"
       },
       "enabled": true,
       "order": 0,
@@ -1551,7 +1727,357 @@
         "repeatSeconds": 0.0
       },
       "parameters": {
-        "gain": 1.0,
+        "strength": 0.8,
+        "boundsScale": 2.2,
+        "radius": 8.0,
+        "radialWeight": 0.15,
+        "bowWeight": 1.0,
+        "swirl": 0.1,
+        "turbulence": 0.18,
+        "chroma": 0.12,
+        "rimColor": [
+          0.55,
+          0.85,
+          1.0
+        ],
+        "rimIntensity": 0.0,
+        "falloff": 1.6,
+        "edgeSoftness": 0.45,
+        "velocityStretch": 1.4,
+        "speedForFull": 18.0,
+        "turbulenceScale": 2.0,
+        "turbulenceSpeed": 0.35,
+        "rimWidth": 0.4,
+        "offsetX": 0.0,
+        "offsetY": 0.0,
+        "offsetZ": 0.0
+      }
+    },
+    {
+      "id": "scout-warp",
+      "type": "spaceWarp",
+      "name": "Spacetime warp",
+      "owner": {
+        "kind": "entity",
+        "name": "scout"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "strength": 0.8,
+        "boundsScale": 2.2,
+        "radius": 8.0,
+        "radialWeight": 0.15,
+        "bowWeight": 1.0,
+        "swirl": 0.1,
+        "turbulence": 0.18,
+        "chroma": 0.12,
+        "rimColor": [
+          0.55,
+          0.85,
+          1.0
+        ],
+        "rimIntensity": 0.0,
+        "falloff": 1.6,
+        "edgeSoftness": 0.45,
+        "velocityStretch": 1.4,
+        "speedForFull": 18.0,
+        "turbulenceScale": 2.0,
+        "turbulenceSpeed": 0.35,
+        "rimWidth": 0.4,
+        "offsetX": 0.0,
+        "offsetY": 0.0,
+        "offsetZ": 0.0
+      }
+    },
+    {
+      "activation": "trigger",
+      "enabled": true,
+      "id": "drummer-hero-pulse",
+      "name": "Hero Pulse (rainbow)",
+      "order": 0,
+      "owner": {
+        "kind": "entity",
+        "name": "drummer"
+      },
+      "parameters": {
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 2.2,
+          "intensity": 1.4,
+          "rainbow": true,
+          "rainbowBrightness": 0.75,
+          "rainbowSaturation": 0.55,
+          "rainbowScale": 0.035,
+          "rainbowSpeed": 0.34,
+          "width": 1.0
+        },
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 2.2,
+          "kind": "radial",
+          "range": 22.0,
+          "ringCount": 2.0,
+          "speed": 7.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 8.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 5.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "response": {
+          "emissive": 0.8,
+          "foliage": 0.9,
+          "ground": 0.5,
+          "surface": 0.25
+        },
+        "source": {
+          "kind": "owner"
+        },
+        "sparkle": {
+          "density": 1.0,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 1.0,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        }
+      },
+      "style": "",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.15,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "type": "groundPulse",
+      "trigger": {
+        "source": "marker",
+        "name": "hero pulse drummer"
+      }
+    },
+    {
+      "id": "drummer-aura",
+      "type": "bioluminescence",
+      "name": "Rainbow photophores",
+      "owner": {
+        "kind": "entity",
+        "name": "drummer"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "pattern": 0.0,
+        "color": [
+          0.62,
+          0.45,
+          1.0
+        ],
+        "intensity": 1.4,
+        "scale": 22.0,
+        "coverage": 0.3,
+        "colorVariation": 0.5,
+        "breatheRate": 0.3,
+        "breatheDepth": 0.7,
+        "waveSpeed": 0.45,
+        "waveInterval": 5.54,
+        "waveGain": 1.6
+      }
+    },
+    {
+      "activation": "trigger",
+      "enabled": true,
+      "id": "keyboardist-hero-pulse",
+      "name": "Hero Pulse (rainbow)",
+      "order": 0,
+      "owner": {
+        "kind": "entity",
+        "name": "keyboardist"
+      },
+      "parameters": {
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 2.2,
+          "intensity": 1.4,
+          "rainbow": true,
+          "rainbowBrightness": 0.75,
+          "rainbowSaturation": 0.55,
+          "rainbowScale": 0.035,
+          "rainbowSpeed": 0.26,
+          "width": 1.0
+        },
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 2.2,
+          "kind": "radial",
+          "range": 22.0,
+          "ringCount": 2.0,
+          "speed": 7.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 8.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 5.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "response": {
+          "emissive": 0.8,
+          "foliage": 0.9,
+          "ground": 0.5,
+          "surface": 0.25
+        },
+        "source": {
+          "kind": "owner"
+        },
+        "sparkle": {
+          "density": 1.0,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 1.0,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        }
+      },
+      "style": "",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.15,
+        "fadeOut": 1.1,
+        "lifetime": 2.6,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "type": "groundPulse",
+      "trigger": {
+        "source": "marker",
+        "name": "hero pulse keyboardist"
+      }
+    },
+    {
+      "id": "keyboardist-aura",
+      "type": "bioluminescence",
+      "name": "Rainbow photophores",
+      "owner": {
+        "kind": "entity",
+        "name": "keyboardist"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "pattern": 0.0,
+        "color": [
+          0.15,
+          0.95,
+          0.78
+        ],
+        "intensity": 1.4,
+        "scale": 22.0,
+        "coverage": 0.3,
+        "colorVariation": 0.5,
+        "breatheRate": 0.3,
+        "breatheDepth": 0.7,
+        "waveSpeed": 0.45,
+        "waveInterval": 5.54,
+        "waveGain": 1.6
+      }
+    },
+    {
+      "id": "drummer-light",
+      "type": "glow",
+      "name": "The drummer's light",
+      "owner": {
+        "kind": "entity",
+        "name": "drummer"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "gain": 0.5,
         "tint": [
           1.0,
           0.56,
@@ -1567,6 +2093,36 @@
         "rimPower": 2.5,
         "spill": false,
         "recolour": 0.0
+      }
+    },
+    {
+      "id": "drummer-rainbow",
+      "type": "colorCycling",
+      "name": "The drummer's light, in rainbow",
+      "owner": {
+        "kind": "entity",
+        "name": "drummer"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "lifetime": 0.0,
+        "fadeIn": 0.0,
+        "fadeOut": 0.0,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 0.0
+      },
+      "parameters": {
+        "speed": 0.34,
+        "range": 0.0,
+        "spatialFrequency": 1.5,
+        "channel": 1,
+        "axis": 0,
+        "phase": 0.0
       }
     }
   ],
@@ -1985,6 +2541,98 @@
       "reactionProfile": "organism",
       "scale": 1.0,
       "yaw": 3.4030001163482666
+    },
+    {
+      "name": "opal-cap",
+      "position": [
+        79.986,
+        13.651,
+        -4.397
+      ],
+      "yaw": -1.016,
+      "scale": 1.0,
+      "radius": 2.86,
+      "height": 6.8,
+      "importance": 0.285,
+      "focalWeight": 0.4,
+      "preferredCameraDistance": 21.1,
+      "preferredCameraElevation": 8.0,
+      "activationRadius": 61.2,
+      "colorAccent": [
+        0.06,
+        0.82,
+        1.0
+      ],
+      "reactionProfile": "organism"
+    },
+    {
+      "name": "sail-cap",
+      "position": [
+        41.293,
+        13.061,
+        45.037
+      ],
+      "yaw": -1.406,
+      "scale": 1.0,
+      "radius": 3.11,
+      "height": 7.4,
+      "importance": 0.2635,
+      "focalWeight": 0.35,
+      "preferredCameraDistance": 22.9,
+      "preferredCameraElevation": 8.0,
+      "activationRadius": 66.6,
+      "colorAccent": [
+        0.06,
+        0.82,
+        1.0
+      ],
+      "reactionProfile": "organism"
+    },
+    {
+      "name": "drummer",
+      "position": [
+        -1.7,
+        7.162,
+        70.9
+      ],
+      "yaw": 3.142,
+      "scale": 1.0,
+      "radius": 2.2,
+      "height": 3.4,
+      "importance": 0.24,
+      "focalWeight": 0.6,
+      "preferredCameraDistance": 12.0,
+      "preferredCameraElevation": 2.0,
+      "activationRadius": 60.0,
+      "colorAccent": [
+        0.62,
+        0.45,
+        1.0
+      ],
+      "reactionProfile": ""
+    },
+    {
+      "name": "keyboardist",
+      "position": [
+        -1.7,
+        7.856,
+        59.9
+      ],
+      "yaw": 0.0,
+      "scale": 1.0,
+      "radius": 2.2,
+      "height": 3.4,
+      "importance": 0.23,
+      "focalWeight": 0.6,
+      "preferredCameraDistance": 12.0,
+      "preferredCameraElevation": 2.0,
+      "activationRadius": 60.0,
+      "colorAccent": [
+        0.62,
+        0.45,
+        1.0
+      ],
+      "reactionProfile": ""
     }
   ],
   "parameters": {
@@ -2255,8 +2903,8 @@
     "entity/horse-11/liveliness/sway": 1.909999966621399,
     "entity/horse-11/liveliness/swayRate": 0.15199999511241913,
     "entity/horse-11/wander/arrive": 0.6499999761581421,
-    "entity/horse-11/wander/homeRadius": 20.350000381469727,
-    "entity/horse-11/wander/maxRange": 14.0,
+    "entity/horse-11/wander/homeRadius": 16.0,
+    "entity/horse-11/wander/maxRange": 12.0,
     "entity/horse-11/wander/minRange": 2.630000114440918,
     "entity/horse-11/wander/pauseMax": 6.239999771118164,
     "entity/horse-11/wander/pauseMin": 1.600000023841858,
@@ -2602,11 +3250,11 @@
     "fx/bloom-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/bloom-cap-hero-pulse/enabled": true,
     "fx/bloom-cap-hero-pulse/fadeIn": 0.15,
-    "fx/bloom-cap-hero-pulse/fadeOut": 1.2,
+    "fx/bloom-cap-hero-pulse/fadeOut": 1.1,
     "fx/bloom-cap-hero-pulse/falloff": 1.5,
     "fx/bloom-cap-hero-pulse/frontWidth": 3.5,
     "fx/bloom-cap-hero-pulse/intensity": 5.0,
-    "fx/bloom-cap-hero-pulse/lifetime": 4.5,
+    "fx/bloom-cap-hero-pulse/lifetime": 2.6,
     "fx/bloom-cap-hero-pulse/rainbow": false,
     "fx/bloom-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/bloom-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2644,11 +3292,11 @@
     "fx/cairn-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/cairn-cap-hero-pulse/enabled": true,
     "fx/cairn-cap-hero-pulse/fadeIn": 0.15,
-    "fx/cairn-cap-hero-pulse/fadeOut": 1.2,
+    "fx/cairn-cap-hero-pulse/fadeOut": 1.1,
     "fx/cairn-cap-hero-pulse/falloff": 1.5,
     "fx/cairn-cap-hero-pulse/frontWidth": 3.5,
     "fx/cairn-cap-hero-pulse/intensity": 5.0,
-    "fx/cairn-cap-hero-pulse/lifetime": 4.5,
+    "fx/cairn-cap-hero-pulse/lifetime": 2.6,
     "fx/cairn-cap-hero-pulse/rainbow": false,
     "fx/cairn-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/cairn-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2728,11 +3376,11 @@
     "fx/elder-2-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/elder-2-cap-hero-pulse/enabled": true,
     "fx/elder-2-cap-hero-pulse/fadeIn": 0.15,
-    "fx/elder-2-cap-hero-pulse/fadeOut": 1.2,
+    "fx/elder-2-cap-hero-pulse/fadeOut": 1.1,
     "fx/elder-2-cap-hero-pulse/falloff": 1.5,
     "fx/elder-2-cap-hero-pulse/frontWidth": 3.5,
     "fx/elder-2-cap-hero-pulse/intensity": 5.0,
-    "fx/elder-2-cap-hero-pulse/lifetime": 4.5,
+    "fx/elder-2-cap-hero-pulse/lifetime": 2.6,
     "fx/elder-2-cap-hero-pulse/rainbow": false,
     "fx/elder-2-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/elder-2-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2770,11 +3418,11 @@
     "fx/ember-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/ember-cap-hero-pulse/enabled": true,
     "fx/ember-cap-hero-pulse/fadeIn": 0.15,
-    "fx/ember-cap-hero-pulse/fadeOut": 1.2,
+    "fx/ember-cap-hero-pulse/fadeOut": 1.1,
     "fx/ember-cap-hero-pulse/falloff": 1.5,
     "fx/ember-cap-hero-pulse/frontWidth": 3.5,
     "fx/ember-cap-hero-pulse/intensity": 5.0,
-    "fx/ember-cap-hero-pulse/lifetime": 4.5,
+    "fx/ember-cap-hero-pulse/lifetime": 2.6,
     "fx/ember-cap-hero-pulse/rainbow": false,
     "fx/ember-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/ember-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2812,11 +3460,11 @@
     "fx/ember-hero-pulse/edgeIntensity": 9.0,
     "fx/ember-hero-pulse/enabled": true,
     "fx/ember-hero-pulse/fadeIn": 0.15,
-    "fx/ember-hero-pulse/fadeOut": 1.2,
+    "fx/ember-hero-pulse/fadeOut": 1.1,
     "fx/ember-hero-pulse/falloff": 1.5,
     "fx/ember-hero-pulse/frontWidth": 3.5,
     "fx/ember-hero-pulse/intensity": 5.0,
-    "fx/ember-hero-pulse/lifetime": 4.5,
+    "fx/ember-hero-pulse/lifetime": 2.6,
     "fx/ember-hero-pulse/rainbow": false,
     "fx/ember-hero-pulse/rainbowBrightness": 1.0,
     "fx/ember-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2854,11 +3502,11 @@
     "fx/lantern-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/lantern-cap-hero-pulse/enabled": true,
     "fx/lantern-cap-hero-pulse/fadeIn": 0.15,
-    "fx/lantern-cap-hero-pulse/fadeOut": 1.2,
+    "fx/lantern-cap-hero-pulse/fadeOut": 1.1,
     "fx/lantern-cap-hero-pulse/falloff": 1.5,
     "fx/lantern-cap-hero-pulse/frontWidth": 3.5,
     "fx/lantern-cap-hero-pulse/intensity": 5.0,
-    "fx/lantern-cap-hero-pulse/lifetime": 4.5,
+    "fx/lantern-cap-hero-pulse/lifetime": 2.6,
     "fx/lantern-cap-hero-pulse/rainbow": false,
     "fx/lantern-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/lantern-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2896,11 +3544,11 @@
     "fx/ridge-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/ridge-cap-hero-pulse/enabled": true,
     "fx/ridge-cap-hero-pulse/fadeIn": 0.15,
-    "fx/ridge-cap-hero-pulse/fadeOut": 1.2,
+    "fx/ridge-cap-hero-pulse/fadeOut": 1.1,
     "fx/ridge-cap-hero-pulse/falloff": 1.5,
     "fx/ridge-cap-hero-pulse/frontWidth": 3.5,
     "fx/ridge-cap-hero-pulse/intensity": 5.0,
-    "fx/ridge-cap-hero-pulse/lifetime": 4.5,
+    "fx/ridge-cap-hero-pulse/lifetime": 2.6,
     "fx/ridge-cap-hero-pulse/rainbow": false,
     "fx/ridge-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/ridge-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2938,11 +3586,11 @@
     "fx/rook-hero-pulse/edgeIntensity": 9.0,
     "fx/rook-hero-pulse/enabled": true,
     "fx/rook-hero-pulse/fadeIn": 0.15,
-    "fx/rook-hero-pulse/fadeOut": 1.2,
+    "fx/rook-hero-pulse/fadeOut": 1.1,
     "fx/rook-hero-pulse/falloff": 1.5,
     "fx/rook-hero-pulse/frontWidth": 3.5,
     "fx/rook-hero-pulse/intensity": 5.0,
-    "fx/rook-hero-pulse/lifetime": 4.5,
+    "fx/rook-hero-pulse/lifetime": 2.6,
     "fx/rook-hero-pulse/rainbow": false,
     "fx/rook-hero-pulse/rainbowBrightness": 1.0,
     "fx/rook-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -2980,11 +3628,11 @@
     "fx/sage-hero-pulse/edgeIntensity": 9.0,
     "fx/sage-hero-pulse/enabled": true,
     "fx/sage-hero-pulse/fadeIn": 0.15,
-    "fx/sage-hero-pulse/fadeOut": 1.2,
+    "fx/sage-hero-pulse/fadeOut": 1.1,
     "fx/sage-hero-pulse/falloff": 1.5,
     "fx/sage-hero-pulse/frontWidth": 3.5,
     "fx/sage-hero-pulse/intensity": 5.0,
-    "fx/sage-hero-pulse/lifetime": 4.5,
+    "fx/sage-hero-pulse/lifetime": 2.6,
     "fx/sage-hero-pulse/rainbow": false,
     "fx/sage-hero-pulse/rainbowBrightness": 1.0,
     "fx/sage-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3022,11 +3670,11 @@
     "fx/scree-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/scree-cap-hero-pulse/enabled": true,
     "fx/scree-cap-hero-pulse/fadeIn": 0.15,
-    "fx/scree-cap-hero-pulse/fadeOut": 1.2,
+    "fx/scree-cap-hero-pulse/fadeOut": 1.1,
     "fx/scree-cap-hero-pulse/falloff": 1.5,
     "fx/scree-cap-hero-pulse/frontWidth": 3.5,
     "fx/scree-cap-hero-pulse/intensity": 5.0,
-    "fx/scree-cap-hero-pulse/lifetime": 4.5,
+    "fx/scree-cap-hero-pulse/lifetime": 2.6,
     "fx/scree-cap-hero-pulse/rainbow": false,
     "fx/scree-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/scree-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3064,11 +3712,11 @@
     "fx/spire-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/spire-cap-hero-pulse/enabled": true,
     "fx/spire-cap-hero-pulse/fadeIn": 0.15,
-    "fx/spire-cap-hero-pulse/fadeOut": 1.2,
+    "fx/spire-cap-hero-pulse/fadeOut": 1.1,
     "fx/spire-cap-hero-pulse/falloff": 1.5,
     "fx/spire-cap-hero-pulse/frontWidth": 3.5,
     "fx/spire-cap-hero-pulse/intensity": 5.0,
-    "fx/spire-cap-hero-pulse/lifetime": 4.5,
+    "fx/spire-cap-hero-pulse/lifetime": 2.6,
     "fx/spire-cap-hero-pulse/rainbow": false,
     "fx/spire-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/spire-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3106,11 +3754,11 @@
     "fx/tide-hero-pulse/edgeIntensity": 9.0,
     "fx/tide-hero-pulse/enabled": true,
     "fx/tide-hero-pulse/fadeIn": 0.15,
-    "fx/tide-hero-pulse/fadeOut": 1.2,
+    "fx/tide-hero-pulse/fadeOut": 1.1,
     "fx/tide-hero-pulse/falloff": 1.5,
     "fx/tide-hero-pulse/frontWidth": 3.5,
     "fx/tide-hero-pulse/intensity": 5.0,
-    "fx/tide-hero-pulse/lifetime": 4.5,
+    "fx/tide-hero-pulse/lifetime": 2.6,
     "fx/tide-hero-pulse/rainbow": false,
     "fx/tide-hero-pulse/rainbowBrightness": 1.0,
     "fx/tide-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3148,11 +3796,11 @@
     "fx/umbra-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/umbra-cap-hero-pulse/enabled": true,
     "fx/umbra-cap-hero-pulse/fadeIn": 0.15,
-    "fx/umbra-cap-hero-pulse/fadeOut": 1.2,
+    "fx/umbra-cap-hero-pulse/fadeOut": 1.1,
     "fx/umbra-cap-hero-pulse/falloff": 1.5,
     "fx/umbra-cap-hero-pulse/frontWidth": 3.5,
     "fx/umbra-cap-hero-pulse/intensity": 5.0,
-    "fx/umbra-cap-hero-pulse/lifetime": 4.5,
+    "fx/umbra-cap-hero-pulse/lifetime": 2.6,
     "fx/umbra-cap-hero-pulse/rainbow": false,
     "fx/umbra-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/umbra-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3190,11 +3838,11 @@
     "fx/vane-hero-pulse/edgeIntensity": 9.0,
     "fx/vane-hero-pulse/enabled": true,
     "fx/vane-hero-pulse/fadeIn": 0.15,
-    "fx/vane-hero-pulse/fadeOut": 1.2,
+    "fx/vane-hero-pulse/fadeOut": 1.1,
     "fx/vane-hero-pulse/falloff": 1.5,
     "fx/vane-hero-pulse/frontWidth": 3.5,
     "fx/vane-hero-pulse/intensity": 5.0,
-    "fx/vane-hero-pulse/lifetime": 4.5,
+    "fx/vane-hero-pulse/lifetime": 2.6,
     "fx/vane-hero-pulse/rainbow": false,
     "fx/vane-hero-pulse/rainbowBrightness": 1.0,
     "fx/vane-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -3232,11 +3880,11 @@
     "fx/veil-cap-hero-pulse/edgeIntensity": 9.0,
     "fx/veil-cap-hero-pulse/enabled": true,
     "fx/veil-cap-hero-pulse/fadeIn": 0.15,
-    "fx/veil-cap-hero-pulse/fadeOut": 1.2,
+    "fx/veil-cap-hero-pulse/fadeOut": 1.1,
     "fx/veil-cap-hero-pulse/falloff": 1.5,
     "fx/veil-cap-hero-pulse/frontWidth": 3.5,
     "fx/veil-cap-hero-pulse/intensity": 5.0,
-    "fx/veil-cap-hero-pulse/lifetime": 4.5,
+    "fx/veil-cap-hero-pulse/lifetime": 2.6,
     "fx/veil-cap-hero-pulse/rainbow": false,
     "fx/veil-cap-hero-pulse/rainbowBrightness": 1.0,
     "fx/veil-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
@@ -6326,7 +6974,7 @@
     "nodes/elder-2-stem/opacity": 1.0,
     "nodes/elder-2-stem/position": [
       -12.0,
-      4.039,
+      3.4356,
       52.0
     ],
     "nodes/elder-2-stem/rotation": [
@@ -15674,6 +16322,30 @@
     "temporal/echo/strength": 0.44999998807907104,
     "music/meter/bar1Beat": 0,
     "music/meter/phraseBars": 8,
+    "nodes/opal-under/emissiveBoost": 0.2,
+    "nodes/opal-gills/emissiveBoost": 0.2,
+    "nodes/sail-under/emissiveBoost": 0.2,
+    "nodes/sail-gills/emissiveBoost": 0.2,
+    "nodes/sail-cap/position": [
+      42.0,
+      7.309,
+      43.0
+    ],
+    "nodes/sail-under/position": [
+      42.0,
+      7.309,
+      43.0
+    ],
+    "nodes/sail-stem/position": [
+      42.0,
+      7.309,
+      43.0
+    ],
+    "nodes/sail-gills/position": [
+      42.0,
+      7.309,
+      43.0
+    ],
     "entity/scout/bank/degrees": 5.0,
     "entity/scout/bank/responseMs": 1500.0,
     "entity/scout/drift/radius": 1.44,
@@ -15920,7 +16592,67 @@
     "procedural/scout/source/subdivisions": 1,
     "procedural/scout/variation/seed": 12345,
     "procedural/scout/variation/uniformScale": 0.0,
-    "fx/horse-light/gain": 0.5,
+    "nodes/drummer/position": [
+      -1.7,
+      5.162,
+      70.9
+    ],
+    "nodes/drummer/rotation": [
+      -2.327,
+      179.983,
+      0.849
+    ],
+    "nodes/drummer/scale": [
+      1.94,
+      1.94,
+      1.94
+    ],
+    "nodes/drum-kit/position": [
+      -1.7,
+      5.162,
+      70.9
+    ],
+    "nodes/drum-kit/rotation": [
+      -2.327,
+      179.983,
+      0.849
+    ],
+    "nodes/drum-kit/scale": [
+      1.94,
+      1.94,
+      1.94
+    ],
+    "nodes/keyboardist/position": [
+      -1.7,
+      5.856,
+      59.9
+    ],
+    "nodes/keyboardist/rotation": [
+      4.263,
+      -0.047,
+      1.254
+    ],
+    "nodes/keyboardist/scale": [
+      1.94,
+      1.94,
+      1.94
+    ],
+    "nodes/keyboard-rig/position": [
+      -1.7,
+      5.856,
+      59.9
+    ],
+    "nodes/keyboard-rig/rotation": [
+      4.263,
+      -0.047,
+      1.254
+    ],
+    "nodes/keyboard-rig/scale": [
+      1.94,
+      1.94,
+      1.94
+    ],
+    "fx/drummer-light/gain": 0.5,
     "post/referenceHeight": 1080.0,
     "scene/fogSky": 0.5,
     "scene/fogSkyDistance": 0.0,
@@ -15929,7 +16661,27 @@
     "scene/glow-pools/reach": 6.0,
     "sources/two-bar-breath/beatSync": true,
     "sources/two-bar-breath/beatsPerCycle": 8.0,
-    "sources/two-bar-breath/phase": 0.630417
+    "sources/two-bar-breath/phase": 0.630417,
+    "fx/opal-cap-hero-pulse/delay": 0.0,
+    "fx/opal-cap-hero-pulse/fadeIn": 0.15,
+    "fx/opal-cap-hero-pulse/fadeOut": 1.1,
+    "fx/opal-cap-hero-pulse/lifetime": 2.6,
+    "fx/opal-cap-hero-pulse/repeat": 0.0,
+    "fx/sail-cap-hero-pulse/delay": 0.0,
+    "fx/sail-cap-hero-pulse/fadeIn": 0.15,
+    "fx/sail-cap-hero-pulse/fadeOut": 1.1,
+    "fx/sail-cap-hero-pulse/lifetime": 2.6,
+    "fx/sail-cap-hero-pulse/repeat": 0.0,
+    "fx/drummer-hero-pulse/delay": 0.0,
+    "fx/drummer-hero-pulse/fadeIn": 0.15,
+    "fx/drummer-hero-pulse/fadeOut": 1.1,
+    "fx/drummer-hero-pulse/lifetime": 2.6,
+    "fx/drummer-hero-pulse/repeat": 0.0,
+    "fx/keyboardist-hero-pulse/delay": 0.0,
+    "fx/keyboardist-hero-pulse/fadeIn": 0.15,
+    "fx/keyboardist-hero-pulse/fadeOut": 1.1,
+    "fx/keyboardist-hero-pulse/lifetime": 2.6,
+    "fx/keyboardist-hero-pulse/repeat": 0.0
   },
   "pathtrace": {
     "albedoProbe": false,
@@ -17480,6 +18232,286 @@
       "target": "particles/ember-spores/emissive"
     },
     {
+      "amount": 0.08799999952316284,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 920.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.opal-gills",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/opal-gills/emissiveBoost"
+    },
+    {
+      "amount": 0.08799999952316284,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 955.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.opal-under",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/opal-under/emissiveBoost"
+    },
+    {
+      "amount": 0.4399999976158142,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 990.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.opal-cap",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/opal-cap/emissiveBoost"
+    },
+    {
+      "amount": 1.0,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 1010.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": true,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.1380000114440918,
+        "remapOutMin": 1.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "multiply",
+      "planItem": "reactivity/section.opal-spores",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "particles/opal-spores/emissive"
+    },
+    {
+      "amount": 0.08799999952316284,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 469.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.sail-gills",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/sail-gills/emissiveBoost"
+    },
+    {
+      "amount": 0.08799999952316284,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 504.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.sail-under",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/sail-under/emissiveBoost"
+    },
+    {
+      "amount": 0.4399999976158142,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 539.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "add",
+      "planItem": "reactivity/section.sail-cap",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "nodes/sail-cap/emissiveBoost"
+    },
+    {
+      "amount": 1.0,
+      "chain": {
+        "attackMs": 40.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1800.0,
+        "delayMs": 559.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": true,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.1380000114440918,
+        "remapOutMin": 1.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "depthMax": 1.0,
+      "depthMin": 0.18799999356269836,
+      "depthSource": "section.energy",
+      "enabled": true,
+      "op": "multiply",
+      "planItem": "reactivity/section.sail-spores",
+      "polarity": "unipolar",
+      "source": "section.change",
+      "target": "particles/sail-spores/emissive"
+    },
+    {
       "amount": 3.0,
       "chain": {
         "attackMs": 5.0,
@@ -18093,6 +19125,111 @@
       }
     },
     {
+      "source": "audio.bass",
+      "target": "fx/aurora/intensity",
+      "component": -1,
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 160.0,
+        "decayMs": 1100.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 1.0,
+        "remapOutMax": 1.16
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "fx/aurora/curtainHeight",
+      "component": -1,
+      "amount": 140.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 240.0,
+        "decayMs": 1500.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0
+      }
+    },
+    {
+      "source": "timeline.kick",
+      "target": "fx/drummer-aura/intensity",
+      "component": -1,
+      "amount": 1.6,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 6.0,
+        "decayMs": 280.0
+      }
+    },
+    {
+      "source": "section.energy",
+      "target": "fx/drummer-aura/intensity",
+      "component": -1,
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 800.0,
+        "decayMs": 2400.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "remapEnabled": true,
+        "remapInMin": 0.2,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.6,
+        "remapOutMax": 1.35
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "fx/keyboardist-aura/intensity",
+      "component": -1,
+      "amount": 1.4,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 60.0,
+        "decayMs": 520.0
+      }
+    },
+    {
+      "source": "section.energy",
+      "target": "fx/keyboardist-aura/intensity",
+      "component": -1,
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 800.0,
+        "decayMs": 2400.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "remapEnabled": true,
+        "remapInMin": 0.2,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.6,
+        "remapOutMax": 1.35
+      }
+    },
+    {
       "source": "timeline.kick",
       "target": "fx/camera-travel-beam/intensity",
       "component": -1,
@@ -18123,6 +19260,19 @@
       "target": "fx/cairn-cap-hero-pulse/intensity",
       "component": -1,
       "amount": 8.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 5.0,
+        "decayMs": 200.0
+      }
+    },
+    {
+      "source": "timeline.kick",
+      "target": "fx/drummer-hero-pulse/intensity",
+      "component": -1,
+      "amount": 1.5,
       "op": "add",
       "polarity": "unipolar",
       "enabled": true,
@@ -18172,7 +19322,33 @@
     },
     {
       "source": "timeline.kick",
+      "target": "fx/keyboardist-hero-pulse/intensity",
+      "component": -1,
+      "amount": 1.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 5.0,
+        "decayMs": 200.0
+      }
+    },
+    {
+      "source": "timeline.kick",
       "target": "fx/lantern-cap-hero-pulse/intensity",
+      "component": -1,
+      "amount": 8.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 5.0,
+        "decayMs": 200.0
+      }
+    },
+    {
+      "source": "timeline.kick",
+      "target": "fx/opal-cap-hero-pulse/intensity",
       "component": -1,
       "amount": 8.0,
       "op": "add",
@@ -18212,6 +19388,19 @@
     {
       "source": "timeline.kick",
       "target": "fx/sage-hero-pulse/intensity",
+      "component": -1,
+      "amount": 8.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "enabled": true,
+      "chain": {
+        "attackMs": 5.0,
+        "decayMs": 200.0
+      }
+    },
+    {
+      "source": "timeline.kick",
+      "target": "fx/sail-cap-hero-pulse/intensity",
       "component": -1,
       "amount": 8.0,
       "op": "add",
@@ -18362,6 +19551,21 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 7.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 7.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 7.844615
+      },
+      {
+        "kind": "cue",
         "name": "travel beam",
         "time": 7.847949
       },
@@ -18377,12 +19581,37 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 9.690769
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 9.690769
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 9.690769
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 11.536923
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 11.536923
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 13.383077
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
         "time": 13.383077
       },
       {
@@ -18397,7 +19626,12 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse lantern-cap",
+        "name": "hero pulse drummer",
+        "time": 15.229231
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 15.229231
       },
       {
@@ -18407,7 +19641,12 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse lantern-cap",
+        "name": "hero pulse drummer",
+        "time": 17.075385
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 17.075385
       },
       {
@@ -18472,6 +19711,21 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 29.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 29.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 29.998462
+      },
+      {
+        "kind": "cue",
         "name": "travel beam",
         "time": 30.001795
       },
@@ -18487,12 +19741,32 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 31.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 31.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 31.844615
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 33.690769
       },
       {
         "kind": "cue",
         "name": "hero pulse bloom-cap",
+        "time": 33.690769
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 33.690769
       },
       {
@@ -18503,6 +19777,11 @@
       {
         "kind": "cue",
         "name": "hero pulse bloom-cap",
+        "time": 35.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 35.536923
       },
       {
@@ -18522,8 +19801,18 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 41.075385
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 41.075385
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 42.921538
       },
       {
         "kind": "cue",
@@ -18552,12 +19841,32 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 46.613846
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 46.613846
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 48.46
       },
       {
         "kind": "cue",
         "name": "hero pulse lantern-cap",
+        "time": 48.46
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 48.46
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 48.46
       },
       {
@@ -18568,6 +19877,16 @@
       {
         "kind": "cue",
         "name": "hero pulse lantern-cap",
+        "time": 50.306154
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 50.306154
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 50.306154
       },
       {
@@ -18692,8 +20011,18 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 77.998462
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 77.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 79.844615
       },
       {
         "kind": "cue",
@@ -18708,6 +20037,11 @@
       {
         "kind": "cue",
         "name": "hero pulse veil-cap",
+        "time": 83.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
         "time": 83.536923
       },
       {
@@ -18797,8 +20131,28 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 103.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse opal-cap",
+        "time": 103.844615
+      },
+      {
+        "kind": "cue",
         "name": "setpiece/e4-river-pair/lift",
         "time": 103.87078996465742
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 105.690769
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse opal-cap",
+        "time": 105.690769
       },
       {
         "kind": "cue",
@@ -18867,12 +20221,32 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 118.613846
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 118.613846
+      },
+      {
+        "kind": "cue",
         "name": "travel beam",
         "time": 118.617179
       },
       {
         "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 120.46
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 120.46
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 120.46
       },
       {
@@ -18947,7 +20321,27 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 137.075385
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 137.075385
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 138.921538
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 138.921538
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
         "time": 138.921538
       },
       {
@@ -18972,8 +20366,13 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse tide",
-        "time": 146.306154
+        "name": "hero pulse drummer",
+        "time": 148.152308
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 148.152308
       },
       {
         "kind": "section",
@@ -18987,7 +20386,47 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 149.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 149.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 151.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 151.844615
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 153.690769
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 153.690769
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse umbra-cap",
+        "time": 155.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 155.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 155.536923
       },
       {
@@ -18997,7 +20436,27 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 157.383077
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 157.383077
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse umbra-cap",
+        "time": 159.229231
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 159.229231
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 159.229231
       },
       {
@@ -19007,7 +20466,22 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 161.075385
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 161.075385
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse lantern-cap",
+        "time": 162.921538
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse opal-cap",
         "time": 162.921538
       },
       {
@@ -19018,6 +20492,11 @@
       {
         "kind": "cue",
         "name": "hero pulse lantern-cap",
+        "time": 164.767692
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse opal-cap",
         "time": 164.767692
       },
       {
@@ -19107,7 +20586,27 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 179.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 179.536923
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 181.383077
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 181.383077
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
         "time": 181.383077
       },
       {
@@ -19147,6 +20646,16 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse opal-cap",
+        "time": 190.613846
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse opal-cap",
+        "time": 192.46
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse spire-cap",
         "time": 192.46
       },
@@ -19182,6 +20691,16 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse drummer",
+        "time": 197.998462
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse keyboardist",
+        "time": 197.998462
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse lantern-cap",
         "time": 199.844615
       },
@@ -19207,6 +20726,11 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 207.229231
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 207.229231
       },
@@ -19217,13 +20741,28 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse elder-2-cap",
+        "name": "hero pulse sail-cap",
         "time": 209.075385
       },
       {
         "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 209.075385
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
         "time": 210.921538
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse elder-2-cap",
+        "time": 210.921538
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 212.767692
       },
       {
         "kind": "cue",
@@ -19233,6 +20772,11 @@
       {
         "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 214.613846
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
         "time": 214.613846
       },
       {
@@ -19247,12 +20791,27 @@
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 216.46
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
         "time": 218.306154
       },
       {
         "kind": "cue",
+        "name": "hero pulse sail-cap",
+        "time": 218.306154
+      },
+      {
+        "kind": "cue",
         "name": "hero pulse elder-2-cap",
+        "time": 220.152308
+      },
+      {
+        "kind": "cue",
+        "name": "hero pulse sail-cap",
         "time": 220.152308
       },
       {
@@ -19818,7 +21377,7 @@
     },
     "events": [
       {
-        "id": "ufo.horse-glow",
+        "id": "ufo.drummer-glow",
         "what": {
           "amount": [
             3.0,
@@ -19831,7 +21390,7 @@
           "kind": "setParameter",
           "mode": "add",
           "seconds": 1.3,
-          "target": "fx/horse-light/glow"
+          "target": "fx/drummer-light/glow"
         },
         "when": {
           "kind": "time",
@@ -19839,7 +21398,7 @@
         }
       },
       {
-        "id": "ufo.horse-rim",
+        "id": "ufo.drummer-rim",
         "what": {
           "amount": [
             5.0,
@@ -19852,11 +21411,192 @@
           "kind": "setParameter",
           "mode": "add",
           "seconds": 1.3,
-          "target": "fx/horse-light/rim"
+          "target": "fx/drummer-light/rim"
         },
         "when": {
           "kind": "time",
           "time": 172.7559620928563
+        }
+      },
+      {
+        "id": "ufo.drummer-rainbow",
+        "what": {
+          "amount": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "hold": 3.6,
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.3,
+          "target": "fx/drummer-rainbow/range"
+        },
+        "when": {
+          "kind": "time",
+          "time": 172.7559620928563
+        }
+      },
+      {
+        "id": "ufo.e1-far-survey-scout-warp-quiet",
+        "what": {
+          "amount": [
+            -0.800000011920929,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 0.5,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 13.865092392734324
+        }
+      },
+      {
+        "id": "ufo.e1-far-survey-scout-warp-back",
+        "what": {
+          "amount": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.2,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 22.63175917861028
+        }
+      },
+      {
+        "id": "ufo.e3-far-lift-scout-warp-quiet",
+        "what": {
+          "amount": [
+            -0.800000011920929,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 0.5,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 65.58482684408071
+        }
+      },
+      {
+        "id": "ufo.e3-far-lift-scout-warp-back",
+        "what": {
+          "amount": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.2,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 71.8848268440807
+        }
+      },
+      {
+        "id": "ufo.e4-river-pair-scout-warp-quiet",
+        "what": {
+          "amount": [
+            -0.800000011920929,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 0.5,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 102.5041232741489
+        }
+      },
+      {
+        "id": "ufo.e4-river-pair-scout-warp-back",
+        "what": {
+          "amount": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.2,
+          "target": "fx/scout-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 111.90412341720004
+        }
+      },
+      {
+        "id": "ufo.e5-centrepiece-visitor-warp-quiet",
+        "what": {
+          "amount": [
+            -0.800000011920929,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 0.5,
+          "target": "fx/visitor-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 170.33929533082218
+        }
+      },
+      {
+        "id": "ufo.e5-centrepiece-visitor-warp-back",
+        "what": {
+          "amount": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "interp": "smooth",
+          "kind": "setParameter",
+          "mode": "add",
+          "seconds": 1.2,
+          "target": "fx/visitor-warp/strength"
+        },
+        "when": {
+          "kind": "time",
+          "time": 177.699295392811
         }
       }
     ]
@@ -40210,8 +41950,8 @@
           {
             "time": 0.0,
             "value": [
-              14.0,
-              5.529,
+              20.0,
+              5.563,
               88.0
             ],
             "interp": "linear"
@@ -40219,8 +41959,8 @@
           {
             "time": 7.847949,
             "value": [
-              4.0,
-              6.611,
+              10.0,
+              6.723,
               74.0
             ],
             "interp": "linear"
@@ -42570,6 +44310,113 @@
         ]
       },
       {
+        "target": "fx/visitor-warp/rimIntensity",
+        "component": -1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 0.0,
+        "enabled": true,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 26.309487,
+            "value": [
+              0.08
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 30.001795,
+            "value": [
+              0.0
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 148.155641,
+            "value": [
+              0.08
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 155.540256,
+            "value": [
+              0.0
+            ],
+            "interp": "step"
+          }
+        ]
+      },
+      {
+        "target": "nodes/elder-2-gills/emissiveBoost",
+        "component": -1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 0.0,
+        "enabled": true,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 162.924872,
+            "value": [
+              0.8
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 166.617179,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          }
+        ]
+      },
+      {
+        "target": "nodes/elder-2-under/emissiveBoost",
+        "component": -1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 0.0,
+        "enabled": true,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 162.924872,
+            "value": [
+              0.8
+            ],
+            "interp": "step"
+          },
+          {
+            "time": 166.617179,
+            "value": [
+              0.1
+            ],
+            "interp": "step"
+          }
+        ]
+      },
+      {
         "target": "fx/camera-travel-beam/color",
         "component": -1,
         "timeBase": "seconds",
@@ -42982,6 +44829,54 @@
           "fingerprint": "fnv1a64:9a884891a9a0cfae",
           "id": "reactivity/section.ember-spores",
           "item": "section.ember-spores"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:63316cc4f757ccbe",
+          "id": "reactivity/section.opal-gills",
+          "item": "section.opal-gills"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:0a1e17ce465f017e",
+          "id": "reactivity/section.opal-under",
+          "item": "section.opal-under"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:da640cdb8b25bfd8",
+          "id": "reactivity/section.opal-cap",
+          "item": "section.opal-cap"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:a7823a306dde3082",
+          "id": "reactivity/section.opal-spores",
+          "item": "section.opal-spores"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:036a3557e3498506",
+          "id": "reactivity/section.sail-gills",
+          "item": "section.sail-gills"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:c29e5d5886d76084",
+          "id": "reactivity/section.sail-under",
+          "item": "section.sail-under"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:6a5c95c3dd71c327",
+          "id": "reactivity/section.sail-cap",
+          "item": "section.sail-cap"
+        },
+        {
+          "domain": "modulation.route",
+          "fingerprint": "fnv1a64:3688aa4b479e3b6d",
+          "id": "reactivity/section.sail-spores",
+          "item": "section.sail-spores"
         },
         {
           "domain": "modulation.route",
@@ -44829,6 +46724,342 @@
           }
         },
         {
+          "group": "hero-emission",
+          "key": "section.opal-gills",
+          "layer": "section",
+          "level": "meso",
+          "owner": "opal-cap",
+          "reason": "opal-cap relights 920 ms after the section changes, 110 m from elder-2-cap: relighting at each new section in opal-gills's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.08799999952316284,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 920.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/opal-gills/emissiveBoost"
+          }
+        },
+        {
+          "group": "hero-emission",
+          "key": "section.opal-under",
+          "layer": "section",
+          "level": "meso",
+          "owner": "opal-cap",
+          "reason": "opal-cap relights 920 ms after the section changes, 110 m from elder-2-cap: relighting at each new section in opal-under's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.08799999952316284,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 955.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/opal-under/emissiveBoost"
+          }
+        },
+        {
+          "group": "hero-emission",
+          "key": "section.opal-cap",
+          "layer": "section",
+          "level": "meso",
+          "owner": "opal-cap",
+          "reason": "opal-cap relights 920 ms after the section changes, 110 m from elder-2-cap: relighting at each new section in opal-cap's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.4399999976158142,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 990.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/opal-cap/emissiveBoost"
+          }
+        },
+        {
+          "group": "particles",
+          "key": "section.opal-spores",
+          "layer": "section",
+          "level": "micro",
+          "owner": "opal-cap",
+          "reason": "opal-cap's spores catch its pulse 90 ms later. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 1.0,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 1010.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": true,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.1380000114440918,
+              "remapOutMin": 1.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "multiply",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "particles/opal-spores/emissive"
+          }
+        },
+        {
+          "group": "hero-emission",
+          "key": "section.sail-gills",
+          "layer": "section",
+          "level": "meso",
+          "owner": "sail-cap",
+          "reason": "sail-cap relights 469 ms after the section changes, 56 m from elder-2-cap: relighting at each new section in sail-gills's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.08799999952316284,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 469.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/sail-gills/emissiveBoost"
+          }
+        },
+        {
+          "group": "hero-emission",
+          "key": "section.sail-under",
+          "layer": "section",
+          "level": "meso",
+          "owner": "sail-cap",
+          "reason": "sail-cap relights 469 ms after the section changes, 56 m from elder-2-cap: relighting at each new section in sail-under's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.08799999952316284,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 504.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/sail-under/emissiveBoost"
+          }
+        },
+        {
+          "group": "hero-emission",
+          "key": "section.sail-cap",
+          "layer": "section",
+          "level": "meso",
+          "owner": "sail-cap",
+          "reason": "sail-cap relights 469 ms after the section changes, 56 m from elder-2-cap: relighting at each new section in sail-cap's glow, at 55% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 0.4399999976158142,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 539.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": false,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.0,
+              "remapOutMin": 0.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "add",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "nodes/sail-cap/emissiveBoost"
+          }
+        },
+        {
+          "group": "particles",
+          "key": "section.sail-spores",
+          "layer": "section",
+          "level": "micro",
+          "owner": "sail-cap",
+          "reason": "sail-cap's spores catch its pulse 90 ms later. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+          "route": {
+            "amount": 1.0,
+            "chain": {
+              "attackMs": 40.0,
+              "clampEnabled": false,
+              "clampMax": 1.0,
+              "clampMin": 0.0,
+              "curve": "linear",
+              "curveAmount": 1.0,
+              "decayMs": 1800.0,
+              "delayMs": 559.0,
+              "envelope": "none",
+              "envelopeFallPerSecond": 4.0,
+              "envelopeHoldMs": 0.0,
+              "gain": 1.0,
+              "offset": 0.0,
+              "remapEnabled": true,
+              "remapInMax": 1.0,
+              "remapInMin": 0.0,
+              "remapOutMax": 1.1380000114440918,
+              "remapOutMin": 1.0,
+              "threshold": "none",
+              "thresholdLevel": 0.5
+            },
+            "component": -1,
+            "depthMax": 1.0,
+            "depthMin": 0.18799999356269836,
+            "depthSource": "section.energy",
+            "enabled": true,
+            "op": "multiply",
+            "polarity": "unipolar",
+            "source": "section.change",
+            "target": "particles/sail-spores/emissive"
+          }
+        },
+        {
           "group": "scatter-glow",
           "key": "kick.fungi",
           "layer": "kick",
@@ -45706,29 +47937,138 @@
       "cues": [
         {
           "effect": {
-            "id": "horse-light",
-            "owner": "horse",
+            "id": "drummer-light",
+            "owner": "drummer",
             "type": "glow"
           },
           "field": "glow",
           "holdSeconds": 3.6,
-          "key": "horse-glow",
+          "key": "drummer-glow",
           "on": "setpiece/e5-centrepiece/lift",
           "rampSeconds": 1.3,
           "value": 3.0
         },
         {
           "effect": {
-            "id": "horse-light",
-            "owner": "horse",
+            "id": "drummer-light",
+            "owner": "drummer",
             "type": "glow"
           },
           "field": "rim",
           "holdSeconds": 3.6,
-          "key": "horse-rim",
+          "key": "drummer-rim",
           "on": "setpiece/e5-centrepiece/lift",
           "rampSeconds": 1.3,
           "value": 5.0
+        },
+        {
+          "effect": {
+            "id": "drummer-rainbow",
+            "owner": "drummer",
+            "type": "colorCycling"
+          },
+          "field": "range",
+          "holdSeconds": 3.6,
+          "key": "drummer-rainbow",
+          "on": "setpiece/e5-centrepiece/lift",
+          "rampSeconds": 1.3,
+          "value": 1.0
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e1-far-survey-scout-warp-quiet",
+          "on": "setpiece/e1-far-survey/beam",
+          "rampSeconds": 0.5,
+          "value": 0.0
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e1-far-survey-scout-warp-back",
+          "on": "setpiece/e1-far-survey/depart",
+          "rampSeconds": 1.2,
+          "value": 0.800000011920929
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e3-far-lift-scout-warp-quiet",
+          "on": "setpiece/e3-far-lift/beam",
+          "rampSeconds": 0.5,
+          "value": 0.0
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e3-far-lift-scout-warp-back",
+          "on": "setpiece/e3-far-lift/depart",
+          "rampSeconds": 1.2,
+          "value": 0.800000011920929
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e4-river-pair-scout-warp-quiet",
+          "on": "setpiece/e4-river-pair/beam",
+          "rampSeconds": 0.5,
+          "value": 0.0
+        },
+        {
+          "effect": {
+            "id": "scout-warp",
+            "owner": "scout",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e4-river-pair-scout-warp-back",
+          "on": "setpiece/e4-river-pair/depart",
+          "rampSeconds": 1.2,
+          "value": 0.800000011920929
+        },
+        {
+          "effect": {
+            "id": "visitor-warp",
+            "owner": "visitor",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e5-centrepiece-visitor-warp-quiet",
+          "on": "setpiece/e5-centrepiece/beam",
+          "rampSeconds": 0.5,
+          "value": 0.0
+        },
+        {
+          "effect": {
+            "id": "visitor-warp",
+            "owner": "visitor",
+            "type": "spaceWarp"
+          },
+          "field": "strength",
+          "key": "e5-centrepiece-visitor-warp-back",
+          "on": "setpiece/e5-centrepiece/depart",
+          "rampSeconds": 1.2,
+          "value": 0.800000011920929
         }
       ],
       "id": "ufo",
@@ -45845,7 +48185,7 @@
         },
         {
           "domain": "staging.scenario",
-          "fingerprint": "fnv1a64:8e7f115f134042d5",
+          "fingerprint": "fnv1a64:6f141ed02e52caa3",
           "id": "setpiece/e5-centrepiece",
           "item": "e5-centrepiece"
         },
@@ -45875,15 +48215,69 @@
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:93a6020292b028f7",
-          "id": "ufo.horse-glow",
-          "item": "horse-glow"
+          "fingerprint": "fnv1a64:21117781348513ef",
+          "id": "ufo.drummer-glow",
+          "item": "drummer-glow"
         },
         {
           "domain": "sequence.event",
-          "fingerprint": "fnv1a64:bf4f53fde04a0beb",
-          "id": "ufo.horse-rim",
-          "item": "horse-rim"
+          "fingerprint": "fnv1a64:71fdf18ee19adc41",
+          "id": "ufo.drummer-rim",
+          "item": "drummer-rim"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:3d31889c740cceee",
+          "id": "ufo.drummer-rainbow",
+          "item": "drummer-rainbow"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:9cc76d3115049fab",
+          "id": "ufo.e1-far-survey-scout-warp-quiet",
+          "item": "e1-far-survey-scout-warp-quiet"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:f05773a29da83f09",
+          "id": "ufo.e1-far-survey-scout-warp-back",
+          "item": "e1-far-survey-scout-warp-back"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:d2491e93c7022d2d",
+          "id": "ufo.e3-far-lift-scout-warp-quiet",
+          "item": "e3-far-lift-scout-warp-quiet"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:8bb553ce44d353c3",
+          "id": "ufo.e3-far-lift-scout-warp-back",
+          "item": "e3-far-lift-scout-warp-back"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:caef4d43c0cd56f7",
+          "id": "ufo.e4-river-pair-scout-warp-quiet",
+          "item": "e4-river-pair-scout-warp-quiet"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:73c5a6f5deaefc09",
+          "id": "ufo.e4-river-pair-scout-warp-back",
+          "item": "e4-river-pair-scout-warp-back"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:fad54c36003d5035",
+          "id": "ufo.e5-centrepiece-visitor-warp-quiet",
+          "item": "e5-centrepiece-visitor-warp-quiet"
+        },
+        {
+          "domain": "sequence.event",
+          "fingerprint": "fnv1a64:26c136337408dbb1",
+          "id": "ufo.e5-centrepiece-visitor-warp-back",
+          "item": "e5-centrepiece-visitor-warp-back"
         }
       ],
       "retimes": [],
@@ -46007,7 +48401,7 @@
         },
         {
           "animals": [
-            "horse"
+            "drummer"
           ],
           "at": {
             "bar": 93,
@@ -46021,8 +48415,8 @@
           "place": {
             "region": {
               "center": [
-                -4.0,
-                66.0
+                -1.7000000476837158,
+                70.9000015258789
               ],
               "radius": 20.0
             }
@@ -46043,7 +48437,8 @@
             "hoverSeconds": 0.75,
             "leaveHeight": 380.0,
             "leaveSeconds": 8.0,
-            "liftSeconds": 4.909999847412109
+            "liftSeconds": 4.909999847412109,
+            "returnSeconds": 6.0
           },
           "template": "abduction"
         }
@@ -46051,20 +48446,36 @@
       "shots": [],
       "subjects": [
         {
-          "alias": "horse",
-          "resolved": {
-            "id": "horse-11",
-            "kind": "entity"
-          },
-          "text": "horse-11"
-        },
-        {
           "alias": "e4-cow",
           "resolved": {
             "id": "cow-12",
             "kind": "entity"
           },
           "text": "cow-12"
+        },
+        {
+          "alias": "drummer",
+          "resolved": {
+            "id": "drummer",
+            "kind": "entity"
+          },
+          "text": "drummer"
+        },
+        {
+          "alias": "scout",
+          "resolved": {
+            "id": "scout",
+            "kind": "entity"
+          },
+          "text": "scout"
+        },
+        {
+          "alias": "visitor",
+          "resolved": {
+            "id": "visitor",
+            "kind": "entity"
+          },
+          "text": "visitor"
         }
       ],
       "tier": "baked",
@@ -47942,9 +50353,9 @@
                     "kind": "moveTo",
                     "name": "to-entry",
                     "point": [
-                      61.80274200439453,
+                      64.10274505615234,
                       0.0,
-                      329.9204406738281
+                      334.8204345703125
                     ]
                   }
                 ]
@@ -47962,7 +50373,7 @@
             "find": [
               {
                 "bind": "target1",
-                "name": "horse-11"
+                "name": "drummer"
               }
             ],
             "name": "transit",
@@ -48211,8 +50622,8 @@
                     "target": "opacity"
                   },
                   {
-                    "kind": "retire",
-                    "name": "vanish"
+                    "kind": "hide",
+                    "name": "gone"
                   }
                 ]
               }
@@ -48264,14 +50675,28 @@
                     "kind": "moveTo",
                     "name": "leave",
                     "point": [
-                      -246.70301818847656,
+                      -244.40301513671875,
                       0.0,
-                      -322.4060363769531
+                      -317.50604248046875
                     ]
                   },
                   {
                     "kind": "hide",
                     "name": "gone"
+                  }
+                ]
+              },
+              {
+                "role": "target1",
+                "steps": [
+                  {
+                    "duration": 6.0,
+                    "kind": "wait",
+                    "name": "away"
+                  },
+                  {
+                    "kind": "return",
+                    "name": "back"
                   }
                 ]
               }

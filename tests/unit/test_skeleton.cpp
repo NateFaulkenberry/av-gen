@@ -213,6 +213,44 @@ TEST_CASE("asking for the state already playing does not restart it", "[scene][a
     CHECK(rig.player.currentState() == "b");
 }
 
+TEST_CASE("a speed of zero holds the clip where it is, and the next speed carries on from there",
+          "[scene][animation][adr987]") {
+    // ADR-987. A body whose idle freezes its walk (the farm pack's `idleRate` 0) is asked for rate 0 at
+    // every stop. The clock was (start, speed), and at speed 0 it could stand still only at frame zero,
+    // so every stop snapped the legs to the clip's first frame and every walk set off from there.
+    scene::SkinnedRig rig;
+    rig.name = "rig";
+    rig.skeleton = chain();
+    rig.clips.push_back(oneChannel(scene::Interpolation::Linear, {0.0f, 1.0f},
+                                   {glm::vec4(0.0f), glm::vec4(10.0f, 0.0f, 0.0f, 0.0f)}));
+    rig.clips.back().name = "walk";
+    rig.addDefaultStates(0.0f);
+    REQUIRE(rig.player.currentState() == "walk");
+    scene::Pose pose;
+    scene::Pose scratch;
+
+    CHECK(rig.player.stateTime(rig.clips, 0.4) == Approx(0.4f));
+    rig.player.setSpeed(0.0f, 0.4); // the body stops
+    for (const double t : {0.4, 0.5, 2.0, 7.25}) {
+        CHECK(rig.player.stateTime(rig.clips, t) == Approx(0.4f)); // however long it stands
+        CHECK(rig.player.stateTime(t) == Approx(0.4f));
+        rig.player.setSpeed(0.0f, t); // and however often the gait asks again
+    }
+    rig.player.evaluate(rig.clips, rig.skeleton, 7.25, pose, scratch);
+    CHECK(pose.local[1].position.x == Approx(4.0f)); // the pose it stopped in, not frame zero's
+
+    rig.player.setSpeed(0.5f, 8.0); // and walks on from where it stopped
+    CHECK(rig.player.stateTime(rig.clips, 8.0) == Approx(0.4f));
+    CHECK(rig.player.stateTime(rig.clips, 8.2) == Approx(0.5f));
+
+    SECTION("a restart still starts at frame zero, moving or not") {
+        rig.player.setSpeed(0.0f, 9.0);
+        rig.player.restart(9.0);
+        rig.player.setSpeed(0.0f, 9.0);
+        CHECK(rig.player.stateTime(rig.clips, 9.5) == Approx(0.0f));
+    }
+}
+
 TEST_CASE("the pose is a pure function of the timeline, not of the frame rate", "[scene][animation]") {
     // The same decisions made at the same timeline seconds, then sampled from two different frame
     // sequences: a wobbling live one and a fixed offline one. The pose at t = 11.0 must be

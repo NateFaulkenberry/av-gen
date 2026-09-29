@@ -39,6 +39,7 @@
 #include "support/stride_speed.hpp"
 #include "world/world_map.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
@@ -985,4 +986,193 @@ TEST_CASE("every farm animal's rate floor is visible, and a save keeps it", "[fa
     // main after that commit's branch point, so the sweep never saw them. The merge raised those
     // three too (testing.md 39), and this count is what would catch a fourth arriving the same way.
     CHECK(checked == 83);
+}
+
+// A probe (revision round 1, ADR-987): the stances the contact analysis finds on the farm pack's one Walk
+// clip, where the clip has each hoof at the two ends of each, and the speed it sweeps back between them -- the
+// number GV3's `STROKE_SPEED` is (tools/gv3/cast.py), in model units per clip second.
+TEST_CASE("probe: the farm Walk's stances", "[.probe][farm][footlock]") {
+    if (!farmPresent()) {
+        SKIP("the farm pack is not present");
+    }
+    for (const char* name : {"horse", "cow", "bull"}) {
+        scene::Scene s = loadAnimal(name);
+        scene::SkinnedRig& rig = s.rigs.front();
+        rig.contactJoints.clear();
+        for (const char* hoof : {"HoofB.L", "HoofB.R", "HoofF.L", "HoofF.R"}) {
+            rig.contactJoints.push_back(scene::ContactJoint{hoof, scene::ContactKind::Foot});
+        }
+        scene::ContactSettings sweep;
+        sweep.mode = scene::ContactMode::Sweep;
+        const std::uint32_t cyclic = rig.analyse(sweep);
+        const int walk = rig.findClip("Walk");
+        REQUIRE(walk >= 0);
+        const auto& tracks = rig.clipContacts[static_cast<std::size_t>(walk)];
+        const scene::AnimationClip& clip = rig.clips[static_cast<std::size_t>(walk)];
+        std::printf("\n%s: Walk %.3f s, %u cyclic\n", name, static_cast<double>(clip.length()), cyclic);
+        const auto hoofAt = [&](const std::string& joint, float time) {
+            scene::Pose pose;
+            scene::setRestPose(rig.skeleton, pose);
+            scene::sampleClip(clip, clip.start + time, pose);
+            std::vector<glm::mat4> model;
+            scene::poseToModel(rig.skeleton, pose, model);
+            return glm::vec3(model[static_cast<std::size_t>(rig.skeleton.find(joint))][3]);
+        };
+        for (const scene::ContactTrack& t : tracks) {
+            std::printf("  %-8s duty %.2f  worst slide %.3f  mean %.3f  lowest %.3f\n", t.joint.c_str(),
+                        static_cast<double>(t.dutyCycle), static_cast<double>(t.worstSlide),
+                        static_cast<double>(t.meanSlide), static_cast<double>(t.lowest));
+            for (const scene::ContactSpan& sp : t.spans) {
+                struct Ends {
+                    glm::vec3 from;
+                    glm::vec3 to;
+                } e{hoofAt(t.joint, sp.start), hoofAt(t.joint, sp.end)};
+                const glm::vec3 d = e.to - e.from;
+                std::printf("      span %.3f -> %.3f (%.3f s): from (%.3f %.3f %.3f) to (%.3f %.3f %.3f), sweep %.3f/s\n",
+                            static_cast<double>(sp.start), static_cast<double>(sp.end),
+                            static_cast<double>(sp.duration()), static_cast<double>(e.from.x),
+                            static_cast<double>(e.from.y), static_cast<double>(e.from.z), static_cast<double>(e.to.x),
+                            static_cast<double>(e.to.y), static_cast<double>(e.to.z),
+                            static_cast<double>(std::sqrt(d.x * d.x + d.z * d.z) / std::max(sp.duration(), 1e-4f)));
+            }
+        }
+    }
+    std::fflush(stdout);
+}
+
+TEST_CASE("probe: the farm Walk's hoof paths", "[.probe][farm][footlock]") {
+    if (!farmPresent()) {
+        SKIP("the farm pack is not present");
+    }
+    for (const char* name : {"horse", "cow", "bull"}) {
+        scene::Scene s = loadAnimal(name);
+        const scene::SkinnedRig& rig = s.rigs.front();
+        const int walk = rig.findClip("Walk");
+        const scene::AnimationClip& clip = rig.clips[static_cast<std::size_t>(walk)];
+        std::printf("\n%s (y, z per 1/30 s):\n", name);
+        for (const char* hoof : {"HoofB.L", "HoofB.R", "HoofF.L", "HoofF.R"}) {
+            const int j = rig.skeleton.find(hoof);
+            std::printf("  %-8s", hoof);
+            for (int k = 0; k < 27; ++k) {
+                scene::Pose pose;
+                scene::setRestPose(rig.skeleton, pose);
+                scene::sampleClip(clip, clip.start + static_cast<float>(k) / 30.0f, pose);
+                std::vector<glm::mat4> model;
+                scene::poseToModel(rig.skeleton, pose, model);
+                const glm::vec3 p(model[static_cast<std::size_t>(j)][3]);
+                std::printf(" %5.3f/%6.3f", static_cast<double>(p.y), static_cast<double>(p.z));
+            }
+            std::printf("\n");
+        }
+    }
+    std::fflush(stdout);
+}
+
+// A probe (ADR-987): the stance lock on a real horse walking straight at a constant speed, the layer fed by
+// hand as `driveLayers` feeds it, the hooves read in the world. The ideal case: what is left here is the
+// layer's own doing, not the simulation's.
+TEST_CASE("probe: a horse's held hooves on a straight walk", "[.probe][farm][footlock]") {
+    if (!farmPresent()) {
+        SKIP("the farm pack is not present");
+    }
+    scene::Scene s = loadAnimal("horse");
+    scene::SkinnedRig& rig = s.rigs.front();
+    const char* hooves[] = {"HoofB.L", "HoofB.R", "HoofF.L", "HoofF.R"};
+    const char* hips[] = {"UpperLegB.L", "UpperLegB.R", "UpperLegF.L", "UpperLegF.R"};
+    const char* knees[] = {"LowerLegB.L", "LowerLegB.R", "LowerLegF.L", "LowerLegF.R"};
+    rig.contactJoints.clear();
+    for (const char* h : hooves) {
+        rig.contactJoints.push_back(scene::ContactJoint{h, scene::ContactKind::Foot});
+    }
+    scene::ContactSettings sweep;
+    sweep.mode = scene::ContactMode::Sweep;
+    rig.analyse(sweep);
+    const int walk = rig.findClip("Walk");
+    const scene::AnimationClip& clip = rig.clips[static_cast<std::size_t>(walk)];
+    const auto& tracks = rig.clipContacts[static_cast<std::size_t>(walk)];
+
+    for (const bool locked : {false, true}) {
+        std::vector<scene::PoseLayer> layers;
+        for (int k = 0; k < 4; ++k) {
+            scene::PoseLayer l;
+            l.name = hooves[k];
+            l.kind = scene::PoseLayerKind::Foot;
+            l.drive = scene::PoseLayerDrive::Manual;
+            l.chainRoot = hips[k];
+            l.chainMid = knees[k];
+            l.chainTip = hooves[k];
+            l.hasGround = true;
+            l.footAlign = 0.0f;
+            l.footLock = locked ? 1.0f : 0.0f;
+            l.footLockMode = scene::FootLockMode::Stance;
+            l.weight = 1.0f;
+            layers.push_back(l);
+        }
+        scene::PoseLayerStack stack;
+        const auto problems = stack.bind(layers, rig.skeleton, rig.clips);
+        REQUIRE(problems.empty());
+        const float scale = 1.94f;
+        const float walkModel = 1.131f;              // model units per clip second
+        const float speed = 1.3f;                    // m/s
+        const float rate = speed / (walkModel * scale);
+        const double dt = 1.0 / 60.0;
+        std::vector<glm::vec3> prev(4, glm::vec3(0.0f));
+        double held = 0.0;
+        double heldFrames = 0.0;
+        double worst = 0.0;
+        double released = 0.0;
+        for (int f = 0; f < 600; ++f) {
+            const double t = f * dt;
+            const float clipTime = std::fmod(static_cast<float>(t) * rate, clip.length());
+            scene::Pose pose;
+            scene::setRestPose(rig.skeleton, pose);
+            scene::sampleClip(clip, clip.start + clipTime, pose);
+            std::vector<float> along(4, -1.0f);
+            for (int k = 0; k < 4; ++k) {
+                scene::PoseLayer& l = stack.layers()[static_cast<std::size_t>(k)];
+                l.inContact = false;
+                const auto& spans = tracks[static_cast<std::size_t>(k)].spans;
+                for (std::size_t i = 0; i < spans.size(); ++i) {
+                    const scene::ContactSpan& sp = spans[i];
+                    const bool inside = sp.wraps() ? (clipTime >= sp.start || clipTime <= sp.end)
+                                                   : (clipTime >= sp.start && clipTime <= sp.end);
+                    if (!inside) continue;
+                    l.inContact = true;
+                    l.contactElapsed = sp.wraps() && clipTime <= sp.end ? (sp.clipLength - sp.start) + clipTime
+                                                                         : clipTime - sp.start;
+                    l.contactRemaining = std::max(sp.duration() - l.contactElapsed, 0.0f);
+                    l.contactSpan = static_cast<int>(i);
+                    along[static_cast<std::size_t>(k)] = l.contactElapsed / std::max(sp.duration(), 1e-4f);
+                }
+            }
+            const glm::vec3 body(0.0f, 0.0f, speed * static_cast<float>(t));
+            const glm::mat4 toWorld = glm::scale(glm::translate(glm::mat4(1.0f), body), glm::vec3(scale));
+            for (scene::PoseLayer& l : stack.layers()) {
+                l.modelToWorld = toWorld;
+            }
+            stack.apply(rig.skeleton, rig.clips, t, pose);
+            std::vector<glm::mat4> model;
+            scene::poseToModel(rig.skeleton, pose, model);
+            for (int k = 0; k < 4; ++k) {
+                const glm::vec3 m(model[static_cast<std::size_t>(rig.skeleton.find(hooves[k]))][3]);
+                const glm::vec3 w = body + m * scale;
+                if (f > 0 && along[static_cast<std::size_t>(k)] >= 0.05f && along[static_cast<std::size_t>(k)] <= 0.7f) {
+                    const glm::vec3 d = w - prev[static_cast<std::size_t>(k)];
+                    const double slide = std::sqrt(d.x * d.x + d.z * d.z);
+                    held += slide;
+                    heldFrames += 1.0;
+                    worst = std::max(worst, slide);
+                } else if (f > 0 && along[static_cast<std::size_t>(k)] > 0.7f) {
+                    const glm::vec3 d = w - prev[static_cast<std::size_t>(k)];
+                    released += std::sqrt(d.x * d.x + d.z * d.z);
+                }
+                prev[static_cast<std::size_t>(k)] = w;
+            }
+        }
+        std::printf("\n  %s: held part %.4f m over %.0f hoof-frames (mean %.2f mm/frame, worst %.2f mm); release %.3f m; "
+                    "body %.2f m\n",
+                    locked ? "locked" : "unlocked", held, heldFrames, 1000.0 * held / std::max(heldFrames, 1.0),
+                    1000.0 * worst, released, speed * 10.0);
+    }
+    std::fflush(stdout);
 }

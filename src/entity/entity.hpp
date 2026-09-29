@@ -154,6 +154,23 @@ struct MotionMatchingDesc {
     friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
 };
 
+// ADR-989: how this body's gaze comes round to what it looks at. The attention a body pays jumps from one
+// subject to the next in a step, and a head aimed at the subject every frame jumped with it -- a quarter turn
+// in one posed frame. With `settle` above zero the direction the head is aimed along is a critically damped
+// spring toward the subject's, in the world, so the head leads the slower body round; the subject is where
+// it settles. 0 is every scene before it: the head aimed at the subject as it is.
+struct GazeSettings {
+    float settle = 0.0f;      // seconds for the gaze to come round to a new subject (95% of the way); 0 = off
+    float maxTurnRate = 0.0f; // degrees a second the gaze may turn at most; 0 = no limit beyond the spring's
+    float eyeHeight = 1.6f;   // metres above the body's drawn position the gaze is measured from
+    // Degrees either side of the body's facing the gaze may turn; 0 = no limit. A subject further round is
+    // looked at from the limit on its own side -- and one within 30 degrees of straight behind from the side
+    // the gaze is already on, so a subject crossing the back does not throw the head from one shoulder to
+    // the other. Set under the look layer's own `maxYaw`, whose clamp is what threw it (ADR-989).
+    float maxYaw = 0.0f;
+    friend bool operator==(const GazeSettings&, const GazeSettings&) = default;
+};
+
 struct EntityDesc {
     std::string name;
     std::string node;             // the composition node this entity drives; defaults to `name`
@@ -206,6 +223,8 @@ struct EntityDesc {
     // validator). One block per character, read by `explore`'s autonomous hops and by the Director's
     // capability card alike, so the two cannot disagree about what the body is capable of.
     JumpSettings jump{};
+    // ADR-989. How the head's aim comes round to a new subject; see `GazeSettings`.
+    GazeSettings gaze{};
     // ADR-623. The matcher in front of the clip provider; see `MotionMatchingDesc`.
     MotionMatchingDesc motionMatching;
     // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.
@@ -472,6 +491,12 @@ public:
     // Advance the provider memory one step. Called from BOTH publish paths -- ADR-554's rule,
     // applied to the very thing that rule was discovered by.
     void advanceMotion(double time, float dt);
+    // ADR-989. Advance the gaze one step toward what the body attends to, or its own facing when it attends
+    // to nothing. Called from BOTH publish paths, after `advanceMotion`, for ADR-554's reason: a seek replays
+    // every step, so the spring a play integrated is the one a scrub reconstructs.
+    void advanceGaze(float dt);
+    // What the pose tier aims a look layer at: the gaze's point when this body has a gaze, else the subject.
+    [[nodiscard]] glm::vec3 publishedLookTarget() const;
     // Phase B §46. Publishes `hasLookTarget` **and the schedule the pose tier blends against**, in
     // one place called by both `EntityWorld::update` and `EntityWorld::seek`. One function rather
     // than two copies of three lines for ADR-554's reason: this struct is the one that rule was
@@ -728,6 +753,18 @@ private:
     // Phase B. Reset with everything else on a seek, and advanced on both publish paths, which is
     // ADR-554's rule applied to the thing ADR-554 was found by.
     MotionMemory motionMemory_;
+    // ADR-989: the gaze, in the world: its yaw about +Y (0 along +Z), its pitch, their rates, and how far out
+    // it is aimed. State, so a checkpoint carries it (every entity is copied whole) and a seek replays it.
+    struct GazeState {
+        float yaw = 0.0f;
+        float pitch = 0.0f;
+        float yawRate = 0.0f;
+        float pitchRate = 0.0f;
+        float distance = 10.0f;
+        bool valid = false;
+    };
+    GazeState gaze_;
+    [[nodiscard]] glm::vec3 gazeOrigin() const;
     MotionState motionState_;
     MotionChainResult motionChainResult_;
     LocomotionPlanState locomotionPlan_;

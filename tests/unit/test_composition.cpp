@@ -1531,6 +1531,57 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     CHECK(s.entities[farChunk].mesh == node->chunks[farChunk].meshes[0]);
 }
 
+TEST_CASE("ADR-980: a chunk that carries water never draws its ground coarser than LOD 1",
+          "[composition][terrain][adr980]") {
+    // The water surface is always built at the base resolution and the shoreline is wherever the drawn
+    // ground cuts it, so a wet chunk drawn at a coarse level pokes its bank up through the river. Far
+    // enough away that the dry chunks take a coarse level, the wet ones must not.
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "terra-far",
+      "camera": { "mode": 1, "position": [0, 60, 520], "target": [0, 0, 0], "fov": 50.0 },
+      "nodes": [
+        { "name": "ground", "kind": "terrain",
+          "world": { "name": "small", "size": [160, 160] },
+          "terrain": { "chunkSize": 40.0, "resolution": 8, "lodLevels": 4,
+                       "lodDistance": 50.0, "viewDistance": 2000.0 },
+          "material": { "baseColor": [0.2, 0.4, 0.3], "roughness": 0.9 } }
+      ]
+    })";
+    Fixture fx;
+    const auto path = writeJson("terrain-far", text);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+    const scene::CompositionNode* node = (*comp)->findNode("ground");
+    REQUIRE(node != nullptr);
+    int wet = 0;
+    int dryCoarse = 0;
+    for (std::size_t i = 0; i < node->chunks.size(); ++i) {
+        const world::TerrainChunk& chunk = node->chunks[i];
+        int level = -1;
+        for (int k = 0; k < world::kMaxTerrainLods; ++k) {
+            if (chunk.meshes[static_cast<std::size_t>(k)] == s.entities[i].mesh) {
+                level = k;
+                break;
+            }
+        }
+        REQUIRE(level >= 0);
+        if (chunk.water != scene::kInvalidMesh) {
+            ++wet;
+            CHECK(level <= world::kWaterChunkMaxLod);
+        } else if (level >= 2) {
+            ++dryCoarse;
+        }
+    }
+    CHECK(wet > 0);       // the shipped small world has a river through it
+    CHECK(dryCoarse > 0); // and the camera is far enough that the cap has something to hold back
+}
+
 TEST_CASE("ordinary authored mesh nodes participate in camera culling", "[composition][culling]") {
     Fixture fx;
     scene::Composition composition(fx.registry, "culling");

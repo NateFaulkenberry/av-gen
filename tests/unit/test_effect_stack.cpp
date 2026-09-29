@@ -489,18 +489,20 @@ TEST_CASE("the evaluator walks by render stage, then priority, then stack positi
     }
 
     SECTION("the walk decides which wave wins the last GPU slot") {
-        // Nine live waves, eight slots: the one walked last is the one dropped, whichever it is.
+        // One more live wave than there are slots (ADR-981: 16): the one walked last is the one
+        // dropped, whichever it is.
+        constexpr int kWaves = static_cast<int>(world::kMaxGpuWaves) + 1;
         std::vector<world::EffectInstance> waves;
-        for (int i = 0; i < 9; ++i) {
+        for (int i = 0; i < kWaves; ++i) {
             waves.push_back(livePulse("w" + std::to_string(i)));
         }
         std::vector<EffectStatus> status = evaluate(waves, 0.5);
-        CHECK(status[8] == EffectStatus::Dropped);
-        std::rotate(waves.begin(), waves.begin() + 8, waves.end()); // w8 to the top of the list
+        CHECK(status[kWaves - 1] == EffectStatus::Dropped);
+        std::rotate(waves.begin(), waves.begin() + (kWaves - 1), waves.end()); // the last to the top
         status = evaluate(waves, 0.5);
-        CHECK(waves[0].id == "w8");
+        CHECK(waves[0].id == "w" + std::to_string(kWaves - 1));
         CHECK(status[0] == EffectStatus::Drawn);
-        CHECK(status[8] == EffectStatus::Dropped); // now w7, walked last
+        CHECK(status[kWaves - 1] == EffectStatus::Dropped); // now the one before it, walked last
     }
 }
 
@@ -582,9 +584,10 @@ TEST_CASE("every instance says what happened to it on the frame", "[effects][sta
         CHECK(status[0] == EffectStatus::Drawn);
         CHECK(status[1] == EffectStatus::Drawn);
     }
-    SECTION("the ninth live wave is dropped, and the eight before it are drawn") {
+    SECTION("the wave past the GPU's slots is dropped, and the ones before it are drawn") {
+        // ADR-981: the slots are `kMaxGpuWaves` (16), not eight.
         std::vector<world::EffectInstance> effects;
-        for (int i = 0; i < 9; ++i) {
+        for (std::size_t i = 0; i <= world::kMaxGpuWaves; ++i) {
             effects.push_back(livePulse("wave-" + std::to_string(i)));
         }
         world::WaveFrame waves{};
@@ -595,7 +598,7 @@ TEST_CASE("every instance says what happened to it on the frame", "[effects][sta
             INFO(effects[i].id);
             CHECK(status[i] == EffectStatus::Drawn);
         }
-        CHECK(status[8] == EffectStatus::Dropped);
+        CHECK(status[world::kMaxGpuWaves] == EffectStatus::Dropped);
     }
     SECTION("the fifth live medium is dropped, and the four before it are drawn") {
         std::vector<world::EffectInstance> effects;

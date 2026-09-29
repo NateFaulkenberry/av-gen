@@ -5,12 +5,12 @@
  "tier": "baked",
  "subjects": [
   {
-   "alias": "horse",
-   "text": "horse-11"
-  },
-  {
    "alias": "e4-cow",
    "text": "cow-12"
+  },
+  {
+   "alias": "drummer",
+   "text": "drummer"
   }
  ],
  "setPieces": [
@@ -121,14 +121,14 @@
    "place": {
     "region": {
      "center": [
-      -4,
-      66
+      -1.7,
+      70.9
      ],
      "radius": 20
     }
    },
    "animals": [
-    "horse"
+    "drummer"
    ],
    "set": {
     "approachSeconds": 21,
@@ -146,18 +146,19 @@
     "entryHeight": 100,
     "departBearing": 328,
     "departDistance": 458,
-    "leaveHeight": 380
+    "leaveHeight": 380,
+    "returnSeconds": 6.0
    },
    "framingMetres": 30
   }
  ],
  "cues": [
   {
-   "key": "horse-glow",
+   "key": "drummer-glow",
    "effect": {
-    "owner": "horse",
+    "owner": "drummer",
     "type": "glow",
-    "id": "horse-light"
+    "id": "drummer-light"
    },
    "field": "glow",
    "on": "setpiece/e5-centrepiece/lift",
@@ -166,15 +167,28 @@
    "holdSeconds": 3.6
   },
   {
-   "key": "horse-rim",
+   "key": "drummer-rim",
    "effect": {
-    "owner": "horse",
+    "owner": "drummer",
     "type": "glow",
-    "id": "horse-light"
+    "id": "drummer-light"
    },
    "field": "rim",
    "on": "setpiece/e5-centrepiece/lift",
    "value": 5.0,
+   "rampSeconds": 1.3,
+   "holdSeconds": 3.6
+  },
+  {
+   "key": "drummer-rainbow",
+   "effect": {
+    "owner": "drummer",
+    "type": "colorCycling",
+    "id": "drummer-rainbow"
+   },
+   "field": "range",
+   "on": "setpiece/e5-centrepiece/lift",
+   "value": 1.0,
    "rampSeconds": 1.3,
    "holdSeconds": 3.6
   }

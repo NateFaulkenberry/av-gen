@@ -70,14 +70,23 @@ void load(app::Engine& engine, bool withAudio) {
 
 // For each target frame: a play from zero through it and one frame more, against a fresh engine that
 // scrubs to it and plays that one frame. The worst body over the whole cast, by name.
-void requireScrubEqualsPlay(bool withAudio, const std::vector<long long>& targets) {
+// `renderClock` plays through the render's own FixedStepClock instead of a hand-built 1/60 step,
+// so the case covers what `--render` actually does (ADR-990).
+void requireScrubEqualsPlay(bool withAudio, const std::vector<long long>& targets, bool renderClock = false) {
     app::Engine played(app::EngineMode::Offline);
     load(played, withAudio);
+    FixedStepClock clock(60.0);
     std::map<long long, std::map<std::string, glm::vec3>> playedAt;
     long long frame = 0;
     for (long long t : targets) {
         for (; frame <= t + 1; ++frame) {
-            frameAt(played, frame);
+            if (renderClock) {
+                const FrameTime ft = clock.tick();
+                REQUIRE(ft.frameIndex == static_cast<std::uint64_t>(frame));
+                played.update(ft);
+            } else {
+                frameAt(played, frame);
+            }
         }
         playedAt[t] = drawn(played);
     }
@@ -112,6 +121,17 @@ TEST_CASE("an Engine scrub of the Glowmere film lands where an Engine play does"
         SKIP("farm or alien assets missing");
     }
     requireScrubEqualsPlay(false, {60, 1800});
+}
+
+// ADR-990. The render's clock handed out deltaTime as a difference of two instants, a few bits off
+// the 1/60 the replay steps. The autonomous cast grew that into metres: on Glowmere Valley 3, 0.7 mm
+// at 6.28 s and up to 114 m by 168 s, so a render from zero was a different film from any scrub.
+// Played by the render's own clock, every body lands exactly where the scrub puts it.
+TEST_CASE("an Engine played by the render's clock lands where a scrub does", "[seek][engine][glowmere][adr990]") {
+    if (!assetsPresent()) {
+        SKIP("farm or alien assets missing");
+    }
+    requireScrubEqualsPlay(false, {60, 600, 1800}, true);
 }
 
 // Cause 2 (ADR-870). With the film's audio its audio-reactive world events and behaviours fire in a

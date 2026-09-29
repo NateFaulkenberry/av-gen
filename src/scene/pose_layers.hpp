@@ -158,6 +158,16 @@ enum class PoseLayerKind : std::uint8_t {
 // the point of the exercise: they name a field of `entity::LocomotionState` that was published
 // every frame and read by nobody. The binding is by *role* and never by layer name, so an author
 // may call a layer whatever they like and a second look layer on the same body still works.
+// How a held foot is held (ADR-987): see `PoseLayer::footLockMode`.
+enum class FootLockMode : std::uint8_t { Velocity, Stance };
+// Seconds between two posed frames past which a `Stance` lock no longer trusts what it held on the first.
+// Longer than the slowest a rig is posed at when it is posed at all (a far rig at 15 Hz is 0.067 s), and
+// far shorter than any stance lasts at a walk.
+inline constexpr double kStanceGap = 0.25;
+// The share of a contact span, at its end, over which a `Stance` lock hands its foot back to the clip: the
+// hoof lifts from where the clip lifts it, and the difference is taken up while it is coming off the ground.
+inline constexpr float kStanceRelease = 0.3f;
+
 enum class PoseLayerDrive : std::uint8_t {
     Manual,
     Look,     // weight from `hasLookTarget`, target from `lookTarget`
@@ -254,6 +264,23 @@ struct PoseLayer {
     // there is nothing to author and nothing to measure wrong. This field is for the cases the rest
     // pose cannot know about -- a hoof sunk into mud, a foot on a step.
     float groundOffset = 0.0f;
+    // How much of the clip's own foot in the air a planted foot keeps (ADR-988). 0, the default and
+    // every scene before it: the foot is put on the plane at the height it stands at, its sole laid
+    // flat on it, on every frame -- the heel never rises and the swing never lifts (GV3's aliens drew
+    // 6 mm of lift against their Walking clip's 0.24 m at the ankle, and a sole the clip rolls 78
+    // degrees onto its toes stayed flat). 1: the clip's foot, carried onto the ground -- put on the plane
+    // at its standing height PLUS the height the clip has it above that, and turned by the plane's tilt
+    // rather than laid on it, so a foot the clip holds flat stands flat on a slope and one it rolls
+    // stays rolled. A stance foot is at its standing height and flat in the clip, so the two agree
+    // there; a foot the clip has below its standing height is planted at it either way.
+    float keepSwing = 0.0f;
+    // The foot's toe joint, for a layer that keeps the swing (ADR-988): a joint hanging from the chain's
+    // tip that is kept at least at its own standing height above the plane, by turning the foot up about
+    // the ankle. A foot carried onto the ground in the clip's own orientation puts its toes where the clip
+    // has them relative to the ANKLE, and wherever the drawn ankle is lower than the clip's -- a stride
+    // shortened, a leg at the end of its reach, a steep slope -- the clip's pointed toes go into the ground.
+    // Empty: no floor.
+    std::string toeJoint;
     // 0 keeps the foot's animated orientation; 1 lays its sole flat on the plane. The same shape as
     // `entity::GroundSettings::slopeAlign`, one level down, and complementary to it -- `slopeAlign`
     // tilts the body, this tilts one foot -- but **not** the same argument, and the default is the
@@ -286,7 +313,8 @@ struct PoseLayer {
     // replay -- so a scrubbed frame would hold an anchor from a timeline the scrub abolished. This
     // one computes the same answer from values already on the seam: in the body's own frame a
     // planted foot must slide **backwards at the body's speed**, so the offset is
-    // `-velocity * elapsed-in-contact` and needs no memory at all.
+    // `-velocity * elapsed-in-contact` and needs no memory at all. (A `Stance` lock, below, is the
+    // exception, and says why and how its memory is kept from outliving its stance.)
     //
     // The approximation is exact at constant velocity and drifts under acceleration by
     // `0.5 * a * t^2` over a stance -- at 2 m/s^2 across a 0.3 s stance, 9 cm, which is why the
@@ -307,8 +335,31 @@ struct PoseLayer {
     float footLock = 0.0f;
     // Seconds of ease at each end of a contact span: §15's approach and release. A lock that
     // switched on and off at the span boundary is the "foot locked, then teleports" failure §15
-    // names outright.
+    // names outright. A `Velocity` lock's: a `Stance` lock starts from the clip's own foot and hands
+    // it back over `kStanceRelease`, so it has no edge to ease.
     float lockBlendSeconds = 0.08f;
+    // **What the lock holds the foot to (ADR-987).** `Velocity` is ADR-557's: the foot the clip poses
+    // NOW, pushed back by the body's travel since contact. That is right for a clip whose planted foot
+    // stands still in the rig's frame -- an idle under a moving body -- and wrong for a walk cycle,
+    // whose stance foot already sweeps back under the hips, so the two would count the travel twice.
+    //
+    // `Stance` is for a walk: from the first posed frame of a contact span the foot stays at the point
+    // in the WORLD where the clip had it then -- whatever the body does meanwhile, turning included --
+    // and over the span's last `kStanceRelease` it is handed back to the clip, so it leaves the ground
+    // from where the clip lifts it. Outside the span the layer leaves the foot as the clip has it, lift
+    // and all; and only the horizontal is held, at the height the clip gives it.
+    //
+    // **This one is remembered, and the memory cannot outlive its stance.** A derived anchor needs the
+    // body's travel and turn since touchdown, and the seam carries only what the body is doing NOW: the
+    // first derived form (the clip's elapsed contact time at the walk's authored speed, turned by the
+    // turn rate over the elapsed time) was exact on a steady walk and threw a bull's hoof 1.16 m in one
+    // frame the moment it began to turn mid-stance. So the stack keeps the point (`stance`) and trusts
+    // it only on the next posed frame of the same span -- later in the timeline, within `kStanceGap`,
+    // not started again. A seek, a step backwards, a cull or a new stance finds nothing to trust and
+    // starts holding from where the clip has the foot on that frame: a scrubbed frame shows the clip's
+    // own foot, never one held from a timeline the scrub abolished (ADR-557's objection), and a render,
+    // which plays every frame from its first, holds every stance from its touchdown.
+    FootLockMode footLockMode = FootLockMode::Velocity;
 
     // ---- Stride (Phase B §7) --------------------------------------------------------------------
     // The joint whose horizontal excursion is scaled -- a foot, or a hand on a quadruped forelimb.
@@ -459,8 +510,24 @@ struct PoseLayer {
     float contactElapsed = 0.0f;
     float contactRemaining = 0.0f;
     glm::vec3 bodyVelocity{0.0f};
+    // ...and, for a `Stance` lock (ADR-987), which of the foot's spans that is, and the rig's model space
+    // to the world this frame.
+    int contactSpan = -1;
+    glm::mat4 modelToWorld{1.0f};
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
+
+    // ---- written by the stack, read back by it the next frame (ADR-987) --------------------------
+    // Where a `Stance` lock is holding its foot in the world, and the frame it last did. Trusted only by
+    // the next posed frame of the same stance -- see `footLockMode` -- and reset by anything else.
+    struct StanceMemory {
+        bool holding = false;
+        int span = -1;
+        float elapsed = 0.0f;
+        double time = 0.0;
+        glm::vec3 world{0.0f};
+    };
+    StanceMemory stance;
 };
 
 // What one layer did this frame, for the same reason `entity::SocketResolution` exists: "it did
@@ -630,6 +697,9 @@ private:
     // `soleUp_` is.
     std::vector<float> restTipHeight_;
     std::vector<IkStatus> ikStatus_;
+    // ADR-988: each foot layer's toe joint (-1 for none) and the toe's standing height, from the rest pose.
+    std::vector<int> toe_;
+    std::vector<float> toeStanding_;
     BodyCompensationSpec bodySpec_;
     int bodyJoint_ = -1;
     BodyCompensation bodyResult_;

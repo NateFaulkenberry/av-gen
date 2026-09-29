@@ -17,6 +17,8 @@ Three layers, deliberately kept apart because they answer different questions:
              of light from the elder on the bar, the wind and the colour on the sections.
 """
 
+import math
+
 from . import music
 
 # ---- BASE ----------------------------------------------------------------------------------------
@@ -98,13 +100,11 @@ BASE = {
     "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
-    # The horse's gold as the saucer lifts it (E5). Its Glow's cues -- self-glow 3 and rim 5 on a white
-    # horse, raised on the lift -- are the first pass's, and the peak blows the horse out: 25.7% of s29's
-    # pixels clipped (31.9% at worst; the evaluator's high "clipped highlights" at 175.76 s), the horse
-    # pale white with its gold only on the legs. The Glow's brightness multiplies everything it adds
-    # and no cue keys it, so halving it halves the peak and keeps the lift -- when it rises, how long it
-    # holds, its colour.
-    "fx/horse-light/gain": 0.5,
+    # The drummer's gold as the saucer lifts him (E5; the horse's light before the art pass, musicians.py
+    # LIFT_GLOW). Its cues -- self-glow 3 and rim 5, raised on the lift -- peak far too bright on a white body
+    # (25.7% of the frame clipped on the horse), and no cue keys the Glow's brightness, so halving it halves
+    # the peak and keeps the lift: when it rises, how long it holds, its colour.
+    "fx/drummer-light/gain": 0.5,
     # One moon. The sky's rotation is the HDRI's, and GV3 has no HDRI: the source (GV2) restated -0.568 rad
     # over the scene's 0. The visible procedural sky is looked up through it (sky_background.wgsl,
     # envRotate), but the skybox's crisp moon is drawn at the sky's own sun direction, un-rotated
@@ -178,14 +178,39 @@ REMOVED_EFFECT_TYPES = {}
 # reads an authored cut, each fires on a trigger instead: a cue marker "hero pulse <hero>" on every
 # downbeat of a shot in which that hero is the subject or stands in the frame within HERO_PULSE_NEAR m.
 # GV2's look is kept whole (colour, rings, speed, range, response, sparkle); only the timing changes, so
-# the ring leaves the hero on the beat (no delay, a quick fade in) and runs its 58 m (4.5 s at 13 m/s),
-# and GV2's pump (`beat.pulse -> intensity` +8) rides the scored kick. The markers are on the Sequence
-# panel; each ring is the Effects panel's "Hero Pulse" on its hero.
+# the ring leaves the hero on the beat (no delay, a quick fade in), and GV2's pump (`beat.pulse ->
+# intensity` +8) rides the scored kick. The markers are on the Sequence panel; each ring is the Effects
+# panel's "Hero Pulse" on its hero.
+# The ring's life (the art pass, item 2). Until ADR-981 a wave drew only its latest trigger's front, so each
+# ring was cut off by the next bar's, 1.85 s and 24 m out -- the owner's "abruptly removed" -- and that is the
+# pulse the owner judged "very close to finished". With every ring now living its own life, the old timing
+# (4.5 s, full strength to 3.3 s) ran each ring on to 58 m at full strength, through foreground the cut had
+# always kept it out of: the first final measured the film 20-40% brighter in mean luma and clipping in nine
+# more shots (the Critic's F031 and its kin; s65 0.22 -> 0.48, s36 0.20 -> 0.47, all of it a ring from a hero
+# 35-45 m off sweeping the lens -- r7b's 0.20 and 0.22 again without it). So the ring keeps what the owner saw
+# and fades the way the owner described ("the wave gradually fades as it travels"): full strength to 1.5 s
+# (20 m), at 77% of it when the next bar's ring leaves the hero, then out over the first 0.75 s of that ring --
+# the two coexist briefly and the older one always finishes -- gone at 34 m, so a ring still never reaches a
+# lens much farther from its hero than the cut let it.
 HERO_PULSE_MARKER = "hero pulse {}"
-HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.2, "lifetime": 4.5, "repeatSeconds": 0.0}
+HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.1, "lifetime": 2.6, "repeatSeconds": 0.0}
 HERO_PULSE_KICK = 8.0
 HERO_PULSE_NEAR = 160.0     # metres: a hero farther than this in the frame does not pulse (the grand wides are 120-150 m)
 HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the nearest)
+# The art pass's performers (musicians.py) pulse beside the heroes, not instead of them: a performer's rings are
+# local (34 m), so they fire when the performer is in frame within this, and they never take one of the two
+# places the mushrooms and aliens have -- 18 m from the elder, they would otherwise have taken half its rings.
+PERFORMER_PULSE_NEAR = 90.0
+# The art pass's two new mushrooms (heroes.py) joined a cut none of whose shots is about them, so they never ring
+# in a shot whose camera passes this close: their ring would sweep the near foreground of a shot about something
+# else. The opal's did: s12 (the herd, 15 m from it) washed and 8% clipped (the Critic's F009/F031), s36 (35 m)
+# at twice r7b's mean luma. A ring now runs out to 34 m (HERO_PULSE_TIMING) with a band behind its front, so the
+# clearance is that and a margin.
+NEW_HERO_LENS_CLEARANCE = 40.0
+PERFORMER_PULSE_KICK = 1.5  # their rings' pump on the scored kick (a mushroom's is HERO_PULSE_KICK, +8)
+# Shots in which nobody rings (revision round 1). s46 follows Tide 3.5 m off past a tall fern, and her own ring,
+# fired on the shot's one downbeat, lit the fern beside the lens to 16% of the frame clipped.
+RINGLESS_SHOTS = {"s46"}
 
 
 # The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
@@ -201,6 +226,12 @@ WATER = {
     # The shoreline fade. The source wrote it as "shoreFade", which nothing reads, so the banks used
     # the default 0.8 m; 1.6 m is what was meant: the surface thins out over the last 1.6 m of depth.
     "edgeFade": 1.6,
+    # Whitewater on the falls down the north head (the art pass, item 1; ADR-985): steep water is shaded
+    # about its own plane, and this lays streaks along the flow on it, in the foam's colour. Only water
+    # steeper than 20 degrees down its flow carries any -- the falls' pitch, 30-44 degrees -- so the valley's river (7.8
+    # at its steepest, `avgen_water_probe`) is untouched. A pale ribbon from the valley's wides (230-520 m),
+    # streaks where a camera comes near; kept under the glowing plants so the head does not become a subject.
+    "cascade": 0.35,
 }
 WATER_DEAD_KEYS = ("shoreFade",)
 
@@ -353,6 +384,38 @@ def travel_beam_cuts(shots):
             continue
         out.append((s.start - 1.0 / 60.0, s.sid, b))
     return out
+
+
+# ---- a shot's own emphasis (revision round 1, the Critic's passes) -------------------------------------------
+# A parameter held at another value for exactly one shot, stepped at its cuts (the cut hides the step). s49,
+# from under the elder as the saucer comes over its rim, sits in the submerged break, whose automation dims every
+# emission to a quarter and the exposure by 2 EV: the Critic's "near-black even for a dark passage" (luma 0.036).
+# The shot is about the saucer and the elder's gills, and the gills read dull grey-green there; at 0.8 (the rest is
+# 0.1) they are the elder's gold again over the dark frame, the break still dark (luma 0.06-0.075, contrast
+# 0.10-0.13, nothing clipped; the kick lane still pumps them).
+SHOT_EMPHASIS = {
+    "s49": {"nodes/elder-2-gills/emissiveBoost": 0.8, "nodes/elder-2-under/emissiveBoost": 0.8},
+}
+
+
+def shot_emphasis(project, scene):
+    """SHOT_EMPHASIS as step tracks at each shot's cuts, from the parameter's own value. Called by the generator
+    once the cut is installed: it reads the shots' times."""
+    shots = {sh.get("label", "").split(" ")[0]: sh for sh in scene["cameraDirection"]["shots"]}
+    per = {}
+    for sid, params in SHOT_EMPHASIS.items():
+        for target, value in params.items():
+            per.setdefault(target, []).append((shots[sid]["start"], shots[sid]["end"], value))
+    tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
+    for target, spans in per.items():
+        base = project["parameters"][target]
+        keys = [{"time": 0.0, "value": [base], "interp": "step"}]
+        for start, end, value in sorted(spans):
+            keys.append({"time": round(start, 6), "value": [value], "interp": "step"})
+            keys.append({"time": round(end, 6), "value": [base], "interp": "step"})
+        tl["tracks"] = [t for t in tl.get("tracks", []) if t["target"] != target]
+        tl["tracks"].append({"target": target, "component": -1, "timeBase": "seconds", "mode": "replace",
+                             "loopLength": 0.0, "enabled": True, "keys": keys})
 
 
 def apply_travel_beam(project, shots):
@@ -572,6 +635,100 @@ def _route(source, target, amount, op="add", chain=None, polarity="unipolar"):
             "polarity": polarity, "enabled": True, "chain": chain or {}}
 
 
+# The aurora answers the bass (the owner, 2026-09-28: "the aurora should react to the audio, with a similar
+# low-energy bass pulse"). Not the aurora's own per-frame response, which stays off (BASE: it read the analyser
+# raw, every frame, and made the sky jump up to 44% between two frames on a kick): two smoothed routes in the
+# style of the river's `audio.bass -> ripple`, onto what a viewer reads as the curtains breathing -- their
+# brightness (a multiply beside the lead's `lead.aurora`, 1.0 at silence and AURORA_BASS_GAIN at a full bass)
+# and a small lift of their tops. The attack is ten frames long, so no frame carries more than a sliver of a
+# kick; the fall is slower than a bar's beat, so the swell rides the bass line rather than flickering on it.
+AURORA_BASS_GAIN = 1.16    # the curtains' brightness at a full bass, over their lead-driven level
+AURORA_BASS_LIFT = 140.0   # metres the curtain tops rise at a full bass, on 2300
+AURORA_BASS_BRIGHT = {"attackMs": 160.0, "decayMs": 1100.0, "clampEnabled": True, "clampMin": 0.0,
+                      "clampMax": 1.0, "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0,
+                      "remapOutMin": 1.0, "remapOutMax": AURORA_BASS_GAIN}
+AURORA_BASS_LIFTING = {"attackMs": 240.0, "decayMs": 1500.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}
+
+
+def aurora_bass_routes():
+    return [_route("audio.bass", "fx/aurora/intensity", 1.0, "multiply", dict(AURORA_BASS_BRIGHT)),
+            _route("audio.bass", "fx/aurora/curtainHeight", AURORA_BASS_LIFT, "add", dict(AURORA_BASS_LIFTING))]
+
+
+# An effect keeps its values twice: its block (the `parameters` the Effects panel builds it from) and its flat
+# `fx/<id>/<field>` parameters, which are applied after the block and so are what renders. The QA pass's state
+# audit found twelve that disagreed (docs/qa-pass/gv3-state-audit.md, item 1) -- the aurora's audio response 1.0
+# in the block and 0 in what renders, its curtain height 2600 against 2300, among them -- and the owner asked
+# for the aurora's to agree. They are resolved for every effect the same way: the block is written from the
+# flat value that renders, last, after every look decision. The field -> block path tables are the registry's
+# own (`aurora_effect.cpp`, `wave_rows.hpp`); a stored-value type (glow, space warp, ...) keeps the field's own
+# name as its block key.
+_WAVE_BLOCK = {
+    "color": "appearance/color", "intensity": "appearance/intensity", "edgeColor": "appearance/edgeColor",
+    "edgeIntensity": "appearance/edgeIntensity", "width": "appearance/width", "rainbow": "appearance/rainbow",
+    "sparkle": "sparkle/enabled", "rainbowSpeed": "appearance/rainbowSpeed",
+    "rainbowScale": "appearance/rainbowScale", "rainbowSaturation": "appearance/rainbowSaturation",
+    "rainbowBrightness": "appearance/rainbowBrightness", "sparkleDensity": "sparkle/density",
+    "sparkleSize": "sparkle/size", "sparkleIntensity": "sparkle/intensity", "sparkleSpeed": "sparkle/speed",
+    "speed": "propagation/speed", "range": "propagation/range", "frontWidth": "propagation/frontWidth",
+    "trailLength": "propagation/trailLength", "falloff": "propagation/falloff",
+    "startOffset": "propagation/startOffset", "verticalExtent": "propagation/verticalExtent",
+    "ringCount": "propagation/ringCount", "beamRadius": "propagation/beamRadius",
+}
+_AURORA_BLOCK = {
+    "lowColor": "appearance/lowColor", "midColor": "appearance/midColor", "topColor": "appearance/topColor",
+    "intensity": "appearance/intensity", "curtainHeight": "shape/curtainHeight", "curtains": "shape/curtainCount",
+    "flowSpeed": "shape/flowSpeed", "audioSensitivity": "audio/sensitivity", "spectrumShape": "audio/spectrumShape",
+    "rainbow": "rainbow/enabled", "radius": "shape/radius", "layerSpacing": "shape/layerSpacing",
+    "baseHeight": "shape/baseHeight", "waveAmplitude": "shape/waveAmplitude", "waveScale": "shape/waveScale",
+    "turbulence": "shape/turbulence", "complexity": "shape/complexity", "driftSpeed": "shape/driftSpeed",
+    "verticalSpeed": "shape/verticalSpeed", "emission": "appearance/emission", "opacity": "appearance/opacity",
+    "edgeBrightness": "appearance/edgeBrightness", "filaments": "appearance/filaments",
+    "sparkle": "appearance/sparkle", "horizonGlow": "appearance/horizonGlow", "audioBass": "audio/bass",
+    "audioLowMid": "audio/lowMid", "audioMid": "audio/mid", "audioHigh": "audio/high",
+    "audioGlints": "audio/glints", "audioBeat": "audio/beat", "rainbowSpeed": "rainbow/speed",
+    "rainbowScale": "rainbow/scale", "rainbowHue": "rainbow/hueOffset", "rainbowSaturation": "rainbow/saturation",
+    "rainbowBrightness": "rainbow/brightness",
+}
+BLOCK_PATHS = {"aurora": _AURORA_BLOCK, "travelBeam": _WAVE_BLOCK, "groundPulse": _WAVE_BLOCK}
+
+
+def _differs(a, b):
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) != len(b) or any(_differs(x, y) for x, y in zip(a, b))
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a != b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) > 1e-5 * max(1.0, abs(b))
+    return a != b
+
+
+def sync_effect_blocks(project):
+    """Write every effect block value that has a flat `fx/` parameter from that parameter (see above).
+    Returns [(effect id, block path, was, now)] for what changed."""
+    params = project["parameters"]
+    changed = []
+    for e in project.get("effects", []):
+        block = e.get("parameters")
+        if not isinstance(block, dict):
+            continue
+        table = BLOCK_PATHS.get(e.get("type"))
+        items = table.items() if table else [(k, k) for k, v in block.items() if not isinstance(v, dict)]
+        for name, path in items:
+            key = f"fx/{e['id']}/{name}"
+            if key not in params:
+                continue
+            node, parts = block, path.split("/")
+            for part in parts[:-1]:
+                node = node.get(part) if isinstance(node, dict) else None
+            if not isinstance(node, dict) or parts[-1] not in node:
+                continue
+            if _differs(node[parts[-1]], params[key]):
+                changed.append((e["id"], path, node[parts[-1]], params[key]))
+                node[parts[-1]] = params[key]
+    return changed
+
+
 def _pulses(name, times, width=1.0 / 60.0):
     """A scored timeline source: a hit at each time, an event the film's own score writes where the
     analyser's would land wherever its detector decided. A time may be a (seconds, value) pair for a
@@ -693,20 +850,53 @@ def apply_motifs(project, scene):
     project["routes"] = routes
     reactivity.prepare(project, scene)
     print("  " + reactivity.apply(project, scene))
+    # After the proposal, not before it: the proposer leaves alone a target something already routes, so a
+    # bass route authored first would cost the aurora the lead's slow response (`lead.aurora`), which the
+    # owner asked to keep. Both now ride the aurora's brightness, the lead slowly and the bass as a swell.
+    project["routes"] += aurora_bass_routes()
     return len(project["routes"])
 
 
 def _hero_positions(scene):
+    from .musicians import GROUPS
+    performers = {g["name"] for g in GROUPS}
     out = {}
     for n in scene["nodes"]:
         if n.get("name", "").endswith("-cap") and n.get("kind") == "procedural":
             out[n["name"]] = n["position"]
+        elif n.get("name") in performers:  # the art pass's performers pulse wherever they are in frame, too
+            out[n["name"]] = n["position"]
+    return out
+
+
+def pulse_blackouts():
+    """{hero: (from, to)}: seconds in which a hero's pulse never fires. The abduction (E5, the beam on bar 93 to the
+    drop on bar 97) keeps the rings it had: the art pass's two new mushrooms and the performers stay out of it,
+    so no new ring crosses the beam. The drummer's lasts until the set piece puts him back behind his kit
+    (ufo.plan.json's `returnSeconds` after the beam goes out, ADR-984): no ring from an empty seat."""
+    import json
+    import pathlib
+    plan = json.loads((pathlib.Path(__file__).resolve().parent / "ufo.plan.json").read_text())
+    e5 = next(p for p in plan["setPieces"] if p["key"] == "e5-centrepiece")
+    back = float(e5.get("set", {}).get("returnSeconds", 0.0))
+    lift = (music.bar(93) - 0.05, music.bar(97) + 0.05)
+    out = {name: [lift] for name in ("opal-cap", "sail-cap", "keyboardist", "drummer")}
+    out["drummer"] = [(lift[0], music.bar(97) + back + 0.2)]
+    # The cold open (s01, to bar 5) is the elder's nocturne: the performers play in it, lit only by their
+    # suits, and their rings start with the riff.
+    for name in ("keyboardist", "drummer"):
+        out[name].append((-1.0, music.bar(5) - 0.05))
     return out
 
 
 def hero_pulse_plan(project, scene, shots):
     """[(time, hero)]: the downbeats on which each hero's pulse fires (see HERO_PULSE_*)."""
     from .framing import keyed, project as proj
+    from .heroes import NEW_HEROES
+    from .musicians import GROUPS
+    performers = {g["name"] for g in GROUPS}
+    newcomers = {f"{name}-cap" for name, *_ in NEW_HEROES}
+    blackout = pulse_blackouts()
     effects = [e for e in project.get("effects", []) if e.get("type") == "groundPulse"]
     owners = {e["owner"]["name"] for e in effects}
     caps = _hero_positions(scene)
@@ -714,6 +904,12 @@ def hero_pulse_plan(project, scene, shots):
     plan = []
     for s in shots:
         rig = s.rig
+        # A shot about the performers (s04) is theirs: the mushrooms give up their rings in it. With the elder's
+        # ring beside theirs, every bar washed the pair teal-white and their rainbow never read (verification
+        # batch 2, s04 at 15.5-18.5 s); the elder's rings go on in every shot around it.
+        stage = s.subject.startswith("the musicians")
+        if s.sid in RINGLESS_SHOTS:
+            continue
         who = {}
         for node in (rig.follow, rig.aim):
             if node in owners:
@@ -727,13 +923,22 @@ def hero_pulse_plan(project, scene, shots):
             for name, pos in caps.items():
                 if name not in owners:
                     continue
+                if name in newcomers and min(
+                        math.dist(keyed(rig, "position", s.start + (s.end - s.start) * k / 8, rig.position)[::2],
+                                  pos[::2]) for k in range(9)) < NEW_HERO_LENS_CLEARANCE:
+                    continue
                 p, z = proj(eye, aim, rig.focal, [pos[0], pos[1] + 2.0, pos[2]])
-                if p is not None and abs(p[0]) <= 0.95 and abs(p[1]) <= 0.95 and z <= HERO_PULSE_NEAR:
+                near = PERFORMER_PULSE_NEAR if name in performers else HERO_PULSE_NEAR
+                if p is not None and abs(p[0]) <= 0.95 and abs(p[1]) <= 0.95 and z <= near:
                     who[name] = min(who.get(name, z), z)
-        chosen = sorted(who, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]
         for t in downbeats:
             if s.start - 0.02 <= t < s.end - 0.3:
-                plan += [(t, n) for n in chosen]
+                # The nearest heroes in frame that may pulse now (a blacked-out one gives up its place), and
+                # the performers in frame beside them.
+                live = [n for n in who if not any(a <= t <= b for a, b in blackout.get(n, ()))]
+                heroes = [] if stage else [n for n in live if n not in performers]
+                plan += [(t, n) for n in sorted(heroes, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]]
+                plan += [(t, n) for n in sorted(n for n in live if n in performers)]
     return plan
 
 
@@ -754,8 +959,11 @@ def apply_hero_pulses(project, scene, shots):
     markers = [m for m in seq.get("markers", []) if m.get("name") not in names]
     markers += [{"kind": "cue", "name": HERO_PULSE_MARKER.format(n), "time": round(t, 6)} for t, n in plan]
     seq["markers"] = sorted(markers, key=lambda m: m["time"])
+    from .musicians import GROUPS
+    performers = {f"fx/{g['name']}-hero-pulse/intensity" for g in GROUPS}
     targets = {f"fx/{e['id']}/intensity" for e in effects}
     project["routes"] = [r for r in project.get("routes", []) if r.get("target") not in targets]
     for t in sorted(targets):
-        project["routes"].append(_route("timeline.kick", t, HERO_PULSE_KICK, "add", {"attackMs": 5.0, "decayMs": 200.0}))
+        pump = PERFORMER_PULSE_KICK if t in performers else HERO_PULSE_KICK
+        project["routes"].append(_route("timeline.kick", t, pump, "add", {"attackMs": 5.0, "decayMs": 200.0}))
     return plan

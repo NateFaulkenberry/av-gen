@@ -5209,7 +5209,17 @@ public:
             return false;
         }
         const double t1 = history_->sample(ring, history_->sampleCount(ring) - 1).t;
-        const double t0 = t1 - world::HistoryBank::kGridStep;
+        double t0 = t1 - world::HistoryBank::kGridStep;
+        double dt = world::HistoryBank::kGridStep;
+        // ADR-983: not across a placement, as HIST's own velocity.
+        if (double since = t0; history_->placementStart(ring, since) && since > t0) {
+            t0 = since;
+            dt = t1 - t0;
+            if (dt <= 1e-9) {
+                out = glm::vec3(0.0f); // placed on this sample: at rest
+                return true;
+            }
+        }
         glm::vec3 p0;
         glm::vec3 p1;
         if (!nodeDrawnPosition(name, t1, p1)) {
@@ -5219,8 +5229,13 @@ public:
             out = glm::vec3(0.0f); // one sample: at rest, as HIST says
             return true;
         }
-        out = (p1 - p0) / static_cast<float>(world::HistoryBank::kGridStep);
+        out = (p1 - p0) / static_cast<float>(dt);
         return true;
+    }
+
+    // ADR-983. Where the node's current placement begins in HIST: a wake reads its path no further back.
+    [[nodiscard]] bool nodePlacedSince(std::string_view name, double& out) const override {
+        return history_ != nullptr && history_->placementStart(name, out);
     }
 
     [[nodiscard]] bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const override {

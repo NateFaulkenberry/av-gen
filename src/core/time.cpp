@@ -40,9 +40,12 @@ FrameTime FixedStepClock::tick() {
         return current_;
     }
     current_.frameIndex += 1;
-    const double next = startTime_ + static_cast<double>(current_.frameIndex) / fps_;
-    current_.deltaTime = next - current_.renderTime;
-    current_.renderTime = next;
+    // The delta is the fixed step itself, not the difference of two instants. Those differ in the
+    // last bits, and the autonomous cast is chaotic enough to grow that into metres: a render from
+    // 0 drifted up to 114 m from a seek or a trace of the same film, which all step exactly 1/fps
+    // (ADR-990).
+    current_.deltaTime = 1.0 / fps_;
+    current_.renderTime = startTime_ + static_cast<double>(current_.frameIndex) / fps_;
     return current_;
 }
 

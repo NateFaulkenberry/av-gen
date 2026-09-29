@@ -75,6 +75,10 @@ Result<void> WaterSettings::validate() const {
     if (swell < 0.0f || swell > 100.0f) {
         return fail("water: swell must be in [0, 100] metres");
     }
+    // ADR-985. Written as `!(inside)` so a NaN fails too.
+    if (!(cascade >= 0.0f && cascade <= 10.0f)) {
+        return fail("water: cascade must be in [0, 10]");
+    }
     // ADR-916. Written as `!(inside)` so a NaN fails too.
     if (!(tears >= 0.0f && tears <= 20.0f)) {
         return fail("water: tears must be in [0, 20]");

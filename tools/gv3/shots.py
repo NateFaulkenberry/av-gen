@@ -46,6 +46,8 @@ E1_PLACE = [-20.0, 25.0, -190.0]     # the survey sweeps x -50..10 along z -190,
 # cow-12 and cow-23 graze after the re-homing. The plan's (-55, 40) held one animal, and E4 never
 # beamed. 54.1 frames the whole region at the station's height, so the station may be anywhere in it.
 E4_PLACE = [-69.0, 14.0, 6.0]
+# The art pass's performers (musicians.py): halfway between the drummer (-1.7, 70.9) and the keyboardist (-1.7, 59.9).
+MUSICIANS_MID = (-1.7, 65.4)
 
 COMPOSITIONS = {}
 
@@ -96,8 +98,11 @@ def follow(focal, node, offset, aim_offset, clearance=1.2, smoothing="walker", a
 @at("open")
 def nocturne(t0, t1, g):
     # [s01] Out of black on the first kick, low among the ferns on the east bank, drifting toward the
-    # elder: one 4-bar move, a contrast with everything after it.
-    r = moving(t0, t1, 24.0, g(14, 88, 1.3), g(4, 74, 1.6), [-12.0, 12.5, 52.0], [-12.0, 12.0, 52.0])
+    # elder: one 4-bar move, a contrast with everything after it. The art pass moved it 6 m east: the
+    # astronaut musicians play under the elder (musicians.py), and the drift ended 4 m from the drummer's kit,
+    # with him filling a third of the frame; from here it passes 12 m from him, the pair seen playing on the
+    # way to the elder.
+    r = moving(t0, t1, 24.0, g(20, 88, 1.3), g(10, 74, 1.6), [-12.0, 12.5, 52.0], [-12.0, 12.0, 52.0])
     return r, dict(lead="hero", purpose="Nocturne: low through the ferns toward the elder", subject="the elder",
                    camera="24 mm, 1.3 m, east bank", movement="slow forward drift",
                    music="cut in on the first downbeat (0.480 s)", effects="heartbeat in the gills")
@@ -127,18 +132,17 @@ def e1_far_survey(t0, t1, g):
 
 
 @at("9.1")
-def horse_grazing(t0, t1, g):
-    # [s05] The white horse -- what the valley will lose -- grazing under the elder's cap, from the
-    # south-east: through a 55 mm, the horse on the lower third (0.13 of the frame) and the whole cap
-    # above it. Iteration 2's 30 mm from here read as the same framing as the east-bank travel (26.1)
-    # and the orbit (49.1), 35 mm lenses a few metres away (the Critic: eyes within 18 m, views within
-    # 12 deg, fields of view within 8); iteration 4's first try from the north-east put the elder as near
-    # the lens as the horse and hid the horse behind a rock (seen in the clip). Its path is the same on
-    # both casts.
-    r = aim_at(55.0, g(22, 78, 3.0), "horse-11", (0.0, 5.0, 0.0), "still")
-    return r, dict(lead="animal", purpose="The white horse grazing under the elder's cap",
-                   subject="horse-11 (what the valley will lose)", camera="55 mm, 3 m, south-east, fixed eye, live aim",
-                   movement="still", music="2 bars")
+def musicians_under_the_cap(t0, t1, g):
+    # [s05] The two astronaut musicians -- the drummer is what the valley will lose -- playing under the
+    # elder's cap, from the south-east (the horse's shot before the art pass). The pair face each other
+    # north-south across 11 m (musicians.py), so from here both stand in profile, the cap beyond and above
+    # them. From the horse's eye (55 mm, 3 m up, 25-30 m off) the ferns between hid them to the chest and the
+    # frame was mostly cap (the first render); 6 m nearer, 5 m up and on a 40 mm, the eye looks over the ferns
+    # and holds them whole, feet to the cap. A fixed frame: they do not move.
+    r = still(40.0, g(16, 76, 5.0), g(*MUSICIANS_MID, 4.5))
+    return r, dict(lead="hero", purpose="The astronaut musicians playing under the elder's cap",
+                   subject="the musicians (the drummer is what the valley will lose)",
+                   camera="40 mm, 5 m, south-east, fixed", movement="still", music="2 bars")
 
 
 @at("11.1")
@@ -595,7 +599,12 @@ def spire_in_aurora(t0, t1, g):
 
 @at("80.1")
 def tide_looks_up(t0, t1, g):
-    r = follow(24.0, "tide", (2.0, 1.2, 3.0), (0.0, 3.2, 0.0), clearance=1.0)
+    # Tide walks east-north-east at 3 m/s through the shot, past a tall fern on the south side of her path.
+    # From (2, 1.2, 3), south of her, the fern stood between the lens and her for half the shot, lit by her
+    # own ring to 16% clipped (revision round 1: the film as it renders since ADR-990). From ahead and north,
+    # (3.2, 1.4, -2.0), she comes on face first with the fern at the frame's left edge, and she gives up her
+    # ring here (look.RINGLESS_SHOTS): clipped 1.1-1.6%.
+    r = follow(24.0, "tide", (3.2, 1.4, -2.0), (0.0, 3.2, 0.0), clearance=1.0)
     return r, dict(lead="alien", purpose="Tide looks up", subject="tide", camera="24 mm, low, in front",
                    movement="follows", music="1 bar, the last before the suspension")
 
@@ -658,18 +667,18 @@ def ember_watches(t0, t1, g):
 def e5_beam_lights(t0, t1, g):
     # [s26] The beam lights, from the west bank.
     r = aim_at(24.0, g(-58, 84, 2.2), "visitor", (0.0, -12.0, 0.0), "craft")
-    return r, dict(lead="event", purpose="E5: the beam lights", subject="the beam, the horse, the elder",
+    return r, dict(lead="event", purpose="E5: the beam lights", subject="the beam, the drummer, the elder",
                    camera="24 mm from the west bank, live aim", movement="still",
                    music="the riser begins; the beam on bar 93", effects="the beam")
 
 
 @at("94.1")
 def e5_up_the_beam(t0, t1, g):
-    # [s27] Up the beam from beside the horse, 12 m off the station: at 6 m (iteration 1, the tuned
+    # [s27] Up the beam from beside the drummer's kit, 13 m off the station: at 6 m (iteration 1, the tuned
     # cast's station) the lens looked almost straight up and the saucer's sway read as yaw. The
     # hovering kind: at the craft's 0.6 s the sway still read 0.102 deg (iteration 2).
     r = aim_at(20.0, g(-8, 83, 1.0), "visitor", (0.0, -3.0, 0.0), "hover")
-    return r, dict(lead="event", purpose="E5: up the beam from beside the horse", subject="the beam and the saucer",
+    return r, dict(lead="event", purpose="E5: up the beam from beside the kit", subject="the beam and the saucer",
                    camera="20 mm, 1 m, looking up", movement="still", music="1 bar")
 
 
@@ -682,15 +691,14 @@ def vane_sees_it(t0, t1, g):
 
 
 @at("95.3")
-def e5_horse_rises(t0, t1, g):
-    # [s29] The horse rises, glowing, side on: the rise is the shot, so the aim's height is not smoothed.
-    # 22 m from the horse, as the first pass framed it: the tuned cast moved E5's station 9.5 m, and from
-    # the first pass's eye the horse rose 13 m from the 85 mm, the beam's glow filled the whole frame and
-    # the horse was a pale ghost in it (gv3-int r1: 12.7% clipped, the Critic's high "clipped highlights").
-    # At 22 m the column is bounded by the night around it again.
-    r = aim_at(85.0, g(-22.5, 75, 8.5), "horse-11", (0.0, 1.0, 0.0), "lifted")
-    return r, dict(lead="event", purpose="E5: the horse rises, glowing, side on", subject="horse-11",
-                   camera="85 mm, side on, 22 m, live aim", movement="still", music="half a bar")
+def e5_drummer_rises(t0, t1, g):
+    # [s29] The drummer rises from behind his kit, flailing, side on: the rise is the shot, so the aim's height
+    # is not smoothed. 21 m from him, as the first pass framed the horse: from nearer, the beam's glow filled
+    # the whole frame and the subject was a pale ghost in it (gv3-int r1: 12.7% clipped). The aim sits at his
+    # chest, 2 m over the node his lift carries (the kit stays behind).
+    r = aim_at(85.0, g(-22.5, 75, 8.5), "drummer", (0.0, 2.0, 0.0), "lifted")
+    return r, dict(lead="event", purpose="E5: the drummer rises from his kit, flailing, side on", subject="the drummer",
+                   camera="85 mm, side on, 21 m, live aim", movement="still", music="half a bar")
 
 
 @at("96.1")
@@ -703,19 +711,20 @@ def e5_elder_beside_the_beam(t0, t1, g):
 
 @at("96.3")
 def e5_horse_under_the_saucer(t0, t1, g):
-    # [s31] The horse under the saucer, from the south, against black sky.
+    # [s31] The drummer under the saucer, from the south, against black sky.
     r = aim_at(70.0, g(10, 118, 3.0), "visitor", (0.0, -4.5, 0.0), "craft")
-    return r, dict(lead="event", purpose="E5: the horse under the saucer", subject="the horse and the saucer",
+    return r, dict(lead="event", purpose="E5: the drummer under the saucer", subject="the drummer and the saucer",
                    camera="70 mm, from the south, 47 m", movement="still", music="one beat")
 
 
 @at("96.4")
 def e5_horse_fades(t0, t1, g):
-    # [s32] The horse fades into the saucer on the roll's last beat, from the south-west through a
+    # [s32] The drummer fades into the saucer on the roll's last beat, from the south-west through a
     # 50 mm (the beat before is 70 mm from the south: two frames that read as one). Aims at the craft,
-    # never at the horse, which is retired on the frame of the drop.
+    # never at the drummer, whose dissolve ends on the frame of the drop (he is back behind the kit six
+    # seconds later, where no shot sees it: ADR-984).
     r = aim_at(50.0, g(-25, 95, 2.5), "visitor", (0.0, -3.5, 0.0), "craft")
-    return r, dict(lead="event", purpose="E5: the horse fades into the saucer", subject="horse-11 vanishing",
+    return r, dict(lead="event", purpose="E5: the drummer fades into the saucer", subject="the drummer vanishing",
                    camera="50 mm, from the south-west", movement="still", music="the last beat of the roll")
 
 

@@ -124,6 +124,61 @@ TEST_CASE("a history ring keeps its depth and one sample past it, and reads betw
     }
 }
 
+TEST_CASE("ADR-983: a velocity never differences across a placement", "[hist][effects][adr983]") {
+    // GV3's saucer is moved hidden to its entry point in a tenth of a second and shown there: a
+    // placement (ADR-911). HIST held both sides of it, so the frame it appeared on read the hidden
+    // move as a velocity -- thousands of metres per second -- and a Space Warp fitted to it.
+    world::HistoryBank bank;
+    const world::HistorySubscription subs[] = {{"craft", 1.0f}};
+    REQUIRE(bank.subscribe(subs));
+    const auto put = [&](int k, float x, std::uint32_t placement) {
+        bank.record(0, k * kStep, glm::vec3(x, 20.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f),
+                    placement);
+    };
+    // Hidden, flying its transit at 3,000 m/s for six steps (placement 0)...
+    for (int k = 0; k <= 6; ++k) {
+        put(k, -600.0f + 50.0f * static_cast<float>(k), 0);
+    }
+    glm::vec3 v(0.0f);
+    REQUIRE(bank.velocity("craft", v));
+    CHECK_THAT(v.x, WithinRel(3000.0f, 1e-4f)); // motion inside one placement is motion
+    double since = -1.0;
+    REQUIRE(bank.placementStart("craft", since));
+    CHECK(since == bank.sample(0, 0).t); // no placement inside the ring: the oldest sample
+
+    // ...shown on step 7 (placement 1), where the transit left it.
+    put(7, -300.0f, 1);
+    REQUIRE(bank.velocity("craft", v));
+    CHECK(glm::length(v) == 0.0f); // at rest on the frame it appears, not 18,000 m/s
+    glm::vec3 a(1.0f);
+    REQUIRE(bank.acceleration(0, a));
+    CHECK(glm::length(a) == 0.0f);
+    REQUIRE(bank.placementStart("craft", since));
+    CHECK_THAT(since, WithinAbs(7 * kStep, 1e-12));
+
+    // Then it flies its approach at 12 m/s: the velocity is that, from the next step on.
+    for (int k = 8; k <= 30; ++k) {
+        put(k, -300.0f + 12.0f * static_cast<float>((k - 7) * kStep), 1);
+    }
+    REQUIRE(bank.velocity("craft", v));
+    CHECK_THAT(v.x, WithinRel(12.0f, 1e-3f));
+    REQUIRE(bank.acceleration(0, a));
+    // The baseline stays inside the placement: float noise at 300 m (a straddled one would be ~10^5).
+    CHECK_THAT(glm::length(a), WithinAbs(0.0, 0.1));
+    REQUIRE(bank.placementStart("craft", since));
+    CHECK_THAT(since, WithinAbs(7 * kStep, 1e-12)); // still the step it was shown on
+
+    SECTION("one step after the placement, the difference is over that step") {
+        world::HistoryBank b2;
+        REQUIRE(b2.subscribe(subs));
+        b2.record(0, 0.0, glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 0);
+        b2.record(0, kStep, glm::vec3(500.0f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 1);
+        b2.record(0, 2 * kStep, glm::vec3(500.1f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 1);
+        REQUIRE(b2.velocity("craft", v));
+        CHECK_THAT(v.x, WithinRel(0.1f * 60.0f, 1e-2f));
+    }
+}
+
 namespace {
 
 // ---- a scripted scene: one craft orbiting (a simulation integrator) with a drift on top -------------

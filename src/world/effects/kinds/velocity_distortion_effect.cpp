@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace avgen::world {
@@ -157,8 +158,8 @@ std::size_t velocityDistortionProxies(const EffectInstance& e, const EffectConte
     glm::vec3 centre(0.0f);
     float ownerRadius = 0.0f;
     NodeView view;
-    if (!kinds::ownerCentre(e, ctx, glm::vec3(0.0f), centre, ownerRadius, view)) {
-        return 0;
+    if (!kinds::ownerCentre(e, ctx, glm::vec3(0.0f), centre, ownerRadius, view) || !view.visible) {
+        return 0; // no drawn owner (none, or hidden: ADR-983): no wake
     }
     glm::vec3 velocity(0.0f);
     if (!ctx.scene->nodeVelocity(e.owner.name, velocity) || !kinds::finite3(velocity)) {
@@ -176,17 +177,29 @@ std::size_t velocityDistortionProxies(const EffectInstance& e, const EffectConte
     // drawn origin; today's origin-to-centre offset carries it to the middle of the bounds. With no
     // history yet (the first frames, or a scene that cannot answer), the path is extrapolated back
     // along the velocity -- a straight wake rather than none.
+    //
+    // ADR-983: and no further back than the owner's current placement. A body PUT somewhere (ADR-911:
+    // a hidden craft shown at its entry point) did not fly the path its history holds before that --
+    // GV3's saucer moves hidden to where it appears in a tenth of a second, and a wake laid along that
+    // move drew a lens tube hundreds of metres long across the sky for a second after it appeared.
+    // An instant before the placement reads the placement's first position, so those segments have
+    // no length and are skipped below: the wake grows from where the body appeared.
     const float persistence = std::clamp(kRows.f(e, "persistence"), 0.1f, 6.0f);
     const glm::vec3 originNow(view.world[3]);
+    double placedSince = -std::numeric_limits<double>::infinity();
+    if (double since = 0.0; ctx.scene->nodePlacedSince(e.owner.name, since)) {
+        placedSince = since;
+    }
     std::array<glm::vec3, kSegments + 2> path{};
     path[0] = centre;
     for (std::size_t k = 1; k < path.size(); ++k) {
         const double back = static_cast<double>(persistence) * static_cast<double>(k) / static_cast<double>(kSegments);
+        const double at = std::max(ctx.seconds - back, placedSince);
         glm::vec3 then;
-        if (ctx.scene->nodeDrawnPosition(e.owner.name, ctx.seconds - back, then) && kinds::finite3(then)) {
+        if (ctx.scene->nodeDrawnPosition(e.owner.name, at, then) && kinds::finite3(then)) {
             path[k] = then + (centre - originNow);
         } else {
-            path[k] = centre - velocity * static_cast<float>(back);
+            path[k] = centre - velocity * static_cast<float>(ctx.seconds - at);
         }
     }
 

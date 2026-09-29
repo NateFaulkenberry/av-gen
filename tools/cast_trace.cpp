@@ -21,6 +21,9 @@
 //                 (the `avgen_behavior_trace` line) and every action that completed, failed, was
 //                 skipped or was cancelled, with its reason, at the simulation second it happened.
 //                 LIST is `all` or names, comma-separated (ADR-933: how a pacing loop is read)
+//   --render-clock WxH   step the engine exactly as `RenderJob` does -- its warm-up frame and second
+//                 seek, `Engine::tick` on its `FixedStepClock`, `setViewport(W, H)` -- instead of the
+//                 constant-step frames below; see the third condition
 //
 // Exit codes: 0 traced; 1 could not load, plan or write; 2 traced, but the plan had items that could
 // not be built (listed under "plan" -> "blocked" and "issues").
@@ -47,6 +50,15 @@
 //   * **Entity distance culling is off,** as it is in an offline render (`DetailLimits::
 //     offlineDefault`). The live viewport culls far bodies; a trace that culled would describe the
 //     viewport.
+//
+// And a third, found by the GV3 art pass (revision round 1): **the step's delta is the render's.** A
+// render's `FixedStepClock` handed `update` the difference of two rounded instants, (k+1)/fps - k/fps,
+// which is not exactly 1/fps in the last bits, while `EntityWorld::seekExact` and the frames here step
+// exactly 1/fps. A body that decides amplifies that: on GV3 the first alien moved 0.7 mm at 6.28 s and
+// 114 m by 168 s, so the trace described a different film from the render. ADR-990 made the clock hand
+// out 1/fps, so the default frames here are the render's again. `--render-clock` steps exactly as
+// `RenderJob` does (its warm-up frame and second seek, its clock, its viewport): the check that the two
+// agree, which on GV3 they do to the bit.
 //
 // ---- the camera track (`--camera`, ADR-911) ----------------------------------------------------
 //
@@ -115,6 +127,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -139,6 +152,8 @@ struct Options {
     fs::path saveProject;
     bool decisions = false;
     std::vector<std::string> decisionsFor; // empty with `decisions`: every deciding character
+    int renderWidth = 0; // --render-clock WxH: step as `RenderJob` does
+    int renderHeight = 0;
 };
 
 void usage() {
@@ -146,7 +161,8 @@ void usage() {
                  "usage: avgen_cast_trace (--project p.json | --scene s.scene.json)\n"
                  "                        [--seconds N] [--start S] [--fps F] [--hz H] [--nodes a,b,...]\n"
                  "                        [--camera] [--out file.json] [--plan plan.json]\n"
-                 "                        [--save-project out.json] [--decisions all|name,name,...]\n");
+                 "                        [--save-project out.json] [--decisions all|name,name,...]\n"
+                 "                        [--render-clock WxH]\n");
 }
 
 std::vector<std::string> splitList(const char* text) {
@@ -181,6 +197,11 @@ bool parse(int argc, char** argv, Options& o) {
             o.nodes = splitList(argv[++i]);
         } else if (std::strcmp(a, "--camera") == 0) {
             o.camera = true;
+        } else if (std::strcmp(a, "--render-clock") == 0 && hasValue) {
+            if (std::sscanf(argv[++i], "%dx%d", &o.renderWidth, &o.renderHeight) != 2 || o.renderWidth <= 0 ||
+                o.renderHeight <= 0) {
+                return false;
+            }
         } else if (std::strcmp(a, "--out") == 0 && hasValue) {
             o.out = argv[++i];
         } else if (std::strcmp(a, "--plan") == 0 && hasValue) {
@@ -309,6 +330,11 @@ struct SetPieceTrace {
         double retired = -1.0;
         glm::vec3 atLift{0.0f};
         glm::vec3 atRetire{0.0f};
+        // ADR-984: a set piece that gives its subject back -- when its dissolve ended, and when (and
+        // where) it was put back.
+        double dissolved = -1.0;
+        double returned = -1.0;
+        glm::vec3 atReturn{0.0f};
     };
     std::vector<Animal> animals;
     std::vector<std::string> failures; // steps that failed, with why
@@ -405,7 +431,28 @@ int main(int argc, char** argv) {
     std::map<std::string, Track> nodes;
     CameraTrack cameraTrack;
     params::ParameterSet& params = engine.params();
-    if (first > 0) {
+    std::unique_ptr<FixedStepClock> clock;
+    const auto viewport = [&] {
+        if (o.renderWidth > 0) {
+            engine.setViewport(static_cast<std::uint32_t>(o.renderWidth), static_cast<std::uint32_t>(o.renderHeight));
+        }
+    };
+    if (o.renderWidth > 0) {
+        // `RenderJob::start`, step for step (the third condition above): the pipeline warm-up drives the
+        // engine one dt-0 frame at the start (its throwaway renderer reads the scene and writes nothing
+        // back), the camera state is reset, and the job positions itself there again with its own clock.
+        const double at = static_cast<double>(first) * dt;
+        FixedStepClock warm(o.fps);
+        warm.restartAt(at);
+        engine.seekSeconds(at);
+        const FrameTime t = engine.tick(warm);
+        viewport();
+        engine.update(t);
+        engine.resetCameraState();
+        clock = std::make_unique<FixedStepClock>(o.fps);
+        clock->restartAt(at);
+        engine.seekSeconds(at);
+    } else if (first > 0) {
         engine.seekSeconds(static_cast<double>(first) * dt);
     }
 
@@ -451,9 +498,14 @@ int main(int argc, char** argv) {
 
     for (std::uint64_t i = first; i < first + frames; ++i) {
         FrameTime time;
-        time.renderTime = static_cast<double>(i) * dt;
-        time.deltaTime = i == first ? 0.0 : dt;
-        time.frameIndex = i;
+        if (clock) {
+            time = engine.tick(*clock);
+        } else {
+            time.renderTime = static_cast<double>(i) * dt;
+            time.deltaTime = i == first ? 0.0 : dt;
+            time.frameIndex = i;
+        }
+        viewport();
         engine.update(time);
         if (o.camera) {
             recordCamera(cameraTrack, engine, *composition, params, time.renderTime);
@@ -531,6 +583,19 @@ int main(int argc, char** argv) {
                         }
                     }
                     break;
+                case stage::StageEventKind::StepDone:
+                    for (SetPieceTrace::Animal& a : piece.animals) {
+                        if (a.role != e.role) {
+                            continue;
+                        }
+                        if (e.step == "fade" && a.dissolved < 0.0) {
+                            a.dissolved = time.renderTime;
+                        } else if (e.step == "back") {
+                            a.returned = time.renderTime;
+                            a.atReturn = where(a.entity);
+                        }
+                    }
+                    break;
                 case stage::StageEventKind::StepFailed:
                     piece.failures.push_back(fmt::format("{:.3f}s {} {} {}: {}", time.renderTime, e.beat, e.role, e.step,
                                                          e.detail));
@@ -597,6 +662,9 @@ int main(int argc, char** argv) {
     doc["hz"] = o.fps / static_cast<double>(every);
     doc["seconds"] = o.seconds;
     doc["start"] = static_cast<double>(first) * dt;
+    // Which film this is (the third condition): "render" stepped as `RenderJob` does, "step" at exactly 1/fps
+    // as a seek replays.
+    doc["clock"] = clock ? "render" : "step";
     for (auto& [name, track] : entities) {
         doc["entities"][name] = {{"t", std::move(track.t)},           {"position", std::move(track.position)},
                                  {"yaw", std::move(track.yaw)},       {"speed", std::move(track.speed)},
@@ -645,6 +713,13 @@ int main(int argc, char** argv) {
                 if (a.retired >= 0.0) {
                     one["retired"] = rounded(a.retired);
                     one["atRetire"] = vec3(a.atRetire);
+                }
+                if (a.dissolved >= 0.0) {
+                    one["dissolved"] = rounded(a.dissolved);
+                }
+                if (a.returned >= 0.0) {
+                    one["returned"] = rounded(a.returned);
+                    one["atReturn"] = vec3(a.atReturn);
                 }
                 animals.push_back(std::move(one));
             }

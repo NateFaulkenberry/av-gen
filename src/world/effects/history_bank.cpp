@@ -212,6 +212,26 @@ bool HistoryBank::sampleAt(std::size_t ring, double t, HistorySample& out) const
     return true;
 }
 
+std::size_t HistoryBank::placementFirst(const Ring& r) const {
+    std::size_t first = r.count - 1;
+    const std::uint32_t placement = at(r, first).placement;
+    while (first > 0 && at(r, first - 1).placement == placement) {
+        --first;
+    }
+    return first;
+}
+
+bool HistoryBank::placementStart(std::string_view node, double& out) const { return placementStart(find(node), out); }
+
+bool HistoryBank::placementStart(std::size_t ring, double& out) const {
+    if (ring >= rings_.size() || rings_[ring].count == 0) {
+        return false;
+    }
+    const Ring& r = rings_[ring];
+    out = at(r, placementFirst(r)).t;
+    return true;
+}
+
 bool HistoryBank::velocity(std::string_view node, glm::vec3& out) const { return velocity(find(node), out); }
 
 bool HistoryBank::velocity(std::size_t ring, glm::vec3& out) const {
@@ -224,7 +244,14 @@ bool HistoryBank::velocity(std::size_t ring, glm::vec3& out) const {
         return true;
     }
     const HistorySample& newest = at(r, r.count - 1);
-    const HistorySample& oldest = at(r, 0);
+    // ADR-983: the oldest sample of the newest one's PLACEMENT, not of the ring. A placement is not
+    // motion (ADR-911): two samples either side of one do not continue one another, and the
+    // difference across them is the distance a body was PUT, divided by a frame -- GV3's saucer,
+    // moved hidden to its entry point in a tenth of a second and shown there, read 5,000 m/s on
+    // the frame it appeared, and a Space Warp fitted to that velocity stretched across the sky. A
+    // body placed on the newest sample is at rest (dt below is 0); one placed a few samples ago
+    // differences over what it has done since, like a ring younger than a step.
+    const HistorySample& oldest = at(r, placementFirst(r));
     const double back = newest.t - kGridStep;
     HistorySample before;
     double dt = kGridStep;
@@ -252,7 +279,8 @@ bool HistoryBank::acceleration(std::size_t ring, glm::vec3& out) const {
         return true;
     }
     const HistorySample& newest = at(r, r.count - 1);
-    const HistorySample& oldest = at(r, 0);
+    // ADR-983: within the newest sample's placement, as `velocity`.
+    const HistorySample& oldest = at(r, placementFirst(r));
     glm::vec3 now(0.0f);
     static_cast<void>(velocity(ring, now));
     // The earlier velocity, one baseline back, differenced over one step exactly as `velocity`

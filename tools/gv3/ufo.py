@@ -17,8 +17,9 @@ music, building to the riser's centrepiece. The five are a Director plan in the 
                  cow-12). The owner: only one animal is ever abducted at a time; the pair E4 used to lift
                  read at 1:45 as "two cows being abducted at once", so the second cow is re-homed away
                  (cast.REHOMED) and no other animal stands within 15 m of any beam
-  E5  abduction  the centrepiece: the saucer takes the elder's own horse -- the beam on bar 93, the
-                 horse gone on the drop, its gold glow riding the lift (two cues on E5's lift)
+  E5  abduction  the centrepiece: the saucer takes the drummer from behind his kit, by the elder (the art pass's
+                 musicians, musicians.py) -- the beam on bar 93, the drummer flailing up it and gone on the
+                 drop, and six seconds later behind his kit again, playing (`returnSeconds`, ADR-984)
 
 This is the generator's last step, run after `make_glowmere_valley_3.py` has written the project:
 
@@ -84,6 +85,19 @@ WATCH_MIN = 0.5
 WATCH_AFTER = 20.0
 
 
+# The crafts' warp (cast.CRAFT_WARP, cast.CRAFT_WAKE: the art pass, item 4) goes quiet while its craft's
+# beam is on -- the brief: the warp must not "obscure the abducted character", "interfere with the lift
+# beam" or "visually confuse the beam and warp effects". Every set piece that lights a beam gets, for each
+# field on its craft, a cue to 0 on its `beam` moment and one back on its `depart` (when the beam goes
+# out). They are derived from the project's own effects when the plan is compiled (`warp_cues`), so the
+# value a cue restores is the value the effect has, and a set piece added to the plan is covered.
+WARP_TYPES = ("spaceWarp", "velocityDistortion")
+BEAM_TEMPLATES = ("survey", "abduction")
+WARP_QUIET_SECONDS = 0.5   # out as the beam lights (the beam itself takes `beamSeconds` to form)
+WARP_BACK_SECONDS = 1.2    # and back as the beam goes out
+COMPILED_PLAN = BUILD / "ufo.plan.compiled.json"
+
+
 def event_name(key, moment):
     """The world and bus event a set piece raises at a moment (ADR-930): `setpiece/<key>/<moment>`."""
     return f"setpiece/{key}/{moment}"
@@ -98,10 +112,57 @@ def dump(obj):
 
 
 # ---- 1. compile --------------------------------------------------------------------------------------
+def craft_bodies(project, project_path):
+    """{staging actor name: the body it flies}, from the project's staging or else its scene's."""
+    actors = (project.get("staging") or {}).get("actors")
+    if not actors:
+        scene_path = pathlib.Path(project_path).parent / project["assets"]["scene"]["path"]["path"]
+        actors = json.loads(scene_path.read_text()).get("staging", {}).get("actors", [])
+    return {a["name"]: a["body"] for a in actors}
+
+
+def warp_cues(the_plan, project, project_path):
+    """The plan with the crafts' warp cues (see WARP_TYPES above) and the subjects they name added."""
+    out = json.loads(json.dumps(the_plan))
+    bodies = craft_bodies(project, project_path)
+    params = project.get("parameters", {})
+    fields = {}
+    for e in project.get("effects", []):
+        owner = e.get("owner", {})
+        if e.get("type") in WARP_TYPES and owner.get("kind") == "entity":
+            strength = params.get(f"fx/{e['id']}/strength", e["parameters"]["strength"])
+            fields.setdefault(owner["name"], []).append((e["id"], e["type"], "strength", float(strength)))
+            # A warp's edge glow (revision round 1) goes with its field: the rim is scaled by the effect's
+            # envelope, not by its strength, so quieting the strength alone left a ring round the beam.
+            rim = params.get(f"fx/{e['id']}/rimIntensity", e["parameters"].get("rimIntensity", 0.0))
+            if e.get("type") == "spaceWarp" and float(rim) > 0.0:
+                fields[owner["name"]].append((e["id"], e["type"], "rimIntensity", float(rim)))
+    aliases = {s["alias"] for s in out.get("subjects", [])}
+    cues = [c for c in out.get("cues", []) if not c.get("key", "").endswith(("-quiet", "-back"))]
+    for sp in out.get("setPieces", []):
+        body = bodies.get(sp["craft"])
+        if sp.get("template") not in BEAM_TEMPLATES or body not in fields:
+            continue
+        if body not in aliases:
+            out.setdefault("subjects", []).append({"alias": body, "text": body})
+            aliases.add(body)
+        for effect_id, kind, field, value in fields[body]:
+            ref = {"owner": body, "type": kind, "id": effect_id}
+            tag = effect_id if field == "strength" else f"{effect_id}-rim"
+            cues.append({"key": f"{sp['key']}-{tag}-quiet", "effect": dict(ref), "field": field,
+                         "on": event_name(sp["key"], "beam"), "value": 0.0, "rampSeconds": WARP_QUIET_SECONDS})
+            cues.append({"key": f"{sp['key']}-{tag}-back", "effect": dict(ref), "field": field,
+                         "on": event_name(sp["key"], "depart"), "value": value, "rampSeconds": WARP_BACK_SECONDS})
+    out["cues"] = cues
+    return out
+
+
 def compile_plan(project_path, scratch):
     """The plan compiled against the project and saved to `scratch`; returns the plan report."""
     report_trace = scratch.with_suffix(".report.json")
-    cmd = [str(TOOL), "--project", str(project_path), "--plan", str(PLAN), "--save-project", str(scratch),
+    COMPILED_PLAN.parent.mkdir(parents=True, exist_ok=True)
+    COMPILED_PLAN.write_text(dump(warp_cues(plan(), json.loads(pathlib.Path(project_path).read_text()), project_path)))
+    cmd = [str(TOOL), "--project", str(project_path), "--plan", str(COMPILED_PLAN), "--save-project", str(scratch),
            "--seconds", "0.05", "--fps", f"{FPS:g}", "--hz", f"{FPS:g}", "--out", str(report_trace)]
     run = subprocess.run(cmd, capture_output=True, text=True)
     if run.returncode not in (0, 2) or not report_trace.exists():
@@ -241,7 +302,8 @@ def check(beats):
             continue
         if "beam" not in p["moments"]:
             problems.append(f"{key} never lit its beam (it found {len(p['animals'])} animal(s))")
-        taken = [a for a in p["animals"] if a.get("retired", -1.0) >= 0.0]
+        # Taken: retired, or (ADR-984) dissolved and put back.
+        taken = [a for a in p["animals"] if a.get("retired", -1.0) >= 0.0 or a.get("returned", -1.0) >= 0.0]
         if len(taken) != count:
             problems.append(f"{key} took {len(taken)} animal(s), not {count}")
     for key in ("e1-far-survey", "e2-flyby"):
@@ -253,15 +315,31 @@ def check(beats):
         bar93 = e5["nominal"].get("beam")
         if bar93 is not None and not 0 <= frame(e5["moments"]["beam"]) - frame(bar93) <= 1:
             problems.append(f"E5's beam lit at {e5['moments']['beam']:.3f} s, not on bar 93 ({bar93:.3f} s)")
-    # The horse is gone on the drop: its dissolve ends, and the next step retires it, within a frame of
-    # the first frame of the drop (bar 97 on the production's grid, which the cut is laid on).
+    # The drummer is gone on the drop: his dissolve ends within a frame of the first frame of the drop (bar 97
+    # on the production's grid, which the cut is laid on). And he is back (ADR-984): put where he was lifted
+    # from, `returnSeconds` after the beam goes out, during a shot that does not see the kit.
     if e5 is not None:
         drop = math.ceil(music.bar(97) * FPS - 1e-6)
-        horse = [a for a in e5["animals"] if a.get("retired", -1.0) >= 0.0]
-        if horse and abs(frame(horse[0]["retired"]) - drop) > 1:
-            problems.append(f"the horse retired at {horse[0]['retired']:.3f} s, not on the drop "
-                            f"(frame {drop}, {drop / FPS:.3f} s)")
+        for a in e5["animals"]:
+            gone = a.get("dissolved", a.get("retired", -1.0))
+            if gone >= 0.0 and abs(frame(gone) - drop) > 1:
+                problems.append(f"{a['entity']} was gone at {gone:.3f} s, not on the drop "
+                                f"(frame {drop}, {drop / FPS:.3f} s)")
+            if "returned" in a:
+                back = [round(u - v, 3) for u, v in zip(a["atReturn"], a["atLift"])]
+                if max(abs(d) for d in back) > 0.01:
+                    problems.append(f"{a['entity']} was put back {back} m from where he was lifted")
+                e5_back = plan_return("e5-centrepiece")
+                if e5_back and abs(a["returned"] - (e5["moments"].get("depart", 0.0) + e5_back)) > 3.0 / FPS:
+                    problems.append(f"{a['entity']} came back at {a['returned']:.3f} s, not {e5_back} s after "
+                                    f"the depart ({e5['moments'].get('depart')})")
     return problems
+
+
+def plan_return(key):
+    """The set piece's `returnSeconds` in the plan (0 when it keeps what it takes)."""
+    sp = next((p for p in plan()["setPieces"] if p["key"] == key), None)
+    return float(sp.get("set", {}).get("returnSeconds", 0.0)) if sp else 0.0
 
 
 def compile_into(project_path=PROJECT, traced=True, trace_file=None):
@@ -308,8 +386,10 @@ def main():
     for p in beats["setPieces"]:
         moments = p.get("moments") or p["nominal"]
         text = ", ".join(f"{m} {t:.3f}" for m, t in sorted(moments.items(), key=lambda kv: kv[1]))
-        taken = ", ".join(f"{a['entity']} {a['retired']:.3f}" for a in p.get("animals", [])
-                          if a.get("retired", -1.0) >= 0.0)
+        taken = ", ".join(f"{a['entity']} {a['retired']:.3f}" if a.get("retired", -1.0) >= 0.0 else
+                          f"{a['entity']} gone {a.get('dissolved', -1.0):.3f}, back {a['returned']:.3f}"
+                          for a in p.get("animals", [])
+                          if a.get("retired", -1.0) >= 0.0 or a.get("returned", -1.0) >= 0.0)
         hold = p.get("holding") or {}
         print(f"  {p['id']:15s} {p['craft']:7s} {text}" + (f"; took {taken}" if taken else "")
               + (f"; held within {hold['maxDrift']:.2f} m" if hold.get("frames") else ""))

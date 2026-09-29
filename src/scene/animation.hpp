@@ -187,7 +187,8 @@ public:
     void setLooping(std::optional<bool> loop);
     [[nodiscard]] bool currentLooping() const { return looping(current_); }
     // Changes the current state's rate without a jump: the clock is rebased so the local clip time
-    // is continuous across the change.
+    // is continuous across the change. A rate of 0 holds the clip where it is (ADR-987), and the next
+    // non-zero rate carries on from there.
     void setSpeed(float speed, double now);
 
     // ---- reading: pure functions of (the above, now) ----
@@ -226,12 +227,18 @@ private:
         int state = -1;
         double start = 0.0; // timeline second this state was entered
         float speed = 1.0f;
+        // ADR-987: the clip seconds a play at speed 0 holds -- where `setSpeed(0)` found it. A clock
+        // stored as (start, speed) cannot stand still anywhere but its first frame, and that is where
+        // every stop of a body whose idle freezes its walk used to put its legs. 0 on any other play.
+        double held = 0.0;
         // ADR-821: this play's looping, when the request said (a sequencer cue with `playback`);
         // -1 means the state's own `loop`. Per play, not per state, so one clip can be a loop for a
         // behaviour and a one-shot for a cue on the same rig.
         std::int8_t loop = -1;
     };
     [[nodiscard]] bool looping(const Playing& playing) const;
+    // Unwrapped clip seconds of a play at `now`: its held second at speed 0, else the clock.
+    [[nodiscard]] static double elapsed(const Playing& playing, double now);
     [[nodiscard]] float localTime(const Playing& playing, const std::vector<AnimationClip>& clips,
                                   double now) const;
     // The pose offset an inertialized transition decays away: what the outgoing state was doing at

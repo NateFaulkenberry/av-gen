@@ -1250,3 +1250,77 @@ TEST_CASE("a signal id cached against one bus is not read against another", "[st
     }
     CHECK_FALSE(s.staging.running("test"));
 }
+
+TEST_CASE("ADR-984: a body given back is where it was bound, facing as it was, placed, with what the scenario "
+          "wrote given back",
+          "[stage][director][adr984]") {
+    const auto scenario = [](bool giveBack) {
+        stage::QueryDesc q;
+        q.bind = "target";
+        q.name = "near";
+        stage::StepDesc up = step(stage::StepKind::MoveTo, "lift");
+        up.point = glm::vec3(10.0f, 12.0f, 3.0f); // up, and three metres aside, so the lift turns it
+        up.duration = lit(0.3f);
+        up.spin = lit(240.0f);
+        stage::StepDesc dim = step(stage::StepKind::Set, "fade");
+        dim.target = "spawnRate";
+        dim.to = lit(0.0f);
+        dim.duration = lit(0.1f);
+        std::vector<stage::StepDesc> steps{up, dim, step(stage::StepKind::Hide, "gone"), waitStep("away", 0.2f)};
+        if (giveBack) {
+            steps.push_back(step(stage::StepKind::Return, "back"));
+        }
+        stage::CueDesc target;
+        target.role = "target";
+        target.steps = std::move(steps);
+        stage::CueDesc actorCue;
+        actorCue.role = "actor";
+        actorCue.steps = {waitStep("hold", 1.5f)};
+        stage::BeatDesc beat;
+        beat.name = "abduct";
+        beat.find = {q};
+        beat.cues = {actorCue, target};
+        stage::ActorDesc actor;
+        actor.name = "star";
+        actor.body = "hero";
+        stage::ScenarioDesc sc;
+        sc.name = "test";
+        sc.actor = "star";
+        sc.maxCycles = 1;
+        sc.beats = {beat};
+        stage::StagingDesc d;
+        d.actors = {actor};
+        d.scenarios = {sc};
+        return d;
+    };
+
+    Stage s(herd(), herdNodes(), scenario(true));
+    const entity::Entity* near = s.world.find("near");
+    REQUIRE(near != nullptr);
+    const glm::vec3 home = s.where("near");
+    const float yaw = near->state().yaw;
+    const std::uint32_t placed = near->placements();
+    s.staging.start("test", s.time);
+    s.tick(0.45);
+    CHECK(s.where("near").y > 8.0f); // lifted
+    CHECK(s.params.find("particles/near/spawnRate")->baseComponent(0) == 0.0f);
+    s.tick(0.5);
+    // Back where it was bound, facing as it did, as a placement, and the rate the scenario zeroed is 10
+    // again (its authored value).
+    CHECK(glm::length(s.where("near") - home) < 1e-4f);
+    CHECK(near->state().yaw == Approx(yaw).margin(1e-5));
+    CHECK(near->placements() == placed + 1);
+    CHECK(s.params.find("particles/near/spawnRate")->baseComponent(0) == 10.0f);
+    CHECK(s.params.find("nodes/near/visible")->baseComponent(0) == 1.0f); // hidden while away, shown again
+    // And it stays there once the scenario has let it go.
+    s.tick(1.5);
+    CHECK_FALSE(s.staging.running("test"));
+    CHECK(glm::length(s.where("near") - home) < 1e-4f);
+    CHECK(s.staging.report().stepsFailed == 0);
+
+    // The partner: the same scenario with no `return` leaves it where the lift put it.
+    Stage kept(herd(), herdNodes(), scenario(false));
+    kept.staging.start("test", kept.time);
+    kept.tick(2.5);
+    CHECK(kept.where("near").y > 8.0f);
+}

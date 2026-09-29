@@ -521,3 +521,58 @@ TEST_CASE("a foot that shuffles without lifting is still stance and swing", "[mo
     CHECK(t.dutyCycle < 0.7f);   // not the 1.0 a height-only reading gives
     CHECK(t.dutyCycle > 0.3f);
 }
+
+// ADR-987. The stance of an in-place walk is the foot going BACK under the body, whatever its height: the
+// farm pack scuffs its hooves forward at their lowest in the swing and lifts them while they still push back,
+// so the height test finds pieces of each stance. The sweep mode reads the stroke, lift and all.
+TEST_CASE("a sweep contact is the backward stroke of an in-place cycle", "[motion][contacts][adr987]") {
+    // One lap of 30 samples: 12 samples forward (the swing, at its lowest in the middle -- a scuff),
+    // then 18 back (the stance, lifting over its last few).
+    AnimationClip clip;
+    clip.name = "walk";
+    AnimationChannel channel;
+    channel.joint = 1;
+    channel.path = AnimationPath::Translation;
+    channel.interpolation = Interpolation::Linear;
+    for (int i = 0; i <= 30; ++i) {
+        const int k = i % 30;
+        float z = 0.0f;
+        float y = 0.0f;
+        if (k < 12) {
+            z = -0.6f + 1.2f * static_cast<float>(k) / 12.0f;                      // forward
+            y = 0.02f + 0.1f * std::fabs(static_cast<float>(k) - 6.0f) / 6.0f;      // lowest mid-swing
+        } else {
+            z = 0.6f - 1.2f * static_cast<float>(k - 12) / 18.0f;                   // back
+            y = k > 25 ? 0.05f * static_cast<float>(k - 25) : 0.05f;                // lifting at the end
+        }
+        channel.times.push_back(static_cast<float>(i) / 30.0f);
+        channel.values.emplace_back(0.0f, y, z, 0.0f);
+    }
+    clip.start = 0.0f;
+    clip.duration = 1.0f;
+    clip.channels.push_back(std::move(channel));
+    const Skeleton sk = twoJointRig();
+
+    ContactSettings sweep;
+    sweep.mode = ContactMode::Sweep;
+    const std::vector<ContactTrack> tracks = detectContacts(sk, clip, kFoot, sweep);
+    REQUIRE(tracks.size() == 1);
+    const ContactTrack& t = tracks.front();
+    INFO("duty " << t.dutyCycle << ", " << t.spans.size() << " span(s)");
+    REQUIRE(t.spans.size() == 1);
+    CHECK(t.dutyCycle > 0.5f);
+    CHECK(t.dutyCycle < 0.7f);
+    const ContactSpan& s = t.spans.front();
+    INFO("span " << s.start << " to " << s.end);
+    // Touchdown at the front of the stroke (the turn at sample 12, 0.4 s) and lift-off at its back -- the
+    // lift over its last few samples (from 0.87 s) is still stance, because the hoof is still going back.
+    CHECK(s.start > 0.35f);
+    CHECK(s.start < 0.5f);
+    CHECK(s.end > 0.9f);
+
+    // THE CONTROL: the height test on the same clip finds the scuff as a plant and the lifting push-off as
+    // not one -- which is what the farm pack showed.
+    const std::vector<ContactTrack> height = detectContacts(sk, clip, kFoot, ContactSettings{});
+    REQUIRE(height.size() == 1);
+    CHECK(height.front().dutyCycle < t.dutyCycle);
+}

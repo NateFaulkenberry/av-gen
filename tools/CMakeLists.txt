@@ -3,6 +3,16 @@
 add_executable(avgen_world_preview world_preview.cpp)
 target_link_libraries(avgen_world_preview PRIVATE avgen_core)
 
+# Where the drawn water and the drawn ground disagree with the world (ADR-980): the terrain's chunk
+# meshes, every ground level and the water surface, compared on a fine grid with `WorldMap`.
+add_executable(avgen_water_probe water_probe.cpp)
+target_link_libraries(avgen_water_probe PRIVATE avgen_core)
+
+# The plants a terrain grows in a region, as a scene load places them (GV3 art pass): where a prop or a
+# hero can stand without a fern through it, answered without a render.
+add_executable(avgen_scatter_probe scatter_probe.cpp)
+target_link_libraries(avgen_scatter_probe PRIVATE avgen_core)
+
 # The Help documentation validator (help-system spec 35). A build target rather than a script
 # because it reads the same content model the application does: a lint that reimplemented the
 # parser would eventually disagree with it, and the disagreement would be silent.
@@ -199,6 +209,11 @@ target_link_libraries(avgen_character_quality PRIVATE avgen_core)
 # on somebody who is not following a script. Runs the same offline engine as the quality meter.
 add_executable(avgen_cast_trace cast_trace.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
 target_link_libraries(avgen_cast_trace PRIVATE avgen_core)
+
+# The GV3 art pass (ADR-982): how far a character's planted feet slide as it sets off from standing,
+# read from the drawn pose every frame of the same offline engine.
+add_executable(avgen_foot_probe foot_probe.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
+target_link_libraries(avgen_foot_probe PRIVATE avgen_core)
 
 # ADR-923: the Director's Song Mode cut of a project as JSON -- every shot's span, subject, arc and
 # the reason for its duration -- on the CPU, for a generator iterating on a plan without the GPU.

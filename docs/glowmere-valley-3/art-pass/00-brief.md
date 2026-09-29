@@ -880,3 +880,70 @@ The addendum is complete when:
 * [ ] No unrelated GV3 systems have been modified unnecessarily.
 
 This should be implemented as part of the upcoming GV3 art pass, with the existing standalone musician prototype treated as the validated source of truth for the character assets and animation setup.
+
+---
+
+## Revision round 1 (owner, 2026-09-29)
+
+*The owner reviewed `GV3-art-pass-final.mp4`: "that render is looking great". Then, in their words, verbatim:*
+
+> check all new hero mushroom stems properly connect to their caps (looks like one or two had gaps)
+> go ahead and foot lock 4 legged rigs
+> add a faint rim, let's see if we can improve UFO warp visibility
+> try a rainbow effect instead of a gold effect on the lift - still looks prettty good either way
+> should we give musicians their own class so critic doesnt treat like animals? go with best rec - just dont mess up the UFO abduction animation
+
+*Added the same day, verbatim:*
+
+> have it do a few passes through the critic this time - there were like one or two shots that felt a little bland but otherwise it was pretty tight
+
+*Coordinator's notes, not the owner's words:*
+1. **Stems and caps.** Check EVERY placed instance of opal and sail, not just the ones in shot, for a gap between
+   stem and cap. Measure it with geometry (the distance from the stem top to the cap underside, per instance, across
+   the variation seeds), not by eye. Find the cause (variation, tilt, scale, the deformer stack) and fix it at the
+   cause. Also check the existing ten hero mushrooms with the same measurement, and report what is found there, but
+   fix them only if they have the same defect.
+2. **Foot locking for four-legged rigs.** Measure the slide at walk starts, and at steady walk, for the farm animals
+   before and after, the same way the aliens were measured. Don't regress the two-legged characters or GV2. Remember
+   the GV2 behaviour fingerprint.
+3. **UFO warp rim.** A FAINT rim so the warp reads over black sky (the s08 flyby). It must not become a visible
+   outline or halo over the lit valley. Show A/B stills over dark sky and over the lit valley.
+4. **Rainbow lift light.** Replace the drummer's gold lift light with a rainbow one, consistent with the musicians'
+   rainbow hero treatment. The owner likes both: show the A/B and pick the better; say which and why.
+5. **Musician class.** The coordinator's recommendation, which the owner delegated to the agent to decide: give the
+   musicians their own class (for example `performer`). Don't make abduction piggyback on "animal": make it eligible
+   by an explicit property or tag, so the Critic classes them correctly. HARD CONSTRAINT: the abduction must be
+   unchanged. Prove it with the same timings (lift at 172.8 s, back on the stool within 1 mm at 183.75 s, seen
+   playing at 198.8 s) and frame-identical, or measurably equivalent, pose samples before and after the refactor. If
+   the cleanest route is riskier than it's worth, say so and keep the tag with a documented reason.
+6. **The Critic, a few passes (this overrides "the Critic once" for this round).** After the five items are done and
+   verified, run the Critic over the whole film and act on it, in up to about three passes; stop earlier once a pass
+   stops producing worthwhile improvements. Focus on the one or two bland shots, found from the Critic's per-shot
+   scores and measurements (brightness, contrast, subject salience, motion), improved with targeted changes within
+   existing systems (framing, timing, lighting, hero or effect emphasis, what the camera looks at). Candidates: s04
+   repeating s14/s30, s05 repeating s01, subjects outweighed in s15/s31/s42. "Otherwise it was pretty tight": don't
+   rework shots that work, don't redesign the sequence, don't add shots. After each pass confirm technical quality
+   and lighting haven't dropped and clipping hasn't risen above the r0 final's 2.32%. The Critic's input renders can
+   be at whatever resolution it needs; only the final r1 is 1080p60 with the song.
+- Same rules: ADRs 986-989 remain; the fewest renders; GPU work under the gpu-lock; no licensed files committed;
+  don't push, don't merge. Both suites exit 0 at the end.
+- **Deliverable:** `~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-r1.mp4` (1080p60, supersample 2, the
+  song), the previous final kept as it is; A/B stills in `r1/`; a "Revision round 1" section in the review folder's
+  REPORT.md, naming the shots treated as bland with before/after stills; for each Critic pass, the scores against
+  the previous pass and what changed in response.
+
+### Round 1 additions (owner, 2026-09-29, verbatim; recorded by the coordinator)
+
+**Item 6:**
+> I forget if I suggested that we increase alien foot height since it pointed out they barely leave the ground,
+> maybe we should try that too
+
+**Item 7:**
+> another thing we could have it look at - the aliens: when they turn their heads its not a smooth animation
+> currently, more a of snap into possition - wondering if we can smooth those movements at all
+
+**On the render clock**, after the art pass found that a render from 0 and a seek describe different films:
+> Ah just go with option A. Don't worry about before and after comparisons, let just move towards getting a render
+> ready for me to review
+
+The coordinator made that change as ADR-990 (`bce61fe9`), with the owner's direct approval.

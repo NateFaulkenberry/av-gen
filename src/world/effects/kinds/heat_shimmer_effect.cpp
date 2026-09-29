@@ -209,8 +209,8 @@ std::size_t heatShimmerProxies(const EffectInstance& e, const EffectContext& ctx
         NodeView view;
         glm::vec3 centre(0.0f);
         float ownerRadius = 0.0f;
-        if (!kinds::ownerCentre(e, ctx, glm::vec3(0.0f), centre, ownerRadius, view)) {
-            return 0; // no drawn owner this frame: nothing to rise from
+        if (!kinds::ownerCentre(e, ctx, glm::vec3(0.0f), centre, ownerRadius, view) || !view.visible) {
+            return 0; // no drawn owner this frame (none, or hidden: ADR-983): nothing to rise from
         }
         if (static_cast<Rise>(kRows.choice(e, "rise")) == Rise::BehindOwner) {
             // The owner's backward axis: the node's drawn +Z is its forward (Ripple's rule), so the

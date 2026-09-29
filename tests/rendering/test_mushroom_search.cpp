@@ -141,7 +141,12 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
     // ten-pick run are byte-identical to a six-pick run: the four extra are genuinely *additional*
     // morphologies, chosen to be as far from the existing six as the population allows, rather than a
     // re-run that shuffles the set.
-    constexpr std::size_t kWinners = 10;
+    //
+    // Twelve since the GV3 art pass (docs/glowmere-valley-3/art-pass/00-brief.md item 5: "two
+    // additional hero mushrooms ... visually unique from the existing hero mushrooms"): by the same
+    // property the first ten are the ten Glowmere already has, and the two new ones are the two
+    // morphologies farthest from all ten.
+    constexpr std::size_t kWinners = 12;
     // The quality/diversity trade, explicit because hiding it inside an algorithm is how a pipeline
     // ends up with six excellent near-identical mushrooms and no knob to say so (ADR-172 / 4.8).
     constexpr float kAlpha = 0.45f;
@@ -266,8 +271,8 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
 
     // ---- the contact sheet: the winners large, under Glowmere's own light --------------------
     constexpr std::uint32_t kTile = 420;
-    const std::uint32_t cols = 5;
-    const std::uint32_t rows = 2;
+    const std::uint32_t cols = 6;
+    const std::uint32_t rows = static_cast<std::uint32_t>((kWinners + cols - 1) / cols);
     std::vector<std::uint8_t> sheet(static_cast<std::size_t>(kTile * cols) * (kTile * rows) * 4, 0);
     const std::uint32_t sheetW = kTile * cols;
     for (std::size_t k = 0; k < winners.size(); ++k) {
@@ -306,7 +311,15 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
         heroes.push_back(search::candidateToJson(schema, population[w]));
     }
     doc["heroes"] = std::move(heroes);
-    const fs::path record = fs::path(AVGEN_SOURCE_DIR) / "examples" / "organisms" / "glowmere2-heroes.json";
+    // The canonical record is what Glowmere's heroes ARE, by value; it is not rewritten by a run unless one
+    // asks (MUSHROOM_WRITE_RECORD=1). Since ADR-986 joined every stem to its cap, the population is not
+    // the one the record was selected from -- the gate now passes candidates it rejected for that very gap,
+    // and the stems' bounds feed the features -- so a re-run picks a different twelve from the second pick
+    // on, and writing them over the record would take away the heroes `tools/gv3/heroes.py` builds.
+    const bool canonical = std::getenv("MUSHROOM_WRITE_RECORD") != nullptr;
+    const fs::path record = canonical
+                                ? fs::path(AVGEN_SOURCE_DIR) / "examples" / "organisms" / "glowmere2-heroes.json"
+                                : outDir / "glowmere2-heroes.json";
     fs::create_directories(record.parent_path(), ec);
     std::ofstream(record) << doc.dump(1);
     std::printf("\n  sheet: %s\n  record: %s\n", (outDir / "mushroom-winners.png").string().c_str(),

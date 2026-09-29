@@ -30,6 +30,13 @@
 namespace avgen::world {
 
 constexpr int kMaxTerrainLods = 4;
+// ADR-980: the coarsest level a chunk that carries water draws its GROUND at. The water surface is
+// always built at the base resolution, and the shoreline is wherever the drawn ground cuts the drawn
+// sheet by depth -- so a chunk whose ground drops to level 3 (9.6 m cells on Glowmere) moves its
+// shoreline by up to a cell and pokes the coarse bank up through the river: 164 m2 of it along
+// Glowmere Valley 3's river, up to 1.3 m deep (`avgen_water_probe`), against none at levels 0 and 1.
+// Capping only the chunks with water costs a few thousand triangles on a wide.
+constexpr int kWaterChunkMaxLod = 1;
 // The `lod` value `buildTerrain` passes to `emit` for a chunk's water surface: past the last real
 // level, so a caller that switches on the level cannot mistake water for a coarser ground.
 constexpr int kWaterLevel = kMaxTerrainLods;

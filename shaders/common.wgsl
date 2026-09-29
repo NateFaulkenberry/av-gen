@@ -118,7 +118,7 @@ struct FrameUniforms {
     // frame-global because the world is, and the shadow views inherit it with the rest of the block.
     // x = how many of the array below are live; the rest of the vector is spare.
     waveCount: vec4<f32>,
-    waves: array<Wave, 8>,
+    waves: array<Wave, 16>, // ADR-981: kMaxGpuWaves
     // ADR-230 atmospheric effects. Appended after the surface waves for the same reason those were
     // appended after `lights`: no offset above it moves, so nothing already reading this block can
     // be broken by adding to the end of it.

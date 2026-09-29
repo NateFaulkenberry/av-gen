@@ -36,7 +36,7 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from gv3 import cast, look, music, songcut, world  # noqa: E402
+from gv3 import cast, heroes, look, music, musicians, songcut, world  # noqa: E402
 from gv3.ground import Ground  # noqa: E402
 
 ROOT = HERE.parent
@@ -295,8 +295,11 @@ def main():
     report = []
     world.close_ends(scene, report)  # before any height is asked of the world
     ground = Ground(world_block(scene))
+    heroes.apply(project, scene, ground, report)  # the art pass's two new heroes, seated by world.apply
     world.apply(project, scene, ground, report)
+    heroes.join_parts(project, scene, report)  # after seating: every hero's parts at its cap's place (ADR-986)
     cast.apply(project, scene)
+    musicians.apply(project, scene, ground, report)  # the art pass's performers (after the cast: an entity each)
     look.apply_base(project, scene)
 
     if args.scout:
@@ -308,6 +311,7 @@ def main():
         end = FILM_END
         arc = look.apply_arc(project)
         motifs = look.apply_motifs(project, scene)
+        motifs += musicians.routes(project, look._route)
         report.append(f"look: {arc} arc track(s), {motifs} motif route(s)")
         # The spans are the Director's, cut from this project as it now stands (songcut.py).
         spans, director, note = songcut.direct(project, scene, recut=args.recut)
@@ -322,6 +326,8 @@ def main():
         return 1
     install_cut(project, scene, shots)
     if not args.scout:
+        cast.warp_rim(project, scene)  # the saucer's faint rim, in the shots that want it (revision round 1)
+        look.shot_emphasis(project, scene)  # a shot's own emphasis: s49's gold gills (revision round 1)
         # The Camera Travel Beam on the camera changes that open a phrase (look.apply_travel_beam).
         beam_cuts = look.apply_travel_beam(project, shots)
         pulses = look.apply_hero_pulses(project, scene, shots)
@@ -332,6 +338,11 @@ def main():
                       + ", ".join(f"{n} {c}" for n, c in sorted(by.items(), key=lambda kv: -kv[1])))
         report.append(f"travel beam: fires on {len(beam_cuts)} cuts, "
                       + ", ".join(f"{sid} (bar {b}, {t:.2f} s)" for t, sid, b in beam_cuts))
+
+    # Last of the look: every effect's block agrees with the flat values that render (look.sync_effect_blocks).
+    synced = look.sync_effect_blocks(project)
+    report.append(f"effect blocks agree with what renders: {len(synced)} value(s) rewritten"
+                  + (": " + ", ".join(f"{i} {p} {w} -> {n}" for i, p, w, n in synced) if synced else ""))
 
     render = project.setdefault("render", {})
     # The render path resolves against the project's folder. Into build/, which git ignores: the film

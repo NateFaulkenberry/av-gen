@@ -65,6 +65,45 @@ HORSE_GLOW = {
                    "rimColor": [1.0, 0.78, 0.42], "rimPower": 2.5, "spill": False, "recolour": 0.0},
 }
 
+# The crafts' warp (the art pass, item 4: "make the UFO feel like it is manipulating spacetime rather than
+# simply flying through the scene"). A Space Warp on each craft, a DF type: it bends what is behind the craft
+# and draws nothing of its own, so the saucer's own look is untouched (DF excludes the owner). At rest only
+# its lens pull, a slow curl and a slight twist act: a living bend of the stars, the aurora and the valley
+# round the hull. In flight its bow wave and its stretch act too, weighted by the craft's own speed (the
+# producer's, from HIST, full at `speedForFull`), so the field leans into the motion and drags out behind
+# the craft. No speed ROUTE: `entity.<name>.speed` reads the hidden move to each entry point (a tenth of a
+# second at thousands of m/s), and a smoothed route would carry that into the frames after the craft appears.
+# It does not exist while its craft is hidden (ADR-983) and reads no placement as motion. It goes quiet while
+# the craft's beam is on: `ufo.py` gives every set piece with a beam two cues, to 0 on its `beam` moment and
+# back to the value below on its `depart`, so the lift is the only thing moving under the craft (the brief:
+# the warp "must not obscure the abducted character"). The first render (0.4, turbulence 0.1) bent only
+# 3-5 px round a stationary saucer at 80 m, invisible against GV3's night; 0.8 and a livelier curl read
+# against the aurora, the stars and the lit valley, and still vanish against black sky, where there is
+# nothing to bend.
+CRAFT_WARP = {
+    "type": "spaceWarp", "name": "Spacetime warp",
+    "parameters": {
+        "strength": 0.8, "boundsScale": 2.2, "radius": 8.0, "radialWeight": 0.15, "bowWeight": 1.0,
+        "swirl": 0.1, "turbulence": 0.18, "chroma": 0.12, "rimColor": [0.55, 0.85, 1.0], "rimIntensity": 0.0,
+        "falloff": 1.6, "edgeSoftness": 0.45, "velocityStretch": 1.4, "speedForFull": 18.0,
+        "turbulenceScale": 2.0, "turbulenceSpeed": 0.35, "rimWidth": 0.4,
+        "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0,
+    },
+}
+# A faint rim (revision round 1: "add a faint rim, let's see if we can improve UFO warp visibility"): over the black
+# sky a warp bends nothing that can be seen, and its edge glow is what shows the field is there. The A/B (r1/): at
+# the field's edge, 0.08 of the radius wide, the rim is a line -- an ellipse eight saucers across drawn round the
+# craft, and an arc over the lit valley after the drop; 0.4 wide it is a soft halo about the craft. So: the soft
+# halo, faint (0.08), and only in the two shots where the saucer is small against the black sky -- the flyby (s08)
+# and its approach over the elder (s47). WARP_RIM_SHOTS; `warp_rim`. The beams' cues quiet it with the field.
+WARP_RIM = 0.08
+WARP_RIM_SHOTS = ("s08", "s47")
+# The wake (a Velocity Distortion along the path) was tried and taken out after the first render: a craft
+# climbing away from the lens leaves its wake between the lens and itself, and the wake refracted the saucer
+# into a crescent with a colour fringe (s59, 182.4 s). The warp's own stretched bow is what trails behind it.
+CRAFT_FIELDS = (("warp", CRAFT_WARP),)
+
+
 # ---- the aliens ------------------------------------------------------------------------------------
 ALIENS = ("rook", "tide", "sage", "ember", "vane")
 # Every alien turns on a 1.5 m circle while it walks, and its gait may turn as fast as that circle
@@ -141,6 +180,21 @@ ALIEN_BOUNCE = {
     "vane":  0.17,   # 0.098 m (5.35 m)
     "rook":  0.18,   # 0.096 m (5.78 m)
 }
+# Their feet leave the ground (revision round 1, item 6: "they barely leave the ground"; ADR-988). The ground
+# layers planted each foot at its standing height with its sole flat on every frame, so the drawn swing lifted
+# 6 mm and no heel ever rose, against the 0.24 m the Walking clip lifts the ankle and the 0.26 m it lifts the
+# toes. Keeping the clip's own foot in the air, carried onto the ground under it, gives the clip's step back; the
+# toes are kept out of the ground where the drawn ankle is lower than the clip's (a shortened stride, a leg at
+# the end of its reach, a steep bank).
+ALIEN_KEEP_SWING = 1.0
+# ...and their heads come round to what they look at (revision round 1, item 7: "when they turn their heads its not
+# a smooth animation currently, more a of snap into possition"; ADR-989). Their attention names a new subject in
+# one step, and the head was aimed at the subject on every frame, so it turned with it: a quarter turn in one
+# posed frame. A gaze settles on a new subject in 0.35 s at no more than 200 degrees a second, from the eyes'
+# height (the alien's head joint stands about 2.5 m up and its eyes 2.7 m at the cast's 1.94x); the body's own
+# turn, 100 degrees a second, follows it. It keeps within 70 degrees of the body's facing, inside the look layer's
+# own 75, whose clamp threw the head from one shoulder to the other when a subject crossed the body's back.
+ALIEN_GAZE = {"settle": 0.35, "maxTurnRate": 200.0, "eyeHeight": 2.6, "maxYaw": 70.0}
 
 # ---- what the aliens hear --------------------------------------------------------------------------
 # The UFO events the aliens react to (ADR-930: every set-piece moment is a world event), how far each
@@ -214,8 +268,39 @@ REHOMED = {
     # column (r6b) and moves to bull-1's slope, 125 m from it (beamclear.py on each round's trace).
     "cow-23": (-76.0, 70.0),
     "bull-10": (-12.0, -128.0),
+    # The art pass: E5 takes the drummer now (musicians.py), and horse-11 grazed round the stage; it joins the
+    # herd on the east meadow, 21 m from horse-2's and horse-20's homes.
+    "horse-11": (70.0, 34.0),
 }
 REHOMED_TERRITORY = {"homeRadius": 16.0, "maxRange": 12.0}
+# Their hooves are held where they land (revision round 1: "go ahead and foot lock 4 legged rigs"; ADR-987).
+# The pack's one Walk sweeps a stance hoof back unevenly -- six times faster at one moment than another --
+# and each hoof at its own average speed, so under a rate-matched body every hoof skated. A stance lock on
+# each leg keeps the hoof at the point in the world where the clip put it at touchdown, whatever the body
+# does meanwhile, and hands it back to the clip over the last 30% of the stroke, at the clip's height.
+# The stance is the hoof's backward stroke ("contactMode": "sweep"): the height test finds pieces of it on
+# this pack. The three species share one leg naming (UpperLeg -> LowerLeg -> Hoof, B hind, F fore).
+HOOF_LOCK = [
+    {"name": f"lock-{end}-{side}", "kind": "foot", "drive": "ground",
+     "chain": [f"UpperLeg{e}.{s}", f"LowerLeg{e}.{s}", f"Hoof{e}.{s}"],
+     "footAlign": 0.0, "footLock": 1.0, "footLockMode": "stance"}
+    for end, e in (("hind", "B"), ("fore", "F")) for side, s in (("left", "L"), ("right", "R"))
+]
+HOOVES = ["HoofB.L", "HoofB.R", "HoofF.L", "HoofF.R"]
+# ...and a rate their legs can keep up with. The pack's walk speeds (ADR-240) were measured on each hoof at
+# its lowest, the fastest moment of an uneven stroke; over the whole backward stroke the horse's hooves go
+# back at 1.131 model units a second, not 1.628, so a body rate-matched to 1.628 out-walked its legs by 44%:
+# a held hoof fell a third of a stroke behind the clip's by lift-off, and slid that far as it was let go. The
+# mean stroke speed over the four hooves (the contact analysis' sweep spans: `avgen_tests "probe: the farm
+# Walk's stances"`), at the cast's 1.94x, in m/s; the ceiling lifted so a run at 2.6 m/s is still matched.
+STROKE_SPEED = {"horse": 1.131 * 1.94, "cow": 1.694 * 1.94, "bull": 1.724 * 1.94}
+STROKE_RATE_MAX = 1.6
+# ...and posed on every frame of the film. A rig posed at 30 Hz in a 60 fps film is drawn with the pose it had
+# a frame ago on every other frame while its body moves on, so a hoof held in the world is drawn one frame's
+# travel ahead and back again: horse-2's held hooves moved 15.2 mm a frame on a straight walk at 30 Hz, the
+# body's own speed, and 0.18 mm at 60 Hz. 0 is every frame (offline); live playback keeps `farHz` beyond
+# `nearDistance`.
+ANIMAL_UPDATE_HZ = 0
 
 
 # ---- helpers ---------------------------------------------------------------------------------------
@@ -388,8 +473,14 @@ def add_scout(project, scene):
 def aliens(project, scene):
     """The characters stream's recommended settings, per alien, and the aliens' ears for E4 and E5."""
     ents = _entities(scene)
+    nodes = _nodes(scene)
     for name in ALIENS:
+        for layer in nodes[name].get("animation", {}).get("layers", []):
+            if layer.get("kind") == "foot" and layer.get("drive") == "ground":
+                layer["keepSwing"] = ALIEN_KEEP_SWING
+                layer["toe"] = "toes_01." + layer["chain"][2].rsplit(".", 1)[1]
         e = ents[name]
+        e["gaze"] = dict(ALIEN_GAZE)
         e["gait"].update(ALIEN_GAIT)
         if name in ALIEN_RUN_BAND:
             e["gait"]["runEnter"], e["gait"]["runExit"] = ALIEN_RUN_BAND[name]
@@ -453,6 +544,19 @@ def animals(project, scene, ground):
         w["maxSlope"] = ANIMAL_MAX_SLOPE
         w["turnRadius"] = radius
         e.setdefault("gait", {})["pivotRadius"] = pivot
+        anim = nodes[name].setdefault("animation", {})
+        anim["updateHz"] = ANIMAL_UPDATE_HZ
+        anim["contacts"] = list(HOOVES)
+        anim["contactMode"] = "sweep"
+        anim["layers"] = [dict(layer) for layer in HOOF_LOCK]
+        gait = e.setdefault("gait", {})
+        stroke = round(STROKE_SPEED[species], 4)
+        gait["walkSpeed"] = stroke
+        gait["runSpeed"] = stroke
+        gait["rateMax"] = STROKE_RATE_MAX
+        _set(project, name, "gait/walkSpeed", stroke)
+        _set(project, name, "gait/runSpeed", stroke)
+        _set(project, name, "gait/rateMax", STROKE_RATE_MAX)
         _set(project, name, "wander/maxSlope", ANIMAL_MAX_SLOPE)
         _set(project, name, "wander/turnRadius", radius)
         _set(project, name, "gait/pivotRadius", pivot)
@@ -466,13 +570,48 @@ def animals(project, scene, ground):
 
 # ---- the horse's light -----------------------------------------------------------------------------
 def horse_light(project):
-    """The Glow on the horse, dark at rest. The plan's cues raise its self-glow and rim on E5's lift
-    (ufo.plan.json, `horse-glow` and `horse-rim`); the first pass's timeline keys are gone, and so is
-    any key a previous generation left on its two fields."""
-    project["effects"] = [e for e in project.get("effects", []) if e["id"] != HORSE_GLOW["id"]] + [
-        copy.deepcopy(HORSE_GLOW)]
+    """No Glow on the horse any more: the art pass's E5 lifts the drummer, who carries his own light
+    (musicians.py). The effect, its cues and any key a previous generation left on its fields are gone."""
+    project["effects"] = [e for e in project.get("effects", []) if e["id"] != HORSE_GLOW["id"]]
+    for key in [k for k in project.get("parameters", {}) if k.startswith(f"fx/{HORSE_GLOW['id']}/")]:
+        del project["parameters"][key]
     tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
     tl["tracks"] = [t for t in tl.get("tracks", []) if not t["target"].startswith(f"fx/{HORSE_GLOW['id']}/")]
+
+
+# ---- the crafts' warp ------------------------------------------------------------------------------
+def craft_warps(project):
+    """A Space Warp on each craft (CRAFT_WARP), always on, as the project's own effect; `ufo.py` quiets it
+    under every beam."""
+    ids = []
+    added = []
+    for body in ("visitor", SCOUT):
+        for suffix, spec in CRAFT_FIELDS:
+            ids.append(f"{body}-{suffix}")
+            added.append({
+                "id": f"{body}-{suffix}", "type": spec["type"], "name": spec["name"],
+                "owner": {"kind": "entity", "name": body},
+                "enabled": True, "order": 0, "style": "", "activation": "always",
+                "timing": {"delay": 0.0, "lifetime": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "windowStart": 0.0,
+                           "windowSeconds": 6.0, "repeatSeconds": 0.0},
+                "parameters": copy.deepcopy(spec["parameters"]),
+            })
+    project["effects"] = [e for e in project.get("effects", []) if e["id"] not in ids] + added
+
+
+def warp_rim(project, scene):
+    """The saucer's faint rim, on in WARP_RIM_SHOTS and off everywhere else (a step at each cut). Called by the
+    generator once the cut is installed: it reads the shots' times."""
+    shots = {sh.get("label", "").split(" ")[0]: sh for sh in scene["cameraDirection"]["shots"]}
+    keys = [{"time": 0.0, "value": [0.0], "interp": "step"}]
+    for name in sorted(WARP_RIM_SHOTS, key=lambda n: shots[n]["start"]):
+        keys.append({"time": round(shots[name]["start"], 6), "value": [WARP_RIM], "interp": "step"})
+        keys.append({"time": round(shots[name]["end"], 6), "value": [0.0], "interp": "step"})
+    target = "fx/visitor-warp/rimIntensity"
+    tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
+    tl["tracks"] = [t for t in tl.get("tracks", []) if t["target"] != target]
+    tl["tracks"].append({"target": target, "component": -1, "timeBase": "seconds", "mode": "replace",
+                         "loopLength": 0.0, "enabled": True, "keys": keys})
 
 
 # ---- entry point -----------------------------------------------------------------------------------
@@ -484,3 +623,4 @@ def apply(project, scene):
     aliens(project, scene)
     animals(project, scene, Ground(world))
     horse_light(project)
+    craft_warps(project)

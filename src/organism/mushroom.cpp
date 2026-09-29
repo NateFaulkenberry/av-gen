@@ -192,12 +192,30 @@ float stemRadius(float t, float baseRadius, float taper, float bulgePos, float b
     return baseRadius * (linear + bulge);
 }
 
+// Where the stem meets the cap (ADR-986): the centre of the ring the underside leaves open for it, the
+// cap's own axis there, and how far past that ring the stem runs on up inside the cap.
+struct StemJoin {
+    glm::vec3 centre{0.0f, 1.0f, 0.0f};
+    glm::vec3 axis{0.0f, 1.0f, 0.0f};
+    float plunge = 0.0f;
+};
+
 scene::MeshData sweepStem(float height, float baseRadius, float taper, float bulgePos,
-                          float bulgeWidth, float curvature, int segments, int sides) {
+                          float bulgeWidth, float curvature, int segments, int sides, const StemJoin& join) {
     scene::MeshData mesh;
+    // ADR-986. A swept ring is perpendicular to the stem's own tangent, and at the top of a curved stem
+    // that leans by atan(2.1 * curvature) -- up to 43 degrees -- while the underside's opening lies in
+    // the cap's plane, tilted about X by the cap's own tilt. Two circles of one size in two planes meet
+    // at a point at most: on the stem's low side its top edge stood below the underside and the opening
+    // gaped round it (all twelve of Glowmere's heroes, 0.16 to 0.97 stem radii; the sail's 0.52 m). So
+    // over its last few rings the stem's frame turns from its tangent to the cap's axis and its centre
+    // moves onto the opening's, the top ring lying in the opening's plane; then one more ring carries the
+    // stem on up inside the cap, so the opening's edge is on the stem's side, not on a knife edge.
+    constexpr int kJoinRings = 3;
+    const glm::vec3 end = stemAxis(1.0f, curvature) * glm::vec3(1.0f, height, 1.0f);
     for (int i = 0; i <= segments; ++i) {
         const float t = static_cast<float>(i) / static_cast<float>(segments);
-        const glm::vec3 centre = stemAxis(t, curvature) * glm::vec3(1.0f, height, 1.0f);
+        glm::vec3 centre = stemAxis(t, curvature) * glm::vec3(1.0f, height, 1.0f);
         const float r = stemRadius(t, baseRadius, taper, bulgePos, bulgeWidth);
         // The frame follows the axis' tangent so the tube does not pinch where it bends.
         const float dt = 1.0f / static_cast<float>(segments);
@@ -205,6 +223,14 @@ scene::MeshData sweepStem(float height, float baseRadius, float taper, float bul
         const glm::vec3 behind = stemAxis(std::max(t - dt, 0.0f), curvature) * glm::vec3(1.0f, height, 1.0f);
         glm::vec3 tangent = ahead - behind;
         tangent = glm::length(tangent) > 1e-6f ? glm::normalize(tangent) : glm::vec3(0.0f, 1.0f, 0.0f);
+        // ...and, near the top, from the tangent to the cap's axis (ADR-986, above).
+        const float into = std::clamp(static_cast<float>(i - (segments - kJoinRings)) / static_cast<float>(kJoinRings),
+                                      0.0f, 1.0f);
+        if (into > 0.0f) {
+            const float w = into * into * (3.0f - 2.0f * into);
+            tangent = glm::normalize(glm::mix(tangent, join.axis, w));
+            centre += (join.centre - end) * w;
+        }
         glm::vec3 side = glm::cross(tangent, glm::vec3(0.0f, 0.0f, 1.0f));
         side = glm::length(side) > 1e-6f ? glm::normalize(side) : glm::vec3(1.0f, 0.0f, 0.0f);
         const glm::vec3 up = glm::normalize(glm::cross(side, tangent));
@@ -217,8 +243,29 @@ scene::MeshData sweepStem(float height, float baseRadius, float taper, float bul
             mesh.vertices.push_back(v);
         }
     }
+    // The plunge: the top ring once more, carried along the cap's axis into the cap (its uv past 1 marks
+    // it as the part of the stem the cap hides). Not for a cap too thin over the opening to hold one: a
+    // ring on top of the last would only add a band of zero-area triangles.
+    const float plungeRadius = stemRadius(1.0f, baseRadius, taper, bulgePos, bulgeWidth);
+    const bool plunge = join.plunge > 0.05f * plungeRadius;
+    if (plunge) {
+        const float r = plungeRadius;
+        glm::vec3 side = glm::cross(join.axis, glm::vec3(0.0f, 0.0f, 1.0f));
+        side = glm::length(side) > 1e-6f ? glm::normalize(side) : glm::vec3(1.0f, 0.0f, 0.0f);
+        const glm::vec3 up = glm::normalize(glm::cross(side, join.axis));
+        const glm::vec3 centre = join.centre + join.axis * join.plunge;
+        for (int k = 0; k <= sides; ++k) {
+            const float theta = 2.0f * kPi * static_cast<float>(k) / static_cast<float>(sides);
+            scene::Vertex v;
+            v.position = centre + (side * std::cos(theta) + up * std::sin(theta)) * r;
+            v.normal = glm::normalize(side * std::cos(theta) + up * std::sin(theta));
+            v.uv = glm::vec2(static_cast<float>(k) / static_cast<float>(sides),
+                             1.0f + join.plunge / std::max(height, 1e-4f));
+            mesh.vertices.push_back(v);
+        }
+    }
     const auto stride = static_cast<std::uint32_t>(sides + 1);
-    for (int i = 0; i < segments; ++i) {
+    for (int i = 0; i < segments + (plunge ? 1 : 0); ++i) {
         for (int k = 0; k < sides; ++k) {
             const std::uint32_t a = static_cast<std::uint32_t>(i) * stride + static_cast<std::uint32_t>(k);
             mesh.indices.insert(mesh.indices.end(), {a, a + stride, a + 1, a + 1, a + stride, a + stride + 1});
@@ -425,10 +472,19 @@ Result<search::Subject> buildMushroom(const search::Parameters& v) {
     subject.parts[1].baseColor = art.palette.secondary * 0.3f;
     subject.parts[1].roughness = 0.52f;
 
+    // Where the stem meets the cap (ADR-986): the opening's centre -- the pivot the cap tilts about, over
+    // the stem's end -- the cap's axis there, and a plunge inside the cap: a quarter of the cap's own depth
+    // over the opening (the upper surface's height there less the underside's), so it stays inside
+    // whatever the centre does, and at most one top radius.
+    StemJoin join;
+    join.centre = glm::vec3(attachXZ.x, capPivotY, attachXZ.y);
+    join.axis = glm::vec3(0.0f, std::cos(tilt), std::sin(tilt));
+    const float depthOver = std::min(upper.at(0.0f), upper.at(std::min(innerU * 1.5f, 1.0f))) - capPivotY;
+    join.plunge = std::clamp(0.25f * depthOver, 0.0f, topRadius);
     subject.parts[2].mesh = sweepStem(kStemHeight, baseRadius, taper,
                                       param(v, MushroomParam::StemBulgePosition),
                                       param(v, MushroomParam::StemBulgeWidth),
-                                      param(v, MushroomParam::StemCurvature), 22, 20);
+                                      param(v, MushroomParam::StemCurvature), 22, 20, join);
     subject.parts[2].role = "stem";
     subject.parts[2].baseColor = art.palette.shadow + glm::vec3(0.18f, 0.09f, 0.16f);
     subject.parts[2].roughness = 0.62f;
