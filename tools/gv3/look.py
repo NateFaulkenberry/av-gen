@@ -204,6 +204,12 @@ WATER = {
     # The shoreline fade. The source wrote it as "shoreFade", which nothing reads, so the banks used
     # the default 0.8 m; 1.6 m is what was meant: the surface thins out over the last 1.6 m of depth.
     "edgeFade": 1.6,
+    # Whitewater on the falls down the north head (the art pass, item 1; ADR-985): steep water is shaded
+    # about its own plane, and this lays streaks along the flow on it, in the foam's colour. Only water
+    # steeper than 12 degrees carries any -- the falls' pitch, 30-44 degrees -- so the valley's river (7.8
+    # at its steepest, `avgen_water_probe`) is untouched. A pale ribbon from the valley's wides (230-520 m),
+    # streaks where a camera comes near; kept under the glowing plants so the head does not become a subject.
+    "cascade": 0.35,
 }
 WATER_DEAD_KEYS = ("shoreFade",)
 

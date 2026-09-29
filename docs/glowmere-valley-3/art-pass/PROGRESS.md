@@ -6,10 +6,11 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, 21:00):** every item and the addendum are in code and data, committed (`ba508a3f`); the
-  verification render batch is queued under the GPU lock (`scratchpad/art/batch1.sh`, outputs in
-  `~/Desktop/av-gen-review/20-gv3-art-pass/verify/`). Then: look at every output, fix what they show (once), the
-  frame-cost A/B, the aurora measurement, the final 1080p render with the song, the Critic ONCE, both suites.
+- **Status (2026-09-28, 22:10):** every item and the addendum are in code and data. Verification batch 1 was
+  reviewed and its findings fixed in data (`7cb99c07`, below); the falls' "slab" look that batch 1 still showed is
+  fixed in the water shader (ADR-985, `cascade`; committed next). Batch 2 (`scratchpad/art/batch2.sh`, outputs in
+  `~/Desktop/av-gen-review/20-gv3-art-pass/verify2/`) is running under the GPU lock. Then: frame-cost A/B, aurora
+  numbers (s72 pair in batch 2), the final 1080p render with the song, the Critic ONCE, both suites, final report.
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -235,6 +236,37 @@ of the head get their jitter re-dealt. Positions, sizes and yaws do not move.
   s54 (drummer, 100% in frame, 0.31-0.33 of the frame).
 - Stage light: evaluated as a variant only (two soft 220 cd spots 9 m over the performers, no shadows); decide from
   the A/B stills.
+
+## Verification batch 1 (2026-09-28 21:06-21:16): what it showed, and what was done
+
+Outputs in `~/Desktop/av-gen-review/20-gv3-art-pass/verify/` (11 stills, 5 clips, 2 r7b clips; all rc 0).
+- **Falls:** edges and junction right (ADR-980 holds), but still a flat textured panel ("slab"): the part above the
+  camera's height shaded as if from under the water, depth read straight down, tears' lattice as bricks. Fixed in
+  the shader: **ADR-985** (below).
+- **UFO warp:** at 0.4 invisible round a stationary saucer at 80 m -> strength 0.8, livelier curl (`cast.py`). The
+  wake refracted the climbing saucer into a colour-fringed crescent (s59, 182.4 s) -> wake removed.
+- **E5:** the drummer read as a pale ghost in the beam -> the horse's gold lift Glow moved to him (`musicians.py`
+  LIFT_GLOW, `ufo.plan.json` drummer-glow/rim cues), gain 0.5 (the cues clipped 25.7% of the frame at full).
+- **Musicians:** rings too strong -> own kick pump 1.5 (`look.PERFORMER_PULSE_KICK`); performers' rings blacked
+  out in the cold open (`look.pulse_blackouts`); s01's drift passed 4 m from the kit -> moved 6 m east (12 m); s04
+  hid them behind ferns -> 40 mm from 5 m up (`shots.py`).
+- **Stage light:** the variant's cones were written in radians; the loader reads DEGREES, so no light reached the
+  performers. Fixed in `artvariant.py` (inner 14, outer 29); A/B again in batch 2.
+- Committed as `7cb99c07` (the generator's output, byte-compared after a fresh make + ufo).
+
+## Falls: ADR-985, water on a steep course is a cascade (item 1, second half)
+
+- `shaders/water.wgsl`: a surface steeper than 12 degrees (fully past 30) is shaded about its own plane: face up from
+  the derivatives, eye's side from the plane, depth across the sheet, ripples turned onto the slope, tears faded.
+  New `WaterSettings::cascade` (control `nodes/<terrain>/water/cascade`): whitewater streaks combed along the flow
+  (12 samples, 0.2 m apart, 0.45 m grain, 3x the water's speed, bounded advection, fading to the mean when too fine).
+  All in `cascade (ADR-985)` marker blocks. GV3: `look.WATER["cascade"] = 0.35`.
+- Probe: the valley's water is 7.8 deg at its steepest (so it never takes the path); the falls 607 m2 > 30 deg.
+- Tests `[cascade]` (new file `test_water_cascade_gpu.cpp`, 5 cases, 152 assertions) pass: flat water byte-identical
+  to the stripped shader (8/8, control differs); QA river changed only on 3 steep bank pixels (a flag arm proves
+  it); the eye's-height seam log ratio 0.007 vs 1.023; tears on a 35-deg slope identical vs 0.0041; streaks +0.50
+  luminance, 3.3x gradient across vs along. All `[water]` GPU tests pass (21 cases, 675 assertions).
+- Batch 2 stills `still-water-a/b`: the falls read as a streaked cascade into the river; the lattice is gone.
 
 ## Plan (the rest, in order)
 

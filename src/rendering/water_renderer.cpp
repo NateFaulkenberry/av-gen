@@ -60,7 +60,7 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              s.reflection, s.fresnel,   s.specular,  s.roughness,  s.maxOpacity,
                              s.ripple,    s.rippleScale, s.rippleSpeed, s.chop,     s.foamWidth,
                              s.edgeFade,  s.refraction, s.glowScale, s.glowCoverage, s.glowDepth,
-                             s.swell,     s.emissiveIntensity, flowTime, fastest,
+                             s.swell,     s.emissiveIntensity, flowTime, fastest, s.cascade,
                              // ADR-916. A NaN shear or cell would take every seam -- and through the
                              // shared sample point, every ripple -- with it.
                              s.tears,     s.tearShear,  s.tearCoverage, s.tearCell, s.tearSpacing,
@@ -93,7 +93,8 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     // on a night sky is the star field reproduced sharply in the river, and reads as a bug.
     u.surface = glm::vec4(s.fresnel, s.specular, std::clamp(s.roughness, 0.02f, 1.0f), s.maxOpacity);
     u.ripples = glm::vec4(s.ripple, std::max(s.rippleScale, 1e-4f), s.rippleSpeed, s.chop);
-    u.shore = glm::vec4(s.foamWidth, s.edgeFade, s.refraction, 0.0f);
+    // ADR-985: the whitewater on steep water rides the slot the shoreline left free.
+    u.shore = glm::vec4(s.foamWidth, s.edgeFade, s.refraction, s.cascade);
     u.life = glm::vec4(std::max(s.glowScale, 1e-4f), s.glowCoverage, s.glowDepth, s.swell);
     u.params = glm::vec4(flowTime, std::max(fastest, 1e-3f), linearDepthValid ? 1.0f : 0.0f, 0.0f);
     // ADR-916. Packed as authored even at `tears` 0: the shader's own gate is what keeps a surface with

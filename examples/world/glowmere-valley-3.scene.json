@@ -1607,7 +1607,8 @@
           "tearStretch": 4.0,
           "tearDirection": "wind",
           "tearDrift": 0.15,
-          "tearWind": 0.6
+          "tearWind": 0.6,
+          "cascade": 0.35
         },
         "flow": {
           "speedScale": 1.0,

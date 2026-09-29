@@ -45,7 +45,8 @@ struct WaterUniforms {
     emissive: vec4<f32>,       // rgb * intensity, w = 0
     surface: vec4<f32>,        // x = fresnel, y = specular, z = roughness, w = maxOpacity
     ripples: vec4<f32>,        // x = amplitude, y = scale (cycles/m), z = speed, w = chop
-    shore: vec4<f32>,          // x = foamWidth (m), y = edgeFade (m), z = refraction (m), w = 0
+    shore: vec4<f32>,          // x = foamWidth (m), y = edgeFade (m), z = refraction (m),
+                               //   w = cascade (the whitewater on a falls, ADR-985)
     life: vec4<f32>,           // x = glowScale, y = glowCoverage, z = glowDepth (m), w = swell (m)
     params: vec4<f32>,         // x = flow time (s), y = world's fastest body (m/s), z = 1 when the
                                //   linear-depth texture is real, w = 0
@@ -462,6 +463,64 @@ fn bedDepthAt(uv: vec2<f32>) -> f32 {
     return mix(mix(d00, d10, f.x), mix(d01, d11, f.x), f.y);
 }
 
+// ---- cascade (ADR-985) begin ----
+// Water on a steep course is a cascade (ADR-985). Everything in `fs_water` was written for a sheet that
+// lies flat: the ripple normal is built about +Y, the depth under a pixel is measured straight down, the
+// side of the surface the eye is on is read from heights, and the tears lie on a lattice in XZ. On a
+// falls -- GV3's runs thirty metres down its hill at up to 44 degrees -- each of those is wrong, and
+// together they drew the hill water as a flat panel with a brick wall printed on it: seen from the
+// valley, the part of the falls above the camera's own height was shaded as if from under the water (a
+// dark ceiling), its depth was read almost edge-on (so it thinned toward transparent, like a shore), its
+// light was a level pool's, and the XZ lattice of the tears stood up on it as rows of bricks.
+//
+// So a surface steeper than 12 degrees is shaded about its own plane, blended in up to 30 degrees so
+// nothing switches at a line: the face's normal comes from the position's derivatives (constant over a
+// triangle, and the water mesh's triangles are 1.2 m), the eye's side is the plane's, the depth is
+// measured across the sheet, the ripples are turned onto the slope, the tears fade out (a flat-water
+// look), and `cascade` lays whitewater on it -- streaks along the flow, running faster than the river.
+//
+// Flat water never enters any of it: under 12 degrees `steep` is exactly 0 and every branch is skipped.
+// test_water_cascade_gpu.cpp holds the renderer to that: flat water is, byte for byte, what the shader
+// with these blocks removed draws.
+const kCascadeFlatCos: f32 = 0.9781476;   // cos 12 degrees: flatter than this is a river, untouched
+const kCascadeSteepCos: f32 = 0.8660254;  // cos 30 degrees: steeper than this is all cascade
+const kCascadeGrain: f32 = 0.45;          // metres: the whitewater's grain across the flow
+const kCascadeComb: f32 = 0.2;            // metres between the samples a streak is combed from (under half
+                                          //   a grain, so a streak is smooth along its length, not a ladder)
+const kCascadeCombSamples: u32 = 12u;     // so a streak is about 2.4 m long
+const kCascadeRush: f32 = 3.0;            // how many times its river's speed the whitewater runs
+
+// `v` turned by the rotation that takes +Y onto the unit vector `to` (to.y > 0), in closed form.
+fn cascadeTurn(v: vec3<f32>, to: vec3<f32>) -> vec3<f32> {
+    let axis = vec3<f32>(to.z, 0.0, -to.x); // cross(+Y, to): its length is the sine of the turn
+    return v * to.y + cross(axis, v) + axis * (dot(axis, v) / (1.0 + to.y));
+}
+
+// How white the cascade is here, 0..1. Streaks along the flow, combed: each is the mean of twelve samples
+// of the value noise stepped back up the local flow (a line integral), so a streak needs no frame of its
+// own. A frame turned to the local flow would swing the whole pattern about the world origin wherever
+// the flow bends -- 300 m out, a degree of meander moves it five metres. It travels under ADR-914's
+// bounded advection like everything else here, and where a streak is too fine to resolve it fades to
+// the streaks' mean white, so a distant falls is a pale sheet rather than a crawl.
+fn cascadeWhite(p: vec2<f32>, dir: vec2<f32>, speed: f32, t: f32, desync: f32, footprint: f32) -> f32 {
+    let ph = flowPhases(t, kFlowPeriod / kCascadeRush, desync + 0.29, 7u);
+    let run = dir * (speed * kCascadeRush);
+    let f = 1.0 / kCascadeGrain;
+    var a = 0.0;
+    var b = 0.0;
+    for (var k = 0u; k < kCascadeCombSamples; k = k + 1u) {
+        let up = p - dir * (f32(k) * kCascadeComb);
+        a = a + noiseD((up - run * ph.travel.x) * f + ph.jump0).x;
+        b = b + noiseD((up - run * ph.travel.y) * f + ph.jump1).x;
+    }
+    // The comb's mean has a standard deviation of about 0.21 on this noise, so a quarter of the sheet is
+    // bright streak; 0.57 is the mean white, measured on the same noise, that a far falls fades to.
+    let field = clamp((a * ph.weight.x + b * ph.weight.y) / f32(kCascadeCombSamples) + 0.5, 0.0, 1.0);
+    let white = 0.35 + 0.65 * smoothstep(0.45, 0.75, field);
+    return mix(0.57, white, rippleLayerFade(f, footprint));
+}
+// ---- cascade (ADR-985) end ----
+
 @fragment
 fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     let screenUv = in.clip.xy * frame.targetSize.zw;
@@ -471,7 +530,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let viewDepth = max(dot(in.worldPos - frame.cameraPos.xyz, frame.cameraForward.xyz), 1e-4);
     // Seen from below (the camera is under the surface) the sheet's up is still +Y in the world;
     // what changes is which side of it the eye is on, and that is what `underwater` carries.
-    let underwater = frame.cameraPos.y < in.worldPos.y;
+    var underwater = frame.cameraPos.y < in.worldPos.y;
 
     let flowDir2 = in.flow.xz;
     let flowLen = length(flowDir2);
@@ -496,6 +555,23 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // Where this part of the surface is in the advection cycle (ADR-914), shared by every effect
     // below that travels, each at its own offset into it.
     let desync = flowDesync(in.worldPos.xz);
+    // ---- cascade (ADR-985) begin ----
+    // The face's own up, from the derivatives (so here, in uniform control flow), and how steep it is:
+    // exactly 0 under 12 degrees, 1 past 30. A camera below a falls sees its upper side, so on a slope
+    // the eye's side of the surface is the plane's, not a comparison of heights.
+    let faceCross = cross(vec3<f32>(dPdx.x, dpdx(in.worldPos.y), dPdx.y),
+                          vec3<f32>(dPdy.x, dpdy(in.worldPos.y), dPdy.y));
+    let faceSide = faceCross * inverseSqrt(max(dot(faceCross, faceCross), 1e-30));
+    let faceUp = select(faceSide, -faceSide, faceSide.y < 0.0);
+    var steep = 0.0;
+    if (faceUp.y < kCascadeFlatCos) {
+        steep = 1.0 - smoothstep(kCascadeSteepCos, kCascadeFlatCos, faceUp.y);
+    }
+    let cascadeUp = normalize(mix(vec3<f32>(0.0, 1.0, 0.0), faceUp, steep));
+    if (steep > 0.0) {
+        underwater = dot(toEye, cascadeUp) < 0.0;
+    }
+    // ---- cascade (ADR-985) end ----
     var rippleAmplitude = water.ripples.x;
     // ---- tears (ADR-916) begin ----
     if (water.tears.x > 0.0) {
@@ -503,10 +579,24 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         waterTearShift = tear.shift;
         waterTearBlur = tear.blur;
         rippleAmplitude = rippleAmplitude + tear.band;
+        // ---- cascade (ADR-985) begin ----
+        // A lattice in XZ stood up on a slope is a wall of bricks: the tears fade out with the steepness.
+        if (steep > 0.0) {
+            waterTearShift = tear.shift * (1.0 - steep);
+            waterTearBlur = tear.blur * (1.0 - steep);
+            rippleAmplitude = water.ripples.x + tear.band * (1.0 - steep);
+        }
+        // ---- cascade (ADR-985) end ----
     }
     // ---- tears (ADR-916) end ----
     let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, lodFootprint, desync) * rippleAmplitude;
     var n = normalize(vec3<f32>(-gradient.x, 1.0, -gradient.y));
+    // ---- cascade (ADR-985) begin ----
+    // The ripples, built about +Y, turned onto the slope.
+    if (steep > 0.0) {
+        n = cascadeTurn(n, cascadeUp);
+    }
+    // ---- cascade (ADR-985) end ----
     if (underwater) {
         n = vec3<f32>(-n.x, -n.y, -n.z);
     }
@@ -567,6 +657,13 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         vertical = max(in.uv.x, 0.0);
         thickness = vertical / max(abs(v.y), 0.15);
     }
+    // ---- cascade (ADR-985) begin ----
+    // On a slope the depth that matters is across the sheet, not straight down: seen from the valley, a
+    // falls is crossed almost edge-on to the vertical, and its vertical depth read it as a shore.
+    if (steep > 0.0 && water.params.z >= 0.5) {
+        vertical = thickness * abs(dot(v, cascadeUp));
+    }
+    // ---- cascade (ADR-985) end ----
     // A surface seen from a very grazing angle over a shallow bed reports a long thickness and goes
     // opaque a metre from the bank, which is right for a lake and wrong for a stream you can see the
     // stones in. Capping the ray's thickness at a few times the vertical depth keeps the shallows
@@ -721,6 +818,14 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
                      rippleLayerFade(surfFrequency, lodFootprint);
         foam = band * broken * water.foamColor.w * mix(0.45, 1.0, speedFraction);
     }
+    // ---- cascade (ADR-985) begin ----
+    // Whitewater on the slope, in the foam's colour and composited as foam is, thinning out where the
+    // water does so the bank stays the shoreline's.
+    if (steep > 0.0 && water.shore.w > 0.0 && !underwater) {
+        foam = foam + cascadeWhite(in.worldPos.xz, dir, speed, t, desync, lodFootprint) * water.shore.w * steep *
+                          shoreFade;
+    }
+    // ---- cascade (ADR-985) end ----
 
     // ---- composite ------------------------------------------------------------------------------
     // Transmission first: how much of the bed survives. Beer-Lambert over the ray's thickness, so

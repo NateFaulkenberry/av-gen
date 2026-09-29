@@ -485,6 +485,7 @@ struct CompositionNode {
     params::Parameter<float>* waterFlowSpeedParam = nullptr;
     params::Parameter<float>* waterSwellParam = nullptr;
     params::Parameter<float>* waterFoamParam = nullptr;
+    params::Parameter<float>* waterCascadeParam = nullptr; // ADR-985
     // ADR-350. ADR-099 chose six water properties as "the ones worth moving". The water-world
     // spec's §17 and §23 ask for a different nine, and none of them were reachable: a scene could
     // not change how clear its water was, what colour it went with depth, or how much sky it

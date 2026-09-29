@@ -5417,6 +5417,9 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(floatDesc(base + "water/flowSpeed", w.rippleSpeed, 0.0f, 100.0f, 0.0f, 4.0f));
         node.waterSwellParam = &params_->add(floatDesc(base + "water/swell", w.swell, 0.0f, 100.0f, 0.0f, 1.5f));
         node.waterFoamParam = &params_->add(floatDesc(base + "water/foam", w.foam, 0.0f, 10.0f, 0.0f, 2.0f));
+        // ADR-985: the whitewater a steep reach carries (flat water has none whatever it is).
+        node.waterCascadeParam =
+            &params_->add(floatDesc(base + "water/cascade", w.cascade, 0.0f, 10.0f, 0.0f, 2.0f));
         node.waterGlowColorParam =
             &params_->add(vec3Desc(base + "water/glowColor", w.glowColor, 0.0f, 20.0f, 0.0f, 1.0f));
         // ADR-350: the nine the water-world spec names, which were all unreachable. `clarity` and
@@ -5498,6 +5501,7 @@ void nullWaterParameters(CompositionNode& node) {
     node.waterFlowSpeedParam = nullptr;
     node.waterSwellParam = nullptr;
     node.waterFoamParam = nullptr;
+    node.waterCascadeParam = nullptr;
     node.waterGlowColorParam = nullptr;
     node.waterClarityParam = nullptr;
     node.waterMaxOpacityParam = nullptr;
@@ -9062,6 +9066,7 @@ void Composition::updateWaterSurfaces() {
         if (node.waterFlowSpeedParam != nullptr) w.rippleSpeed = node.waterFlowSpeedParam->value();
         if (node.waterSwellParam != nullptr) w.swell = node.waterSwellParam->value();
         if (node.waterFoamParam != nullptr) w.foam = node.waterFoamParam->value();
+        if (node.waterCascadeParam != nullptr) w.cascade = node.waterCascadeParam->value();
         if (node.waterGlowColorParam != nullptr) w.glowColor = node.waterGlowColorParam->value();
         if (node.waterClarityParam != nullptr) w.clarity = node.waterClarityParam->value();
         if (node.waterMaxOpacityParam != nullptr) w.maxOpacity = node.waterMaxOpacityParam->value();
@@ -10250,6 +10255,7 @@ nlohmann::json Composition::toJson() const {
                                       {"sparkle", ts.water.sparkle},
                                       {"sparkleColor", vecToJson(ts.water.sparkleColor)},
                                       {"swell", ts.water.swell},
+                                      {"cascade", ts.water.cascade},
                                       {"tears", ts.water.tears},
                                       {"tearShear", ts.water.tearShear},
                                       {"tearCoverage", ts.water.tearCoverage},
@@ -12055,6 +12061,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"glowCoverage", &w.glowCoverage},
                               TerrainFloat{"glowDepth", &w.glowDepth},
                               TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell},
+                              TerrainFloat{"cascade", &w.cascade},
                               TerrainFloat{"tears", &w.tears}, TerrainFloat{"tearShear", &w.tearShear},
                               TerrainFloat{"tearCoverage", &w.tearCoverage},
                               TerrainFloat{"tearCell", &w.tearCell},
