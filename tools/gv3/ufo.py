@@ -17,8 +17,9 @@ music, building to the riser's centrepiece. The five are a Director plan in the 
                  cow-12). The owner: only one animal is ever abducted at a time; the pair E4 used to lift
                  read at 1:45 as "two cows being abducted at once", so the second cow is re-homed away
                  (cast.REHOMED) and no other animal stands within 15 m of any beam
-  E5  abduction  the centrepiece: the saucer takes the elder's own horse -- the beam on bar 93, the
-                 horse gone on the drop, its gold glow riding the lift (two cues on E5's lift)
+  E5  abduction  the centrepiece: the saucer takes the drummer from behind his kit, by the elder (the art pass's
+                 musicians, musicians.py) -- the beam on bar 93, the drummer flailing up it and gone on the
+                 drop, and six seconds later behind his kit again, playing (`returnSeconds`, ADR-984)
 
 This is the generator's last step, run after `make_glowmere_valley_3.py` has written the project:
 
@@ -295,7 +296,8 @@ def check(beats):
             continue
         if "beam" not in p["moments"]:
             problems.append(f"{key} never lit its beam (it found {len(p['animals'])} animal(s))")
-        taken = [a for a in p["animals"] if a.get("retired", -1.0) >= 0.0]
+        # Taken: retired, or (ADR-984) dissolved and put back.
+        taken = [a for a in p["animals"] if a.get("retired", -1.0) >= 0.0 or a.get("returned", -1.0) >= 0.0]
         if len(taken) != count:
             problems.append(f"{key} took {len(taken)} animal(s), not {count}")
     for key in ("e1-far-survey", "e2-flyby"):
@@ -307,15 +309,31 @@ def check(beats):
         bar93 = e5["nominal"].get("beam")
         if bar93 is not None and not 0 <= frame(e5["moments"]["beam"]) - frame(bar93) <= 1:
             problems.append(f"E5's beam lit at {e5['moments']['beam']:.3f} s, not on bar 93 ({bar93:.3f} s)")
-    # The horse is gone on the drop: its dissolve ends, and the next step retires it, within a frame of
-    # the first frame of the drop (bar 97 on the production's grid, which the cut is laid on).
+    # The drummer is gone on the drop: his dissolve ends within a frame of the first frame of the drop (bar 97
+    # on the production's grid, which the cut is laid on). And he is back (ADR-984): put where he was lifted
+    # from, `returnSeconds` after the beam goes out, during a shot that does not see the kit.
     if e5 is not None:
         drop = math.ceil(music.bar(97) * FPS - 1e-6)
-        horse = [a for a in e5["animals"] if a.get("retired", -1.0) >= 0.0]
-        if horse and abs(frame(horse[0]["retired"]) - drop) > 1:
-            problems.append(f"the horse retired at {horse[0]['retired']:.3f} s, not on the drop "
-                            f"(frame {drop}, {drop / FPS:.3f} s)")
+        for a in e5["animals"]:
+            gone = a.get("dissolved", a.get("retired", -1.0))
+            if gone >= 0.0 and abs(frame(gone) - drop) > 1:
+                problems.append(f"{a['entity']} was gone at {gone:.3f} s, not on the drop "
+                                f"(frame {drop}, {drop / FPS:.3f} s)")
+            if "returned" in a:
+                back = [round(u - v, 3) for u, v in zip(a["atReturn"], a["atLift"])]
+                if max(abs(d) for d in back) > 0.01:
+                    problems.append(f"{a['entity']} was put back {back} m from where he was lifted")
+                e5_back = plan_return("e5-centrepiece")
+                if e5_back and abs(a["returned"] - (e5["moments"].get("depart", 0.0) + e5_back)) > 3.0 / FPS:
+                    problems.append(f"{a['entity']} came back at {a['returned']:.3f} s, not {e5_back} s after "
+                                    f"the depart ({e5['moments'].get('depart')})")
     return problems
+
+
+def plan_return(key):
+    """The set piece's `returnSeconds` in the plan (0 when it keeps what it takes)."""
+    sp = next((p for p in plan()["setPieces"] if p["key"] == key), None)
+    return float(sp.get("set", {}).get("returnSeconds", 0.0)) if sp else 0.0
 
 
 def compile_into(project_path=PROJECT, traced=True, trace_file=None):
@@ -362,8 +380,10 @@ def main():
     for p in beats["setPieces"]:
         moments = p.get("moments") or p["nominal"]
         text = ", ".join(f"{m} {t:.3f}" for m, t in sorted(moments.items(), key=lambda kv: kv[1]))
-        taken = ", ".join(f"{a['entity']} {a['retired']:.3f}" for a in p.get("animals", [])
-                          if a.get("retired", -1.0) >= 0.0)
+        taken = ", ".join(f"{a['entity']} {a['retired']:.3f}" if a.get("retired", -1.0) >= 0.0 else
+                          f"{a['entity']} gone {a.get('dissolved', -1.0):.3f}, back {a['returned']:.3f}"
+                          for a in p.get("animals", [])
+                          if a.get("retired", -1.0) >= 0.0 or a.get("returned", -1.0) >= 0.0)
         hold = p.get("holding") or {}
         print(f"  {p['id']:15s} {p['craft']:7s} {text}" + (f"; took {taken}" if taken else "")
               + (f"; held within {hold['maxDrift']:.2f} m" if hold.get("frames") else ""))

@@ -249,6 +249,9 @@ REHOMED = {
     # column (r6b) and moves to bull-1's slope, 125 m from it (beamclear.py on each round's trace).
     "cow-23": (-76.0, 70.0),
     "bull-10": (-12.0, -128.0),
+    # The art pass: E5 takes the drummer now (musicians.py), and horse-11 grazed round the stage; it joins the
+    # herd on the east meadow, 21 m from horse-2's and horse-20's homes.
+    "horse-11": (70.0, 34.0),
 }
 REHOMED_TERRITORY = {"homeRadius": 16.0, "maxRange": 12.0}
 
@@ -501,11 +504,11 @@ def animals(project, scene, ground):
 
 # ---- the horse's light -----------------------------------------------------------------------------
 def horse_light(project):
-    """The Glow on the horse, dark at rest. The plan's cues raise its self-glow and rim on E5's lift
-    (ufo.plan.json, `horse-glow` and `horse-rim`); the first pass's timeline keys are gone, and so is
-    any key a previous generation left on its two fields."""
-    project["effects"] = [e for e in project.get("effects", []) if e["id"] != HORSE_GLOW["id"]] + [
-        copy.deepcopy(HORSE_GLOW)]
+    """No Glow on the horse any more: the art pass's E5 lifts the drummer, who carries his own light
+    (musicians.py). The effect, its cues and any key a previous generation left on its fields are gone."""
+    project["effects"] = [e for e in project.get("effects", []) if e["id"] != HORSE_GLOW["id"]]
+    for key in [k for k in project.get("parameters", {}) if k.startswith(f"fx/{HORSE_GLOW['id']}/")]:
+        del project["parameters"][key]
     tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
     tl["tracks"] = [t for t in tl.get("tracks", []) if not t["target"].startswith(f"fx/{HORSE_GLOW['id']}/")]
 

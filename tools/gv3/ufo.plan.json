@@ -5,12 +5,12 @@
  "tier": "baked",
  "subjects": [
   {
-   "alias": "horse",
-   "text": "horse-11"
-  },
-  {
    "alias": "e4-cow",
    "text": "cow-12"
+  },
+  {
+   "alias": "drummer",
+   "text": "drummer"
   }
  ],
  "setPieces": [
@@ -121,14 +121,14 @@
    "place": {
     "region": {
      "center": [
-      -4,
-      66
+      -1.7,
+      70.9
      ],
      "radius": 20
     }
    },
    "animals": [
-    "horse"
+    "drummer"
    ],
    "set": {
     "approachSeconds": 21,
@@ -146,37 +146,11 @@
     "entryHeight": 100,
     "departBearing": 328,
     "departDistance": 458,
-    "leaveHeight": 380
+    "leaveHeight": 380,
+    "returnSeconds": 6.0
    },
    "framingMetres": 30
   }
  ],
- "cues": [
-  {
-   "key": "horse-glow",
-   "effect": {
-    "owner": "horse",
-    "type": "glow",
-    "id": "horse-light"
-   },
-   "field": "glow",
-   "on": "setpiece/e5-centrepiece/lift",
-   "value": 3.0,
-   "rampSeconds": 1.3,
-   "holdSeconds": 3.6
-  },
-  {
-   "key": "horse-rim",
-   "effect": {
-    "owner": "horse",
-    "type": "glow",
-    "id": "horse-light"
-   },
-   "field": "rim",
-   "on": "setpiece/e5-centrepiece/lift",
-   "value": 5.0,
-   "rampSeconds": 1.3,
-   "holdSeconds": 3.6
-  }
- ]
+ "cues": []
 }

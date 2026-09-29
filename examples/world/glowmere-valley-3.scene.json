@@ -307,6 +307,98 @@
         1.0
       ],
       "reactionProfile": "organism"
+    },
+    {
+      "name": "opal-cap",
+      "position": [
+        79.986,
+        13.651,
+        -4.397
+      ],
+      "yaw": -1.016,
+      "scale": 1.0,
+      "radius": 2.86,
+      "height": 6.8,
+      "importance": 0.285,
+      "focalWeight": 0.4,
+      "preferredCameraDistance": 21.1,
+      "preferredCameraElevation": 8.0,
+      "activationRadius": 61.2,
+      "colorAccent": [
+        0.06,
+        0.82,
+        1.0
+      ],
+      "reactionProfile": "organism"
+    },
+    {
+      "name": "sail-cap",
+      "position": [
+        41.293,
+        13.061,
+        45.037
+      ],
+      "yaw": -1.406,
+      "scale": 1.0,
+      "radius": 3.11,
+      "height": 7.4,
+      "importance": 0.2635,
+      "focalWeight": 0.35,
+      "preferredCameraDistance": 22.9,
+      "preferredCameraElevation": 8.0,
+      "activationRadius": 66.6,
+      "colorAccent": [
+        0.06,
+        0.82,
+        1.0
+      ],
+      "reactionProfile": "organism"
+    },
+    {
+      "name": "drummer",
+      "position": [
+        -1.7,
+        7.162,
+        70.9
+      ],
+      "yaw": 3.142,
+      "scale": 1.0,
+      "radius": 2.2,
+      "height": 3.4,
+      "importance": 0.24,
+      "focalWeight": 0.6,
+      "preferredCameraDistance": 12.0,
+      "preferredCameraElevation": 2.0,
+      "activationRadius": 60.0,
+      "colorAccent": [
+        0.62,
+        0.45,
+        1.0
+      ],
+      "reactionProfile": ""
+    },
+    {
+      "name": "keyboardist",
+      "position": [
+        -1.7,
+        7.856,
+        59.9
+      ],
+      "yaw": 0.0,
+      "scale": 1.0,
+      "radius": 2.2,
+      "height": 3.4,
+      "importance": 0.23,
+      "focalWeight": 0.6,
+      "preferredCameraDistance": 12.0,
+      "preferredCameraElevation": 2.0,
+      "activationRadius": 60.0,
+      "colorAccent": [
+        0.62,
+        0.45,
+        1.0
+      ],
+      "reactionProfile": ""
     }
   ],
   "effects": [
@@ -3397,6 +3489,26 @@
           "softness": 30.0,
           "strength": 1.0,
           "minHeight": 2.2
+        },
+        {
+          "center": [
+            -1.41,
+            70.22
+          ],
+          "radius": 2.47,
+          "softness": 1.5,
+          "strength": 1.0,
+          "minHeight": 0.0
+        },
+        {
+          "center": [
+            -1.7,
+            60.43
+          ],
+          "radius": 2.38,
+          "softness": 1.5,
+          "strength": 1.0,
+          "minHeight": 0.0
         }
       ]
     },
@@ -9056,9 +9168,9 @@
       "kind": "gltf",
       "name": "horse-11",
       "position": [
-        -4.0,
-        5.420000076293945,
-        66.0
+        70.0,
+        7.997,
+        34.0
       ],
       "rotation": [
         0.0,
@@ -9244,6 +9356,914 @@
         "volumeGlow": 0.0,
         "fogCoupling": 0.8
       }
+    },
+    {
+      "name": "opal-cap",
+      "kind": "procedural",
+      "position": [
+        80.0,
+        8.208,
+        -5.0
+      ],
+      "rotation": [
+        0.0,
+        -58.22,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 251,
+            "values": [
+              0.38772329688072205,
+              -67.96966552734375,
+              19.348033905029297,
+              0.346048504114151,
+              0.09477021545171738,
+              0.5270368456840515,
+              0.6161338090896606,
+              0.027720211073756218,
+              2.0,
+              0.02214859426021576,
+              15.497483253479004,
+              0.09043915569782257,
+              0.010709798894822598,
+              4.564196586608887,
+              48.0,
+              0.37551385164260864,
+              2.0,
+              2.8621819019317627
+            ]
+          },
+          "generatedPart": 0
+        },
+        "sourceTransform": {
+          "scale": [
+            5.072,
+            5.072,
+            5.072
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2Cap",
+          "baseColor": [
+            0.09255,
+            0.03624,
+            0.3
+          ],
+          "roughness": 0.44,
+          "emissiveColor": [
+            0.03,
+            0.41,
+            0.5
+          ],
+          "emissiveIntensity": 1.2879818558692933
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "opal-under",
+      "kind": "procedural",
+      "position": [
+        80.0,
+        8.208,
+        -5.0
+      ],
+      "rotation": [
+        0.0,
+        -58.22,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 251,
+            "values": [
+              0.38772329688072205,
+              -67.96966552734375,
+              19.348033905029297,
+              0.346048504114151,
+              0.09477021545171738,
+              0.5270368456840515,
+              0.6161338090896606,
+              0.027720211073756218,
+              2.0,
+              0.02214859426021576,
+              15.497483253479004,
+              0.09043915569782257,
+              0.010709798894822598,
+              4.564196586608887,
+              48.0,
+              0.37551385164260864,
+              2.0,
+              2.8621819019317627
+            ]
+          },
+          "generatedPart": 1
+        },
+        "sourceTransform": {
+          "scale": [
+            5.072,
+            5.072,
+            5.072
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2TissueCool",
+          "baseColor": [
+            0.05553,
+            0.02174,
+            0.18
+          ],
+          "roughness": 0.52,
+          "emissiveColor": [
+            0.06,
+            0.82,
+            1.0
+          ],
+          "emissiveIntensity": 0.18
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "opal-stem",
+      "kind": "procedural",
+      "position": [
+        80.0,
+        8.208,
+        -5.0
+      ],
+      "rotation": [
+        0.0,
+        -58.22,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 251,
+            "values": [
+              0.38772329688072205,
+              -67.96966552734375,
+              19.348033905029297,
+              0.346048504114151,
+              0.09477021545171738,
+              0.5270368456840515,
+              0.6161338090896606,
+              0.027720211073756218,
+              2.0,
+              0.02214859426021576,
+              15.497483253479004,
+              0.09043915569782257,
+              0.010709798894822598,
+              4.564196586608887,
+              48.0,
+              0.37551385164260864,
+              2.0,
+              2.8621819019317627
+            ]
+          },
+          "generatedPart": 2
+        },
+        "sourceTransform": {
+          "scale": [
+            5.072,
+            5.072,
+            5.072
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.24,
+            0.12,
+            0.25
+          ],
+          "roughness": 0.62,
+          "emissiveColor": [
+            0.015,
+            0.205,
+            0.25
+          ],
+          "emissiveIntensity": 0.06
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        }
+      }
+    },
+    {
+      "name": "opal-gills",
+      "kind": "procedural",
+      "position": [
+        80.0,
+        8.208,
+        -5.0
+      ],
+      "rotation": [
+        0.0,
+        -58.22,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 251,
+            "values": [
+              0.38772329688072205,
+              -67.96966552734375,
+              19.348033905029297,
+              0.346048504114151,
+              0.09477021545171738,
+              0.5270368456840515,
+              0.6161338090896606,
+              0.027720211073756218,
+              2.0,
+              0.02214859426021576,
+              15.497483253479004,
+              0.09043915569782257,
+              0.010709798894822598,
+              4.564196586608887,
+              48.0,
+              0.37551385164260864,
+              2.0,
+              2.8621819019317627
+            ]
+          },
+          "generatedPart": 3
+        },
+        "sourceTransform": {
+          "scale": [
+            5.072,
+            5.072,
+            5.072
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2TissueCool",
+          "baseColor": [
+            0.008,
+            0.016,
+            0.048
+          ],
+          "roughness": 0.4,
+          "emissiveColor": [
+            0.06,
+            0.82,
+            1.0
+          ],
+          "emissiveIntensity": 2.8621819019317627
+        },
+        "motion": {
+          "stiffness": 0.8,
+          "mass": 0.5,
+          "damping": 0.95,
+          "windSensitivity": 0.5,
+          "bendLimit": 0.09,
+          "tipAmplitude": 0.06
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "opal-spores",
+      "kind": "particles",
+      "parent": "opal-cap",
+      "position": [
+        0.505,
+        5.035,
+        0.329
+      ],
+      "visible": true,
+      "particles": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shape": "disc",
+        "seed": 4270,
+        "extent": [
+          2.073,
+          0.15,
+          2.073
+        ],
+        "capacity": 128,
+        "spawnRate": 4.1,
+        "lifetimeMin": 16.0,
+        "lifetimeMax": 22.0,
+        "speedMin": 0.1,
+        "speedMax": 0.2,
+        "direction": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "spread": 0.22,
+        "drag": 0.08,
+        "gravity": [
+          0.0,
+          -0.05,
+          0.0
+        ],
+        "sizeStart": 0.07,
+        "sizeEnd": 0.025,
+        "blend": "additive",
+        "colorStart": [
+          0.06,
+          0.82,
+          1.0,
+          0.0
+        ],
+        "colorEnd": [
+          0.06,
+          0.82,
+          1.0,
+          0.0
+        ],
+        "emissive": 3.936,
+        "opacityCurve": [
+          {
+            "t": 0.0,
+            "value": 0.0
+          },
+          {
+            "t": 0.18,
+            "value": 0.75
+          },
+          {
+            "t": 0.7,
+            "value": 0.55
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ],
+        "turbulence": 0.09,
+        "turbulenceScale": 0.6,
+        "turbulenceSpeed": 0.1,
+        "softness": 0.18,
+        "fogCoupling": 1.0
+      }
+    },
+    {
+      "name": "sail-cap",
+      "kind": "procedural",
+      "position": [
+        42.0,
+        7.309,
+        43.0
+      ],
+      "rotation": [
+        0.0,
+        -80.54,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 707,
+            "values": [
+              0.5815221667289734,
+              -52.393489837646484,
+              -3.2300901412963867,
+              0.14351917803287506,
+              0.331635445356369,
+              1.2650251388549805,
+              0.1588095873594284,
+              0.16478075087070465,
+              1.0,
+              0.16482438147068024,
+              16.464279174804688,
+              0.026571962982416153,
+              0.011119955219328403,
+              2.23333740234375,
+              52.0,
+              0.35500600934028625,
+              1.0,
+              5.072240829467773
+            ]
+          },
+          "generatedPart": 0
+        },
+        "sourceTransform": {
+          "scale": [
+            5.3709,
+            5.3709,
+            5.3709
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2Cap",
+          "baseColor": [
+            0.09255,
+            0.03624,
+            0.3
+          ],
+          "roughness": 0.44,
+          "emissiveColor": [
+            0.002,
+            0.1,
+            0.058
+          ],
+          "emissiveIntensity": 0.3
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "sail-under",
+      "kind": "procedural",
+      "position": [
+        42.0,
+        7.309,
+        43.0
+      ],
+      "rotation": [
+        0.0,
+        -80.54,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 707,
+            "values": [
+              0.5815221667289734,
+              -52.393489837646484,
+              -3.2300901412963867,
+              0.14351917803287506,
+              0.331635445356369,
+              1.2650251388549805,
+              0.1588095873594284,
+              0.16478075087070465,
+              1.0,
+              0.16482438147068024,
+              16.464279174804688,
+              0.026571962982416153,
+              0.011119955219328403,
+              2.23333740234375,
+              52.0,
+              0.35500600934028625,
+              1.0,
+              5.072240829467773
+            ]
+          },
+          "generatedPart": 1
+        },
+        "sourceTransform": {
+          "scale": [
+            5.3709,
+            5.3709,
+            5.3709
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2TissueCool",
+          "baseColor": [
+            0.05553,
+            0.02174,
+            0.18
+          ],
+          "roughness": 0.52,
+          "emissiveColor": [
+            0.02,
+            1.0,
+            0.58
+          ],
+          "emissiveIntensity": 4.057792663574219
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "sail-stem",
+      "kind": "procedural",
+      "position": [
+        42.0,
+        7.309,
+        43.0
+      ],
+      "rotation": [
+        0.0,
+        -80.54,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 707,
+            "values": [
+              0.5815221667289734,
+              -52.393489837646484,
+              -3.2300901412963867,
+              0.14351917803287506,
+              0.331635445356369,
+              1.2650251388549805,
+              0.1588095873594284,
+              0.16478075087070465,
+              1.0,
+              0.16482438147068024,
+              16.464279174804688,
+              0.026571962982416153,
+              0.011119955219328403,
+              2.23333740234375,
+              52.0,
+              0.35500600934028625,
+              1.0,
+              5.072240829467773
+            ]
+          },
+          "generatedPart": 2
+        },
+        "sourceTransform": {
+          "scale": [
+            5.3709,
+            5.3709,
+            5.3709
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "baseColor": [
+            0.24,
+            0.12,
+            0.25
+          ],
+          "roughness": 0.62,
+          "emissiveColor": [
+            0.005,
+            0.25,
+            0.145
+          ],
+          "emissiveIntensity": 0.06
+        },
+        "motion": {
+          "stiffness": 18.0,
+          "mass": 120.0,
+          "damping": 0.95,
+          "windSensitivity": 0.16,
+          "bendLimit": 0.015,
+          "tipAmplitude": 0.01
+        }
+      }
+    },
+    {
+      "name": "sail-gills",
+      "kind": "procedural",
+      "position": [
+        42.0,
+        7.309,
+        43.0
+      ],
+      "rotation": [
+        0.0,
+        -80.54,
+        0.0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "generated",
+          "generated": {
+            "generator": "mushroom",
+            "generatorVersion": 1,
+            "schemaHash": 5729455907941625987,
+            "index": 707,
+            "values": [
+              0.5815221667289734,
+              -52.393489837646484,
+              -3.2300901412963867,
+              0.14351917803287506,
+              0.331635445356369,
+              1.2650251388549805,
+              0.1588095873594284,
+              0.16478075087070465,
+              1.0,
+              0.16482438147068024,
+              16.464279174804688,
+              0.026571962982416153,
+              0.011119955219328403,
+              2.23333740234375,
+              52.0,
+              0.35500600934028625,
+              1.0,
+              5.072240829467773
+            ]
+          },
+          "generatedPart": 3
+        },
+        "sourceTransform": {
+          "scale": [
+            5.3709,
+            5.3709,
+            5.3709
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "material": {
+          "program": "glowmere2TissueCool",
+          "baseColor": [
+            0.008,
+            0.016,
+            0.048
+          ],
+          "roughness": 0.4,
+          "emissiveColor": [
+            0.02,
+            1.0,
+            0.58
+          ],
+          "emissiveIntensity": 1.2680602073669434
+        },
+        "motion": {
+          "stiffness": 0.8,
+          "mass": 0.5,
+          "damping": 0.95,
+          "windSensitivity": 0.5,
+          "bendLimit": 0.09,
+          "tipAmplitude": 0.06
+        },
+        "emissiveField": "drop-ring",
+        "emissiveFieldAmount": 1.5
+      }
+    },
+    {
+      "name": "sail-spores",
+      "kind": "particles",
+      "parent": "sail-cap",
+      "position": [
+        1.893,
+        5.302,
+        1.032
+      ],
+      "visible": true,
+      "particles": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "shape": "disc",
+        "seed": 4287,
+        "extent": [
+          3.695,
+          0.15,
+          3.695
+        ],
+        "capacity": 512,
+        "spawnRate": 12.9,
+        "lifetimeMin": 16.0,
+        "lifetimeMax": 22.0,
+        "speedMin": 0.1,
+        "speedMax": 0.2,
+        "direction": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "spread": 0.22,
+        "drag": 0.08,
+        "gravity": [
+          0.0,
+          -0.05,
+          0.0
+        ],
+        "sizeStart": 0.07,
+        "sizeEnd": 0.025,
+        "blend": "additive",
+        "colorStart": [
+          0.02,
+          1.0,
+          0.58,
+          0.0
+        ],
+        "colorEnd": [
+          0.02,
+          1.0,
+          0.58,
+          0.0
+        ],
+        "emissive": 3.936,
+        "opacityCurve": [
+          {
+            "t": 0.0,
+            "value": 0.0
+          },
+          {
+            "t": 0.18,
+            "value": 0.75
+          },
+          {
+            "t": 0.7,
+            "value": 0.55
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ],
+        "turbulence": 0.09,
+        "turbulenceScale": 0.6,
+        "turbulenceSpeed": 0.1,
+        "softness": 0.18,
+        "fogCoupling": 1.0
+      }
+    },
+    {
+      "name": "drummer",
+      "kind": "gltf",
+      "asset": "../../assets/musicians/astronaut_drums.glb",
+      "position": [
+        -1.7,
+        5.162,
+        70.9
+      ],
+      "rotation": [
+        -2.327,
+        179.983,
+        0.849
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true,
+      "animation": {
+        "state": "Drums",
+        "blend": 0.35,
+        "speed": 1.0,
+        "updateHz": 30,
+        "nearDistance": 25.0,
+        "farHz": 15.0,
+        "cullDistance": 360.0
+      }
+    },
+    {
+      "name": "drum-kit",
+      "kind": "gltf",
+      "asset": "../../assets/musicians/drum_kit.glb",
+      "position": [
+        -1.7,
+        5.162,
+        70.9
+      ],
+      "rotation": [
+        -2.327,
+        179.983,
+        0.849
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "keyboardist",
+      "kind": "gltf",
+      "asset": "../../assets/musicians/astronaut_keys.glb",
+      "position": [
+        -1.7,
+        5.856,
+        59.9
+      ],
+      "rotation": [
+        4.263,
+        -0.047,
+        1.254
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true,
+      "animation": {
+        "state": "Piano",
+        "blend": 0.35,
+        "speed": 1.0,
+        "updateHz": 30,
+        "nearDistance": 25.0,
+        "farHz": 15.0,
+        "cullDistance": 360.0
+      }
+    },
+    {
+      "name": "keyboard-rig",
+      "kind": "gltf",
+      "asset": "../../assets/musicians/keyboard_set.glb",
+      "position": [
+        -1.7,
+        5.856,
+        59.9
+      ],
+      "rotation": [
+        4.263,
+        -0.047,
+        1.254
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
     },
     {
       "name": "elder-rings",
@@ -11054,9 +12074,9 @@
         },
         {
           "arrive": 0.65,
-          "homeRadius": 20.35,
+          "homeRadius": 16.0,
           "kind": "wander",
-          "maxRange": 14.0,
+          "maxRange": 12.0,
           "minRange": 2.63,
           "pauseMax": 6.24,
           "pauseMin": 1.6,
@@ -11233,6 +12253,81 @@
         "farm",
         "cow"
       ]
+    },
+    {
+      "name": "drummer",
+      "node": "drummer",
+      "seed": 20260949,
+      "tags": [
+        "musician",
+        "astronaut"
+      ],
+      "gait": {
+        "matchRate": false,
+        "walkSpeed": 1.0,
+        "runSpeed": 40.0,
+        "rateMin": 1.0,
+        "rateMax": 1.0,
+        "runEnter": 60.0,
+        "runExit": 50.0,
+        "moveEnter": 0.2,
+        "moveExit": 0.1,
+        "accel": 100.0,
+        "decel": 100.0,
+        "idleRate": 1.0,
+        "blend": 0.35
+      },
+      "clips": {
+        "idle": "Drums",
+        "turn": "Drums",
+        "observe": "Drums",
+        "react": "Drums",
+        "walk": "Flail",
+        "run": "Flail",
+        "fall": "Flail"
+      },
+      "fullDetailDistance": 120.0,
+      "coarseInterval": 0.1,
+      "cullDistance": 360.0,
+      "behaviors": [],
+      "reactions": []
+    },
+    {
+      "name": "keyboardist",
+      "node": "keyboardist",
+      "seed": 20260950,
+      "tags": [
+        "musician",
+        "astronaut"
+      ],
+      "gait": {
+        "matchRate": false,
+        "walkSpeed": 1.0,
+        "runSpeed": 40.0,
+        "rateMin": 1.0,
+        "rateMax": 1.0,
+        "runEnter": 60.0,
+        "runExit": 50.0,
+        "moveEnter": 0.2,
+        "moveExit": 0.1,
+        "accel": 100.0,
+        "decel": 100.0,
+        "idleRate": 1.0,
+        "blend": 0.35
+      },
+      "clips": {
+        "idle": "Piano",
+        "turn": "Piano",
+        "observe": "Piano",
+        "react": "Piano",
+        "walk": "Piano",
+        "run": "Piano"
+      },
+      "fullDetailDistance": 120.0,
+      "coarseInterval": 0.1,
+      "cullDistance": 360.0,
+      "behaviors": [],
+      "reactions": []
     }
   ],
   "navWadeDepth": 0.8536,
@@ -11340,7 +12435,7 @@
       },
       {
         "id": 5,
-        "name": "s04 The white horse grazing under the elder's cap",
+        "name": "s04 The astronaut musicians playing under the elder's cap",
         "slug": "s04",
         "placement": "free",
         "position": [
@@ -11349,22 +12444,13 @@
           78.0
         ],
         "target": [
-          0.0,
-          0.0,
-          0.0
+          -1.7,
+          11.486,
+          65.4
         ],
         "fov": 24.616,
         "focalLength": 55.0,
-        "autoDirector": false,
-        "aimNode": "horse-11",
-        "aimOffset": [
-          0.0,
-          5.0,
-          0.0
-        ],
-        "followSmoothSeconds": 0.0,
-        "followVerticalSmoothSeconds": 0.0,
-        "followLead": 0.0
+        "autoDirector": false
       },
       {
         "id": 6,
@@ -12442,7 +13528,7 @@
       },
       {
         "id": 53,
-        "name": "s52 E5: up the beam from beside the horse",
+        "name": "s52 E5: up the beam from beside the kit",
         "slug": "s52",
         "placement": "free",
         "position": [
@@ -12506,7 +13592,7 @@
       },
       {
         "id": 55,
-        "name": "s54 E5: the horse rises, glowing, side on",
+        "name": "s54 E5: the drummer rises from his kit, flailing, side on",
         "slug": "s54",
         "placement": "free",
         "position": [
@@ -12522,10 +13608,10 @@
         "fov": 16.0714,
         "focalLength": 85.0,
         "autoDirector": false,
-        "aimNode": "horse-11",
+        "aimNode": "drummer",
         "aimOffset": [
           0.0,
-          1.0,
+          2.0,
           0.0
         ],
         "followSmoothSeconds": 0.5,
@@ -12553,7 +13639,7 @@
       },
       {
         "id": 57,
-        "name": "s56 E5: the horse under the saucer",
+        "name": "s56 E5: the drummer under the saucer",
         "slug": "s56",
         "placement": "free",
         "position": [
@@ -12581,7 +13667,7 @@
       },
       {
         "id": 58,
-        "name": "s57 E5: the horse fades into the saucer",
+        "name": "s57 E5: the drummer fades into the saucer",
         "slug": "s57",
         "placement": "free",
         "position": [
@@ -12977,7 +14063,7 @@
         "end": 18.924872,
         "transition": "cut",
         "locked": true,
-        "label": "s04 The white horse grazing under the elder's cap"
+        "label": "s04 The astronaut musicians playing under the elder's cap"
       },
       {
         "camera": 6,
@@ -13361,7 +14447,7 @@
         "end": 174.001795,
         "transition": "cut",
         "locked": true,
-        "label": "s52 E5: up the beam from beside the horse"
+        "label": "s52 E5: up the beam from beside the kit"
       },
       {
         "camera": 54,
@@ -13377,7 +14463,7 @@
         "end": 175.847949,
         "transition": "cut",
         "locked": true,
-        "label": "s54 E5: the horse rises, glowing, side on"
+        "label": "s54 E5: the drummer rises from his kit, flailing, side on"
       },
       {
         "camera": 56,
@@ -13393,7 +14479,7 @@
         "end": 177.232564,
         "transition": "cut",
         "locked": true,
-        "label": "s56 E5: the horse under the saucer"
+        "label": "s56 E5: the drummer under the saucer"
       },
       {
         "camera": 58,
@@ -13401,7 +14487,7 @@
         "end": 177.694103,
         "transition": "cut",
         "locked": true,
-        "label": "s57 E5: the horse fades into the saucer"
+        "label": "s57 E5: the drummer fades into the saucer"
       },
       {
         "camera": 59,

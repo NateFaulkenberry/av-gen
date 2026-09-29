@@ -36,7 +36,7 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from gv3 import cast, look, music, songcut, world  # noqa: E402
+from gv3 import cast, heroes, look, music, musicians, songcut, world  # noqa: E402
 from gv3.ground import Ground  # noqa: E402
 
 ROOT = HERE.parent
@@ -295,8 +295,10 @@ def main():
     report = []
     world.close_ends(scene, report)  # before any height is asked of the world
     ground = Ground(world_block(scene))
+    heroes.apply(project, scene, ground, report)  # the art pass's two new heroes, seated by world.apply
     world.apply(project, scene, ground, report)
     cast.apply(project, scene)
+    musicians.apply(project, scene, ground, report)  # the art pass's performers (after the cast: an entity each)
     look.apply_base(project, scene)
 
     if args.scout:
@@ -308,6 +310,7 @@ def main():
         end = FILM_END
         arc = look.apply_arc(project)
         motifs = look.apply_motifs(project, scene)
+        motifs += musicians.routes(project, look._route)
         report.append(f"look: {arc} arc track(s), {motifs} motif route(s)")
         # The spans are the Director's, cut from this project as it now stands (songcut.py).
         spans, director, note = songcut.direct(project, scene, recut=args.recut)

@@ -207,7 +207,8 @@ TEST_CASE("the spore anchor is under the cap and on its axis", "[unit][mushroom]
 TEST_CASE("probe: hero spore anchors", "[.probe][mushroom]") {
     const organism::MushroomGenerator generator;
     std::printf("\n===== hero spore anchors (unit frame) =====\n");
-    for (const std::uint32_t i : {131u, 776u, 644u, 4u, 684u, 515u, 675u, 755u, 508u, 380u}) {
+    // The last two are the GV3 art pass's heroes (the search's eleventh and twelfth picks).
+    for (const std::uint32_t i : {131u, 776u, 644u, 4u, 684u, 515u, 675u, 755u, 508u, 380u, 251u, 707u}) {
         auto subject = generator.build(search::sampleAt(generator.schema().parameters, i));
         REQUIRE(subject.has_value());
         const organism::MushroomAnchors a = organism::mushroomAnchors(*subject);

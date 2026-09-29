@@ -98,13 +98,8 @@ BASE = {
     "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
-    # The horse's gold as the saucer lifts it (E5). Its Glow's cues -- self-glow 3 and rim 5 on a white
-    # horse, raised on the lift -- are the first pass's, and the peak blows the horse out: 25.7% of s29's
-    # pixels clipped (31.9% at worst; the evaluator's high "clipped highlights" at 175.76 s), the horse
-    # pale white with its gold only on the legs. The Glow's brightness multiplies everything it adds
-    # and no cue keys it, so halving it halves the peak and keeps the lift -- when it rises, how long it
-    # holds, its colour.
-    "fx/horse-light/gain": 0.5,
+    # (The horse's gold Glow went with the horse: the art pass's E5 lifts the drummer, who carries his own
+    # light, musicians.py.)
     # One moon. The sky's rotation is the HDRI's, and GV3 has no HDRI: the source (GV2) restated -0.568 rad
     # over the scene's 0. The visible procedural sky is looked up through it (sky_background.wgsl,
     # envRotate), but the skybox's crisp moon is drawn at the sky's own sun direction, un-rotated
@@ -186,6 +181,10 @@ HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.2, "lifetime": 4
 HERO_PULSE_KICK = 8.0
 HERO_PULSE_NEAR = 160.0     # metres: a hero farther than this in the frame does not pulse (the grand wides are 120-150 m)
 HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the nearest)
+# The art pass's performers (musicians.py) pulse beside the heroes, not instead of them: a performer's rings are
+# local (34 m), so they fire when the performer is in frame within this, and they never take one of the two
+# places the mushrooms and aliens have -- 18 m from the elder, they would otherwise have taken half its rings.
+PERFORMER_PULSE_NEAR = 90.0
 
 
 # The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
@@ -795,16 +794,39 @@ def apply_motifs(project, scene):
 
 
 def _hero_positions(scene):
+    from .musicians import GROUPS
+    performers = {g["name"] for g in GROUPS}
     out = {}
     for n in scene["nodes"]:
         if n.get("name", "").endswith("-cap") and n.get("kind") == "procedural":
             out[n["name"]] = n["position"]
+        elif n.get("name") in performers:  # the art pass's performers pulse wherever they are in frame, too
+            out[n["name"]] = n["position"]
+    return out
+
+
+def pulse_blackouts():
+    """{hero: (from, to)}: seconds in which a hero's pulse never fires. The abduction (E5, the beam on bar 93 to the
+    drop on bar 97) keeps the rings it had: the art pass's two new mushrooms and the performers stay out of it,
+    so no new ring crosses the beam. The drummer's lasts until the set piece puts him back behind his kit
+    (ufo.plan.json's `returnSeconds` after the beam goes out, ADR-984): no ring from an empty seat."""
+    import json
+    import pathlib
+    plan = json.loads((pathlib.Path(__file__).resolve().parent / "ufo.plan.json").read_text())
+    e5 = next(p for p in plan["setPieces"] if p["key"] == "e5-centrepiece")
+    back = float(e5.get("set", {}).get("returnSeconds", 0.0))
+    lift = (music.bar(93) - 0.05, music.bar(97) + 0.05)
+    out = {name: lift for name in ("opal-cap", "sail-cap", "keyboardist", "drummer")}
+    out["drummer"] = (lift[0], music.bar(97) + back + 0.2)
     return out
 
 
 def hero_pulse_plan(project, scene, shots):
     """[(time, hero)]: the downbeats on which each hero's pulse fires (see HERO_PULSE_*)."""
     from .framing import keyed, project as proj
+    from .musicians import GROUPS
+    performers = {g["name"] for g in GROUPS}
+    blackout = pulse_blackouts()
     effects = [e for e in project.get("effects", []) if e.get("type") == "groundPulse"]
     owners = {e["owner"]["name"] for e in effects}
     caps = _hero_positions(scene)
@@ -826,12 +848,17 @@ def hero_pulse_plan(project, scene, shots):
                 if name not in owners:
                     continue
                 p, z = proj(eye, aim, rig.focal, [pos[0], pos[1] + 2.0, pos[2]])
-                if p is not None and abs(p[0]) <= 0.95 and abs(p[1]) <= 0.95 and z <= HERO_PULSE_NEAR:
+                near = PERFORMER_PULSE_NEAR if name in performers else HERO_PULSE_NEAR
+                if p is not None and abs(p[0]) <= 0.95 and abs(p[1]) <= 0.95 and z <= near:
                     who[name] = min(who.get(name, z), z)
-        chosen = sorted(who, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]
         for t in downbeats:
             if s.start - 0.02 <= t < s.end - 0.3:
-                plan += [(t, n) for n in chosen]
+                # The nearest heroes in frame that may pulse now (a blacked-out one gives up its place), and
+                # the performers in frame beside them.
+                live = [n for n in who if not (n in blackout and blackout[n][0] <= t <= blackout[n][1])]
+                heroes = [n for n in live if n not in performers]
+                plan += [(t, n) for n in sorted(heroes, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]]
+                plan += [(t, n) for n in sorted(n for n in live if n in performers)]
     return plan
 
 

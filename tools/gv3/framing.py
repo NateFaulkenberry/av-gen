@@ -33,7 +33,7 @@ from gv3 import songcut  # noqa: E402
 from gv3.ground import Ground  # noqa: E402
 
 HEIGHTS = {"rook": 3.3, "tide": 3.3, "sage": 3.3, "ember": 3.3, "vane": 3.3, "visitor": 7.1, "scout": 4.3}
-PALE = {"rook", "tide", "sage", "ember", "vane", "horse-11"}   # white bodies: seen = pale pixels there
+PALE = {"rook", "tide", "sage", "ember", "vane", "horse-11", "drummer", "keyboardist"}   # white bodies: seen = pale pixels there
 SEEN_STEP = 0.5          # seconds between visibility samples
 ASPECT = 16.0 / 9.0
 
