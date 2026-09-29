@@ -436,6 +436,19 @@ passes (up to about three) on the bland shots, both suites, the r1 render.
    seating: the cap keeps its height). New test `[adr986]`. The search no longer reproduces the record (its
    population changed), so its test writes the canonical record only with `MUSHROOM_WRITE_RECORD=1`.
 
+3. **UFO warp rim -- done (data).** A/B stills in `r1/batch/rim-*`: at the field's edge, 0.08 of the radius wide, the
+   rim is a line -- an ellipse eight saucers across over the black sky (s08, 27.9 s), a big arc over the elder at
+   E5's hover (164 s) and an arc across the lit valley after the drop (179.5 s), even at 0.12. 0.4 wide it is a soft
+   halo about the craft. Chosen: rimIntensity 0.08, rimWidth 0.4, keyed on only in s08 (the flyby) and s47 (E5's
+   approach), where the saucer is small against the black sky, 0 everywhere else (`cast.warp_rim`, a step track at
+   the cuts, installed after the cut). The beam cues would quiet a rim too (`ufo.warp_cues`: the rim scales with the
+   envelope, not the strength), though none is on under a beam.
+4. **Rainbow lift -- done (data); the rainbow chosen.** A Color Cycling on the drummer's emission (`drummer-rainbow`,
+   speed 0.34 = his pulse's rainbow speed, 1.5 bands up his body), range 0 at rest and raised on the lift with the
+   light by a plan cue (same ramp and hold). A/B at 175.4/175.7 s (`r1/batch/lift-*`): gold; rainbow paled to the
+   pulse's 0.55 saturation (read as tinted white in a <1 s shot); rainbow at the gold's saturation (chosen:
+   unmistakably his rainbow, and a body against the cyan beam); 2.5 bands (striped him).
+
 5. **Musician class -- done (data), proved unchanged.** What the round-0 report got wrong: the musicians were never
    tagged "animal" (their tags were `musician`, `astronaut`); the Critic called them animals because its adapter
    (`creative-critic/adapters/avgen/avgen_adapter.py`, `entity_kind`) defaults any body with no tag it knows to

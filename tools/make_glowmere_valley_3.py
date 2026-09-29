@@ -326,6 +326,7 @@ def main():
         return 1
     install_cut(project, scene, shots)
     if not args.scout:
+        cast.warp_rim(project, scene)  # the saucer's faint rim, in the shots that want it (revision round 1)
         # The Camera Travel Beam on the camera changes that open a phrase (look.apply_travel_beam).
         beam_cuts = look.apply_travel_beam(project, shots)
         pulses = look.apply_hero_pulses(project, scene, shots)

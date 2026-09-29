@@ -178,6 +178,19 @@
    "value": 5.0,
    "rampSeconds": 1.3,
    "holdSeconds": 3.6
+  },
+  {
+   "key": "drummer-rainbow",
+   "effect": {
+    "owner": "drummer",
+    "type": "colorCycling",
+    "id": "drummer-rainbow"
+   },
+   "field": "range",
+   "on": "setpiece/e5-centrepiece/lift",
+   "value": 1.0,
+   "rampSeconds": 1.3,
+   "holdSeconds": 3.6
   }
  ]
 }

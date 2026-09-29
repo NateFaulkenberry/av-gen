@@ -131,7 +131,12 @@ def warp_cues(the_plan, project, project_path):
         owner = e.get("owner", {})
         if e.get("type") in WARP_TYPES and owner.get("kind") == "entity":
             strength = params.get(f"fx/{e['id']}/strength", e["parameters"]["strength"])
-            fields.setdefault(owner["name"], []).append((e["id"], e["type"], float(strength)))
+            fields.setdefault(owner["name"], []).append((e["id"], e["type"], "strength", float(strength)))
+            # A warp's edge glow (revision round 1) goes with its field: the rim is scaled by the effect's
+            # envelope, not by its strength, so quieting the strength alone left a ring round the beam.
+            rim = params.get(f"fx/{e['id']}/rimIntensity", e["parameters"].get("rimIntensity", 0.0))
+            if e.get("type") == "spaceWarp" and float(rim) > 0.0:
+                fields[owner["name"]].append((e["id"], e["type"], "rimIntensity", float(rim)))
     aliases = {s["alias"] for s in out.get("subjects", [])}
     cues = [c for c in out.get("cues", []) if not c.get("key", "").endswith(("-quiet", "-back"))]
     for sp in out.get("setPieces", []):
@@ -141,12 +146,13 @@ def warp_cues(the_plan, project, project_path):
         if body not in aliases:
             out.setdefault("subjects", []).append({"alias": body, "text": body})
             aliases.add(body)
-        for effect_id, kind, strength in fields[body]:
+        for effect_id, kind, field, value in fields[body]:
             ref = {"owner": body, "type": kind, "id": effect_id}
-            cues.append({"key": f"{sp['key']}-{effect_id}-quiet", "effect": dict(ref), "field": "strength",
+            tag = effect_id if field == "strength" else f"{effect_id}-rim"
+            cues.append({"key": f"{sp['key']}-{tag}-quiet", "effect": dict(ref), "field": field,
                          "on": event_name(sp["key"], "beam"), "value": 0.0, "rampSeconds": WARP_QUIET_SECONDS})
-            cues.append({"key": f"{sp['key']}-{effect_id}-back", "effect": dict(ref), "field": "strength",
-                         "on": event_name(sp["key"], "depart"), "value": strength, "rampSeconds": WARP_BACK_SECONDS})
+            cues.append({"key": f"{sp['key']}-{tag}-back", "effect": dict(ref), "field": field,
+                         "on": event_name(sp["key"], "depart"), "value": value, "rampSeconds": WARP_BACK_SECONDS})
     out["cues"] = cues
     return out
 

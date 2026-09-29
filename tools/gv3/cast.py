@@ -86,10 +86,18 @@ CRAFT_WARP = {
         "strength": 0.8, "boundsScale": 2.2, "radius": 8.0, "radialWeight": 0.15, "bowWeight": 1.0,
         "swirl": 0.1, "turbulence": 0.18, "chroma": 0.12, "rimColor": [0.55, 0.85, 1.0], "rimIntensity": 0.0,
         "falloff": 1.6, "edgeSoftness": 0.45, "velocityStretch": 1.4, "speedForFull": 18.0,
-        "turbulenceScale": 2.0, "turbulenceSpeed": 0.35, "rimWidth": 0.08,
+        "turbulenceScale": 2.0, "turbulenceSpeed": 0.35, "rimWidth": 0.4,
         "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0,
     },
 }
+# A faint rim (revision round 1: "add a faint rim, let's see if we can improve UFO warp visibility"): over the black
+# sky a warp bends nothing that can be seen, and its edge glow is what shows the field is there. The A/B (r1/): at
+# the field's edge, 0.08 of the radius wide, the rim is a line -- an ellipse eight saucers across drawn round the
+# craft, and an arc over the lit valley after the drop; 0.4 wide it is a soft halo about the craft. So: the soft
+# halo, faint (0.08), and only in the two shots where the saucer is small against the black sky -- the flyby (s08)
+# and its approach over the elder (s47). WARP_RIM_SHOTS; `warp_rim`. The beams' cues quiet it with the field.
+WARP_RIM = 0.08
+WARP_RIM_SHOTS = ("s08", "s47")
 # The wake (a Velocity Distortion along the path) was tried and taken out after the first render: a craft
 # climbing away from the lens leaves its wake between the lens and itself, and the wake refracted the saucer
 # into a crescent with a colour fringe (s59, 182.4 s). The warp's own stretched bow is what trails behind it.
@@ -589,6 +597,21 @@ def craft_warps(project):
                 "parameters": copy.deepcopy(spec["parameters"]),
             })
     project["effects"] = [e for e in project.get("effects", []) if e["id"] not in ids] + added
+
+
+def warp_rim(project, scene):
+    """The saucer's faint rim, on in WARP_RIM_SHOTS and off everywhere else (a step at each cut). Called by the
+    generator once the cut is installed: it reads the shots' times."""
+    shots = {sh.get("label", "").split(" ")[0]: sh for sh in scene["cameraDirection"]["shots"]}
+    keys = [{"time": 0.0, "value": [0.0], "interp": "step"}]
+    for name in sorted(WARP_RIM_SHOTS, key=lambda n: shots[n]["start"]):
+        keys.append({"time": round(shots[name]["start"], 6), "value": [WARP_RIM], "interp": "step"})
+        keys.append({"time": round(shots[name]["end"], 6), "value": [0.0], "interp": "step"})
+    target = "fx/visitor-warp/rimIntensity"
+    tl = project.setdefault("timeline", {"enabled": True, "cues": [], "tracks": []})
+    tl["tracks"] = [t for t in tl.get("tracks", []) if t["target"] != target]
+    tl["tracks"].append({"target": target, "component": -1, "timeBase": "seconds", "mode": "replace",
+                         "loopLength": 0.0, "enabled": True, "keys": keys})
 
 
 # ---- entry point -----------------------------------------------------------------------------------

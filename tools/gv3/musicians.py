@@ -106,6 +106,22 @@ LIFT_GLOW = {
     "parameters": {"gain": 1.0, "tint": [1.0, 0.56, 0.2], "glow": 0.0, "rim": 0.0,
                    "rimColor": [1.0, 0.78, 0.42], "rimPower": 2.5, "spill": False, "recolour": 0.0},
 }
+# ...in rainbow (revision round 1: "try a rainbow effect instead of a gold effect on the lift"). A Color Cycling on
+# his emission -- the lift light and the suit's photophores with it -- turns its hue round the wheel in bands that
+# run up his body, at his hero pulse's own rainbow speed. At rest its range is 0 and it changes nothing; the plan
+# raises it on the lift with the light (ufo.plan.json `drummer-rainbow`), so it lasts exactly as long as the light.
+# The A/B (r1/): the gold; the rainbow paled to the pulse's saturation (0.55), which read as a tinted white in a
+# shot under a second long; the rainbow at the gold's own saturation, one and a half bands up the body -- chosen:
+# unmistakably his rainbow, and a body against the cyan beam; and two and a half bands, which striped him.
+LIFT_RAINBOW = {
+    "id": "drummer-rainbow", "type": "colorCycling", "name": "The drummer's light, in rainbow",
+    "owner": {"kind": "entity", "name": "drummer"},
+    "enabled": True, "order": 0, "style": "", "activation": "always",
+    "timing": {"delay": 0.0, "lifetime": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "windowStart": 0.0,
+               "windowSeconds": 6.0, "repeatSeconds": 0.0},
+    "parameters": {"speed": 0.34, "range": 0.0, "spatialFrequency": 1.5, "channel": 1, "axis": 0, "phase": 0.0},
+}
+LIFT_RAINBOW_ON = True  # the A/B's winner (REPORT.md, revision round 1); False is the round-0 gold
 
 
 def _tilt_rotation(yaw_deg, gx, gz):
@@ -254,7 +270,11 @@ def effects(project):
         ids |= {pulse["id"], suit["id"]}
         added += [pulse, suit]
     ids.add(LIFT_GLOW["id"])
-    added.append(copy.deepcopy(LIFT_GLOW))
+    glow = copy.deepcopy(LIFT_GLOW)
+    ids.add(LIFT_RAINBOW["id"])
+    rainbow = copy.deepcopy(LIFT_RAINBOW)  # always there: the plan's cue names it
+    rainbow["enabled"] = LIFT_RAINBOW_ON
+    added += [glow, rainbow]
     project["effects"] = [e for e in fx if e.get("id") not in ids] + added
 
 
