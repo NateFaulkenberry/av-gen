@@ -1266,7 +1266,7 @@ TEST_CASE("ADR-984: a body given back is where it was bound, facing as it was, p
         dim.target = "spawnRate";
         dim.to = lit(0.0f);
         dim.duration = lit(0.1f);
-        std::vector<stage::StepDesc> steps{up, dim, waitStep("away", 0.2f)};
+        std::vector<stage::StepDesc> steps{up, dim, step(stage::StepKind::Hide, "gone"), waitStep("away", 0.2f)};
         if (giveBack) {
             steps.push_back(step(stage::StepKind::Return, "back"));
         }
@@ -1311,6 +1311,7 @@ TEST_CASE("ADR-984: a body given back is where it was bound, facing as it was, p
     CHECK(near->state().yaw == Approx(yaw).margin(1e-5));
     CHECK(near->placements() == placed + 1);
     CHECK(s.params.find("particles/near/spawnRate")->baseComponent(0) == 10.0f);
+    CHECK(s.params.find("nodes/near/visible")->baseComponent(0) == 1.0f); // hidden while away, shown again
     // And it stays there once the scenario has let it go.
     s.tick(1.5);
     CHECK_FALSE(s.staging.running("test"));

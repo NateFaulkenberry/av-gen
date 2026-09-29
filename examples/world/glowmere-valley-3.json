@@ -48292,7 +48292,7 @@
         },
         {
           "domain": "staging.scenario",
-          "fingerprint": "fnv1a64:4b757585e7cbc719",
+          "fingerprint": "fnv1a64:6f141ed02e52caa3",
           "id": "setpiece/e5-centrepiece",
           "item": "e5-centrepiece"
         },
@@ -50757,6 +50757,10 @@
                     "kind": "set",
                     "name": "fade",
                     "target": "opacity"
+                  },
+                  {
+                    "kind": "hide",
+                    "name": "gone"
                   }
                 ]
               }

@@ -350,14 +350,17 @@ TEST_CASE("ADR-984: an abduction that gives its subject back dissolves it and pu
     const stage::BeatDesc* depart = beat(*s, "depart");
     REQUIRE(lift != nullptr);
     REQUIRE(depart != nullptr);
-    // Nothing retires it...
+    // Nothing retires it; it is hidden once it has dissolved (not drawn at all while it waits)...
+    bool hides = false;
     for (const stage::BeatDesc* b : {lift, depart}) {
         for (const stage::CueDesc& c : b->cues) {
             for (const stage::StepDesc& st : c.steps) {
                 CHECK(st.kind != stage::StepKind::Retire);
+                hides = hides || (b == lift && c.role == "target1" && st.kind == stage::StepKind::Hide);
             }
         }
     }
+    CHECK(hides);
     // ...and as the craft leaves, the subject waits the given seconds and is put back.
     const stage::CueDesc* back = nullptr;
     for (const stage::CueDesc& c : depart->cues) {

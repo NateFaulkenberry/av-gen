@@ -518,10 +518,11 @@ ScenarioDesc abduction(const Plan& p) {
         fade.from = literal(1.0f);
         fade.hasFrom = true;
         fade.ease = true;
-        // ADR-984: a subject the set piece gives back dissolves and waits, unseen, to be put back as
-        // the craft leaves; one it keeps is retired.
+        // ADR-984: a subject the set piece gives back dissolves and is hidden -- not drawn at all while it
+        // waits, so nothing it carries (a glow, a pattern on its surface, the bloom they feed) is left in
+        // the air at opacity 0 -- to be put back, shown, as the craft leaves; one it keeps is retired.
         if (giveBack) {
-            lift.cues.push_back(cue(targetRole(k), {rise, fade}));
+            lift.cues.push_back(cue(targetRole(k), {rise, fade, step(StepKind::Hide, "gone")}));
         } else {
             lift.cues.push_back(cue(targetRole(k), {rise, fade, step(StepKind::Retire, "vanish")}));
         }
