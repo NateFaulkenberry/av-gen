@@ -28,15 +28,20 @@ seat must be filled again a few bars later, and there was no step that could fil
    held there with no speed, so its gait comes to rest on its own clips, until the scenario releases it; after
    that it stands where it was put.
 2. **The abduction template's `returnSeconds`** (a structure value, default 0 = retire as before): when it is more,
-   each lifted body dissolves as before but is not retired; the departure gains a cue per body that waits that many
-   seconds after the beam goes out and returns it. The set piece's timeline lasts until the last body is back.
+   each lifted body dissolves as before and is then HIDDEN rather than retired -- not drawn at all while it waits,
+   because at opacity 0 a body is still drawn in the blend pipeline and what it carries (a glow, a pattern on its
+   surface, the bloom they feed) could stay in the air; the hide takes the frame the retire took, so the lift keeps
+   its length. The departure gains a cue per body that waits that many seconds after the beam goes out and returns
+   it, shown (the hide is among what the scenario gives back). The set piece's timeline lasts until the last body
+   is back.
 3. The cast trace reports, per lifted body, when its dissolve ended (`dissolved`) and when and where it was put
    back (`returned`, `atReturn`), so a film can check both.
 
 ## Consequences
 
 - GV3's riser takes the drummer from behind his kit on bar 93, he dissolves into the saucer on the drop, and six
-  seconds later -- during a shot that does not see the kit -- he is behind it again, playing.
+  seconds later -- during a shot that does not see the kit -- he is behind it again, playing. Traced: lifted 172.783
+  s, gone 177.700 s (the drop's frame), departure 177.733 s (r7b's), back 183.750 s, 1 mm from his seat.
 - Every abduction that does not ask for a return compiles to exactly the beats it did.
 - A returned body is back in the world the whole time it was away (it was never retired): anything that looks for
   bodies may find it, hidden, while it waits. For GV3's drummer, who has no behaviours and stands in no query, that
