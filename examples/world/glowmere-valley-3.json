@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-3.scene.json",
-        "sha256": "1642870b49b9c1217009d8ce33db5e904e6f4cae61f584ca44e10719f78b7599",
-        "size": 354576
+        "sha256": "b558e4b7020c421be3f8655dfb83c0b913dce00c6c11d79430ecf309b3e3c672",
+        "size": 354577
       }
     }
   },
@@ -20363,11 +20363,6 @@
         "kind": "cue",
         "name": "hero pulse spire-cap",
         "time": 144.46
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse tide",
-        "time": 146.306154
       },
       {
         "kind": "cue",

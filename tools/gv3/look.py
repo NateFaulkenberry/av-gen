@@ -208,6 +208,9 @@ PERFORMER_PULSE_NEAR = 90.0
 # clearance is that and a margin.
 NEW_HERO_LENS_CLEARANCE = 40.0
 PERFORMER_PULSE_KICK = 1.5  # their rings' pump on the scored kick (a mushroom's is HERO_PULSE_KICK, +8)
+# Shots in which nobody rings (revision round 1). s46 follows Tide 3.5 m off past a tall fern, and her own ring,
+# fired on the shot's one downbeat, lit the fern beside the lens to 16% of the frame clipped.
+RINGLESS_SHOTS = {"s46"}
 
 
 # The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
@@ -905,6 +908,8 @@ def hero_pulse_plan(project, scene, shots):
         # ring beside theirs, every bar washed the pair teal-white and their rainbow never read (verification
         # batch 2, s04 at 15.5-18.5 s); the elder's rings go on in every shot around it.
         stage = s.subject.startswith("the musicians")
+        if s.sid in RINGLESS_SHOTS:
+            continue
         who = {}
         for node in (rig.follow, rig.aim):
             if node in owners:

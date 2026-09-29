@@ -60,5 +60,8 @@ render's clock. That is one more case of a test sharing the product's blind spot
     procedural `prevInfo` take differences of instants; both are render-only.
 - **GV2's behaviour fingerprint is unchanged.** It is traced with a constant `1/60`.
 - **Open, not explained by this ADR:** on 2026-09-29 one full GV3 render diverged from a 0-8.25 s render of the same
-  project and binary from 8.017 s. Two 0-12 s renders were identical to each other. The art pass is re-checking
-  this with the new clock.
+  project and binary from 8.017 s. Two 0-12 s renders were identical to each other. Re-checked with the new clock
+  (the art pass, `c467ad75`): the full render and a 0-12 s render agree frame for frame from 0 to 11.98 s (719 of
+  720 frames). The one that differs is the short range's own last frame, which is drained differently at a range's
+  end; two short renders of different lengths show the same. So the divergence did not recur. It was one run of
+  the old binary, and its cause is unknown.

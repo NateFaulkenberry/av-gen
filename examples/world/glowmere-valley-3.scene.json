@@ -14180,9 +14180,9 @@
         ],
         "followNode": "tide",
         "followOffset": [
-          2.0,
-          1.2,
-          3.0
+          3.2,
+          1.4,
+          -2.0
         ],
         "followClearance": 1.0,
         "followSmoothSeconds": 0.3,

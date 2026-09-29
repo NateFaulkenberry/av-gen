@@ -683,6 +683,28 @@ Re-checked with the render-clock trace and probe. Sound unless said otherwise.
 - Its film is superseded by ADR-990 (the cast now walks the step world's paths). It chose the next bland shot:
   s49, the Critic's only "near-black even for a dark passage" (3.7 s); s08 is the black-sky flyby, s29 is 0.92 s.
 
+### Critic pass 3 (`c467ad75`: ADR-990's film, s50 on its own rig, s49's gold gills)
+
+- Render `scratchpad/r1/critic/p3.mp4` from 0 (2,057 s, rc 0); the adapter's cast a `--render-clock` trace (equal
+  to the default one to the bit). Job `job_1a0eebc7c69814c2a`: 141 issues (10 high, 82 medium, 49 low), 68
+  strengths. Against round 0's final (`job_1a0edfe96ef980150`): musical synchronisation 0.904 -> 0.951, effects
+  0.951 -> 0.975, temporal coherence 0.936 -> 0.942, visual coherence 0.885 -> 0.891; visual hierarchy 0.747 ->
+  0.725 (the compare's one "degraded"), composition 0.717 -> 0.706, motion 0.849 -> 0.844, lighting 0.501 -> 0.496,
+  technical quality 0.407 -> 0.398. 8 resolved (s49's near-black among them), 7 new. Much of the movement is the
+  new film itself: every alien walks another path from about 6 s.
+- The full render against a 0-12 s render of the new binary: equal frame for frame to 11.98 s (ADR-990's "Open"
+  note updated): the 8.017 s divergence did not recur.
+- Film: mean luma 0.2472, clipped 2.390% (r0's final 2.318%), almost all of it s46: **s46** ("Tide looks up", a
+  24 mm follow 3.6 m off) clipped 7.0% (the Critic: high, "up to 14.5%"), and a tall fern stood between the lens and
+  Tide for half the shot, lit by her own ring. In the old clock's film she walked elsewhere; the step world was
+  never rendered before. Fixed in data: the follow offset (2, 1.2, 3) -> (3.2, 1.4, -2.0), ahead and north of her,
+  face first, the fern at the left edge; and `look.RINGLESS_SHOTS = {"s46"}` (her ring was the fern's light). Seek
+  stills `scratchpad/r1/s46/noring-sheet.png`: clipped 1.1-1.6%, luma 0.11-0.13. Paths unchanged (trace: worst body
+  0.0; only s46's 111 camera frames differ). Not re-judged by the Critic (three passes); measured in the r1 render.
+- Left: s50's Sage passes out at the left edge in its first 1.5 s (the Critic: "sage outweighs ember", medium), and
+  Ember's own ring clips up to 2.6% of the shot's frames (medium); s49's gold gills now outshine the saucer (medium
+  hierarchy, the trade asked for); s29 darker than the film's median (low).
+
 ## Plan (the rest, in order)
 
 1. ~~Milestone 1 (water, pulses, gait, probes, ADRs 980-982)~~ `cdbcf63f`. ~~Aurora~~, ~~UFO warp~~, ~~heroes~~,

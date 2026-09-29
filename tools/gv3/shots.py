@@ -599,7 +599,12 @@ def spire_in_aurora(t0, t1, g):
 
 @at("80.1")
 def tide_looks_up(t0, t1, g):
-    r = follow(24.0, "tide", (2.0, 1.2, 3.0), (0.0, 3.2, 0.0), clearance=1.0)
+    # Tide walks east-north-east at 3 m/s through the shot, past a tall fern on the south side of her path.
+    # From (2, 1.2, 3), south of her, the fern stood between the lens and her for half the shot, lit by her
+    # own ring to 16% clipped (revision round 1: the film as it renders since ADR-990). From ahead and north,
+    # (3.2, 1.4, -2.0), she comes on face first with the fern at the frame's left edge, and she gives up her
+    # ring here (look.RINGLESS_SHOTS): clipped 1.1-1.6%.
+    r = follow(24.0, "tide", (3.2, 1.4, -2.0), (0.0, 3.2, 0.0), clearance=1.0)
     return r, dict(lead="alien", purpose="Tide looks up", subject="tide", camera="24 mm, low, in front",
                    movement="follows", music="1 bar, the last before the suspension")
 
