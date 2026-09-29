@@ -498,15 +498,18 @@ parked, and the aurora (art pass).
 
 ## Final validation (merged head)
 
-> **PLACEHOLDER: the coordinator fills this in.** Results of both suites and the build on the merged
-> `qa/coord` head, from `build/qa-runs/final/summary.txt` and the logs beside it (`build.log`,
-> `configure.log`, suite logs). Record for each binary: the commit, the exit code, cases passed / skipped /
-> failed (the one `[!shouldfail]` expected), and the assertion count.
+Both suites were run by the coordinator on 2026-09-28 on the merged head `ecf0fca4`: qa/coord with qa/clean, qa/perf,
+`proto/astronaut-musicians`, qa/dirty-check (ADR-952) and qa/ci. The commits after it on qa/coord change only
+docs. CMake was reconfigured first so that every newly merged test file is compiled. The build exited 0, and the
+suites ran one after the other, the GPU suite under `tools/gpu-lock.sh`.
 
 | binary | commit | exit | cases | passed | skipped | failed | assertions |
 |---|---|---:|---:|---:|---:|---:|---:|
-| `avgen_tests` | | | | | | | |
-| `avgen_render_tests` | | | | | | | |
+| `avgen_tests` | `ecf0fca4` | **0** | 3,854 | 3,834 | 19 | 1 (the expected `[!shouldfail]` slope lean, the only FAILED line) | 9,124,440 |
+| `avgen_render_tests` | `ecf0fca4` | **0** | 549 | 548 | 1 (`test_texture_share.cpp:243`) | 0 | 617,263 |
+
+Push CI on qa/ci's head `2f89010a` was green (run 36491542093). The nightly sanitizer layout runs for the first
+time once this is on main.
 
 ## Where the sources disagree
 
