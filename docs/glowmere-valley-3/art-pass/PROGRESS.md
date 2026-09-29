@@ -6,15 +6,13 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 15:30): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
-  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1-7 done and committed
-  (`9c86d2b1`, `e6e7719f`, `d18b64cf`, `1fa60913`); Critic passes 1 and 2 done. Investigating s50 found an engine
-  determinism defect (below, "Found: a render is not the film its seeks and traces describe"); the owner chose
-  option A, which the coordinator committed as `bce61fe9` (ADR-990): renders, seeks and traces are one film again.
-  s50 is back on its original rig; s49 gets the elder's gold gills (the second bland shot). Next: commit, Critic
-  pass 3 (rendered from 0), the full-vs-12 s render check with the new binary, frame costs, both suites (after a
-  reconfigure and full rebuild), `GV3-art-pass-r1.mp4`, REPORT.md. No before/after comparisons of old film
-  against new (the owner waived them).
+- **Status (2026-09-29, 17:50): REVISION ROUND 1 COMPLETE** (the owner's words and the coordinator's notes are at
+  the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1-7 committed (`9c86d2b1`,
+  `e6e7719f`, `d18b64cf`, `1fa60913`). Investigating s50 found an engine determinism defect (below, "Found: a
+  render is not the film its seeks and traces describe"); the owner chose option A, committed by the coordinator as
+  `bce61fe9` (ADR-990): renders, seeks and traces are one film again. Three Critic passes; s50 back on its own rig,
+  s49's gold gills (`c467ad75`), s46 from ahead of Tide (`17a31073`). `GV3-art-pass-r1.mp4` rendered at
+  `17a31073`; both suites rc 0 there; REPORT.md has a "Revision round 1" section. The coordinator merges.
   Items 6 and 7 came later from the coordinator (relayed as the owner's); recording them in `00-brief.md` was
   refused by the permission system, so they are described here only -- the coordinator or the owner can add them
   to the brief. Round 0 (the pass) is complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it
@@ -715,6 +713,37 @@ Re-checked with the render-clock trace and probe. Sound unless said otherwise.
 3. ~~The owner's final~~ from `c20c182c` (`GV3-art-pass-final.mp4`), measured shot by shot against r7.
 4. ~~Both suites~~: failed once (five defects, fixed in `6aa3701d`), then both rc 0 on `6aa3701d`; ~~the final~~
    re-rendered from `6aa3701d`. Done; the coordinator merges.
+
+Revision round 1:
+1. ~~Items 1, 5~~ `9c86d2b1`, `e6e7719f`; ~~items 2, 6, 7~~ `d18b64cf`; ~~items 3, 4~~ `1fa60913`; ~~Critic pass 1~~.
+2. ~~The render-clock defect, the audit, pass 2~~ `7cea50bc`, `662bd4b6`; ~~option A~~ `bce61fe9` (the coordinator).
+3. ~~s50 back, s49's gold gills, pass 3~~ `c467ad75`; ~~s46~~ `17a31073`.
+4. ~~`GV3-art-pass-r1.mp4`~~ from `17a31073` (below); ~~frame costs~~; ~~both suites~~ (below); ~~REPORT.md's
+   "Revision round 1"~~; the handback. Round 1 done; the coordinator merges.
+
+### Both suites (`scratchpad/r1/suites.sh`, under the lock, reconfigured and fully rebuilt after ADR-990)
+
+At `17a31073` (the one uncommitted file was this one): `build/release/tests/avgen_render_tests` **rc 0** (554 cases:
+553 passed, 1 skipped -- the NDI runtime; 617,347 assertions; 1,054 s). `build/release/tests/avgen_tests` **rc 0**
+(3,879 cases: 3,859 passed, 19 skipped, 1 failed as expected -- the `[!shouldfail]` slope lean,
+`test_character_lab_slopes.cpp:187`; 10,050,350 assertions; 2,173 s).
+
+### The r1 render, and what it measures
+
+- **`~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-r1.mp4`**, rendered at `17a31073` (clean tree) by
+  `scratchpad/r1/finish-r1.sh` under the lock: `avgen --headless --project examples/world/glowmere-valley-3.json
+  --render <file> --size 1920x1080 --fps 60 --range 0:225.5 --supersample 2`, h264 with the song (AAC 48 kHz
+  stereo). 225.5 s, 926.1 MB (32.9 Mb/s); 16:13:24-16:48:36, 2,112 s, rc 0, no error lines. The round-0 final kept.
+- Film (`shotluma`, 6 frames a shot): mean luma 0.2457, clipped 2.309% (round 0's final 0.2438 / 2.317%); shots
+  clipping over 3%: 21 (21). s46 7.02% -> 1.08%, s49 luma 0.039 -> 0.061, s50 0.075 -> 0.200 (0.9% clipped).
+- Against pass 3's render (`c467ad75`), frame by frame: identical from 0 to 146.27 s; 330 frames differ, 146.27-150.13
+  s (s46 and the opening of s47, where Tide's ring no longer lights anything) and short runs to 167.68 s (the
+  exposure meter carrying the change). So two full renders of the new binary agree wherever their projects do.
+- **Frame cost** (`scratchpad/r1/perf/perf.sh`: `perf_sweep points`, 1280x720, 42 frames at 30 fps, 3 reps
+  interleaved; medians, ms): rim s08 @27.5 30.9 vs 30.4 without (GPU 20.3 both); rainbow lift @175.4 42.7 vs 42.9
+  gold (spread 6-7%); the cast items (2, 6, 7) against `e6e7719f`'s cast: herd @113 33.0 vs 32.6 (update 3.9 vs
+  3.7), Vane @53.5 29.2 vs 29.3 (4.3 vs 4.0), wide @78.9 32.9 vs 32.4 (GPU 22.7 vs 23.1). At most +0.5 ms wall,
+  update +0.2-0.3 ms; the whole-film CPU measure (+0.48 ms a frame, ADR-987) stands.
 
 ## Log
 
