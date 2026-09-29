@@ -6,15 +6,23 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 12:00): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
-  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1, 5 committed; items
-  2, 6, 7 done in code (ADR-987, 988, 989), committed together; next: item 3 (warp rim), item 4 (rainbow lift),
-  the verification batch, the Critic passes, suites, the r1 render. Items 6 and 7 came later from the coordinator
-  (relayed as the owner's); recording them in `00-brief.md` was refused by the permission system, so they are
-  described here only -- the coordinator or the owner can add them to the brief. Round 0 (the pass) is
-  complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it is. Round 1 delivers
-  `GV3-art-pass-r1.mp4`, stills in `~/Desktop/av-gen-review/20-gv3-art-pass/r1/`, a "Revision round 1" section in
-  that folder's `REPORT.md`; the Critic runs up to about three passes this round (the owner's words).
+- **Status (2026-09-29, 13:40): REVISION ROUND 1 in progress** (the owner's words and the coordinator's notes are
+  at the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1-7 done and committed
+  (`9c86d2b1`, `e6e7719f`, `d18b64cf`, `1fa60913`); verification batch done; Critic pass 1 done (job
+  `job_1a0edf926f31b1a6b`). Bland shots chosen: s50, s29. Investigating s50 found an ENGINE DETERMINISM DEFECT
+  (below, "Found: a render is not the film its seeks and traces describe"); the coordinator chose option C for this
+  round (no engine change; reframe s50 against the film as rendered) and asked for the write-up, an audit of rounds
+  0 and 1 for the same trap (below), and every Critic input rendered from 0. Next: s50 reframe + s29 (targeted),
+  Critic pass 2 (the adapter fed the RENDER-CLOCK cast trace), frame costs, suites, the r1 render, REPORT.md.
+  Items 6 and 7 came later from the coordinator (relayed as the owner's); recording them in `00-brief.md` was
+  refused by the permission system, so they are described here only -- the coordinator or the owner can add them
+  to the brief. Round 0 (the pass) is complete: its final is `GV3-art-pass-final.mp4` from `6aa3701d`, kept as it
+  is. Round 1 delivers `GV3-art-pass-r1.mp4`, stills in `~/Desktop/av-gen-review/20-gv3-art-pass/r1/`, a "Revision
+  round 1" section in that folder's `REPORT.md`; the Critic runs up to about three passes this round.
+- **Tracing the rendered film:** `avgen_cast_trace ... --render-clock 1920x1080` (added this round; the default still
+  steps a constant 1/fps, which is the seek's film, not the render's). Same for `avgen_foot_probe --render-clock
+  1920x1080` (and `--fixed-clock`, `--warm-up`, `--viewport`, `--instants`, `--delta-difference` to take it apart).
+  Any measurement that is to describe the film uses it.
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -496,6 +504,110 @@ passes (up to about three) on the bland shots, both suites, the r1 render.
    lands it where a play does, test). Aliens' head in the world, posed steps: p99 671 -> 211 deg/s, worst 4,587 ->
    1,653 (an authored startle), steps over 400 deg/s 405 -> 28 (15 startle, 4 a walking turn, 9 the film's first
    0.17 s); accel p99 61,800 -> 3,050 deg/s^2. Feet and paths unchanged by it. `scratchpad/r1/head/headstats.py`.
+
+### Critic pass 1 (whole film from `1fa60913`, rendered from 0 at the final's settings)
+
+- Render `scratchpad/r1/critic/p1.mp4` (render.sh: 1920x1080, 60 fps, supersample 2, 0-225.5, rc 0, 2,112 s).
+  Baseline for the round: the Critic re-run on round 0's final (`GV3-art-pass-final.mp4`), job
+  `job_1a0edfe96ef980150`: 146 issues (10 high, 82 medium, 54 low), 70 strengths; composition 0.717,
+  cinematography 0.833, lighting 0.501, color 0.951, visual hierarchy 0.747, motion 0.849, temporal 0.936,
+  technical 0.407.
+- Pass 1, job `job_1a0edf926f31b1a6b`: 143 issues (10 high, 81 medium, 52 low), 68 strengths; motion 0.873 (+0.024),
+  cinematography 0.845 (+0.012), the rest unchanged to the third decimal; 3 wobble findings resolved, none new
+  (`critic compare`, `scratchpad/r1/critic/compare-p0-p1.json`). Film: mean luma 0.2438, mean clipped 2.32% (r0's
+  final: the same), `shotluma-p1.json`.
+- **The bland shots** (`scratchpad/r1/critic/bland.py`: per shot, camera and image motion, novelty, luma, contrast,
+  subject coverage, findings): **s50** (166.62-170.31, "Ember on the west bank, the saucer settling over the elder
+  beyond": static eye, novelty 0.087, luma 0.074, contrast 0.120, its subject 1% of the frame) and **s29**
+  (88.16-89.08, "the ember mushroom on the east terrace, lit": the film's lowest novelty 0.048 and contrast 0.042,
+  luma 0.082, image motion 0.013; no downbeat inside it, so its hero never pulses in it).
+- NOTE: the adapter was given `build/gv3/cast-ufo.json`, the constant-delta trace: its character data describes the
+  step world, not the film (the audit below). From pass 2 the adapter gets the render-clock trace.
+
+### Found: a render is not the film its seeks and traces describe (the render's frame delta)
+
+Investigating s50 (in the film a dark far field; in every seek still and in the cast trace, the authored
+composition: Ember lit in the lower left, the saucer upper right, the elder between) found an engine determinism
+defect. Not fixed this round (the coordinator's decision: option C); for the owner to decide between A and B.
+
+- **The measurement.** The same project and binary, the whole film on the CPU (`avgen_foot_probe`, then
+  `avgen_cast_trace`), stepped five ways: constant `dt = 1/60` (the trace tools' way); the instant spelled `i/60`
+  with constant dt; `setViewport(1920, 1080)` before each update; the render job's warm-up frame and second seek;
+  `FixedStepClock::tick` (the render's clock). The first three and the warm-up are bit-identical to the constant
+  step. The clock is not, and neither is a constant-step run given `dt = i/60 - (i-1)/60`: **the delta alone** does
+  it. `FixedStepClock::tick` hands `update` `next - current_.renderTime`, the difference of two rounded instants,
+  which is not 1/60 in its last bits. `EntityWorld::seekExact` (ADR-700) steps exactly `1/rate`.
+- **The divergence** (whole film, render-clock trace against the constant-step trace, `scratchpad/r1/audit/`):
+  the first body to part is Tide, 0.7 mm at 6.28 s (Vane 7.25 s, Rook 11.9 s, Sage 14.0 s, Ember 62.6 s). The
+  aliens' largest distance: 0.03 m at 7 s, 0.1 m at 30 s, 15 m at 45 s, 21 m at 60 s, 68 m at 90 s, 80 m at 150 s,
+  **114 m at 168.5 s**. Farm animals: millimetres until ~120 s, then up to 12.5 m. The crafts, the beams, the
+  performers and every set piece's beats are identical to the frame in both (director-driven, nothing decides).
+- **Confirmed against the renders.** The pass-1 film's s50 frames put Rook, Ember and Vane exactly where the render-
+  clock trace projects them (x 657/743/859 px against 655/740/860 at 168.5 s), by the lantern 80 m off; a range
+  render of 168.5 s (which seeks) shows the constant-step trace's world.
+- **Which paths use which delta.** The render's (`next - previous`): `RenderJob` (every video and still render),
+  `FrameRange` (frame sequences), the headless benchmark -- and a range render plays with it from its start, having
+  SEEKED to its start (so a range render is a third film: the step world at its first frame, drifting after).
+  Constant `1/fps`: the seek replay (`EntityWorld::seekExact`, what a scrub and a range render's start land on),
+  `avgen_cast_trace`, `avgen_behavior_trace`, `avgen_character_quality`, `avgen_overlay_shot`, `avgen_foot_probe`,
+  and the test harness (`tests/support/project_round_trip.hpp stepFrames`) -- so every "a seek lands where a play
+  does" test holds, and no test runs the render's clock against a seek. (Live play integrates the wall clock and
+  is not reproducible by design; this is the offline path.)
+- **Why it matters.** ADR-091's two tiers and ADR-700's "a seek lands where a play does" hold for the constant
+  step only; the deliverable does not use it. Every tool that says where a character will be in the film (the cast
+  trace the generator composes on, `framing.py`, `ufo-beats.json`'s watches, the Critic adapter's cast, the editor's
+  scrub) describes the step world; a chaotic body amplifies one ulp into 100 m within three minutes.
+- **Options (the owner's decision):**
+  - **A. `FixedStepClock::tick` reports `1/fps`** after its first frame (one line). Every render then agrees with
+    seeks, range renders, traces and tests. Every existing film with deciding characters changes from its first
+    divergence: GV3's aliens from ~6 s, its animals from ~120 s -- toward the paths the cut was composed on (s50 as
+    authored), but the film the owner reviewed is re-dealt; GV2 the same kind of change. Nothing else changes.
+  - **B. The replay and the tools take the render's delta** (`k/fps - (k-1)/fps`). Every film stays as rendered;
+    seeks, range renders and traces then describe it. Wider: `seekExact`, the harness's `stepFrames` and every tool
+    loop change together (a test stepping the old constant would part from the replay), and checkpoints are
+    re-recorded. Invisible in any film.
+  - Either way: a test that renders (or ticks `FixedStepClock`) against a seek to the same instant, which is the
+    test that was missing.
+- **This round (option C):** tools only, defaults unchanged. `avgen_cast_trace --render-clock WxH` steps as
+  `RenderJob` does and writes `"clock": "render"` (the default writes `"step"`); the probe has the same option and
+  its parts. Used for the audit below, the s50 reframe and the Critic's cast from pass 2.
+
+### Audit: what rounds 0 and 1 derived from the step world (the coordinator's ask)
+
+Re-checked with the render-clock trace and probe. Sound unless said otherwise.
+- **Unaffected (nothing that decides is involved):** water and falls (ADR-980, 985), hero pulses (ADR-981; the
+  markers and the pulse plan use keyed camera positions, never a trace), the aurora, the warp and its rim (ADR-983,
+  item 3: the saucer's track is identical in both worlds, so the rim stills at 27.9/164/179.5 s show the film's
+  saucer), the stems (item 1), the rainbow lift (item 4: the drummer and the saucer identical), E5's timing (lifted
+  172.783, gone 177.700, back 183.733: every set piece's beats identical), the hero sites and the new heroes' lens
+  clearance and the musicians' placement (`hero_sites.py`, `place_search.py`: keyed eyes, never a trace; the closest
+  camera to either performer, 12.1 m, and to opal/sail, 15.1/26.3 m, are keyed shots, the same in both worlds).
+- **Item 5 (the class):** renders against renders, and the performers' paths are identical in both worlds: sound.
+- **Measured in the step world, re-taken in the render's** (`scratchpad/r1/audit/m-*`; r0 = `19c215d3`'s project
+  with the old player emulated, which reproduces round 0's step-world numbers exactly):
+  - ADR-982 (round 0, alien starts): standing slide per foot median 0.019 m, p90 0.022 (step world 0.018/0.023).
+  - Item 2 (ADR-987), r0 -> r1: held part 2.051 -> 0.032 m/m; release 0.630 -> 0.638; standing 17.06 -> 2.90
+    mm/frame (worst 1.946 -> 0.214 m); starts 0.083 -> 0.045 m per metre of body. (Step world: 2.048 -> 0.032,
+    0.629 -> 0.636, 16.95 -> 2.66, 0.086 -> 0.045.) Horse-2's first minute is identical in both worlds.
+  - Item 6 (ADR-988), r0 -> r1: ankle step peak median 0.265-0.267 -> 0.387-0.393 m (p90 0.48-0.49), toes
+    0.038-0.042 -> 0.093-0.098 (p90 0.28-0.33), frames with a foot >2 cm under 3,117 -> 9, lowest -0.127 -> -0.051.
+  - Item 7 (ADR-989), r0 -> r1: head speed p50 18.1 -> 21.2, p99 691 -> 212, worst 4,590 -> 1,653 deg/s; steps over
+    400 deg/s 373 -> 25; accel p99 50,400 -> 3,060 deg/s^2.
+- **Affected:**
+  - **s50:** its fixed eye aims live at Ember, placed from the step trace; in the film she is 80 m off. The bland
+    shot. Reframed against the render-clock trace (below).
+  - **`framing.py`** (the generator's check and round 0's run): against the render trace only s50's verdict changes
+    (Ember 0.20 -> 0.06 of the frame, the saucer and the elder out of it). Follow shots keep their subject to the
+    pixel in both worlds; their backgrounds differ.
+  - **s35** ("E4: Sage watches the cow rise"): in the step world Sage is never in frame; in the film she stands
+    in front of the lens, head and shoulders, watching the cow go up -- it reads as intended, by luck. Left.
+  - **The Critic's cast** (round 0's job and pass 1): the video was the film (rendered from 0), the adapter's
+    character tracks the step world -- so its per-shot subject coverage and occlusion findings for aliens were
+    judged against positions the film does not have (e.g. round 0's "s31/s15/s42 an alien or a horse outweighing
+    or hiding the subject" and pass 1's s50 coverage). From pass 2 the adapter gets `--render-clock` traces.
+  - **Seek stills of the cast** (verification batches, the s50 debug stills): valid as A/B of one moment (both arms
+    seek to the same world) but not the film's moment for aliens; the A/B evidence for items 6/7 was measured over
+    the whole film instead, now in both worlds.
 
 ## Plan (the rest, in order)
 

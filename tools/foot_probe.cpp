@@ -7,6 +7,14 @@
 // `--pose-out` writes the dumped character's every joint, in the world, every frame of the dump's window: the
 // instrument for "this change does not move that body", compared between two builds (revision round 1).
 //
+// Which film (revision round 1): by default the engine is stepped exactly 1/fps a frame, as a seek replays and as
+// `avgen_cast_trace` does. A render's `FixedStepClock` hands `update` the difference of two rounded instants
+// instead, and a body that decides amplifies that last bit into a different path (GV3: 0.7 mm at 6.28 s, 114 m
+// by 168 s). `--render-clock WxH` steps as `RenderJob` does -- its warm-up frame and second seek, its clock, its
+// viewport -- and measures the film as rendered; `--fixed-clock`, `--warm-up` and `--viewport WxH` are its three
+// parts, and `--instants` / `--delta-difference` spell a constant-step frame's instant, or its delta, the clock's
+// way. `--camera-out FILE [--track a,b]` writes the drawn camera (and those bodies) every frame.
+//
 // It runs the real `app::Engine` in Offline mode, as `avgen_cast_trace` does, and after every frame reads
 // each character's DRAWN feet: the rig's evaluated pose through the skinned mesh's world transform. No
 // clip is analysed and nothing is re-derived: this is where the feet were in the picture.
@@ -49,6 +57,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -75,6 +84,18 @@ struct Options {
     std::string profile; // name -- its first clip sampled over its length, feet in model space
     std::string poseOut; // with --dump: every joint of that character, in the world, every frame, to a file
     std::string feetOut; // every character's feet, in the world, every frame, to a file (comparing two builds)
+    std::string cameraOut; // the drawn camera's eye and target, every frame (play against seek)
+    std::vector<std::string> track; // with --camera-out: these entities' positions on each camera line
+    int renderWidth = 0;   // --render-clock WxH: step as `RenderJob` does (its warm-up, its clock, its viewport)
+    int renderHeight = 0;
+    // The three things --render-clock does, one at a time (which of them changes the film), and two spellings of
+    // a constant-step frame:
+    bool fixedClock = false; // --fixed-clock: the frame time from `FixedStepClock::tick`
+    bool instants = false;   // --instants: the instant spelled i / fps, as the clock and the replay spell it
+    bool deltaDifference = false; // --delta-difference: dt as the difference of two such instants, as the clock does
+    bool warmUp = false;     // --warm-up: the job's dt-0 warm-up update and its second seek
+    int viewWidth = 0;       // --viewport WxH: `setViewport` before every update
+    int viewHeight = 0;
 };
 
 bool parse(int argc, char** argv, Options& o) {
@@ -117,6 +138,36 @@ bool parse(int argc, char** argv, Options& o) {
             const char* v = next();
             if (v == nullptr) return false;
             o.poseOut = v;
+        } else if (a == "--camera-out") {
+            const char* v = next();
+            if (v == nullptr) return false;
+            o.cameraOut = v;
+        } else if (a == "--track") {
+            const char* v = next();
+            if (v == nullptr) return false;
+            std::stringstream ss(v);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                o.track.push_back(item);
+            }
+        } else if (a == "--render-clock") {
+            const char* v = next();
+            if (v == nullptr || std::sscanf(v, "%dx%d", &o.renderWidth, &o.renderHeight) != 2) return false;
+            o.fixedClock = true;
+            o.warmUp = true;
+            o.viewWidth = o.renderWidth;
+            o.viewHeight = o.renderHeight;
+        } else if (a == "--fixed-clock") {
+            o.fixedClock = true;
+        } else if (a == "--instants") {
+            o.instants = true;
+        } else if (a == "--delta-difference") {
+            o.deltaDifference = true;
+        } else if (a == "--warm-up") {
+            o.warmUp = true;
+        } else if (a == "--viewport") {
+            const char* v = next();
+            if (v == nullptr || std::sscanf(v, "%dx%d", &o.viewWidth, &o.viewHeight) != 2) return false;
         } else if (a == "--feet-out") {
             const char* v = next();
             if (v == nullptr) return false;
@@ -274,17 +325,64 @@ int main(int argc, char** argv) {
     const double dt = 1.0 / o.fps;
     const auto first = static_cast<std::uint64_t>(std::llround(o.start * o.fps));
     const auto frames = static_cast<std::uint64_t>(std::llround(o.seconds * o.fps)) + 1;
-    if (first > 0) {
+    std::unique_ptr<FixedStepClock> clock;
+    const auto viewport = [&] {
+        if (o.viewWidth > 0) {
+            engine.setViewport(static_cast<std::uint32_t>(o.viewWidth), static_cast<std::uint32_t>(o.viewHeight));
+        }
+    };
+    if (o.warmUp) {
+        // `RenderJob::start`, step for step: the pipeline warm-up drives the engine one dt-0 frame at the
+        // start (on a throwaway renderer, which reads the scene and writes nothing back), the camera state
+        // is reset, and the job positions itself there with a second seek.
+        FixedStepClock warm(o.fps);
+        warm.restartAt(static_cast<double>(first) * dt);
+        engine.seekSeconds(static_cast<double>(first) * dt);
+        const FrameTime t = engine.tick(warm);
+        viewport();
+        engine.update(t);
+        engine.resetCameraState();
+        engine.seekSeconds(static_cast<double>(first) * dt);
+    } else if (first > 0) {
         engine.seekSeconds(static_cast<double>(first) * dt);
     }
+    if (o.fixedClock) {
+        // The job's clock: every frame is `tick` on it.
+        clock = std::make_unique<FixedStepClock>(o.fps);
+        clock->restartAt(static_cast<double>(first) * dt);
+    }
     std::vector<glm::mat4> model;
+    std::ofstream cameraFile;
+    if (!o.cameraOut.empty()) {
+        cameraFile.open(o.cameraOut);
+    }
     for (std::uint64_t i = first; i < first + frames; ++i) {
         FrameTime time;
-        time.renderTime = static_cast<double>(i) * dt;
-        time.deltaTime = i == first ? 0.0 : dt;
-        time.frameIndex = i;
+        if (clock) {
+            time = engine.tick(*clock);
+        } else {
+            const auto instant = [&](std::uint64_t k) {
+                return o.instants || o.deltaDifference ? static_cast<double>(k) / o.fps : static_cast<double>(k) * dt;
+            };
+            time.renderTime = instant(i);
+            time.deltaTime = i == first ? 0.0 : (o.deltaDifference ? instant(i) - instant(i - 1) : dt);
+            time.frameIndex = i;
+        }
+        viewport();
         engine.update(time);
         const scene::Scene& scene = comp->scene();
+        if (cameraFile.is_open()) {
+            cameraFile << time.renderTime << ' ' << scene.camera.position.x << ' ' << scene.camera.position.y << ' '
+                       << scene.camera.position.z << ' ' << scene.camera.target.x << ' ' << scene.camera.target.y << ' '
+                       << scene.camera.target.z;
+            for (const std::string& name : o.track) {
+                if (const entity::Entity* e = comp->entityWorld().find(name)) {
+                    const glm::vec3 p = e->state().position();
+                    cameraFile << ' ' << p.x << ' ' << p.y << ' ' << p.z;
+                }
+            }
+            cameraFile << '\n';
+        }
         for (Character& c : cast) {
             const entity::Entity* e = comp->entityWorld().find(c.name);
             const scene::CompositionNode* node = comp->findNode(c.node);
