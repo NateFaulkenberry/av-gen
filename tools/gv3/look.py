@@ -17,6 +17,8 @@ Three layers, deliberately kept apart because they answer different questions:
              of light from the elder on the bar, the wind and the colour on the sections.
 """
 
+import math
+
 from . import music
 
 # ---- BASE ----------------------------------------------------------------------------------------
@@ -176,11 +178,22 @@ REMOVED_EFFECT_TYPES = {}
 # reads an authored cut, each fires on a trigger instead: a cue marker "hero pulse <hero>" on every
 # downbeat of a shot in which that hero is the subject or stands in the frame within HERO_PULSE_NEAR m.
 # GV2's look is kept whole (colour, rings, speed, range, response, sparkle); only the timing changes, so
-# the ring leaves the hero on the beat (no delay, a quick fade in) and runs its 58 m (4.5 s at 13 m/s),
-# and GV2's pump (`beat.pulse -> intensity` +8) rides the scored kick. The markers are on the Sequence
-# panel; each ring is the Effects panel's "Hero Pulse" on its hero.
+# the ring leaves the hero on the beat (no delay, a quick fade in), and GV2's pump (`beat.pulse ->
+# intensity` +8) rides the scored kick. The markers are on the Sequence panel; each ring is the Effects
+# panel's "Hero Pulse" on its hero.
+# The ring's life (the art pass, item 2). Until ADR-981 a wave drew only its latest trigger's front, so each
+# ring was cut off by the next bar's, 1.85 s and 24 m out -- the owner's "abruptly removed" -- and that is the
+# pulse the owner judged "very close to finished". With every ring now living its own life, the old timing
+# (4.5 s, full strength to 3.3 s) ran each ring on to 58 m at full strength, through foreground the cut had
+# always kept it out of: the first final measured the film 20-40% brighter in mean luma and clipping in nine
+# more shots (the Critic's F031 and its kin; s65 0.22 -> 0.48, s36 0.20 -> 0.47, all of it a ring from a hero
+# 35-45 m off sweeping the lens -- r7b's 0.20 and 0.22 again without it). So the ring keeps what the owner saw
+# and fades the way the owner described ("the wave gradually fades as it travels"): full strength to 1.5 s
+# (20 m), at 77% of it when the next bar's ring leaves the hero, then out over the first 0.75 s of that ring --
+# the two coexist briefly and the older one always finishes -- gone at 34 m, so a ring still never reaches a
+# lens much farther from its hero than the cut let it.
 HERO_PULSE_MARKER = "hero pulse {}"
-HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.2, "lifetime": 4.5, "repeatSeconds": 0.0}
+HERO_PULSE_TIMING = {"delay": 0.0, "fadeIn": 0.15, "fadeOut": 1.1, "lifetime": 2.6, "repeatSeconds": 0.0}
 HERO_PULSE_KICK = 8.0
 HERO_PULSE_NEAR = 160.0     # metres: a hero farther than this in the frame does not pulse (the grand wides are 120-150 m)
 HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the nearest)
@@ -188,6 +201,12 @@ HERO_PULSE_PER_SHOT = 2     # at most this many heroes pulse in one shot (the ne
 # local (34 m), so they fire when the performer is in frame within this, and they never take one of the two
 # places the mushrooms and aliens have -- 18 m from the elder, they would otherwise have taken half its rings.
 PERFORMER_PULSE_NEAR = 90.0
+# The art pass's two new mushrooms (heroes.py) joined a cut none of whose shots is about them, so they never ring
+# in a shot whose camera passes this close: their ring would sweep the near foreground of a shot about something
+# else. The opal's did: s12 (the herd, 15 m from it) washed and 8% clipped (the Critic's F009/F031), s36 (35 m)
+# at twice r7b's mean luma. A ring now runs out to 34 m (HERO_PULSE_TIMING) with a band behind its front, so the
+# clearance is that and a margin.
+NEW_HERO_LENS_CLEARANCE = 40.0
 PERFORMER_PULSE_KICK = 1.5  # their rings' pump on the scored kick (a mushroom's is HERO_PULSE_KICK, +8)
 
 
@@ -838,8 +857,10 @@ def pulse_blackouts():
 def hero_pulse_plan(project, scene, shots):
     """[(time, hero)]: the downbeats on which each hero's pulse fires (see HERO_PULSE_*)."""
     from .framing import keyed, project as proj
+    from .heroes import NEW_HEROES
     from .musicians import GROUPS
     performers = {g["name"] for g in GROUPS}
+    newcomers = {f"{name}-cap" for name, *_ in NEW_HEROES}
     blackout = pulse_blackouts()
     effects = [e for e in project.get("effects", []) if e.get("type") == "groundPulse"]
     owners = {e["owner"]["name"] for e in effects}
@@ -864,6 +885,10 @@ def hero_pulse_plan(project, scene, shots):
                 aim = caps[rig.aim]
             for name, pos in caps.items():
                 if name not in owners:
+                    continue
+                if name in newcomers and min(
+                        math.dist(keyed(rig, "position", s.start + (s.end - s.start) * k / 8, rig.position)[::2],
+                                  pos[::2]) for k in range(9)) < NEW_HERO_LENS_CLEARANCE:
                     continue
                 p, z = proj(eye, aim, rig.focal, [pos[0], pos[1] + 2.0, pos[2]])
                 near = PERFORMER_PULSE_NEAR if name in performers else HERO_PULSE_NEAR

@@ -46,6 +46,14 @@ of the way through its life. The Shockwave and the Ripple never had this: they d
 - A travel beam fired on markers further apart than its lifetime (Glowmere Valley 3's: 7.4 s apart, 3.2 s of
   life) is unchanged.
 - Per-fragment cost is per live front; measured with the art pass's A/B (PROGRESS.md).
+- **Amended the same day, after the art pass's one Critic run.** Running every ring its full 58 m at GV3's old
+  timing (4.5 s, full strength to 3.3 s) carried rings through foreground the cut had always kept them out of:
+  the first final measured 20-40% more mean luma than r7b in many shots and more clipping in nine (s65 0.22 ->
+  0.48, s36 0.20 -> 0.47; the Critic's lighting -6.9 and technical quality -10.5 points). The engine is
+  unchanged; GV3's timing is now 2.6 s with a 1.1 s fade (`look.HERO_PULSE_TIMING`): full strength to 1.5 s, at
+  77% when the next bar's ring leaves, gone at 34 m -- two rings coexist briefly and the older always finishes.
+  Measured at seven of the affected moments against r7b's project: within a few hundredths of its mean luma
+  except where a new hero's ring is meant to show (PROGRESS.md, "The Critic").
 
 ## Rejected alternatives
 

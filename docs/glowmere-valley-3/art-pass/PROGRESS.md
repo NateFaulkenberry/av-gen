@@ -6,11 +6,10 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, 22:10):** every item and the addendum are in code and data. Verification batch 1 was
-  reviewed and its findings fixed in data (`7cb99c07`, below); the falls' "slab" look that batch 1 still showed is
-  fixed in the water shader (ADR-985, `cascade`; committed next). Batch 2 (`scratchpad/art/batch2.sh`, outputs in
-  `~/Desktop/av-gen-review/20-gv3-art-pass/verify2/`) is running under the GPU lock. Then: frame-cost A/B, aurora
-  numbers (s72 pair in batch 2), the final 1080p render with the song, the Critic ONCE, both suites, final report.
+- **Status (2026-09-28, 22:15):** every item and the addendum are done in code and data and verified in three small
+  render batches (`verify/`, `verify2/`, `verify3/` in the review folder); frame costs measured; head `f2a01447`.
+  The final whole-film render (1080p x2, the song) is running under the GPU lock: step 4 of the plan below. Then the
+  Critic ONCE, both suites, the final report.
 - **Variant projects** for renders live in `examples/world/_art-*.json` (made by `scratchpad/art/artvariant.py`,
   never committed): DELETE them (`artvariant.py --clean`) before running the suites or committing.
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -290,6 +289,77 @@ Outputs in `~/Desktop/av-gen-review/20-gv3-art-pass/verify2/` (10 stills, 5 clip
   median 0.414%. So no flicker added (p99 identical); the sky is 24% brighter on average with the bass swell.
   (Batch 1, the arrival wide s23-s24: max 1.22% vs 1.33%, p99 1.20% vs 1.24%, mean +15%. The drop's s58 was
   confounded by the saucer: 54.98% vs 43.88%, at the white flash of 180.967 s, the same in both.)
+
+## Frame cost (matched A/B under the GPU lock, 2026-09-28 21:57-22:01)
+
+`tools/perf_sweep.py points ... --arm cur=build/release/src/avgen --size 1280x720 --frames 42 --fps 30 --reps 3`
+(42 runs, interleaved; raw `scratchpad/art/perf-ab.json`, table `perf-ab.md`). Medians of each run's p50, ms:
+
+| point | variant | wall | GPU | engine update | draws | tris |
+|---|---|---:|---:|---:|---:|---:|
+| s08 flyby @27.5 (craft moving) | full / no warp | 29.7 / 30.4 | 20.2 / 20.3 | 4.1 / 4.7 | 328 / 328 | 570k / 570k |
+| s49 @164 (craft hovering) | full / no warp | 23.2 / 23.2 | 13.6 / 13.7 | 4.0 / 4.1 | 292 / 292 | 448k / 448k |
+| s04 @16 (the musicians' shot) | full / no musicians | 35.1 / 33.8 | 26.0 / 25.0 | 3.7 / 3.7 | 266 / 232 | 576k / 517k |
+| s04 @16 | no aura / stage light | 34.5 / 35.3 | 25.3 / 25.8 | 3.7 / 3.7 | 266 / 266 | 576k / 576k |
+| s01 @3 (cold open) | full / no musicians | 26.8 / 26.4 | 17.6 / 17.4 | 3.8 / 3.7 | 312 / 278 | 580k / 522k |
+| s24 @78.9 (wide) | full / r7b's project | 32.9 / 30.8 | 23.0 / 23.1 | 3.6 / 2.9 | 350 / 306 | 667k / 595k |
+| s66 @194.7 (worst wide) | full / r7b's project | 32.4 / 32.2 | 22.9 / 24.1 | 3.5 / 2.9 | 370 / 326 | 697k / 627k |
+
+- **UFO warp:** nothing measurable (spread 2-4%).
+- **Musicians:** +1.3 ms wall, +1.0 ms GPU in their own close shot (34 draws, 58k tris); +0.4 / +0.2 ms in s01.
+  Their aura (rings + suit photophores) is +0.6 ms wall, +0.7 ms GPU of that.
+- **Stage light:** nothing measurable (and omitted on the look).
+- **The whole pass's data** against r7b's project on this engine: +2.1 ms wall at s24 (CPU: engine update +0.7,
+  renderer CPU +0.9; the GPU the same), +0.2 ms at s66; +44 draws, +70k tris.
+- **The engine's changes** (ADR-980-985), cross-run against the QA pass's clean baseline (gate951, r7b, same seconds
+  and settings, `docs/qa-pass/perf.md`): s24 30.8 ms both (GPU 22.8 -> 23.1), s66 32.2 ms both (GPU 23.5 -> 24.1);
+  +10-13k tris from the water LOD floor. Not a matched A/B: read it as "within half a millisecond".
+
+## Verification batch 3 (2026-09-28 22:13): s04 and the warp
+
+Outputs in `verify3/` (8 stills, all rc 0).
+- **s04** (16.0, 17.3): both performers read -- the drummer violet with his kit, the keyboardist white with his
+  photophores under the cap -- with their own rainbow rings (teal, violet, white bands) round them. Fixed.
+- **Warp A/B** (full vs `_art-nowarp`, pixels changing by more than 12/765): the flyby at 27.9 s 62 px (a black
+  sky: nothing to bend); the hover at 164 s 1,142 px (subtle, round the craft); the departure at the drop, 179.5 s,
+  89,571 px -- the hills and the aurora behind the leaving saucer bend over a wide field (the elder in front is
+  untouched: DF bends only what is behind the owner). It reads where there is something behind the craft; over
+  black sky it cannot.
+
+## The first final and the Critic (ONCE), 2026-09-28 22:16-22:56
+
+- **First final:** `GV3-art-pass-final.mp4` at `f2a01447`, 1920x1080, supersample 2, 60 fps, 0-225.5 s, h264 q90
+  with the song (AAC 48 kHz stereo); 13,530 frames, 927.6 MB; rendered in 2,076 s (34.6 min), rc 0, no errors.
+- **The Critic** (`scratchpad/art/critic.sh`: the adapter with the whole-film cast trace, then `critic submit
+  --mode preview --strict`): job `job_1a0eb13123079bf2e`, complete (not partial), 287.7 s. 152 issues (0
+  critical, 11 high, 90 medium, 51 low), 63 strengths. Dimensions: composition 0.711, cinematography 0.853,
+  lighting 0.437, color 0.927, depth 1.0, visual hierarchy 0.736, motion 0.881, temporal coherence 0.966, effects
+  0.951, environment 0.909, character staging 0.938, visual coherence 0.888, pacing 1.0, musical sync 0.904,
+  creative intent 0.927, technical quality 0.327.
+- **Against the revision's last whole-film preview** (`job_1a0e6cc7f6ba208ae`, r7; `critic compare`, a diff of the
+  two reports, not another evaluation): 45 findings resolved (the horse's E5 occlusions among them), 40 new, 99
+  persisting. Improved: motion +11.6, visual hierarchy +6.3, cinematography +6.1, composition +3.6, character
+  staging +2.1. Degraded: technical quality -10.5, lighting -6.9, musical sync -4.7, color -3.0, creative
+  intent -3.0, effects -2.4, environment -2.1.
+- **What the new findings were, traced:** the degraded lighting and technical quality are clipping and "pale and
+  washed out" in shots that were 20-40% brighter than r7b in mean luma (s12 0.16 -> 0.46, s36 0.21 -> 0.38, s65
+  0.22 -> 0.48). Stills A/B'd against r7b's project on this engine (`verify4/`) found two causes, both mine:
+  (1) the hero rings, which ADR-981 lets live their whole 4.5 s at GV3's old timing, ran on at full strength
+  through foreground the old cut never let them reach; (2) the opal, whose ring swept the near foreground of s12
+  (15 m from the lens) and s36 (35 m): with its pulse disabled s36 and s65 fall to r7b's luma exactly (0.203 vs
+  0.201, 0.229 vs 0.222). This is the brief's "small obvious correction necessary to satisfy a requirement"
+  (item 2: the pulse's appearance intact, the wave fading as it travels; item 5: composition and hierarchy kept).
+- **The correction (data, `look.py`):** `HERO_PULSE_TIMING` 4.5 s / fade 1.2 -> 2.6 s / fade 1.1 (full to 1.5 s, 77%
+  when the next ring leaves, gone at 34 m; ADR-981 amended); `NEW_HERO_LENS_CLEARANCE` 40 m: the two new
+  mushrooms do not ring in a shot whose camera passes that close (opal keeps 6 rings in s33/34, s48/49, s63-65;
+  sail keeps its 25). Checked at seven moments (1280x720 stills, mean luma / clipped): s12 42.2 s r7b 0.174 ->
+  0.195; s36 113.3 s 0.201 -> 0.202; s65 193.5 s 0.222 -> 0.269 (the opal's one ring, a band in the mid-ground);
+  s17 61.0 s 0.348 -> 0.348; s05 20.5 s 0.356 -> 0.357; s14 50.5 s 0.361 -> 0.254; s04 17.3 s 0.268.
+- **Not acted on (not necessary for a requirement, or not small):** "nearly the same framing" s04/s14, s04/s30,
+  s05/s01, s26/s05 (variety); s31/s15/s42 an alien or a horse outweighing or hiding the subject (the walkers' paths
+  differ now that the new heroes and performers are obstacles; the subjects stay in frame); the persisting
+  findings the r7 job already had (clipping in the drop, routes that do not visibly move umbra/veil, camera
+  jitter). The Critic runs once; the corrected final is not re-judged by it.
 
 ## Plan (the rest, in order)
 

@@ -32,8 +32,9 @@ seated on the ground by `world.seat_heroes` with the other ten.
 **What makes them heroes.** A `heroes` entry in the scene and in the project (ranked last of the featured
 mushrooms, `reactivity.FEATURED`, so the proposal's layers stay where they were and these two relight on the
 section changes); a Hero Pulse that the cut fires on its downbeats wherever they are in frame
-(`look.apply_hero_pulses`); the drop ring on their glowing parts (`reactivity.prepare`); and, as heroes, they
-are obstacles the walkers go round (ADR-193).
+(`look.apply_hero_pulses`), except in a shot whose camera passes within `look.NEW_HERO_LENS_CLEARANCE` of them
+(the Critic found the opal's ring washing s12 and s36, shots about the herd); the drop ring on their glowing
+parts (`reactivity.prepare`); and, as heroes, they are obstacles the walkers go round (ADR-193).
 """
 
 import copy
