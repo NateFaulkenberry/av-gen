@@ -189,9 +189,10 @@ report     one row per sanitizer in the run summary; prunes caches on main
   The Release run gates correctness. Each report appears in the summary as `SANITIZER FAILURE` with
   its type, first frame and a stack excerpt, and every job uploads its shard logs and XML
   (`sanitizer-logs-*`, 14 days).
-- **Exclusions:** none by name any more in `tools/ci/hosted-runner-exceptions.txt` (the two crash
-  exclusions were fixed and removed on 2026-09-28). The ASan plan skips two cases it cannot finish;
-  UBSan runs them.
+- **Exclusions:** none. `tools/ci/hosted-runner-exceptions.txt` has no `exclude` entry (the two crash
+  exclusions were fixed and removed on 2026-09-28, `e9681785`); its 27 entries are all `needs-assets`,
+  which run and are reported, not skipped. The ASan plan skips two cases it cannot finish; UBSan runs
+  them.
 - **Locally:** `tools/ci/run-suite.sh ubsan --build`, `tsan --build`, `asan:<job> --build`.
 
 ## What the categories mean
@@ -247,7 +248,7 @@ The verdict rules come from docs/testing.md:
 to caches, not to artifacts, not to LFS. Publishing them is the owner's decision (see follow-ups).
 The missing packs:
 
-- `assets/aliens`, `assets/quaternius`, `assets/nature`, `assets/terrain`
+- `assets/aliens`, `assets/quaternius` (all but the three tracked fixtures), `assets/nature`, `assets/terrain`
 - `assets/hdri/*.hdr`, `assets/environments/*`, `assets/audio/*.wav`
 - `assets/kenney/city`, `assets/imported/concert`, `assets/treeisle`
 - `~/Desktop/*.mp3`
@@ -264,11 +265,14 @@ suite behaves in four ways without the packs (census 2026-09-24):
 | explicit `SKIP` | 149 of the CPU suite's skips; almost all are asset skips (e.g. 45× "the Glowmere alien is not present", 18× "glowmere-valley.wav is generated") | counted as skipped, grouped by reason under "Skipped cases by reason" |
 | early return that passes having asserted nothing | 55 (static census) | counted as **passed**; CI cannot tell. Listed below |
 | degraded scene, still asserts something | many | passed, with reduced meaning |
-| fails for lack of the asset | 29 | 28 run and are reported as **"Failed: needs local assets"** (not a pass and not gating); 1 is excluded because it segfaults |
-| crashes for lack of the asset | 2 | **excluded** by name; each is named in every summary |
+| fails for lack of the asset | 29 at the census; **27 entries today** | run, and reported as **"Failed: needs local assets"** (not a pass and not gating). On a local run without the assets (2026-09-28), 26 fail this way and 1 skips |
+| crashes for lack of the asset | 2 at the census; **0 today** | were **excluded** by name until 2026-09-28; both were test defects and are fixed (below), so nothing is excluded |
 
-`tools/ci/hosted-runner-exceptions.txt` lists every case in the last three rows, with the asset it
-needs, taken from observed CI failures. A needs-assets case that starts passing is flagged as a
+`tools/ci/hosted-runner-exceptions.txt` lists every case in the "fails" row, with the asset it
+needs, taken from observed CI failures. It has no `exclude` entries.
+The three CC0 Quaternius fixtures (`CommonTree_1`, `Rock_Medium_1`, `Mushroom_Common`) have been
+tracked since 2026-09-28, so the 16 CPU cases that need only them no longer skip on the runner.
+None of them was in the exceptions file. A needs-assets case that starts passing is flagged as a
 stale entry. A new failure that is not on the list fails the job, as it should: add it to the
 list only with a run URL showing the asset is the cause.
 
@@ -404,7 +408,8 @@ reference, if it were private (macOS billed at 10× Linux):
 
 The ASan/UBSan run covers the default CPU set, the same set as the per-push job, minus:
 
-- the two documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`), as on every push;
+- nothing excluded by name: `tools/ci/hosted-runner-exceptions.txt` has had no `exclude` entry since
+  2026-09-28 (it held two crash exclusions before that);
 - two cases that no hosted job can finish under ASan, skipped by name (below).
 
 Where every case runs is decided by one file, `tools/ci/sanitizer-plan.txt`, read by
@@ -487,8 +492,9 @@ the `[stage]` cases. Run 36087867052 split it into `main` plus four `[stage]` pa
 - the `heap-use-after-free` in `Composition::unregisterParameters`;
 - the null dereference in `test_body_compensation.cpp`, which now skips without its asset.
 
-The Debug-only `assert` in `json.hpp` from the music-video `get_state` case without its audio is
-still excluded.
+The Debug-only `assert` in `json.hpp` from the music-video `get_state` case without its audio was
+excluded until 2026-09-28 (`e9681785`). That case now skips without `night-shift.wav`, and CI
+generates the file anyway, so it runs and is no longer excluded.
 
 Runs 36241405408 and 36321265640 found one more: UBSan's `load of value 240, which is not a valid
 value for type 'bool'` at `atmospherics.cpp:698`, in `packComet`. It is the same mistake as the wave
@@ -597,10 +603,11 @@ such.
    still need a sanitizer-sized variant, a shorter run when `__has_feature(address_sanitizer)`.
 5. **ASan at `-O1`.** ASan's documentation recommends `-O1`; the preset is Debug `-O0`. It would
    likely be several times faster (not measured). Only worth doing if the nightly margin shrinks again.
-6. **Three CC0 fixtures could be tracked.** The GPU LOD, visibility, ecology and emission cases load
-   `CommonTree_1`, `Rock_Medium_1` and `Mushroom_Common` from the Quaternius pack (CC0; about 4 MB with
-   their textures). They are gitignored only because the pack is large; tracking those three would let
-   the CPU cases that use them run on every push, and shrink the private set.
+6. **Three CC0 fixtures: DONE (2026-09-28, owner's decision).** `CommonTree_1`, `Rock_Medium_1` and
+   `Mushroom_Common`, with their five textures and the pack's licence file, are tracked: 12 files,
+   12.7 MB. (The "about 4 MB" first given here left out the textures.) 16 CPU cases that skipped on
+   the runner now run, and the private list is 11 files shorter
+   ([gpu-ci-private-assets.md](gpu-ci-private-assets.md)).
 
 ## Files
 
