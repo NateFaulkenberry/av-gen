@@ -183,11 +183,16 @@ TEST_CASE("The ladder's size measure is a bound on what is drawn, and the two ra
         float highest = 0.0f;
         std::string lowestName;
         std::string highestName;
+        // The bounds below are claims about the WHOLE ladder (the ferns are the low end), so a partial
+        // pack says nothing. A clean checkout has exactly that: the three fixtures this case's first
+        // section needs are tracked (2026-09-28) and the rest of the pack is not.
+        for (const Layer& layer : glowmereLayers()) {
+            if (!loadAsset(layer.asset).valid) {
+                SKIP("the full Quaternius pack is not present in this checkout (no '" << layer.asset << "')");
+            }
+        }
         for (const Layer& layer : glowmereLayers()) {
             const Asset a = loadAsset(layer.asset);
-            if (!a.valid) {
-                continue;
-            }
             const float ratio = rendering::sourceCullRadius(a.lo, a.hi) / halfDiagonal(a.lo, a.hi);
             if (ratio < lowest) {
                 lowest = ratio;

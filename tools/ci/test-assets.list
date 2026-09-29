@@ -9,8 +9,13 @@
 # ~/Desktop/MP3/bass.mp3 (copyrighted songs; the owner's decision), and the motion packs 17 cases need
 # that are not on the owner's machine either (retargeted 100STYLE, the augmented scout pack).
 #
-# Tier 1, the GPU suite: 63 files, 64.7 MB. Tier 2 adds what the Glowmere-tier CPU cases need:
-# 139 files, 195.8 MB, of which the Tree of Life island meshes are most.
+# Tier 1, the GPU suite: 52 files, 52.0 MB. Tier 2 adds what the Glowmere-tier CPU cases need:
+# 139 files, 195.8 MB, of which the Tree of Life island meshes are most. (MB here is 10^6 bytes.)
+#
+# 2026-09-28 (owner's decision): the three CC0 Quaternius fixtures -- CommonTree_1, Rock_Medium_1 and
+# Mushroom_Common, with their five textures, 11 files, 12.7 MB -- are now TRACKED in this repository
+# and were taken off this list. The private repository at the pinned 61ff6dd still holds them; that is
+# harmless (the fetch script links only ignored paths) until the set is next rebuilt from this list.
 # Re-measure after changing the suites: tools/ci/opentrace.c has the recipe.
 
 # ---- tier 1: avgen_render_tests -------------------------------------------------------------------
@@ -24,14 +29,10 @@ farm/cow.glb
 farm/horse.glb
 quaternius/glTF/Bark_DeadTree.png
 quaternius/glTF/Bark_DeadTree_Normal.png
-quaternius/glTF/Bark_NormalTree.png
-quaternius/glTF/Bark_NormalTree_Normal.png
 quaternius/glTF/Bark_TwistedTree.png
 quaternius/glTF/Bark_TwistedTree_Normal.png
 quaternius/glTF/Bush_Common.bin
 quaternius/glTF/Bush_Common.gltf
-quaternius/glTF/CommonTree_1.bin
-quaternius/glTF/CommonTree_1.gltf
 quaternius/glTF/CommonTree_4.bin
 quaternius/glTF/CommonTree_4.gltf
 quaternius/glTF/DeadTree_1.bin
@@ -48,13 +49,9 @@ quaternius/glTF/Grass_Common_Short.bin
 quaternius/glTF/Grass_Common_Short.gltf
 quaternius/glTF/Leaf_Pine_C.png
 quaternius/glTF/Leaves.png
-quaternius/glTF/Leaves_NormalTree_C.png
 quaternius/glTF/Leaves_TwistedTree_C.png
-quaternius/glTF/Mushroom_Common.bin
-quaternius/glTF/Mushroom_Common.gltf
 quaternius/glTF/Mushroom_Laetiporus.bin
 quaternius/glTF/Mushroom_Laetiporus.gltf
-quaternius/glTF/Mushrooms.png
 quaternius/glTF/PathRocks_Diffuse.png
 quaternius/glTF/Pebble_Round_2.bin
 quaternius/glTF/Pebble_Round_2.gltf
@@ -70,9 +67,6 @@ quaternius/glTF/Plant_7.bin
 quaternius/glTF/Plant_7.gltf
 quaternius/glTF/Plant_7_Big.bin
 quaternius/glTF/Plant_7_Big.gltf
-quaternius/glTF/Rock_Medium_1.bin
-quaternius/glTF/Rock_Medium_1.gltf
-quaternius/glTF/Rocks_Diffuse.png
 quaternius/glTF/TwistedTree_2.bin
 quaternius/glTF/TwistedTree_2.gltf
 quaternius/glTF/TwistedTree_4.bin

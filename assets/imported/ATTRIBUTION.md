@@ -28,6 +28,12 @@ every time: a fresh git worktree has no `assets/quaternius`, so every world load
 behind a wall of "glTF file not found" warnings until the directory is symlinked in from the main
 checkout.
 
+**Except three test fixtures, tracked since 2026-09-28** (owner's decision, QA pass): `glTF/CommonTree_1`,
+`glTF/Rock_Medium_1` and `glTF/Mushroom_Common` (`.gltf` + `.bin`), their five textures
+(`Bark_NormalTree.png`, `Bark_NormalTree_Normal.png`, `Leaves_NormalTree_C.png`, `Rocks_Diffuse.png`,
+`Mushrooms.png`) and `License_Standard.txt` itself: 12 files, 12.7 MB, unmodified from the pack. CC0 1.0
+permits redistribution; `.gitignore` re-includes exactly these paths, one line each.
+
 ## What was changed
 
 Both arrived as binary FBX (version 7400), which this engine does not read — it loads `.gltf` and

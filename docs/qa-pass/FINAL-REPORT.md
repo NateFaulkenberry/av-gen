@@ -475,12 +475,14 @@ parked, and the aurora (art pass).
 5. **G2 and G3, the partial-load data-loss hazards.** Accept them, or schedule a transactional load.
 6. **The paused ADR-440 hitch** (~36 ms every ~380 ms). Accept it, or pay for a cheaper serialiser or a
    snapshot.
-7. **Track the three CC0 Quaternius GPU fixtures** (about 4 MB). Their CPU cases would then run on every push,
-   and the private set would shrink.
-8. **Repository hygiene:**
-   - remove the 28 committed treeisland PNGs (51 MB; this does not shrink history);
-   - remove the 9 `_vx2-*` arms, plus a `.gitignore` rule;
-   - whether to audit the other ~40 treeisland arms.
+7. **DONE (see the addendum).** ~~Track the three CC0 Quaternius GPU fixtures (about 4 MB).~~ Tracked on
+   `qa/tidy`: 12 files, 12.7 MB with their textures and the licence file. 16 CPU cases now run on every push.
+8. **Repository hygiene: DONE, except the PNGs (see the addendum).**
+   - remove the 28 committed treeisland PNGs (51 MB; this does not shrink history): **not done**, because four
+     ADRs cite them (ADR-372 keeps them on purpose as a record). Still the owner's call;
+   - ~~remove the 9 `_vx2-*` arms, plus a `.gitignore` rule~~: done. `check_project_integrity` reports 0 problems;
+   - ~~whether to audit the other ~40 treeisland arms~~: audited. All 22 are referenced and load cleanly, and
+     none was removed.
 9. **`--ui-ab` ignores `--start-at`:** fix it if that benchmark will be used again.
 
 ## Success criteria (from the brief)
@@ -490,7 +492,7 @@ parked, and the aurora (art pass).
 | The Glowmere projects are integrated, and GV3 is reproducible from repository state | **Met** | r7b is in `examples/world/`. It loads with 0 errors (105/105 routes, 130/130 tracks, 18/18 effects, 73 shots). Main's generator reproduces it byte-identically, apart from the relative song path. The song and the licensed models are excluded, and the reason is documented |
 | The causes of GV3's performance are understood | **Met** | A verdict on each of A, B and C, backed by measurement, a profile, r = 0.975, bisection, and one-at-a-time GPU attribution |
 | Real project-state problems are cleaned up, and demonstrable regressions and important bugs are fixed | **Partly met** | Both CPU regressions are removed from the frame, and the ten fixes in "Bugs fixed" each have a test or a measured validation. Stale arms are gone. But the G2/G3 data-loss hazards are open, and GV3's duplicated values and the family's dead data are listed, not removed |
-| CI is materially cleaner | **Met** | Every red run was triaged. One build action, one local==CI script, cache discipline, an empty exceptions file, an honest sanitizer gate. Push CI is green |
+| CI is materially cleaner | **Met** | Every red run was triaged. One build action, one local==CI script, cache discipline, an exceptions file with no exclusions (its 27 entries are reported `needs-assets` cases), an honest sanitizer gate. Push CI is green |
 | ASan, UBSan and TSan (where appropriate) run in CI | **Met** | All three have run with 0 reports: ASan over the whole plan, UBSan over 3838/3838, TSan over its subset. Whole-suite TSan was measured and does not fit, which is documented. The nightly runs from `main` start after the merge |
 | GPU CI works through the private-asset strategy or the best documented alternative | **Partly met** | Built, documented, the private repository published and pinned. Parked by the owner before the secret and the runner, so no GPU verdict comes from CI. Hosted GPU is informational (363/443 fail) |
 | Fixtures are minimal where practical, and nightly validation runs without the owner's machine | **Partly met** | The asset set was measured down to 202 files. The CPU suite and all three sanitizers run nightly on hosted runners. But the Glowmere-tier and GPU nightlies are gated off until steps 4-6 |
@@ -541,3 +543,64 @@ time once this is on main.
   (run 36464437262).
 - **The removed arms.** PROGRESS.md says "nine `_diag-water-*` arms and `_pre-defects`". Commit `bc2c1939`
   calls them eleven (nine files plus `_pre-defects` and its scene).
+
+## Addendum: the owner's tidy decision
+
+2026-09-28, after this report. The owner decided: "Track those assets, tidy up repo if needed." The work is
+on `qa/tidy`, branched from `qa/coord` `9dc9a06c`.
+
+- **Decision 7: done. The three CC0 Quaternius fixtures are tracked.**
+  - The files: `CommonTree_1`, `Rock_Medium_1` and `Mushroom_Common` (`.gltf` + `.bin`), plus the five
+    textures they reference (`Bark_NormalTree`, `Bark_NormalTree_Normal`, `Leaves_NormalTree_C`, `Rocks_Diffuse`,
+    `Mushrooms`) and the pack's `License_Standard.txt`. That is 12 files and 12.7 MB, byte-identical to the
+    owner's checkout, with one `.gitignore` negation per file.
+  - **The size was misstated.** "About 4 MB" left out the textures. The meshes alone are 0.53 MB.
+  - **The licence** is CC0 1.0, by the pack's own `License_Standard.txt`, `assets/imported/ATTRIBUTION.md`
+    ("gitignored for size, not for licence") and `assets/manifest.json`. ADR-542 says that Quaternius "may be
+    embedded but not redistributed". The same sentence calls the purchased alien and farm packs CC0, so it is
+    not a reliable record.
+  - **The effect:** 16 CPU cases that skipped on a clean checkout now pass. They are in
+    `test_world_navigation` (6), `test_visibility_culling` (3), `test_composition` (2),
+    `test_ecology_light_selection` (2), `test_lod_ladder`, `test_mesh_lod` and `test_emission_lanes`. This
+    was measured by running `run-suite.sh cpu` without the untracked assets, with and without the fixtures:
+    3601 passed and 226 skipped before, 3617 passed and 210 skipped after.
+  - **It exposed one test defect,** now fixed (`e568d2c4`). The second section of `test_lod_ladder` asserted
+    whole-ladder bounds over whichever layers were present, so with three layers present it failed.
+  - `tools/ci/test-assets.list` loses 11 files. Tier 1 is now 52 files, 52.0 MB. The GPU CI doc's table is
+    corrected: the pinned repository's "248 MB" is 260.5 MB counted in MiB.
+  - **The private repository was not touched.** At `61ff6dd` it still holds the 11 files.
+    `tools/fetch-test-assets.sh` would have refused the whole fetch over them, because they are no longer
+    ignored paths. It now skips a path this repository tracks, and the fix was tested offline. The 11 files
+    drop out when the set is next rebuilt, which also needs a new lock sha.
+  - **The hosted-runner exceptions are unchanged.** Both Quaternius entries need the rest of the pack.
+- **Decision 8: done, except the PNGs.**
+  - **The 9 `_vx2-*` arms are removed** (648 KB), with a `.gitignore` rule. Nothing loaded or named them.
+    `check_project_integrity.py` now prints "9 project(s) carrying effect parameters, 12 fingerprinting a
+    scene / 0 problem(s)" and exits 0. Their generator, `tools/make_vortex2_arms.py`, was kept, but it still
+    does not run against today's deliverable.
+  - **The 28 treeisland PNGs (51 MB) are NOT removed.** Four ADRs cite them. ADR-393 and ADR-450 name
+    individual images as evidence. ADR-372 says the `cosmickey/` frames are kept deliberately as the record
+    of ADR-358's investigation. ADR-390 is the fourth. Removing them from the tip would leave those citations
+    pointing at nothing. To remove them anyway, repoint each citation at a commit that holds the image (for
+    example `git show dab170b1:examples/treeisland/renders/...`). This is the owner's call. Removing them
+    would not shrink history either way.
+  - **The treeisland arms are audited.** 22 arms remain beside the 3 deliverables. Each one:
+    - is named by a generator (`make_cosmickey_arms.py`, `make_treeisland_arms.py`), an ADR (358, 371, 372,
+      390, 339, 900), `renders/treeisland/stills.json` or a test;
+    - loads with `avgen --project <p> --audit-routes` at rc 0 with 0 errors. The warnings are the same
+      class as the deliverable's own: unknown `shader/glowmere-cosmos/*` parameters and a dead hero pulse.
+
+    None is clearly dead, so none was removed. `_ca-vg-g1/g2` were committed deliberately (ADR-371: "so the
+    next pass starts from them"). `_ck-before-*` and `_compare-original` are hand-written records of a
+    "before" state.
+- **`docs/development/ci.md` now gives one account of the exclusions** ("Where the sources disagree", item
+  6). `hosted-runner-exceptions.txt` has **0 `exclude` and 27 `needs-assets` entries**. The json.hpp case
+  was retired in `e9681785`. So "the exceptions file is empty" (above, and in PROGRESS.md) is true of
+  exclusions only.
+- **Validation on `qa/tidy`:**
+  - `cmake --preset release` then `--build` succeeded.
+  - `avgen_tests` exits 0: 3854 cases, 3834 passed, 19 skipped, 1 failed as expected (the `[!shouldfail]`
+    at `test_character_lab_slopes.cpp:187`).
+  - `avgen_render_tests`, run under `tools/gpu-lock.sh`, exits 0: 549 cases, 548 passed, 1 skipped.
+  - `run-suite.sh cpu` without the untracked assets exits 0: 3617 passed, 0 failed, 210 skipped,
+    26 needs-assets, 1 expected failure.

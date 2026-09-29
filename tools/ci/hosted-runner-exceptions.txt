@@ -43,7 +43,8 @@ needs-assets | the trace is not blind: the key switched on for one alien changes
 needs-assets | no animated asset in the repository carries root motion | assets/aliens + assets/quaternius (counts clips on disk)
 needs-assets | the animation capability inventory is what the lab documentation says it is | assets/aliens + assets/quaternius (counts clips on disk)
 
-# --- assets/quaternius (trees, rocks, plants)
+# --- assets/quaternius (trees, rocks, plants). CommonTree_1, Rock_Medium_1 and Mushroom_Common are tracked
+# since 2026-09-28; these two cases need the rest of the pack.
 needs-assets | Swarm centres sit in real crowns, and the table is a function of the camera alone | assets/quaternius
 needs-assets | The firefly material lights exactly the swarm trees and leaves every other tree as it was | assets/quaternius
 

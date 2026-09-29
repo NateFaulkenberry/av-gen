@@ -98,12 +98,26 @@ GPU suite (549 cases) and over the 280 CPU cases a hosted runner skips or fails 
 
 | Tier | Needed by | Files | Size |
 |---|---|---:|---:|
-| 1 | `avgen_render_tests`: 5 aliens, 3 farm animals, 55 Quaternius meshes and textures | 63 | 65 MB |
-| 2 | the Glowmere-tier `avgen_tests` cases: the rest of the aliens and farm, 55 more Quaternius, 55 Kenney city pieces, 15 nature, 1 HDRI | 133 | 44 MB |
-| 2 | the Tree of Life island meshes (the tree-island cases only; optional) | 6 | 152 MB |
+| 1 | `avgen_render_tests`: 5 aliens, 3 farm animals, 44 Quaternius meshes and textures | 52 | 52.0 MB |
+| 2 | the Glowmere-tier `avgen_tests` cases: the rest of the aliens and farm, 55 more Quaternius, 55 Kenney city pieces, 15 nature, 1 HDRI | 133 | 43.9 MB |
+| 2 | the Tree of Life island meshes (the tree-island cases only; optional) | 6 | 151.9 MB |
 
-So the private repository is about **110 MB** without the island and 260 MB with it, against 1.4 GB in
-`assets/`. It leaves out:
+(MB is 10^6 bytes. The list is 191 files, 247.8 MB; the pinned repository's "248 MB" for its 202 files
+was 260.5 MB counted in MiB.)
+
+So the private set is about **96 MB** without the island and 248 MB with it, against 1.4 GB in
+`assets/`.
+
+**Tracked since 2026-09-28, owner's decision: the three CC0 Quaternius fixtures.** `CommonTree_1`,
+`Rock_Medium_1` and `Mushroom_Common` (the GPU LOD, visibility, ecology and emission cases' production
+fixtures), with their five textures and the pack's `License_Standard.txt`: 12 files, 12.7 MB, in the
+public repository under narrow `.gitignore` negations. The CPU cases that load them now run on every
+push. They left the list (11 files, 12.7 MB; the licence file was never on it). **The private repository
+at the pinned `61ff6dd` still holds those 11 files.** That is harmless: `tools/fetch-test-assets.sh`
+skips any path this repository tracks rather than linking or refusing it. They drop out the next time
+the private set is rebuilt from the list (step 1), which also needs a new lock sha.
+
+It leaves out:
 - `assets/audio/*.wav`: CI regenerates them;
 - the songs (`~/Desktop/Rebuild.mp3`, `~/Desktop/MP3/bass.mp3`): the owner's decision;
 - the motion packs 17 cases need (retargeted 100STYLE, the augmented scout pack and its database):
