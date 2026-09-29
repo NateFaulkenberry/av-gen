@@ -8,6 +8,11 @@ target_link_libraries(avgen_world_preview PRIVATE avgen_core)
 add_executable(avgen_water_probe water_probe.cpp)
 target_link_libraries(avgen_water_probe PRIVATE avgen_core)
 
+# The plants a terrain grows in a region, as a scene load places them (GV3 art pass): where a prop or a
+# hero can stand without a fern through it, answered without a render.
+add_executable(avgen_scatter_probe scatter_probe.cpp)
+target_link_libraries(avgen_scatter_probe PRIVATE avgen_core)
+
 # The Help documentation validator (help-system spec 35). A build target rather than a script
 # because it reads the same content model the application does: a lint that reimplemented the
 # parser would eventually disagree with it, and the disagreement would be silent.

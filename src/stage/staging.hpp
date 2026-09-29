@@ -186,6 +186,10 @@ enum class StepKind : std::uint8_t {
     Detach,
     Release, // give up the claim on a role
     Retire,  // hide it, release it, and never offer it to a query again
+    // ADR-984: put it back where this run bound it -- the place and the facing it had then -- as a
+    // placement, with every parameter the scenario drove through the role given back, and hold it
+    // there until the scenario lets it go. What a set piece that gives its subject back ends with.
+    Return,
 };
 [[nodiscard]] const char* stepKindName(StepKind kind);
 [[nodiscard]] std::optional<StepKind> stepKindFromName(std::string_view name);
@@ -728,6 +732,11 @@ private:
         std::string role;
         std::string actor;  // "" when the role is a plain entity
         std::string entity;
+        // ADR-984: where the body stood and which way it faced when this run bound it, for `Return`.
+        // Simulation state like the rest of the run, so a checkpoint carries it.
+        glm::vec3 home{0.0f};
+        float homeYaw = 0.0f;
+        bool hasHome = false;
     };
     struct CueRun {
         std::size_t step = 0;
@@ -815,7 +824,11 @@ private:
     void writeParameter(const Run& run, std::string_view role, const std::string& path,
                         float value, const StageContext& ctx, int component = 0);
     void bindRole(Run& run, const std::string& role, const std::string& entity,
-                  const std::string& actor);
+                  const std::string& actor, const entity::Entity* body = nullptr);
+    // Every parameter this run drove through `role` while it resolved to `name`, back to what it held
+    // before the scenario first wrote it (ADR-385), except `except`. What `Retire` and `Return` share.
+    void restoreWritten(const Run& run, const std::string& name, const std::string& except,
+                        const StageContext& ctx);
     void releaseClaims(const Run& run);
     [[nodiscard]] bool claimed(std::string_view entity) const;
     [[nodiscard]] bool isRetired(std::string_view entity) const;

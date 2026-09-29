@@ -141,7 +141,12 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
     // ten-pick run are byte-identical to a six-pick run: the four extra are genuinely *additional*
     // morphologies, chosen to be as far from the existing six as the population allows, rather than a
     // re-run that shuffles the set.
-    constexpr std::size_t kWinners = 10;
+    //
+    // Twelve since the GV3 art pass (docs/glowmere-valley-3/art-pass/00-brief.md item 5: "two
+    // additional hero mushrooms ... visually unique from the existing hero mushrooms"): by the same
+    // property the first ten are the ten Glowmere already has, and the two new ones are the two
+    // morphologies farthest from all ten.
+    constexpr std::size_t kWinners = 12;
     // The quality/diversity trade, explicit because hiding it inside an algorithm is how a pipeline
     // ends up with six excellent near-identical mushrooms and no knob to say so (ADR-172 / 4.8).
     constexpr float kAlpha = 0.45f;
@@ -266,8 +271,8 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
 
     // ---- the contact sheet: the winners large, under Glowmere's own light --------------------
     constexpr std::uint32_t kTile = 420;
-    const std::uint32_t cols = 5;
-    const std::uint32_t rows = 2;
+    const std::uint32_t cols = 6;
+    const std::uint32_t rows = static_cast<std::uint32_t>((kWinners + cols - 1) / cols);
     std::vector<std::uint8_t> sheet(static_cast<std::size_t>(kTile * cols) * (kTile * rows) * 4, 0);
     const std::uint32_t sheetW = kTile * cols;
     for (std::size_t k = 0; k < winners.size(); ++k) {

@@ -309,6 +309,11 @@ struct SetPieceTrace {
         double retired = -1.0;
         glm::vec3 atLift{0.0f};
         glm::vec3 atRetire{0.0f};
+        // ADR-984: a set piece that gives its subject back -- when its dissolve ended, and when (and
+        // where) it was put back.
+        double dissolved = -1.0;
+        double returned = -1.0;
+        glm::vec3 atReturn{0.0f};
     };
     std::vector<Animal> animals;
     std::vector<std::string> failures; // steps that failed, with why
@@ -531,6 +536,19 @@ int main(int argc, char** argv) {
                         }
                     }
                     break;
+                case stage::StageEventKind::StepDone:
+                    for (SetPieceTrace::Animal& a : piece.animals) {
+                        if (a.role != e.role) {
+                            continue;
+                        }
+                        if (e.step == "fade" && a.dissolved < 0.0) {
+                            a.dissolved = time.renderTime;
+                        } else if (e.step == "back") {
+                            a.returned = time.renderTime;
+                            a.atReturn = where(a.entity);
+                        }
+                    }
+                    break;
                 case stage::StageEventKind::StepFailed:
                     piece.failures.push_back(fmt::format("{:.3f}s {} {} {}: {}", time.renderTime, e.beat, e.role, e.step,
                                                          e.detail));
@@ -645,6 +663,13 @@ int main(int argc, char** argv) {
                 if (a.retired >= 0.0) {
                     one["retired"] = rounded(a.retired);
                     one["atRetire"] = vec3(a.atRetire);
+                }
+                if (a.dissolved >= 0.0) {
+                    one["dissolved"] = rounded(a.dissolved);
+                }
+                if (a.returned >= 0.0) {
+                    one["returned"] = rounded(a.returned);
+                    one["atReturn"] = vec3(a.atReturn);
                 }
                 animals.push_back(std::move(one));
             }

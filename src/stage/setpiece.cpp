@@ -24,7 +24,7 @@ using U = SlotUse;
 
 // The craft's arrival and departure are the same slots in the two templates that stop somewhere;
 // they are written out in both rather than spliced, so each table reads as the whole template.
-constexpr std::array<SetPieceSlot, 34> kAbduction{{
+constexpr std::array<SetPieceSlot, 35> kAbduction{{
     {"transitSeconds", 0.1f, 0.02f, 30.0f, U::Parameter, "hidden move to where it appears", "s"},
     {"approachSeconds", 12.0f, 1.0f, 120.0f, U::Parameter, "approach", "s"},
     {"entryHeight", 70.0f, 5.0f, 400.0f, U::Parameter, "height it appears at, above the ground", "m"},
@@ -64,6 +64,10 @@ constexpr std::array<SetPieceSlot, 34> kAbduction{{
     {"animals", 1.0f, 1.0f, 3.0f, U::Structure, "animals lifted", ""},
     {"stackRadius", 1.6f, 0.0f, 8.0f, U::Structure, "animals' spacing in the beam", "m"},
     {"stackStagger", 1.2f, 0.0f, 8.0f, U::Structure, "animals' height spacing in the beam", "m"},
+    // ADR-984: 0 takes what it lifted for good (retired, ADR-934). More gives it back: put where it
+    // was taken, as it was, this many seconds after the beam goes out -- GV3's drummer, behind his kit
+    // again once no shot sees it.
+    {"returnSeconds", 0.0f, 0.0f, 600.0f, U::Structure, "give it back this long after the beam goes out (0: taken for good)", "s"},
 }};
 
 constexpr std::array<SetPieceSlot, 24> kSurvey{{
@@ -198,6 +202,10 @@ Result<Plan> plan(const SetPieceSpec& spec) {
                    {"lift", ta + th + tb + (3.0 * fs)},
                    {"depart", ta + th + tb + lift + (4.0 * fs)}};
         tail = d("gapSeconds") + d("leaveSeconds") + fs;
+        // ADR-984: a subject given back is put back a step after its wait, inside the departure.
+        if (d("returnSeconds") > 0.0) {
+            tail = std::max(tail, d("returnSeconds") + (2.0 * fs));
+        }
         break;
     }
     case SetPieceKind::Survey: {
@@ -390,8 +398,9 @@ std::vector<CueDesc> beamRising() {
             cue("actor.beam", {glow})};
 }
 
-// The beam going out and the craft leaving.
-BeatDesc departing(const Plan& p) {
+// The beam going out and the craft leaving -- and, when the set piece gives back what it lifted
+// (ADR-984), each subject put back where it was taken, `returnSeconds` after the beam goes out.
+BeatDesc departing(const Plan& p, int giveBack = 0) {
     const SetPieceSpec& spec = *p.spec;
     StepDesc cut = setTo("beam-cut", "size", literal(0.0f), param("beamFadeSeconds"));
     BeatDesc b = beat("depart", {cue("actor.beam", {step(StepKind::Hide, "beam-out"),
@@ -405,6 +414,11 @@ BeatDesc departing(const Plan& p) {
     gap.duration = param("gapSeconds");
     b.cues.push_back(cue("actor", {gap, moveTo("leave", p.timeline.exit, "leaveHeight", "leaveSeconds"),
                                    step(StepKind::Hide, "gone")}));
+    for (int k = 0; k < giveBack; ++k) {
+        StepDesc away = step(StepKind::Wait, "away");
+        away.duration = literal(v(spec, "returnSeconds"));
+        b.cues.push_back(cue(targetRole(k), {away, step(StepKind::Return, "back")}));
+    }
     b.release = true;
     return b;
 }
@@ -432,6 +446,7 @@ ScenarioDesc abduction(const Plan& p) {
     const SetPieceSpec& spec = *p.spec;
     const bool region = spec.place.kind == SetPiecePlace::Kind::Region;
     const int n = p.animals;
+    const bool giveBack = v(spec, "returnSeconds") > 0.0f;
     std::vector<BeatDesc> beats = opening(p, p.timeline.entry, "entryHeight", true);
     if (region) {
         // The subject first, so the craft can come in on it: the nearest animal to the region's
@@ -503,10 +518,16 @@ ScenarioDesc abduction(const Plan& p) {
         fade.from = literal(1.0f);
         fade.hasFrom = true;
         fade.ease = true;
-        lift.cues.push_back(cue(targetRole(k), {rise, fade, step(StepKind::Retire, "vanish")}));
+        // ADR-984: a subject the set piece gives back dissolves and waits, unseen, to be put back as
+        // the craft leaves; one it keeps is retired.
+        if (giveBack) {
+            lift.cues.push_back(cue(targetRole(k), {rise, fade}));
+        } else {
+            lift.cues.push_back(cue(targetRole(k), {rise, fade, step(StepKind::Retire, "vanish")}));
+        }
     }
     beats.push_back(std::move(lift));
-    beats.push_back(departing(p));
+    beats.push_back(departing(p, giveBack ? n : 0));
     clock(beats, p);
 
     ScenarioDesc s;

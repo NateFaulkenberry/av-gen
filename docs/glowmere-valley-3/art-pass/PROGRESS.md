@@ -18,6 +18,17 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
   the project stays the generator's output. Never round-trip the project through Python `json` by hand, and never
   clean it with a headless load-and-save.
 
+## The owner's morning render (coordinator, 2026-09-28 evening): a firm deliverable
+
+- **When the pass is complete** (after the fixes and the Critic): the WHOLE film with the song muxed in, review
+  quality, 1080p if it fits overnight (else 720p, and say why), saved as
+  `~/Desktop/av-gen-review/20-gv3-art-pass/GV3-art-pass-final.mp4`. This replaces step 6's low-res preview.
+- **Safety net:** if the pass will not be finished by about 06:00 local, render the whole film from the latest
+  COMMITTED state first, as `GV3-art-pass-WIP-<short sha>.mp4` in the same folder, with a short `README.md` beside
+  it saying what is and is not in it yet.
+- Under `tools/gpu-lock.sh`; local only (licensed assets and the song: never upload). Record path, settings and
+  duration here and in the final message.
+
 ## Rules for this pass (from the launch prompt and the brief)
 
 - Targeted refinement, not a redesign; the fewest renders; the Creative Critic ONCE, at the end; then stop.

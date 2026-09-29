@@ -112,6 +112,7 @@ const char* stepKindName(StepKind kind) {
     case StepKind::Detach: return "detach";
     case StepKind::Release: return "release";
     case StepKind::Retire: return "retire";
+    case StepKind::Return: return "return";
     }
     return "?";
 }
@@ -129,6 +130,7 @@ std::optional<StepKind> stepKindFromName(std::string_view name) {
     if (name == "detach") return StepKind::Detach;
     if (name == "release") return StepKind::Release;
     if (name == "retire") return StepKind::Retire;
+    if (name == "return") return StepKind::Return;
     return std::nullopt;
 }
 
@@ -748,15 +750,26 @@ entity::Entity* Staging::resolve(const Run& run, std::string_view role,
 }
 
 void Staging::bindRole(Run& run, const std::string& role, const std::string& entity,
-                       const std::string& actor) {
+                       const std::string& actor, const entity::Entity* body) {
+    Binding* bound = nullptr;
     for (Binding& b : run.bindings) {
         if (b.role == role) {
             b.entity = entity;
             b.actor = actor;
-            return;
+            bound = &b;
+            break;
         }
     }
-    run.bindings.push_back(Binding{.role = role, .actor = actor, .entity = entity});
+    if (bound == nullptr) {
+        run.bindings.push_back(Binding{.role = role, .actor = actor, .entity = entity});
+        bound = &run.bindings.back();
+    }
+    // ADR-984: the body's place and facing as the run takes it, for a `Return` to put it back.
+    bound->hasHome = body != nullptr;
+    if (body != nullptr) {
+        bound->home = body->state().position();
+        bound->homeYaw = body->state().yaw;
+    }
 }
 
 // ---- claims -------------------------------------------------------------------------------------
@@ -888,7 +901,7 @@ bool Staging::runQuery(Run& run, const QueryDesc& query, const StageContext& ctx
             ++report_.unbound;
             return false;
         }
-        bindRole(run, query.bind, query.name, {});
+        bindRole(run, query.bind, query.name, {}, e);
         if (query.claim) {
             claims_.push_back(
                 Claim{.entity = query.name,
@@ -989,7 +1002,7 @@ bool Staging::runQuery(Run& run, const QueryDesc& query, const StageContext& ctx
         return false;
     }
     const std::string& won = candidates_[best].name;
-    bindRole(run, query.bind, won, {});
+    bindRole(run, query.bind, won, {}, ctx.world->entities()[candidates_[best].entity].get());
     if (query.claim) {
         claims_.push_back(Claim{.entity = won,
                                 .holder = desc_.scenarios[run.scenario].name + "/" + query.bind});
@@ -1832,24 +1845,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             // twice over. Measured: 3,615 frames of 5,400 still carrying a retired body in `Blend`,
             // which is what the control arm of "the fade reaches the flattened scene and is given
             // back" was built to catch, and did, on its first run.
-            //
-            // `written_` already holds the base of everything this director wrote and which role
-            // resolved it, so this replays a record that existed rather than adding a second list
-            // of parameter names the director has to know by heart.
-            if (ctx.params != nullptr) {
-                const std::string& holder = desc_.scenarios[run.scenario].name;
-                for (const Written& w : written_) {
-                    // By the BODY, not by the role: `target` binds a different animal every cycle.
-                    if (w.scenario != holder || w.entity != name || w.path == hidePath) {
-                        continue;
-                    }
-                    if (params::IParameter* p = ctx.params->find(w.path); p != nullptr) {
-                        for (std::size_t c = 0; c < w.base.size() && c < p->componentCount(); ++c) {
-                            p->setBaseComponent(c, w.base[c]);
-                        }
-                    }
-                }
-            }
+            restoreWritten(run, name, hidePath, ctx);
             writeParameter(run, role, hidePath, 0.0f, ctx);
         }
         claims_.erase(std::remove_if(claims_.begin(), claims_.end(),
@@ -1863,8 +1859,67 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         }
         return StepStatus::Done;
     }
+
+    case StepKind::Return: {
+        // ADR-984. A set piece that gives its subject back: GV3's drummer, lifted from his kit on the
+        // riser, is behind it again once no shot sees the kit. Put where this run BOUND it, in the
+        // place and facing it had then -- one frame, a placement (ADR-911), so nothing that watches
+        // the body reads the jump as motion -- with every parameter the scenario drove through the role
+        // given back (the dissolve's `opacity` among them), and held there without a speed, so the
+        // gait comes to rest on the body's own clips. The hold ends when the scenario releases it
+        // (`release`, or its end), which leaves the body where it now stands.
+        if (self == nullptr) {
+            return StepStatus::Failed;
+        }
+        const std::string name = resolveName(run, role);
+        const Binding* home = nullptr;
+        for (const Binding& b : run.bindings) {
+            if (b.role == role && b.entity == name && b.hasHome) {
+                home = &b;
+            }
+        }
+        if (home == nullptr) {
+            cue.reason = fmt::format("return: role '{}' was not bound to a body this run can put back", role);
+            return StepStatus::Failed;
+        }
+        if (!cue.started) {
+            cue.started = true;
+            self->actions().cancel(entity::Authority::Director, ctx.time);
+            restoreWritten(run, name, {}, ctx);
+            self->markPlaced();
+        }
+        entity::DirectorMotion motion;
+        motion.active = true;
+        motion.position = home->home;
+        motion.yaw = home->homeYaw;
+        motion.hasYaw = true;
+        self->setDirectorMotion(motion);
+        return StepStatus::Done;
+    }
     }
     return StepStatus::Done;
+}
+
+void Staging::restoreWritten(const Run& run, const std::string& name, const std::string& except,
+                             const StageContext& ctx) {
+    // `written_` already holds the base of everything this director wrote and which role resolved it,
+    // so this replays a record that existed rather than adding a second list of parameter names the
+    // director has to know by heart.
+    if (ctx.params == nullptr) {
+        return;
+    }
+    const std::string& holder = desc_.scenarios[run.scenario].name;
+    for (const Written& w : written_) {
+        // By the BODY, not by the role: `target` binds a different animal every cycle.
+        if (w.scenario != holder || w.entity != name || (!except.empty() && w.path == except)) {
+            continue;
+        }
+        if (params::IParameter* p = ctx.params->find(w.path); p != nullptr) {
+            for (std::size_t c = 0; c < w.base.size() && c < p->componentCount(); ++c) {
+                p->setBaseComponent(c, w.base[c]);
+            }
+        }
+    }
 }
 
 // ---- "has it actually stopped?" ------------------------------------------------------------------

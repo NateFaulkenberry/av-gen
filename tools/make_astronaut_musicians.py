@@ -1193,9 +1193,101 @@ THRONE_R = 0.174
 EXPORT_SETS = {
     "astronaut_keys": {"objects": ["keys_rig", "keys_mesh"], "action": "Piano"},
     "keyboard_set": {"objects": ["keyboard", "stand", "piano_bench"]},
-    "astronaut_drums": {"objects": ["drums_rig", "drums_mesh", "drumsticks"], "action": "Drums"},
+    "astronaut_drums": {"objects": ["drums_rig", "drums_mesh", "drumsticks"], "action": ["Drums", "Flail"]},
     "drum_kit": {"objects": [f"drum_{n}" for n in DRUM_PIECES.values()]},
 }
+
+
+# The drummer's abduction (GV3 art pass, docs/glowmere-valley-3/art-pass/00-brief.md addendum section 10-11:
+# "the drummer's body becomes increasingly uncontrolled as he is pulled upward ... legs dangling, torso
+# rotating slightly, arms flailing, drumsticks moving erratically"). The simplest approach the brief
+# lists: simple keyed transforms. Every bone starts from where the drum clip's first frame has it -- so
+# the switch from playing to flailing is a crossfade between two poses that share a posture -- and
+# swings about its own local axes on a few incommensurate rhythms: two swings 90 degrees apart trace
+# an ellipse whatever the bone's roll, so a limb windmills rather than nods. The amplitude grows from
+# FLAIL_START to 1 over FLAIL_RAMP seconds: a lift lasts about five, and the flailing builds with it.
+# The sticks are skinned to the hands, so they flail with them. Not a loop: a lift is shorter than it.
+FLAIL_SECONDS = 5.0
+FLAIL_RAMP = 2.5
+FLAIL_START = 0.3
+FLAIL = {
+    # bone: [(local axis, degrees, Hz, phase degrees), ...]
+    "pelvis": [("Y", 6.0, 1.0, 0.0), ("X", 4.0, 1.2, 40.0)],
+    "spine_01": [("Y", 7.0, 1.0, 30.0), ("X", 5.0, 1.2, 0.0)],
+    "spine_02": [("Y", 7.0, 1.0, 60.0), ("Z", 5.0, 1.6, 90.0)],
+    "spine_03": [("Y", 6.0, 1.0, 90.0), ("X", 5.0, 1.2, 120.0)],
+    "neck_01": [("X", 8.0, 1.2, 0.0), ("Y", 12.0, 0.8, 45.0)],
+    "head": [("X", 10.0, 1.2, 60.0), ("Y", 16.0, 0.8, 90.0)],
+    "clavicle_l": [("Z", 12.0, 1.6, 0.0)],
+    "clavicle_r": [("Z", 12.0, 2.0, 180.0)],
+    "upperarm_l": [("X", 60.0, 1.6, 0.0), ("Z", 45.0, 1.6, 90.0)],
+    "upperarm_r": [("X", 60.0, 2.0, 200.0), ("Z", 45.0, 2.0, 290.0)],
+    "lowerarm_l": [("X", 40.0, 2.4, 30.0), ("Z", 20.0, 2.0, 0.0)],
+    "lowerarm_r": [("X", 40.0, 2.0, 120.0), ("Z", 20.0, 2.4, 60.0)],
+    "hand_l": [("X", 30.0, 2.8, 0.0), ("Z", 25.0, 2.4, 90.0)],
+    "hand_r": [("X", 30.0, 2.4, 45.0), ("Z", 25.0, 2.8, 135.0)],
+    "thigh_l": [("X", 25.0, 2.0, 0.0), ("Z", 10.0, 1.0, 90.0)],
+    "thigh_r": [("X", 25.0, 2.0, 180.0), ("Z", 10.0, 1.0, 270.0)],
+    "calf_l": [("X", 18.0, 2.0, 70.0)],
+    "calf_r": [("X", 18.0, 2.0, 250.0)],
+    "foot_l": [("X", 20.0, 2.4, 0.0)],
+    "foot_r": [("X", 20.0, 2.4, 180.0)],
+}
+_AXES = {"X": Vector((1.0, 0.0, 0.0)), "Y": Vector((0.0, 1.0, 0.0)), "Z": Vector((0.0, 0.0, 1.0))}
+
+
+def make_flail(rig, base_action, name="Flail", seconds=FLAIL_SECONDS, base_frame=1):
+    """A keyed action on `rig`: the drum clip's first pose, flailing harder and harder (see FLAIL)."""
+    fps = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
+    frames = list(range(1, int(round(seconds * fps)) + 2))
+    base_bag = base_action.layers[0].strips[0].channelbag(base_action.slots[0])
+    base = {}
+    for fc in base_bag.fcurves:
+        base.setdefault(fc.data_path, {})[fc.array_index] = fc.evaluate(base_frame)
+    act = bpy.data.actions.get(name)
+    if act:
+        bpy.data.actions.remove(act)
+    act = bpy.data.actions.new(name)
+    act.use_fake_user = True
+    slot = act.slots.new(id_type="OBJECT", name=rig.name)
+    bag = act.layers.new("flail").strips.new(type="KEYFRAME").channelbag(slot, ensure=True)
+    linear = bpy.types.Keyframe.bl_rna.properties["interpolation"].enum_items["LINEAR"].value
+
+    def write(path, index, group, values):
+        fc = bag.fcurves.new(path, index=index, group_name=group)
+        fc.keyframe_points.add(len(frames))
+        co = []
+        for f, v in zip(frames, values):
+            co += [float(f), float(v)]
+        fc.keyframe_points.foreach_set("co", co)
+        fc.keyframe_points.foreach_set("interpolation", [linear] * len(frames))
+        fc.update()
+
+    peak = 0.0
+    for b in rig.data.bones:
+        path = f'pose.bones["{b.name}"].rotation_quaternion'
+        q0 = Quaternion([base.get(path, {}).get(i, (1.0, 0.0, 0.0, 0.0)[i]) for i in range(4)])
+        q0.normalize()
+        rows = []
+        for f in frames:
+            t = (f - 1) / fps
+            ramp = min(1.0, t / FLAIL_RAMP)
+            env = FLAIL_START + (1.0 - FLAIL_START) * ramp * ramp * (3.0 - 2.0 * ramp)
+            q = q0.copy()
+            for axis, deg, hz, phase in FLAIL.get(b.name, ()):
+                angle = math.radians(deg) * env * math.sin(2.0 * math.pi * hz * t + math.radians(phase))
+                q = q @ Quaternion(_AXES[axis], angle)
+                peak = max(peak, abs(math.degrees(angle)))
+            q.normalize()
+            if rows and rows[-1].dot(q) < 0.0:
+                q.negate()
+            rows.append(q)
+        for i in range(4):
+            write(path, i, b.name, [q[i] for q in rows])
+    loc = 'pose.bones["pelvis"].location'
+    for i in range(3):
+        write(loc, i, "pelvis", [base.get(loc, {}).get(i, 0.0)] * len(frames))
+    return act, {"frames": len(frames), "seconds": seconds, "ramp_s": FLAIL_RAMP, "peak_swing_deg": round(peak, 1)}
 
 
 def grounded_retarget(src, dst, mesh, name, **kw):
@@ -1300,6 +1392,13 @@ def build(src_dir, helmet_fix=True):
               "hihat_xy": (chh.x, chh.y), "hihat_z": chh.z})
     kit = load_drum_kit(src_dir, drums)
     place_drum_kit(kit, T)
+    # The abduction's flail (GV3), after the drum clip: it starts from that clip's first pose. The drum
+    # clip stays the rig's active action, so everything below measures the performance.
+    drums_action = drig.animation_data.action
+    drums_slot = drig.animation_data.action_slot
+    _flail, report["flail"] = make_flail(drig, drums_action)
+    drig.animation_data.action = drums_action
+    drig.animation_data.action_slot = drums_slot
     report["drummer"] = {"lift_m": round(lift_d, 4), "left_hand_ik": ik_d["l"] if ik_d else None,
                          "grip_error_deg": {"l": gl[2], "r": gr[2]},
                          "targets": {k: (round(v, 4) if isinstance(v, float) else [round(x, 4) for x in v])
@@ -1327,8 +1426,10 @@ def export_set(build_blend, name, out_path):
     for o in list(bpy.data.objects):
         if o.name not in keep:
             bpy.data.objects.remove(o, do_unlink=True)
+    wanted = spec.get("action")
+    wanted = set(wanted) if isinstance(wanted, list) else {wanted}
     for a in list(bpy.data.actions):
-        if a.name != spec.get("action"):
+        if a.name not in wanted:
             bpy.data.actions.remove(a)
     for o in bpy.data.objects:
         o.hide_set(False)

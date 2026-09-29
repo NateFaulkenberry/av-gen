@@ -952,6 +952,196 @@
     },
     "overall": 0.8850948214530945
    }
+  },
+  {
+   "features": {
+    "aspectRatio": 0.8294610381126404,
+    "capAsymmetry": 0.03403514623641968,
+    "capHeight": 0.3284933567047119,
+    "capThickness": 0.346048504114151,
+    "capTilt": 15.497483253479004,
+    "capWidth": 0.8349306583404541,
+    "edgeWaviness": 0.09043915569782257,
+    "emissionIntensity": 2.8621819019317627,
+    "gillDensity": 57.489803314208984,
+    "silhouetteComplexity": 2928.0,
+    "stemCurvature": 0.09477021545171738,
+    "stemHeight": 1.006594181060791,
+    "stemWidth": 0.18903480470180511
+   },
+   "generator": "mushroom",
+   "generatorVersion": 1,
+   "index": 251,
+   "mesh": {
+    "surfaceArea": 0.0,
+    "triangles": 5536
+   },
+   "parameters": {
+    "aspect": 0.38772329688072205,
+    "capThickness": 0.346048504114151,
+    "capTiltDeg": 15.497483253479004,
+    "centreTangentDeg": 19.348033905029297,
+    "edgeWaviness": 0.09043915569782257,
+    "emissionIntensity": 2.8621819019317627,
+    "emissionStructure": 2.0,
+    "gillCount": 48.0,
+    "gillDepth": 0.37551385164260864,
+    "lobeCount": 2.0,
+    "lobeDepth": 0.02214859426021576,
+    "rimTangentDeg": -67.96966552734375,
+    "stemBulgePosition": 0.6161338090896606,
+    "stemBulgeWidth": 0.027720211073756218,
+    "stemCurvature": 0.09477021545171738,
+    "stemTaper": 0.5270368456840515,
+    "surfaceNoiseAmp": 0.010709798894822598,
+    "surfaceNoiseScale": 4.564196586608887
+   },
+   "schemaHash": 5729455907941625987,
+   "scores": {
+    "components": {
+     "capSolidity": {
+      "raw": 0.346048504114151,
+      "score": 0.0,
+      "weight": 1.0
+     },
+     "gillPitch": {
+      "raw": 0.054646085947752,
+      "score": 1.0,
+      "weight": 1.5
+     },
+     "multiView": {
+      "raw": 0.15205326676368713,
+      "score": 1.0,
+      "weight": 1.5
+     },
+     "organicity": {
+      "raw": 0.582754909992218,
+      "score": 0.7426666617393494,
+      "weight": 1.5
+     },
+     "outline": {
+      "raw": 0.5654450058937073,
+      "score": 1.0,
+      "weight": 2.0
+     },
+     "pixelsPerTriangle": {
+      "raw": 8.751487731933594,
+      "score": 1.0,
+      "weight": 1.5
+     },
+     "proportion": {
+      "raw": 0.8294610381126404,
+      "score": 1.0,
+      "weight": 2.0
+     },
+     "silhouette": {
+      "raw": 0.20916748046875,
+      "score": 1.0,
+      "weight": 2.5
+     },
+     "stemCurve": {
+      "raw": 0.09477021545171738,
+      "score": 1.0,
+      "weight": 1.0
+     }
+    },
+    "overall": 0.9044138193130493
+   }
+  },
+  {
+   "features": {
+    "aspectRatio": 1.126785397529602,
+    "capAsymmetry": 0.00406187167391181,
+    "capHeight": 0.4016573429107666,
+    "capThickness": 0.14351917803287506,
+    "capTilt": 16.464279174804688,
+    "capWidth": 1.2036619186401367,
+    "edgeWaviness": 0.026571962982416153,
+    "emissionIntensity": 5.072240829467773,
+    "gillDensity": 43.201499938964844,
+    "silhouetteComplexity": 3024.0,
+    "stemCurvature": 0.331635445356369,
+    "stemHeight": 1.0682264566421509,
+    "stemWidth": 0.5366887450218201
+   },
+   "generator": "mushroom",
+   "generatorVersion": 1,
+   "index": 707,
+   "mesh": {
+    "surfaceArea": 0.0,
+    "triangles": 5632
+   },
+   "parameters": {
+    "aspect": 0.5815221667289734,
+    "capThickness": 0.14351917803287506,
+    "capTiltDeg": 16.464279174804688,
+    "centreTangentDeg": -3.2300901412963867,
+    "edgeWaviness": 0.026571962982416153,
+    "emissionIntensity": 5.072240829467773,
+    "emissionStructure": 1.0,
+    "gillCount": 52.0,
+    "gillDepth": 0.35500600934028625,
+    "lobeCount": 1.0,
+    "lobeDepth": 0.16482438147068024,
+    "rimTangentDeg": -52.393489837646484,
+    "stemBulgePosition": 0.1588095873594284,
+    "stemBulgeWidth": 0.16478075087070465,
+    "stemCurvature": 0.331635445356369,
+    "stemTaper": 1.2650251388549805,
+    "surfaceNoiseAmp": 0.011119955219328403,
+    "surfaceNoiseScale": 2.23333740234375
+   },
+   "schemaHash": 5729455907941625987,
+   "scores": {
+    "components": {
+     "capSolidity": {
+      "raw": 0.14351917803287506,
+      "score": 1.0,
+      "weight": 1.0
+     },
+     "gillPitch": {
+      "raw": 0.0727195292711258,
+      "score": 0.7554935216903687,
+      "weight": 1.5
+     },
+     "multiView": {
+      "raw": 0.3103756606578827,
+      "score": 0.43531370162963867,
+      "weight": 1.5
+     },
+     "organicity": {
+      "raw": 0.3640819787979126,
+      "score": 1.0,
+      "weight": 1.5
+     },
+     "outline": {
+      "raw": 0.6044098734855652,
+      "score": 0.9194005131721497,
+      "weight": 2.0
+     },
+     "pixelsPerTriangle": {
+      "raw": 12.228671073913574,
+      "score": 1.0,
+      "weight": 1.5
+     },
+     "proportion": {
+      "raw": 1.126785397529602,
+      "score": 1.0,
+      "weight": 2.0
+     },
+     "silhouette": {
+      "raw": 0.23638916015625,
+      "score": 1.0,
+      "weight": 2.5
+     },
+     "stemCurve": {
+      "raw": 0.331635445356369,
+      "score": 0.8853217959403992,
+      "weight": 1.0
+     }
+    },
+    "overall": 0.8972643613815308
+   }
   }
  ],
  "population": 800,
