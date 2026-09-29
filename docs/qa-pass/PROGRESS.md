@@ -81,6 +81,22 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - **Superseded:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main waits for qa/ci.
 - **Superseded, kept for the record:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
+## On main (2026-09-28)
+- **Pushed:** qa/coord `9c35aee8` went to origin/main as a fast-forward from `77ea4247`, by the owner's choice
+  ("push to origin main"). It contains qa/clean, qa/perf, qa/ci, qa/dirty-check (ADR-952) and
+  `proto/astronaut-musicians`.
+- **Suites on merged head `ecf0fca4`:** both exit 0. `avgen_tests` ran 3,854 cases; `avgen_render_tests` had 548
+  passed and 1 skipped.
+- **Push CI** on main: run 36502163093.
+- **Pre-push check:** the only asset paths in the range are text (`assets/audio/manifest.json`,
+  `assets/musicians/ATTRIBUTION.md`), and no binaries are added.
+- **The owner's local checkout was NOT touched.** It is behind origin/main until they pull.
+- **Follow-ups:**
+  - `qa/tidy` (in progress in `../av-gen-qa-tidy`): track the 3 CC0 Quaternius fixtures, remove the treeisland
+    PNGs, the `_vx2` arms and the dead arms, and fix the ci.md exclusions. It goes to main as a second push once
+    its suites pass.
+  - The GV3 art pass (`../av-gen-art`) merges after that.
+
 ## The final report
 `FINAL-REPORT.md` (`d7f624ed`) answers the brief's 11 questions. Where this file's interim numbers differ from it,
 the report and `perf-summary.md` (the clean retake) win.
