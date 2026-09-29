@@ -848,6 +848,10 @@ def hero_pulse_plan(project, scene, shots):
     plan = []
     for s in shots:
         rig = s.rig
+        # A shot about the performers (s04) is theirs: the mushrooms give up their rings in it. With the elder's
+        # ring beside theirs, every bar washed the pair teal-white and their rainbow never read (verification
+        # batch 2, s04 at 15.5-18.5 s); the elder's rings go on in every shot around it.
+        stage = s.subject.startswith("the musicians")
         who = {}
         for node in (rig.follow, rig.aim):
             if node in owners:
@@ -870,7 +874,7 @@ def hero_pulse_plan(project, scene, shots):
                 # The nearest heroes in frame that may pulse now (a blacked-out one gives up its place), and
                 # the performers in frame beside them.
                 live = [n for n in who if not any(a <= t <= b for a, b in blackout.get(n, ()))]
-                heroes = [n for n in live if n not in performers]
+                heroes = [] if stage else [n for n in live if n not in performers]
                 plan += [(t, n) for n in sorted(heroes, key=lambda n: who[n])[:HERO_PULSE_PER_SHOT]]
                 plan += [(t, n) for n in sorted(n for n in live if n in performers)]
     return plan

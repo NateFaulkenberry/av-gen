@@ -19596,11 +19596,6 @@
       },
       {
         "kind": "cue",
-        "name": "hero pulse elder-2-cap",
-        "time": 15.229231
-      },
-      {
-        "kind": "cue",
         "name": "hero pulse drummer",
         "time": 15.229231
       },
@@ -19613,11 +19608,6 @@
         "kind": "cue",
         "name": "travel beam",
         "time": 15.232564
-      },
-      {
-        "kind": "cue",
-        "name": "hero pulse elder-2-cap",
-        "time": 17.075385
       },
       {
         "kind": "cue",

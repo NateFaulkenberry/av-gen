@@ -268,21 +268,49 @@ Outputs in `~/Desktop/av-gen-review/20-gv3-art-pass/verify/` (11 stills, 5 clips
   luminance, 3.3x gradient across vs along. All `[water]` GPU tests pass (21 cases, 675 assertions).
 - Batch 2 stills `still-water-a/b`: the falls read as a streaked cascade into the river; the lattice is gone.
 
+## Verification batch 2 (2026-09-28 21:40-21:56): what it showed
+
+Outputs in `~/Desktop/av-gen-review/20-gv3-art-pass/verify2/` (10 stills, 5 clips; all rc 0).
+- **Falls (ADR-985):** `still-water-a/b` read as a streaked cascade into the river; from the valley's wides
+  (`still-falls-s20`, 300 m) a small pale ribbon between the hills, no more prominent than before.
+- **Stage light (addendum §8), with the cones in degrees:** a real pool (the difference image shows it round the
+  drummer and his kit), but in the frame it hardly reads: the ground there is already lit by the ferns' glow and
+  the rings. In s04, the shot that sees them in the film, it changes 13k pixels by a mean of 0.38/765. It does not
+  genuinely improve the composition, and anything brighter would be the conventional light the addendum warns
+  flattens the look. **Decision: omitted.** A/B stills kept: `still-{drums,keys,s04}{,-stage}`.
+- **E5 (`clip-e5-s51-s60`):** the drummer rises out of the beam flailing, reads as a figure with limbs (s54,
+  175.0 s), small in the beam in the wide (s55), gone at the drop; no crescent on the departure (the wake is out).
+  The gold lift light barely shows inside the beam's own light (reads mint-white); readable, so left.
+- **s01:** the drift passes the pair at 12 m; the cold open's teal wash is r7b's (the elder's heartbeat).
+- **s04:** the elder's hero ring swept through the pair on every bar and washed them teal-white; their rainbow
+  never read. Fixed in data: a shot whose subject is the musicians is theirs (`look.hero_pulse_plan`: the
+  mushrooms give up their rings in it). To verify in batch 3.
+- **Aurora (s72, the drop's last wide, 214.62-222.0, top fifth, 60 fps):** art pass: mean luma 0.1384,
+  frame-to-frame max 2.88%, p99 2.26%, median 0.430%. r7b (same engine): mean 0.1117, max 2.85%, p99 2.26%,
+  median 0.414%. So no flicker added (p99 identical); the sky is 24% brighter on average with the bass swell.
+  (Batch 1, the arrival wide s23-s24: max 1.22% vs 1.33%, p99 1.20% vs 1.24%, mean +15%. The drop's s58 was
+  confounded by the saucer: 54.98% vs 43.88%, at the white flash of 180.967 s, the same in both.)
+
 ## Plan (the rest, in order)
 
-1. ~~Commit milestone 1 (water, pulses, gait, the two probes, ADRs 980-982).~~ Done, `cdbcf63f`.
-2. ~~Aurora bass pulse + resolve the aurora's duplicate block values (`look.py`; data only).~~ Done; measure in 6.
-3. ~~UFO warp~~ done in code and data (above); verify in 6.
-4. Hero mushrooms: the search's two next farthest-point picks (`test_mushroom_search.cpp` kWinners 10 -> 12; the
-   record gains two, the first ten byte-identical); placed by GV3's generator with GV2's hero recipe (four parts,
-   spores, a `heroes` entry, a Hero Pulse, their reactivity lanes); shots adjusted where they belong.
-5. Musicians: GLBs rebuilt from `~/Desktop/musician_assets` (+ a procedural "Flail" clip on the drummer, authored in
-   the build script); placed by the river at E5's lift point (the drummer where the horse was lifted, (-0.7, 73.9)),
-   facing each other, x1.94 per group; entities + heroes + a rainbow aura (Ground Pulse "Rainbow" + a suit glow),
-   audio-routed; E5's subject -> the drummer with a flail and a return (engine: the abduction template's return,
-   ADR-984); horse-11 re-homed; shots re-aimed; stage light evaluated A/B.
-6. Verification renders (minimal), perf A/B under the GPU lock, one whole-film preview, the Critic once.
-7. Both suites; final report.
+1. ~~Milestone 1 (water, pulses, gait, probes, ADRs 980-982)~~ `cdbcf63f`. ~~Aurora~~, ~~UFO warp~~, ~~heroes~~,
+   ~~musicians + E5 (ADR-983, 984)~~, ~~batch 1 + its fixes~~ `7cb99c07`, ~~falls cascade (ADR-985)~~ `84258eeb`,
+   ~~batch 2~~, ~~frame-cost A/B~~ (`scratchpad/art/perf-ab.json`).
+2. Regenerate for the s04 ring rule (`look.hero_pulse_plan` "stage"), with `ufo.py` WITH its trace (it rewrites
+   `build/gv3/cast-ufo.json`, the Critic's cast); commit.
+3. Batch 3 (`scratchpad/art/batch3.sh`, 8 stills to `verify3/`): s04 at 16.0/17.3; the warp A/B (full vs
+   `_art-nowarp`) at the flyby 27.9, the hover 164, the leave 179.5.
+4. The final: `tools/gpu-lock.sh scratchpad/art/final.sh` -> `~/Desktop/av-gen-review/20-gv3-art-pass/
+   GV3-art-pass-final.mp4` (1920x1080, supersample 2, 60 fps, 0-225.5 s, h264 q90, the song muxed; ~35-45 min;
+   log `scratchpad/art/final-GV3-art-pass-final.log`). Check the log for scene-load warnings (a failed load
+   renders bare sky and exits 0).
+5. The Critic ONCE on that file: from `~/Documents/GitHub/creative-critic`, the adapter with `--cast
+   <worktree>/build/gv3/cast-ufo.json --video <final> --range 0:225.5 --width 1920 --height 1080 --out
+   work/gv3-art-pass`, then `critic submit --inputs work/gv3-art-pass/inputs.json --mode preview --session
+   gv3-art-pass --track film --wait --json --strict` (background). Map its findings to the brief's 8 aspects;
+   only a small, necessary correction, then re-render the final.
+6. `artvariant.py --clean x`; reconfigure; both suites by exit code (the CPU one under the lock too); final
+   PROGRESS, commit, report.
 
 ## Log
 
