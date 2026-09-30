@@ -233,8 +233,9 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
 - `maxDistance` (ADR-1002) caps the march in tree-local units (0 = the bounds only); the lit pass
   and the depth prepass apply it identically.
 - `look` (ADR-1002, raymarch only, every term off at 0): `aoStrength`/`aoDistance` (5 taps along
-  the normal), `edgeIntensity`/`edgeWidth`/`edgeColor` (emission from the field's Laplacian over the
-  tetrahedron taps: creases and edges glow, flats do not; added to colour and to the bloom target),
+  the normal), `edgeIntensity`/`edgeWidth`/`edgeColor` (emission where the normal taken at `edgeWidth`
+  disagrees with the surface normal: creases and edges glow, flats do not; added to colour and to
+  the bloom target),
   `shadowStrength`/`shadowSoftness`/`shadowDirection`/`shadowSteps` (a Quilez penumbra march
   towards a world direction). Occlusion and shadow scale the whole shaded colour (the cheap
   version: emission and fog included); edges are added after them.

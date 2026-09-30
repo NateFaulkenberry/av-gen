@@ -11,8 +11,9 @@
 - **`look`** holds three field-evaluated terms. Each is off at 0, costs nothing when off, and is a
   parameter (`look/...`).
   - Ambient occlusion: 5 taps along the normal.
-  - Edge emission: the discrete Laplacian of the field over the tetrahedron taps at `edgeWidth`. It is
-    added to both the colour and the emission target.
+  - Edge emission: the angle between the surface normal and a tetrahedron normal taken at
+    `edgeWidth` (a first version used the field's Laplacian, which turned coincident faces and
+    bound-only kinks into speckle; ADR-1003). It is added to both the colour and the emission target.
   - A soft shadow: a Quilez penumbra march towards `shadowDirection`, bounded by `shadowSteps`.
 
   This is a cheap version. The occlusion and the shadow scale the whole shaded colour, emission and
