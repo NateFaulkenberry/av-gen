@@ -9,14 +9,15 @@ It writes examples/sonic-garden/sonic-garden.scene.json and the `sonic`, `source
 files; the variants are regenerated from the master as before.
 
 The mapping language, in four layers (ART-NOTES.md in the review folder has the table and the reasons):
-  1. Families (group "family", slow tier, competing): organic, crystalline, chaotic. They are the world's identity:
-     which structures exist, the palette, the air, the light, the material family.
+  1. Families (group "family", slow tier, competing): organic, crystalline, chaotic, and silence (no sound, no
+     world). They are the world's identity: which structures exist, the palette, the air, the light, the materials.
   2. A second source ("world") splits chaotic by weight into its two faces: tectonic (heavy: a loud, full, pitched
      sound) and impact (light: noise and transients). With them there are four palettes, all continuous blends.
   3. Qualities (medium tier): mass, radiance, grain, edge, shimmer, breath, energy, tension, swarm.
   4. Musical context (notes.* only): sustain, figure (an arpeggio's patterned motion), stack (dense chords), lift
      (pitch). And the MIDI note-on itself, whose visual gesture is chosen by the family through a route's depth:
-     a swell in the organic world, a ring in the crystalline one, a heave in the heavy one, a strike in the light one.
+     a swell in the organic world, a ring in the crystalline one, a heave in the heavy one; in the light one the
+     audio's own transients strike instead.
 Everything here is an artistic choice (brief §27), and every weight is also a live parameter.
 """
 import json
@@ -64,6 +65,10 @@ GARDEN_MAPPINGS = [
                       ("sonic.roughness.slow", 2.0, True)], "product", group="family"),
     M("chaotic", [("sonic.roughness.slow", 2.0, False), ("sonic.sharpness.slow", 1.0, False),
                   ("sonic.smoothness.slow", 1.0, True)], "mean", -0.2, 1.6, group="family"),
+    # silence owns the world when there is no sound (slow energy under 0.2), so a world grows in from nothing
+    # rather than from whichever family an all-zero character happens to favour (on frame 0 that was chaotic, via
+    # "not smooth", and every world opened with shards shrinking away).
+    M("silence", [("sonic.energy.slow", 1.0, True)], "mean", -4.0, 5.0, 2.0, group="family"),  # bias is +-4
     # qualities
     M("mass", [("sonic.energy.slow", 1.0, False), ("sonic.density.slow", 3.0, False),
                ("sonic.harmonicity.slow", 3.0, False)], "product", -0.3, 5.0, 1.5),  # loud AND full AND pitched
@@ -220,14 +225,14 @@ ON_VERTEX = xf(rot=(45.0, 0.0, 35.264))
 nodes.append(proc("prisms", GEM,
                   {"kind": "radial", "count": 12, "radius": 7.6, "orientation": "outward"},
                   xf((0, 1.9, 0), scale=(1.0, 3.2, 1.0)),
-                  mat((0.05, 0.065, 0.1), (0.55, 0.85, 1.0), 0.03, rough=0.42, metal=0.1),
+                  mat((0.05, 0.065, 0.1), (0.35, 0.7, 1.0), 0.03, rough=0.42, metal=0.1),
                   sourceTransform=ON_VERTEX,
                   variation={"seed": 21, "scale": [0.2, 0.4, 0.2], "rotation": [0.0, 0.6, 0.0]},
                   materialVariation={"hueGradient": 0.04, "valueRandom": 0.2}))
 nodes.append(proc("spires", GEM,
                   {"kind": "radial", "count": 12, "radius": 4.7, "orientation": "outward", "startAngle": 0.2618},
                   xf((0, 1.1, 0), scale=(0.6, 1.9, 0.6)),
-                  mat((0.05, 0.065, 0.1), (0.55, 0.85, 1.0), 0.03, rough=0.42, metal=0.1),
+                  mat((0.05, 0.065, 0.1), (0.35, 0.7, 1.0), 0.03, rough=0.42, metal=0.1),
                   sourceTransform=ON_VERTEX,
                   variation={"seed": 22, "scale": [0.2, 0.4, 0.2], "rotation": [0.15, 0.6, 0.15]},
                   materialVariation={"hueGradient": 0.05, "valueRandom": 0.2}))
@@ -298,7 +303,7 @@ scene = {
     # The rig is sized to the subject; without a focal point the subject would be the whole 150 m ground.
     "composition": {"focalPoints": [{"name": "hero", "position": [0.0, 2.6, 0.0], "radius": 4.0}]},
     "lights": [{"id": "heart", "name": "heart", "type": "point", "position": [0.0, 2.6, 0.0], "color": [1, 1, 1],
-                "intensity": 0.0, "range": 14.0, "radius": 0.4, "castsShadow": False, "volumetric": 0.4}],
+                "intensity": 0.0, "range": 9.0, "radius": 0.4, "castsShadow": False, "volumetric": 0.4}],
     "environment": {
         "intensity": 0.0, "background": [0.004, 0.004, 0.006], "fogColor": [0.0, 0.0, 0.0],
         "volumeDensity": 0.0008, "volumeMaxDistance": 90.0, "skyIntensity": 5.0,
@@ -441,32 +446,33 @@ palette("procedural/shards/material/emissiveColor", {"tectonic": (0.5, 0.15, 1.0
         **SLOW)
 R("visual.tectonic", "procedural/slabs/source/scale", 1.0, op="multiply", **SLOW)
 R("visual.tectonic", "procedural/slabs/transform/position", 3.6, comp=1, **SLOW)
-R("visual.energy", "procedural/slabs/transform/position", 0.35, comp=1, depth="visual.tectonic", attackMs=60,
-  decayMs=500)
+R("visual.energy", "procedural/slabs/transform/position", 0.35, comp=1, depth="visual.tectonic", attackMs=350,
+  decayMs=1200)
 R("visual.grain", "procedural/slabs/material/emissive", 0.12, depth="visual.tectonic", attackMs=60, decayMs=400)
-R("visual.energy", "procedural/ground/deform/2/amount", 0.3, depth="visual.tectonic", attackMs=120, decayMs=700)
+R("visual.energy", "procedural/ground/deform/2/amount", 0.25, depth="visual.tectonic", attackMs=500, decayMs=1500)
 R("visual.tectonic", "particles/dust/spawnRate", 160.0, **SLOW)
 R("visual.grain", "particles/sparks/spawnRate", 80.0, depth="visual.impact", attackMs=50, decayMs=300)
 
-# ---- the same MIDI note, three gestures: the family the sound belongs to decides what a note-on looks like.
-# organic: a slow swell of light; crystalline: a precise ring; chaotic: a strike.
+# ---- the same MIDI note, different gestures: the family the sound belongs to decides what a note-on looks like.
+# organic: a slow swell of light; crystalline: a precise ring; tectonic: a heave of the mass (below); impact: the
+# audio's transients strike (the next block).
 R("notes.noteOn", "procedural/hero/material/emissive", 0.6, depth="visual.organic", attackMs=0, decayMs=1400)
 R("notes.noteOn", "procedural/stalks/material/emissive", 0.5, depth="visual.organic", attackMs=0, decayMs=1600)
 R("notes.noteOn", "procedural/caps/material/emissive", 0.8, depth="visual.organic", attackMs=0, decayMs=1800)
 R("notes.noteOn", "particles/spores/burst", 6.0, depth="visual.organic", attackMs=0, decayMs=120)
-R("notes.noteOn", "procedural/prisms/material/emissive", 0.6, depth="visual.crystalline", attackMs=0, decayMs=150)
-R("notes.noteOn", "procedural/spires/material/emissive", 0.9, depth="visual.crystalline", attackMs=0, decayMs=120)
+R("notes.noteOn", "procedural/prisms/material/emissive", 0.35, depth="visual.crystalline", attackMs=0, decayMs=90)
+R("notes.noteOn", "procedural/spires/material/emissive", 0.6, depth="visual.crystalline", attackMs=0, decayMs=90)
 R("notes.noteOn", "procedural/halos/material/emissive", 5.0, depth="visual.crystalline", attackMs=0, decayMs=320)
-R("notes.noteOn", "procedural/facets/material/emissive", 0.5, depth="visual.crystalline", attackMs=0, decayMs=200)
+R("notes.noteOn", "procedural/facets/material/emissive", 0.4, depth="visual.crystalline", attackMs=0, decayMs=150)
 R("notes.noteOn", "particles/glints/burst", 25.0, depth="visual.crystalline", attackMs=0, decayMs=60)
 R("notes.noteOn", "procedural/shards/material/emissive", 0.25, depth="visual.tectonic", attackMs=0, decayMs=200)
-R("notes.noteOn", "procedural/shards/transform/scale", 0.25, depth="visual.chaotic", attackMs=0, decayMs=260)
 # weight: a note does not light the heavy world's hero, it swells it -- a slow heave of the mass itself
 R("notes.noteOn", "procedural/hero/source/scale", 1.0, op="multiply", gain=0.07, offset=1.0, depth="visual.tectonic",
-  attackMs=40, decayMs=450)
+  attackMs=120, decayMs=700)
 
 # ---- the audio's own impacts: what the transient sounded like, not that a note began.
-R("sonic.transient", "procedural/shards/transform/scale", 0.4, depth="visual.impact", attackMs=0, decayMs=380)
+R("sonic.transient", "procedural/shards/transform/scale", 0.35, depth="visual.impact", threshold="gate",
+  thresholdLevel=0.6, attackMs=0, decayMs=380)
 R("sonic.transient", "procedural/shards/material/emissive", 0.45, depth="visual.impact", attackMs=0, decayMs=60)
 R("sonic.transient", "particles/sparks/burst", 90.0, depth="visual.impact", attackMs=0, decayMs=45)
 R("sonic.transient", "procedural/hero/material/emissive", 0.8, depth="visual.impact", attackMs=0, decayMs=70)
@@ -501,18 +507,26 @@ R("visual.stack", "procedural/halos/source/scale", 1.0, op="multiply", gain=0.4,
   decayMs=900)
 R("visual.stack", "procedural/caps/source/scale", 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=400,
   decayMs=1000)
-R("notes.noteOn", "lights/heart/intensity", 14.0, depth="visual.stack", attackMs=0, decayMs=650)
+R("notes.noteOn", "lights/heart/intensity", 6.0, depth="visual.stack", attackMs=0, decayMs=650)
 R("notes.noteOn", "particles/spores/burst", 30.0, depth="visual.stack", attackMs=0, decayMs=90)
 R("notes.noteOn", "particles/glints/burst", 40.0, depth="visual.stack", attackMs=0, decayMs=70)
+
+# Each particle system belongs to a family: gestures anywhere may spawn it, but only its own world lets it shine
+# (additive particles with no emission are invisible), so a chord's burst of motes is warm in the garden and absent
+# from the heavy world.
+for n, fam in (("spores", "organic"), ("glints", "crystalline"), ("dust", "tectonic"), ("sparks", "impact")):
+    R("visual." + fam, "particles/%s/emissive" % n, 1.0, op="multiply", **SLOW)
 
 # ---- the heart: a point light inside the hero, so its glow reaches the ground and the forms around it
 palette("lights/heart/color", {"organic": (1.0, 0.55, 0.3), "crystalline": (0.6, 0.85, 1.0),
                                "tectonic": (0.55, 0.2, 1.0), "impact": (0.9, 1.0, 0.75)}, **SLOW)
-R("visual.radiance", "lights/heart/intensity", 6.0, **MED)
-R("notes.noteOn", "lights/heart/intensity", 8.0, depth="visual.organic", attackMs=0, decayMs=1400)
-R("notes.noteOn", "lights/heart/intensity", 14.0, depth="visual.crystalline", attackMs=0, decayMs=240)
-R("notes.noteOn", "lights/heart/intensity", 10.0, depth="visual.tectonic", attackMs=0, decayMs=160)
-R("sonic.transient", "lights/heart/intensity", 40.0, depth="visual.impact", attackMs=0, decayMs=90)
+# Kept local on purpose: a creative-critic pass on the first render found the whole frame brightening with the
+# onsets (98% of regions, 12% of mean luma), which reads as exposure flicker, not as the world responding.
+R("visual.radiance", "lights/heart/intensity", 4.0, **MED)
+R("notes.noteOn", "lights/heart/intensity", 4.0, depth="visual.organic", attackMs=0, decayMs=1400)
+R("notes.noteOn", "lights/heart/intensity", 7.0, depth="visual.crystalline", attackMs=0, decayMs=240)
+R("notes.noteOn", "lights/heart/intensity", 5.0, depth="visual.tectonic", attackMs=0, decayMs=300)
+R("sonic.transient", "lights/heart/intensity", 20.0, depth="visual.impact", attackMs=0, decayMs=90)
 
 # ---- the camera: weight lowers it and tips it up at the hero
 R("visual.mass", "camera/position", -1.0, comp=1, **SLOW)

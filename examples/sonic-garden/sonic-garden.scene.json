@@ -47,7 +47,7 @@
     1
    ],
    "intensity": 0.0,
-   "range": 14.0,
+   "range": 9.0,
    "radius": 0.4,
    "castsShadow": false,
    "volumetric": 0.4
@@ -957,8 +957,8 @@
       0.1
      ],
      "emissiveColor": [
-      0.55,
-      0.85,
+      0.35,
+      0.7,
       1.0
      ],
      "emissiveIntensity": 0.03,
@@ -1047,8 +1047,8 @@
       0.1
      ],
      "emissiveColor": [
-      0.55,
-      0.85,
+      0.35,
+      0.7,
       1.0
      ],
      "emissiveIntensity": 0.03,

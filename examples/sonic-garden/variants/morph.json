@@ -153,6 +153,21 @@
       "gain": 1.6
      },
      {
+      "name": "silence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "sonic.energy.slow",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "group": "family",
+      "bias": -4.0,
+      "gain": 5.0,
+      "curve": 2.0
+     },
+     {
       "name": "mass",
       "combine": "product",
       "inputs": [
@@ -2481,8 +2496,8 @@
    "component": 1,
    "depthSource": "visual.tectonic",
    "chain": {
-    "attackMs": 60,
-    "decayMs": 500
+    "attackMs": 350,
+    "decayMs": 1200
    }
   },
   {
@@ -2500,13 +2515,13 @@
   {
    "source": "visual.energy",
    "target": "procedural/ground/deform/2/amount",
-   "amount": 0.3,
+   "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tectonic",
    "chain": {
-    "attackMs": 120,
-    "decayMs": 700
+    "attackMs": 500,
+    "decayMs": 1500
    }
   },
   {
@@ -2583,25 +2598,25 @@
   {
    "source": "notes.noteOn",
    "target": "procedural/prisms/material/emissive",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.crystalline",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "procedural/spires/material/emissive",
    "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.crystalline",
    "chain": {
     "attackMs": 0,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "notes.noteOn",
-   "target": "procedural/spires/material/emissive",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 120
+    "decayMs": 90
    }
   },
   {
@@ -2619,13 +2634,13 @@
   {
    "source": "notes.noteOn",
    "target": "procedural/facets/material/emissive",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.crystalline",
    "chain": {
     "attackMs": 0,
-    "decayMs": 200
+    "decayMs": 150
    }
   },
   {
@@ -2654,18 +2669,6 @@
   },
   {
    "source": "notes.noteOn",
-   "target": "procedural/shards/transform/scale",
-   "amount": 0.25,
-   "op": "add",
-   "polarity": "unipolar",
-   "depthSource": "visual.chaotic",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 260
-   }
-  },
-  {
-   "source": "notes.noteOn",
    "target": "procedural/hero/source/scale",
    "amount": 1.0,
    "op": "multiply",
@@ -2674,18 +2677,20 @@
    "chain": {
     "gain": 0.07,
     "offset": 1.0,
-    "attackMs": 40,
-    "decayMs": 450
+    "attackMs": 120,
+    "decayMs": 700
    }
   },
   {
    "source": "sonic.transient",
    "target": "procedural/shards/transform/scale",
-   "amount": 0.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.impact",
    "chain": {
+    "threshold": "gate",
+    "thresholdLevel": 0.6,
     "attackMs": 0,
     "decayMs": 380
    }
@@ -2952,7 +2957,7 @@
   {
    "source": "notes.noteOn",
    "target": "lights/heart/intensity",
-   "amount": 14.0,
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.stack",
@@ -2983,6 +2988,50 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 70
+   }
+  },
+  {
+   "source": "visual.organic",
+   "target": "particles/spores/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.crystalline",
+   "target": "particles/glints/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.tectonic",
+   "target": "particles/dust/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.impact",
+   "target": "particles/sparks/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
    }
   },
   {
@@ -3132,7 +3181,7 @@
   {
    "source": "visual.radiance",
    "target": "lights/heart/intensity",
-   "amount": 6.0,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3143,7 +3192,7 @@
   {
    "source": "notes.noteOn",
    "target": "lights/heart/intensity",
-   "amount": 8.0,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3155,7 +3204,7 @@
   {
    "source": "notes.noteOn",
    "target": "lights/heart/intensity",
-   "amount": 14.0,
+   "amount": 7.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.crystalline",
@@ -3167,19 +3216,19 @@
   {
    "source": "notes.noteOn",
    "target": "lights/heart/intensity",
-   "amount": 10.0,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tectonic",
    "chain": {
     "attackMs": 0,
-    "decayMs": 160
+    "decayMs": 300
    }
   },
   {
    "source": "sonic.transient",
    "target": "lights/heart/intensity",
-   "amount": 40.0,
+   "amount": 20.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.impact",

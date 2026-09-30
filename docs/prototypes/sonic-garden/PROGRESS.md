@@ -3,7 +3,8 @@
 Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
-the mappings, the families, the look and the §34-36 judgements.
+the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
+review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 
 ## Rules in force
 
@@ -24,7 +25,7 @@ the mappings, the families, the look and the §34-36 judgements.
 | 3 sonic character | done | `src/sonic/character.*`, `src/sonic/sonic_runtime.*` |
 | 4 interpreter | done | `src/sonic/interpret_source.*` (source kind `interpret`) |
 | 5 test material + scene (engineering) | done | `tools/make_sonic_material.py`, `examples/sonic-garden/` |
-| 5 art (mappings, families, look, §34-36) | **next: art agent** | see "For the art agent" |
+| 5 art (mappings, families, look, §34-36) | pass 1 done (art agent, 2026-09-30) | see "Art pass 1" below; `tools/sonic_garden_look.py` |
 | 6-7 | not started | live input and live MIDI are Phase 7 |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
@@ -94,34 +95,28 @@ running status; SMPTE timing is refused. Live MIDI (Phase 7) would append to the
 
 ## The scene: `examples/sonic-garden/` (also in the Examples menu, Lab, "Sonic Garden")
 
-- `sonic-garden.scene.json`: a composition of existing generators only.
-  - `ground`: a box.
-  - `hero`: a 128x96 sphere with deformer slots 1 noise, 2 sine, 3 twist and 4 displacement.
-  - `tendrils`: bent, swaying cylinders. `blooms`: flattened spheres. Both organic.
-  - `crystals`: hexagonal bipyramids, a sphere with 6 segments and 2 rings, stretched by `sourceTransform`.
-  - `shards`: thin boxes on a spiral.
-  - `spores`: particles.
-  - The studio-softbox rig and a dark environment with fog.
-- `sonic-garden.json`: the **master project**.
-  - The pad's audio, the `sonic` block, and the interpret source `garden` with 14 mappings.
-    - `organic`, `crystalline` and `chaotic` compete in the group `family`, with sharpness 2.
-    - The others: glow, light, warm, cool, turbulence, spikes, breath, swarm, motion, pulse, hit.
-  - 24 neutral routes. `--audit-routes` finds all of them live.
-  - Family presence scales each structure group's `source/scale`, so the instances shrink in place; the
-    distribution's `transform/scale` would pull the whole ring in toward the hero.
+- **Both files are written by `tools/sonic_garden_look.py`** (art pass 1). Edit the tool, run it, then run the
+  variants tool. The scene and the master's `sonic`, `sources`, `routes`, `timeline` and `parameters` are its output;
+  hand edits to them are overwritten. The node and mapping inventory is in "Art pass 1" below.
+- `sonic-garden.json`: the **master project** (the pad's audio, the `sonic` block, two interpret sources, 241 routes,
+  a keyed camera). `--audit-routes` finds every route live.
 - `variants/*.json`: the master with only the audio and notes swapped. **Don't edit these**: edit the master, then
   run `python3 tools/sonic_garden_variants.py`. Its `--width/--height/--out` flags write low-res copies elsewhere.
+  It also stretches the master's timeline (the camera move) to each file's length: the context and morph files are
+  31.5 s against the phrase's 21.5 s.
 
 ## For the art agent: how to tune without engine edits
 
-1. **Interpreter mappings.** Edit the master's `sources[0].settings.mappings`.
+1. **Interpreter mappings.** Since art pass 1 these are authored in `tools/sonic_garden_look.py` (`GARDEN_MAPPINGS`,
+   `WORLD_MAPPINGS`), which writes the master's `sources`; run it, then the variants tool.
    - Inputs can be any bus signal, with a weight and an invert flag.
    - `combine` is mean, sum, product, max or min, followed by bias, gain and curve.
    - Mappings can share a `group`, whose `sharpness` sets how they compete.
    - The weights are also live parameters under `sources/garden/<mapping>/in<k>`, together with bias, gain and
      curve, and `sources/garden/group/family/sharpness`.
 2. **Routes.** Map `visual.*`, or anything else, to scene parameters with ordinary chains: smoothing, envelopes and
-   depth.
+   depth. Also in `tools/sonic_garden_look.py` (`R`, `palette`, `scalar`). `op: multiply` gives base x chain(x), so
+   `gain`/`offset` in the chain set a range (`gain 0.4, offset 0.8` is 0.8..1.2 x base).
 3. **The character itself.** A `sonic.character` block in the project overrides any dimension:
 
    ```json
@@ -148,8 +143,91 @@ running status; SMPTE timing is refused. Live MIDI (Phase 7) would append to the
    tools/gpu-lock.sh build/release/src/avgen --headless --project <dir>/<sound>.json --render <out>.mp4 --range 0:21.5
    ```
 
-   This takes about 22 s per sound. The review folder's grid was made from these with ffmpeg; this ffmpeg has no
-   `drawtext`, so the labels are PIL PNGs overlaid.
+   This took about 22 s per sound on the first scene; the art-pass scene takes about 25 s at 640x360, 35 s at
+   960x540 and 85 s at 1920x1080 per 21.5 s. The render size flag is `--size WxH`. This ffmpeg has no `drawtext`,
+   so labels are PIL PNGs overlaid.
+
+## Art pass 1 (art agent, 2026-09-30)
+
+Everything is data, written by `tools/sonic_garden_look.py`; the only other changes are the new rig
+`examples/lightrigs/sonic-garden.rig.json` and the timeline stretch in `tools/sonic_garden_variants.py`. No engine
+code changed. ART-NOTES.md in the review folder has the reasoning per family and per sound.
+
+### The mapping language (interpreter `garden`, then `world`)
+
+| layer | mappings | reads |
+|---|---|---|
+| families (group `family`, sharpness 3) | `organic` = warm x smooth x (1-bright)^1.5 x (1-inharmonic); `crystalline` = bright^.5 x inharmonic^.5 x (1-rough)^2; `chaotic` = mean(2 rough, sharp, 1-smooth), bias -0.2 gain 1.6; `silence` = full at zero energy, gone by 0.2 | slow tier |
+| weight | `mass` = energy x density^3 x harmonicity^3 (loud AND full AND pitched), bias -0.3 gain 5 curve 1.5 | slow tier |
+| world (second source) | `tectonic` = chaotic x mass; `impact` = chaotic x (1-mass) | this frame's garden outputs |
+| qualities | `radiance`, `grain`, `edge`, `shimmer`, `breath`, `energy`, `tension`, `swarm` | medium tier |
+| musical context | `sustain` (legato, duration, not rhythm), `figure` (rhythm x regularity x not chord), `stack` (chord, polyphony), `lift` (pitch) | `notes.*` only |
+
+- Character tuning (the one retune): `roughness` also reads `bandwidth` (1.5-6 kHz, log). Distortion spreads the
+  spectrum; before it, the bass read "dense and bright" (0.41) rather than rough.
+- Phrase means: pad organic 0.93; bell crystalline 0.75 (organic 0.12, chaotic 0.13); bass tectonic 0.96; perc
+  impact 0.98. The morph: organic 1.00 -> 0.93 -> 0.59 -> 0.25 -> 0.04 -> 0.00, crystalline peaking at 0.72
+  (15-20 s), chaotic 0.53 (20-25 s) -> 0.95 (25-30 s). Context-pad: organic holds at 0.90-0.94 while sustain,
+  figure and stack each lead their own section (0.80, 0.60, 0.77).
+- **The same note-on, four gestures.** `notes.noteOn` is routed with `depthSource` = a family, so the family decides
+  what the event looks like: organic, a 1.4-1.8 s swell of light; crystalline, a 90-320 ms ring of the crystals and
+  halos; tectonic, a 450 ms heave of the core's scale; impact, `sonic.transient` (the audio's own attack) flashes and
+  bursts. This is §19: MIDI says a note happened, the sound decides its form.
+- Palettes are blended, never switched: every world colour (sky zenith and horizon, fog, ambient, hero, heart light,
+  grade) is one add route per family and channel from a zero base, so an in-between sound gets an in-between world.
+  Light colour is the rig's `temperature` (rig lights have no colour parameter).
+- Each particle system belongs to a family through `particles/<n>/emissive` x family (spores organic, glints
+  crystalline, dust tectonic, sparks impact), so a gesture in the wrong world spawns nothing visible.
+- `silence` (a fourth family member: full at zero slow energy, gone by 0.2) owns the world before the first sound.
+  Without it, frame 0's all-zero character made `chaotic` (via "not smooth") the only non-zero family, the slow
+  route chains snapped to it, and every world opened with blades shrinking away; now each world grows in from a
+  bare plain in about a second.
+
+### The Creative Critic (one pass, preview mode, on the §34 sequence)
+
+Job `job_1a0f22441b5f3737c` (session `sonic-garden`, track `s34`): 8 findings, 0 high, 4 medium; technical
+quality, colour, composition and intent adherence 1.0. Acted on:
+- F001 "the whole frame pulses with the audio" (98% of regions, 12% of mean luma, onset-locked): the heart light's
+  note gains halved and its range cut from 14 to 9 m, so the response stays on the core and the ground near it.
+- F003 "camera shake" in the bass: it was the ground swell and the monoliths following the energy at 60-120 ms;
+  now 350-500 ms attack and 1.2-1.5 s decay (heavy things move slowly), and the core's note heave is slower.
+- F004-F006 in the perc: the blade cloud no longer pumps on every note; the audio's transients expand it only above
+  0.6 (a chain `threshold: gate`), and the heart flash is half as bright.
+Not acted on: F002 (cuts off the beat: the "cuts" are the joins between four renders), F007 (the pad "shows
+nothing new after 0.13 s": it is the calm world by design), F008 (bass and perc "share a composition": the same
+camera move is the point of §34; the representative frames were the first, still-forming ones).
+
+### The scene (17 nodes)
+
+`ground` (150 m, undulating, with a swell only the heavy world raises), `horizon` (a far ring of mesas), `hero` (a
+lumpy sphere: noise, sine breath, twist without speed, displacement), `facets` (a gem: a chamfered cube with two
+rotated hierarchy copies), organic `stalks` (tubes), `caps` + `capstems` (lathe-profile tubes), `petals`,
+crystalline `prisms` + `spires` (cubes stood on a vertex and stretched: rhombohedra, the one faceted crystal the
+primitives allow), `halos` (three thin tori), chaotic `shards` (blades on a spiral) and `slabs` (monoliths that
+rise out of the ground), particles `spores`, `glints`, `sparks`, `dust`, and a `heart` point light inside the hero.
+The camera is keyed (`timeline`): a low wide establishing view from the front left, an arc right and in, closest on
+the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
+
+### Found while doing it (for the engineering agent)
+
+- **Twist deformers invert normals past 90 degrees of turn.** `shaders/procedural.wgsl`, `vs_proc`: the finite-
+  difference normal is flipped whenever `dot(nw, nRef) < 0`, where `nRef` is the *undeformed* normal. Any twist whose
+  angle passes 90 degrees (always, once `speed * t` has run for a while) turns the band of faces around the axis inside
+  out: a sphere with `twist speed 0.3` renders a black equator from about 5 s on (the caps, whose normals lie along the
+  axis, stay right). The flip is only needed for a mirrored transform, so a fix is to take the sign from the
+  determinant of the instance scale and object matrix instead of from `nRef`. Worked around here: no twist speed,
+  and spins are `time.seconds` rotation routes (which rebuild the instance cloud per frame, cheap for these nodes,
+  and are held inside the +-360 degree parameter range for 31.5 s).
+- Interpreter parameters clamp silently: `bias` is +-4 and `gain` +-16, so a mapping authored with bias -9 runs at -4.
+- The trace's event columns are always 0 (rows are written after `clearEvents`); watch a `visual.*` that reads them.
+- Emission at note rate reads as a steady glow: a flash every 0.3 s with a 150 ms decay is lit half the time. Keep
+  event decays under about 100 ms where notes are dense.
+
+### Next
+
+- Engineering: the twist normal fix above (with a render test); Phase 6/7 as planned.
+- Art: the §35 bell sustained section starts half organic (a slow, single bell note genuinely reads soft and warm),
+  which confounds "same timbre, different context" there; the pad version is the clean §35 demonstration.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
