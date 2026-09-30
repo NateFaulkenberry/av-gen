@@ -113,7 +113,8 @@ TEST_CASE("the procedural space art presets load, every rule the music drives ex
         SKIP("assets/audio/night-shift.wav is not generated");
     }
     const std::vector<std::string> projects = {"infinite-hall",       "recursive-cathedral", "folding-space",
-                                               "radial-architecture", "geometry-explosion",  "showcase"};
+                                               "radial-architecture", "geometry-explosion",  "showcase",
+                                               "experiment-melt-void"};
     for (const std::string& name : projects) {
         INFO(name);
         const std::filesystem::path path =
