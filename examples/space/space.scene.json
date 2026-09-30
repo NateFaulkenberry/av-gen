@@ -570,7 +570,8 @@
       0.25
      ],
      "shadowSteps": 32
-    }
+    },
+    "castShadows": false
    }
   }
  ]

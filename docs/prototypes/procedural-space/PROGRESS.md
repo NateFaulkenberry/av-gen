@@ -127,6 +127,10 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
   - `repeat` content must stay inside its cell.
   - Orbit (camera mode 0) integrates over time, so it does not scrub.
   - The graph editor does not offer the new kinds.
+  - **Raymarched SDFs cast no shadow-map shadow.** This is a pre-existing defect, documented by the
+    hidden probe "A raymarched SDF does not reach the shadow map" in `test_sdf_gpu.cpp`: the shadow
+    pass reuses the camera's screen rect. For local shadowing use `look/shadow/*` (the SDF soft
+    shadow). The example sets `castShadows: false` so the shadow passes do not march for nothing.
 
 ## Performance
 
