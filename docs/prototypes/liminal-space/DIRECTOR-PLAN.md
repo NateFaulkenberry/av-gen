@@ -587,14 +587,16 @@ is that all you got? / is that all I show you?" **The fill:** the low end drops 
 **What we see.**
 - **Bar 84:** with the beat back, the corridor turns into **the square stairwell**: four flights round a void,
   each a stair up (the Penrose loop).
-  - The camera climbs one flight, turns, climbs the next, and after four flights arrives at the **same landing**,
-    one storey higher. Across the void it sees the flights it has already climbed.
+  - The camera climbs one flight, turns, climbs the next, and after four flights (a flight every bar and a half)
+    arrives at bar 90 at the **same landing**, one storey higher. Across the void it sees the flights it has
+    already climbed.
   - The question is made spatial: effort without arrival.
 - **The breathing returns** with the sub, and **the walls begin to crack**. Thin seams open between the wall
   planes, and **slivers of sky-blue daylight leak in**. Each time round they are a little wider, then close again:
   false arrivals (Butler), the palette almost opening. The motes glint on the offbeat hats.
-- **Bar 90:** on the last "is that all?" the camera arrives at the top landing, and the beacon is **right there**:
-  a plain doorway three metres ahead, full of warm light.
+- **Bar 90:** on the last "is that all?", back on the same landing, the camera turns, and the beacon is **right
+  there**: the landing's plain doorway, three metres ahead, full of warm light. The loop has not broken; the way
+  out has come to it.
 - **The fill (198.65 s):** on bar 91 beat 3 the camera takes the last steps. For two beats the doorway's light
   fills the frame, a bright threshold.
 
@@ -694,6 +696,94 @@ light, not black, and it holds still through the tail.
 spacious, more coherent, less fragmented." It ends in the white of relief (Jonauskaite: white goes with relief).
 
 ---
+
+## 7a. The timing sheet
+
+This is the film as a list of timed camera events: the plan in §7 made concrete for the implementation. Times come
+from the bar grid (bar.beat, 109 BPM to bar 75, 111 from bar 76). The same list is `shots` in
+`tools/liminal/all-you-got.sections.json`. Between events the camera keeps its last instruction. Every change of
+speed or gaze eases over at least half a second, and nothing starts or stops dead except where marked.
+
+| time (s) | bar.beat | camera | what happens |
+|---|---|---|---|
+| **Intro** | | | |
+| 0.00 | 1.1 | hold, 0 m/s | the opening frame: the pale corridor, a little off axis; the beacon far away at its end |
+| 2.20 | 2.1 | walk, easing to 0.6 m/s over 2 s | the music begins; the walk begins |
+| 6.61 | 4.1 | slow to 0.2; look left 35° | an empty side room; hold |
+| 8.81 | 5.1 | gaze back to the axis; 0.6 m/s | walk on |
+| 11.01 | 6.1 | 0.6 m/s | the bass pulse; the sun patch lies on the floor ahead (walked through at about 13 s) |
+| 15.41 | 8.1 | turn right; climb at 0.5 m/s | the side opening and the stair |
+| 19.82 | 10.1 | the landing; turn 180°; climb | the second flight |
+| 24.22 | 12.1 | hold 1 bar | **the opening frame again**: the corridor's start, where we began |
+| 26.42 | 13.1 | walk 0.7 m/s | the riser; towards the wide stair and the brighter light |
+| 28.62 | 14.1 | climb 0.8 m/s | the first "all you got"; the beacon swells once a bar from here |
+| 36.88 | 17.4 | stop for one beat on the top step | the one-beat gap |
+| **Dance** | | | |
+| 37.43 | 18.1 | step out; ease to 1.4 m/s; gaze up +10° | **the great hall**: shafts, the rose wall, the tiny figure across the hall |
+| 41.83 | 20.1 | down the long stair on the axis, 1.5 m/s | the hall breathes with the bass |
+| 46.24 | 22.1 | across the floor on the axis, 1.6 m/s | one-point perspective; the beacon high above the target doorway |
+| 53.94 | 25.3 | into the doorway's reveal | **light threshold** (swap to the enfilade) |
+| **Verse 1** | | | |
+| 55.05 | 26.1 | 1.1 m/s; the gaze follows the voice | the enfilade; "How little do I know?" |
+| 63.85 | 30.1 | threshold | the figure two rooms ahead, in a doorway's light |
+| 72.66 | 34.1 | hesitate: 30 cm back, then on | "Come on, tell me what you wanna" |
+| 74.86 | 35.1 | turn left 90° through a side door | the turn for no clear reason |
+| 75.96 | 35.3 | a doorframe crosses the lens | **the figure is gone** when it clears |
+| 77.06 | 36.1 | 1.0 m/s | a room identical to the one it left, beacon and all |
+| 81.47 | 38.1 | threshold | "can you tell me it's fine though?" |
+| 88.07 | 41.1 | slowing, into the last door's reveal | "let it go" (87.5 s); **light threshold** (swap to the stairhead) |
+| **Let go** | | | |
+| 90.28 | 42.1 | **stop, 0 m/s** | the stairhead above the void; the figure at the top step; colour drains; breathing stops |
+| 92.48 | 43.1 | down a second flight, 0.5 m/s | the pulse returns alone; "[let it go]" repeats; the sun patch slides |
+| 99.08 | 46.1 | look back and up at the figure over 2 s; hold | the figure left above |
+| 103.49 | 48.1 | gaze forward; 0.5 m/s | architecture settled to true |
+| **Build** | | | |
+| 105.69 | 49.1 | pause in a narrow passage, 0.2 m/s | the held breath; the light ahead brightens |
+| 107.89 | 50.1 | 0.2 m/s | the light brightens again |
+| 109.54 | 50.4 | walk resumes | the pickup into verse 2 |
+| **Verse 2** | | | |
+| 110.09 | 51.1 | 1.2 m/s | the crossing stairwell; "do you wanna have fun?" |
+| 114.50 | 53.1 | **reversal**: stop, back 40 cm, turn to another flight | the first change of mind |
+| 118.35 | 54.4 | — | phrase-end noise sweep: near-field tremble for one beat |
+| 118.90 | 55.1 | slow; look left 60° | **the window into the verse-1 rooms**, from an impossible angle; the figure's lamp still lit |
+| 121.10 | 56.1 | **reversal**; down a flight | the second change of mind |
+| 123.30 | 57.1 | 0.8 m/s; gaze down | the beacon below, through the stairwell |
+| 126.61 | 58.3 | into a door's reveal | noise sweep, tremble; **light threshold** (swap to the enfilade's far end) |
+| **Bridge** | | | |
+| 127.71 | 59.1 | **the verse 1 move repeated exactly** (path, height, speed) | the enfilade from the other end, light flipped; "how little do I know?" (x4) |
+| 136.51 | 63.1 | the gaze passes over an empty doorway | the figure's doorway, empty |
+| 144.22 | 66.3 | stop at a small doorway | "steps in the process, feel it grow"; the tiny room with the beacon inside |
+| **Grow** | | | |
+| 145.32 | 67.1 | step in; 0.9 m/s rising to 1.4 by bar 73 | the impact and the lift to F; **the room begins to grow**; gold spreads |
+| 151.93 | 70.1 | gaze steady on the far wall | **a doorway opens: sky and sun, seen for the first time** |
+| **Break** | | | |
+| 160.73 | 74.1 | **stop in that doorway, 0 m/s** | drums out; total stillness |
+| 164.59 | 75.4 | step into the light | **the bright threshold** (swap to the first corridor, K8) |
+| **All you** | | | |
+| 165.14 | 76.1 | 1.8 m/s on the axis; FOV 45° → 90° over 4 bars | **the first corridor again**, amber; the dolly zoom; "is that all you" |
+| 173.79 | 80.1 | through a side door; FOV back to 55° in the reveal; 2.0-2.2 m/s | **the start of the same corridor**; the sun patch has moved; narrower, lower |
+| 181.35 | 83.3 | ease to a stop in 0.5 s | the pulse stops |
+| **Is that all** | | | |
+| 182.43 | 84.1 | climb 1.8 m/s | the beat returns: the Penrose stairwell's first flight; breathing returns |
+| 185.68 | 85.3 | landing; turn 90°; climb | the second flight; the first cracks of sky |
+| 188.92 | 87.1 | landing; turn 90°; climb | the third flight; the cracks wider, then closing; the flights already climbed visible across the void |
+| 192.16 | 88.3 | landing; turn 90°; climb | the fourth flight; the offbeat glints |
+| 195.41 | 90.1 | **the same landing**; turn to its doorway | four flights up and back where we were; the beacon's light is in the doorway, 3 m ahead |
+| 198.65 | 91.3 | the last steps | **the fill: the doorway's light fills the frame** |
+| **Let go II** | | | |
+| 199.73 | 92.1 | out; 1.4 m/s; gaze ahead and up +8° | **the open**: sky, sun, the walls unfolding; the palette opens |
+| 201.89 | 93.1 | climb the long stair, 1.5 m/s, on the axis | a stair from inside into the air; deep, slow breathing |
+| **For your life** | | | |
+| 217.03 | 100.1 | 1.2 m/s among the free-standing parts | "just steps in a process / for your life" |
+| 221.35 | 102.1 | through a free-standing doorway | one doorway per call |
+| 225.68 | 104.1 | through a doorway; the figure at the top, against the sky | climbing towards it |
+| 230.00 | 106.1 | through a doorway | the last before the top |
+| 234.33 | 108.1 | **arrive beside the figure; turn to its gaze, down** | the last lift; the first corridor small and roofless below |
+| 238.65 | 110.1 | turn back to the sun; rise slowly | the fragments begin to align |
+| 245.14 | 113.1 | hold | **a single doorway framing the sun** |
+| **Out** | | | |
+| 247.30 | 114.1 | ease forward, 0.3 m/s → 0 | the air brightens to white-gold |
+| 251.62 | 116.1 | still | everything dissolves into light; the tail |
 
 ## 8. The sound-to-behaviour vocabulary
 
@@ -795,7 +885,8 @@ This is a sketch for the implementation handoff; the engineer's design is `ENGIN
 - **The camera** is the journey (mode 3): keyed distance with holds and hesitations, yaw and pitch for looking,
   `sway` for the searching gaze, `bob` for the step, and `fov` for the one dolly zoom.
 - **Colour** is the palette block: states K0-K12 bound to wall, floor, accent, fog, sky, light, beacon and edge
-  colours, and the grade.
+  colours, and the grade. The hex values in §5 are sRGB. The palette block's states are linear RGB (ADR-1043), so
+  they are converted when the project is generated.
 
 ## 13. Needs from engineering, ranked
 
