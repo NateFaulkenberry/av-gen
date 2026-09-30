@@ -5,7 +5,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
 
 ## Rules in force
 
-- The GPU belongs to the owner until about 23:45 on 2026-09-29. After that, all GPU work, **including
+- The GPU belongs to the owner until about 23:57 on 2026-09-29 (moved from 23:45 by the owner). After that, all GPU work, **including
   `avgen_tests`**, goes through `tools/gpu-lock.sh`.
 - Build: `cmake --preset release && cmake --build --preset release`. Reconfigure after adding a test
   file.
@@ -111,6 +111,14 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
   ```
 
   This prints the GPU pass medians (`sdf=`) and the "sdf march" steps line.
+- **The other look knobs are ordinary parameters:**
+  - fog: `scene/volumeDensity` (the surface fog's extinction), `scene/fogColor`, and
+    `scene/volumeMaxDistance` (> 0 turns on the volumetric march, which costs frame time);
+  - light: `lightrig/SpaceNocturne/keyIntensity|ambientIntensity|ambientColor` and
+    `lightrig/SpaceNocturne/<key|rim|accent>/intensity|azimuth|elevation`;
+  - material: `sdf/space/material/{baseColor, emissiveColor, emissive, roughness, metallic}`, and a
+    material program (ADR-030) by name through `material.program` in the scene file;
+  - post: `post/bloom/*`, `post/grade/*`, `camera/exposure/compensation`.
 - **Known limits:**
   - One material per SDF object. A second material is a second `sdf` node, and a second full-screen
     march.
@@ -122,11 +130,11 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
 
 ## Performance
 
-*Pending: the GPU is the owner's until about 23:45.*
+*Pending: the GPU is the owner's until about 23:57.*
 
 ## Next steps
 
-1. After 23:45, under the lock: run `avgen_render_tests "[sdf]"` for the new parity cases, then run
+1. After 23:57, under the lock: run `avgen_render_tests "[sdf]"` for the new parity cases, then run
    the full `avgen_tests` and `avgen_render_tests` and judge them by their exit codes.
 2. Benchmark each state at 1920x1080, 1440x810, 960x540 and 634x356 (render scales 1, 0.75, 0.5 and
    0.33). Record the `sdf` pass time, the frame time and the steps.

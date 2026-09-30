@@ -238,6 +238,9 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
   `shadowStrength`/`shadowSoftness`/`shadowDirection`/`shadowSteps` (a Quilez penumbra march
   towards a world direction). Occlusion and shadow scale the whole shaded colour (the cheap
   version: emission and fog included); edges are added after them.
+- `depthPrepass`, `castShadows` (ADR-1002, default true): whether the object is marched again into
+  the depth prepass and into the shadow maps. Off saves a full march each; the lit pass still writes
+  depth, but prepass readers (GTAO, the screen-space shadow mask, contact shadows) no longer see it.
 - `maxSteps`, `epsilon` (hit threshold, scaled by distance so it is screen-space constant),
   `stepScale` (relaxation; displaced or twisted trees need < 1) and `normalEpsilon` are raymarch
   only. `resolution` is mesh only.

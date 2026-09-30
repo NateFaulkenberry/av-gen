@@ -25,3 +25,8 @@
   3-slot MapRead ring, which is read a few frames late. `SdfStats` carries the average steps, the
   maximum steps, the hit ratio and the out-of-steps ratio. They are shown in the Render stats lines and
   printed as medians by the headless benchmark (`--headless --frames N`).
+- **`depthPrepass` and `castShadows`** are per-object switches, both true by default, which is the
+  ADR-027 behaviour. Each depth-only pass is a full second march over the object's rect. With a switch
+  off, the lit pass still writes depth, so composition with meshes stays correct. What is lost is the
+  object in the passes that read the prepass before the lit pass (GTAO, the screen-space shadow mask,
+  contact shadows) and, for `castShadows`, its shadow-map shadow.

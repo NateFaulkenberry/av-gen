@@ -334,6 +334,17 @@ TEST_CASE("SdfObject march cap and look round trip through JSON and validate", "
     CHECK(back->look.shadowSoftness == 12.0f);
     CHECK(back->look.shadowDirection == glm::vec3(0.2f, 1.0f, -0.4f));
     CHECK(back->look.shadowSteps == 40);
+    // The depth-only opt-outs (default on: the ADR-027 behaviour).
+    CHECK(back->depthPrepass);
+    CHECK(back->castShadows);
+    scene::SdfObject optOut = o;
+    optOut.depthPrepass = false;
+    optOut.castShadows = false;
+    const auto optBack = scene::SdfObject::fromJson(optOut.toJson());
+    REQUIRE(optBack);
+    CHECK_FALSE(optBack->depthPrepass);
+    CHECK_FALSE(optBack->castShadows);
+    CHECK(optOut.structuralHash() == o.structuralHash());
     // Old files (no look block) keep the defaults: everything off.
     const auto plain = scene::SdfObject::fromJson(nlohmann::json{{"name", "x"}});
     REQUIRE(plain);

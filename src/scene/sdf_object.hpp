@@ -54,6 +54,13 @@ struct SdfObject {
     float stepScale = 0.9f;              // relaxation (displaced trees need < 1)
     float normalEpsilon = 0.002f;
     float maxDistance = 0.0f;            // ADR-1002: march length cap in tree-local units (0 = the bounds only)
+    // ADR-1002: whether a Raymarch object is marched into the depth prepass and into the shadow maps.
+    // Each is a full second march over the object's screen (or shadow-map) rect. Off: the lit pass
+    // still writes depth, so meshes and particles compose correctly; what is lost is the object's
+    // depth in the passes that read the prepass before the lit pass (GTAO, the screen-space shadow
+    // mask, contact shadows) and, for castShadows, its shadow in the shadow maps.
+    bool depthPrepass = true;
+    bool castShadows = true;
     SdfLook look;                        // ADR-1002
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material
     // program. Runtime only (the Composition writes it every frame); 1 is the surface as authored.

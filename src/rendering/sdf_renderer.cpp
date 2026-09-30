@@ -730,6 +730,10 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
         if (item.objectIndex >= scene.sdfs.size()) {
             continue;
         }
+        const scene::SdfObject& object = scene.sdfs[item.objectIndex];
+        if (reducedSteps ? !object.castShadows : !object.depthPrepass) {
+            continue; // ADR-1002: opted out of this depth-only march
+        }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
         pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
