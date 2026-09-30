@@ -978,30 +978,32 @@ the invisible wrap, and a walking figure. Measured against this plan, the look n
 
 ## 13. Needs from engineering, ranked
 
-Checked against the engineer's plan in `ENGINEERING.md` (a: `stairs`/`screw`/`warp` and the vocabulary library;
-b: `spring`/`integrate`; c: the journey camera; d: the palette block; e: journey anchors and per-cell props; f: the
-example). "Covered" means the plan already includes it. The others are new asks, or clarifications of an existing
-item.
+This is checked against the engineer's plan in `ENGINEERING.md` and against what has since landed on the branch.
+- **Landed:** ADR-1040 (stairs, screw, warp, shell and `tools/liminal_sdf.py`), ADR-1041 (spring and integrate),
+  ADR-1042 (the journey camera and nodes on the journey) and ADR-1043 (the palette), as of `fa927036` and
+  `465a4a8a`.
+- **Status meanings:** "landed" is in the branch; "authoring" is possible with what landed; "new" is not yet
+  there.
 
 | rank | need | why the film needs it | status |
 |---|---|---|---|
 | 1 | **Chapters: a sequence of cells along one continuous journey.** Switch the active world (cell design, screw and path) at a scheduled time, with the camera's pose continuous across the swap, at a threshold whose geometry is identical in both cells. It can be several SDF objects with timeline-keyed visibility, or a fast `morph` inside the threshold. | Six spaces over four minutes; a single cell for 254 s cannot tell this story. | **new** (the plan has one screw world plus `morph`) |
-| 2 | **The journey camera** with keyable distance (holds, hesitation), yaw, pitch, lookAhead, sway, bob, height, `fov`, and a collision guard | The wanderer | covered (c); `fov` needs confirming as keyable during a journey |
-| 3 | **A look-at target blend**: aim toward a world point (the beacon) with a keyable weight, on top of the path-relative look | The gaze easing toward the beacon when the voice sings; the dolly zoom held on the far doorway | **new** (small) |
+| 2 | **The journey camera** with keyable distance (holds, hesitation), yaw, pitch, lookAhead, sway, bob, height, `fov`, and a collision guard | The wanderer | **landed** (ADR-1042: distance, lookAhead, height, yaw, pitch, bob, stride, sway, radius, the guard); `fov` keyable during a journey needs confirming |
+| 3 | **A look-at target blend**: aim toward a world point (the beacon) with a keyable weight, on top of the path-relative look | The gaze easing toward the beacon when the voice sings; the dolly zoom held on the far doorway | **new** (small); meanwhile approximated by keying `yaw`/`pitch` towards the beacon per shot |
 | 4 | **More than one material in a world**: at least plaster, floor, accent planes, and an emissive beacon surface, with separate palette bindings. A per-node material ID, or the vocabulary library splitting a cell into several SDF objects by role. | Rose planes (K1, K10), floor bands, the glowing beacon; one material per object makes every surface the same colour | **new**; a clarification of a and d |
-| 5 | **The stairs primitive and the vocabulary** (room, corridor, doorway with a reveal, stairway with landing and a single rail, platform, window opening, skirting line) | The whole world | covered (a); rail, skirting and window opening need adding to the list |
-| 6 | **Screw repetition**, translation and helix (n = 4) with rise | The endless corridor, the Penrose stairwell, the endless stair up | covered (a) |
-| 7 | **The palette block** with roles for wall, floor, accent, fog/void, sky (zenith and horizon), key or sun light, lamp and beacon light, emissive, edge colour, and grade | The colour script K0-K12, and the withheld daylight | covered (d); needs the role list |
-| 8 | **`spring` and `integrate`** chain stages | Breathing, pace, no step functions anywhere | covered (b) |
-| 9 | **Continuous structural transforms as parameters**: wall-plane separation offsets, ceiling removal (height to infinity, or a lift-away offset), room growth (a room's size animating 3 m → 30 m while the path stays clear), seams opening between wall planes | "Feel it grow", the cracks, the release unfolding | largely authoring on named nodes; confirm the collision guard handles a room growing around the camera |
+| 5 | **The stairs primitive and the vocabulary** (room, corridor, doorway with a reveal, stairway with landing and a single rail, platform, window opening, skirting line) | The whole world | **landed** (ADR-1040); rail, skirting and windows are `slab`s and `opening`s (authoring) |
+| 6 | **Screw repetition**, translation and helix (n = 4) with rise | The endless corridor, the Penrose stairwell, the endless stair up | **landed** (ADR-1040) |
+| 7 | **The palette block** with roles for wall, floor, accent, fog/void, sky (zenith and horizon), key or sun light, lamp and beacon light, emissive, edge colour, and grade | The colour script K0-K12, and the withheld daylight | **landed** (ADR-1043); roles are free-form, so the list is authoring |
+| 8 | **`spring` and `integrate`** chain stages | Breathing, pace, no step functions anywhere | **landed** (ADR-1041) |
+| 9 | **Continuous structural transforms as parameters**: wall-plane separation offsets, ceiling removal (height to infinity, or a lift-away offset), room growth (a room's size animating 3 m → 30 m while the path stays clear), seams opening between wall planes | "Feel it grow", the cracks, the release unfolding | **authoring** (a named `room`'s `size` and `At` translation, named openings and translations); confirm the collision guard with a room growing around the camera |
 | 10 | **A sky and daylight**: a sky gradient (zenith and horizon) and a sun direction and colour, keyable, withheld until the release | The release's daylight, and the glimpse at "feel it grow" | **new or clarify** (does the SDF look have a sky beyond the fog colour?) |
 | 11 | **The beacon light and the sun patch**: a warm point or area light in a doorway, scattering into the volumetric fog, with keyable colour, intensity and radius (the spreading light at "feel it grow"); and a rectangle of warm light on a floor (an emissive floor quad, or a spot with a window-shaped cookie) | Motifs 1 and 4, and the growth of light | probably existing lights; confirm volumetric scattering with the new fog |
 | 12 | **The figure**: a human silhouette, 1.75 m, placeable at a world point or on the journey (walking ahead on its own distance keys), with keyable visibility (it vanishes only while occluded) and **its material colour bound to a palette role**. The example's walking Quaternius UAL1 mannequin works (§12b) once its wooden tone is overridden. Fallback: a simple static **SDF scale figure** in the vocabulary library, which takes the palette and needs no asset. | Motif 3 | mostly covered (e: the walking figure on the journey exists); the **palette-bound material override is new** |
 | 13 | **Motes**: particles in the light shafts, kept near the camera across the wrap, with brightness routable from the hats | The fine, high-frequency layer | probably existing particles; confirm placement near the camera across the wrap |
 | 14 | **A near-field tremble**: a high-frequency, tiny displacement that fades out beyond a few metres from the camera | Roughness is local (phrase-end noise sweeps) | **new** (small; could be `warp` with a camera-distance mask) |
-| 15 | **A beat-locked bob**: step phase from the music grid rather than distance, fading with speed | The walk felt on the beat | **new** (small) |
+| 15 | **A beat-locked bob**: steps on the beat | The walk felt on the beat | **authoring**: key `stride` = speed x beat period with each speed change (the bob follows distance, ADR-1042); new only if an exact phase lock is wanted |
 | 16 | **Analyzer inputs**: the section map (`tools/liminal/all-you-got.sections.json`) and the coupling and palette curves given to the Creative Critic, with the addendum's criteria (loneliness, wandering, restraint, emotional progression, whether effects feel motivated) | Evaluating whether it communicates, not whether it impresses (§15-16) | engineer item 3 ("if time") |
-| 17 | A camera **roll** (up vector) | One slow Relativity roll on a landing in verse 2 | optional; **cut it** if it costs anything |
+| 17 | A camera **roll** (up vector) | One slow Relativity roll on a landing in verse 2 | **not available** (ADR-1042: the pose has no up vector); **cut** |
 
 **Not needed tonight:** true portals, Droste or log-polar zooms, recursion, kaleidoscopes, and scene states for
 anything visible.
