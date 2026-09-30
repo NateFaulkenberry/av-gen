@@ -442,6 +442,21 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
     let nInst = quatRotate(inst.rotation, n / safeScale);
     let nRef = normalize((object.normalMatrix * vec4<f32>(nInst, 0.0)).xyz);
+    // ADR-1021: the chain's handedness, for the normal's sign below. Only a mirror turns a surface
+    // over: the object matrix, the instance scale, or a path deformer run backwards along its
+    // spline. Computed here, before the chain, and not beside its use: reading `proc` after the
+    // three deformChain calls (this loop, or even one prevInfo field) measured 2 ms more GPU a frame
+    // in the Sonic Garden at 1080p (shadow 0.85 -> 2.4 ms) with identical images; here it is free.
+    let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
+    var handedness = determinant(objectLinear) * s.x * s.y * s.z;
+    let deformerCount = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= deformerCount) { break; }
+        let d = proc.deformers[i];
+        if (deformerCode(d) == DEFORM_PATH && d.params.x >= 0.0 && d.params.y < 0.0 && d.centerAmount.w > 0.5) {
+            handedness = -handedness;
+        }
+    }
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
@@ -509,17 +524,6 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
         nw = nRef;
     } else {
         nw = normalize(nw);
-        let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
-        var handedness = determinant(objectLinear) * s.x * s.y * s.z;
-        let deformerCount = u32(proc.timeInfo.y + 0.5);
-        for (var i = 0u; i < 8u; i = i + 1u) {
-            if (i >= deformerCount) { break; }
-            let d = proc.deformers[i];
-            if (deformerCode(d) == DEFORM_PATH && d.params.x >= 0.0 && d.params.y < 0.0 &&
-                d.centerAmount.w > 0.5) {
-                handedness = -handedness;
-            }
-        }
         if (handedness < 0.0) {
             nw = -nw;
         }

@@ -49,5 +49,11 @@ The shader multiplies those signs and flips `nw` only when the product is negati
 - Mirrored procedural instances were already not drawn correctly (with back-face culling, an instance with a
   negative scale renders as its far side); that is unchanged and outside this decision. For an undeformed or
   mildly deformed mirror the mirror term gives the same normal the old test did.
-- Cost: one 3x3 determinant and a loop over at most eight deformer codes per vertex, only on the path that has a
-  non-degenerate cross product.
+- Cost: nothing measurable, but only because of where it is computed. The handedness (a 3x3 determinant and a loop
+  over at most eight deformer codes) is evaluated before the three `deformChain` calls. The first version computed
+  it beside its use, after the chain, and cost 2 ms of GPU a frame in the Sonic Garden at 1080p (the shadow pass
+  0.85 -> 2.4 ms, the scene pass +0.2 ms) with bit-identical images. Reading even one `proc` uniform field at that
+  point cost the same, while the old `dot(nw, nRef)` test and the instance-scale term alone cost nothing; this
+  looks like the Metal compiler's scheduling of the vertex stage's uniform loads around the loop-heavy chain.
+  Measured by swapping only the shader directory (`AVGEN_SHADER_DIR`) on one binary: head 36.96 ms GPU median, the
+  final shader 37.09 ms (noise; the shadow and scene passes are identical to 0.01 ms).

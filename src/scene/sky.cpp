@@ -75,6 +75,9 @@ std::uint64_t SkyRuntime::hash() const {
 namespace {
 
 constexpr float kSkyRelativeTolerance = 1.0f / 128.0f;
+// A floor for a sky that is nearly black: a zenith at 1e-4 whose residual family weights move it by
+// a few 1e-5 is invisible (1e-5 linear is a tenth of an 8-bit level at unit exposure).
+constexpr float kSkyAbsoluteTolerance = 1e-5f;
 // The chord between two unit vectors is their angle to first order; a cosine this close to 1 is not
 // representable in float.
 constexpr float kSkySunChordTolerance = 2.5e-4f; // 0.25 mrad
@@ -82,11 +85,11 @@ constexpr float kSkySunChordTolerance = 2.5e-4f; // 0.25 mrad
 bool colourWithin(const glm::vec3& a, const glm::vec3& b) {
     const float scale = std::max({a.r, a.g, a.b, b.r, b.g, b.b});
     const glm::vec3 d = glm::abs(a - b);
-    return std::max({d.r, d.g, d.b}) <= kSkyRelativeTolerance * scale + 1e-7f;
+    return std::max({d.r, d.g, d.b}) <= kSkyRelativeTolerance * scale + kSkyAbsoluteTolerance;
 }
 
 bool scalarWithin(float a, float b) {
-    return std::abs(a - b) <= kSkyRelativeTolerance * std::max(std::abs(a), std::abs(b)) + 1e-7f;
+    return std::abs(a - b) <= kSkyRelativeTolerance * std::max(std::abs(a), std::abs(b)) + kSkyAbsoluteTolerance;
 }
 
 } // namespace
