@@ -106,6 +106,10 @@
         "signal": "sonic.inharmonicity.slow",
         "weight": 1.0,
         "invert": true
+       },
+       {
+        "signal": "sonic.stability.slow",
+        "weight": 0.5
        }
       ],
       "group": "family"

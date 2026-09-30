@@ -157,7 +157,7 @@ code changed. ART-NOTES.md in the review folder has the reasoning per family and
 
 | layer | mappings | reads |
 |---|---|---|
-| families (group `family`, sharpness 3) | `organic` = warm x smooth x (1-bright)^1.5 x (1-inharmonic); `crystalline` = bright^.5 x inharmonic^.5 x (1-rough)^2; `chaotic` = mean(2 rough, sharp, 1-smooth), bias -0.2 gain 1.6; `silence` = full at zero energy, gone by 0.2 | slow tier |
+| families (group `family`, sharpness 3) | `organic` = warm x smooth x (1-bright)^1.5 x (1-inharmonic) x steady^.5; `crystalline` = bright^.5 x inharmonic^.5 x (1-rough)^2; `chaotic` = mean(2 rough, sharp, 1-smooth), bias -0.2 gain 1.6; `silence` = full at zero energy, gone by 0.2 | slow tier |
 | weight | `mass` = energy x density^3 x harmonicity^3 (loud AND full AND pitched), bias -0.3 gain 5 curve 1.5 | slow tier |
 | world (second source) | `tectonic` = chaotic x mass; `impact` = chaotic x (1-mass) | this frame's garden outputs |
 | qualities | `radiance`, `grain`, `edge`, `shimmer`, `breath`, `energy`, `tension`, `swarm` | medium tier |
@@ -165,10 +165,13 @@ code changed. ART-NOTES.md in the review folder has the reasoning per family and
 
 - Character tuning (the one retune): `roughness` also reads `bandwidth` (1.5-6 kHz, log). Distortion spreads the
   spectrum; before it, the bass read "dense and bright" (0.41) rather than rough.
-- Phrase means: pad organic 0.93; bell crystalline 0.75 (organic 0.12, chaotic 0.13); bass tectonic 0.96; perc
-  impact 0.98. The morph: organic 1.00 -> 0.93 -> 0.59 -> 0.25 -> 0.04 -> 0.00, crystalline peaking at 0.72
-  (15-20 s), chaotic 0.53 (20-25 s) -> 0.95 (25-30 s). Context-pad: organic holds at 0.90-0.94 while sustain,
+- Phrase means: pad organic 0.89; bell crystalline 0.82 (organic 0.05, chaotic 0.13); bass tectonic 0.96; perc
+  impact 0.98. The morph: organic 1.00 -> 0.90 -> 0.51 -> 0.20 -> 0.03 -> 0.00, crystalline peaking at 0.76
+  (15-20 s), chaotic 0.53 (20-25 s) -> 0.95 (25-30 s). Context-pad: organic holds at 0.82-0.90 while sustain,
   figure and stack each lead their own section (0.80, 0.60, 0.77).
+- `organic` requires a steady sound (`stability^0.5`): a decaying FM bell chord reads warm and soft too, and only
+  its moving spectrum (stability 0.53 against the pad's 0.80) tells it apart. Without the term the bell's first five
+  seconds drifted half organic (0.39); with it 0.18.
 - **The same note-on, four gestures.** `notes.noteOn` is routed with `depthSource` = a family, so the family decides
   what the event looks like: organic, a 1.4-1.8 s swell of light; crystalline, a 90-320 ms ring of the crystals and
   halos; tectonic, a 450 ms heave of the core's scale; impact, `sonic.transient` (the audio's own attack) flashes and
@@ -197,7 +200,8 @@ Not acted on: F002 (cuts off the beat: the "cuts" are the joins between four ren
 nothing new after 0.13 s": it is the calm world by design), F008 (bass and perc "share a composition": the same
 camera move is the point of §34; the representative frames were the first, still-forming ones).
 
-Second pass on the final sequence, `job_1a0f2444b7c997dcd`, compared with the first (`critic compare`): still 0
+Second pass, `job_1a0f2444b7c997dcd`, on the sequence just before the last family retune (organic's steadiness term,
+which moves only the pad/bell balance), compared with the first (`critic compare`): still 0
 high; the whole-frame onset response fell from 98% of regions at 12% of mean luma to 94% at 9%; the bass's
 high-frequency motion share from 28% to 13%; perc jitter from 0.18 to 0.06. The perc's "camera shake" remains
 (its blade bursts fill much of the frame, which the global-motion estimate reads as camera motion), and three low
@@ -240,6 +244,16 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
   and spins are `time.seconds` rotation routes (which rebuild the instance cloud per frame, cheap for these nodes,
   and are held inside the +-360 degree parameter range for 31.5 s).
 - Interpreter parameters clamp silently: `bias` is +-4 and `gain` +-16, so a mapping authored with bias -9 runs at -4.
+- **The sky's lighting cube is rebuilt every frame.** The world palettes drive `env/sky/zenithColor`,
+  `horizonColor` and `haze` through slow chains, which never quite settle, and the renderer rebuilds the procedural
+  sky (a 1024 cube with prefiltered mips) whenever a sky value moves. Measured by A/B on 10 s of the pad at 1080p:
+  38.5 s with the 25 sky routes, 32.4 s without, so about 20 ms a frame. The log's "procedural sky built in ~110 ms"
+  includes GPU backpressure and overstates it. For live use, rebuild on a meaningful change (an epsilon on the sky
+  parameters) or amortise the prefilter; the art-side fallback is a fixed sky (the fog, light and grade still carry
+  the palettes).
+- Frame cost of the garden offline at 1920x1080, encoding included: about 108 ms a frame without the sky rebuilds
+  and 128 ms with them (7.6-7.8 fps). No live-rate profile was taken; the engineering agent should profile it before
+  Phase 7.
 - The trace's event columns are always 0 (rows are written after `clearEvents`); watch a `visual.*` that reads them.
 - Emission at note rate reads as a steady glow: a flash every 0.3 s with a 150 ms decay is lit half the time. Keep
   event decays under about 100 ms where notes are dense.
@@ -249,8 +263,9 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 - Engineering: the twist normal fix above (with a render test); Phase 6/7 as planned. When live input arrives, the
   families and gestures here need no change (they read bus signals), but `silence` and the slow tier will define how
   a live world starts and how fast it changes; tune `mass`'s bias and the family sharpness on real material first.
-- Art: the §35 bell sustained section starts half organic (a slow, single bell note genuinely reads soft and warm),
-  which confounds "same timbre, different context" there; the pad version is the clean §35 demonstration.
+- Art: the §35 bell sustained section is still partly organic (0.34: a slow, single bell note genuinely reads soft
+  and warm), which confounds "same timbre, different context" there; the pad version is the clean §35
+  demonstration.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 

@@ -55,11 +55,13 @@ def M(name, inputs, combine="mean", bias=0.0, gain=1.0, curve=1.0, group=None):
 
 
 GARDEN_MAPPINGS = [
-    # families: products are ANDs -- warm AND smooth AND not bright AND not inharmonic is organic; bright-ish AND
+    # families: products are ANDs -- warm AND smooth AND not bright AND not inharmonic AND steady is organic (a
+    # decaying FM bell chord is warm and soft too; only its moving spectrum tells it apart); bright-ish AND
     # inharmonic AND clean is crystalline (the bell, and the morph's bright and resonant stages); chaotic is a mean
     # of roughness (doubled), sharpness and the absence of smoothness, lifted off the floor by bias/gain.
     M("organic", [("sonic.warmth.slow", 1.0, False), ("sonic.smoothness.slow", 1.0, False),
-                  ("sonic.brightness.slow", 1.5, True), ("sonic.inharmonicity.slow", 1.0, True)],
+                  ("sonic.brightness.slow", 1.5, True), ("sonic.inharmonicity.slow", 1.0, True),
+                  ("sonic.stability.slow", 0.5, False)],
       "product", group="family"),
     M("crystalline", [("sonic.brightness.slow", 0.5, False), ("sonic.inharmonicity.slow", 0.5, False),
                       ("sonic.roughness.slow", 2.0, True)], "product", group="family"),
