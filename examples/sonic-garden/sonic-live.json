@@ -2702,7 +2702,7 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/hero/material/baseColor",
-   "amount": 0.16,
+   "amount": 0.048,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -2714,7 +2714,7 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/hero/material/baseColor",
-   "amount": 0.22,
+   "amount": 0.066,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -2726,7 +2726,7 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/hero/material/baseColor",
-   "amount": 0.3,
+   "amount": 0.09,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,

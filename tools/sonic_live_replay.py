@@ -22,8 +22,8 @@ file path's to 1e-6), so a trace of the replay is what the live world reads, les
     python3 tools/sonic_live_replay.py <probe-events.csv> <probe.wav> <out-dir> --render <clip.mp4> [--size 1280x720]
         [--title T]
 
-renders the replay project headless at 30 fps (under tools/gpu-lock.sh: it takes the GPU lock itself), then writes a
-review clip: every frame with a readout strip under it (the synth patch and knobs, MIDI, the sound, the fast
+renders the replay project headless at 30 fps (under tools/gpu-lock.sh: it takes the GPU lock itself, so do not
+call it from inside the lock), then writes a review clip: the render with a readout strip under it (the synth patch and knobs, MIDI, the sound, the fast
 channels and the world's families, from the trace) and the probe's own recording as its soundtrack. The live
 editor's --live-capture shows the same performance through the live path at about 15 fps; this is the full-quality
 picture of it.
@@ -34,7 +34,6 @@ import csv
 import json
 import os
 import struct
-import glob
 import shutil
 import subprocess
 import sys
@@ -130,62 +129,59 @@ def main():
 
 
 def render_clip(a, project, trace, events, rec0):
-    """Renders the replay (30 fps, PNG frames), puts the readout strip under each frame, and muxes the probe's
-    recording under it."""
+    """Renders the replay (30 fps video), draws a readout strip at 10 fps, stacks the two and muxes the probe's
+    recording under them."""
     from PIL import Image, ImageDraw
+    import bisect
     start = (int(next(r for r in events if r["kind"] == "start")["hostNs"]) - rec0) / 1e9
     end = (int(next(r for r in events if r["kind"] == "end")["hostNs"]) - rec0) / 1e9
     t0, t1 = max(0.0, start), end + 0.3
+    w, h = (int(x) for x in a.size.split("x"))
     tmp = tempfile.mkdtemp(prefix="sonic-replay-")
-    frames_dir = os.path.join(tmp, "frames")
-    cmd = [os.path.join(REPO, "tools", "gpu-lock.sh"), AVGEN, "--headless", "--project", project, "--render",
-           frames_dir, "--format", "png", "--range", f"{t0:.3f}:{t1:.3f}", "--size", a.size, "--fps", "30",
-           "--particle-warmup", "120"]
+    video = os.path.join(tmp, "render.mp4")
+    cmd = [os.path.join(REPO, "tools", "gpu-lock.sh"), AVGEN, "--headless", "--project", project, "--render", video,
+           "--range", f"{t0:.3f}:{t1:.3f}", "--size", a.size, "--quality", "92", "--particle-warmup", "120"]
     r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
+    if r.returncode != 0 or not os.path.exists(video):
         sys.stderr.write(r.stdout[-4000:] + r.stderr[-4000:])
-        sys.exit(r.returncode)
+        sys.exit(r.returncode or 1)
     with open(trace) as f:
         tr = list(csv.DictReader(f))
     times = [float(x["time"]) for x in tr]
     synth = sorted(((int(e["hostNs"]) - rec0) / 1e9, e) for e in events if e["kind"] not in ("recording",))
-    pngs = sorted(glob.glob(os.path.join(frames_dir, "*.png")))
-    out_dir = os.path.join(tmp, "strip")
-    os.makedirs(out_dir)
-    import bisect
-    for i, path in enumerate(pngs):
-        t = t0 + i / 30.0
+    strips = os.path.join(tmp, "strip")
+    os.makedirs(strips)
+    n = int((t1 - t0) * 10) + 1
+    for i in range(n):
+        t = t0 + i / 10.0
         k = min(bisect.bisect_left(times, t), len(tr) - 1)
         row = tr[k]
         g = lambda c: float(row.get(c, 0.0) or 0.0)
         ev = [e for tt, e in synth if tt <= t]
         last = ev[-1] if ev else synth[0][1]
         patch = next((e["kind"][6:] for e in reversed(ev) if e["kind"].startswith("patch:")), "-")
-        img = Image.open(path).convert("RGB")
-        w, h = img.size
-        canvas = Image.new("RGB", (w, h + 66), (12, 12, 16))
-        canvas.paste(img, (0, 0))
-        d = ImageDraw.Draw(canvas)
+        img = Image.new("RGB", (w, 66), (12, 12, 16))
+        d = ImageDraw.Draw(img)
         c1, c2 = 10, w // 2 - 20
-        d.text((c1, h + 6), f"{a.title}   t {t - start:5.2f} s", fill=(230, 230, 230))
-        d.text((c1, h + 24), f"synth {patch}: cutoff {float(last['cutoff']):5.0f} Hz  drive {float(last['drive']):4.1f}",
+        d.text((c1, 6), f"{a.title}   t {t - start:5.1f} s", fill=(230, 230, 230))
+        d.text((c1, 24), f"synth {patch}: cutoff {float(last['cutoff']):5.0f} Hz  drive {float(last['drive']):4.1f}",
                fill=(200, 200, 140))
-        d.text((c1, h + 42), f"MIDI held {g('notes.active'):.0f}  pitch {g('notes.pitch'):.2f}  "
-                             f"vel {g('notes.velocity'):.2f}", fill=(140, 200, 240))
-        d.text((c2, h + 6), f"sound: bright {g('sonic.brightness'):.2f}  rough {g('sonic.roughness'):.2f}  "
-                            f"warm {g('sonic.warmth'):.2f}  energy {g('sonic.energy'):.2f}", fill=(240, 170, 140))
-        d.text((c2, h + 24), f"fast: glow {g('visual.glow'):.2f}  grit {g('visual.grit'):.2f}  "
-                             f"figure {g('visual.figure'):.2f}  stack {g('visual.stack'):.2f}", fill=(240, 220, 150))
-        d.text((c2, h + 42), f"world: organic {g('visual.organic'):.2f}  glass {g('visual.crystalline'):.2f}  "
-                             f"heavy {g('visual.tectonic'):.2f}  strike {g('visual.impact'):.2f}",
-               fill=(170, 240, 170))
-        canvas.save(os.path.join(out_dir, f"{i:06d}.png"))
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "30", "-i", os.path.join(out_dir, "%06d.png"),
-                    "-ss", f"{t0:.4f}", "-i", a.wav, "-map", "0:v", "-map", "1:a", "-shortest",
-                    "-vf", "format=yuv420p", "-c:v", "libx264", "-crf", "19", "-c:a", "aac", "-b:a", "160k",
-                    a.render], check=True)
+        d.text((c1, 42), f"MIDI held {g('notes.active'):.0f}  pitch {g('notes.pitch'):.2f}  "
+                         f"vel {g('notes.velocity'):.2f}", fill=(140, 200, 240))
+        d.text((c2, 6), f"sound: bright {g('sonic.brightness'):.2f}  rough {g('sonic.roughness'):.2f}  "
+                        f"warm {g('sonic.warmth'):.2f}  energy {g('sonic.energy'):.2f}", fill=(240, 170, 140))
+        d.text((c2, 24), f"fast: glow {g('visual.glow'):.2f}  grit {g('visual.grit'):.2f}  "
+                         f"figure {g('visual.figure'):.2f}  stack {g('visual.stack'):.2f}", fill=(240, 220, 150))
+        d.text((c2, 42), f"world: organic {g('visual.organic'):.2f}  glass {g('visual.crystalline'):.2f}  "
+                         f"heavy {g('visual.tectonic'):.2f}  strike {g('visual.impact'):.2f}", fill=(170, 240, 170))
+        img.save(os.path.join(strips, f"{i:06d}.png"))
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video, "-framerate", "10", "-i",
+                    os.path.join(strips, "%06d.png"), "-ss", f"{t0:.4f}", "-i", a.wav,
+                    "-filter_complex", "[1:v]fps=30[s];[0:v][s]vstack=inputs=2,format=yuv420p[v]",
+                    "-map", "[v]", "-map", "2:a", "-shortest", "-c:v", "libx264", "-crf", "19", "-c:a", "aac",
+                    "-b:a", "160k", a.render], check=True)
     shutil.rmtree(tmp, ignore_errors=True)
-    print(f"wrote {a.render} ({len(pngs)} frames, {t1 - t0:.1f} s)")
+    print(f"wrote {a.render} ({t1 - t0:.1f} s)")
 
 
 if __name__ == "__main__":

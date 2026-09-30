@@ -232,6 +232,10 @@ def retime(route):
         # the master's +0.25 lit the observatory's floor into the largest pale area of the held frame and the
         # crystals' faces into grey cards; dimmer, the glass holds its light at its edges and the rings carry it
         route["amount"] = -0.5
+    if s == "visual.crystalline" and t == "procedural/hero/material/baseColor":
+        # the core inside the gem was pale blue-grey (0.16, 0.22, 0.3); between the glass and the heavy world (the
+        # top of a filter sweep, a held drive) that turned the heavy world's dark fissured mass into a pale rock
+        route["amount"] = round(route["amount"] * 0.3, 4)
     if s == "visual.crystalline" and t == RIG + "/ambientColor":
         route["amount"] = round(route["amount"] * 0.6, 4)  # (and its ambient: the floor stays dark stone)
     if s == "visual.crystalline" and t == "post/bloom/intensity":
