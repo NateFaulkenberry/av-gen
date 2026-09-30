@@ -1,0 +1,296 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Geometry Explosion",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   -3.8,
+   0.0
+  ],
+  "target": [
+   40,
+   1.0,
+   0
+  ],
+  "fov": 70.0,
+  "orbitSpeed": 0.0,
+  "distance": 22.0,
+  "height": 6.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "fogColor": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "lightRig": "space-art.rig.json",
+  "volumeDensity": 0.024,
+  "volumeAbsorption": 1.0,
+  "volumeMaxDistance": 140.0,
+  "volumeScattering": 1.0
+ },
+ "nodes": [
+  {
+   "name": "space",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "plane",
+        "axis": [
+         0,
+         1,
+         0
+        ],
+        "offset": -7.0
+       },
+       {
+        "kind": "twist",
+        "amount": 0.0,
+        "name": "roll",
+        "children": [
+         {
+          "kind": "polarRepeat",
+          "count": 0,
+          "name": "radial",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             22,
+             -7.0,
+             0
+            ],
+            "name": "gateAt",
+            "children": [
+             {
+              "kind": "repeat",
+              "size": [
+               0,
+               0,
+               0
+              ],
+              "count": 2,
+              "name": "rows",
+              "children": [
+               {
+                "kind": "recurse",
+                "count": 0,
+                "scale": 1.7,
+                "translation": [
+                 0,
+                 0,
+                 9
+                ],
+                "rotation": [
+                 0,
+                 0,
+                 0
+                ],
+                "size": [
+                 0,
+                 0,
+                 1
+                ],
+                "name": "nest",
+                "children": [
+                 {
+                  "kind": "union",
+                  "name": "gate",
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0,
+                     6,
+                     4.5
+                    ],
+                    "children": [
+                     {
+                      "kind": "roundedBox",
+                      "size": [
+                       0.8,
+                       6,
+                       0.8
+                      ],
+                      "rounding": 0.1
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0,
+                     6,
+                     -4.5
+                    ],
+                    "children": [
+                     {
+                      "kind": "roundedBox",
+                      "size": [
+                       0.8,
+                       6,
+                       0.8
+                      ],
+                      "rounding": 0.1
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0,
+                     12,
+                     0
+                    ],
+                    "children": [
+                     {
+                      "kind": "intersection",
+                      "children": [
+                       {
+                        "kind": "rotate",
+                        "rotation": [
+                         0,
+                         0,
+                         90
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 4.5,
+                          "rounding": 0.55
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "plane",
+                        "axis": [
+                         0,
+                         -1,
+                         0
+                        ],
+                        "offset": 0.0
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.014,
+      0.015,
+      0.026
+     ],
+     "emissiveColor": [
+      0.15,
+      1.0,
+      0.55
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.2
+    },
+    "renderMode": "raymarch",
+    "boundsMin": [
+     -2000,
+     -400,
+     -2000
+    ],
+    "boundsMax": [
+     2000,
+     400,
+     2000
+    ],
+    "look": {
+     "aoStrength": 0.8,
+     "aoDistance": 2.0,
+     "edgeIntensity": 2.6,
+     "edgeWidth": 0.05,
+     "edgeColor": [
+      0.2,
+      0.7,
+      1.0
+     ],
+     "shadowStrength": 0.0,
+     "shadowSoftness": 10.0,
+     "shadowDirection": [
+      0.35,
+      1.0,
+      0.25
+     ],
+     "shadowSteps": 32
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "compile": true,
+    "maxSteps": 200,
+    "epsilon": 0.0012,
+    "stepScale": 0.65,
+    "normalEpsilon": 0.004,
+    "maxDistance": 260.0
+   }
+  }
+ ],
+ "lights": [
+  {
+   "name": "gateLight",
+   "type": "point",
+   "position": [
+    22,
+    2.0,
+    0
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 90.0,
+   "range": 26.0,
+   "castsShadow": false
+  },
+  {
+   "name": "far",
+   "type": "point",
+   "position": [
+    60,
+    5.0,
+    0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 60.0,
+   "range": 30.0,
+   "castsShadow": false
+  }
+ ]
+}

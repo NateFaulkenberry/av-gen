@@ -313,7 +313,13 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     shaded.emission = shaded.emission * visibility;
     if (sdf.look0.z > 0.0) {
         let edge = sdfEdge(offset, count, pL, time, object.model, sdf.look0.w, nL);
-        let glow = sdf.look1.xyz * (sdf.look0.z * edge);
+        // ADR-1004: the edge light sits on the surface, so the air between the eye and the surface
+        // dims it like the rest of the shaded colour. `applyFog` is `mix(fog, c, f)`, so its values at
+        // c = 1 and c = 0 differ by exactly the transmittance `f`, whatever fog model is active. Unfogged,
+        // a repeated structure's edges stayed at full strength to the march's end, which read as a flat
+        // wireframe with no depth and aliased into moire where the edges shrank below a pixel.
+        let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
+        let glow = sdf.look1.xyz * (sdf.look0.z * edge * transmittance);
         shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
         shaded.emission = shaded.emission + glow;
     }

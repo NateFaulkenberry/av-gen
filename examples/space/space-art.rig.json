@@ -1,0 +1,21 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "SpaceArt",
+ "description": "Procedural Space POC, the art presets. The architecture is darker than its air: a restrained cold backlight from the far end of the space (a sheen that runs to the vanishing point), a faint violet front rim so forms read, and a green under-light that touches only undersides (vault soffits, lintels, ribs) -- the restrained green of the brief. No shadow maps: raymarched SDFs do not reach them, and local shading is the SDF look block's AO.",
+ "keyIntensity": 1.0,
+ "ambientIntensity": 0.035,
+ "ambientColor": [0.30, 0.32, 0.70],
+ "ambientTemperature": 12000,
+ "lights": [
+  {"name": "key", "type": "directional", "role": "key", "azimuth": 90.0, "elevation": 32.0, "distance": 2.0,
+   "intensity": 0.45, "color": [0.55, 0.66, 1.0], "temperature": 9500, "castsShadow": false, "volumetric": 0.0,
+   "followCamera": false},
+  {"name": "rim", "type": "directional", "role": "rim", "azimuth": 270.0, "elevation": 22.0, "distance": 2.0,
+   "intensity": 0.22, "color": [0.62, 0.45, 1.0], "temperature": 11000, "castsShadow": false, "volumetric": 0.0,
+   "followCamera": false},
+  {"name": "accent", "type": "directional", "role": "fill", "azimuth": 180.0, "elevation": -35.0, "distance": 2.0,
+   "intensity": 0.16, "color": [0.25, 1.0, 0.55], "temperature": 8000, "castsShadow": false, "volumetric": 0.0,
+   "followCamera": false}
+ ]
+}

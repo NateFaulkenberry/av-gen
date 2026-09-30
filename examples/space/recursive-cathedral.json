@@ -1,0 +1,104 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "recursive-cathedral.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.015
+ },
+ "sources": [
+  {
+   "kind": "random",
+   "name": "bar",
+   "settings": {
+    "trigger": "music.bar",
+    "seed": 1005
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "audio.highMid",
+   "target": "sdf/space/node/nest/count",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/nest/scale",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/nest/rotation",
+   "amount": 22.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 700,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  }
+ ],
+ "presets": [],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 30.0
+ }
+}

@@ -1,0 +1,1365 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "showcase.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.015,
+  "sdf/space/node/state/amount": 0.0,
+  "sdf/space/node/hroll/amount": 0.0,
+  "sdf/space/node/hbend/amount": 0.0,
+  "sdf/space/node/hfold/offset": -110.0,
+  "sdf/space/node/pierAt/translation": [
+   0.0,
+   0.5,
+   7.0
+  ],
+  "sdf/space/node/baseAt/translation": [
+   0.0,
+   -6.65,
+   7.0
+  ],
+  "sdf/space/node/impostAt/translation": [
+   0.0,
+   7.65,
+   7.0
+  ],
+  "sdf/space/node/vaultBore/radius": 7.0,
+  "sdf/space/node/rib/radius": 7.0,
+  "sdf/space/node/pier/rounding": 0.1,
+  "sdf/space/node/piers/size": [
+   8.0,
+   0.0,
+   0.0
+  ],
+  "sdf/space/node/bases/size": [
+   8.0,
+   0.0,
+   0.0
+  ],
+  "sdf/space/node/imposts/size": [
+   8.0,
+   0.0,
+   0.0
+  ],
+  "sdf/space/node/ribs/size": [
+   8.0,
+   0.0,
+   0.0
+  ],
+  "sdf/space/node/nest/count": 0,
+  "sdf/space/node/lradial/count": 0,
+  "sdf/space/node/ltwist/amount": 0.0,
+  "macros/rules": 0.0,
+  "scene/volumeDensity": 0.028,
+  "camera/position": [
+   0.0,
+   -3.8,
+   0.0
+  ],
+  "camera/target": [
+   40.0,
+   -0.20000000000000018,
+   0.0
+  ],
+  "lights/heart/intensity": 0.0,
+  "sdf/space/look/edge/intensity": 2.6,
+  "camera/fov": 68.0,
+  "sdf/space/node/hfold/axis": [
+   -0.7500000000000001,
+   0.49999999999999994,
+   0.4330127018922193
+  ],
+  "sources/drift/rate": 0.004418912947414936,
+  "sources/drift/phase": 0.0
+ },
+ "sources": [
+  {
+   "kind": "macro",
+   "name": "macros",
+   "settings": {
+    "knobs": [
+     {
+      "name": "rules",
+      "default": 0.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "random",
+   "name": "bar",
+   "settings": {
+    "trigger": "music.bar",
+    "seed": 1011
+   }
+  },
+  {
+   "kind": "random",
+   "name": "phrase",
+   "settings": {
+    "trigger": "music.phrase",
+    "seed": 1012
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "drift",
+   "settings": {
+    "shape": "saw"
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/pierAt/translation",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/baseAt/translation",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/impostAt/translation",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/vaultBore/radius",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/rib/radius",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/piers/size",
+   "amount": -1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/bases/size",
+   "amount": -1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/imposts/size",
+   "amount": -1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/ribs/size",
+   "amount": -1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.lowMid",
+   "target": "sdf/space/node/hbend/amount",
+   "amount": 0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 7000
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "audio.energy",
+   "target": "sdf/space/node/hroll/amount",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 8000
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.phrase",
+   "target": "sdf/space/node/pier/rounding",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 900,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/hfold/axis",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 900,
+    "decayMs": 900
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "audio.highMid",
+   "target": "sdf/space/node/nest/count",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 5000
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/nest/scale",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/nest/rotation",
+   "amount": 22.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 700,
+    "decayMs": 700
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/lattice/size",
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "sdf/space/node/ltwist/amount",
+   "amount": 0.015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 7000
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.phrase",
+   "target": "sdf/space/node/lradial/count",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "lights/nave0/intensity",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "lights/nave1/intensity",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "lights/nave2/intensity",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "lights/nave3/intensity",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "lights/nave4/intensity",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "lfo.drift",
+   "target": "camera/position",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "lfo.drift",
+   "target": "camera/target",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  }
+ ],
+ "presets": [
+  {
+   "name": "show/normal",
+   "values": {
+    "sdf/space/node/state/amount": [
+     0.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.0
+    ],
+    "scene/volumeDensity": [
+     0.028
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     -0.20000000000000018,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  },
+  {
+   "name": "show/strange",
+   "values": {
+    "sdf/space/node/state/amount": [
+     0.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.006
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.004
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.55
+    ],
+    "scene/volumeDensity": [
+     0.028
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     -0.20000000000000018,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  },
+  {
+   "name": "show/folded",
+   "values": {
+    "sdf/space/node/state/amount": [
+     0.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.004
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.005
+    ],
+    "sdf/space/node/hfold/offset": [
+     -20.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.8
+    ],
+    "scene/volumeDensity": [
+     0.028
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     -0.20000000000000018,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     12.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  },
+  {
+   "name": "show/cathedral",
+   "values": {
+    "sdf/space/node/state/amount": [
+     1.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.004
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.005
+    ],
+    "sdf/space/node/hfold/offset": [
+     -20.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     4
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.8
+    ],
+    "scene/volumeDensity": [
+     0.026
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     22.0,
+     -1.5,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     30.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  },
+  {
+   "name": "show/lattice",
+   "values": {
+    "sdf/space/node/state/amount": [
+     2.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     4
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.3
+    ],
+    "scene/volumeDensity": [
+     0.032
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     1.0,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     1.3
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  },
+  {
+   "name": "show/abstraction",
+   "values": {
+    "sdf/space/node/state/amount": [
+     2.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     4
+    ],
+    "sdf/space/node/lradial/count": [
+     6
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.025
+    ],
+    "macros/rules": [
+     1.0
+    ],
+    "scene/volumeDensity": [
+     0.042
+    ],
+    "camera/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     0.0,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     1.5
+    ],
+    "camera/fov": [
+     46.0
+    ]
+   }
+  },
+  {
+   "name": "show/reforming",
+   "values": {
+    "sdf/space/node/state/amount": [
+     1.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     7.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     7.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     7.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     7.0
+    ],
+    "sdf/space/node/rib/radius": [
+     7.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     8.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     5
+    ],
+    "sdf/space/node/lradial/count": [
+     6
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.025
+    ],
+    "macros/rules": [
+     0.6
+    ],
+    "scene/volumeDensity": [
+     0.026
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     22.0,
+     -1.5,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     30.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     60.0
+    ]
+   }
+  },
+  {
+   "name": "show/reformed",
+   "values": {
+    "sdf/space/node/state/amount": [
+     0.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hbend/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     9.0
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     9.0
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     9.0
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     9.0
+    ],
+    "sdf/space/node/rib/radius": [
+     9.0
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.8
+    ],
+    "sdf/space/node/piers/size": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/lradial/count": [
+     0
+    ],
+    "sdf/space/node/ltwist/amount": [
+     0.0
+    ],
+    "macros/rules": [
+     0.3
+    ],
+    "scene/volumeDensity": [
+     0.028
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     -0.20000000000000018,
+     0.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "camera/fov": [
+     68.0
+    ]
+   }
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 226.3
+ },
+ "states": {
+  "initial": "Normal",
+  "states": [
+   {
+    "name": "Normal",
+    "preset": "show/normal"
+   },
+   {
+    "name": "Strange",
+    "preset": "show/strange",
+    "transition": {
+     "seconds": 8.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 32,
+      "from": "Normal"
+     }
+    ]
+   },
+   {
+    "name": "Folded",
+    "preset": "show/folded",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 48,
+      "from": "Strange"
+     }
+    ]
+   },
+   {
+    "name": "Cathedral",
+    "preset": "show/cathedral",
+    "transition": {
+     "seconds": 8.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 64,
+      "from": "Folded"
+     }
+    ]
+   },
+   {
+    "name": "Lattice",
+    "preset": "show/lattice",
+    "transition": {
+     "seconds": 5.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 80,
+      "from": "Cathedral"
+     }
+    ]
+   },
+   {
+    "name": "Abstraction",
+    "preset": "show/abstraction",
+    "transition": {
+     "seconds": 2.0,
+     "easing": "easeIn",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 88,
+      "from": "Lattice"
+     },
+     {
+      "kind": "signal",
+      "signal": "music.drop",
+      "threshold": 0.5,
+      "from": "Lattice"
+     }
+    ]
+   },
+   {
+    "name": "Reforming",
+    "preset": "show/reforming",
+    "transition": {
+     "seconds": 8.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 104,
+      "from": "Abstraction"
+     }
+    ]
+   },
+   {
+    "name": "Reformed",
+    "preset": "show/reformed",
+    "transition": {
+     "seconds": 8.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 112,
+      "from": "Reforming"
+     }
+    ]
+   }
+  ]
+ }
+}

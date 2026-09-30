@@ -1,0 +1,425 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Radial Architecture",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.25,
+   -5.3,
+   0.15
+  ],
+  "target": [
+   0.6,
+   63.0,
+   0.35
+  ],
+  "fov": 84.0,
+  "orbitSpeed": 0.0,
+  "distance": 22.0,
+  "height": 6.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "fogColor": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "lightRig": "space-art.rig.json",
+  "volumeDensity": 0.022,
+  "volumeAbsorption": 1.0,
+  "volumeMaxDistance": 140.0,
+  "volumeScattering": 1.0
+ },
+ "nodes": [
+  {
+   "name": "space",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "rotate",
+      "rotation": [
+       0,
+       0,
+       0
+      ],
+      "name": "turn",
+      "children": [
+       {
+        "kind": "twist",
+        "amount": 0.0,
+        "name": "spiral",
+        "children": [
+         {
+          "kind": "union",
+          "name": "rotunda",
+          "children": [
+           {
+            "kind": "plane",
+            "axis": [
+             0,
+             1,
+             0
+            ],
+            "offset": -7.0
+           },
+           {
+            "kind": "polarRepeat",
+            "count": 12,
+            "name": "ringA",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               12,
+               2.0,
+               0
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.6,
+                 9,
+                 0.6
+                ],
+                "rounding": 0.1
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0,
+             11.0,
+             0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 12,
+              "rounding": 0.5
+             }
+            ]
+           },
+           {
+            "kind": "polarRepeat",
+            "count": 24,
+            "name": "ringB",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               24,
+               6.0,
+               0
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.9,
+                 13,
+                 0.9
+                ],
+                "rounding": 0.12
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0,
+             19.0,
+             0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 24,
+              "rounding": 0.7
+             }
+            ]
+           },
+           {
+            "kind": "polarRepeat",
+            "count": 24,
+            "name": "domeRibs",
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0,
+                 19.0,
+                 0
+                ],
+                "children": [
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   90,
+                   0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "torus",
+                    "radius": 24,
+                    "rounding": 0.45
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "plane",
+                "axis": [
+                 0,
+                 -1,
+                 0
+                ],
+                "offset": -19.0
+               },
+               {
+                "kind": "plane",
+                "axis": [
+                 -1,
+                 0,
+                 0
+                ],
+                "offset": 0.0
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "polarRepeat",
+            "count": 16,
+            "name": "chapels",
+            "children": [
+             {
+              "kind": "difference",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 38,
+                 5.0,
+                 0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   8,
+                   12,
+                   0.5
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 38,
+                 -2.0,
+                 0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.8,
+                   5,
+                   1.0
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.014,
+      0.015,
+      0.026
+     ],
+     "emissiveColor": [
+      0.15,
+      1.0,
+      0.55
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.2
+    },
+    "renderMode": "raymarch",
+    "boundsMin": [
+     -2000,
+     -400,
+     -2000
+    ],
+    "boundsMax": [
+     2000,
+     400,
+     2000
+    ],
+    "look": {
+     "aoStrength": 0.8,
+     "aoDistance": 2.0,
+     "edgeIntensity": 2.6,
+     "edgeWidth": 0.05,
+     "edgeColor": [
+      0.2,
+      0.7,
+      1.0
+     ],
+     "shadowStrength": 0.0,
+     "shadowSoftness": 10.0,
+     "shadowDirection": [
+      0.35,
+      1.0,
+      0.25
+     ],
+     "shadowSteps": 32
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "compile": true,
+    "maxSteps": 160,
+    "epsilon": 0.0012,
+    "stepScale": 0.7,
+    "normalEpsilon": 0.004,
+    "maxDistance": 260.0
+   }
+  }
+ ],
+ "lights": [
+  {
+   "name": "oculus",
+   "type": "point",
+   "position": [
+    0,
+    37.0,
+    0
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 300.0,
+   "range": 60.0,
+   "castsShadow": false
+  },
+  {
+   "name": "core",
+   "type": "point",
+   "position": [
+    0,
+    -1.0,
+    0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 25.0,
+   "range": 14.0,
+   "castsShadow": false
+  },
+  {
+   "name": "ring0",
+   "type": "point",
+   "position": [
+    12.727922061357857,
+    13.0,
+    12.727922061357855
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 40.0,
+   "range": 16.0,
+   "castsShadow": false
+  },
+  {
+   "name": "ring1",
+   "type": "point",
+   "position": [
+    -12.727922061357855,
+    13.0,
+    12.727922061357857
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 40.0,
+   "range": 16.0,
+   "castsShadow": false
+  },
+  {
+   "name": "ring2",
+   "type": "point",
+   "position": [
+    -12.727922061357859,
+    13.0,
+    -12.727922061357855
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 40.0,
+   "range": 16.0,
+   "castsShadow": false
+  },
+  {
+   "name": "ring3",
+   "type": "point",
+   "position": [
+    12.727922061357852,
+    13.0,
+    -12.727922061357859
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 40.0,
+   "range": 16.0,
+   "castsShadow": false
+  }
+ ]
+}
