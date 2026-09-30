@@ -30,7 +30,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | second brief PARTS 2-7 (live AA) | done (2026-09-30) | `AA-RESEARCH.md`, ADR-1024; see "Live anti-aliasing" below |
 | second brief PART 8 (merge prep) | see "Live anti-aliasing" below | |
 | second brief PARTS 9-14 (integration, live MIDI, live audio, sync, UI, demo plumbing) | done (2026-09-30), ADR-1025 | see "Live input" below; the owner's hands-on test is `LIVE-QUICKSTART.md` |
-| second brief PARTS 15-16 (live demo art, live art direction) | next: art agent | the demo project exists (`examples/sonic-garden/sonic-live.json`), untuned for live play |
+| second brief PARTS 15-16 (live demo art, live art direction) | in progress (art agent, 2026-09-30) | see "Live art (PARTS 15-16)" below; `tools/sonic_live_project.py` writes the live tuning |
 | second brief PART 22 (the hardware test) | the owner's | `LIVE-QUICKSTART.md` |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
@@ -666,6 +666,25 @@ audio via BlackHole.
 - device-absent;
 - `sonic.live` projects;
 - a real CoreMIDI source (`[device]`).
+
+## Live art (art agent, 2026-09-30, `01-brief-live.md` PARTS 15-16) -- IN PROGRESS
+
+### Resume here (live art)
+
+- Commits on `proto/sonic-garden`: `4dcb65c5` (first pass: timing, families, glow/grit, live scene, probe patches,
+  replay tool), `cbb5bd3d` (the filter seen in the garden, waiting world, matte observatory floor, seed, hold).
+- **Everything is data written by `tools/sonic_live_project.py`** (the live project AND its own scene,
+  `examples/sonic-garden/sonic-live.scene.json`). The master and its variants are untouched. Run it after any change
+  to the master.
+- **Tuning loop without a GPU:** record a probe scenario once
+  (`build/release/tools/avgen_sonic_probe <scenario> --out e.csv --wav a.wav`, into BlackHole, no app needed), then
+  `python3 tools/sonic_live_replay.py e.csv a.wav <dir> --trace` makes a file project of it and traces every signal
+  (the live and file paths compute the same character, ADR-1025). The replay project also renders headless under
+  `tools/gpu-lock.sh` for stills and full-quality clips.
+- Probe scenarios for PART 15: `low`, `high`, `chords`, `arp`, `distorted`, `sweep`, `drive`, plus `patches` (one
+  phrase through pad, pluck, lead, FM bell, distorted bass, noise perc), `drivechord` and `play` (~2 min).
+- Next: live-captured clips per test + play-through, the notes, the quickstart's "what to try", the preview-tier
+  frame cost, `[sonic]` tests.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
