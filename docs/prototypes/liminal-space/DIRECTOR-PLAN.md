@@ -866,16 +866,17 @@ demonstrate something the renderer can do?* Then check it against these:
 
 This is a sketch for the implementation handoff; the engineer's design is `ENGINEERING.md`.
 
-- **Five cell designs**, built with the vocabulary library (room, corridor, doorway, stairway, landing,
-  platform):
+- **Six cell designs**, built with the vocabulary library (`tools/liminal_sdf.py`: `room`, `corridor`,
+  `doorway`, `stairway`, `landing`, `platform`, `screw`, `breathing`, `morph`):
 
   | cell | used in | repetition |
   |---|---|---|
-  | **A. The first corridor** | intro, the loop | a translation screw: the corridor repeats, and the end doorway opens onto its own start |
-  | **B. The great hall** | dance, "let it go" | its stairhead above the void is part of it |
-  | **C. The enfilade** | verse 1, the bridge, and the tiny room that grows at "feel it grow" | a translation screw by one room, about 9.7 m |
-  | **D. The stairwell** | verse 2's crossing flights, and the Penrose loop of bars 84-91 | a helix screw, n = 4 |
-  | **E. The open** | the release | a rising translation screw (the endless stair up), the separated fragments, the sky |
+  | **A. The first corridor** | intro, the loop (bars 76-83) | a vertical screw: every storey is the same corridor, reached by its side stairwell |
+  | **B. The great hall** | the end of the intro, dance | none |
+  | **C. The enfilade** | verse 1, the bridge, the room that grows | a translation screw by one room (9.7 m) |
+  | **D. The void stairwell** | "let it go", the rebuild, verse 2 | none (a deep shaft; fog below) |
+  | **P. The Penrose stairwell** | "is that all?" (bars 84-91) | a helix screw, n = 4 |
+  | **E. The open** | the release to the end | a rising translation screw (the endless stair up) |
 
 - **Chapters.** Each section's journey runs in one cell. Swaps between cells happen at the light thresholds in §9.
 - **Continuous change inside a chapter** is timeline curves on named dimensions: ceiling height, room size, wall
@@ -888,6 +889,68 @@ This is a sketch for the implementation handoff; the engineer's design is `ENGIN
   colours, and the grade. The hex values in §5 are sRGB. The palette block's states are linear RGB (ADR-1043), so
   they are converted when the project is generated.
 
+### 12a. The cell sheet (starting dimensions)
+
+These are metres, +X forward and +Y up. They are starting points to be judged on screen, sized from the camera
+speeds and the phrase lengths so that thresholds fall on phrase downbeats.
+
+- **A. The first corridor.**
+  - **The corridor:** 32 m long, interior 3.2 m wide and 5.0 m tall (too tall).
+    - Tall window openings on -Z: 1.2 by 3.4 m, sill 0.9 m, every 4 m.
+    - Side doorways on +Z into unlit rooms, every 8 m.
+    - A skirting line, and the sun patch on the floor at x ≈ 6.
+    - At the +X end, **the beacon doorway**: 1.4 by 3.2 m, a warm light in a small room behind it that is never
+      entered.
+  - **The side stairwell** at x ≈ 12: two flights of 15 risers (0.18 by 0.30) with a half-landing, rising 5.4 m
+    to a doorway at the **start** of the same corridor one storey up (the screw T = (0, 5.4, 0)).
+  - **The loop:**
+    - The first pass runs from about 29 m to 12 m before the beacon doorway, while the field of view opens from
+      45° to 90° (the doorway holds its size).
+    - The second pass returns to the start by the side stairwell.
+    - `corridorWidth` and `corridorHeight` narrow by about 8 % each pass.
+- **B. The great hall.**
+  - **The room:** interior 40 m long by 24 m wide by 20 m tall.
+  - **Entry:** the intro's wide stair arrives on a **landing on the -X wall at y = 12**. A long stair on the axis
+    descends to the floor: 67 risers, about 20 m of run.
+  - **The high windows:** on ±Z at y 12-18, carrying the shafts.
+  - **The rose wall:** the +Z wall, accent material.
+  - **Crossing flights:** two free-standing flights and three landings (`platform`) at 4-10 m.
+  - **The figure:** on a landing at about (22, 6, 7).
+  - **The beacon:** a lit doorway high in the +X wall (y = 10), with a floor doorway beneath it, the exit to C.
+- **C. The enfilade.**
+  - **The rooms:** each 9.7 m long, 6 m wide and 4 m tall, joined by aligned doorways 1.2 by 3.0 m, so a
+    threshold falls every 4 bars at 1.1 m/s.
+  - **Lamps and windows:** one lamp pool per room, and windows on -Z onto dusk fog.
+  - **A parallel enfilade** is reached by the side door at bar 35.
+  - **Proportion drift:** `roomHeight` and `roomWidth` drift ±8 % on slow curves.
+  - **The tiny room:** 3 by 3 by 3 m, a named `room` whose `size` and `At` translation are keyed from 3 m to 30 m
+    over bars 67-73, floor fixed. Its far wall has a named opening whose width is keyed 0 → 2 m from bar 70, onto
+    the sky.
+- **D. The void stairwell.**
+  - **The shaft:** a square shaft 20 by 20 m, closed below by fog about 60 m down.
+  - **The stairhead:** at the top, on a landing looking over the void, where the figure stands.
+  - **The descent:** two flights go down from it, and the camera takes the left one.
+  - **The rebuild's passage:** 1.4 m wide and 2.6 m tall, off a lower landing (the film's only low ceiling).
+  - **Verse 2:** the passage opens back into the shaft among four to six flights at different levels and angles,
+    bridged landings, and doorways at every height.
+  - **The impossible window:** one window looks into C's rooms.
+  - **Level drift:** flight levels are named and drift ±0.5 m.
+- **P. The Penrose stairwell.**
+  - **The screw:** a helix, n = 4. Each cell is one flight of 12 risers along a side of a square well 8 m across,
+    plus a corner landing, rising 2.2 m, so four flights climb 8.8 m and return above the start.
+  - **The cracks:** seams between wall planes, with keyed widths of 0-0.3 m, sky light behind them.
+  - **The landing's doorway:** where the loop closes, carrying the beacon light at bar 90.
+- **E. The open.**
+  - **The first landing:** the stairwell's four wall planes stand around it on named translations. They separate
+    outwards by 0 → 12 m over bars 92-95, and the ceiling lifts away.
+  - **The long stair:** up into the air, on a rising screw T = (6, 3.6, 0).
+  - **The free-standing parts:** doorways (frames only), landings, flights and wall planes, 10-20 m either side of
+    the path, with the fog pushed out to 300 m or more.
+  - **The top landing:** with the figure, at bar 108.
+  - **The first corridor below:** a roofless copy, 40-60 m down.
+  - **The alignment:** four to six planes and frames on named translations that converge by bar 113 into one
+    doorway framing the sun, seen from the top landing only.
+
 ## 13. Needs from engineering, ranked
 
 Checked against the engineer's plan in `ENGINEERING.md` (a: `stairs`/`screw`/`warp` and the vocabulary library;
@@ -897,7 +960,7 @@ item.
 
 | rank | need | why the film needs it | status |
 |---|---|---|---|
-| 1 | **Chapters: a sequence of cells along one continuous journey.** Switch the active world (cell design, screw and path) at a scheduled time, with the camera's pose continuous across the swap, at a threshold whose geometry is identical in both cells. It can be several SDF objects with timeline-keyed visibility, or a fast `morph` inside the threshold. | Five spaces over four minutes; a single cell for 254 s cannot tell this story. | **new** (the plan has one screw world plus `morph`) |
+| 1 | **Chapters: a sequence of cells along one continuous journey.** Switch the active world (cell design, screw and path) at a scheduled time, with the camera's pose continuous across the swap, at a threshold whose geometry is identical in both cells. It can be several SDF objects with timeline-keyed visibility, or a fast `morph` inside the threshold. | Six spaces over four minutes; a single cell for 254 s cannot tell this story. | **new** (the plan has one screw world plus `morph`) |
 | 2 | **The journey camera** with keyable distance (holds, hesitation), yaw, pitch, lookAhead, sway, bob, height, `fov`, and a collision guard | The wanderer | covered (c); `fov` needs confirming as keyable during a journey |
 | 3 | **A look-at target blend**: aim toward a world point (the beacon) with a keyable weight, on top of the path-relative look | The gaze easing toward the beacon when the voice sings; the dolly zoom held on the far doorway | **new** (small) |
 | 4 | **More than one material in a world**: at least plaster, floor, accent planes, and an emissive beacon surface, with separate palette bindings. A per-node material ID, or the vocabulary library splitting a cell into several SDF objects by role. | Rose planes (K1, K10), floor bands, the glowing beacon; one material per object makes every surface the same colour | **new**; a clarification of a and d |
@@ -907,7 +970,7 @@ item.
 | 8 | **`spring` and `integrate`** chain stages | Breathing, pace, no step functions anywhere | covered (b) |
 | 9 | **Continuous structural transforms as parameters**: wall-plane separation offsets, ceiling removal (height to infinity, or a lift-away offset), room growth (a room's size animating 3 m → 30 m while the path stays clear), seams opening between wall planes | "Feel it grow", the cracks, the release unfolding | largely authoring on named nodes; confirm the collision guard handles a room growing around the camera |
 | 10 | **A sky and daylight**: a sky gradient (zenith and horizon) and a sun direction and colour, keyable, withheld until the release | The release's daylight, and the glimpse at "feel it grow" | **new or clarify** (does the SDF look have a sky beyond the fog colour?) |
-| 11 | **The beacon light**: a warm point or area light in a doorway, scattering into the volumetric fog, with keyable colour, intensity and radius (the spreading light at "feel it grow") | Motif 1 and the growth of light | probably existing lights; confirm volumetric scattering with the new fog |
+| 11 | **The beacon light and the sun patch**: a warm point or area light in a doorway, scattering into the volumetric fog, with keyable colour, intensity and radius (the spreading light at "feel it grow"); and a rectangle of warm light on a floor (an emissive floor quad, or a spot with a window-shaped cookie) | Motifs 1 and 4, and the growth of light | probably existing lights; confirm volumetric scattering with the new fog |
 | 12 | **The figure**: a static human silhouette, 1.75 m, standing and facing away, placeable at a world point or a journey anchor, with keyable visibility (it vanishes only while occluded). Preferred: a simple **SDF scale figure** in the vocabulary library (head, torso, legs, arms at the sides), which takes the palette and needs no licensed asset. Fallback: a plain astronaut GLB, if it reads as a person rather than sci-fi. | Motif 3 | partly covered (e); the SDF figure is **new** and small |
 | 13 | **Motes**: particles in the light shafts, kept near the camera across the wrap, with brightness routable from the hats | The fine, high-frequency layer | probably existing particles; confirm placement near the camera across the wrap |
 | 14 | **A near-field tremble**: a high-frequency, tiny displacement that fades out beyond a few metres from the camera | Roughness is local (phrase-end noise sweeps) | **new** (small; could be `warp` with a camera-distance mask) |
@@ -922,7 +985,7 @@ anything visible.
 
 | risk | fallback |
 |---|---|
-| **Chapters** are not ready | Run the whole film in two cells: the corridor (A) and a combined stairwell and hall (B + D). Morph the corridor into the enfilade. Let the release open cell A itself (the walls separate and the ceiling lifts). The loop still returns to the first corridor, and the arc survives. |
+| **Chapters** are not ready | Run the whole film in two or three worlds: the corridor (A, which also carries the loop), a combined hall and stairwell (B + D + P), and the open (E). Morph the corridor into the enfilade (C) with a slow `morph`. The loop still returns to the first corridor, and the arc survives. |
 | **One material per world** | Colour planes become light instead of paint: the rose comes from coloured light falling on the plaster. The palette still works, with less graphic power. |
 | **The figure** reads wrong | Drop it. Scale comes from door heights, risers and rails. The bar-108 arrival becomes the camera alone at the top, looking back at the first corridor and then turning to the sun. |
 | **Performance** in the open (long rays and many fragments) | Fog out far fragments sooner, and bring `maxDistance` in to the fog's reach. The release reads through light and sky more than geometry. |
