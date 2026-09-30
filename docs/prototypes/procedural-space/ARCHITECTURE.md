@@ -176,3 +176,13 @@ The inspector, the World panel's SDF tree, scene states and routes already give 
 only part of the POC that the removal in E could not undo cleanly. With named nodes the parameter list
 reads as the architecture (`columns/size`, `hall/twist/amount`), which is all a panel would have
 added.
+
+## Addendum after measurement (2026-09-30, 01:00)
+
+The risk this decision named was real, and the fallback it named was taken. The interpreted example
+cost 105-254 ms per frame at render scale 0.5, with healthy march statistics (21-29 average steps),
+so the cost was per evaluation. Compiling the tree to WGSL (ADR-1003) brought it to 8.7-12.6 ms at
+0.5 and 20-34 ms at 1080p. Nothing else about the architecture changed: the same scene data, the same
+parameters and routes, the same pass, and the same depth composition. That is the promotion path in
+E, taken early. A production "procedural environment" would be exactly this: SDF composition nodes
+with `compile` on, a preset library of trees, and the graph editor offering the new node kinds.
