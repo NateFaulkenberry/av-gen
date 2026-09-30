@@ -2,7 +2,7 @@
  "format": "avgen-lightrig",
  "version": 1,
  "name": "SpaceNocturne",
- "description": "Procedural Space POC: a cold high key down the architecture, a violet rim, deep blue ambient. Neutral; the art agent owns it.",
+ "description": "Procedural Space POC: a cold high key down the architecture, a violet rim, deep blue ambient. The key casts no shadow map: the spaces have solid ceilings, so a directional shadow would black out every interior (and march the full-screen SDF into every cascade). Local shadowing is the SDF look block. Neutral; the art agent owns it.",
  "keyIntensity": 1.6,
  "ambientIntensity": 0.05,
  "ambientColor": [
@@ -26,7 +26,7 @@
     1.0
    ],
    "temperature": 9500,
-   "castsShadow": true,
+   "castsShadow": false,
    "shadowStrength": 0.85,
    "softness": 1.4,
    "volumetric": 0.0,
