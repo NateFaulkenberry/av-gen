@@ -166,3 +166,117 @@ TEST_CASE("the procedural space art presets load, every rule the music drives ex
         }
     }
 }
+
+// Brief §19-21, §27 and §36 ("modulation mapping"): the music moves the rules it is routed to, only the
+// music moves them, and the same audio moves them the same way twice. Infinite Hall's routes are all
+// ungated (no macro depth), so every routed rule must move within 20 s of the project's own score.
+TEST_CASE("the Infinite Hall's music moves its rules, only the music does, and it is repeatable",
+          "[space][sdf][example]") {
+    if (!audioPresent()) {
+        SKIP("assets/audio/night-shift.wav is not generated");
+    }
+    const std::filesystem::path path = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples/space/infinite-hall.json";
+    nlohmann::json doc = testsupport::readJson(path);
+    std::vector<std::string> targets;
+    for (const auto& route : doc["routes"]) {
+        const std::string target = route["target"].get<std::string>();
+        if (std::find(targets.begin(), targets.end(), target) == targets.end()) {
+            targets.push_back(target);
+        }
+    }
+    REQUIRE(targets.size() == 10);
+
+    struct Run {
+        std::vector<std::size_t> components;           // per target: its component count
+        std::vector<std::vector<float>> samples;      // per sample: every target's final components
+        std::vector<std::vector<spatial::SdfNodeGpu>> tables; // per sample: the compiled parameter table
+    };
+    constexpr int kFrames = 1200; // 20 s at the helper's 60 fps
+    constexpr int kEvery = 30;
+    const auto run = [&](const std::filesystem::path& project) {
+        app::Engine engine(app::EngineMode::Offline);
+        auto loaded = engine.loadProject(project);
+        if (!loaded) {
+            FAIL(loaded.error().message);
+        }
+        Run out;
+        constexpr double kDt = 1.0 / 60.0;
+        for (int i = 0; i < kFrames; ++i) {
+            FrameTime time;
+            time.renderTime = static_cast<double>(i) * kDt;
+            time.deltaTime = i == 0 ? 0.0 : kDt;
+            time.frameIndex = static_cast<std::uint64_t>(i);
+            engine.update(time);
+            if (i % kEvery != 0) {
+                continue;
+            }
+            std::vector<float> values;
+            out.components.clear();
+            for (const std::string& target : targets) {
+                const params::IParameter* p = engine.params().find(target);
+                REQUIRE(p != nullptr);
+                out.components.push_back(p->componentCount());
+                for (std::size_t c = 0; c < p->componentCount(); ++c) {
+                    values.push_back(p->finalComponent(c));
+                }
+            }
+            out.samples.push_back(std::move(values));
+            REQUIRE(engine.scene().sdfs.size() == 1);
+            std::vector<spatial::SdfNodeGpu> table;
+            spatial::sdfCompileTable(engine.scene().sdfs[0].tree, table);
+            out.tables.push_back(std::move(table));
+        }
+        return out;
+    };
+    // The targets whose final value moved over the window.
+    const auto moved = [&](const Run& r) {
+        std::vector<std::string> names;
+        std::size_t offset = 0;
+        for (std::size_t t = 0; t < targets.size(); ++t) {
+            bool any = false;
+            for (std::size_t c = 0; c < r.components[t]; ++c) {
+                float lo = r.samples.front()[offset + c];
+                float hi = lo;
+                for (const auto& s : r.samples) {
+                    lo = std::min(lo, s[offset + c]);
+                    hi = std::max(hi, s[offset + c]);
+                }
+                any = any || (hi - lo) > 1e-3f;
+            }
+            if (any) {
+                names.push_back(targets[t]);
+            }
+            offset += r.components[t];
+        }
+        return names;
+    };
+
+    // With the score: every routed rule moves.
+    const Run a = run(path);
+    const std::vector<std::string> movedWithMusic = moved(a);
+    for (const std::string& target : targets) {
+        INFO(target);
+        CHECK(std::find(movedWithMusic.begin(), movedWithMusic.end(), target) != movedWithMusic.end());
+    }
+    // The same audio, a fresh engine: the same rules at every sample, to the bit (§27).
+    const Run b = run(path);
+    REQUIRE(a.samples.size() == b.samples.size());
+    for (std::size_t i = 0; i < a.samples.size(); ++i) {
+        INFO("sample " << i);
+        CHECK(a.samples[i] == b.samples[i]);
+        REQUIRE(a.tables[i].size() == b.tables[i].size());
+        CHECK(std::memcmp(a.tables[i].data(), b.tables[i].data(), a.tables[i].size() * sizeof(spatial::SdfNodeGpu)) == 0);
+    }
+    // And the music is what moves them: the same project with no audio holds every rule still (the bar
+    // clock, and so the seeded per-bar re-spacing, needs a track as well).
+    doc["assets"].erase("audio");
+    doc["assets"]["scene"]["path"] = (path.parent_path() / "infinite-hall.scene.json").string();
+    const std::filesystem::path silent = std::filesystem::temp_directory_path() / "avgen-space-hall-no-audio.json";
+    {
+        std::ofstream out(silent);
+        out << doc.dump(1);
+    }
+    const Run still = run(silent);
+    std::filesystem::remove(silent);
+    CHECK(moved(still).empty());
+}
