@@ -3510,6 +3510,16 @@
           "softness": 1.5,
           "strength": 1.0,
           "minHeight": 0.0
+        },
+        {
+          "center": [
+            -66.26,
+            -27.73
+          ],
+          "radius": 0.6,
+          "softness": 0.0,
+          "strength": 1.0,
+          "minHeight": 3.0
         }
       ]
     },

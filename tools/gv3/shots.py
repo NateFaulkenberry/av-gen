@@ -609,6 +609,29 @@ def tide_looks_up(t0, t1, g):
                    movement="follows", music="1 bar, the last before the suspension")
 
 
+# Plants cleared for a shot whose subject would pass through them in close-up (revision round 2; the owner:
+# clipping through ferns is fine, "but ideally not in this shot"). A terrain clearing that only layers at least
+# `minHeight` tall answer (ecology.cpp `clearanceWeight`), so it takes the one plant and leaves the ground cover.
+SHOT_CLEARINGS = {
+    # s46 (2:26-2:28): the "fern" is a fan plant (Plant_1_Big, 3.84 m, fronds reaching 1.4-1.9 m out at 2.5-3.3 m
+    # up). Tide passes 0.83 m from its stem at 147.17 s, her head 3.3 m up, within its fronds' reach on 79 of the
+    # shot's 111 frames. A 0.6 m clearing for layers 3 m and taller removes that plant and no other instance of any
+    # layer (avgen_scatter_probe over the whole map, before and after); nothing else then reaches her head in the
+    # shot. It stood 3.84 m tall, under the fan plants' 4 m obstacle height, so the navigation (and so every path)
+    # is unchanged. The fan plants south of it in the scatter's row order re-deal their index-keyed hue jitter (their
+    # layer's `hueRandom`, 0.02); their positions, sizes, yaws and glow do not move.
+    "s46": {"center": [-66.26, -27.73], "radius": 0.6, "softness": 0.0, "strength": 1.0, "minHeight": 3.0},
+}
+
+
+def apply_clearings(scene):
+    """SHOT_CLEARINGS onto the terrain's clearings."""
+    terrain = next(n for n in scene["nodes"] if n.get("kind") == "terrain")
+    clearings = terrain.setdefault("clearings", [])
+    for sid in sorted(SHOT_CLEARINGS):
+        clearings.append(dict(SHOT_CLEARINGS[sid]))
+
+
 # ==== 9 suspension (bars 81-88): E5 begins ==============================================================
 @at("81.1")
 def e5_over_the_rim(t0, t1, g):

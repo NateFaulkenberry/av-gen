@@ -947,3 +947,21 @@ This should be implemented as part of the upcoming GV3 art pass, with the existi
 > ready for me to review
 
 The coordinator made that change as ADR-990 (`bce61fe9`), with the owner's direct approval.
+
+## Revision round 2 (owner, 2026-09-29, verbatim; relayed by the coordinator)
+
+**Item 1:**
+> let's investigate why the astronauts have a spotted pattern on them and see if we can remove it
+
+**Item 2:**
+> and then one more small change right at 2:27 in the movie we have close up shot of an alien clipping through a
+> fern - it's fine if they clip through ferns but ideally not in this shot
+
+**Scope**, after both items were asked for:
+> you can just make the changes and Ill check myself visually that they worked
+
+- Item 1 is done by the coordinator (`cef39ba1`): the spots were the suits' Bioluminescence photophores
+  (`<name>-aura`), now off (`musicians.SUIT_PHOTOPHORES_ON = False`).
+- Item 2 is s46 (146.31-148.16 s, "Tide looks up"): fix that shot only, small and local; verify with geometry or the
+  trace, not renders. No r2 render, stills, Critic or full suites: the tests covering what changes, GV3 loading
+  with 0 errors, and a commit on `gv3/art-pass`.

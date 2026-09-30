@@ -6,7 +6,11 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-29, 17:50): REVISION ROUND 1 COMPLETE** (the owner's words and the coordinator's notes are at
+- **Status (2026-09-29, 22:10): REVISION ROUND 2 COMPLETE** (merged main at `45f8ba14`, then `325d180e` and the
+  coordinator's `cef39ba1`; the owner's words are the brief's last section; the tracking is "Revision round 2"
+  at the end of this file). Item 1 (the suits' spots) was the coordinator's (`cef39ba1`); item 2 (s46's fern) is
+  a one-plant terrain clearing. Scope scaled down by the owner: no r2 render, stills, Critic or full suites.
+- **Round 1 (2026-09-29, 17:50): COMPLETE** (the owner's words and the coordinator's notes are at
   the end of `00-brief.md`; the tracking is the section "Revision round 1" below). Items 1-7 committed (`9c86d2b1`,
   `e6e7719f`, `d18b64cf`, `1fa60913`). Investigating s50 found an engine determinism defect (below, "Found: a
   render is not the film its seeks and traces describe"); the owner chose option A, committed by the coordinator as
@@ -749,3 +753,34 @@ At `17a31073` (the one uncommitted file was this one): `build/release/tests/avge
 
 - 2026-09-28: read the brief, the prototype's notes and report, the perf summary, the state audit, the generator.
   ADR block 980-989 assigned. Worktree build started.
+
+## Revision round 2 (owner, 2026-09-29): tracking
+
+The owner's words, verbatim, are the brief's last section ("Revision round 2"), with the scope they set: "you can
+just make the changes and Ill check myself visually that they worked". Worktree fast-forwarded to `cef39ba1`
+(main `45f8ba14` + `325d180e` + `cef39ba1`), reconfigured and rebuilt in full.
+
+1. **The suits' spots -- the coordinator's (`cef39ba1`).** They were the performers' `<name>-aura` Bioluminescence
+   photophores; `musicians.SUIT_PHOTOPHORES_ON = False` drops the two effects and their four routes. Nothing here.
+2. **The fern at 2:27 -- a one-plant clearing.** 2:27 is s46 ("Tide looks up", 146.31-148.16 s). The "fern" is a
+   fan plant (`fan-plants`, Plant_1_Big, at (-66.26, 7.83, -27.73), scale 1.199, 3.84 m; its fronds reach 1.4-1.9 m
+   out at 2.5-3.3 m up, from the asset's own vertices). Tide's head (the four highest joints of her drawn pose,
+   `avgen_foot_probe --dump tide:146.2:148.3 --pose-out`) passes 0.83 m from its stem at 147.17 s, 3.3 m up, within
+   its fronds' reach on 79-83 of the shot's 111 frames. Nothing else along her path in the shot is taller than 1.5 m.
+   - **Fix (data):** `shots.SHOT_CLEARINGS["s46"]`, applied by `shots.apply_clearings` after the cut: a terrain
+     clearing at the plant, 0.6 m, softness 0, `minHeight` 3.0 (only layers at least 3 m tall answer it: the fan
+     plants and the trees, and no tree stands there).
+   - **Verified (no renders, per the owner):** the whole map's scatter, every layer, before and after
+     (`avgen_scatter_probe --region` the world): exactly that one instance gone, 63,814 of 63,815 lines identical.
+     Along s46's 111 frames no plant then reaches her head region (a conservative reach per plant). The plant was
+     under the fan plants' 4 m obstacle height, so the navigation is unchanged: every body and the camera over the
+     whole film identical to 0.0 m (`avgen_cast_trace`, before and after), every set piece's beats identical;
+     `fan-plants` 315 -> 314 instances, 110 obstacles, 3,530 in all, as before.
+   - **Side effect:** fan plants later in the scatter's north-to-south row order re-deal their index-keyed hue
+     jitter (`hueRandom` 0.02); positions, sizes, yaws and glow are position-keyed and do not move.
+3. **Checks:** the regenerated project differs from `cef39ba1`'s only by the clearing (the scene) and the scene's
+   hash and size (the project). GV3 loads with 0 errors and 0 warnings (`avgen --headless --project ...
+   --audit-routes`: 119 routes, 25 effects and 136 tracks all live; one pre-existing "phase-rate" hazard among the
+   effects' default routes, whose routes are byte-identical). `avgen_tests "[world]"` rc 0 (188 cases).
+   `tools/gv3/world.py --check` exits 1 with output identical to `cef39ba1`'s (the 13 one-column open-end views in
+   s03/s24/s26/s65/s66 are pre-existing, as round 0 found).
