@@ -350,7 +350,37 @@ def analyse(path, lag_search_ms=80):
         k = np.round(pk_t / period0)
         res["drift_vs_first_tempo"] = {"t": pk_t.tolist(), "resid": (pk_t - k * period0).tolist()}
 
-    # Local tempo from the onset autocorrelation, 12 s windows (a coarse independent view)
+    # Per-bar onset phase: every onset (any band, finer 1024/256 STFT) against the nearest sixteenth of the marker
+    # grid, and of the first tempo carried through the whole song. A right grid keeps the median near 0 in every bar;
+    # a wrong one drifts and wraps. This is robust to syncopation, unlike an autocorrelation tempo.
+    MF, _, fF = stft(mono, sr, 1024, 256)
+    fpsF = sr / 256
+    envF = onset_env(MF, fF, 30, 16000, fpsF)
+    del MF
+    pkF, _ = signal.find_peaks(envF, height=0.3, distance=int(0.09 * fpsF))
+    otF = pkF / fpsF
+
+    def sixteenth_resid(times, grid):
+        j = np.clip(np.searchsorted(grid, times) - 1, 0, len(grid) - 2)
+        b0, b1 = grid[j], grid[j + 1]
+        s16 = (b1 - b0) / 4
+        u = (times - b0) / s16
+        return (u - np.round(u)) * s16
+
+    rm = sixteenth_resid(otF, beats)
+    r1 = sixteenth_resid(otF, np.arange(0, dur + 2, 60.0 / tm[0][1]))
+    lat = float(np.median(rm))
+    phase_rows = []
+    for i, a in enumerate(beats[::4]):
+        b = beats[(i + 1) * 4] if (i + 1) * 4 < len(beats) else dur
+        m = (otF >= a) & (otF < b)
+        if m.sum() >= 2:
+            phase_rows.append((i + 1, int(m.sum()), float(np.median(rm[m] - lat) * 1000),
+                               float(np.median(r1[m] - lat) * 1000)))
+    res["onset_phase_by_bar"] = phase_rows
+
+    # Local tempo from the onset autocorrelation, 12 s windows (a coarse independent view; biased by syncopated
+    # patterns, so the per-bar phase above is the check that counts)
     loc = []
     e = env["full"]
     W = int(12 * fps)
@@ -467,9 +497,9 @@ def plots(res, sections, lyrics, out):
             if shade and j % 2 == 1:
                 ax.axvspan(a, b, color="#f0efeb", zorder=0, lw=0)
             ax.axvline(a, color=INK2, lw=0.6, alpha=0.6, zorder=1)
-            if labels:
-                ax.text((a + b) / 2, 1.02, sec["id"], transform=ax.get_xaxis_transform(), ha="center",
-                        va="bottom", fontsize=8, color=INK, fontweight="bold")
+            if labels:  # staggered in two rows so short sections do not collide
+                ax.text((a + b) / 2, 1.10 + 0.09 * (j % 2), sec["id"], transform=ax.get_xaxis_transform(),
+                        ha="center", va="bottom", fontsize=8, color=INK, fontweight="bold")
         ax.set_xlim(0, dur)
 
     def bar_axis(ax):
@@ -480,7 +510,8 @@ def plots(res, sections, lyrics, out):
         sec2.tick_params(colors=INK2, length=2, pad=1)
         return sec2
 
-    legend_kw = dict(frameon=False, fontsize=8, loc="upper left", ncol=4)
+    legend_kw = dict(frameon=True, facecolor=SURFACE, edgecolor=GRID, framealpha=0.92, fontsize=8, loc="lower left",
+                     ncol=5)
 
     # 01 energy: loudness, bands, drums, vocal band, all on the shared time axis
     fig, ax = plt.subplots(5, 1, figsize=(16, 13), sharex=True,
@@ -501,6 +532,7 @@ def plots(res, sections, lyrics, out):
                                    ("presence", "presence 2-6 kHz"), ("brill", "brilliance 6-12 kHz")]):
         a1.plot(s["tA"], sm(s["band_db"][nm]), color=SERIES[j], lw=1.2, label=lab)
     a1.set_ylabel("band energy (dB, 1 s)")
+    a1.set_ylim(-15, 58)
     a1.legend(**legend_kw)
     mark(a1)
     a2 = ax[2]
@@ -516,8 +548,8 @@ def plots(res, sections, lyrics, out):
             label="centre-panned harmonic share, 250 Hz-4 kHz")
     if lyrics:
         for seg in lyrics:
-            a3.axvspan(seg["t0"], seg["t1"], ymin=0.9, ymax=1.0, color=SERIES[6], alpha=0.8, lw=0)
-        a3.plot([], [], color=SERIES[6], lw=6, label="recognised sung phrases")
+            a3.axvspan(seg["t0"], seg["t1"], ymin=0.92, ymax=1.0, color=SERIES[6], alpha=0.8, lw=0)
+        a3.plot([], [], color=SERIES[6], lw=6, label="sung phrases (placed)")
     a3.set_ylabel("vocal band")
     a3.legend(**legend_kw)
     mark(a3)
@@ -528,7 +560,8 @@ def plots(res, sections, lyrics, out):
     a4.set_xlabel("time (s)")
     a4.legend(**legend_kw)
     mark(a4)
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    a3.set_ylim(0, 0.62)
+    fig.tight_layout(rect=(0, 0, 1, 0.965))
     fig.savefig(os.path.join(out, "01-energy.png"), dpi=130)
     plt.close(fig)
 
@@ -542,7 +575,8 @@ def plots(res, sections, lyrics, out):
     fig, axs = plt.subplots(1, 1, figsize=(16, 6.5))
     cmap = LinearSegmentedColormap.from_list("ink", ["#fcfcfb", "#9ec3ee", "#2a78d6", "#12305a", "#060d1a"])
     vmax = np.percentile(D, 99.7)
-    axs.pcolormesh(tA[::2], edges, D[::2].T, cmap=cmap, vmin=vmax - 70, vmax=vmax, shading="auto",
+    centres = np.sqrt(edges[:-1] * edges[1:])
+    axs.pcolormesh(tA[::2], centres, D[::2].T, cmap=cmap, vmin=vmax - 70, vmax=vmax, shading="auto",
                    rasterized=True)
     axs.set_yscale("log")
     axs.set_ylim(30, 16000)
@@ -551,10 +585,10 @@ def plots(res, sections, lyrics, out):
     axs.set_ylabel("frequency (Hz)")
     axs.set_xlabel("time (s)")
     axs.grid(False)
-    for sec in secs:
+    for j, sec in enumerate(secs):
         axs.axvline(sec["t0"], color=SERIES[1], lw=1.0, alpha=0.9)
-        axs.text(sec["t0"] + 0.6, 13500, sec["id"], color=INK, fontsize=8, fontweight="bold", va="top",
-                 bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.8, pad=1.5))
+        axs.text(sec["t0"] + 0.6, 13500 if j % 2 == 0 else 8500, sec["id"], color=INK, fontsize=8,
+                 fontweight="bold", va="top", bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.8, pad=1.5))
     bar_axis(axs)
     axs.set_title("All You Got: log-frequency spectrogram with the analyst's section boundaries", loc="left")
     fig.tight_layout()
@@ -569,16 +603,16 @@ def plots(res, sections, lyrics, out):
     axm = fig.add_subplot(gs[0])
     cm2 = LinearSegmentedColormap.from_list("div", ["#1f5fae", "#f4f3ef", "#c4461c"])
     axm.imshow(SSM, cmap=cm2, vmin=-1, vmax=1, origin="upper", extent=(0.5, n + 0.5, n + 0.5, 0.5))
-    for sec in secs:
+    for j, sec in enumerate(secs):
         axm.axhline(sec["bar0"] - 0.5, color=INK, lw=0.6)
         axm.axvline(sec["bar0"] - 0.5, color=INK, lw=0.6)
-        axm.text(sec["bar0"] + 0.3, 0.2, sec["id"], fontsize=8, va="bottom", ha="left", color=INK,
-                 fontweight="bold", rotation=0)
+        axm.text(sec["bar0"] - 0.3, 0.2 - 2.2 * (j % 2), sec["id"], fontsize=8, va="bottom", ha="left",
+                 color=INK, fontweight="bold", rotation=0)
     axm.set_xlabel("bar")
     axm.set_ylabel("bar")
     axm.grid(False)
-    axm.set_title("Bar self-similarity (arrangement features + chroma); red = alike, blue = unlike", loc="left",
-                  pad=16)
+    fig.suptitle("Bar self-similarity (arrangement features and chroma): red = alike, blue = unlike", x=0.01,
+                 ha="left", fontsize=11, fontweight="bold")
     axn = fig.add_subplot(gs[1])
     xb = np.arange(1, n + 1)
     axn.plot(xb, res["novelty4"], color=SERIES[0], label="novelty, 4-bar kernel")
@@ -590,7 +624,7 @@ def plots(res, sections, lyrics, out):
     axn.set_xlim(0.5, n + 0.5)
     axn.set_xlabel("bar (dotted: novelty peaks; solid: the analyst's boundaries)")
     axn.legend(frameon=False, fontsize=8, loc="upper right")
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.975))
     fig.savefig(os.path.join(out, "03-structure.png"), dpi=120)
     plt.close(fig)
 
@@ -609,11 +643,13 @@ def plots(res, sections, lyrics, out):
     axh.set_yticklabels([lab for _, lab in feats])
     axh.set_xlabel("bar")
     axh.grid(False)
-    for sec in secs:
+    for j, sec in enumerate(secs):
         axh.axvline(sec["bar0"] - 0.5, color=INK, lw=0.9)
-        axh.text(sec["bar0"] - 0.3, -0.7, sec["id"], fontsize=8, fontweight="bold", va="bottom", ha="left")
-    axh.set_title("Arrangement by bar (z-scores; orange = more than usual, blue = less)", loc="left", pad=16)
-    fig.tight_layout()
+        axh.text(sec["bar0"] - 0.3, -0.7 - 0.9 * (j % 2), sec["id"], fontsize=8, fontweight="bold", va="bottom",
+                 ha="left")
+    fig.suptitle("Arrangement by bar (z-scores; orange = more than usual, blue = less)", x=0.01, ha="left",
+                 fontsize=11, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
     fig.savefig(os.path.join(out, "04-arrangement.png"), dpi=130)
     plt.close(fig)
 
@@ -629,11 +665,16 @@ def plots(res, sections, lyrics, out):
         axt[0].set_ylim(-280, 280)
         axt[0].set_title("Tempo map check: kick onsets against the 109 BPM grid carried through the whole song "
                          "(the saw-tooth after 165 s is the faster tempo)", loc="left")
-        lt = np.array(res["local_tempo"])
-        axt[1].plot(lt[:, 0], lt[:, 1], color=SERIES[2], marker="o", ms=2.5, lw=1)
-        axt[1].set_ylim(100, 120)
-        axt[1].set_ylabel("local tempo, 12 s\nautocorrelation (BPM)")
+        ph = np.array(res["onset_phase_by_bar"])
+        bt0 = {b["bar"]: b["t0"] for b in bars}
+        xs = np.array([bt0[int(k)] for k in ph[:, 0]])
+        axt[1].plot(xs, ph[:, 3], color=SERIES[1], marker="o", ms=3, lw=1,
+                    label=f"against {res['tempo_map'][0][1]:g} BPM throughout")
+        axt[1].plot(xs, ph[:, 2], color=SERIES[0], marker="o", ms=3, lw=1.6, label="against the marker grid")
+        axt[1].set_ylim(-70, 70)
+        axt[1].set_ylabel("median onset offset from\nthe nearest 16th, per bar (ms)")
         axt[1].set_xlabel("time (s)")
+        axt[1].legend(frameon=True, facecolor=SURFACE, edgecolor=GRID, fontsize=8, loc="lower left")
         for ax_ in axt:
             ax_.set_xlim(0, dur)
             for sec in secs:
@@ -692,7 +733,7 @@ def main():
         for sec in sections["sections"]:
             sec["t0"] = bt[sec["bar0"]]["t0"]
             sec["t1"] = bt[sec["bar1"]]["t1"]
-        lyr = None
+        lyr = sections.get("vocals")  # the analyst's placed phrases, else the recogniser's raw segments
         if args.lyrics:
             with open(os.path.expanduser(args.lyrics)) as f:
                 lyr = [s_ for s_ in json.load(f)["segments"] if s_["no_speech"] < 0.6]
