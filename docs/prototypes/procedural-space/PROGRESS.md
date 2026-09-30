@@ -7,7 +7,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. ADR bloc
 | phase | state | notes |
 |---|---|---|
 | 1 architecture | done | `ARCHITECTURE.md`, ADR-1000: host on the existing ADR-027 SDF path as composition `sdf` nodes |
-| 2 research | in progress | `RESEARCH.md` |
+| 2 research | done | `RESEARCH.md`: A (existing ray marcher) + E for free; F (compiled SDF) is the measured fallback |
 | 3-6 foundation | not started | |
 
 ## Rules in force
