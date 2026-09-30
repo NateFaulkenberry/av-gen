@@ -661,8 +661,11 @@ std::optional<Finding> SceneLivenessFacts::deadTarget(std::string_view path, int
             }
         }
         if (surface != nullptr && !surface->material.program.empty()) {
+            // ADR-1023: a program that writes emission replaces the material's own (ADR-179) -- unless
+            // the emission it writes is computed from the material's own (`materialEmission`, ADR-904),
+            // in which case the program only shapes it and the material's emissive still decides it.
             if (const MaterialProgram* p = findProgram(scene, surface->material.program);
-                p != nullptr && inRange(p->emissionRegister)) {
+                p != nullptr && inRange(p->emissionRegister) && !p->emissionReadsMaterial()) {
                 return make("program-owns-emission", Verdict::Dead,
                             fmt::format("{} is replaced by program '{}', which writes emission (ADR-179)", what,
                                         p->name));

@@ -189,6 +189,12 @@ struct MaterialProgram {
     // the displayed hue and a gain.
     [[nodiscard]] bool writesEmission() const;
     [[nodiscard]] bool emissionReadsInstance() const;
+    // ADR-1023: an emission the program writes depends, through the same data flow, on the
+    // `materialEmission` input alone -- the material's own emissive colour x intensity. Such a program
+    // shapes the material's emission (a rim, a vein mask, a tip) rather than replacing it, so a route
+    // into the material's `emissive` or `emissiveColor` still reaches the screen. (`instanceEmissive`
+    // does not count: it is the instance's variation, a ratio against the material's colour.)
+    [[nodiscard]] bool emissionReadsMaterial() const;
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     [[nodiscard]] nlohmann::json toJson() const;

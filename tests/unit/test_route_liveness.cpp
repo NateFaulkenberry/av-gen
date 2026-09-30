@@ -8,6 +8,7 @@
 #include "params/modulation.hpp"
 #include "params/timeline.hpp"
 #include "scene/composition.hpp"
+#include "scene/material_program.hpp"
 #include "scene/route_liveness.hpp"
 #include "signals/signal_bus.hpp"
 #include "signals/source.hpp"
@@ -456,7 +457,7 @@ struct SceneWorld {
     signals::SignalBus bus;
     signals::SourceRack sources;
 
-    explicit SceneWorld(int extraPrograms = 0) {
+    explicit SceneWorld(int extraPrograms = 0, bool shapedEmission = false) {
         std::string programs = R"(
           {"name": "glowing", "ops": [{"kind": "constant", "dst": 1, "constant": [0.2, 1.0, 0.5, 1.0]}], "emission": 1},
           {"name": "dull", "ops": [{"kind": "constant", "dst": 1, "constant": [0.3, 0.3, 0.3, 1.0]}], "baseColor": 1},
@@ -466,6 +467,20 @@ struct SceneWorld {
         for (int i = 0; i < extraPrograms; ++i) {
             programs += R"(, {"name": "extra)" + std::to_string(i) +
                         R"(", "ops": [{"kind": "constant", "dst": 1, "constant": [1, 1, 1, 1]}], "emission": 1})";
+        }
+        if (shapedEmission) {
+            // ADR-1023: a program that shapes the material's own emission (a Fresnel rim of it); one whose
+            // emission reads only the instance's variation (a ratio, not the material's emission); and one
+            // that reads the material's emission into a register its emission does not depend on.
+            programs += R"(,
+          {"name": "shaped", "ops": [{"kind": "input", "dst": 1, "input": "materialEmission"},
+                                     {"kind": "fresnel", "dst": 2, "value": 2.0},
+                                     {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2}], "emission": 3},
+          {"name": "tinted", "ops": [{"kind": "input", "dst": 1, "input": "instanceEmissive"},
+                                     {"kind": "constant", "dst": 2, "constant": [1.0, 0.5, 0.2, 1.0]},
+                                     {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2}], "emission": 3},
+          {"name": "aside", "ops": [{"kind": "input", "dst": 1, "input": "materialEmission"},
+                                    {"kind": "constant", "dst": 3, "constant": [1.0, 1.0, 1.0, 1.0]}], "emission": 3})";
         }
         std::string nodes = sphere("lamp", R"({"program": "glowing"})") + "," +
                             sphere("rock", R"({"program": "dull", "emissiveIntensity": 0.0})") + "," +
@@ -483,6 +498,11 @@ struct SceneWorld {
                                 "material": {"emissiveIntensity": 3.0, "emissiveColor": [1.0, 1.0, 0.2]}}})";
         for (int i = 0; i < extraPrograms; ++i) {
             nodes += "," + sphere("extra" + std::to_string(i), R"({"program": "extra)" + std::to_string(i) + R"("})");
+        }
+        if (shapedEmission) {
+            nodes += "," + sphere("veined", R"({"program": "shaped", "emissiveIntensity": 1.0})") + "," +
+                     sphere("tint", R"({"program": "tinted", "emissiveIntensity": 1.0})") + "," +
+                     sphere("aside", R"({"program": "aside", "emissiveIntensity": 1.0})");
         }
         const auto document = nlohmann::json::parse(R"({"format": "avgen-scene", "version": 1, "name": "liveness",
             "materialPrograms": [)" + programs + R"(], "nodes": [)" + nodes + "]}");
@@ -545,6 +565,37 @@ TEST_CASE("liveness: program-owns-emission (ADR-179)", "[liveness][scene][adr902
     // ...and is the whole emission on one with no program, or a program that leaves it alone.
     CHECK_FALSE(has(w.target("procedural/ember/material/emissive"), "program-owns-emission"));
     CHECK_FALSE(has(w.target("procedural/rock/material/emissive"), "program-owns-emission"));
+}
+
+TEST_CASE("liveness: a program that shapes the material's own emission leaves it live (ADR-1023)",
+          "[liveness][scene][adr1023][sonic]") {
+    SceneWorld w(0, true);
+    // The Sonic Garden's surfaces: the program decides where the light lives (here a rim), the material's
+    // emissive -- and every route into it -- still decides its colour and strength.
+    CHECK_FALSE(has(w.target("procedural/veined/material/emissive"), "program-owns-emission"));
+    CHECK_FALSE(has(w.target("procedural/veined/material/emissiveColor"), "program-owns-emission"));
+    // The instance's variation is a ratio against the material's colour, not the material's emission.
+    CHECK(has(w.target("procedural/tint/material/emissive"), "program-owns-emission"));
+    // Data flow, not presence: reading the material's emission somewhere the emission ignores is not enough.
+    CHECK(has(w.target("procedural/aside/material/emissive"), "program-owns-emission"));
+    // The query itself, beside ADR-904's broader one.
+    const auto program = [](const char* text) {
+        auto p = scene::MaterialProgram::fromJson(nlohmann::json::parse(text));
+        REQUIRE(p.has_value());
+        return *p;
+    };
+    const auto shaped = program(R"({"name": "s", "ops": [{"kind": "input", "dst": 1, "input": "materialEmission"},
+        {"kind": "fresnel", "dst": 2}, {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2}], "emission": 3})");
+    CHECK(shaped.emissionReadsMaterial());
+    CHECK(shaped.emissionReadsInstance());
+    const auto ratio = program(R"({"name": "r", "ops": [{"kind": "input", "dst": 1, "input": "instanceEmissive"}],
+        "emission": 1})");
+    CHECK_FALSE(ratio.emissionReadsMaterial());
+    CHECK(ratio.emissionReadsInstance());
+    const auto layered = program(R"({"name": "l", "ops": [{"kind": "input", "dst": 1, "input": "materialEmission"}],
+        "layers": [{"name": "glow", "ops": [{"kind": "fresnel", "dst": 2},
+                                            {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2}], "emission": 3}]})");
+    CHECK(layered.emissionReadsMaterial()); // a layer's emission, reading what the base left in a register
 }
 
 TEST_CASE("liveness: node-emits-nothing, to the post-program emissiveBoost semantics", "[liveness][scene][adr902]") {

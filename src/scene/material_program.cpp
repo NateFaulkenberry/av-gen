@@ -806,13 +806,17 @@ bool MaterialProgram::writesEmission() const {
     return writes;
 }
 
-bool MaterialProgram::emissionReadsInstance() const {
-    // One flag per register, run over the ops exactly as `runOps` runs them (enabled ops only, the
-    // shared budget, out-of-range ops skipped): a register holds the instance's emission when the op
-    // that last wrote it read either input, or read a register that held it.
+namespace {
+
+// Whether an emission the program writes depends -- through the ops' data flow, not merely somewhere in
+// the program -- on an input `reads` accepts. One flag per register, run over the ops exactly as `runOps`
+// runs them (enabled ops only, the shared budget, out-of-range ops skipped): a register holds the input
+// when the op that last wrote it read the input, or read a register that held it.
+template <typename Pred>
+bool emissionDependsOn(const MaterialProgram& program, Pred reads) {
     std::array<bool, kMaterialRegisters> held{};
     int budget = kMaxMaterialOps;
-    const auto run = [&held, &budget](const std::vector<MaterialOp>& list) {
+    const auto run = [&held, &budget, &reads](const std::vector<MaterialOp>& list) {
         for (const MaterialOp& op : list) {
             if (!op.enabled) {
                 continue;
@@ -825,23 +829,34 @@ bool MaterialProgram::emissionReadsInstance() const {
                 !registerInRange(op.srcC)) {
                 continue;
             }
-            const OpReads reads = opReads(op.kind);
-            const bool input = op.kind == MaterialOpKind::Input &&
-                               (op.input == MaterialInput::InstanceEmissive ||
-                                op.input == MaterialInput::MaterialEmission);
-            const auto at = [&held](int r) { return held[static_cast<std::size_t>(r)]; };
+            const OpReads r = opReads(op.kind);
+            const bool input = op.kind == MaterialOpKind::Input && reads(op.input);
+            const auto at = [&held](int reg) { return held[static_cast<std::size_t>(reg)]; };
             held[static_cast<std::size_t>(op.dst)] =
-                input || (reads.a && at(op.srcA)) || (reads.b && at(op.srcB)) || (reads.c && at(op.srcC));
+                input || (r.a && at(op.srcA)) || (r.b && at(op.srcB)) || (r.c && at(op.srcC));
         }
     };
-    run(ops);
-    bool reads = registerInRange(emissionRegister) && held[static_cast<std::size_t>(emissionRegister)];
-    forEachRunLayer(layers, [&](const MaterialLayer& layer) {
+    run(program.ops);
+    bool depends = registerInRange(program.emissionRegister) &&
+                   held[static_cast<std::size_t>(program.emissionRegister)];
+    forEachRunLayer(program.layers, [&](const MaterialLayer& layer) {
         run(layer.ops);
-        reads = reads || (registerInRange(layer.emissionRegister) &&
-                          held[static_cast<std::size_t>(layer.emissionRegister)]);
+        depends = depends || (registerInRange(layer.emissionRegister) &&
+                              held[static_cast<std::size_t>(layer.emissionRegister)]);
     });
-    return reads;
+    return depends;
+}
+
+} // namespace
+
+bool MaterialProgram::emissionReadsInstance() const {
+    return emissionDependsOn(*this, [](MaterialInput in) {
+        return in == MaterialInput::InstanceEmissive || in == MaterialInput::MaterialEmission;
+    });
+}
+
+bool MaterialProgram::emissionReadsMaterial() const {
+    return emissionDependsOn(*this, [](MaterialInput in) { return in == MaterialInput::MaterialEmission; });
 }
 
 Result<void> MaterialProgram::validate() const {
