@@ -672,7 +672,11 @@ audio via BlackHole.
 ### Resume here (live art)
 
 - Commits on `proto/sonic-garden`: `4dcb65c5` (first pass: timing, families, glow/grit, live scene, probe patches,
-  replay tool), `cbb5bd3d` (the filter seen in the garden, waiting world, matte observatory floor, seed, hold).
+  replay tool), `cbb5bd3d` (the filter seen in the garden, waiting world, matte observatory floor, seed, hold),
+  `7a35999e` (chaotic reads rasp so a bell is not rough; forms from 0.375; the glass keeps its blacks; composition;
+  the quickstart's "What to try"), `626c64d2` (the heavy core stays dark between worlds; the replay clip tool).
+- The look is final unless the owner's hardware test says otherwise; the design and the measurements are in the notes
+  (`~/Desktop/av-gen-review/23-sonic-garden/live-art/LIVE-ART-NOTES.md`, drafted in the art agent's scratchpad).
 - **Everything is data written by `tools/sonic_live_project.py`** (the live project AND its own scene,
   `examples/sonic-garden/sonic-live.scene.json`). The master and its variants are untouched. Run it after any change
   to the master.
@@ -683,8 +687,9 @@ audio via BlackHole.
   `tools/gpu-lock.sh` for stills and full-quality clips.
 - Probe scenarios for PART 15: `low`, `high`, `chords`, `arp`, `distorted`, `sweep`, `drive`, plus `patches` (one
   phrase through pad, pluck, lead, FM bell, distorted bass, noise perc), `drivechord` and `play` (~2 min).
-- Next: live-captured clips per test + play-through, the notes, the quickstart's "what to try", the preview-tier
-  frame cost, `[sonic]` tests.
+- Next (in progress at 19:50): the final media run (live captures of every test and the play-through, full-quality
+  replays of the same performances, the frame cost at the default and preview tiers, a Live panel photograph),
+  then the notes into the review folder, this section's summary, and `avgen_tests "[sonic]"` under the lock.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
