@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -367,4 +368,53 @@ TEST_CASE("SdfObject march cap and look round trip through JSON and validate", "
     other.look.edgeIntensity = 9.0f;
     other.maxDistance = 5.0f;
     CHECK(other.structuralHash() == o.structuralHash());
+}
+
+TEST_CASE("SDF compile: WGSL source, parameter table and structural key", "[sdf][space]") {
+    SdfNode ring = unary(SdfNodeKind::PolarRepeat, translate({3, 0, 0}, box(glm::vec3(0.3f, 2.0f, 0.3f))));
+    ring.count = 8;
+    SdfNode nest = unary(SdfNodeKind::Recurse, sphere(0.5f));
+    nest.count = 2;
+    nest.scale = 2.0f;
+    SdfNode morph = combo(SdfNodeKind::Morph, {ring, nest, box(glm::vec3(1.0f))});
+    morph.amount = 0.5f;
+    SdfNode root = unary(SdfNodeKind::Twist, morph);
+    root.amount = 0.1f;
+    SdfTree tree = treeOf(root);
+    REQUIRE(tree.validate());
+
+    std::vector<spatial::SdfNodeGpu> table;
+    const std::string src = spatial::sdfCompileWgsl(tree, table);
+    CHECK(src.find("fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32") !=
+          std::string::npos);
+    // Kind-specialised: only the helpers this tree uses, never the generic dispatchers.
+    CHECK(src.find("sdfPrimitive(") == std::string::npos);
+    CHECK(src.find("sdfWarp(") == std::string::npos);
+    CHECK(src.find("sdfFinishUnary(") == std::string::npos);
+    CHECK(src.find("sdfWarpTwist(") != std::string::npos);
+    CHECK(src.find("sdfWarpPolar(") != std::string::npos);
+    CHECK(src.find("sdfRecurseStep(") != std::string::npos);
+    CHECK(src.find("sdfFinishUnaryNoise(") == std::string::npos);
+    // One table record per effective node, in emission order, with live parameter values.
+    CHECK(table.size() == static_cast<std::size_t>(tree.nodeCount()));
+    std::vector<spatial::SdfNodeGpu> again;
+    spatial::sdfCompileTable(tree, again);
+    REQUIRE(again.size() == table.size());
+    CHECK(std::memcmp(again.data(), table.data(), table.size() * sizeof(spatial::SdfNodeGpu)) == 0);
+
+    // The key ignores values (a morph's amount, counts, sizes) and sees structure.
+    const std::uint64_t key = spatial::sdfCompileKey(tree);
+    SdfTree moved = tree;
+    moved.root.amount = 0.9f;
+    moved.root.children[0].amount = 2.0f;
+    moved.root.children[0].children[0].count = 12;
+    CHECK(spatial::sdfCompileKey(moved) == key);
+    std::string movedSrc = spatial::sdfCompileWgsl(moved, table);
+    CHECK(movedSrc == src);
+    SdfTree restructured = tree;
+    restructured.root.children[0].children[2].enabled = false;
+    CHECK(spatial::sdfCompileKey(restructured) != key);
+    SdfTree rekinded = tree;
+    rekinded.root.children[0].children[2].kind = SdfNodeKind::Sphere;
+    CHECK(spatial::sdfCompileKey(rekinded) != key);
 }

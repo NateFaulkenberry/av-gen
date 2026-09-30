@@ -60,6 +60,10 @@ struct SdfObject {
     // depth in the passes that read the prepass before the lit pass (GTAO, the screen-space shadow
     // mask, contact shadows) and, for castShadows, its shadow in the shadow maps.
     bool depthPrepass = true;
+    // ADR-1003: march a WGSL compilation of the tree instead of interpreting the packed program. A
+    // structural change (a kind, a child, `enabled`) compiles a new pipeline (a hitch of tens of ms);
+    // parameter changes, a morph's amount and counts included, do not.
+    bool compile = false;
     bool castShadows = true;
     SdfLook look;                        // ADR-1002
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material

@@ -514,6 +514,7 @@ json SdfObject::toJson() const {
     j["maxDistance"] = maxDistance;
     j["depthPrepass"] = depthPrepass;
     j["castShadows"] = castShadows;
+    j["compile"] = compile;
     j["look"] = json{{"aoStrength", look.aoStrength},         {"aoDistance", look.aoDistance},
                      {"edgeIntensity", look.edgeIntensity},   {"edgeWidth", look.edgeWidth},
                      {"edgeColor", vecToJson(look.edgeColor)}, {"shadowStrength", look.shadowStrength},
@@ -586,6 +587,7 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
     AVGEN_SDF_READ(o.maxDistance, "maxDistance", readFloat);
     AVGEN_SDF_READ(o.depthPrepass, "depthPrepass", readBool);
     AVGEN_SDF_READ(o.castShadows, "castShadows", readBool);
+    AVGEN_SDF_READ(o.compile, "compile", readBool);
     if (j.contains("look")) {
         const json& lj = j.at("look");
         if (!lj.is_object()) {

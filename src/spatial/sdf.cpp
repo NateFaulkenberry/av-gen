@@ -1277,6 +1277,212 @@ Result<scene::MeshData> meshSdf(const SdfTree& tree, glm::vec3 boundsMin, glm::v
     return mesh;
 }
 
+// ---- ADR-1003: the tree compiled to WGSL ---------------------------------------------------------
+
+namespace {
+
+class WgslEmitter {
+public:
+    WgslEmitter(std::vector<SdfNodeGpu>& table, const FieldSet* fields, bool emitSource)
+        : table_(table), fields_(fields), emit_(emitSource) {}
+
+    // Emits the statements computing `node`'s distance at point expression `p`; returns the name of
+    // the variable holding it. nullptr = the far value. Every call is kind-specialised (the exact
+    // per-kind helper the interpreter's dispatch reaches), so the generated module carries only
+    // the code its tree uses: a generic sdfPrimitive/sdfWarp/sdfFinishUnary per node inlines every
+    // kind's body (fbm and voronoi included) at every node, which took Metal's compiler over ten
+    // minutes and 2.9 GB on the example's 54-node tree.
+    std::string node(const SdfNode* n, const std::string& p, int indent) {
+        const std::string v = fresh("d");
+        if (n == nullptr) {
+            line(indent, "let " + v + " = SDF_FAR;");
+            return v;
+        }
+        const std::uint32_t slot = record(*n);
+        const std::string r = "sdfNodes[offset + " + std::to_string(slot) + "u]";
+        switch (n->kind) {
+        case SdfNodeKind::Sphere: return let(indent, v, "sdfSphere(" + p + ", " + r + ".p0.x)");
+        case SdfNodeKind::Box: return let(indent, v, "sdfBox(" + p + ", " + r + ".p1.xyz)");
+        case SdfNodeKind::RoundedBox: return let(indent, v, "sdfRoundBox(" + p + ", " + r + ".p1.xyz, " + r + ".p0.z)");
+        case SdfNodeKind::Cylinder:
+            return let(indent, v, "sdfCappedCylinder(" + p + ", " + r + ".p0.x, " + r + ".p0.y * 0.5)");
+        case SdfNodeKind::Capsule: return let(indent, v, "sdfCapsule(" + p + ", " + r + ".p0.x, " + r + ".p0.y * 0.5)");
+        case SdfNodeKind::Torus: return let(indent, v, "sdfTorus(" + p + ", " + r + ".p0.x, " + r + ".p0.z)");
+        case SdfNodeKind::Plane: return let(indent, v, "sdfPlane(" + p + ", " + r + ".p2.xyz, " + r + ".p0.w)");
+        case SdfNodeKind::Cone: return let(indent, v, "sdfCone(" + p + ", " + r + ".p0.x, " + r + ".p0.y)");
+        default: break;
+        }
+        if (isCombination(n->kind)) {
+            std::vector<const SdfNode*> kids;
+            for (const SdfNode& child : n->children) {
+                if (const SdfNode* e = effective(child)) {
+                    kids.push_back(e);
+                }
+            }
+            if (kids.empty()) {
+                return let(indent, v, "SDF_FAR");
+            }
+            if (n->kind == SdfNodeKind::Morph) {
+                // Each child is emitted once, behind a branch on whether the amount selects it.
+                const std::string k = std::to_string(kids.size());
+                const std::string a = fresh("a");
+                const std::string first = fresh("f");
+                const std::string w = fresh("w");
+                const std::string c0 = fresh("c");
+                const std::string c1 = fresh("c");
+                line(indent, "let " + a + " = clamp(" + r + ".p2.w, 0.0, " + k + ".0 - 1.0);");
+                line(indent, "let " + first + " = min(u32(floor(" + a + ")), " + k + "u - 1u);");
+                line(indent, "let " + w + " = " + a + " - f32(" + first + ");");
+                line(indent, "var " + c0 + " = SDF_FAR;");
+                line(indent, "var " + c1 + " = SDF_FAR;");
+                for (std::size_t i = 0; i < kids.size(); ++i) {
+                    const std::string idx = std::to_string(i) + "u";
+                    line(indent, "if (" + first + " == " + idx + " || (" + w + " > 0.0 && " + first + " + 1u == " + idx + ")) {");
+                    const std::string c = node(kids[i], p, indent + 1);
+                    line(indent + 1, "if (" + first + " == " + idx + ") { " + c0 + " = " + c + "; } else { " + c1 + " = " + c + "; }");
+                    line(indent, "}");
+                }
+                line(indent, "var " + v + " = " + c0 + ";");
+                line(indent, "if (" + w + " > 0.0) { " + v + " = " + v + " + (" + c1 + " - " + v + ") * " + w + "; }");
+                return v;
+            }
+            const std::string first = node(kids[0], p, indent);
+            line(indent, "var " + v + " = " + first + ";");
+            for (std::size_t i = 1; i < kids.size(); ++i) {
+                const std::string c = node(kids[i], p, indent);
+                std::string op;
+                switch (n->kind) {
+                case SdfNodeKind::Union: op = "min(" + v + ", " + c + ")"; break;
+                case SdfNodeKind::Intersection: op = "max(" + v + ", " + c + ")"; break;
+                case SdfNodeKind::Difference: op = "max(" + v + ", -" + c + ")"; break;
+                case SdfNodeKind::SmoothUnion: op = "sdfSmin(" + v + ", " + c + ", max(" + r + ".p3.w, 1e-4))"; break;
+                case SdfNodeKind::SmoothIntersection:
+                    op = "-sdfSmin(-" + v + ", -" + c + ", max(" + r + ".p3.w, 1e-4))";
+                    break;
+                case SdfNodeKind::SmoothDifference:
+                    op = "-sdfSmin(-" + v + ", " + c + ", max(" + r + ".p3.w, 1e-4))";
+                    break;
+                default: op = v; break;
+                }
+                line(indent, v + " = " + op + ";");
+            }
+            return v;
+        }
+        const SdfNode* child = effectiveChild(*n);
+        if (n->kind == SdfNodeKind::Recurse) {
+            const std::string inv = fresh("inv");
+            const std::string q = fresh("q");
+            const std::string lvl = fresh("l");
+            line(indent, "var " + v + " = SDF_FAR;");
+            line(indent, "var " + inv + " = 1.0;");
+            line(indent, "var " + q + " = " + p + ";");
+            line(indent, "for (var " + lvl + " = 0; " + lvl + " <= " + std::to_string(kMaxSdfRecurseLevels) + "; " + lvl +
+                             " = " + lvl + " + 1) {");
+            const std::string c = node(child, q, indent + 1);
+            line(indent + 1, v + " = min(" + v + ", " + c + " * " + inv + ");");
+            line(indent + 1, "if (" + lvl + " >= i32(" + r + ".p5.z)) {");
+            line(indent + 2, "break;");
+            line(indent + 1, "}");
+            line(indent + 1, q + " = sdfRecurseStep(" + r + ", " + q + ");");
+            line(indent + 1, inv + " = " + inv + " / " + r + ".p1.w;");
+            line(indent, "}");
+            return v;
+        }
+        std::string warp;
+        switch (n->kind) {
+        case SdfNodeKind::Translate: warp = p + " - " + r + ".p3.xyz"; break;
+        case SdfNodeKind::Rotate: warp = "sdfQuatRotate(vec4<f32>(-" + r + ".p4.xyz, " + r + ".p4.w), " + p + ")"; break;
+        case SdfNodeKind::Scale: warp = p + " / " + r + ".p1.w"; break;
+        case SdfNodeKind::Twist: warp = "sdfWarpTwist(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Bend: warp = "sdfWarpBend(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Repeat: warp = "sdfWarpRepeat(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::PolarRepeat: warp = "sdfWarpPolar(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Mirror: warp = "sdfWarpMirror(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Fold: warp = "sdfWarpFold(" + r + ", " + p + ")"; break;
+        default: warp = p; break; // displacements leave the point alone
+        }
+        std::string q = p;
+        if (warp != p) {
+            q = fresh("q");
+            line(indent, "let " + q + " = " + warp + ";");
+        }
+        const std::string c = node(child, q, indent);
+        switch (n->kind) {
+        case SdfNodeKind::Scale: return let(indent, v, c + " * " + r + ".p1.w");
+        case SdfNodeKind::DisplaceNoise: return let(indent, v, "sdfFinishUnaryNoise(" + r + ", " + c + ", " + p + ", t, world)");
+        case SdfNodeKind::DisplaceVoronoi:
+            return let(indent, v, "sdfFinishUnaryVoronoi(" + r + ", " + c + ", " + p + ", t, world)");
+        case SdfNodeKind::DisplaceWave: return let(indent, v, "sdfFinishUnaryWave(" + r + ", " + c + ", " + p + ", t, world)");
+        case SdfNodeKind::DisplaceField: return let(indent, v, "sdfFinishUnaryField(" + r + ", " + c + ", " + p + ", t, world)");
+        default: return c;
+        }
+    }
+
+    [[nodiscard]] const std::string& source() const { return out_; }
+
+private:
+    std::uint32_t record(const SdfNode& n) {
+        // One table record per emitted node. A morph child emitted twice (in two cases) gets two
+        // records with identical contents, which is harmless and keeps emission a single walk.
+        const auto slot = static_cast<std::uint32_t>(table_.size());
+        table_.push_back(packNode(n, 0, fields_));
+        return slot;
+    }
+    std::string fresh(const char* stem) { return std::string(stem) + std::to_string(next_++); }
+    std::string let(int indent, const std::string& v, const std::string& expr) {
+        line(indent, "let " + v + " = " + expr + ";");
+        return v;
+    }
+    void line(int indent, const std::string& text) {
+        if (emit_) {
+            out_.append(static_cast<std::size_t>(indent) * 4, ' ');
+            out_ += text;
+            out_ += '\n';
+        }
+    }
+
+    std::vector<SdfNodeGpu>& table_;
+    const FieldSet* fields_;
+    bool emit_;
+    std::string out_;
+    int next_ = 0;
+};
+
+void hashStructure(StructHash& h, const SdfNode& n) {
+    h.u32(static_cast<std::uint32_t>(n.kind));
+    h.boolean(n.enabled);
+    h.u32(static_cast<std::uint32_t>(n.children.size()));
+    for (const SdfNode& child : n.children) {
+        hashStructure(h, child);
+    }
+}
+
+} // namespace
+
+std::string sdfCompileWgsl(const SdfTree& tree, std::vector<SdfNodeGpu>& table, const FieldSet* fields) {
+    table.clear();
+    WgslEmitter e(table, fields, true);
+    const std::string result = e.node(effective(tree.root), "p", 1);
+    std::string src = "// ADR-1003: generated from an SDF tree by spatial::sdfCompileWgsl. Do not edit.\n"
+                      "fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {\n";
+    src += e.source();
+    src += "    return " + result + ";\n}\n";
+    return src;
+}
+
+void sdfCompileTable(const SdfTree& tree, std::vector<SdfNodeGpu>& table, const FieldSet* fields) {
+    table.clear();
+    WgslEmitter e(table, fields, false);
+    (void)e.node(effective(tree.root), "p", 1);
+}
+
+std::uint64_t sdfCompileKey(const SdfTree& tree) {
+    StructHash h;
+    h.str("sdf-compile-v1");
+    hashStructure(h, tree.root);
+    return h.value();
+}
+
 // ---- GPU packing and the packed interpreter ----------------------------------------------------
 
 int packSdfTree(const SdfTree& tree, std::vector<SdfNodeGpu>& out, const FieldSet* fields) {

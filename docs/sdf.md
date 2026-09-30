@@ -238,6 +238,10 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
   `shadowStrength`/`shadowSoftness`/`shadowDirection`/`shadowSteps` (a Quilez penumbra march
   towards a world direction). Occlusion and shadow scale the whole shaded colour (the cheap
   version: emission and fog included); edges are added after them.
+- `compile` (ADR-1003, default false): draw the object with its tree compiled to WGSL instead of
+  the interpreter. Roughly 15x faster per evaluation on the space example; a structural change
+  (kind, child, `enabled`) compiles a new pipeline (seconds on first sight of a structure);
+  parameter changes never do.
 - `depthPrepass`, `castShadows` (ADR-1002, default true): whether the object is marched again into
   the depth prepass and into the shadow maps. Off saves a full march each; the lit pass still writes
   depth, but prepass readers (GTAO, the screen-space shadow mask, contact shadows) no longer see it.

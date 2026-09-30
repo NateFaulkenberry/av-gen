@@ -571,7 +571,8 @@
      ],
      "shadowSteps": 32
     },
-    "castShadows": false
+    "castShadows": false,
+    "compile": true
    }
   }
  ]

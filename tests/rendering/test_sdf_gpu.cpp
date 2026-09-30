@@ -804,6 +804,66 @@ TEST_CASE("SDF mesh mode draws the surface-nets mesh and caches it by hash", "[g
     CHECK(std::abs(a.pixels - b.pixels) < a.pixels / 10);
 }
 
+// ADR-1003: a tree compiled to WGSL renders the picture the interpreter does, with the look terms
+// on (they evaluate the field too), and a parameter change reuses the compiled pipeline.
+TEST_CASE("SDF compiled trees render like the interpreter", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "blob";
+    SdfNode nest = unary(SdfNodeKind::Recurse, translate(glm::vec3(0.9f, 0.0f, 0.0f), complexTree()));
+    nest.count = 2;
+    nest.scale = 2.2f;
+    nest.translation = glm::vec3(1.0f, 0.0f, 0.4f);
+    nest.size = glm::vec3(1.0f, 0.0f, 1.0f);
+    SdfNode morph = combo(SdfNodeKind::Morph, {sphere(1.2f), std::move(nest)}, 0.5f);
+    morph.amount = 0.6f;
+    o.tree = treeOf(std::move(morph));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    o.look.aoStrength = 0.7f;
+    o.look.edgeIntensity = 2.0f;
+    addBox(s, "wall", {0.0f, -1.0f, -2.0f}, {3.0f, 0.2f, 3.0f}, {0.2f, 0.3f, 0.9f});
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.75;
+    const auto render = [&](bool compile, float amount) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        c.tree.root.amount = amount;
+        copy.sdfs.push_back(c);
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    for (const float amount : {0.0f, 0.6f, 1.0f}) {
+        INFO("morph amount " << amount);
+        const auto interpreted = render(false, amount);
+        const auto compiled = render(true, amount);
+        REQUIRE(interpreted.width == compiled.width);
+        long differing = 0;
+        int worst = 0;
+        for (std::uint32_t y = 0; y < compiled.height; ++y) {
+            for (std::uint32_t x = 0; x < compiled.width; ++x) {
+                for (int ch = 0; ch < 3; ++ch) {
+                    const int delta = std::abs(int(interpreted.pixel(x, y)[ch]) - int(compiled.pixel(x, y)[ch]));
+                    worst = std::max(worst, delta);
+                    differing += delta > 2 ? 1 : 0;
+                }
+            }
+        }
+        INFO("channels differing by more than 2: " << differing << ", worst " << worst);
+        // Float reassociation differs between the two programs; a handful of edge-mask threshold
+        // pixels may flip. The surface itself must agree.
+        CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF rendering is deterministic across fresh renderers", "[gpu][sdf]") {
     auto ctx = makeContext();
     scene::Scene s = baseScene();

@@ -129,6 +129,20 @@ static_assert(sizeof(SdfNodeGpu) == 112);
 // Flattens the tree post-order (children before parent; disabled subtrees removed; parents of no
 // enabled children become an "empty" far-away distance) into `out`; returns the node count.
 [[nodiscard]] int packSdfTree(const SdfTree& tree, std::vector<SdfNodeGpu>& out, const FieldSet* fields = nullptr);
+// ADR-1003: the tree compiled to straight-line WGSL. `sdfCompileWgsl` returns the source of
+//   fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32
+// which evaluates the effective tree with the same helpers the interpreter uses (sdfPrimitive,
+// sdfCombine, sdfWarp, sdfFinishUnary, sdfRecurseStep) and reads every node's parameters from
+// sdfNodes[offset + k], k = the node's slot in `table` (one record per effective node, pre-order).
+// Parameters stay live: only the structure is compiled. `sdfCompileKey` hashes exactly what the
+// source depends on (kinds, child structure, enabled flags), so a value change never recompiles
+// (a morph's amount, a count, a size, ...) and a structural one always does.
+[[nodiscard]] std::string sdfCompileWgsl(const SdfTree& tree, std::vector<SdfNodeGpu>& table,
+                                         const FieldSet* fields = nullptr);
+[[nodiscard]] std::uint64_t sdfCompileKey(const SdfTree& tree);
+// Fills `table` exactly as sdfCompileWgsl does (per frame; no source generated).
+void sdfCompileTable(const SdfTree& tree, std::vector<SdfNodeGpu>& table, const FieldSet* fields = nullptr);
+
 // CPU evaluation of a packed array (the exact GPU algorithm; tests compare it with evaluate()).
 [[nodiscard]] float evaluatePacked(std::span<const SdfNodeGpu> nodes, const glm::vec3& p, double time,
                                    const FieldSet* fields = nullptr);

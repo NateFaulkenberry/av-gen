@@ -214,6 +214,60 @@ fn sdfQuatRotate(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
 }
 
 // The child's point of a domain op (displacements leave p unchanged).
+fn sdfWarpTwist(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let angle = n.p2.w * p.y;
+    let c = cos(angle);
+    let s = sin(angle);
+    return vec3<f32>(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+}
+
+fn sdfWarpBend(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let c = cos(n.p2.w * p.x);
+    let s = sin(n.p2.w * p.x);
+    return vec3<f32>(c * p.x - s * p.y, s * p.x + c * p.y, p.z);
+}
+
+fn sdfWarpRepeat(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let size = n.p1.xyz;
+    let count = i32(n.p5.z);
+    let limit = f32(count);
+    var q = p;
+    for (var i = 0u; i < 3u; i = i + 1u) {
+        if (size[i] > 0.0) {
+            var cell = sdfRnd(p[i] / size[i]);
+            if (count > 0) {
+                cell = clamp(cell, -limit, limit);
+            }
+            q[i] = p[i] - size[i] * cell;
+        }
+    }
+    return q;
+}
+
+fn sdfWarpPolar(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let count = i32(n.p5.z);
+    if (count <= 0) {
+        return p;
+    }
+    let sector = SDF_TWO_PI / f32(count);
+    let r = length(p.xz);
+    // atan2(0, 0) is undefined in WGSL (NaN on Metal) but +0 in std::atan2: match the CPU.
+    let a = select(atan2(p.z, p.x), 0.0, r == 0.0);
+    let a2 = a - sector * sdfRnd(a / sector);
+    return vec3<f32>(cos(a2) * r, p.y, sin(a2) * r);
+}
+
+fn sdfWarpMirror(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let m = n.p1.xyz;
+    return vec3<f32>(select(p.x, abs(p.x), m.x > 0.0), select(p.y, abs(p.y), m.y > 0.0),
+                     select(p.z, abs(p.z), m.z > 0.0));
+}
+
+fn sdfWarpFold(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let axis = sdfSafeNormalize(n.p2.xyz);
+    return p - 2.0 * min(dot(p, axis) - n.p0.w, 0.0) * axis;
+}
+
 fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
     let kind = n.kind;
     if (kind == SDF_TRANSLATE) {
@@ -226,52 +280,22 @@ fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
         return p / n.p1.w;
     }
     if (kind == SDF_TWIST) {
-        let angle = n.p2.w * p.y;
-        let c = cos(angle);
-        let s = sin(angle);
-        return vec3<f32>(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+        return sdfWarpTwist(n, p);
     }
     if (kind == SDF_BEND) {
-        let c = cos(n.p2.w * p.x);
-        let s = sin(n.p2.w * p.x);
-        return vec3<f32>(c * p.x - s * p.y, s * p.x + c * p.y, p.z);
+        return sdfWarpBend(n, p);
     }
     if (kind == SDF_REPEAT) {
-        let size = n.p1.xyz;
-        let count = i32(n.p5.z);
-        let limit = f32(count);
-        var q = p;
-        for (var i = 0u; i < 3u; i = i + 1u) {
-            if (size[i] > 0.0) {
-                var cell = sdfRnd(p[i] / size[i]);
-                if (count > 0) {
-                    cell = clamp(cell, -limit, limit);
-                }
-                q[i] = p[i] - size[i] * cell;
-            }
-        }
-        return q;
+        return sdfWarpRepeat(n, p);
     }
     if (kind == SDF_POLAR_REPEAT) {
-        let count = i32(n.p5.z);
-        if (count <= 0) {
-            return p;
-        }
-        let sector = SDF_TWO_PI / f32(count);
-        let r = length(p.xz);
-        // atan2(0, 0) is undefined in WGSL (NaN on Metal) but +0 in std::atan2: match the CPU.
-        let a = select(atan2(p.z, p.x), 0.0, r == 0.0);
-        let a2 = a - sector * sdfRnd(a / sector);
-        return vec3<f32>(cos(a2) * r, p.y, sin(a2) * r);
+        return sdfWarpPolar(n, p);
     }
     if (kind == SDF_MIRROR) {
-        let m = n.p1.xyz;
-        return vec3<f32>(select(p.x, abs(p.x), m.x > 0.0), select(p.y, abs(p.y), m.y > 0.0),
-                         select(p.z, abs(p.z), m.z > 0.0));
+        return sdfWarpMirror(n, p);
     }
     if (kind == SDF_FOLD) {
-        let axis = sdfSafeNormalize(n.p2.xyz);
-        return p - 2.0 * min(dot(p, axis) - n.p0.w, 0.0) * axis;
+        return sdfWarpFold(n, p);
     }
     return p; // SDF_RECURSE: level 0 is the node's own point
 }
@@ -288,26 +312,42 @@ fn sdfRecurseStep(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
 // ---- displacements (the END half of a unary op) --------------------------------------------------
 
 // `p` is the op's own local point; `world` takes it to world space for field sampling.
+fn sdfFinishUnaryNoise(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    return d + n.p2.w * (fbm3(p * n.p5.x + vec3<f32>(n.p5.y * t), n.seed) * 2.0 - 1.0);
+}
+
+fn sdfFinishUnaryVoronoi(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    return d + n.p2.w * (voronoiF1(p * n.p5.x, n.seed) - 0.5);
+}
+
+fn sdfFinishUnaryWave(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    return d + n.p2.w * sin(dot(p, n.p2.xyz) * n.p5.x + n.p5.y * t);
+}
+
+fn sdfFinishUnaryField(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    if (n.fieldSlot < 0) {
+        return d;
+    }
+    let wp = (world * vec4<f32>(p, 1.0)).xyz;
+    return d + n.p2.w * fieldScalar(n.fieldSlot, wp);
+}
+
 fn sdfFinishUnary(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     let kind = n.kind;
     if (kind == SDF_SCALE) {
         return d * n.p1.w;
     }
     if (kind == SDF_DISPLACE_NOISE) {
-        return d + n.p2.w * (fbm3(p * n.p5.x + vec3<f32>(n.p5.y * t), n.seed) * 2.0 - 1.0);
+        return sdfFinishUnaryNoise(n, d, p, t, world);
     }
     if (kind == SDF_DISPLACE_VORONOI) {
-        return d + n.p2.w * (voronoiF1(p * n.p5.x, n.seed) - 0.5);
+        return sdfFinishUnaryVoronoi(n, d, p, t, world);
     }
     if (kind == SDF_DISPLACE_WAVE) {
-        return d + n.p2.w * sin(dot(p, n.p2.xyz) * n.p5.x + n.p5.y * t);
+        return sdfFinishUnaryWave(n, d, p, t, world);
     }
     if (kind == SDF_DISPLACE_FIELD) {
-        if (n.fieldSlot < 0) {
-            return d;
-        }
-        let wp = (world * vec4<f32>(p, 1.0)).xyz;
-        return d + n.p2.w * fieldScalar(n.fieldSlot, wp);
+        return sdfFinishUnaryField(n, d, p, t, world);
     }
     return d;
 }
