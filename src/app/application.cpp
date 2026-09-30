@@ -250,6 +250,10 @@ std::string usageText() {
            "                      Overrides the settings file for this run; never applies to a\n"
            "                      render, where the Offline tier pins the scale to 1\n"
            "  --adaptive-budget <ms>  the GPU frame time --adaptive-scale aims at (default 16.67)\n"
+           "  --adaptive-floor <s>  the lowest scale --adaptive-scale may reach: 0.5 (default), 0.58,\n"
+           "                      0.71, 0.85 or 1 (ADR-1024)\n"
+           "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
+           "                      given, it also applies to a headless playback run (ADR-1024)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
            "  --particle-warmup <n>  step the particle pools n frames before the first frame of a\n"
            "                      render range or after a seek, so the range does not open on an\n"
@@ -783,6 +787,22 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
                 return fail("--adaptive-budget must be between 4 and 200 ms, got '{}'", *v);
             }
             ++i;
+        } else if (arg == "--adaptive-floor") {
+            auto v = need(i, "--adaptive-floor");
+            if (!v) return std::unexpected(v.error());
+            options.adaptiveFloor = std::strtof(v->c_str(), nullptr);
+            if (!(options.adaptiveFloor >= 0.5f) || options.adaptiveFloor > 1.0f) {
+                return fail("--adaptive-floor must be between 0.5 and 1, got '{}'", *v);
+            }
+            ++i;
+        } else if (arg == "--live-aa") {
+            auto v = need(i, "--live-aa");
+            if (!v) return std::unexpected(v.error());
+            if (*v != "fxaa" && *v != "off") {
+                return fail("--live-aa must be fxaa or off, got '{}'", *v);
+            }
+            options.liveAntialias = *v == "fxaa";
+            ++i;
         } else if (arg == "--preview-mode") {
             // ADR-246. Exists so the output preview can be driven by the scripted-interaction
             // driver and by a benchmark arm: the mode is otherwise only reachable from a toolbar,
@@ -1254,6 +1274,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         }
         renderer_->setQualitySettings(settings);
     }
+    // ADR-1024. Only when asked for on the command line: the editor otherwise takes it from the
+    // setting (in the frame loop), and a headless run keeps the scene's own antialiasing.
+    if (options_.liveAntialias.has_value()) {
+        rendering::QualitySettings settings = renderer_->qualitySettings();
+        settings.antialiasFloor = *options_.liveAntialias ? rendering::kLiveAntialiasFloor : 0.0f;
+        renderer_->setQualitySettings(settings);
+        log::info("live anti-aliasing: {}", *options_.liveAntialias ? "fxaa" : "off");
+    }
     if (!options_.disablePasses.empty()) {
         rendering::SceneRenderer::PassToggles toggles;
         std::string off;
@@ -1425,6 +1453,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             rs.enabled = options_.adaptiveScale.value_or(settings_.adaptiveCanvasScale);
             rs.budgetMs = options_.adaptiveBudgetMs > 0.0 ? options_.adaptiveBudgetMs
                                                           : settings_.adaptiveCanvasBudgetMs;
+            rs.floorRung = rungForScale(options_.adaptiveFloor > 0.0f ? options_.adaptiveFloor
+                                                                      : settings_.adaptiveCanvasFloor);
             autoResolution_.configure(rs);
             log::info("adaptive render scale: {} (budget {:.2f} ms GPU, floor {:.2f}x)",
                       rs.enabled ? "on" : "off", rs.budgetMs,
@@ -4476,6 +4506,24 @@ int Application::runLive() {
             // Switching it off resets the ladder to rung 0, and the block below then puts the
             // renderer back to full resolution on the same frame.
             autoResolution_.configure(rs);
+        }
+        // ADR-1024, the same shape: the lowest scale, and the live antialiasing. Raising the floor
+        // above the current rung pulls the rung up with it (`configure` clamps), and the block below
+        // re-sizes on the same frame.
+        if (panel_ != nullptr && options_.adaptiveFloor <= 0.0f &&
+            autoResolution_.settings().floorRung != rungForScale(settings_.adaptiveCanvasFloor)) {
+            InteractiveResolutionSettings rs = autoResolution_.settings();
+            rs.floorRung = rungForScale(settings_.adaptiveCanvasFloor);
+            autoResolution_.configure(rs);
+        }
+        if (panel_ != nullptr && !options_.liveAntialias.has_value()) {
+            const float floor = settings_.liveAntialias ? rendering::kLiveAntialiasFloor : 0.0f;
+            if (renderer_->qualitySettings().antialiasFloor != floor) {
+                rendering::QualitySettings q = renderer_->qualitySettings();
+                q.antialiasFloor = floor;
+                renderer_->setQualitySettings(q);
+                log::info("live anti-aliasing: {}", settings_.liveAntialias ? "fxaa" : "off");
+            }
         }
         // ---- the adaptive render scale (§15-§17) ------------------------------------------------
         //

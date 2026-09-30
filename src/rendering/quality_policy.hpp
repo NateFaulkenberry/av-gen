@@ -98,7 +98,8 @@ struct QualityPolicy {
                representation.spread == 0.0f && materialTier.forceTopTier &&
                !materialTier.enabled && !settings.materialTiers &&
                settings.forcedMaterialTier == MaterialTier::Full && settings.renderScale == 1.0f &&
-               settings.shadowMaskScale == 1.0f && settings.aoResolutionScale == 1.0f;
+               settings.shadowMaskScale == 1.0f && settings.aoResolutionScale == 1.0f &&
+               settings.antialiasFloor == 0.0f; // ADR-1024: a render is exactly as authored
     }
 };
 

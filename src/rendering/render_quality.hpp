@@ -69,6 +69,11 @@ enum class MaterialTier : std::uint8_t {
 }
 
 // Everything a tier scales. Resolutions are in texels, counts in samples/steps.
+// ADR-1024: the FXAA strength the live editor's "Live anti-aliasing: FXAA" sets as its floor.
+// ADR-059's own recommendation ("0.75 is a good default ... above that the filter starts to soften
+// real detail as well as the edges"), and within 0.2 of what GV3 and the Tree of Life author.
+inline constexpr float kLiveAntialiasFloor = 0.75f;
+
 struct QualitySettings {
     std::uint32_t shadowResolution = 2048; // one cascade / spot map, square
     std::uint32_t cascadeCount = 3;
@@ -288,6 +293,21 @@ struct QualitySettings {
     // resolution-dependent -- 640x400 is 0.26x the pixels of 1280x800 and 0.66x the scene time --
     // so the naive model that makes dynamic resolution attractive is wrong here by a factor of two.
     float renderScale = 1.0f;
+
+    // ---- ADR-1024: live edge antialiasing ----------------------------------------------------------
+    //
+    // The least FXAA (ADR-059, `post/output/antialias`) the frame gets, whatever the scene authored:
+    // the pass runs at `max(authored, floor)`. A scene that asks for more still gets more. 0 -- every
+    // tier's value, and the only value the Offline tier may hold -- leaves the frame exactly as
+    // authored, so a render is unchanged by construction. The live editor raises it from the
+    // person's "Live anti-aliasing" setting; nothing else does.
+    //
+    // A floor and not a tier default, because the evidence is that the live picture's jaggies are
+    // not the tier's (docs/prototypes/sonic-garden/AA-RESEARCH.md: at matched resolution the
+    // Realtime and Offline tiers are 0.6% apart on edge error) but the adaptive render scale's and
+    // the missing antialiasing's; and a tier default would move every GPU test that renders at the
+    // default tier.
+    float antialiasFloor = 0.0f;
 
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.

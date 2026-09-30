@@ -219,3 +219,37 @@ TEST_CASE("the floor is honoured", "[unit][resolution]") {
     CHECK(feed(c, 2000, 500.0, 520.0) == 1);
     CHECK(c.scale() == app::kRenderScaleRungs[1]);
 }
+
+// ADR-1024: the lowest scale is a setting, and the ladder holds it. Paired with the same frames on
+// the default floor, where the ladder does go below it (ADR-182).
+TEST_CASE("a raised floor stops the ladder above thin geometry's break-up", "[unit][resolution][adr1024]") {
+    CHECK(app::rungForScale(0.5f) == app::kRenderScaleRungs.size() - 1);
+    CHECK(app::rungForScale(1.0f) == 0);
+    CHECK(app::kRenderScaleRungs[app::rungForScale(0.71f)] == 0.71f);
+    CHECK(app::kRenderScaleRungs[app::rungForScale(0.7f)] == 0.71f); // nearest rung
+    CHECK(app::rungForScale(0.1f) == app::kRenderScaleRungs.size() - 1);
+
+    // The Sonic Garden's measured shape: far over budget at every rung.
+    app::InteractiveResolution open;
+    open.configure(fast());
+    CHECK(feed(open, 200, 60.0, 62.0) == app::kRenderScaleRungs.size() - 1);
+
+    app::InteractiveResolution held;
+    auto s = fast();
+    s.floorRung = app::rungForScale(0.71f);
+    held.configure(s);
+    CHECK(feed(held, 200, 60.0, 62.0) == app::rungForScale(0.71f));
+
+    // Raising the floor while below it pulls the rung up at once.
+    auto raised = fast();
+    raised.floorRung = app::rungForScale(0.85f);
+    open.configure(raised);
+    CHECK(open.rung() == app::rungForScale(0.85f));
+
+    // A floor of 1.0 is "never reduce".
+    app::InteractiveResolution never;
+    auto n = fast();
+    n.floorRung = app::rungForScale(1.0f);
+    never.configure(n);
+    CHECK(feed(never, 200, 60.0, 62.0) == 0);
+}

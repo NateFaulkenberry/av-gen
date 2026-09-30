@@ -156,3 +156,17 @@ TEST_CASE("render scale is a tier parameter with one rounding rule", "[unit][qua
     p.settings.renderScale = 2.0f;
     CHECK(p.renderSize(1280, 800).width == 2560);
 }
+
+// ADR-1024: no tier antialiases on its own -- the live floor is the editor's, and an offline
+// policy that carried it would no longer be "exactly as authored".
+TEST_CASE("the live antialiasing floor is zero at every tier and refused offline", "[unit][quality][policy][adr1024]") {
+    for (const QualityTier tier : {QualityTier::Preview, QualityTier::Realtime, QualityTier::High,
+                                   QualityTier::Offline}) {
+        INFO("tier " << qualityTierName(tier));
+        CHECK(QualityPolicy::forTier(tier).settings.antialiasFloor == 0.0f);
+    }
+    QualityPolicy offline = QualityPolicy::forTier(QualityTier::Offline);
+    REQUIRE(offline.assertOfflineIsUncompromised());
+    offline.settings.antialiasFloor = kLiveAntialiasFloor;
+    CHECK_FALSE(offline.assertOfflineIsUncompromised());
+}

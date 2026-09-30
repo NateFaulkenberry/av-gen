@@ -213,3 +213,44 @@ TEST_CASE("the adaptive render scale round-trips, and its budget is clamped rath
         CHECK(out->adaptiveCanvasBudgetMs == app::AppSettings{}.adaptiveCanvasBudgetMs);
     }
 }
+
+// ADR-1024: the live antialiasing and the adaptive scale's floor. Per machine, like the budget.
+TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[unit][settings][adr1024]") {
+    app::AppSettings settings;
+    CHECK(settings.liveAntialias);             // FXAA by default
+    CHECK(settings.adaptiveCanvasFloor == 0.5f); // the ladder's own floor by default
+
+    settings.liveAntialias = false;
+    settings.adaptiveCanvasFloor = 0.85f;
+    const auto document = settings.toJson();
+    CHECK(document.at("general").at("liveAntialias") == "off");
+    const auto loaded = app::AppSettings::fromJson(document);
+    REQUIRE(loaded.has_value());
+    CHECK_FALSE(loaded->liveAntialias);
+    CHECK(loaded->adaptiveCanvasFloor == 0.85f);
+
+    {
+        // A name this build does not know is refused, as the view mode is.
+        auto doc = document;
+        doc["general"]["liveAntialias"] = "taa";
+        CHECK_FALSE(app::AppSettings::fromJson(doc).has_value());
+    }
+    {
+        // Out of the ladder's range: clamped, not refused.
+        auto doc = document;
+        doc["general"]["adaptiveCanvasFloor"] = 0.1;
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->adaptiveCanvasFloor == 0.5f);
+    }
+    {
+        // A file written before this existed.
+        auto doc = document;
+        doc["general"].erase("liveAntialias");
+        doc["general"].erase("adaptiveCanvasFloor");
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->liveAntialias);
+        CHECK(out->adaptiveCanvasFloor == 0.5f);
+    }
+}

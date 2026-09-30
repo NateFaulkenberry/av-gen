@@ -153,6 +153,13 @@ struct AppOptions {
     std::optional<bool> adaptiveScale;
     // --adaptive-budget <ms>: the GPU frame time the controller aims at. 0 = use the setting.
     double adaptiveBudgetMs = 0.0;
+    // --adaptive-floor <scale>: the lowest scale the controller may reach (ADR-1024). 0 = use the
+    // setting.
+    float adaptiveFloor = 0.0f;
+    // --live-aa <fxaa|off> (ADR-1024): the live viewport's FXAA floor. Unset = the setting in the
+    // editor, and nothing on a headless run; set, it applies to either -- which is how a bench
+    // measures what the editor shows.
+    std::optional<bool> liveAntialias;
     // --supersample: an offline render's multiple of the output size (ADR-212). 1 = off.
     float supersample = 1.0f;
     // --particle-warmup: ADR-360's bounded particle warm-up, in frames. 0 = off, which is the

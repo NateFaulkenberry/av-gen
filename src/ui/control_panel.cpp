@@ -532,6 +532,13 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     }
     ImGui::Separator();
     ImGui::Text("%u x %u", stats.width, stats.height);
+    // ADR-1024: when the adaptive scale has the scene below the canvas, say so here -- it is the
+    // single biggest thing about how sharp the picture is, and it used to be visible only in the
+    // Performance panel.
+    if (stats.sceneWidth > 0 && stats.sceneHeight > 0 && stats.sceneHeight != stats.height) {
+        ImGui::SameLine();
+        ImGui::TextColored(caution, "(scene %u x %u)", stats.sceneWidth, stats.sceneHeight);
+    }
     ImGui::Separator();
     ImGui::Text("%u draws / %u tris", stats.drawCalls, stats.triangles);
     ImGui::Separator();

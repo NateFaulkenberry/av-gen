@@ -68,6 +68,15 @@ struct AppSettings {
     // playhead budget). Nothing below about 8 ms is reachable on the content this was measured on,
     // because the frame has a ~4.6 ms floor that no resolution can touch.
     double adaptiveCanvasBudgetMs = 16.67;
+    // ADR-1024. The lowest scale the controller may reach, one of `kRenderScaleRungs`. 0.5 is the
+    // ladder's own floor and the default. Raising it is the trade the adaptive scale cannot make for
+    // you: measured on the Sonic Garden (AA-RESEARCH.md), thin geometry -- 4-5 px rings -- beads at
+    // 0.71 and breaks into dots at 0.5, while the frame gets 38% cheaper rather than 75%, because
+    // a third of it (shadows) does not scale with resolution. A per-machine choice, like the budget.
+    float adaptiveCanvasFloor = 0.5f;
+    // ADR-1024. Edge antialiasing for the live viewport: FXAA at no less than `kLiveAntialiasFloor`,
+    // or off (the scene's own `post/output/antialias` only). A render never sees it.
+    bool liveAntialias = true;
     AppearanceTheme appearance = AppearanceTheme::System;
     // ADR-320/ADR-225: the Render panel shows the frames a render is writing. Off by default --
     // it is an instrument, and an instrument is never the reason a deliverable costs more -- but a

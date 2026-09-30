@@ -3,12 +3,14 @@
 #include "ui/style.hpp"
 #include "ai/control_plane.hpp"
 #include "app/engine.hpp"
+#include "app/interactive_resolution.hpp"
 #include "app/settings.hpp"
 #include "ui/theme.hpp"
 
 #include <imgui.h>
 
 #include <algorithm>
+#include <cstdio>
 
 namespace avgen::ui {
 namespace {
@@ -150,7 +152,7 @@ void SettingsPanel::drawRendering() {
             "back up into the viewport, down to half size. It only engages on a frame that is "
             "missing its budget and that the GPU -- not the interface -- is what is holding up; "
             "it never changes a render, and it goes back to full resolution when the scene gets "
-            "cheaper. The Performance panel shows the resolution it settled on.");
+            "cheaper. The status bar shows the resolution it settled on.");
         ImGui::BeginDisabled(!adaptive);
         propertyLabel("Frame budget", "The GPU time it aims at");
         auto budget = static_cast<float>(settings->adaptiveCanvasBudgetMs);
@@ -160,7 +162,48 @@ void SettingsPanel::drawRendering() {
                 onChanged();
             }
         }
+        // ADR-1024. The rungs themselves, so the choice is one the ladder can actually hold.
+        propertyLabel("Lowest scale", "How far it may go");
+        const std::size_t floorRung = app::rungForScale(settings->adaptiveCanvasFloor);
+        char current[16];
+        std::snprintf(current, sizeof(current), "%.2fx", static_cast<double>(app::kRenderScaleRungs[floorRung]));
+        if (ImGui::BeginCombo("##adaptive-canvas-floor", current)) {
+            for (std::size_t i = 0; i < app::kRenderScaleRungs.size(); ++i) {
+                char label[16];
+                std::snprintf(label, sizeof(label), "%.2fx", static_cast<double>(app::kRenderScaleRungs[i]));
+                if (ImGui::Selectable(label, i == floorRung)) {
+                    settings->adaptiveCanvasFloor = app::kRenderScaleRungs[i];
+                    if (onChanged) {
+                        onChanged();
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::TextWrapped(
+            "Below about 0.7x, thin geometry -- rings, wires, tubes a few pixels wide -- breaks up "
+            "into dots, and no antialiasing can put it back. Raise this when edges matter more than "
+            "frame rate; 1.00x keeps full resolution whatever the frame costs.");
         ImGui::EndDisabled();
+    }
+
+    // ADR-1024. Live only: a render keeps the project's own antialiasing and supersampling.
+    if (settings != nullptr) {
+        ImGui::Spacing();
+        propertyLabel("Anti-aliasing", "Live viewport edges");
+        const char* modes[] = {"Off", "FXAA"};
+        int mode = settings->liveAntialias ? 1 : 0;
+        if (ImGui::Combo("##live-antialias", &mode, modes, 2)) {
+            settings->liveAntialias = mode == 1;
+            if (onChanged) {
+                onChanged();
+            }
+        }
+        ImGui::TextWrapped(
+            "FXAA smooths stair-stepped edges in the viewport for under half a millisecond; a scene "
+            "that asks for more antialiasing still gets more. It cannot restore geometry thinner "
+            "than a pixel. Offline renders are unaffected: they use the project's own settings and "
+            "supersampling.");
     }
 
     // ADR-364. Here rather than in the Render panel because it is a property of how this person

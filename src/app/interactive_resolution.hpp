@@ -73,6 +73,20 @@ namespace avgen::app {
 // costs the application can pay should be small and nameable.
 inline constexpr std::array<float, 5> kRenderScaleRungs{1.0f, 0.85f, 0.71f, 0.58f, 0.5f};
 
+// ADR-1024: the rung nearest a scale, for the "lowest adaptive scale" setting. A scale between two
+// rungs goes to the nearer; outside the ladder it clamps to the end.
+[[nodiscard]] inline std::size_t rungForScale(float scale) {
+    std::size_t best = 0;
+    for (std::size_t i = 1; i < kRenderScaleRungs.size(); ++i) {
+        const float d = kRenderScaleRungs[i] - scale;
+        const float b = kRenderScaleRungs[best] - scale;
+        if ((d < 0 ? -d : d) < (b < 0 ? -b : b)) {
+            best = i;
+        }
+    }
+    return best;
+}
+
 struct InteractiveResolutionSettings {
     // Off is the honest default for the *type*; the editor turns it on (see `application.cpp`).
     // Every other consumer of a QualitySettings -- the render job, the benchmark harness, the GPU

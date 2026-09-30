@@ -37,6 +37,8 @@ json AppSettings::toJson() const {
     doc["general"] = json{{"canvasRenderScale", canvasRenderScale},
                           {"adaptiveCanvasScale", adaptiveCanvasScale},
                           {"adaptiveCanvasBudgetMs", adaptiveCanvasBudgetMs},
+                          {"adaptiveCanvasFloor", adaptiveCanvasFloor},
+                          {"liveAntialias", liveAntialias ? "fxaa" : "off"},
                           {"appearance", appearanceThemeName(appearance)},
                           {"renderFramePreview", renderFramePreview},
                           {"suspendViewportDuringRender", suspendViewportDuringRender}};
@@ -80,6 +82,16 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
         // bottom of the range is already "as fast as the resolution can make it".
         out.adaptiveCanvasBudgetMs =
             std::clamp(general->value("adaptiveCanvasBudgetMs", out.adaptiveCanvasBudgetMs), 4.0, 200.0);
+        // Clamped into the ladder's range; the application snaps it to the nearest rung.
+        out.adaptiveCanvasFloor =
+            std::clamp(general->value("adaptiveCanvasFloor", out.adaptiveCanvasFloor), 0.5f, 1.0f);
+        if (const auto aa = general->find("liveAntialias"); aa != general->end()) {
+            const std::string name = aa->is_string() ? aa->get<std::string>() : std::string{};
+            if (name != "fxaa" && name != "off") {
+                return fail("general.liveAntialias must be \"fxaa\" or \"off\"");
+            }
+            out.liveAntialias = name == "fxaa";
+        }
         out.renderFramePreview = general->value("renderFramePreview", out.renderFramePreview);
         out.suspendViewportDuringRender =
             general->value("suspendViewportDuringRender", out.suspendViewportDuringRender);

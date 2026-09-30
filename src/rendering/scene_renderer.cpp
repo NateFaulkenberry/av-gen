@@ -1821,6 +1821,10 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "renderScale=0.58 (a third of the pixels)"},
         {"scale50", [](QualitySettings& q) { q.renderScale = 0.50f; },
          "renderScale=0.50 (a quarter of the pixels -- the adaptive ladder's floor)"},
+        // ADR-1024: the live editor's antialiasing, on any run -- how a render or a bench reproduces
+        // the live picture's FXAA without the editor.
+        {"liveaa", [](QualitySettings& q) { q.antialiasFloor = kLiveAntialiasFloor; },
+         "antialiasFloor=0.75 (the live editor's FXAA floor, ADR-1024)"},
     };
     return kArms;
 }
@@ -4422,6 +4426,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // renderer directly may not have, so the shutter is taken from the camera either way.
         scene::PostSettings postSettings = scene.post;
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
+        // ADR-1024: the live floor on the scene's FXAA. 0 everywhere but the live editor.
+        postSettings.antialias = std::max(postSettings.antialias, qualitySettings_.antialiasFloor);
         postIn.settings = &postSettings;
         postIn.antialias = toggles_.antialias; // ADR-187
         postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite

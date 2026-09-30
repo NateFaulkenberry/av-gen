@@ -404,3 +404,70 @@ TEST_CASE("FXAA antialiases, and does so without looking at the previous frame",
         CHECK(d.identical());
     }
 }
+
+// ADR-1024: the live editor's antialiasing is a floor on the scene's FXAA, and nothing else. Three
+// claims, each against a render the claim could lose to: a zero floor is the authored frame byte
+// for byte (which is what keeps an offline render unchanged); a raised floor is the frame the
+// scene would give at that strength; and a scene that asks for more than the floor keeps its own.
+TEST_CASE("the live antialiasing floor raises FXAA and changes nothing else", "[gpu][post][fxaa][adr1024]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.post.bloomEnabled = false;
+    s.post.tonemap = scene::TonemapOperator::Clamp;
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    const auto mesh = s.addMesh(scene::makeCube(1.2f));
+    auto& e = s.addEntity("edge", mesh);
+    e.material.baseColor = {0.0f, 0.0f, 0.0f};
+    e.material.emissiveColor = {1.0f, 1.0f, 1.0f};
+    e.material.emissiveIntensity = 4.0f;
+    e.material.unlit = true;
+    e.transform.rotation = glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 22.0f)));
+
+    const auto render = [&](float authored, float floor) {
+        s.post.antialias = authored;
+        rendering::QualitySettings q = renderer.qualitySettings();
+        q.antialiasFloor = floor;
+        renderer.setQualitySettings(q);
+        FrameTime t{};
+        auto img = renderer.renderToImage(s, t, 256, 256);
+        REQUIRE(img.has_value());
+        return *img;
+    };
+
+    const auto authoredOff = render(0.0f, 0.0f);
+    const auto authoredLive = render(rendering::kLiveAntialiasFloor, 0.0f);
+    const auto authoredMore = render(0.95f, 0.0f);
+    const auto floorOnOff = render(0.0f, rendering::kLiveAntialiasFloor);
+    const auto floorOnMore = render(0.95f, rendering::kLiveAntialiasFloor);
+    CHECK(ctx->errorCount() == 0);
+
+    {
+        // The scene the claims need: at this strength FXAA visibly changes the frame.
+        const auto d = testing::byteDiff(authoredOff.rgba, authoredLive.rgba);
+        INFO("authored 0 vs authored 0.75: " << d.describe());
+        REQUIRE_FALSE(d.identical());
+    }
+    {
+        const auto d = testing::byteDiff(floorOnOff.rgba, authoredLive.rgba);
+        INFO("floor 0.75 over authored 0 vs authored 0.75: " << d.describe());
+        CHECK(d.identical());
+    }
+    {
+        const auto d = testing::byteDiff(floorOnMore.rgba, authoredMore.rgba);
+        INFO("floor 0.75 over authored 0.95 vs authored 0.95: " << d.describe());
+        CHECK(d.identical());
+    }
+    {
+        const auto again = render(0.0f, 0.0f);
+        const auto d = testing::byteDiff(again.rgba, authoredOff.rgba);
+        INFO("floor back to 0 vs never raised: " << d.describe());
+        CHECK(d.identical());
+    }
+}

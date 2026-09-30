@@ -1,6 +1,6 @@
 # Sonic Garden POC: progress
 
-Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1023).
+Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1024).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
 the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
@@ -27,6 +27,8 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | 5 test material + scene (engineering) | done | `tools/make_sonic_material.py`, `examples/sonic-garden/` |
 | 5 art (mappings, families, look, §34-36) | pass 1 and **pass 2 done** (art agent, 2026-09-30; pass 2 is the second brief's PART 1) | see "Art pass 1" and "Art pass 2" below; `tools/sonic_garden_look.py`; review media in `23-sonic-garden/pass2/` |
 | 5 engineering follow-up | done (2026-09-30) | twist normals (ADR-1021), sky rebuild tolerance (ADR-1022), live-rate profile; see "Engineering follow-up" |
+| second brief PARTS 2-7 (live AA) | done (2026-09-30) | `AA-RESEARCH.md`, ADR-1024; see "Live anti-aliasing" below |
+| second brief PART 8 (merge prep) | see "Live anti-aliasing" below | |
 | 6-7 | not started | live input and live MIDI are Phase 7; the owner's next brief is `01-brief-live.md` (not started: the owner reviews the art first) |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
@@ -458,6 +460,38 @@ Architectural findings, recorded, not optimised:
   wall is 5-6 ms above the median for that reason. Amortising the prefilter across frames would remove the spike;
   not done (not needed for correctness, and the p50 is GPU-bound).
 - At preview tier 1080 the garden runs at about 48-53 fps, at 640x360 about 65-72 fps: live use is viable.
+
+## Live anti-aliasing (engineering agent, 2026-09-30, `01-brief-live.md` PARTS 2-8)
+
+The full record is `AA-RESEARCH.md`, and the decision is ADR-1024. Review media is in `23-sonic-garden/aa/`.
+
+- **Cause.**
+  - The adaptive render scale (on by default, 16.67 ms budget) takes the garden, GV3 and the Space presets to its
+    0.5 floor on the owner's 1640x1326 canvas: a quarter of the pixels, bilinear-stretched in the tone map.
+  - Nothing antialiases the live frame: FXAA runs only if authored, and the garden authors none.
+  - The offline path is 1:1, and for GV3 and the review stills it is supersampled 2x.
+  - The tier is 0.6% of the edge error; the floor doubles it.
+- **Implemented.**
+  - `QualitySettings::antialiasFloor`: FXAA runs at `max(authored, floor)`.
+    - It is 0 at every tier and must be 0 offline.
+    - Settings > Rendering > "Anti-aliasing" (FXAA by default, or Off) sets 0.75 in the live editor.
+    - Also `--live-aa`, and the quality arm `liveaa`.
+  - Settings > Rendering > "Lowest scale", also `--adaptive-floor`, default 0.50x (unchanged).
+  - The status bar shows `(scene WxH)` when the scene is below the canvas.
+  - Settings keys: `general.liveAntialias` and `general.adaptiveCanvasFloor`.
+- **Measured.**
+  - FXAA is below timer resolution (at most 0.066 ms). It takes 12-16% off edge error and crawl at full
+    resolution, and 2-3% at the floor.
+  - Garden GPU p50 at 1640x1326: 0.5 = 22.9 ms, 0.71 = 28.6, 0.85 = 32.8, 1.0 = 37.4.
+- **Offline.** 180 frames across four projects are byte-identical to head.
+- **Tried and reverted.**
+  - A Karis-weighted (`c/(1+luma)`) FXAA resample: no measurable difference on the strike frames.
+  - The FXAA shader is unchanged.
+- **Open, for whoever picks this up.**
+  - Phone-wire widening of `torus`/`tube` procedurals: the thin-geometry fix at any resolution.
+  - SMAA, only if FXAA is judged soft.
+  - `"supersample": 2` in the garden's own `render` block: the art owner's call, since it doubles render time.
+  - The live default floor stays 0.5 by decision (ADR-1024). Raising it is the owner's frame-rate choice.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
