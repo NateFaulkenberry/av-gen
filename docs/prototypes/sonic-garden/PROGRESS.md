@@ -620,8 +620,7 @@ audio via BlackHole.
 - Suites:
   - `avgen_tests` at `ee6f1092`: exit 0; 3,931 cases, 3,911 passed, 19 skipped, 1 failed as expected (the
     `[!shouldfail]` slope lean). `16638fed` changes only `application.cpp`, which neither test binary compiles.
-  - `avgen_render_tests`: run it under `tools/gpu-lock.sh` if this line has no result:
-    `tools/gpu-lock.sh build/release/tests/avgen_render_tests; echo $?`
+  - `avgen_render_tests` at `16638fed`, run after the CPU suite: exit 0; 559 cases, 558 passed, 1 skipped.
 - The review media are in place: `~/Desktop/av-gen-review/23-sonic-garden/live/` (3 clips, 2 curve plots and CSVs,
   the panel screenshot).
 - Next:
