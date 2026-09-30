@@ -1,7 +1,7 @@
 # Procedural Space POC: progress
 
 Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR block is 1000-1019;
-1000 to 1003 are used.
+1000 to 1005 are used.
 
 ## Rules in force
 
@@ -11,7 +11,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
   file.
 - A shader or scene edit while a suite is running mixes two versions into one run; don't do it.
 
-## Status (2026-09-30, 01:21)
+## Status (2026-09-30, 04:30)
 
 | phase | state | notes |
 |---|---|---|
@@ -20,6 +20,10 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
 | 3-6 foundation | done and verified on the GPU | ADR-1001 (morph, fold, recurse, names, `count`/`axis`), ADR-1002 (look, march cap, step statistics, prepass and shadow switches), ADR-1003 (compiled trees), `examples/space` |
 | 4 instrumentation | done, measured | see "Performance" |
 | 7, 8, 11 look, presets, evaluation | done (art agent, 2026-09-30 01:21-03:45) | see "Art pass"; media and `ART-NOTES.md` in `~/Desktop/av-gen-review/22-procedural-space/` |
+| 9 profiling | done (engineering, 03:45-04:30) | see "Phase 9"; no optimisation (none both small and visually equivalent) |
+| 10 validation | done | see "Phase 10" |
+| nesting limit | done: ADR-1005 | compiled trees are not stack-bound; depth 16 |
+| 38 report | drafted | `REPORT.md` (the report text was handed to the coordinator; see the hand-off) |
 
 ## What exists (engine)
 
@@ -249,6 +253,57 @@ t = 30 s.
   kaleidoscope, the bend and a second fold together.
 - **The depth prepass + GTAO lattice** on grazing SDF floors (the art presets turn the prepass off).
 - **Volumetric jitter** shows as speckle in lamp halos with no temporal accumulation.
+
+## Phase 9: profiling of the final art (engineering, 2026-09-30 04:00)
+
+- **Method.** `--headless --frames 150 --fps 30 --range <song time>: --audio ~/Desktop/Rebuild.mp3
+  --bench-json`, at 1920x1080, 1440x810, 960x540 and 634x356, under `/usr/bin/time -l` for the peak
+  RSS. Each showcase stage (and each Folding / Explosion / melt state) was measured on its own
+  copy of the project with that stage's preset baked into `parameters` and `states` removed (scene
+  states count bars from the start of a run, and in a first attempt an `initial` state's preset did not show over the
+  project's `parameters`). The copies were `examples/space/_bench_*.json`, untracked and deleted after.
+- **Results** (GPU p50 ms at 1.0 / 0.5; the full table is in `REPORT.md` section 3):
+  showcase stages 45-51 / 15-17, except Cathedral 87 / 27; Infinite Hall 40 / 15; Recursive
+  Cathedral 79 / 26; Folding 41-43 / 14; Radial 43 / 15; Explosion 27-47 / 10-16; melt 44 (1.0 only).
+  CPU work about 0.5 ms (every frame GPU-bound). Peak RSS 0.95-1.03 GB. Below 0.5 the numbers stop
+  scaling (fixed work costs more at 0.33 than at 0.5: GPU clocks drop under light load).
+- **Findings.**
+  1. The kaleidoscope is the showcase's cheapest stage (19.1 average steps, max 42), not a hotspot.
+  2. Recursion is the hotspot: same steps as the hall (about 26) but 2.2-2.8x the march cost (65-68
+     ms at 1080p), because every step evaluates the 27-node chamber once per level (6 levels).
+  3. The volumetric march is a fixed 16-18 ms at 1080p (6-7 ms at 0.5), whatever the geometry.
+  4. The depth prepass is off in the art presets (0.0-0.1 ms).
+- **No optimisation.** Per-level culling in `recurse` is exact only for exact fields (the chamber's
+  polar repeat is a bound), and the volumetric pass's levers (resolution, steps) change the halos.
+  Both are promotion items.
+- **Live editor:** showcase at canvas 0.5, `--play`: GPU p50 12.3 ms, p95 15.7, 77 fps.
+- **Offline 1080p:** 8.1-15.2 fps (the offline tier raises sky, volumetrics and detail limits).
+
+## Phase 10: integration validation (engineering, 2026-09-30 04:00-04:15)
+
+- **Loading, preview, playback, parameters:** all 7 projects load with 0 warnings; the editor plays the
+  showcase at 77 fps (canvas 0.5); `--stress 7` for 600 frames: no crash, 0 GPU errors (a random
+  `enabled` toggle invalidated the tree once and the renderer skipped it with a warning, as designed).
+- **Scene states are play-forward.** `--start-at 150` in the editor shows the Normal stage at 2:38, not
+  Mathematical. Routes follow a seek (the signal bus replays); states do not. Owner decision.
+- **Audio conditions** (Infinite Hall and showcase, 0-36 s, 384x216; tones = 55/200/800/3000/9000 Hz
+  sines 6 s each, `ffmpeg`; drums = `tools/make_test_audio.py --seconds 36`; EDM = Rebuild 2:30-3:06;
+  complex = `assets/audio/glowmere-valley.wav`). Mean per-frame luma change (hall / showcase): no
+  audio 0.08 / 0.20, tones 1.43 / 0.52, drums 2.27 / 0.75, EDM 2.26 / 0.70, complex 2.41 / 0.63. No
+  audio and silence render byte-identically, and nothing moves: the bar clock needs a track, so no
+  per-bar rule or state fires. The showcase moves less early by design (`macros/rules` gates the
+  band routes to 0 in the Normal stage).
+- **Determinism:** 7 projects x 2 renders at 1080p (60-62 s with Rebuild): identical sequence hashes.
+  12 low-resolution renders: byte-identical across two processes and across the ADR-1005 build.
+- **New test** (`[space]`): the Infinite Hall's music moves every routed rule, two fresh engines give
+  bit-identical rules and compiled tables over 20 s, and with no audio nothing moves.
+
+## ADR-1005 (the art agent's nesting request)
+
+`SdfTree::validate(SdfEvaluator::Compiled)` skips the interpreter's stack checks; `SdfObject`
+validates for its `compile` flag; `kMaxSdfDepth` 12 -> 16. A compiled tree may now nest up to 15 unary
+operators. `tools/make_space_presets.py` checks compiled trees against the compiled limits. No preset
+changed (generator output identical; renders byte-identical).
 
 ## Next steps (engineering)
 
