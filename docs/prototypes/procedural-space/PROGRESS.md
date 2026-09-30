@@ -11,7 +11,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
   file.
 - A shader or scene edit while a suite is running mixes two versions into one run; don't do it.
 
-## Status (2026-09-30, about 01:10)
+## Status (2026-09-30, 01:21)
 
 | phase | state | notes |
 |---|---|---|
@@ -56,7 +56,9 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
   - `avgen_tests`: binary exit 0; 3,876 passed, 19 skipped, 1 failed as expected (the slope lean).
   - `avgen_render_tests "[sdf]"`: 10 of 11 pass. The failure is the pre-existing hidden probe "A
     raymarched SDF does not reach the shadow map", which fails until that defect is fixed.
-  - Full `avgen_render_tests`: see "Next steps".
+  - Full `avgen_render_tests` at `f1d93a4f`: binary exit 0; 554 passed, 1 skipped.
+  - The full CPU suite ran before ADR-1003 landed. After it, `avgen_tests "[sdf]"` (53 cases,
+    including `[space]`) passes.
 
 ## The example: `examples/space/space.json` (also in the Examples menu under Lab)
 
@@ -187,9 +189,8 @@ t = 30 s.
 
 ## Next steps (engineering)
 
-1. The full `avgen_render_tests` run was started at about 01:10. Record its binary exit code here.
-2. Possible optimisations, measured and not yet needed:
+1. Possible optimisations, measured and not yet needed:
    - drop the depth prepass for the SDF (2-6 ms at 1080p);
    - over-relaxation (Keinert) for the exact states;
    - lower `maxSteps` for the 0.1 % exhausted rays.
-3. §34 offline and timeline playback work (the 60 s render). Creative Critic runs are the art agent's.
+2. §34 offline and timeline playback work (the 60 s render). Creative Critic runs are the art agent's.
