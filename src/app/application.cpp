@@ -179,6 +179,9 @@ std::string usageText() {
            "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
            "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
            "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
+           "  --live-capture <d>  with live Sonic input: every 2nd frame (--live-capture-every <n>) re-rendered\n"
+           "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
+           "                      review clip; costs frame time\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
@@ -391,6 +394,26 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--midi");
             if (!v) return std::unexpected(v.error());
             options.midi = *v;
+            ++i;
+        } else if (arg == "--live-capture") {
+            auto v = need(i, "--live-capture");
+            if (!v) return std::unexpected(v.error());
+            options.liveCapture = *v;
+            ++i;
+        } else if (arg == "--live-capture-size") {
+            auto v = need(i, "--live-capture-size");
+            if (!v) return std::unexpected(v.error());
+            unsigned w = 0, h = 0;
+            if (std::sscanf(v->c_str(), "%ux%u", &w, &h) != 2 || w < 16 || h < 16) {
+                return fail("--live-capture-size wants WxH");
+            }
+            options.liveCaptureWidth = w;
+            options.liveCaptureHeight = h;
+            ++i;
+        } else if (arg == "--live-capture-every") {
+            auto v = need(i, "--live-capture-every");
+            if (!v) return std::unexpected(v.error());
+            options.liveCaptureEvery = std::max(1, std::atoi(v->c_str()));
             ++i;
         } else if (arg == "--sonic-live-log") {
             auto v = need(i, "--sonic-live-log");
@@ -5236,6 +5259,9 @@ int Application::runLive() {
         if (liveLog_ && engine_->liveSonic()) {
             writeLiveSonicLog(sonic::hostNowNs(), lastGpuFrameMs_);
         }
+        if (options_.liveCapture && engine_->liveSonic()) {
+            captureLiveFrame(time);
+        }
         if (uiCaptureDone_) {
             break;   // --capture-ui, without --capture-ui-stay: the picture is written, we are done
         }
@@ -6632,6 +6658,17 @@ void Application::serviceLiveSonic() {
             hub.applyIo();
         }
         engine_->setLiveSonicSmoothing(settings_.live.smoothing);
+        // The panel that says whether anything is arriving, where the person will look for it.
+        if (bool* open = panel_->layout().slot("Live"); open != nullptr) {
+            *open = true;
+        }
+        // A live world keeps moving: with no audio file there is nothing to wait for, so the transport runs
+        // (with no duration it runs unbounded). A project with audio keeps its own transport.
+        if (!engine_->hasAudio() && !engine_->isPlaying()) {
+            if (auto r = engine_->play(); !r) {
+                log::warn("live sonic: transport: {}", r.error().message);
+            }
+        }
         if (!engine_->hasLiveInput() && !options_.input && !settings_.live.audioInput.empty()) {
             if (auto r = engine_->useAudioInput(settings_.live.audioInput); !r) {
                 panel_->setStatus("live audio input '" + settings_.live.audioInput + "': " + r.error().message);
@@ -6670,6 +6707,38 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
         *liveLog_ << ',' << fmt::format("{:.5g}", static_cast<double>(bus.value(id)));
     }
     *liveLog_ << '\n';
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+void Application::captureLiveFrame(const FrameTime& time) {
+    if (liveCaptureFrames_++ % static_cast<std::uint64_t>(options_.liveCaptureEvery) != 0) {
+        return;
+    }
+    const std::filesystem::path dir = *options_.liveCapture;
+    if (!liveCaptureIndex_) {
+        std::filesystem::create_directories(dir);
+        liveCaptureIndex_ = std::make_unique<std::ofstream>(dir / "frames.csv");
+        *liveCaptureIndex_ << "file,frameNs,liveSeconds\n";
+    }
+    const std::uint64_t ns = engine_->liveSonicFrameNs();
+    const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                    engine_->barPhase()};
+    auto image = renderer_->renderToImage(engine_->scene(), time, options_.liveCaptureWidth,
+                                          options_.liveCaptureHeight, &shaderInputs);
+    if (!image) {
+        log::warn("--live-capture: {}", image.error().message);
+        return;
+    }
+    const std::string name = fmt::format("f{:06d}.ppm", liveCaptureFrames_ - 1);
+    if (auto r = gpu::writePpm(*image, dir / name); !r) {
+        log::warn("--live-capture: {}", r.error().message);
+        return;
+    }
+    *liveCaptureIndex_ << name << ',' << ns << ',' << fmt::format("{:.6f}", engine_->liveSonicSeconds()) << '\n';
 }
 
 } // namespace avgen::app

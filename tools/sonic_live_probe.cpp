@@ -209,15 +209,18 @@ void scenario(const std::string& name, Player& p) {
     Synth& s = p.synth;
     if (name == "latency") {
         s.cutoff.store(6000.0f);
+        // 0.8 s is exactly 75 analysis hops (512 at 48 kHz) and 48 frames at 60 Hz, so a plain 0.8 s grid would
+        // put every note at the same hop and frame phase and measure one offset 24 times. The extra 3.1 ms per note
+        // walks both phases across the run.
         for (int i = 0; i < 24; ++i) {
-            const double t = 1.0 + 0.8 * i;
+            const double t = 1.0 + 0.8031 * i;
             const int key = 48 + (i * 7) % 24;
             p.waitUntil(t);
             p.on(key, 100);
             p.waitUntil(t + 0.35);
             p.off(key);
         }
-        p.waitUntil(1.0 + 0.8 * 24 + 1.0);
+        p.waitUntil(1.0 + 0.8031 * 24 + 1.0);
     } else if (name == "sweep") {
         s.cutoff.store(120.0f);
         s.resonance.store(0.9f);

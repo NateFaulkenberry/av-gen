@@ -286,6 +286,11 @@ struct AppOptions {
     bool live = false;
     std::optional<std::string> midi;
     std::optional<std::string> sonicLiveLog;
+    // --live-capture <dir>: every Nth live frame re-rendered at a small size into <dir> as PPM, with frames.csv
+    // (frame, host ns). For review clips of a live session; it costs frame time, so not in a latency run.
+    std::optional<std::string> liveCapture;
+    int liveCaptureEvery = 2;
+    std::uint32_t liveCaptureWidth = 960, liveCaptureHeight = 540;
     std::optional<int> oscPort;
     bool listAudioDevices = false;
     bool listMidi = false;
@@ -454,6 +459,9 @@ private:
     std::unique_ptr<std::ofstream> liveLog_;
     std::vector<std::pair<std::string, signals::SignalId>> liveLogColumns_;
     std::uint64_t liveLogFrames_ = 0;
+    std::unique_ptr<std::ofstream> liveCaptureIndex_;
+    std::uint64_t liveCaptureFrames_ = 0;
+    void captureLiveFrame(const FrameTime& time);
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();

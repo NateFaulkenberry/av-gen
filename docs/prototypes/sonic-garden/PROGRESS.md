@@ -1,6 +1,6 @@
 # Sonic Garden POC: progress
 
-Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1024).
+Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1025).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
 the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
@@ -29,7 +29,9 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | 5 engineering follow-up | done (2026-09-30) | twist normals (ADR-1021), sky rebuild tolerance (ADR-1022), live-rate profile; see "Engineering follow-up" |
 | second brief PARTS 2-7 (live AA) | done (2026-09-30) | `AA-RESEARCH.md`, ADR-1024; see "Live anti-aliasing" below |
 | second brief PART 8 (merge prep) | see "Live anti-aliasing" below | |
-| 6-7 | not started | live input and live MIDI are Phase 7; the owner's next brief is `01-brief-live.md` (not started: the owner reviews the art first) |
+| second brief PARTS 9-14 (integration, live MIDI, live audio, sync, UI, demo plumbing) | done (2026-09-30), ADR-1025 | see "Live input" below; the owner's hands-on test is `LIVE-QUICKSTART.md` |
+| second brief PARTS 15-16 (live demo art, live art direction) | next: art agent | the demo project exists (`examples/sonic-garden/sonic-live.json`), untuned for live play |
+| second brief PART 22 (the hardware test) | the owner's | `LIVE-QUICKSTART.md` |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
 
@@ -507,6 +509,144 @@ The full record is `AA-RESEARCH.md`, and the decision is ADR-1024. Review media 
   - The root-level `indtune.cpp` and `temporal-*.png` are tracked on main already, not by this branch. I left them
     alone.
 
+## Live input (engineering agent, 2026-09-30, `01-brief-live.md` PARTS 9-14) -- ADR-1025
+
+The owner's hands-on test is `LIVE-QUICKSTART.md`. Review media are in `~/Desktop/av-gen-review/23-sonic-garden/live/`.
+
+### PART 19, before and after
+
+```
+BEFORE (files only)
+  .wav -> AnalysisTrack (whole file, at load) -> analyzeTimbre (load-time pass) -> SonicRuntime.advance (hop clock)
+  .mid -> NoteTrack -> contextAt(t)                                                        \
+                                                         sonic.* timbre.* notes.* -> interpret -> visual.* -> routes
+  (live app: CoreMIDI -> ControlHub -> control.* only; --input -> AnalysisRunner -> audio.* only)
+
+AFTER (live added; the file path unchanged)
+  LIVE MIDI  CoreMIDI -> MidiInbox -> ControlHub.update (engine thread) -> LiveNotes (NoteTrack, host clock)
+                -> contextAt / eventsBetween (the SAME functions) -> Musical Context -> notes.*
+  LIVE AUDIO device -> AudioInput callback (unchanged: downmix, ring) -> AnalysisRunner thread: Analyzer
+                -> FrameTap: LiveTimbre -> TimbreAnalyzer::analyze (the SAME function) -> SPSC snapshot queue
+                -> render thread: LiveSonic.frame -> SonicRuntime::step per analysis frame (the SAME step) -> sonic.*
+                                             Sonic Model = LiveSonic (character + context)
+                -> interpret source (Visual Interpreter) -> visual.* -> existing routes/modulators -> parameters
+                -> generators -> scene -> renderer -> live AA (ADR-1024) -> display
+```
+
+Musical information (`notes.*`), sonic information (`sonic.*`, `timbre.*`), visual interpretation (`visual.*`) and
+rendering stay separate layers, as PART 19 asks.
+
+### Threading
+
+| thread | does | never does |
+|---|---|---|
+| audio callback | downmix, gain, write the existing SPSC ring (128-frame capture period now) | allocate, lock, analyse |
+| analysis (AnalysisRunner) | STFT, beat tracker, then the tap: timbre (0.1-0.25 ms/frame), push a ~100-byte snapshot | block on the render thread (a full queue drops the newest, counted) |
+| CoreMIDI | parse into the inbox (existing) | touch the engine |
+| engine/render | drain MIDI into LiveNotes; drain snapshots into `SonicRuntime::step` (~1 us each); publish | DSP |
+
+### Entry point (PART 9)
+
+- `Engine::setLiveSonic` (live engine only).
+- A project with `"sonic": {"live": true}` turns it on when the editor opens it, and every other project turns it
+  off.
+- The **Sonic Live** example (`examples/sonic-garden/sonic-live.json`, from `tools/sonic_live_project.py`).
+- The **Live** panel (View > Live; it opens itself when live input turns on).
+- `--live`, `--midi <filter>`, `--input <device>`.
+- Per-machine settings: `live.audioInput`, `live.midiInput`, `live.smoothing`.
+- Turning live on with no audio file starts the transport, so `time.seconds` animation runs. With no duration it is
+  unbounded.
+
+### Latency (PART 12), measured
+
+- **Rig:** `avgen_sonic_probe latency` sends a note over a CoreMIDI virtual source and starts its synth voice at
+  the same host instant; the synth plays into BlackHole; the app captures BlackHole.
+- **Clock:** every time is `mach_absolute_time` ns on both sides, joined by `tools/sonic_live_latency.py`.
+- **Frames:** about 57 fps in the editor at 1640x1326 (adaptive scale at the 0.5 floor).
+- **Sampling:** 48 notes per arm. The note grid steps 3.1 ms per note, so that hop and frame phases are sampled,
+  not fixed; the first, unstepped runs measured one phase and read 10 ms too optimistic.
+
+| path | p50 | p90 | max |
+|---|---|---|---|
+| MIDI -> bus (frame start) | 13.2 ms | 22.8 | 25.0 |
+| MIDI -> present | 18.4 | 29.3 | 47.7 |
+| audio -> bus | 23.8 | 33.2 | 47.9 |
+| audio -> present | 28.6 | 38.2 | 52.5 |
+| audio -> bus, miniaudio's default 480-frame capture period (A/B) | 27.4 | 35.8 | 48.3 |
+
+- What follows present: the GPU frame (about 17-19 ms, pipelined) and scanout (up to one refresh).
+- Most of the audio path is structural: the analyzer's centred 2048-sample window (about 21 ms of group delay),
+  plus the hop, plus waiting for the next frame.
+- **No compensation.** The note gesture appears about one frame before its timbre, which is the order a player
+  expects. Delaying MIDI to align them would only make the instrument feel late (ADR-1025 §8).
+
+### PART 17 and PART 18 through the live path
+
+One held A2 (MIDI constant: `notes.active` 1, `notes.pitch` 0.25, `notes.velocity` 0.756 throughout), synthesized
+audio via BlackHole.
+
+- **Filter sweep** (low-pass 120 Hz to 9 kHz over 8 s, and back over 5 s):
+  - `sonic.brightness` 0.00 to 0.57 and back;
+  - `warmth` 1.00 to 0.67;
+  - `roughness` 0.00 to 0.32;
+  - `visual.glow` (the art's filter channel) 0 to 0.70;
+  - the families cross from organic 1.00 toward crystalline (0.42 at the peak), then back.
+  - The medium tier lags the cutoff by about 1 s (its time constants).
+- **Distortion** (a mellow tone, low-passed at 350 Hz, into a tanh drive of 1 to 40):
+  - `roughness` 0.006 to 0.28;
+  - `brightness` 0.02 to 0.48;
+  - `warmth` 0.99 to 0.72;
+  - `visual.grain` 0.004 to 0.21;
+  - `visual.glow` 0 to 0.57.
+  - The families stay organic-led (0.83 organic, 0.17 crystalline, `chaotic` 0), so the world changes less than
+    the numbers. The art agent should tune for live play.
+  - The probe's first version drove the saws before its filter: a clipped saw is a square, with the same 1/n
+    spectrum, and nothing moved. That is a lesson for the owner's test too: distortion ahead of a closed filter
+    barely changes timbre.
+- Review media in `23-sonic-garden/live/`:
+  - `02-filter-sweep-live.mp4`, `-curves.png` and `.csv`;
+  - `03-distortion-...`;
+  - `01-live-demo-probe-synth.mp4` (low soft notes, high bright notes, chords, an arpeggio, a sweep, distortion);
+  - `04-live-panel-and-viewport.png`.
+  - The clips are about 15 fps, because `--live-capture` re-renders each frame at 640x360.
+
+### For the art agent (PARTS 15-16)
+
+- The demo is the garden master with no audio or MIDI file, `sonic.live: true`, and the camera held at the
+  master's 10.75 s framing. Re-run `python3 tools/sonic_live_project.py` after changing the master. Put live-only
+  overrides in that tool.
+- Tune on the probe or real material:
+  - the `high`/`low` register split (centred on the phrase's 0.38-0.54);
+  - `mass`'s bias;
+  - the family sharpness;
+  - `chaotic` against real distortion (see above);
+  - `temporal/echo` in the warm world;
+  - how the world opens from `silence`.
+- To test without hardware, start the app, then run the probe:
+  - `build/release/src/avgen --example "Sonic Live" --input BlackHole --sonic-live-log x.csv`
+  - `build/release/tools/avgen_sonic_probe <sweep|drive|demo|latency> --out p.csv [--wav p.wav]`
+- Tools:
+  - `tools/sonic_live_curves.py` (the table and the plot);
+  - `tools/sonic_live_clip.py` (a review clip from `--live-capture <dir> --live-capture-every 1
+    --live-capture-size 640x360`).
+- The windowed app runs here under `tools/gpu-lock.sh`. `--capture-ui f.png --capture-ui-panel Live` photographs
+  the panel.
+
+### Tests
+
+`tests/unit/test_sonic_live.cpp`, `[sonic][adr1025]`, 11 cases:
+- live notes equal to file notes;
+- events fire once;
+- pedal, all-off and retrigger;
+- the note track stays bounded;
+- the SPSC queue across threads;
+- **the threaded live timbre path reaches the file path's character to 1e-6**;
+- a disabled tap does nothing;
+- engine MIDI;
+- device-absent;
+- `sonic.live` projects;
+- a real CoreMIDI source (`[device]`).
+
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
 | dim | pad | bell | bass | perc |
@@ -623,6 +763,7 @@ Engineering follow-up, at `41aa1cf7`, reconfigured, both suites under `tools/gpu
   only harmonicity proves noisy on real material.
 - The interpret source's parameters are registered at attach. Changing its settings JSON at runtime needs a
   project reload. Nothing edits it at runtime today.
-- The live input path (`--input`) and live MIDI are not wired to the Sonic runtime (Phase 7).
+- Live input and live MIDI are wired (ADR-1025). Pitch bend, MPE and MIDI 2.0 are not used yet (the note keeps a
+  float pitch and velocity for them).
 - The timbre pass is serial at load: about 2.5 s for a 4-minute track. If that matters, it parallelises trivially
   by frame.
