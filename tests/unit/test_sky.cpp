@@ -184,6 +184,47 @@ TEST_CASE("SkyRuntime::hash changes exactly when a rebuild is needed", "[sky]") 
     CHECK(a.hash() != b.hash());
 }
 
+// ADR-1022. A sky routed through slow chains drifts by parts per million a frame; the renderer keeps
+// the cube it built until the drift passes a tolerance no 8-bit frame can show.
+TEST_CASE("skyWithinRebuildTolerance: a settling drift keeps the cube, a real change does not", "[sky][adr1022]") {
+    const SkyRuntime built = defaultSky();
+    CHECK(skyWithinRebuildTolerance(built, built));
+    const auto within = [&built](auto&& mutate) {
+        SkyRuntime s = built;
+        mutate(s);
+        return skyWithinRebuildTolerance(built, s);
+    };
+    // Parts per thousand: within.
+    CHECK(within([](SkyRuntime& s) { s.zenithColor *= 1.003f; }));
+    CHECK(within([](SkyRuntime& s) { s.horizonColor.r *= 0.997f; }));
+    CHECK(within([](SkyRuntime& s) { s.intensity *= 1.004f; }));
+    CHECK(within([](SkyRuntime& s) { s.hazeWidth *= 1.004f; }));
+    CHECK(within([](SkyRuntime& s) { s.sunDirection = glm::normalize(s.sunDirection + glm::vec3(1e-4f, 0.0f, 0.0f)); }));
+    // A channel near zero beside a bright one is measured against the bright one.
+    {
+        SkyRuntime a = built;
+        a.groundColor = {0.5f, 0.3f, 1e-4f};
+        SkyRuntime b = a;
+        b.groundColor.b = 1e-3f; // ten times larger, but 0.2% of the colour's brightest channel
+        CHECK(skyWithinRebuildTolerance(a, b));
+    }
+    // A percent or more, anywhere: rebuild.
+    CHECK_FALSE(within([](SkyRuntime& s) { s.zenithColor.g *= 1.02f; }));
+    CHECK_FALSE(within([](SkyRuntime& s) { s.sunColor.r *= 0.98f; }));
+    CHECK_FALSE(within([](SkyRuntime& s) { s.sunIntensity *= 1.02f; }));
+    CHECK_FALSE(within([](SkyRuntime& s) { s.sunAngularRadius *= 1.02f; }));
+    CHECK_FALSE(within([](SkyRuntime& s) { s.sunGlowWidth *= 1.02f; }));
+    CHECK_FALSE(within([](SkyRuntime& s) { s.sunDirection = glm::normalize(s.sunDirection + glm::vec3(1e-3f, 0.0f, 0.0f)); }));
+    // Drift adds up: each step is small, but the comparison is against the sky that was built.
+    SkyRuntime drifting = built;
+    int steps = 0;
+    while (skyWithinRebuildTolerance(built, drifting) && steps < 1000) {
+        drifting.zenithColor *= 1.001f;
+        ++steps;
+    }
+    CHECK(steps < 20);
+}
+
 TEST_CASE("resolveSky clamps the values a build would divide by", "[sky]") {
     SkySettings settings;
     settings.hazeWidth = 0.0f;

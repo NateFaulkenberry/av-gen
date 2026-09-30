@@ -442,6 +442,21 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
     let nInst = quatRotate(inst.rotation, n / safeScale);
     let nRef = normalize((object.normalMatrix * vec4<f32>(nInst, 0.0)).xyz);
+    // ADR-1021: the chain's handedness, for the normal's sign below. Only a mirror turns a surface
+    // over: the object matrix, the instance scale, or a path deformer run backwards along its
+    // spline. Computed here, before the chain, and not beside its use: reading `proc` after the
+    // three deformChain calls (this loop, or even one prevInfo field) measured 2 ms more GPU a frame
+    // in the Sonic Garden at 1080p (shadow 0.85 -> 2.4 ms) with identical images; here it is free.
+    let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
+    var handedness = determinant(objectLinear) * s.x * s.y * s.z;
+    let deformerCount = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= deformerCount) { break; }
+        let d = proc.deformers[i];
+        if (deformerCode(d) == DEFORM_PATH && d.params.x >= 0.0 && d.params.y < 0.0 && d.centerAmount.w > 0.5) {
+            handedness = -handedness;
+        }
+    }
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
@@ -498,12 +513,18 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
             p2 = p2 + fxVertexOffset(p2, nRef, now, fxFlags, fxLanes);
         }
     }
+    // ADR-1021. cross(J t1, J t2) = det(J) J^-T n: the rebuilt normal is the outward one times the
+    // sign of the chain's Jacobian determinant. The deformers are continuous from the identity and
+    // do not change that sign; only a mirror does -- the instance scale, the object matrix, or a path
+    // deformer run backwards along its spline -- so the flip is taken from those. (It used to be
+    // taken from the angle to the *undeformed* normal, which turned any twist past a quarter turn
+    // inside out.)
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
     } else {
         nw = normalize(nw);
-        if (dot(nw, nRef) < 0.0) {
+        if (handedness < 0.0) {
             nw = -nw;
         }
     }

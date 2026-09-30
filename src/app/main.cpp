@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 #include "app/reactivity_cli.hpp"
 #include "app/route_audit_cli.hpp"
+#include "app/sonic_trace_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
 #include "core/log.hpp"
@@ -71,6 +72,11 @@ int main(int argc, char** argv) {
         return avgen::app::runProposeReactivityCommand(options->project.value_or(std::filesystem::path{}),
                                                        *options->proposeReactivity,
                                                        options->fpsGiven ? options->offlineFps : 0.0);
+    }
+    // ADR-1020: the Sonic Garden's signals, the same way.
+    if (options->sonicTrace) {
+        return avgen::app::runSonicTraceCommand(options->project.value_or(std::filesystem::path{}), *options->sonicTrace,
+                                                options->fpsGiven ? options->offlineFps : 0.0);
     }
     avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
 

@@ -46,6 +46,7 @@
 #include "rendering/shader_layer.hpp"
 #include "rendering/shadow_renderer.hpp"
 #include "rendering/skinning.hpp"
+#include "scene/sky.hpp"
 #include "rendering/simulation.hpp"
 #include "rendering/spline_buffers.hpp"
 #include "rendering/volume_renderer.hpp"
@@ -954,6 +955,11 @@ private:
     // ADR-036: the procedural sky is rebuilt only when its resolved parameters change.
     std::uint64_t skyHash_ = 0;
     bool skyBuilt_ = false;
+    // ADR-1022: the sky the cube on screen was built from, and at what sizes, so a sky that has
+    // moved by less than scene::skyWithinRebuildTolerance keeps it.
+    scene::SkyRuntime builtSky_{};
+    std::uint32_t builtSkyCube_ = 0;
+    std::uint32_t builtSkyPrefiltered_ = 0;
     // ADR-233: and, in the live editor only, not on every frame of the drag that is changing them.
     // The full IBL chain -- cube, irradiance, GGX prefilter, all of it blocking -- costs 40-70 ms
     // on this machine, and `processSky`'s own header says it is load-time work. A lighting drag

@@ -1,0 +1,54 @@
+# ADR-1022: The procedural sky rebuilds when it moves past a tolerance, not on every bit
+
+**Status:** Accepted (Sonic Garden POC, engineering follow-up to art pass 1).
+**Date:** 2026-09-30
+
+## Context
+
+ADR-036 rebuilds the procedural sky's lighting cube (source cube, irradiance, GGX prefilter; at the offline tier
+a 1024 face, ADR-919) whenever `SkyRuntime::hash()` changes. The hash is over the float bits. The Sonic Garden's
+world palettes drive `env/sky/zenithColor`, `horizonColor` and `haze` through slow route chains that approach
+their targets asymptotically, so the sky moved by parts per million on nearly every frame and rebuilt on nearly
+every frame: 301 builds in 300 frames of the pad, at about 47 ms each as logged (including the chain's queue
+waits). The art agent's A/B put it at about 20 ms of a 128 ms 1080p frame.
+
+ADR-233 already defers rebuilds during an editor drag; offline and in playback it does nothing.
+
+## Decision
+
+`scene::skyWithinRebuildTolerance(built, current)` compares the sky the cube was built from with this frame's:
+each colour within 1/128 of its own largest channel plus 1e-5 absolute, each scalar within 1/128 relative plus
+1e-5, the sun direction within 0.25 mrad. The absolute floor is for a nearly black sky: the percussion's zenith sits
+near 1e-4, where the residual weights of the other families move it by a few 1e-5 a frame, and without the floor it
+still rebuilt on 351 of 361 frames. `SceneRenderer::updateEnvironment` keeps the cube when the sizes are unchanged and the sky is within
+tolerance. The comparison is against the sky that was **built**, so a slow drift still rebuilds once it has added
+up, and nothing lags by more than the tolerance.
+
+The alternative, amortising the prefilter over frames, would make the reflections lag by whole frames on every
+change and needs the cube kept across builds; the tolerance is a few lines and bounded in error.
+
+## Consequences
+
+Measured against a rebuild on every frame (the head binary), both with the head shaders, `--headless` at 30 fps,
+same session:
+
+| clip | frames | builds before | after | render time before | after | frames differing | worst pixel |
+|---|---|---|---|---|---|---|---|
+| Sonic Garden pad, 0-10 s, 960x540 | 300 | 301 | 75 | 17.8 s | 13.6 s | 254 | 1 (8-bit) |
+| Sonic Garden morph, 8-24 s, 640x360 | 480 | 481 | 169 | 20.3 s | 16.6 s | 479 | 1 |
+| Sonic Garden perc, 0-12 s, 960x540 | 360 | 361 | 111 | | | 304 | 1 |
+| night-shift (sky on a sequence), 0-20 s, 960x540 | 600 | 2 | 2 | 23.0 s | 23.1 s | 0 | 0 |
+
+Mean absolute difference at most 0.02 per channel, and no pixel anywhere differs by more than one level. Other
+tolerances on the pad and morph: 1/512 without the floor cut the pad only to 155 of 361 builds; 1/64 was also
+within one level but changed twice as many pixels; 1/32 reached two levels. GV3 (`examples/world/glowmere-valley-3.json`)
+was the suggested sky-routed project, but by inspection it sets `env/sky/*` only as static parameters (no route or
+timeline track targets the sky), so night-shift, whose sequence keys the sky's colours and intensities, was used.
+
+- The cube is now a function of the sky's history within the tolerance: a seek that lands on a frame builds the
+  exact sky, while playback may arrive with one built up to 1/128 earlier. The difference is at most one level in
+  8 bits on the material measured.
+- In the headless profile (default tier, 1080p) the environment update fell from 6.1-6.5 ms a frame to 1.6-2.1 ms
+  and the wall-clock median from 43-45 ms to 38-40 ms; at the offline tier (1024 faces) each build is about 47 ms.
+- `tests/unit/test_sky.cpp` (`[adr1022]`) covers the tolerance; `tests/rendering/test_sky_gpu.cpp`, "a sky drifting
+  inside the rebuild tolerance is not rebuilt", covers the renderer through `environmentBuildCount()`.

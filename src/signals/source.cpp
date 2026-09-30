@@ -1,5 +1,7 @@
 #include "signals/source.hpp"
 
+#include "sonic/interpret_source.hpp"
+
 #include "core/log.hpp"
 #include "core/rng.hpp"
 #include "params/processor.hpp"
@@ -1226,8 +1228,15 @@ void SourceRack::sample(SignalBus& bus, const SourceContext& context) const {
     if (params_ == nullptr) {
         return;
     }
+    // In the order update() uses (ADR-900): a pure source that reads other signals (an interpret source,
+    // ADR-1020) must sample after the publishers it reads, or a replay reads last step's values.
     for (const auto& source : sources_) {
-        if (source->pureInTime()) {
+        if (source->pureInTime() && !source->readsTriggers()) {
+            source->sample(bus, context);
+        }
+    }
+    for (const auto& source : sources_) {
+        if (source->pureInTime() && source->readsTriggers()) {
             source->sample(bus, context);
         }
     }
@@ -1325,6 +1334,10 @@ std::unique_ptr<Source> SourceRack::create(const std::string& kind, const std::s
     }
     if (kind == "control") {
         return std::make_unique<ControlSource>(name);
+    }
+    if (kind == "interpret") {
+        // ADR-1020: the Sonic Garden's Visual Interpreter; its mappings publish visual.<mapping>.
+        return std::make_unique<sonic::InterpretSource>(name);
     }
     return nullptr;
 }

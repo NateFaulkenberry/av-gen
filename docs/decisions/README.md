@@ -37,6 +37,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 980-989 | gv3/art-pass -- the GV3 targeted art pass |
 | 990-999 | gv3/art-pass -- the GV3 targeted art pass (980-989 exhausted) |
 | 1000-1019 | proto/procedural-space |
+| 1020-1039 | proto/sonic-garden |
 | 701+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -609,3 +610,6 @@ confirm the citation you are about to change is your own.
 | [1003](ADR-1003-sdf-trees-compile-to-wgsl.md) | SDF trees compile to WGSL (`compile: true` replaces the interpreter with kind-specialised straight-line WGSL; parameters stay live in a per-node table and only structure recompiles; 140 -> 8.1 ms on the space example at 960x540; the lit and prepass marches now share one function and the lit depth is 4 ulps nearer, fixing an ulp depth-test speckle. proto/procedural-space) | Accepted |
 | [1004](ADR-1004-sdf-edge-light-is-fogged.md) | The SDF edge light is fogged like the surface it sits on (the edge emission is multiplied by the fog transmittance, taken as applyFog(1) - applyFog(0); unchanged with no fog. proto/procedural-space) | Accepted |
 | [1005](ADR-1005-compiled-sdf-trees-are-not-stack-bound.md) | Compiled SDF trees are not bound by the interpreter's stacks (`validate(SdfEvaluator::Compiled)` skips the 8-entry stack checks; depth 12 -> 16; a compiled tree whose variant fails is drawn interpreted only if it fits the stacks, else skipped with a warning. proto/procedural-space) | Accepted |
+| [1020](ADR-1020-sonic-interpretation-rides-the-existing-bus.md) | Sonic interpretation rides the existing bus (Sonic Garden POC: a timbre post-pass over the stored spectra, a Sonic Character runtime in `SignalClock` on the hop clock, `notes.*` musical context as a pure function of time over a MIDI-file note track, and the Visual Interpreter as an `interpret` source kind whose mappings publish `visual.<name>`; fixed-range normalisation, never auto-gain) | Accepted |
+| [1021](ADR-1021-a-deformed-normal-flips-only-for-a-mirror.md) | A deformed normal flips only for a mirror (the finite-difference normal's sign comes from the instance scale, the object matrix and a reversed path deformer, not from its angle to the undeformed normal, which turned every twist past 90 degrees inside out) | Accepted |
+| [1022](ADR-1022-the-procedural-sky-rebuilds-past-a-tolerance.md) | The procedural sky rebuilds past a tolerance (1/128 relative per colour and scalar, 0.25 mrad on the sun, against the sky that was built; routed skies stop rebuilding the IBL chain every frame) | Accepted |

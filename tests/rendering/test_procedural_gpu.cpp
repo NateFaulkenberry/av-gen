@@ -281,6 +281,124 @@ TEST_CASE("Twist deformer: amount 0 is the identity, amount 1 moves the silhouet
     CHECK(ctx->errorCount() == 0);
 }
 
+namespace {
+
+// One lit sphere, seen from the front. A sphere twisted about its own axis is the same surface, so
+// every twist of it has to render as the untwisted sphere does.
+scene::Scene litSphereScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.3f, -0.4f, -1.0f)); // from behind the camera
+    key.intensity = 3.0f;
+    s.addLight(key);
+
+    scene::ProceduralGeometry g;
+    g.name = "orb";
+    g.source.kind = scene::PrimitiveKind::Sphere;
+    g.source.radius = 1.5f;
+    g.source.segments = 96;
+    g.source.rings = 48;
+    g.distribution.kind = scene::DistributionKind::Single;
+    g.instances = gridInstances(1, 1, 1.0f);
+    g.structureVersion = 1;
+    g.meshHash = specHash(g.source) ^ 0x51u;
+    g.material.baseColor = {0.8f, 0.8f, 0.8f};
+    g.material.emissiveIntensity = 0.0f;
+    g.material.roughness = 0.7f;
+    s.procedurals.push_back(g);
+    return s;
+}
+
+// Mean absolute difference per channel (0..255) over the pixels either image covers, and the share
+// of the reference's lit pixels that the other renders at under half their brightness.
+struct ImageDiff {
+    double meanAbs = 0.0;
+    double darkenedShare = 0.0;
+};
+ImageDiff diffImages(const gpu::Image8& ref, const gpu::Image8& img) {
+    ImageDiff d;
+    std::uint64_t covered = 0;
+    std::uint64_t lit = 0;
+    std::uint64_t darkened = 0;
+    double sum = 0.0;
+    for (std::uint32_t y = 0; y < ref.height; ++y) {
+        for (std::uint32_t x = 0; x < ref.width; ++x) {
+            const auto* a = ref.pixel(x, y);
+            const auto* b = img.pixel(x, y);
+            const int la = a[0] + a[1] + a[2];
+            const int lb = b[0] + b[1] + b[2];
+            if (la <= 15 && lb <= 15) {
+                continue;
+            }
+            ++covered;
+            for (int c = 0; c < 3; ++c) {
+                sum += std::abs(static_cast<int>(a[c]) - static_cast<int>(b[c]));
+            }
+            if (la > 120) {
+                ++lit;
+                if (lb * 2 < la) {
+                    ++darkened;
+                }
+            }
+        }
+    }
+    d.meanAbs = covered > 0 ? sum / (3.0 * static_cast<double>(covered)) : 0.0;
+    d.darkenedShare = lit > 0 ? static_cast<double>(darkened) / static_cast<double>(lit) : 0.0;
+    return d;
+}
+
+} // namespace
+
+// ADR-1021. The vertex stage rebuilds the normal by finite differences and used to flip it whenever
+// it faced away from the *undeformed* normal. Any twist past a quarter turn -- which a twist with a
+// speed always reaches -- turned the band of faces around its axis inside out: a sphere with twist
+// speed 0.3 rendered a black equator from about five seconds on. The flip now comes from the
+// handedness of the transform (a mirror), which is the only thing that can turn a surface over.
+TEST_CASE("A twist past a quarter turn keeps its normals outward", "[gpu][procedural][adr1021]") {
+    auto ctx = makeContext();
+    const scene::Scene plain = litSphereScene();
+    const auto base = renderOnce(*ctx, plain, 0.0);
+    REQUIRE(coverage(base).pixels > 5000);
+
+    struct Arm {
+        const char* name;
+        float amount;
+        float speed;
+        float phase;
+        double time;
+    };
+    const Arm arms[] = {
+        {"a half-turn phase (a rigid rotation)", 0.0f, 0.0f, 3.14159265f, 0.0},
+        {"twist 4 rad/m across the sphere (+-344 degrees)", 4.0f, 0.0f, 0.0f, 0.0},
+        {"twist speed 0.3 at 10 s (the art pass's case)", 0.0f, 0.3f, 0.0f, 10.0},
+        {"a small twist (under a quarter turn)", 0.5f, 0.0f, 0.0f, 0.0},
+    };
+    int index = 0;
+    for (const Arm& arm : arms) {
+        INFO(arm.name);
+        scene::Scene s = plain;
+        scene::Deformer d = twist(arm.amount, scene::DeformSpace::Local);
+        d.speed = arm.speed;
+        d.phase = arm.phase;
+        s.procedurals[0].deformers.push_back(d);
+        const auto img = renderOnce(*ctx, s, arm.time);
+        const ImageDiff diff = diffImages(base, img);
+        INFO("mean abs diff " << diff.meanAbs << ", darkened share of lit pixels " << diff.darkenedShare);
+        CHECK(diff.darkenedShare < 0.01);
+        CHECK(diff.meanAbs < 3.0);
+        if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
+            const std::string file = "procedural_twist_normal_" + std::to_string(index) + ".ppm";
+            REQUIRE(gpu::writePpm(img, std::filesystem::path(dumpDir) / file).has_value());
+        }
+        ++index;
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
 // The source transform is step 1 of the chain in procedural.hpp and the trailing factor of
 // ProceduralGeometry::instanceMatrix(). It used to be honoured only on the CPU: the vertex shader
 // ignored it, so an authored `sourceTransform` silently did nothing on screen.

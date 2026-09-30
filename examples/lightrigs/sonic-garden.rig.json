@@ -1,0 +1,26 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "SonicGarden",
+  "description": "The Sonic Garden's rig: a soft key high on one side, a strong rim behind for silhouettes against the sky, a whisper of fill, and a low glow from under the hero. Every light's colour temperature and intensity is driven by the interpreter's families, so the rig is neutral on its own.",
+  "keyIntensity": 1.6,
+  "ambientIntensity": 0.035,
+  "ambientColor": [0.3, 0.3, 0.34],
+  "ambientTemperature": 7000,
+  "lights": [
+    {"name": "key", "type": "directional", "role": "key", "azimuth": 42.0, "elevation": 38.0, "distance": 3.0,
+     "intensity": 1.0, "color": [1.0, 1.0, 1.0], "temperature": 6500, "size": 0.6,
+     "castsShadow": true, "shadowStrength": 1.0, "softness": 1.5, "volumetric": 0.6, "followCamera": true},
+    {"name": "rim", "type": "rect", "role": "rim", "azimuth": 162.0, "elevation": 22.0, "distance": 2.6,
+     "intensity": 0.9, "color": [1.0, 1.0, 1.0], "temperature": 8000, "size": 0.7, "aspect": 4.0,
+     "castsShadow": false, "softness": 1.2, "volumetric": 0.2, "followCamera": true},
+    {"name": "fill", "type": "rect", "role": "fill", "azimuth": -70.0, "elevation": 6.0, "distance": 3.0,
+     "intensity": 0.08, "color": [1.0, 1.0, 1.0], "temperature": 7500, "size": 3.0, "aspect": 2.0,
+     "castsShadow": false, "softness": 3.0, "volumetric": 0.0, "followCamera": true},
+    {"name": "under", "type": "disk", "role": "practical", "azimuth": 10.0, "elevation": -35.0, "distance": 1.4,
+     "intensity": 0.0, "color": [1.0, 1.0, 1.0], "temperature": 4000, "size": 1.2,
+     "castsShadow": false, "softness": 2.0, "volumetric": 0.3, "followCamera": true},
+    {"name": "ambient", "type": "directional", "role": "ambient", "azimuth": 0.0, "elevation": 80.0,
+     "distance": 4.0, "intensity": 1.0, "castsShadow": false, "followCamera": true}
+  ]
+}

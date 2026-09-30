@@ -11,6 +11,7 @@
 #include "app/camera_director.hpp"
 #include "app/control_hub.hpp"
 #include "app/music_runtime.hpp"
+#include "sonic/sonic_runtime.hpp"
 #include "app/render_settings.hpp"
 #include "app/scene_states.hpp"
 #include "app/transport.hpp"
@@ -85,6 +86,7 @@ struct SignalClock {
     analysis::AnalysisFrame latest; // the last one published
     bool hasFrame = false;
     MusicRuntime music;             // music.* (ADR-073); its detector is history
+    sonic::SonicRuntime sonic;      // sonic.*, timbre.*, notes.* (ADR-1020); the character is history
     // The beat clock (ADR-896). `clockBeats` is its position, 0 at the clock's first beat. With an
     // analysed grid it is a pure function of the second (`analysis::clockBeatsAt`); live input and a
     // MIDI clock extrapolate it per render frame from the tempo (ADR-012), resynchronised whenever
@@ -951,6 +953,12 @@ public:
     // them. Read it to ask *when* something fired; the bus clears event values at the end of every
     // update(), so polling the signals from outside the frame only ever sees zero.
     [[nodiscard]] const MusicRuntime& music() const { return clock_.music; }
+    // ADR-1020: the Sonic Garden subsystem. Null when the project has no `sonic` block, and then it does nothing.
+    [[nodiscard]] const sonic::SonicSetup* sonicSetup() const { return sonic_.get(); }
+    [[nodiscard]] const sonic::SonicRuntime& sonicRuntime() const { return clock_.sonic; }
+    // Installs a `sonic` block (as a project's would be read, paths relative to `baseDir`), or removes the
+    // subsystem with a null json. Analyses the loaded track's timbre when there is one.
+    [[nodiscard]] Result<void> setSonic(const nlohmann::json& block, const std::filesystem::path& baseDir);
     // The effect triggers' clock, as the last effect update bound it (ADR-896: its Beat source
     // counts through `meter()`).
     [[nodiscard]] const world::TriggerClock& triggerClock() const { return triggerClock_; }
@@ -1285,6 +1293,10 @@ private:
     std::unique_ptr<analysis::AnalysisRunner> runner_;
     std::shared_ptr<analysis::AnalysisTrack> track_;
     SignalClock clock_; // ADR-870: the live signal pipeline's carried state
+    // ADR-1020: the Sonic Garden's setup (character spec, notes, timbre track) and the audio it analysed.
+    std::shared_ptr<sonic::SonicSetup> sonic_;
+    std::uint64_t sonicRevision_ = 0;
+    void refreshSonicTimbre();
     double lastRenderTime_ = 0.0;
     EngineStats stats_;
 };

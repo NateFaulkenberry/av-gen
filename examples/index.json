@@ -317,6 +317,12 @@
       "description": "Procedural Space POC (proto/procedural-space): ray-marched impossible architecture whose spatial rules follow the music. One SDF node morphs between a hall, a rotunda, a recursive cathedral and a lattice on sections and drops; bass widens, mids bend and tighten repetition, highs add recursion and edge light.",
       "name": "Procedural Space (POC)",
       "project": "space/space.json"
+    },
+    {
+      "category": "Lab",
+      "description": "The Sonic Garden POC (ADR-1020): one MIDI phrase through a pad, an FM bell, a distorted bass and noisy percussion. The Sonic Character, the notes' musical context and the interpret source's visual families drive a hero form, organic and crystalline structures, shards, spores and the camera. Variants per sound are in sonic-garden/variants/; the audio comes from tools/make_sonic_material.py.",
+      "name": "Sonic Garden",
+      "project": "sonic-garden/sonic-garden.json"
     }
   ]
 }
