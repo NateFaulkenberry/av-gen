@@ -492,6 +492,20 @@ The full record is `AA-RESEARCH.md`, and the decision is ADR-1024. Review media 
   - SMAA, only if FXAA is judged soft.
   - `"supersample": 2` in the garden's own `render` block: the art owner's call, since it doubles render time.
   - The live default floor stays 0.5 by decision (ADR-1024). Raising it is the owner's frame-rate choice.
+- **PART 8, merge preparation.**
+  - The diff against main contains only the Sonic Garden art and engineering and this change. There is no temporary
+    code or debug-only behaviour, and the feature is disabled with Settings "Anti-aliasing: Off" or `--live-aa off`.
+  - The Sonic Garden master, its 7 variants and the 8 Space projects load with no errors or GPU errors.
+    `--audit-routes` finds 371/371 routes live.
+  - ADR-1023, which art pass 2 left out of the index, and ADR-1024 are now indexed. `test_repo_hygiene` had caught
+    it.
+  - Both suites were run under `tools/gpu-lock.sh`, one after the other, at `6de4561f`:
+    - `avgen_render_tests`: exit 0; 559 cases, 558 passed, 1 skipped. This ran before the index commit, which is
+      docs-only.
+    - `avgen_tests`: exit 0; 3,920 cases, 3,900 passed, 19 skipped, 1 failed as expected (the `[!shouldfail]`
+      slope lean).
+  - The root-level `indtune.cpp` and `temporal-*.png` are tracked on main already, not by this branch. I left them
+    alone.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
