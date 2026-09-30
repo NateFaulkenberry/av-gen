@@ -187,6 +187,8 @@ std::string usageText() {
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
+           "  --sonic-trace <f>   with --project: write the Sonic Garden signals (sonic.*, notes.*, timbre.*,\n"
+           "                      visual.*) per frame as CSV, and a character summary; no GPU (ADR-1020)\n"
            "  --audit-routes <f>  with --project: write every route, timeline track, effect default\n"
            "                      route and effect with a verdict (live / dead / hazard) and the\n"
            "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
@@ -535,6 +537,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--audit-routes");
             if (!v) return std::unexpected(v.error());
             options.auditRoutes = *v;
+            ++i;
+        } else if (arg == "--sonic-trace") {
+            auto v = need(i, "--sonic-trace");
+            if (!v) return std::unexpected(v.error());
+            options.sonicTrace = *v;
             ++i;
         } else if (arg == "--propose-reactivity") {
             auto v = need(i, "--propose-reactivity");

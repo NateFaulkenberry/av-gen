@@ -57,7 +57,7 @@ namespace {
 // this order, so the engine's bus and a seek replay's bus give each the same id -- which is what
 // lets the replay's `MusicRuntime` (it holds its ids) and its values be handed back to the engine.
 void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, Engine::TimeSignals& time,
-                         MusicRuntime& music) {
+                         MusicRuntime& music, sonic::SonicRuntime& sonic) {
     audio = signals::AudioSignals::declare(bus);
     time.seconds = bus.declare("time.seconds", 0.0f, 3600.0f);
     time.progress = bus.declare("time.progress");
@@ -89,6 +89,8 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
     bus.setLabel(time.timelineProgress, "progress through the current section");
     bus.setLabel(time.timelineEnergy, "energy of the current section");
     bus.setLabel(time.timelineChange, "section change (a new section begins)");
+    // ADR-1020: sonic.*, timbre.*, notes.* -- last, so every id above is the one it always was.
+    sonic.declare(bus);
 }
 
 } // namespace
@@ -120,7 +122,7 @@ public:
     explicit ReplaySignals(Engine& engine) : engine_(engine) {
         signals::AudioSignals audio;
         Engine::TimeSignals time;
-        declareFrameSignals(zeroBus_, audio, time, zero_.music);
+        declareFrameSignals(zeroBus_, audio, time, zero_.music, zero_.sonic);
         bus_ = zeroBus_;
     }
 
@@ -412,6 +414,7 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
         mix(bits(section.endSeconds));
         mix(bits(static_cast<double>(section.energy)));
     }
+    mix(sonic_ ? sonic_->key() : 0u); // ADR-1020: sonic.*, timbre.*, notes.*
     mix(playing ? 1u : 0u);
     return h;
 }
@@ -542,7 +545,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     scene::registerTreeGenerator();
     ensureControlSource();
     // First on the bus, and in the one order a seek replay's bus also uses (ADR-870).
-    declareFrameSignals(bus_, audioSignals_, timeSignals_, clock_.music);
+    declareFrameSignals(bus_, audioSignals_, timeSignals_, clock_.music, clock_.sonic);
     stateProgressSignal_ = bus_.declare("state.progress");
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
@@ -2441,6 +2444,14 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         doc["transport"]["tempo"] = {{"bpm", tempoOverride_.bpm},
                                      {"source", audio::tempoProvenanceToken(tempoOverride_.source)}};
     }
+    // ADR-1020: the `sonic` block as it was loaded, with its notes path written relative to this file.
+    if (sonic_) {
+        nlohmann::json block = sonic_->document;
+        if (!sonic_->notesPath.empty()) {
+            block["notes"] = relativeTo(sonic_->notesPath, dir);
+        }
+        doc["sonic"] = std::move(block);
+    }
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
@@ -2739,6 +2750,14 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         return path; // still missing: the loader reports it
     };
 
+    // ADR-1020: the Sonic Garden block, read before the audio so that loading the audio analyses its timbre
+    // once. Absent means the subsystem is off, not inherited from the last project.
+    {
+        const auto block = doc.find("sonic");
+        if (auto r = setSonic(block != doc.end() ? *block : nlohmann::json(), dir); !r) {
+            warn("sonic: " + r.error().message);
+        }
+    }
     stage(2);
     // The audio is the project's too. A document that names none means silence, not whatever was
     // playing before: opening a project with no `assets.audio` used to leave the previous piece
@@ -4127,6 +4146,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     log::info("analyzed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
     audioFile_ = std::move(file);
     ++audioRevision_;
+    refreshSonicTimbre(); // ADR-1020: only when the project has a `sonic` block
     modulator_.resetState();
     clock_.music.reset();
     clock_.hasFrame = false;
@@ -4999,6 +5019,12 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     // The classifier's events, after the clock as they always were. Unconditional: no audio
     // consumed means every music.* signal is false.
     clock.music.publish(bus);
+    // ADR-1020: the Sonic Character walks the analysis frames up to this instant (the hop clock, like the
+    // classifier), and the musical context is read at it. No setup: zeros, and no work.
+    if (sonic_ && track_ != nullptr && !track_->empty()) {
+        clock.sonic.advance(*sonic_, *track_, time.renderTime);
+    }
+    clock.sonic.publish(sonic_.get(), bus, time.renderTime);
     return pulse;
 }
 
@@ -6289,6 +6315,43 @@ params::ModRoute* Engine::routeForTarget(const std::string& path) {
         }
     }
     return nullptr;
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+// ---- ADR-1020: the Sonic Garden subsystem --------------------------------------------------------------------------
+
+Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem::path& baseDir) {
+    clock_.sonic.reset();
+    if (block.is_null()) {
+        sonic_.reset();
+        sonicRevision_ = 0;
+        return {};
+    }
+    auto setup = sonic::SonicSetup::fromJson(block, baseDir);
+    if (!setup) {
+        sonic_.reset();
+        return std::unexpected(setup.error());
+    }
+    sonic_ = std::make_shared<sonic::SonicSetup>(std::move(*setup));
+    sonicRevision_ = 0;
+    log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
+              sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
+    refreshSonicTimbre();
+    return {};
+}
+
+void Engine::refreshSonicTimbre() {
+    if (!sonic_ || !track_ || track_->empty() || sonicRevision_ == audioRevision_) {
+        return;
+    }
+    sonic_->trackFrames = 0;
+    sonic_->analyse(*track_);
+    sonicRevision_ = audioRevision_;
+    clock_.sonic.reset();
+    log::info("sonic: timbre of {} analysis frames in {:.1f} ms", sonic_->timbre.size(), sonic_->timbreMillis);
 }
 
 } // namespace avgen::app

@@ -288,6 +288,8 @@ struct AppOptions {
     // ADR-927: `--propose-reactivity <out>`, with --project: the Director's default reactivity
     // proposal as a document a generator can read, edit and install; headless, no GPU.
     std::optional<std::filesystem::path> proposeReactivity;
+    // ADR-1020: `--sonic-trace <out.csv>`, with --project: the Sonic Garden's signals per frame; headless, no GPU.
+    std::optional<std::filesystem::path> sonicTrace;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>
