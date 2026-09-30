@@ -559,6 +559,11 @@
        {
         "signal": "visual.low",
         "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
        }
       ]
      },
@@ -573,6 +578,11 @@
        {
         "signal": "visual.high",
         "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
        }
       ]
      },
@@ -587,6 +597,11 @@
        {
         "signal": "visual.low",
         "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
        }
       ]
      },
@@ -601,6 +616,11 @@
        {
         "signal": "visual.high",
         "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
        }
       ]
      },
@@ -615,6 +635,51 @@
        {
         "signal": "visual.grit",
         "weight": 0.55
+       }
+      ]
+     },
+     {
+      "name": "organicAccent",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "visual.organic",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
+     },
+     {
+      "name": "crystalAccent",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "visual.crystalline",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
+     },
+     {
+      "name": "tectonicAccent",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "visual.tectonic",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.density",
+        "weight": 1.0,
+        "invert": true
        }
       ]
      }
@@ -3837,7 +3902,7 @@
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 120
@@ -3873,7 +3938,7 @@
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
+   "depthSource": "visual.crystalAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 90
@@ -3909,7 +3974,7 @@
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
+   "depthSource": "visual.crystalAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 150
@@ -3921,7 +3986,7 @@
    "amount": 25.0,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
+   "depthSource": "visual.crystalAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 60
@@ -3933,7 +3998,7 @@
    "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.tectonic",
+   "depthSource": "visual.tectonicAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 200
@@ -3945,7 +4010,7 @@
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
-   "depthSource": "visual.tectonic",
+   "depthSource": "visual.tectonicAccent",
    "chain": {
     "gain": 0.07,
     "offset": 1.0,
@@ -3959,7 +4024,7 @@
    "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.tectonic",
+   "depthSource": "visual.tectonicAccent",
    "chain": {
     "attackMs": 100,
     "decayMs": 900
@@ -4769,7 +4834,7 @@
    "amount": 2.5,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 1400
@@ -4781,7 +4846,7 @@
    "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.tectonic",
+   "depthSource": "visual.tectonicAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 300
@@ -5352,7 +5417,7 @@
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 150,
     "decayMs": 1400
@@ -5400,7 +5465,7 @@
    "amount": 0.7,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 250,
     "decayMs": 1500
@@ -5532,7 +5597,7 @@
    "amount": -0.08,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 220,
     "decayMs": 1300
@@ -5544,7 +5609,7 @@
    "amount": -0.07,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 260,
     "decayMs": 1500
@@ -5608,7 +5673,7 @@
    "amount": 3.5,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
+   "depthSource": "visual.crystalAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 240
@@ -5637,7 +5702,7 @@
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.organic",
+   "depthSource": "visual.organicAccent",
    "chain": {
     "attackMs": 90,
     "decayMs": 1200
@@ -5649,7 +5714,7 @@
    "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.crystalline",
+   "depthSource": "visual.crystalAccent",
    "chain": {
     "attackMs": 0,
     "decayMs": 220

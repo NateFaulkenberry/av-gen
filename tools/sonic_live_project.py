@@ -40,7 +40,9 @@ What live play needs is put in (the live art pass; LIVE-ART-NOTES.md has the mea
      low from A2 to D4.
   7. A NOTE IS A GESTURE, NOT A FLASH. The organic swell rises over 120-250 ms instead of snapping on; the rings of
      the observatory swing on a note and ring down; a note's light is held by the sound itself (the release: a pad's
-     long tail keeps the garden lit, a pluck's dies with it); the heart light's per-note flash is smaller.
+     long tail keeps the garden lit, a pluck's dies with it); the heart light's per-note flash is smaller; and every
+     gesture is an accent, scaled by how sparse the playing is, so a fast arpeggio is texture and motion, not a
+     strobe.
   8. RELEASE -> TRAILS: the temporal echo is small by default (the master's 0.5 ghosted the rippling tendrils) and
      grows with held, legato playing.
   9. THE WAITING WORLD: before any sound, a composed night -- a cold horizon line, the ground's veins breathing
@@ -175,7 +177,25 @@ LIVE_GARDEN = [
 LIVE_WORLD = [
     # fragments: the chaotic world's blades, or distortion's shards in any world (x 0.55: fragments, not a world)
     M("fragments", [("visual.chaotic", 1.0, False), ("visual.grit", 0.55, False)], "max"),
+    # Accents: a note's gesture is scaled by how sparse the playing is (1 - notes.density: 0.86 for a slow melody,
+    # 0.65-0.8 for chords, 0.45 for a 16th-note riff, 0.27 for a fast arpeggio). Sparse notes are events; dense
+    # playing becomes texture, carried by `figure` (the turning, rippling, orbiting motion) rather than by a flash
+    # per note -- the brief's "not NOTE ON -> flash, over and over". Every note-on route reads these (the family's
+    # gesture), or the register splits below, which carry the same term.
+    M("organicAccent", [("visual.organic", 1.0, False), ("notes.density", 1.0, True)], "product"),
+    M("crystalAccent", [("visual.crystalline", 1.0, False), ("notes.density", 1.0, True)], "product"),
+    M("tectonicAccent", [("visual.tectonic", 1.0, False), ("notes.density", 1.0, True)], "product"),
+    M("organicLo", [("visual.organic", 1.0, False), ("visual.low", 1.0, False), ("notes.density", 1.0, True)],
+      "product"),
+    M("organicHi", [("visual.organic", 1.0, False), ("visual.high", 1.0, False), ("notes.density", 1.0, True)],
+      "product"),
+    M("crystalLo", [("visual.crystalline", 1.0, False), ("visual.low", 1.0, False), ("notes.density", 1.0, True)],
+      "product"),
+    M("crystalHi", [("visual.crystalline", 1.0, False), ("visual.high", 1.0, False), ("notes.density", 1.0, True)],
+      "product"),
 ]
+ACCENT = {"visual.organic": "visual.organicAccent", "visual.crystalline": "visual.crystalAccent",
+          "visual.tectonic": "visual.tectonicAccent"}
 FAMILY_SHARPNESS = 3.0
 
 
@@ -505,6 +525,9 @@ def main():
             src["settings"].setdefault("groups", {})["family"] = {"sharpness": FAMILY_SHARPNESS}
     routes = [retime(copy.deepcopy(r)) for r in live["routes"] if not drop(r)]
     routes += live_routes()
+    for r in routes:  # every note-on gesture is an accent (see ACCENT)
+        if r["source"] == "notes.noteOn" and r.get("depthSource") in ACCENT:
+            r["depthSource"] = ACCENT[r["depthSource"]]
     live["routes"] = routes
 
     # the camera: a slow drift round the master's mid-move framing
