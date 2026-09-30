@@ -180,12 +180,13 @@ Result<std::string> readString(const json& j, const char* key, const std::string
 // ---- per-kind node members exposed as parameters ------------------------------------------------
 
 enum class NodeField : std::uint8_t {
-    Radius, Height, Size, Rounding, Offset, Translation, Rotation, Scale, Amount, Smooth, Frequency, Speed, Enabled
+    Radius, Height, Size, Rounding, Offset, Translation, Rotation, Scale, Amount, Smooth, Frequency, Speed, Enabled,
+    Axis, Count, // ADR-1001
 };
 
-constexpr std::array<const char*, 13> kNodeFieldNames = {
+constexpr std::array<const char*, 15> kNodeFieldNames = {
     "radius", "height", "size", "rounding", "offset", "translation", "rotation",
-    "scale",  "amount", "smooth", "frequency", "speed", "enabled",
+    "scale",  "amount", "smooth", "frequency", "speed", "enabled", "axis", "count",
 };
 
 // The members a node kind actually uses (plus Enabled on every node).
@@ -235,11 +236,23 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
     case SdfNodeKind::Bend:
         out = {F::Amount};
         break;
+    case SdfNodeKind::Morph:
+        out = {F::Amount};
+        break;
     case SdfNodeKind::Repeat:
+        out = {F::Size, F::Count};
+        break;
     case SdfNodeKind::Mirror:
         out = {F::Size};
         break;
     case SdfNodeKind::PolarRepeat:
+        out = {F::Count};
+        break;
+    case SdfNodeKind::Fold:
+        out = {F::Axis, F::Offset};
+        break;
+    case SdfNodeKind::Recurse:
+        out = {F::Count, F::Scale, F::Translation, F::Rotation, F::Size};
         break;
     case SdfNodeKind::DisplaceNoise:
     case SdfNodeKind::DisplaceWave:
@@ -272,8 +285,10 @@ void visitPreOrder(const SdfNode& node, int& index, Fn&& fn) {
     }
 }
 
-std::string nodePath(int index, NodeField field) {
-    return "node/" + std::to_string(index) + "/" + kNodeFieldNames[static_cast<std::size_t>(field)];
+// ADR-1001: a named node is addressed by its name, an unnamed one by its pre-order index.
+std::string nodePath(const SdfNode& node, int index, NodeField field) {
+    const std::string id = node.name.empty() ? std::to_string(index) : node.name;
+    return "node/" + id + "/" + kNodeFieldNames[static_cast<std::size_t>(field)];
 }
 
 struct Registrar {
@@ -301,13 +316,17 @@ struct Registrar {
         return add(std::move(d), rel, label);
     }
     params::Parameter<int>* i(const std::string& rel, int def, int lo, int hi, int slo, int shi) {
+        return i(rel, rel, def, lo, hi, slo, shi);
+    }
+    params::Parameter<int>* i(const std::string& rel, const std::string& label, int def, int lo, int hi, int slo,
+                              int shi) {
         params::ParamDesc<int> d;
         d.defaultValue = def;
         d.hardMin = lo;
         d.hardMax = hi;
         d.softMin = slo;
         d.softMax = shi;
-        return add(std::move(d), rel, rel);
+        return add(std::move(d), rel, label);
     }
     params::Parameter<bool>* b(const std::string& rel, const std::string& label, bool def) {
         params::ParamDesc<bool> d;
@@ -358,10 +377,13 @@ private:
     std::unordered_map<std::string_view, params::IParameter*> map_;
 };
 
-// "node/<i>/<field>" into a stack buffer.
-std::string_view nodeKey(char* buf, std::size_t size, int index, NodeField field) {
-    const int n = std::snprintf(buf, size, "node/%d/%s", index, kNodeFieldNames[static_cast<std::size_t>(field)]);
-    return std::string_view(buf, n > 0 ? static_cast<std::size_t>(n) : 0);
+// "node/<i or name>/<field>" into a stack buffer (names are short; a longer key is truncated and
+// then simply finds nothing, which validation prevents by limiting what a name can be).
+std::string_view nodeKey(char* buf, std::size_t size, const SdfNode& node, int index, NodeField field) {
+    const char* fieldName = kNodeFieldNames[static_cast<std::size_t>(field)];
+    const int n = node.name.empty() ? std::snprintf(buf, size, "node/%d/%s", index, fieldName)
+                                    : std::snprintf(buf, size, "node/%s/%s", node.name.c_str(), fieldName);
+    return std::string_view(buf, n > 0 ? std::min(static_cast<std::size_t>(n), size - 1) : 0);
 }
 
 } // namespace
@@ -414,6 +436,15 @@ Result<void> SdfObject::validate() const {
     }
     if (!(normalEpsilon > 0.0f) || !std::isfinite(normalEpsilon)) {
         return fail("sdf '{}': normalEpsilon must be > 0", name);
+    }
+    if (!(maxDistance >= 0.0f) || !std::isfinite(maxDistance)) {
+        return fail("sdf '{}': maxDistance must be >= 0 (0 = the bounds only)", name);
+    }
+    if (!(look.aoDistance > 0.0f) || !(look.edgeWidth > 0.0f) || !(look.shadowSoftness > 0.0f)) {
+        return fail("sdf '{}': look aoDistance, edgeWidth and shadowSoftness must be > 0", name);
+    }
+    if (look.shadowSteps < 1 || look.shadowSteps > 256) {
+        return fail("sdf '{}': look shadowSteps must be in 1..256 (got {})", name, look.shadowSteps);
     }
     return {};
 }
@@ -480,6 +511,12 @@ json SdfObject::toJson() const {
     j["epsilon"] = epsilon;
     j["stepScale"] = stepScale;
     j["normalEpsilon"] = normalEpsilon;
+    j["maxDistance"] = maxDistance;
+    j["look"] = json{{"aoStrength", look.aoStrength},         {"aoDistance", look.aoDistance},
+                     {"edgeIntensity", look.edgeIntensity},   {"edgeWidth", look.edgeWidth},
+                     {"edgeColor", vecToJson(look.edgeColor)}, {"shadowStrength", look.shadowStrength},
+                     {"shadowSoftness", look.shadowSoftness}, {"shadowDirection", vecToJson(look.shadowDirection)},
+                     {"shadowSteps", look.shadowSteps}};
     return j;
 }
 
@@ -544,6 +581,34 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
     AVGEN_SDF_READ(o.epsilon, "epsilon", readFloat);
     AVGEN_SDF_READ(o.stepScale, "stepScale", readFloat);
     AVGEN_SDF_READ(o.normalEpsilon, "normalEpsilon", readFloat);
+    AVGEN_SDF_READ(o.maxDistance, "maxDistance", readFloat);
+    if (j.contains("look")) {
+        const json& lj = j.at("look");
+        if (!lj.is_object()) {
+            return fail("'look' must be an object");
+        }
+        auto rf = [&](float& target, const char* key) -> Result<void> {
+            auto v = readFloat(lj, key, target);
+            if (!v) return std::unexpected(v.error());
+            target = *v;
+            return {};
+        };
+        auto rv = [&](glm::vec3& target, const char* key) -> Result<void> {
+            auto v = readVec3(lj, key, target);
+            if (!v) return std::unexpected(v.error());
+            target = *v;
+            return {};
+        };
+        for (auto r : {rf(o.look.aoStrength, "aoStrength"), rf(o.look.aoDistance, "aoDistance"),
+                       rf(o.look.edgeIntensity, "edgeIntensity"), rf(o.look.edgeWidth, "edgeWidth"),
+                       rv(o.look.edgeColor, "edgeColor"), rf(o.look.shadowStrength, "shadowStrength"),
+                       rf(o.look.shadowSoftness, "shadowSoftness"), rv(o.look.shadowDirection, "shadowDirection")}) {
+            if (!r) return std::unexpected(r.error());
+        }
+        auto steps = readInt(lj, "shadowSteps", o.look.shadowSteps);
+        if (!steps) return std::unexpected(steps.error());
+        o.look.shadowSteps = *steps;
+    }
     if (auto ok = o.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -576,6 +641,20 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.v3("bounds/min", "bounds/min", rest.boundsMin, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("bounds/max", "bounds/max", rest.boundsMax, -1e4f, 1e4f, -20.0f, 20.0f);
     r.i("resolution", rest.resolution, 2, 256, 8, 128);
+    // ADR-1002: the march and the look, so a route, a state or the timeline can tune them.
+    r.i("march/maxSteps", rest.maxSteps, 1, 1024, 16, 512);
+    r.f("march/epsilon", "march/epsilon", rest.epsilon, 1e-6f, 0.1f, 1e-4f, 0.01f);
+    r.f("march/stepScale", "march/stepScale", rest.stepScale, 0.1f, 1.0f, 0.3f, 1.0f);
+    r.f("march/maxDistance", "march/maxDistance", rest.maxDistance, 0.0f, 1e5f, 0.0f, 500.0f);
+    r.f("look/ao/strength", "look/ao/strength", rest.look.aoStrength, 0.0f, 1.0f, 0.0f, 1.0f);
+    r.f("look/ao/distance", "look/ao/distance", rest.look.aoDistance, 1e-3f, 100.0f, 0.05f, 5.0f);
+    r.f("look/edge/intensity", "look/edge/intensity", rest.look.edgeIntensity, 0.0f, 1000.0f, 0.0f, 20.0f);
+    r.f("look/edge/width", "look/edge/width", rest.look.edgeWidth, 1e-4f, 10.0f, 0.005f, 0.5f);
+    r.v3("look/edge/color", "look/edge/color", rest.look.edgeColor, 0.0f, 100.0f, 0.0f, 1.0f, true);
+    r.f("look/shadow/strength", "look/shadow/strength", rest.look.shadowStrength, 0.0f, 1.0f, 0.0f, 1.0f);
+    r.f("look/shadow/softness", "look/shadow/softness", rest.look.shadowSoftness, 0.1f, 256.0f, 1.0f, 64.0f);
+    r.v3("look/shadow/direction", "look/shadow/direction", rest.look.shadowDirection, -1.0f, 1.0f, -1.0f, 1.0f);
+    r.i("look/shadow/steps", rest.look.shadowSteps, 1, 256, 8, 96);
 
     const int nodeCount = rest.tree.nodeCount();
     p.nodeAmount.assign(static_cast<std::size_t>(nodeCount), nullptr);
@@ -586,7 +665,7 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
         const std::string kindName = spatial::sdfNodeKindName(n.kind);
         const auto slot = static_cast<std::size_t>(i - 1);
         for (const NodeField field : nodeFields(n.kind)) {
-            const std::string rel = nodePath(i, field);
+            const std::string rel = nodePath(n, i, field);
             const std::string label = kindName + "/" + kNodeFieldNames[static_cast<std::size_t>(field)];
             switch (field) {
             case NodeField::Radius:
@@ -628,6 +707,14 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
             case NodeField::Enabled:
                 r.b(rel, label, n.enabled);
                 break;
+            case NodeField::Axis:
+                r.v3(rel, label, n.axis, -1.0f, 1.0f, -1.0f, 1.0f);
+                break;
+            case NodeField::Count: {
+                const int hi = n.kind == SdfNodeKind::Recurse ? spatial::kMaxSdfRecurseLevels : 4096;
+                r.i(rel, label, n.count, 0, hi, 0, n.kind == SdfNodeKind::Recurse ? hi : 64);
+                break;
+            }
             }
         }
     });
@@ -662,12 +749,25 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("bounds/min", live.boundsMin);
     index.copy("bounds/max", live.boundsMax);
     index.copy("resolution", live.resolution);
+    index.copy("march/maxSteps", live.maxSteps);
+    index.copy("march/epsilon", live.epsilon);
+    index.copy("march/stepScale", live.stepScale);
+    index.copy("march/maxDistance", live.maxDistance);
+    index.copy("look/ao/strength", live.look.aoStrength);
+    index.copy("look/ao/distance", live.look.aoDistance);
+    index.copy("look/edge/intensity", live.look.edgeIntensity);
+    index.copy("look/edge/width", live.look.edgeWidth);
+    index.copy("look/edge/color", live.look.edgeColor);
+    index.copy("look/shadow/strength", live.look.shadowStrength);
+    index.copy("look/shadow/softness", live.look.shadowSoftness);
+    index.copy("look/shadow/direction", live.look.shadowDirection);
+    index.copy("look/shadow/steps", live.look.shadowSteps);
 
-    char buf[64];
+    char buf[128];
     int i = 0;
     visitPreOrder(live.tree.root, i, [&](SdfNode& n, int nodeIndex) {
         for (const NodeField field : nodeFields(n.kind)) {
-            const std::string_view key = nodeKey(buf, sizeof(buf), nodeIndex, field);
+            const std::string_view key = nodeKey(buf, sizeof(buf), n, nodeIndex, field);
             switch (field) {
             case NodeField::Radius:
                 index.copy(key, n.radius);
@@ -707,6 +807,12 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
                 break;
             case NodeField::Enabled:
                 index.copy(key, n.enabled);
+                break;
+            case NodeField::Axis:
+                index.copy(key, n.axis);
+                break;
+            case NodeField::Count:
+                index.copy(key, n.count);
                 break;
             }
         }

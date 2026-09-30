@@ -35,11 +35,76 @@ struct SdfObjectUniforms {
     info: vec4<u32>,        // x = node offset, y = node count, z = max steps, w = shadow steps
     march: vec4<f32>,       // x = epsilon, y = step scale, z = normal epsilon, w = time
     rect: vec4<f32>,        // NDC rect of the projected bounds: xmin, ymin, xmax, ymax
+    // ADR-1002 (scene::SdfLook, the march cap)
+    look0: vec4<f32>,       // ao strength, ao distance, edge intensity, edge width
+    look1: vec4<f32>,       // edge colour rgb, max distance (0 = the bounds only)
+    look2: vec4<f32>,       // shadow strength, shadow softness k, shadow steps, 1 = collect step statistics
+    look3: vec4<f32>,       // shadow direction (world, towards the light)
+};
+
+// ADR-1002: step statistics, accumulated by the lit pass on every 4th pixel in x and y.
+// [0] sum of steps, [1] max steps, [2] sampled rays, [3] hits, [4] rays that ran out of steps.
+struct SdfStepStats {
+    counters: array<atomic<u32>, 8>,
 };
 
 @group(1) @binding(1) var<uniform> sdf: SdfObjectUniforms;
 @group(1) @binding(2) var<storage, read> sdfNodes: array<SdfNodeGpu>;
 @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
+@group(1) @binding(4) var<storage, read_write> sdfStepStats: SdfStepStats;
+
+// The march's far end: the AABB exit, capped by `look1.w` when that is set (ADR-1002). The lit pass
+// and the depth prepass must agree on it or the prepass depth rejects the lit surface.
+fn sdfMarchEnd(slabFar: f32) -> f32 {
+    return select(slabFar, min(slabFar, sdf.look1.w), sdf.look1.w > 0.0);
+}
+
+// ADR-1002: 5-tap SDF ambient occlusion along the normal (Quilez), local space. 1 = open.
+fn sdfOcclusion(offset: u32, count: u32, p: vec3<f32>, n: vec3<f32>, t: f32, world: mat4x4<f32>,
+                reach: f32) -> f32 {
+    var occ = 0.0;
+    var weight = 1.0;
+    for (var i = 0; i < 5; i = i + 1) {
+        let h = reach * (0.05 + f32(i) * 0.25);
+        let d = sdfEvaluate(offset, count, p + n * h, t, world);
+        occ = occ + max(h - d, 0.0) * weight;
+        weight = weight * 0.8;
+    }
+    return clamp(1.0 - 1.2 * occ / reach, 0.0, 1.0);
+}
+
+// ADR-1002: the field's discrete Laplacian at the hit over the tetrahedron taps at `width`: ~0 on a
+// flat, large on convex edges and concave creases alike. Returned as a 0..1 edge mask.
+fn sdfEdge(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>, width: f32) -> f32 {
+    let k0 = vec3<f32>(1.0, -1.0, -1.0);
+    let k1 = vec3<f32>(-1.0, -1.0, 1.0);
+    let k2 = vec3<f32>(-1.0, 1.0, -1.0);
+    let k3 = vec3<f32>(1.0, 1.0, 1.0);
+    let s = sdfEvaluate(offset, count, p + k0 * width, t, world) + sdfEvaluate(offset, count, p + k1 * width, t, world) +
+            sdfEvaluate(offset, count, p + k2 * width, t, world) + sdfEvaluate(offset, count, p + k3 * width, t, world) -
+            4.0 * sdfEvaluate(offset, count, p, t, world);
+    return clamp(abs(s) / width, 0.0, 1.0);
+}
+
+// ADR-1002: soft shadow towards `dir` (local space) from the hit (Quilez, res = min(k h / t)).
+// Bounded by `steps` and by the march end; 1 = lit.
+fn sdfSoftShadow(offset: u32, count: u32, p: vec3<f32>, dir: vec3<f32>, t: f32, world: mat4x4<f32>,
+                 k: f32, steps: u32, tMax: f32, eps: f32) -> f32 {
+    var res = 1.0;
+    var s = eps * 8.0;
+    for (var i = 0u; i < steps; i = i + 1u) {
+        let h = sdfEvaluate(offset, count, p + dir * s, t, world);
+        if (h < eps) {
+            return 0.0;
+        }
+        res = min(res, k * h / s);
+        s = s + clamp(h, eps, tMax * 0.1);
+        if (s > tMax) {
+            break;
+        }
+    }
+    return clamp(res, 0.0, 1.0);
+}
 
 struct SdfVertexOut {
     @builtin(position) clip: vec4<f32>,
@@ -100,7 +165,7 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     let rdL = rdScaled / unitScale;
     let slab = sdfSlab(roL, rdL, sdf.boundsMin.xyz, sdf.boundsMax.xyz);
     let tStart = max(slab.x, tNearPlane * unitScale);
-    let tEnd = slab.y;
+    let tEnd = sdfMarchEnd(slab.y);
 
     let offset = sdf.info.x;
     let count = sdf.info.y;
@@ -111,8 +176,11 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
 
     var hit = false;
     var t = tStart;
+    var steps = 0u;
+    var left = false;
     if (slab.x <= slab.y && tEnd > 0.0) {
         for (var i = 0u; i < maxSteps; i = i + 1u) {
+            steps = i + 1u;
             let p = roL + rdL * t;
             let d = sdfEvaluate(offset, count, p, time, object.model);
             if (d < epsilon * max(t, 1e-4)) {
@@ -121,8 +189,23 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
             }
             t = t + d * stepScale;
             if (t > tEnd) {
+                left = true;
                 break;
             }
+        }
+    } else {
+        left = true;
+    }
+    // ADR-1002: sampled step statistics (every 4th pixel in x and y), before a miss discards.
+    let pix = vec2<u32>(in.clip.xy);
+    if (sdf.look2.w > 0.5 && (pix.x & 3u) == 0u && (pix.y & 3u) == 0u) {
+        atomicAdd(&sdfStepStats.counters[0], steps);
+        atomicMax(&sdfStepStats.counters[1], steps);
+        atomicAdd(&sdfStepStats.counters[2], 1u);
+        if (hit) {
+            atomicAdd(&sdfStepStats.counters[3], 1u);
+        } else if (!left) {
+            atomicAdd(&sdfStepStats.counters[4], 1u);
         }
     }
     if (!hit) {
@@ -142,8 +225,32 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     let screenUv = vec2<f32>(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
     var out: SdfFragmentOut;
     // The local hit point is the ADR-030 `localPosition` material input.
-    let shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
+    var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
                               materialInstanceZero(pL), screenUv);
+    // ADR-1002: the field's own occlusion, soft shadow and edge emission. A cheap version: occlusion and
+    // shadow scale the whole shaded colour (lighting, the material's emission and the fog alike); the
+    // edges add emission afterwards, into the colour and the bloom target, so they are never occluded.
+    let nFace = select(-nL, nL, dot(nL, roL - pL) >= 0.0);
+    var visibility = 1.0;
+    if (sdf.look0.x > 0.0) {
+        visibility = visibility * mix(1.0, sdfOcclusion(offset, count, pL, nFace, time, object.model, sdf.look0.y),
+                                      clamp(sdf.look0.x, 0.0, 1.0));
+    }
+    if (sdf.look2.x > 0.0) {
+        let dirL = normalize((sdf.worldToLocal * vec4<f32>(sdfSafeNormalize(sdf.look3.xyz), 0.0)).xyz);
+        let shadowT = select(tEnd - tStart, sdf.look1.w, sdf.look1.w > 0.0);
+        let lit = sdfSoftShadow(offset, count, pL + nFace * epsilon * max(t, 1e-3) * 2.0, dirL, time, object.model,
+                                sdf.look2.y, u32(sdf.look2.z), max(shadowT, 1e-3), epsilon * max(t, 1e-3));
+        visibility = visibility * mix(1.0, lit, clamp(sdf.look2.x, 0.0, 1.0));
+    }
+    shaded.color = vec4<f32>(shaded.color.rgb * visibility, shaded.color.a);
+    shaded.emission = shaded.emission * visibility;
+    if (sdf.look0.z > 0.0) {
+        let edge = sdfEdge(offset, count, pL, time, object.model, sdf.look0.w);
+        let glow = sdf.look1.xyz * (sdf.look0.z * edge);
+        shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
+        shaded.emission = shaded.emission + glow;
+    }
     out.color = shaded.color;
     out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);
     // The hit point carried by last frame's object matrix and view-projection (ADR-035).
@@ -187,7 +294,7 @@ fn sdfDepthOnly(in: SdfVertexOut, maxSteps: u32, epsilon: f32) -> SdfDepthOut {
     let rdL = rdScaled / unitScale;
     let slab = sdfSlab(roL, rdL, sdf.boundsMin.xyz, sdf.boundsMax.xyz);
     let tStart = max(slab.x, tNearPlane * unitScale);
-    let tEnd = slab.y;
+    let tEnd = sdfMarchEnd(slab.y);
     if (slab.x > slab.y || tEnd <= 0.0) {
         discard;
     }

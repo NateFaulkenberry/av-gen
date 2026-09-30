@@ -25,6 +25,20 @@ enum class SdfRenderMode : std::uint8_t { Raymarch, Mesh };
 [[nodiscard]] const char* sdfRenderModeName(SdfRenderMode mode);
 [[nodiscard]] std::optional<SdfRenderMode> sdfRenderModeFromName(std::string_view name);
 
+// ADR-1002: the ray-marched surface's own cheap lighting terms, evaluated from the field itself at the
+// hit (Raymarch mode only; per-frame uniforms, not structural). Every term is off at 0.
+struct SdfLook {
+    float aoStrength = 0.0f;       // 5-tap SDF ambient occlusion along the normal; 0 = off, 1 = full
+    float aoDistance = 1.0f;       // how far (tree-local units) the occlusion looks
+    float edgeIntensity = 0.0f;    // emissive edges from the field's curvature (a 4-tap Laplacian); 0 = off
+    float edgeWidth = 0.05f;       // the Laplacian's tap offset: wider picks up broader creases
+    glm::vec3 edgeColor{0.25f, 0.8f, 1.0f};
+    float shadowStrength = 0.0f;   // an SDF soft shadow towards `shadowDirection`; 0 = off (a second march)
+    float shadowSoftness = 8.0f;   // Quilez's k: larger = harder
+    glm::vec3 shadowDirection{0.3f, 1.0f, 0.2f}; // world space, towards the light
+    int shadowSteps = 32;
+};
+
 struct SdfObject {
     std::string name = "sdf";
     bool visible = true;
@@ -39,6 +53,8 @@ struct SdfObject {
     float epsilon = 0.002f;              // hit threshold (× distance for perspective)
     float stepScale = 0.9f;              // relaxation (displaced trees need < 1)
     float normalEpsilon = 0.002f;
+    float maxDistance = 0.0f;            // ADR-1002: march length cap in tree-local units (0 = the bounds only)
+    SdfLook look;                        // ADR-1002
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material
     // program. Runtime only (the Composition writes it every frame); 1 is the surface as authored.
     float emissionGain = 1.0f;
@@ -69,6 +85,9 @@ struct SdfParameters {
     params::Parameter<glm::vec3>* baseColor = nullptr;
     params::Parameter<float>* emissive = nullptr;
 };
+// ADR-1002 parameters, beside the rest: march/{maxSteps, epsilon, stepScale, maxDistance} and
+// look/{ao/strength, ao/distance, edge/intensity, edge/width, edge/color, shadow/strength,
+// shadow/softness, shadow/direction, shadow/steps}.
 [[nodiscard]] SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObject& rest,
                                                   const std::string& prefix);
 // Copies finals into `live`; structural nodes (kind, children, enabled) come from `rest`.

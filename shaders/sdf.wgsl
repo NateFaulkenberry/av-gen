@@ -53,22 +53,26 @@ const SDF_DIFFERENCE: u32 = 10u;
 const SDF_SMOOTH_UNION: u32 = 11u;
 const SDF_SMOOTH_INTERSECTION: u32 = 12u;
 const SDF_SMOOTH_DIFFERENCE: u32 = 13u;
-const SDF_TRANSLATE: u32 = 14u;
-const SDF_ROTATE: u32 = 15u;
-const SDF_SCALE: u32 = 16u;
-const SDF_TWIST: u32 = 17u;
-const SDF_BEND: u32 = 18u;
-const SDF_REPEAT: u32 = 19u;
-const SDF_POLAR_REPEAT: u32 = 20u;
-const SDF_MIRROR: u32 = 21u;
-const SDF_DISPLACE_NOISE: u32 = 22u;
-const SDF_DISPLACE_VORONOI: u32 = 23u;
-const SDF_DISPLACE_WAVE: u32 = 24u;
-const SDF_DISPLACE_FIELD: u32 = 25u;
+const SDF_MORPH: u32 = 14u;          // ADR-1001
+const SDF_TRANSLATE: u32 = 15u;
+const SDF_ROTATE: u32 = 16u;
+const SDF_SCALE: u32 = 17u;
+const SDF_TWIST: u32 = 18u;
+const SDF_BEND: u32 = 19u;
+const SDF_REPEAT: u32 = 20u;
+const SDF_POLAR_REPEAT: u32 = 21u;
+const SDF_MIRROR: u32 = 22u;
+const SDF_FOLD: u32 = 23u;           // ADR-1001
+const SDF_RECURSE: u32 = 24u;        // ADR-1001
+const SDF_DISPLACE_NOISE: u32 = 25u;
+const SDF_DISPLACE_VORONOI: u32 = 26u;
+const SDF_DISPLACE_WAVE: u32 = 27u;
+const SDF_DISPLACE_FIELD: u32 = 28u;
 
 const SDF_FAR: f32 = 1e9;
 const SDF_BEGIN: u32 = 0xFFFFu;
 const SDF_STACK: u32 = 8u;
+const SDF_LOOPS: u32 = 2u;           // nested Recurse nodes (spatial::kMaxSdfLoops)
 const SDF_TWO_PI: f32 = 6.283185307179586;
 
 // ---- primitives (Quilez exact distances) ----------------------------------------------------------
@@ -189,6 +193,9 @@ fn sdfCombine(kind: u32, d: f32, c: f32, smoothK: f32) -> f32 {
     if (kind == SDF_SMOOTH_DIFFERENCE) {
         return -sdfSmin(-d, c, k);
     }
+    if (kind == SDF_MORPH) {
+        return d + (c - d) * smoothK; // the packer stored this fold's weight in `smooth`
+    }
     return d;
 }
 
@@ -262,7 +269,20 @@ fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
         return vec3<f32>(select(p.x, abs(p.x), m.x > 0.0), select(p.y, abs(p.y), m.y > 0.0),
                          select(p.z, abs(p.z), m.z > 0.0));
     }
-    return p;
+    if (kind == SDF_FOLD) {
+        let axis = sdfSafeNormalize(n.p2.xyz);
+        return p - 2.0 * min(dot(p, axis) - n.p0.w, 0.0) * axis;
+    }
+    return p; // SDF_RECURSE: level 0 is the node's own point
+}
+
+// ADR-1001: one Recurse level, conj(R) * fold(p) * scale - translation (spatial::recurseStep).
+fn sdfRecurseStep(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let m = n.p1.xyz;
+    var q = vec3<f32>(select(p.x, abs(p.x), m.x > 0.0), select(p.y, abs(p.y), m.y > 0.0),
+                      select(p.z, abs(p.z), m.z > 0.0));
+    q = sdfQuatRotate(vec4<f32>(-n.p4.xyz, n.p4.w), q);
+    return q * n.p1.w - n.p3.xyz;
 }
 
 // ---- displacements (the END half of a unary op) --------------------------------------------------
@@ -299,8 +319,13 @@ fn sdfFinishUnary(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32
 fn sdfEvaluate(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     var dist: array<f32, 8>;
     var pts: array<vec3<f32>, 8>;
+    // ADR-1001: Recurse loop frames (level, running union, 1 / scale^level).
+    var loopLevel: array<i32, 2>;
+    var loopAcc: array<f32, 2>;
+    var loopInv: array<f32, 2>;
     var sp = 0u;
     var pp = 0u;
+    var lp = 0u;
     var cur = p;
     let total = arrayLength(&sdfNodes);
     for (var i = 0u; i < count; i = i + 1u) {
@@ -316,7 +341,7 @@ fn sdfEvaluate(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>
             }
             dist[sp] = sdfPrimitive(n, cur);
             sp = sp + 1u;
-        } else if (kind <= SDF_SMOOTH_DIFFERENCE) {
+        } else if (kind <= SDF_MORPH) {
             let children = n.childCount;
             if (children == 0u) {
                 if (sp >= SDF_STACK) {
@@ -343,7 +368,36 @@ fn sdfEvaluate(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>
             }
             pts[pp] = cur;
             pp = pp + 1u;
+            if (kind == SDF_RECURSE) {
+                if (lp >= SDF_LOOPS) {
+                    return SDF_FAR;
+                }
+                loopLevel[lp] = 0;
+                loopAcc[lp] = SDF_FAR;
+                loopInv[lp] = 1.0;
+                lp = lp + 1u;
+            }
             cur = sdfWarp(n, cur);
+        } else if (kind == SDF_RECURSE) {
+            // END of a level: `cur` is this level's point again (the subtree restored it).
+            if (lp == 0u || sp == 0u || pp == 0u) {
+                return SDF_FAR;
+            }
+            let f = lp - 1u;
+            sp = sp - 1u;
+            loopAcc[f] = min(loopAcc[f], dist[sp] * loopInv[f]);
+            if (loopLevel[f] < i32(n.p5.z) && n.fieldSlot >= 0 && u32(n.fieldSlot) < i) {
+                loopLevel[f] = loopLevel[f] + 1;
+                cur = sdfRecurseStep(n, cur);
+                loopInv[f] = loopInv[f] / n.p1.w;
+                i = u32(n.fieldSlot); // the loop's increment resumes after BEGIN
+                continue;
+            }
+            pp = pp - 1u;
+            cur = pts[pp];
+            dist[sp] = loopAcc[f];
+            sp = sp + 1u;
+            lp = lp - 1u;
         } else {
             if (pp == 0u || sp == 0u) {
                 return SDF_FAR;

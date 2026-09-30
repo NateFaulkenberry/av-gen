@@ -16,7 +16,15 @@
 //   distance rescaled); Twist(amount radians per unit along axis Y); Bend(amount radians per unit,
 //   about Z bending X); Repeat(size = cell size per axis, 0 = no repeat on that axis; `count` limits
 //   copies per side, 0 = infinite); PolarRepeat(count copies about Y); Mirror(axis mask via size:
-//   > 0 mirrors that axis).
+//   > 0 mirrors that axis); Fold(axis = plane normal, offset: the half-space behind the plane
+//   dot(p, n) = offset is reflected in front of it); Recurse (ADR-1001: the child is evaluated at
+//   levels 0..count and the results are unioned, d = min_l child(p_l) / scale^l, with p_0 = p and
+//   p_{l+1} = conj(R) * fold(p_l) * scale - translation, where fold = |p| on the axes whose `size`
+//   component is > 0 and R = rotation. Nested architecture from one node).
+//   Morph (ADR-1001, a combination): interpolates between consecutive enabled children by `amount`
+//   in [0, k - 1]: a = clamp(amount), i = floor(a), d = c_i + (c_{i+1} - c_i) * (a - i). Only c_i and
+//   c_{i+1} are evaluated (only c_i at an integer amount), so one float switches or morphs between
+//   structural states and pays for at most two of them.
 //   Displacement (one child): DisplaceNoise d += amount * (fbm3(p * frequency + speed*t) * 2 - 1);
 //   DisplaceVoronoi d += amount * (voronoiF1(p * frequency) - 0.5); DisplaceWave d += amount *
 //   sin(dot(p, axis) * frequency + speed * t); DisplaceField d += amount * fieldScalar(reference) (GPU
@@ -40,8 +48,8 @@ namespace avgen::spatial {
 
 enum class SdfNodeKind : std::uint8_t {
     Sphere, Box, RoundedBox, Cylinder, Capsule, Torus, Plane, Cone,
-    Union, Intersection, Difference, SmoothUnion, SmoothIntersection, SmoothDifference,
-    Translate, Rotate, Scale, Twist, Bend, Repeat, PolarRepeat, Mirror,
+    Union, Intersection, Difference, SmoothUnion, SmoothIntersection, SmoothDifference, Morph,
+    Translate, Rotate, Scale, Twist, Bend, Repeat, PolarRepeat, Mirror, Fold, Recurse,
     DisplaceNoise, DisplaceVoronoi, DisplaceWave, DisplaceField,
 };
 [[nodiscard]] const char* sdfNodeKindName(SdfNodeKind kind);
@@ -51,6 +59,9 @@ enum class SdfNodeKind : std::uint8_t {
 
 struct SdfNode {
     SdfNodeKind kind = SdfNodeKind::Sphere;
+    // ADR-1001: an optional name. A named node's parameters are `node/<name>/<field>` instead of
+    // `node/<pre-order index>/<field>`. Letters, digits, '_' and '-'; not all digits; unique in a tree.
+    std::string name;
     bool enabled = true;
     float radius = 1.0f;
     float height = 2.0f;
@@ -75,6 +86,8 @@ struct SdfNode {
 constexpr int kMaxSdfNodes = 64;
 constexpr int kMaxSdfDepth = 8;
 constexpr int kMaxSdfStack = 8;
+constexpr int kMaxSdfLoops = 2;       // nested Recurse nodes (the interpreter's loop frames)
+constexpr int kMaxSdfRecurseLevels = 8;
 
 struct SdfTree {
     SdfNode root;
@@ -100,13 +113,13 @@ struct SdfTree {
 struct alignas(16) SdfNodeGpu {
     std::uint32_t kind;
     std::uint32_t childCount;    // combinations pop this many; unary ops 1; primitives 0
-    std::int32_t fieldSlot;      // DisplaceField
+    std::int32_t fieldSlot;      // DisplaceField; a Recurse END record: the index of its BEGIN in the program
     std::uint32_t seed;
     glm::vec4 p0;                // radius, height, rounding, offset
     glm::vec4 p1;                // size.xyz, scale
     glm::vec4 p2;                // axis.xyz, amount
-    glm::vec4 p3;                // translation.xyz, smooth
-    glm::vec4 p4;                // rotation quaternion (xyzw) for Rotate; frequency for displacements in .x otherwise
+    glm::vec4 p3;                // translation.xyz, smooth (a Morph fold record: its weight)
+    glm::vec4 p4;                // rotation quaternion (xyzw) for Rotate and Recurse; frequency for displacements in .x otherwise
     glm::vec4 p5;                // frequency, speed, float(count), pad
 };
 static_assert(sizeof(SdfNodeGpu) == 112);

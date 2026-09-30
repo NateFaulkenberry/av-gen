@@ -533,6 +533,45 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         wave.axis = glm::vec3(1.0f, 0.3f, -0.4f);
         cases.push_back({"displace wave", treeOf(std::move(wave)), 1e-4f});
     }
+    // ADR-1001: morph, fold and recurse (including the recurse loop jumping back over a subtree,
+    // nested twice, and a morph inside a recurse level).
+    {
+        auto base = [] {
+            return combo(SdfNodeKind::SmoothUnion, {sphere(0.5f), translate(glm::vec3(0.5f, 0.2f, 0.0f), box(glm::vec3(0.3f)))},
+                         0.25f);
+        };
+        for (const float amount : {0.0f, 0.35f, 1.0f, 1.6f, 2.0f}) {
+            SdfNode morph = combo(SdfNodeKind::Morph,
+                                  {sphere(1.0f), box(glm::vec3(0.7f, 0.4f, 0.9f)), translate(glm::vec3(0.3f, 0.0f, 0.0f), sphere(0.4f))},
+                                  0.5f);
+            morph.amount = amount;
+            cases.push_back({"morph " + std::to_string(amount), treeOf(std::move(morph)), 1e-4f});
+        }
+        SdfNode folded = unary(SdfNodeKind::Fold, translate(glm::vec3(0.7f, 0.2f, 0.0f), base()));
+        folded.axis = glm::vec3(1.0f, 0.4f, -0.3f);
+        folded.offset = 0.2f;
+        cases.push_back({"fold", treeOf(std::move(folded)), 1e-4f});
+        SdfNode recursed = unary(SdfNodeKind::Recurse, translate(glm::vec3(0.9f, 0.0f, 0.3f), base()));
+        recursed.count = 3;
+        recursed.scale = 2.0f;
+        recursed.translation = glm::vec3(1.0f, 0.5f, 0.8f);
+        recursed.rotationDegrees = glm::vec3(0.0f, 25.0f, 10.0f);
+        recursed.size = glm::vec3(1.0f, 0.0f, 1.0f);
+        cases.push_back({"recurse", treeOf(std::move(recursed)), 1e-4f});
+        SdfNode inner = unary(SdfNodeKind::Recurse,
+                              combo(SdfNodeKind::Morph, {box(glm::vec3(0.4f)), sphere(0.5f)}, 0.5f));
+        inner.children[0].amount = 0.4f;
+        inner.count = 2;
+        inner.scale = 1.7f;
+        inner.translation = glm::vec3(0.6f, 0.0f, 0.0f);
+        inner.size = glm::vec3(1.0f);
+        SdfNode outer = unary(SdfNodeKind::Recurse, combo(SdfNodeKind::Union, {std::move(inner), sphere(0.2f)}, 0.5f));
+        outer.count = 2;
+        outer.scale = 2.5f;
+        outer.translation = glm::vec3(0.0f, 1.2f, 0.4f);
+        outer.size = glm::vec3(0.0f, 1.0f, 1.0f);
+        cases.push_back({"recurse nested", treeOf(std::move(outer)), 1e-4f});
+    }
     cases.push_back({"complex", treeOf(complexTree()), 1e-3f});
     checkParity(*ctx, harness, cases, fields, 1.37);
 }

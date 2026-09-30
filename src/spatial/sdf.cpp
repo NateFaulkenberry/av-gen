@@ -118,16 +118,16 @@ constexpr std::uint32_t kBeginMarker = 0xFFFFu;
 constexpr int kMaxSdfPackedNodes = kMaxSdfNodes * 2;
 constexpr float kTwoPi = 6.283185307179586f;
 
-constexpr std::array<const char*, 26> kKindNames = {
+constexpr std::array<const char*, 29> kKindNames = {
     "sphere",       "box",           "roundedBox",         "cylinder",         "capsule",   "torus",
     "plane",        "cone",          "union",              "intersection",     "difference", "smoothUnion",
-    "smoothIntersection", "smoothDifference", "translate", "rotate",           "scale",     "twist",
-    "bend",         "repeat",        "polarRepeat",        "mirror",           "displaceNoise",
-    "displaceVoronoi", "displaceWave", "displaceField",
+    "smoothIntersection", "smoothDifference", "morph", "translate", "rotate",  "scale",     "twist",
+    "bend",         "repeat",        "polarRepeat",        "mirror",           "fold",      "recurse",
+    "displaceNoise", "displaceVoronoi", "displaceWave", "displaceField",
 };
 
 bool isCombination(SdfNodeKind kind) {
-    return kind >= SdfNodeKind::Union && kind <= SdfNodeKind::SmoothDifference;
+    return kind >= SdfNodeKind::Union && kind <= SdfNodeKind::Morph;
 }
 
 bool isUnary(SdfNodeKind kind) {
@@ -326,9 +326,34 @@ float combine(SdfNodeKind kind, float d, float c, float smooth) {
         return -smin(-d, -c, k);
     case SdfNodeKind::SmoothDifference:
         return -smin(-d, c, k);
+    case SdfNodeKind::Morph:
+        return d + (c - d) * smooth; // ADR-1001: `smooth` carries this fold's weight
     default:
         return d;
     }
+}
+
+// ADR-1001: which enabled children a Morph blends. a = amount clamped to [0, children - 1]; the result
+// is c_first + (c_second - c_first) * weight with first = floor(a), second = first + 1 and weight =
+// a - first. Only those (one when weight is 0) are evaluated or packed, so a settled morph costs one
+// structure, and the far value (1e9) of an unrelated child never enters the arithmetic.
+struct MorphPick {
+    int first = 0;
+    int second = -1; // -1: `first` alone
+    float weight = 0.0f;
+};
+MorphPick morphPick(float amount, int children) {
+    MorphPick m;
+    if (children <= 0) {
+        return m;
+    }
+    const float a = glm::clamp(amount, 0.0f, static_cast<float>(children - 1));
+    m.first = std::min(static_cast<int>(std::floor(a)), children - 1);
+    m.weight = a - static_cast<float>(m.first);
+    if (m.weight > 0.0f && m.first + 1 < children) {
+        m.second = m.first + 1;
+    }
+    return m;
 }
 
 float rnd(float x) {
@@ -383,9 +408,22 @@ glm::vec3 warpPoint(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
     case SdfNodeKind::Mirror:
         return glm::vec3(n.size.x > 0.0f ? std::fabs(p.x) : p.x, n.size.y > 0.0f ? std::fabs(p.y) : p.y,
                          n.size.z > 0.0f ? std::fabs(p.z) : p.z);
-    default:
-        return p;
+    case SdfNodeKind::Fold: {
+        // ADR-1001: reflect the half-space behind the plane dot(p, n) = offset in front of it.
+        const glm::vec3 axis = safeNormalize(n.axis);
+        return p - 2.0f * std::min(glm::dot(p, axis) - n.offset, 0.0f) * axis;
     }
+    default:
+        return p; // Recurse: level 0 is the node's own point; recurseStep makes the next levels
+    }
+}
+
+// ADR-1001: one Recurse level, p_{l+1} = conj(R) * fold(p_l) * scale - translation.
+glm::vec3 recurseStep(const NodeParams& n, const glm::vec3& p) {
+    glm::vec3 q(n.size.x > 0.0f ? std::fabs(p.x) : p.x, n.size.y > 0.0f ? std::fabs(p.y) : p.y,
+                n.size.z > 0.0f ? std::fabs(p.z) : p.z);
+    q = glm::conjugate(n.rotation) * q;
+    return q * n.scale - n.translation;
 }
 
 float displace(SdfNodeKind kind, const NodeParams& n, float d, const glm::vec3& p, double time, const FieldSet* fields) {
@@ -426,20 +464,50 @@ float evalEffective(const SdfNode* node, const glm::vec3& p, double time, const 
         return primitiveDistance(kind, paramsOf(*node, fields), p);
     }
     if (isCombination(kind)) {
-        bool first = true;
+        int enabledChildren = 0;
+        for (const SdfNode& child : node->children) {
+            enabledChildren += effective(child) != nullptr ? 1 : 0;
+        }
+        const MorphPick pick = morphPick(node->amount, enabledChildren);
+        int index = 0;
+        int folded = 0;
         float d = kFar;
         for (const SdfNode& child : node->children) {
             const SdfNode* e = effective(child);
             if (e == nullptr) {
                 continue;
             }
+            const int own = index++;
+            float k = node->smooth;
+            if (kind == SdfNodeKind::Morph) {
+                if (own != pick.first && own != pick.second) {
+                    continue;
+                }
+                k = pick.weight;
+            }
             const float c = evalEffective(e, p, time, fields, depth + 1);
-            d = first ? c : combine(kind, d, c, node->smooth);
-            first = false;
+            d = folded == 0 ? c : combine(kind, d, c, k);
+            ++folded;
         }
         return d;
     }
     const NodeParams params = paramsOf(*node, fields);
+    if (kind == SdfNodeKind::Recurse) {
+        // The packed interpreter's loop, level by level, in the same operation order.
+        const SdfNode* child = effectiveChild(*node);
+        glm::vec3 q = p;
+        float acc = kFar;
+        float invScale = 1.0f;
+        for (int level = 0;; ++level) {
+            acc = std::min(acc, evalEffective(child, q, time, fields, depth + 1) * invScale);
+            if (level >= params.count) {
+                break;
+            }
+            q = recurseStep(params, q);
+            invScale = invScale / params.scale;
+        }
+        return acc;
+    }
     const glm::vec3 q = warpPoint(kind, params, p);
     const float d = evalEffective(effectiveChild(*node), q, time, fields, depth + 1);
     return finishUnary(kind, params, d, p, time, fields);
@@ -485,8 +553,30 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     if (n.kind == SdfNodeKind::Scale && !(n.scale > 0.0f)) {
         return fail("sdf node 'scale': scale must be > 0");
     }
-    if (n.kind == SdfNodeKind::Plane && glm::length(n.axis) < 1e-8f) {
-        return fail("sdf node 'plane' has a zero axis");
+    if ((n.kind == SdfNodeKind::Plane || n.kind == SdfNodeKind::Fold) && glm::length(n.axis) < 1e-8f) {
+        return fail("sdf node '{}' has a zero axis", label);
+    }
+    if (n.kind == SdfNodeKind::Recurse) {
+        if (!(n.scale > 0.0f)) {
+            return fail("sdf node 'recurse': scale must be > 0");
+        }
+        if (n.count > kMaxSdfRecurseLevels) {
+            return fail("sdf node 'recurse': count must be <= {} (got {})", kMaxSdfRecurseLevels, n.count);
+        }
+    }
+    if (!n.name.empty()) {
+        bool digitsOnly = true;
+        for (const char c : n.name) {
+            const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
+                            c == '-';
+            if (!ok) {
+                return fail("sdf node name '{}': only letters, digits, '_' and '-' are allowed", n.name);
+            }
+            digitsOnly = digitsOnly && c >= '0' && c <= '9';
+        }
+        if (digitsOnly) {
+            return fail("sdf node name '{}' is all digits, which would read as a node index", n.name);
+        }
     }
     const auto childCount = static_cast<int>(n.children.size());
     if (sdfNodeIsPrimitive(n.kind)) {
@@ -554,6 +644,37 @@ PackedMetrics packedMetrics(const SdfNode* node) {
     return m;
 }
 
+// The deepest nesting of enabled Recurse nodes (the packed interpreter's loop frames).
+int recurseNesting(const SdfNode* node) {
+    if (node == nullptr) {
+        return 0;
+    }
+    int deepest = 0;
+    if (isUnary(node->kind)) {
+        deepest = recurseNesting(effectiveChild(*node));
+    } else {
+        for (const SdfNode& child : node->children) {
+            deepest = std::max(deepest, recurseNesting(effective(child)));
+        }
+    }
+    return deepest + (node->kind == SdfNodeKind::Recurse ? 1 : 0);
+}
+
+Result<void> uniqueNames(const SdfNode& n, std::vector<std::string>& seen) {
+    if (!n.name.empty()) {
+        if (std::find(seen.begin(), seen.end(), n.name) != seen.end()) {
+            return fail("sdf node name '{}' is used twice", n.name);
+        }
+        seen.push_back(n.name);
+    }
+    for (const SdfNode& child : n.children) {
+        if (auto ok = uniqueNames(child, seen); !ok) {
+            return ok;
+        }
+    }
+    return {};
+}
+
 // ---- hashing (FNV-1a over bit patterns) ----------------------------------------------------------
 
 class StructHash {
@@ -585,6 +706,7 @@ private:
 
 void hashNode(StructHash& h, const SdfNode& n) {
     h.u32(static_cast<std::uint32_t>(n.kind));
+    h.str(n.name);
     h.boolean(n.enabled);
     h.f32(n.radius);
     h.f32(n.height);
@@ -720,7 +842,7 @@ SdfNodeGpu packNode(const SdfNode& n, std::uint32_t childCount, const FieldSet* 
     g.p1 = glm::vec4(n.size, n.scale);
     g.p2 = glm::vec4(n.axis, n.amount);
     g.p3 = glm::vec4(n.translation, n.smooth);
-    if (n.kind == SdfNodeKind::Rotate) {
+    if (n.kind == SdfNodeKind::Rotate || n.kind == SdfNodeKind::Recurse) {
         const glm::quat q = glm::quat(glm::radians(n.rotationDegrees));
         g.p4 = glm::vec4(q.x, q.y, q.z, q.w);
     } else {
@@ -752,15 +874,29 @@ void emitPacked(const SdfNode* node, std::vector<SdfNodeGpu>& out, const FieldSe
         return;
     }
     if (isCombination(node->kind)) {
+        int enabledChildren = 0;
+        for (const SdfNode& child : node->children) {
+            enabledChildren += effective(child) != nullptr ? 1 : 0;
+        }
+        const MorphPick pick = morphPick(node->amount, enabledChildren);
         std::uint32_t emitted = 0;
+        int index = 0;
         for (const SdfNode& child : node->children) {
             const SdfNode* e = effective(child);
             if (e == nullptr) {
                 continue;
             }
+            const int own = index++;
+            if (node->kind == SdfNodeKind::Morph && own != pick.first && own != pick.second) {
+                continue; // a morph packs only the one or two children it blends
+            }
             emitPacked(e, out, fields);
             if (emitted > 0) {
-                out.push_back(packNode(*node, 2, fields)); // binary fold with the running result
+                SdfNodeGpu fold = packNode(*node, 2, fields); // binary fold with the running result
+                if (node->kind == SdfNodeKind::Morph) {
+                    fold.p3.w = pick.weight;
+                }
+                out.push_back(fold);
             }
             ++emitted;
         }
@@ -769,9 +905,14 @@ void emitPacked(const SdfNode* node, std::vector<SdfNodeGpu>& out, const FieldSe
         }
         return;
     }
+    const auto begin = static_cast<std::int32_t>(out.size());
     out.push_back(packNode(*node, kBeginMarker, fields));
     emitPacked(effectiveChild(*node), out, fields);
-    out.push_back(packNode(*node, 1, fields));
+    SdfNodeGpu end = packNode(*node, 1, fields);
+    if (node->kind == SdfNodeKind::Recurse) {
+        end.fieldSlot = begin; // the loop jumps back to the record after its BEGIN
+    }
+    out.push_back(end);
 }
 
 } // namespace
@@ -809,6 +950,9 @@ json SdfNode::toJson() const {
     static const SdfNode def;
     json j = json::object();
     j["kind"] = sdfNodeKindName(kind);
+    if (!name.empty()) {
+        j["name"] = name;
+    }
     if (enabled != def.enabled) {
         j["enabled"] = enabled;
     }
@@ -889,6 +1033,7 @@ Result<SdfNode> SdfNode::fromJson(const json& j, int depth) {
         }
         n.kind = *kind;
     }
+    AVGEN_SDF_READ(n.name, "name", readString);
     AVGEN_SDF_READ(n.enabled, "enabled", readBool);
     AVGEN_SDF_READ(n.radius, "radius", readFloat);
     AVGEN_SDF_READ(n.height, "height", readFloat);
@@ -940,6 +1085,13 @@ Result<void> SdfTree::validate() const {
     }
     if (m.pointStack > kMaxSdfStack) {
         return fail("sdf tree nests {} unary operations (max {})", m.pointStack, kMaxSdfStack);
+    }
+    if (const int loops = recurseNesting(effective(root)); loops > kMaxSdfLoops) {
+        return fail("sdf tree nests {} recurse nodes (max {})", loops, kMaxSdfLoops);
+    }
+    std::vector<std::string> names;
+    if (auto ok = uniqueNames(root, names); !ok) {
+        return ok;
     }
     return {};
 }
@@ -1133,10 +1285,17 @@ int packSdfTree(const SdfTree& tree, std::vector<SdfNodeGpu>& out, const FieldSe
 float evaluatePacked(std::span<const SdfNodeGpu> nodes, const glm::vec3& p, double time, const FieldSet* fields) {
     std::array<float, kMaxSdfStack> dist{};
     std::array<glm::vec3, kMaxSdfStack> pts{};
+    // ADR-1001: Recurse loop frames (level, running union, 1 / scale^level).
+    std::array<int, kMaxSdfLoops> loopLevel{};
+    std::array<float, kMaxSdfLoops> loopAcc{};
+    std::array<float, kMaxSdfLoops> loopInv{};
     int sp = 0;
     int pp = 0;
+    int lp = 0;
     glm::vec3 cur = p;
-    for (const SdfNodeGpu& g : nodes) {
+    const auto total = static_cast<std::int64_t>(nodes.size());
+    for (std::int64_t i = 0; i < total; ++i) {
+        const SdfNodeGpu& g = nodes[static_cast<std::size_t>(i)];
         const auto kind = static_cast<SdfNodeKind>(g.kind);
         if (sdfNodeIsPrimitive(kind)) {
             if (sp >= kMaxSdfStack) {
@@ -1167,7 +1326,34 @@ float evaluatePacked(std::span<const SdfNodeGpu> nodes, const glm::vec3& p, doub
                 return kFar;
             }
             pts[static_cast<std::size_t>(pp++)] = cur;
+            if (kind == SdfNodeKind::Recurse) {
+                if (lp >= kMaxSdfLoops) {
+                    return kFar;
+                }
+                loopLevel[static_cast<std::size_t>(lp)] = 0;
+                loopAcc[static_cast<std::size_t>(lp)] = kFar;
+                loopInv[static_cast<std::size_t>(lp)] = 1.0f;
+                ++lp;
+            }
             cur = warpPoint(kind, paramsOf(g, fields), cur);
+        } else if (kind == SdfNodeKind::Recurse) {
+            // END of a level: `cur` is this level's point again (the subtree restored it).
+            if (lp <= 0 || sp <= 0 || pp <= 0) {
+                return kFar;
+            }
+            const auto f = static_cast<std::size_t>(lp - 1);
+            const NodeParams params = paramsOf(g, fields);
+            loopAcc[f] = std::min(loopAcc[f], dist[static_cast<std::size_t>(--sp)] * loopInv[f]);
+            if (loopLevel[f] < params.count && g.fieldSlot >= 0 && g.fieldSlot < i) {
+                ++loopLevel[f];
+                cur = recurseStep(params, cur);
+                loopInv[f] = loopInv[f] / params.scale;
+                i = g.fieldSlot; // the loop's ++i resumes at the record after BEGIN
+                continue;
+            }
+            cur = pts[static_cast<std::size_t>(--pp)];
+            dist[static_cast<std::size_t>(sp++)] = loopAcc[f];
+            --lp;
         } else {
             if (pp <= 0 || sp <= 0) {
                 return kFar;
