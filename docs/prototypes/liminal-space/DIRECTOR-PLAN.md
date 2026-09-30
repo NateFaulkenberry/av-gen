@@ -927,7 +927,8 @@ speeds and the phrase lengths so that thresholds fall on phrase downbeats.
     over bars 67-73, floor fixed. Its far wall has a named opening whose width is keyed 0 → 2 m from bar 70, onto
     the sky.
 - **D. The void stairwell.**
-  - **The shaft:** a square shaft 20 by 20 m, closed below by fog about 60 m down.
+  - **The shaft:** a square shaft 40 by 40 m (large enough to read as an enormous empty space), closed below by fog
+    about 60 m down; its far walls, with doorways at every height, are faint lines in the fog.
   - **The stairhead:** at the top, on a landing looking over the void, where the figure stands.
   - **The descent:** two flights go down from it, and the camera takes the left one.
   - **The rebuild's passage:** 1.4 m wide and 2.6 m tall, off a lower landing (the film's only low ceiling).
