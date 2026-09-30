@@ -1,4 +1,6 @@
 #include "ui/control_panel.hpp"
+
+#include "sonic/sonic_runtime.hpp"
 #include "rendering/render_quality.hpp"
 
 #include "ui/param_widget.hpp"
@@ -2311,6 +2313,8 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
         ImPlot::EndPlot();
     }
 
+    drawSonic(engine);
+
     // Waveform: a window of the decoded file around the play-head.
     if (ImPlot::BeginPlot("Waveform", ImVec2(-1, 120), ImPlotFlags_NoLegend | ImPlotFlags_NoMenus)) {
         ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_Lock);
@@ -2330,6 +2334,67 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
             ImPlot::PlotLine("wave", waveform_.data(), kPoints);
         }
         ImPlot::EndPlot();
+    }
+}
+
+// ADR-1020 (brief §24): the Sonic Garden's compact diagnostic view -- the Sonic Character's medium tier as bars
+// (the slow tier as a tick on each), the musical context in numbers, and the interpreter's visual signals. Shown
+// only when the project has a `sonic` block; everything here is also on the bus and in `--sonic-trace`.
+void ControlPanel::drawSonic(app::Engine& engine) {
+    const sonic::SonicSetup* setup = engine.sonicSetup();
+    if (setup == nullptr || !ImGui::CollapsingHeader("Sonic", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+    const sonic::SonicRuntime& rt = engine.sonicRuntime();
+    const float barWidth = std::max(80.0f, ImGui::GetContentRegionAvail().x * 0.45f);
+    const auto bar = [&](const char* label, float medium, float slow) {
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine(110.0f);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        char text[16];
+        std::snprintf(text, sizeof text, "%.2f", static_cast<double>(medium));
+        ImGui::ProgressBar(std::clamp(medium, 0.0f, 1.0f), ImVec2(barWidth, 0.0f), text);
+        // The slow tier: a tick where the identity sits.
+        const float h = ImGui::GetItemRectSize().y;
+        const float x = at.x + std::clamp(slow, 0.0f, 1.0f) * barWidth;
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(x, at.y), ImVec2(x, at.y + h), IM_COL32(255, 220, 120, 255), 2.0f);
+    };
+    ImGui::TextDisabled("SONIC CHARACTER  (bar: medium tier, tick: slow tier)");
+    for (std::size_t i = 0; i < sonic::kDimensionCount; ++i) {
+        bar(sonic::dimensionName(static_cast<sonic::Dimension>(i)), rt.medium()[i], rt.slow()[i]);
+    }
+    const sonic::TimbreFeatures& t = rt.timbre();
+    ImGui::TextDisabled("%.0f dB  f0 %.0f Hz  harm %.2f  inharm %.2f  flat %.3f  diss %.3f  rolloff %.0f Hz",
+                        static_cast<double>(t.loudnessDb), static_cast<double>(t.f0Hz),
+                        static_cast<double>(t.harmonicity), static_cast<double>(t.inharmonicity),
+                        static_cast<double>(t.flatness), static_cast<double>(t.dissonance),
+                        static_cast<double>(t.rolloffHz));
+    ImGui::Separator();
+    ImGui::TextDisabled("MUSICAL CONTEXT  (%zu notes)", setup->notes.notes.size());
+    const sonic::MusicalContext& c = rt.context();
+    ImGui::Text("active %d   pitch %s   range %.0f st   velocity %.2f", c.active, sonic::pitchName(c.pitch).c_str(),
+                static_cast<double>(c.range), static_cast<double>(c.velocity));
+    ImGui::Text("density %.1f/s   rhythm %.1f/s   regularity %.2f   motion %.1f st   direction %+.2f",
+                static_cast<double>(c.density), static_cast<double>(c.rhythm), static_cast<double>(c.regularity),
+                static_cast<double>(c.motion), static_cast<double>(c.direction));
+    ImGui::Text("duration %.2f s   legato %.2f   chord %.2f   tension %.2f   repetition %.2f   phrase %.2f",
+                static_cast<double>(c.duration), static_cast<double>(c.legato), static_cast<double>(c.chord),
+                static_cast<double>(c.tension), static_cast<double>(c.repetition), static_cast<double>(c.phrase));
+    // The interpreter's outputs, whatever the project named them.
+    const signals::SignalBus& bus = engine.signals();
+    bool first = true;
+    for (std::size_t i = 0; i < bus.size(); ++i) {
+        const auto id = static_cast<signals::SignalId>(i);
+        const std::string& name = bus.info(id).name;
+        if (!name.starts_with("visual.")) {
+            continue;
+        }
+        if (first) {
+            ImGui::Separator();
+            ImGui::TextDisabled("VISUAL INTERPRETER");
+            first = false;
+        }
+        bar(name.c_str() + 7, bus.value(id), bus.value(id));
     }
 }
 

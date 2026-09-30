@@ -35,6 +35,90 @@
     "outro": 100.0
    },
    "sha256": "66092f806f1b4b05a17565a5436797cbc9fb49d9b4bbe18ed288054d7f47c3c6"
+  },
+  {
+   "name": "sonic-pad",
+   "file": "audio/sonic-pad.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 21.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/phrase.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "4c977cda2be138949bc67db65d57c64c69cc2a2b2fbbe8762522697b8f4f3651"
+  },
+  {
+   "name": "sonic-bell",
+   "file": "audio/sonic-bell.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 21.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/phrase.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "f6667258664d703f9e9468e4218aad37622d1df6ebb114433b218ed84d63db15"
+  },
+  {
+   "name": "sonic-bass",
+   "file": "audio/sonic-bass.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 21.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/phrase.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "7902be915e931fdc3112158312931366703b4c88ba914058ea1de236d516ffe7"
+  },
+  {
+   "name": "sonic-perc",
+   "file": "audio/sonic-perc.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 21.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/phrase.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "91d05567d9bf9c014ad7a4ae43cc87f1c5a22ac19bd97895c174222bdadc2899"
+  },
+  {
+   "name": "sonic-context-pad",
+   "file": "audio/sonic-context-pad.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 31.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/context.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "a0c8e4ef119722e5b082b16f157f8768f6a5a14a19185ee7024fee308e123320"
+  },
+  {
+   "name": "sonic-context-bell",
+   "file": "audio/sonic-context-bell.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 31.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/context.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "c29ca508e48c47d16f27e2be39e936d89b22ae0cecbd4ac1e11601cb8a56d91c"
+  },
+  {
+   "name": "sonic-morph",
+   "file": "audio/sonic-morph.wav",
+   "command": "python3 tools/make_sonic_material.py",
+   "seconds": 31.5,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "notes": "examples/sonic-garden/notes/morph.mid",
+   "purpose": "Sonic Garden POC test material (docs/prototypes/sonic-garden)",
+   "sha256": "1d3841dc21952e2320243224040e10e6d78bca8650f95f77b732cb5b7cd8b738"
   }
  ]
 }

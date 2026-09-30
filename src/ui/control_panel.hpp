@@ -414,6 +414,7 @@ private:
     void drawResponse(app::Engine& engine);
     void drawParameters(app::Engine& engine);
     void drawAnalysis(app::Engine& engine);
+    void drawSonic(app::Engine& engine); // ADR-1020: the Sonic Garden diagnostic view
     void drawPerformance(app::Engine& engine, const FrameStats& stats);
     // §13. The dashboard: where the frame's time goes, what it contains, and the arms that take a
     // subsystem away. Separate from `drawPerformance`, which is Control's compact summary line.

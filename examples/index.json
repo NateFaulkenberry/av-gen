@@ -311,6 +311,12 @@
       "description": "One continuous knob from high summer to deep winter: canopy, undergrowth, ground, sky, fog, pollen, leaf fall and snow are all targets of a single world macro. No winter scene exists.",
       "name": "Season shift",
       "project": "weather/season.json"
+    },
+    {
+      "category": "Lab",
+      "description": "The Sonic Garden POC (ADR-1020): one MIDI phrase through a pad, an FM bell, a distorted bass and noisy percussion. The Sonic Character, the notes' musical context and the interpret source's visual families drive a hero form, organic and crystalline structures, shards, spores and the camera. Variants per sound are in sonic-garden/variants/; the audio comes from tools/make_sonic_material.py.",
+      "name": "Sonic Garden",
+      "project": "sonic-garden/sonic-garden.json"
     }
   ]
 }

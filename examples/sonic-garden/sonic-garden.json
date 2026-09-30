@@ -1,0 +1,531 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic Garden"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/sonic-pad.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "sonic-garden.scene.json"
+  }
+ },
+ "sonic": {
+  "notes": "notes/phrase.mid"
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.6,
+  "post/bloom/threshold": 0.9,
+  "post/output/vignette": 0.35,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.6
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "garden",
+   "settings": {
+    "mappings": [
+     {
+      "name": "organic",
+      "group": "family",
+      "inputs": [
+       {
+        "signal": "sonic.warmth.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.smoothness.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.brightness.slow",
+        "weight": 1.0,
+        "invert": true
+       },
+       {
+        "signal": "sonic.inharmonicity.slow",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
+     },
+     {
+      "name": "crystalline",
+      "group": "family",
+      "inputs": [
+       {
+        "signal": "sonic.inharmonicity.slow",
+        "weight": 2.0
+       },
+       {
+        "signal": "sonic.brightness.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.roughness.slow",
+        "weight": 1.0,
+        "invert": true
+       },
+       {
+        "signal": "notes.regularity",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "chaotic",
+      "group": "family",
+      "inputs": [
+       {
+        "signal": "sonic.roughness.slow",
+        "weight": 1.5
+       },
+       {
+        "signal": "sonic.sharpness.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.density.slow",
+        "weight": 0.5
+       },
+       {
+        "signal": "sonic.smoothness.slow",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
+     },
+     {
+      "name": "glow",
+      "inputs": [
+       {
+        "signal": "sonic.energy",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.velocity",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "light",
+      "inputs": [
+       {
+        "signal": "sonic.brightness",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.pitch",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "warm",
+      "inputs": [
+       {
+        "signal": "sonic.warmth",
+        "weight": 1.0
+       }
+      ],
+      "curve": 1.5
+     },
+     {
+      "name": "cool",
+      "inputs": [
+       {
+        "signal": "sonic.warmth",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "curve": 1.5
+     },
+     {
+      "name": "turbulence",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "sonic.roughness",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.energy",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "spikes",
+      "inputs": [
+       {
+        "signal": "sonic.sharpness",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.inharmonicity",
+        "weight": 0.5
+       }
+      ],
+      "bias": -0.2,
+      "gain": 1.4
+     },
+     {
+      "name": "breath",
+      "inputs": [
+       {
+        "signal": "sonic.smoothness.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.duration",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "swarm",
+      "inputs": [
+       {
+        "signal": "notes.density",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.density",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "motion",
+      "inputs": [
+       {
+        "signal": "notes.motion",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.movement",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "pulse",
+      "inputs": [
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "hit",
+      "inputs": [
+       {
+        "signal": "sonic.transient",
+        "weight": 1.0
+       }
+      ]
+     }
+    ],
+    "groups": {
+     "family": {
+      "sharpness": 2.0
+     }
+    }
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.organic",
+   "target": "procedural/tendrils/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.organic",
+   "target": "procedural/blooms/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.crystalline",
+   "target": "procedural/crystals/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.chaotic",
+   "target": "procedural/shards/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.organic",
+   "target": "scene/volumeDensity",
+   "amount": 0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "visual.turbulence",
+   "target": "procedural/hero/deform/1/amount",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "visual.breath",
+   "target": "procedural/hero/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "visual.motion",
+   "target": "procedural/hero/deform/3/amount",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.spikes",
+   "target": "procedural/hero/deform/4/amount",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "procedural/hero/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "visual.pulse",
+   "target": "procedural/hero/material/emissive",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "peakhold",
+    "attackMs": 5,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.warm",
+   "target": "procedural/hero/material/emissiveColor",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.cool",
+   "target": "procedural/hero/material/emissiveColor",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.light",
+   "target": "procedural/hero/material/emissiveColor",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.pulse",
+   "target": "procedural/crystals/material/emissive",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "peakhold",
+    "attackMs": 2,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "visual.light",
+   "target": "procedural/crystals/material/emissive",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 100,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "visual.breath",
+   "target": "procedural/tendrils/deform/2/amount",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "procedural/blooms/material/emissive",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.hit",
+   "target": "procedural/shards/material/emissive",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "peakhold",
+    "attackMs": 2,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "visual.turbulence",
+   "target": "procedural/shards/deform/1/amount",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "visual.swarm",
+   "target": "particles/spores/spawnRate",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 100,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "visual.turbulence",
+   "target": "particles/spores/turbulence",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "visual.hit",
+   "target": "particles/spores/emissive",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "peakhold",
+    "attackMs": 2,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "visual.motion",
+   "target": "camera/orbitSpeed",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1280,
+  "height": 720,
+  "fps": 30,
+  "output": "sequence",
+  "path": "renders/sonic-garden"
+ }
+}
