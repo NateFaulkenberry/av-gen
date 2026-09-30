@@ -298,7 +298,7 @@ t = 30 s.
 - **New test** (`[space]`): the Infinite Hall's music moves every routed rule, two fresh engines give
   bit-identical rules and compiled tables over 20 s, and with no audio nothing moves.
 
-## Suites at `1808fa65` (run 04:16-05:20, after ADR-1005 and the new `[space]` test)
+## Suites at `1808fa65` (run 04:16-05:08, after ADR-1005 and the new `[space]` test)
 
 - `tools/gpu-lock.sh build/release/tests/avgen_tests`: **binary exit 0**; 3,900 cases: 3,880 passed,
   19 skipped, 1 failed as expected (the `[!shouldfail]` slope lean). 10,057,077 assertions.
