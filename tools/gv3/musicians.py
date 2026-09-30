@@ -88,6 +88,10 @@ SUIT = {"pattern": 0.0, "color": [0.15, 0.95, 0.78], "intensity": 1.4, "scale": 
 # The drummer's photophores centre on the valley's violet, the keyboardist's on its cyan-green: one palette,
 # two phases of it. (Pink at 3.0 with a +5 kick turned the whole drummer into a pink glow on every kick.)
 SUIT_VARIATION = {"drummer": {"color": [0.62, 0.45, 1.0]}, "keyboardist": {}}
+# The owner, 2026-09-29, on the spotted suits in the art pass's r1: "let's investigate why the astronauts have a
+# spotted pattern on them and see if we can remove it". Off: the suits are plain, and the rainbow hero pulse is
+# their whole aura. True puts the photophores and their two routes back exactly as r1 rendered them.
+SUIT_PHOTOPHORES_ON = False
 # What each suit answers: the drummer the scored kick, the keyboardist the lead; both the section's energy.
 SUIT_ROUTES = {
     "drummer": ("timeline.kick", 1.6, 6.0, 280.0),
@@ -267,8 +271,8 @@ def effects(project):
                 "timing": {"delay": 0.0, "lifetime": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "windowStart": 0.0,
                            "windowSeconds": 6.0, "repeatSeconds": 0.0},
                 "parameters": dict(SUIT, **SUIT_VARIATION[name])}
-        ids |= {pulse["id"], suit["id"]}
-        added += [pulse, suit]
+        ids |= {pulse["id"], suit["id"]}  # the suit's id either way, so a switched-off one is taken out
+        added += [pulse, suit] if SUIT_PHOTOPHORES_ON else [pulse]
     ids.add(LIFT_GLOW["id"])
     glow = copy.deepcopy(LIFT_GLOW)
     ids.add(LIFT_RAINBOW["id"])
@@ -281,6 +285,10 @@ def effects(project):
 def routes(project, route):
     """The suits' music, after the reactivity proposal (it leaves alone a target something already routes)."""
     out = []
+    if not SUIT_PHOTOPHORES_ON:
+        stale = {f"fx/{g['name']}-aura/intensity" for g in GROUPS}
+        project["routes"] = [r for r in project.get("routes", []) if r.get("target") not in stale]
+        return 0
     for g in GROUPS:
         name = g["name"]
         source, amount, attack, decay = SUIT_ROUTES[name]

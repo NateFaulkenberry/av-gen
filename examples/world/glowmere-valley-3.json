@@ -1890,45 +1890,6 @@
       }
     },
     {
-      "id": "drummer-aura",
-      "type": "bioluminescence",
-      "name": "Rainbow photophores",
-      "owner": {
-        "kind": "entity",
-        "name": "drummer"
-      },
-      "enabled": true,
-      "order": 0,
-      "style": "",
-      "activation": "always",
-      "timing": {
-        "delay": 0.0,
-        "lifetime": 0.0,
-        "fadeIn": 0.0,
-        "fadeOut": 0.0,
-        "windowStart": 0.0,
-        "windowSeconds": 6.0,
-        "repeatSeconds": 0.0
-      },
-      "parameters": {
-        "pattern": 0.0,
-        "color": [
-          0.62,
-          0.45,
-          1.0
-        ],
-        "intensity": 1.4,
-        "scale": 22.0,
-        "coverage": 0.3,
-        "colorVariation": 0.5,
-        "breatheRate": 0.3,
-        "breatheDepth": 0.7,
-        "waveSpeed": 0.45,
-        "waveInterval": 5.54,
-        "waveGain": 1.6
-      }
-    },
-    {
       "activation": "trigger",
       "enabled": true,
       "id": "keyboardist-hero-pulse",
@@ -2014,45 +1975,6 @@
       "trigger": {
         "source": "marker",
         "name": "hero pulse keyboardist"
-      }
-    },
-    {
-      "id": "keyboardist-aura",
-      "type": "bioluminescence",
-      "name": "Rainbow photophores",
-      "owner": {
-        "kind": "entity",
-        "name": "keyboardist"
-      },
-      "enabled": true,
-      "order": 0,
-      "style": "",
-      "activation": "always",
-      "timing": {
-        "delay": 0.0,
-        "lifetime": 0.0,
-        "fadeIn": 0.0,
-        "fadeOut": 0.0,
-        "windowStart": 0.0,
-        "windowSeconds": 6.0,
-        "repeatSeconds": 0.0
-      },
-      "parameters": {
-        "pattern": 0.0,
-        "color": [
-          0.15,
-          0.95,
-          0.78
-        ],
-        "intensity": 1.4,
-        "scale": 22.0,
-        "coverage": 0.3,
-        "colorVariation": 0.5,
-        "breatheRate": 0.3,
-        "breatheDepth": 0.7,
-        "waveSpeed": 0.45,
-        "waveInterval": 5.54,
-        "waveGain": 1.6
       }
     },
     {
@@ -19159,74 +19081,6 @@
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0
-      }
-    },
-    {
-      "source": "timeline.kick",
-      "target": "fx/drummer-aura/intensity",
-      "component": -1,
-      "amount": 1.6,
-      "op": "add",
-      "polarity": "unipolar",
-      "enabled": true,
-      "chain": {
-        "attackMs": 6.0,
-        "decayMs": 280.0
-      }
-    },
-    {
-      "source": "section.energy",
-      "target": "fx/drummer-aura/intensity",
-      "component": -1,
-      "amount": 1.0,
-      "op": "multiply",
-      "polarity": "unipolar",
-      "enabled": true,
-      "chain": {
-        "attackMs": 800.0,
-        "decayMs": 2400.0,
-        "clampEnabled": true,
-        "clampMin": 0.0,
-        "clampMax": 1.0,
-        "remapEnabled": true,
-        "remapInMin": 0.2,
-        "remapInMax": 1.0,
-        "remapOutMin": 0.6,
-        "remapOutMax": 1.35
-      }
-    },
-    {
-      "source": "audio.mid",
-      "target": "fx/keyboardist-aura/intensity",
-      "component": -1,
-      "amount": 1.4,
-      "op": "add",
-      "polarity": "unipolar",
-      "enabled": true,
-      "chain": {
-        "attackMs": 60.0,
-        "decayMs": 520.0
-      }
-    },
-    {
-      "source": "section.energy",
-      "target": "fx/keyboardist-aura/intensity",
-      "component": -1,
-      "amount": 1.0,
-      "op": "multiply",
-      "polarity": "unipolar",
-      "enabled": true,
-      "chain": {
-        "attackMs": 800.0,
-        "decayMs": 2400.0,
-        "clampEnabled": true,
-        "clampMin": 0.0,
-        "clampMax": 1.0,
-        "remapEnabled": true,
-        "remapInMin": 0.2,
-        "remapInMax": 1.0,
-        "remapOutMin": 0.6,
-        "remapOutMax": 1.35
       }
     },
     {
