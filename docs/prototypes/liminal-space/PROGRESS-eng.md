@@ -21,7 +21,7 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 | d | project `palette` (ADR-1043) | done |
 | e | surfaces (a material id per node) and node `tint` (ADR-1044); the walking figure | done |
 | f | `examples/liminal/` (48 s) via `tools/make_liminal_example.py`; capture in `~/Desktop/av-gen-review/24-liminal-space/eng/` | done (capture is of the 32 s version; re-render after the chapter version) |
-| 3 | analyzer: SDF adapter + temporal checks | not started |
+| 3 | analyzer: `tools/liminal_critic.py` (Critic inputs for an SDF project + the section 16 temporal checks) | done (see below) |
 
 ## Test commands
 
@@ -140,6 +140,27 @@ tools/gpu-lock.sh ./build/release/src/avgen --headless --project <p> --frames 15
 ./build/release/src/avgen --project <p> --audit-routes -   # every route and track: live/dead/hazard
 ```
 
+### The analyzer (section 15-16, and the addendum's criteria)
+
+`tools/liminal_critic.py` (python3 + numpy + ffmpeg; no new dependency):
+
+- `inputs --project <p> --sections tools/liminal/all-you-got.sections.json --video <render> [--video-start s] --out <d>`
+  writes Creative Critic inputs for an SDF project, which its AV Gen adapter could not describe: segments from the
+  section map (bars to seconds on the song's grid, the section's `coupling` as the intended energy, so the Critic
+  stops using its high-band proxy), shots from the timing sheet, the journey (chapters, the keyed walk as speeds),
+  the palette timeline, the routes, and the addendum's ten questions in the intent. Then
+  `cd ../creative-critic && .venv/bin/critic submit --inputs <d>/inputs.json --mode preview --wait`.
+  Checked: job `job_1a0f4beb258918319` (fast mode, the 32 s example) completed with full coverage and 10 shots.
+- `temporal --video <render> --audio ~/Desktop/"All You Got.wav" --sections ... [--video-start s] --out <d>` writes
+  `temporal.json`/`.md`: **aggression-unanswered** (4-bar windows where the music's aggression -- loudness,
+  high-band energy and noisiness together -- rises and the picture's activity does not), **snapping** and **flicker**
+  (isolated change spikes, A-B-A flips, and whether they sit on audio transients), **colour-too-fast** /
+  **colour-churn** (an OKLab colour move completed in under a bar away from a section boundary, or more than two
+  per phrase), **breakdown-contrast** (a breakdown section not at least 15% below its neighbours in visual
+  intensity). Findings are phrased like the brief's section 16 examples, and the report lists the addendum's
+  emotional questions for the reviewer. `selftest` shows each check firing on its defect and quiet on its
+  absence. On the 32 s example: aggression-activity correlation 0.83, 0 snaps, 0 flicker frames.
+
 ## Open (the art agent's needs list, ranked by the coordinator)
 
 | need | status |
@@ -154,7 +175,7 @@ tools/gpu-lock.sh ./build/release/src/avgen --headless --project <p> --frames 15
 | 8 figure bound to the palette | done (`nodes/<n>/tint`) |
 | 9 motes near the camera across the wrap | open: anchor a particle emitter to the journey at the camera's distance; world-space particles will jump at a wrap, keep lifetimes short |
 | 10 near-field tremble | open (small: a warp windowed by distance from the camera) |
-| 11 section map to the analyzer | open (analyzer work not started) |
+| 11 section map to the analyzer | done (`tools/liminal_critic.py inputs` / `temporal` read `tools/liminal/all-you-got.sections.json`) |
 
 ## Notes for a successor
 
