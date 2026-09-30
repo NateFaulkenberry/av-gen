@@ -1,6 +1,6 @@
 # Sonic Garden POC: progress
 
-Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1022).
+Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1023).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
 the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
@@ -25,7 +25,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | 3 sonic character | done | `src/sonic/character.*`, `src/sonic/sonic_runtime.*` |
 | 4 interpreter | done | `src/sonic/interpret_source.*` (source kind `interpret`) |
 | 5 test material + scene (engineering) | done | `tools/make_sonic_material.py`, `examples/sonic-garden/` |
-| 5 art (mappings, families, look, §34-36) | pass 1 done (art agent, 2026-09-30) | see "Art pass 1" below; `tools/sonic_garden_look.py` |
+| 5 art (mappings, families, look, §34-36) | pass 1 done; **pass 2 in progress** (art agent, 2026-09-30, the second brief's PART 1) | see "Art pass 1" and "Art pass 2" below; `tools/sonic_garden_look.py` |
 | 5 engineering follow-up | done (2026-09-30) | twist normals (ADR-1021), sky rebuild tolerance (ADR-1022), live-rate profile; see "Engineering follow-up" |
 | 6-7 | not started | live input and live MIDI are Phase 7; the owner's next brief is `01-brief-live.md` (not started: the owner reviews the art first) |
 
@@ -268,6 +268,36 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 - Art: the §35 bell sustained section is still partly organic (0.34: a slow, single bell note genuinely reads soft
   and warm), which confounds "same timbre, different context" there; the pad version is the clean §35
   demonstration.
+
+## Art pass 2 (art agent, 2026-09-30, `01-brief-live.md` PART 1) -- in progress
+
+The owner's verdict on pass 1: promising, "visually primitive". Pass 2 keeps the mapping language (families,
+qualities, context, note gestures) and rebuilds what it is expressed through. Everything is still written by
+`tools/sonic_garden_look.py` (run it, then `tools/sonic_garden_variants.py`); the rig is
+`examples/lightrigs/sonic-garden.rig.json`.
+
+- **Surfaces: six material programs** in the scene (`sgGround`, `sgCore`, `sgFlesh`, `sgGlass`, `sgObsidian`,
+  `sgBasalt`). Each shapes the material's OWN emission through the `materialEmission` input (ADR-904): the program
+  decides where the light lives (rims, veins, fissures, tendril tips, fracture lines), the routes still decide its
+  colour and strength. Base colour and roughness stay the material's own wherever a route drives them.
+- **ADR-1023 (engine, small):** the route auditor called every route into such a program's material emissive dead
+  (`program-owns-emission`, ADR-179 predates ADR-904). `MaterialProgram::emissionReadsMaterial()` follows the ops'
+  data flow; the rule now fires only when the emission ignores the material's own. Test `[adr1023]` in
+  `tests/unit/test_route_liveness.cpp`.
+- **Forms:** a lotus of cupped petals (two bends on a flat ellipsoid: the deformers act after the source transform)
+  round a small seed of light, in place of the orb; an armillary of platinum rings round the dark-glass gem;
+  basalt monoliths with glowing seams; obsidian blades whose rims go white-hot on a strike; a shock ring that races
+  out along the ground from each hit; per-world skylines (giant fungi, glass spires, a basalt ridge).
+- **Light:** the key and rim are fixed in the world (not to the camera) and placed per world by routes; the sky
+  takes its sun from the key (`useKeyLight`), so the warm world has a low sun behind the lotus, in frame, and a
+  camera move never drags it. A `note` light rides the pitch; a hard `top` spot exists only in the void.
+- **Fog economy:** `scene/volumeMaxDistance` is routed from organic and tectonic only (exactly 0 below a weight of
+  0.2), so the observatory and the void keep closed-form distance fog (ADR-705) and skip the 21 ms march.
+- **Camera:** a 50 mm lens (was 35) and one slow push-in (about 7 m in 21 s) holding the hero left of centre.
+- **MIDI against timbre:** `glow` (brightness alone, medium tier) is the continuous "filter" channel; `high`/`low`
+  (register) split each family's note gesture so low notes answer low in the world and high notes high.
+- **Interpreter shaping is `x * gain + bias`** (then the curve), not `(x + bias) * gain`: a mapping meant to span
+  pitch 0.38..0.54 is gain 6.25, bias -2.375.
 
 ## Engineering follow-up (engineering agent, 2026-09-30)
 

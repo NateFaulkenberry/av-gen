@@ -3,6 +3,7 @@
 
     python3 tools/sonic_garden_review.py render --out <dir> [--size 1920x1080] [--stills-at 17]
     python3 tools/sonic_garden_review.py assemble --out <dir> --review <dir>
+    python3 tools/sonic_garden_review.py beforeafter --out <dir> --review <dir> --before <earlier review dir>
 
 `render` writes low-cost-to-regenerate inputs into <dir>: the variants (from the master, via sonic_garden_variants.py),
 one video per variant (under tools/gpu-lock.sh, one lock for the whole batch), one supersampled still per §34 sound,
@@ -227,6 +228,54 @@ def assemble(args):
              "One phrase, one synth, its sound morphing", MORPH, od)
 
 
+def before_after(args):
+    """An earlier pass against this one: the same phrase window per sound, the earlier render on the left and the new
+    one on the right, with that sound's audio; and the stills paired, one row per sound.
+
+    --before is an earlier review folder (its 34-same-midi-four-sounds.mp4 grid and 34-still-<sound>.png), --out the
+    new render directory, --review the new review folder."""
+    src, rev, old = os.path.abspath(args.out), os.path.abspath(args.review), os.path.abspath(args.before)
+    os.makedirs(rev, exist_ok=True)
+    tmp = tempfile.mkdtemp()
+    t0, dur = (float(x) for x in args.window.split(":"))
+    parts = []
+    for i, (v, t, s) in enumerate(SOUNDS):
+        # the earlier grid's quadrant i (960x540, its own label kept), and the new render scaled to match
+        qx, qy = (i % 2) * 960, (i // 2) * 540
+        left, right, title = (os.path.join(tmp, "%s%d.png" % (k, i)) for k in "lrt")
+        label_png(left, 960, 540, "before: " + args.before_name, None, scale=1.1)
+        label_png(right, 960, 540, "after: " + args.after_name, None, scale=1.1)
+        label_png(title, 1920, 1080, t, s, scale=1.3)
+        out = os.path.join(tmp, "ba%d.mp4" % i)
+        fc = ("[0:v]crop=960:540:%d:%d,setpts=PTS-STARTPTS[a];[1:v]scale=960:540:flags=lanczos,setpts=PTS-STARTPTS[b];"
+              "[a][2:v]overlay=0:H-h[a2];[b][3:v]overlay=0:H-h[b2];[a2][b2]hstack=inputs=2[row];"
+              "[row]pad=1920:1080:0:270:black[p];[p][4:v]overlay=0:0[v]" % (qx, qy))
+        new = os.path.join(src, v + ".mp4")
+        run(["ffmpeg", "-y", "-ss", str(t0), "-t", str(dur), "-i", os.path.join(old, "34-same-midi-four-sounds.mp4"),
+             "-ss", str(t0), "-t", str(dur), "-i", new, "-i", left, "-i", right, "-i", title,
+             "-filter_complex", fc, "-map", "[v]", "-map", "1:a?", "-c:v", "libx264", "-crf", "17", "-preset", "slow",
+             "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "192k", "-shortest", out])
+        parts.append(out)
+    lst = os.path.join(tmp, "list.txt")
+    with open(lst, "w") as f:
+        f.writelines("file '%s'\n" % p for p in parts)
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", "-movflags", "+faststart",
+         os.path.join(rev, "before-after-with-audio.mp4")])
+    # the stills, paired: one row per sound, the earlier pass left
+    sheet = Image.new("RGB", (1920, 2160))
+    f1 = font(26, True)
+    for i, (v, t, s) in enumerate(SOUNDS):
+        for j, (png, tag) in enumerate(((os.path.join(old, "34-still-%s.png" % v), args.before_name),
+                                        (os.path.join(src, "still-" + v, "frame_000000.png"), args.after_name))):
+            im = Image.open(png).convert("RGB").resize((960, 540), Image.LANCZOS)
+            d = ImageDraw.Draw(im, "RGBA")
+            text = "%s   (%s)" % (t, tag)
+            d.rectangle([0, 0, d.textlength(text, font=f1) + 24, 44], fill=(0, 0, 0, 130))
+            d.text((12, 6), text, font=f1, fill=(240, 240, 240, 255))
+            sheet.paste(im, (j * 960, i * 540))
+    sheet.save(os.path.join(rev, "before-after-stills.png"))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -237,8 +286,15 @@ def main():
     a = sub.add_parser("assemble")
     a.add_argument("--out", required=True, help="the render directory")
     a.add_argument("--review", required=True)
+    b = sub.add_parser("beforeafter")
+    b.add_argument("--out", required=True, help="the new render directory")
+    b.add_argument("--review", required=True, help="the new review folder")
+    b.add_argument("--before", required=True, help="the earlier review folder (its grid and stills)")
+    b.add_argument("--window", default="12:6", help="start:seconds of the phrase to compare")
+    b.add_argument("--before-name", default="art pass 1")
+    b.add_argument("--after-name", default="art pass 2")
     args = ap.parse_args()
-    render(args) if args.cmd == "render" else assemble(args)
+    {"render": render, "assemble": assemble, "beforeafter": before_after}[args.cmd](args)
 
 
 if __name__ == "__main__":
