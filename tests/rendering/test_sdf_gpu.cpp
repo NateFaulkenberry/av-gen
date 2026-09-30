@@ -604,6 +604,9 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         warped.translation = glm::vec3(0.4f, 1.7f, -2.2f);
         warped.seed = 9;
         cases.push_back({"warp", treeOf(std::move(warped)), 1e-3f});
+        SdfNode shell = unary(SdfNodeKind::Shell, box(glm::vec3(0.8f, 0.6f, 0.7f)));
+        shell.offset = 0.15f;
+        cases.push_back({"shell", treeOf(std::move(shell)), 1e-4f});
     }
     cases.push_back({"complex", treeOf(complexTree()), 1e-3f});
     checkParity(*ctx, harness, cases, fields, 1.37);

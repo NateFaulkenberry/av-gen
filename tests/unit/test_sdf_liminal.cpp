@@ -238,6 +238,21 @@ TEST_CASE("Warp: zero amount is the identity, a masked axis is untouched, the ph
     CHECK(maxStep < 0.05f);
 }
 
+TEST_CASE("Shell: a box becomes a room with walls of the given thickness", "[sdf][liminal]") {
+    SdfNode shell = unary(SdfNodeKind::Shell, box({2.15f, 1.65f, 3.15f})); // interior 4 x 3 x 6, walls 0.3
+    shell.offset = 0.3f;
+    const SdfTree t = treeOf(shell);
+    REQUIRE(t.validate());
+    CHECK_THAT(static_cast<double>(t.evaluate({0.0f, 0.0f, 0.0f}, 0.0)), WithinAbs(1.5, 1e-5));   // to the ceiling/floor
+    CHECK_THAT(static_cast<double>(t.evaluate({1.0f, 0.0f, 0.0f}, 0.0)), WithinAbs(1.0, 1e-5));   // to the +x wall
+    CHECK(t.evaluate({2.15f, 0.0f, 0.0f}, 0.0) < 0.0f);                                          // inside the wall
+    CHECK_THAT(static_cast<double>(t.evaluate({2.5f, 0.0f, 0.0f}, 0.0)), WithinAbs(0.2, 1e-5));   // outside it
+    SdfNode bad = shell;
+    bad.offset = -0.1f;
+    CHECK_FALSE(treeOf(bad).validate());
+    checkPackedMatches(t, points({-3.0f, -2.0f, -4.0f}, {3.0f, 2.0f, 4.0f}, 6));
+}
+
 TEST_CASE("Liminal kinds: the packed interpreter equals the tree, and JSON round-trips", "[sdf][liminal]") {
     SdfNode flight = translate({-1.0f, 0.0f, 0.0f}, stairs(0.3f, 0.18f, 0.7f, 7, 0.1f));
     SdfNode landing = translate({1.4f, 1.26f, 0.0f}, box({0.5f, 0.05f, 0.7f}));

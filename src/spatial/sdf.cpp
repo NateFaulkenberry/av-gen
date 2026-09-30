@@ -118,13 +118,13 @@ constexpr std::uint32_t kBeginMarker = 0xFFFFu;
 constexpr int kMaxSdfPackedNodes = kMaxSdfNodes * 2;
 constexpr float kTwoPi = 6.283185307179586f;
 
-constexpr std::array<const char*, 32> kKindNames = {
+constexpr std::array<const char*, 33> kKindNames = {
     "sphere",       "box",           "roundedBox",         "cylinder",         "capsule",   "torus",
     "plane",        "cone",          "union",              "intersection",     "difference", "smoothUnion",
     "smoothIntersection", "smoothDifference", "morph", "translate", "rotate",  "scale",     "twist",
     "bend",         "repeat",        "polarRepeat",        "mirror",           "fold",      "recurse",
     "displaceNoise", "displaceVoronoi", "displaceWave", "displaceField",
-    "stairs",       "screw",         "warp", // ADR-1040
+    "stairs",       "screw",         "warp",  "shell", // ADR-1040
 };
 
 bool isCombination(SdfNodeKind kind) {
@@ -552,6 +552,9 @@ float finishUnary(SdfNodeKind kind, const NodeParams& n, float d, const glm::vec
     if (kind == SdfNodeKind::Screw) {
         return screwSeam(n, p, d);
     }
+    if (kind == SdfNodeKind::Shell) {
+        return std::fabs(d) - 0.5f * n.offset; // ADR-1040: exact for an exact child
+    }
     if (isDisplacement(kind)) {
         return displace(kind, n, d, p, time, fields);
     }
@@ -657,6 +660,9 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     }
     if (n.kind == SdfNodeKind::Scale && !(n.scale > 0.0f)) {
         return fail("sdf node 'scale': scale must be > 0");
+    }
+    if (n.kind == SdfNodeKind::Shell && !(n.offset >= 0.0f)) {
+        return fail("sdf node 'shell': offset (the wall thickness) must be >= 0");
     }
     if (n.kind == SdfNodeKind::Stairs && (!(n.size.x > 0.0f) || !(n.size.y > 0.0f) || n.count < 1)) {
         return fail("sdf node 'stairs': size.x (run) and size.y (rise) must be > 0 and count >= 1");
@@ -1525,6 +1531,7 @@ public:
         switch (n->kind) {
         case SdfNodeKind::Scale: return let(indent, v, c + " * " + r + ".p1.w");
         case SdfNodeKind::Screw: return let(indent, v, "sdfFinishScrew(" + r + ", " + c + ", " + p + ")");
+        case SdfNodeKind::Shell: return let(indent, v, "abs(" + c + ") - 0.5 * " + r + ".p0.w");
         case SdfNodeKind::DisplaceNoise: return let(indent, v, "sdfFinishUnaryNoise(" + r + ", " + c + ", " + p + ", t, world)");
         case SdfNodeKind::DisplaceVoronoi:
             return let(indent, v, "sdfFinishUnaryVoronoi(" + r + ", " + c + ", " + p + ", t, world)");

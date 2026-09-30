@@ -56,6 +56,8 @@ enum class SdfNodeKind : std::uint8_t {
     // rise), and a smooth vector-noise domain warp. The range predicates in sdf.cpp and
     // shaders/sdf.wgsl special-case them.
     Stairs, Screw, Warp,
+    // ADR-1040: a hollow shell of `offset` thickness centred on the child's surface (onion): a room from one box.
+    Shell,
 };
 [[nodiscard]] const char* sdfNodeKindName(SdfNodeKind kind);
 [[nodiscard]] std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name);

@@ -7723,12 +7723,24 @@ JourneyPose Composition::guardJourneyPose(JourneyPose pose) const {
         const float scale = std::max(so.transform.scale.x, 1e-6f);
         glm::vec3 local = glm::vec3(toLocal * glm::vec4(pose.eye, 1.0f));
         const float r = radius / scale;
+        // The screw's seam guard (ADR-1040) caps the field at the cell boundary for the march; to the
+        // camera it would read as a wall at every seam, so the guard queries the tree without it.
+        spatial::SdfTree tree = so.tree;
+        const auto unseam = [](spatial::SdfNode& n, const auto& self) -> void {
+            if (n.kind == spatial::SdfNodeKind::Screw) {
+                n.offset = 0.0f;
+            }
+            for (spatial::SdfNode& c : n.children) {
+                self(c, self);
+            }
+        };
+        unseam(tree.root, unseam);
         for (int pass = 0; pass < 2; ++pass) {
-            const float d = so.tree.evaluate(local, currentTime_, &scene_.fields);
+            const float d = tree.evaluate(local, currentTime_, &scene_.fields);
             if (!(d < r)) {
                 break;
             }
-            const glm::vec3 n = so.tree.normal(local, currentTime_, 0.01f, &scene_.fields);
+            const glm::vec3 n = tree.normal(local, currentTime_, 0.01f, &scene_.fields);
             local += n * (r - d);
         }
         const glm::vec3 eye = glm::vec3(toWorld * glm::vec4(local, 1.0f));

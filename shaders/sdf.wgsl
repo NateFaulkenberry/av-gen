@@ -71,6 +71,7 @@ const SDF_DISPLACE_FIELD: u32 = 28u;
 const SDF_STAIRS: u32 = 29u;         // ADR-1040 (a primitive, appended)
 const SDF_SCREW: u32 = 30u;          // ADR-1040
 const SDF_WARP: u32 = 31u;           // ADR-1040
+const SDF_SHELL: u32 = 32u;          // ADR-1040
 
 const SDF_FAR: f32 = 1e9;
 const SDF_BEGIN: u32 = 0xFFFFu;
@@ -439,6 +440,9 @@ fn sdfFinishUnary(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32
     }
     if (kind == SDF_SCREW) {
         return sdfFinishScrew(n, d, p);
+    }
+    if (kind == SDF_SHELL) {
+        return abs(d) - 0.5 * n.p0.w;
     }
     if (kind == SDF_DISPLACE_NOISE) {
         return sdfFinishUnaryNoise(n, d, p, t, world);

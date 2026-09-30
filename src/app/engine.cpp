@@ -1705,6 +1705,13 @@ std::string relativeTo(const std::filesystem::path& file, const std::filesystem:
 
 std::filesystem::path resolveFrom(const std::string& stored, const std::filesystem::path& baseDir) {
     std::filesystem::path p(stored);
+    // "~/..." is the user's home (the Liminal example names the owner's song as ~/Desktop/..., which
+    // must never be copied into the repository).
+    if (stored.size() >= 2 && stored[0] == '~' && (stored[1] == '/' || stored[1] == '\\')) {
+        if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+            p = std::filesystem::path(home) / stored.substr(2);
+        }
+    }
     if (p.is_absolute()) {
         return p.lexically_normal();
     }

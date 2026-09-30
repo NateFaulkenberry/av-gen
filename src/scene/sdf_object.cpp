@@ -271,6 +271,9 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
                              // offset = the seam guard's margin (0 = off)
         out = {F::Translation, F::Count, F::Offset};
         break;
+    case SdfNodeKind::Shell: // ADR-1040: offset = the wall thickness
+        out = {F::Offset};
+        break;
     case SdfNodeKind::Warp: // ADR-1040: size = per-axis gain, translation = the phase
         out = {F::Amount, F::Frequency, F::Size, F::Translation};
         break;
