@@ -572,6 +572,39 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         outer.size = glm::vec3(0.0f, 1.0f, 1.0f);
         cases.push_back({"recurse nested", treeOf(std::move(outer)), 1e-4f});
     }
+    // ADR-1040: the liminal vocabulary -- stairs (block and floating), the screw in both modes, the warp.
+    {
+        SdfNode stairs = node(SdfNodeKind::Stairs);
+        stairs.size = glm::vec3(0.3f, 0.18f, 0.6f);
+        stairs.count = 6;
+        stairs.height = 0.0f;
+        cases.push_back({"stairs block", treeOf(translate(glm::vec3(-0.9f, -0.5f, 0.0f), stairs)), 1e-4f});
+        stairs.height = 0.25f;
+        cases.push_back({"stairs floating", treeOf(translate(glm::vec3(-0.9f, -0.5f, 0.0f), stairs)), 1e-4f});
+        auto cell = [] {
+            return combo(SdfNodeKind::Union, {box(glm::vec3(0.4f, 0.1f, 0.3f)), translate(glm::vec3(0.2f, 0.3f, 0.0f), sphere(0.15f))},
+                         0.5f);
+        };
+        SdfNode slab = unary(SdfNodeKind::Screw, cell());
+        slab.translation = glm::vec3(1.1f, 0.35f, 0.2f);
+        cases.push_back({"screw translation", treeOf(std::move(slab)), 1e-4f});
+        SdfNode helix = unary(SdfNodeKind::Screw, translate(glm::vec3(0.9f, 0.0f, 0.0f), cell()));
+        helix.count = 4;
+        helix.translation = glm::vec3(0.0f, 0.4f, 0.0f);
+        helix.offset = 0.08f;
+        cases.push_back({"screw helix", treeOf(helix), 1e-4f});
+        SdfNode guardedSlab = unary(SdfNodeKind::Screw, cell());
+        guardedSlab.translation = glm::vec3(1.1f, 0.35f, 0.2f);
+        guardedSlab.offset = 0.05f;
+        cases.push_back({"screw seam guard", treeOf(std::move(guardedSlab)), 1e-4f});
+        SdfNode warped = unary(SdfNodeKind::Warp, cell());
+        warped.amount = 0.2f;
+        warped.frequency = 1.3f;
+        warped.size = glm::vec3(1.0f, 0.0f, 0.6f);
+        warped.translation = glm::vec3(0.4f, 1.7f, -2.2f);
+        warped.seed = 9;
+        cases.push_back({"warp", treeOf(std::move(warped)), 1e-3f});
+    }
     cases.push_back({"complex", treeOf(complexTree()), 1e-3f});
     checkParity(*ctx, harness, cases, fields, 1.37);
 }
@@ -861,6 +894,60 @@ TEST_CASE("SDF compiled trees render like the interpreter", "[gpu][sdf]") {
         // pixels may flip. The surface itself must agree.
         CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1040: the liminal kinds compile to WGSL and render as the interpreter does.
+TEST_CASE("SDF compiled liminal kinds render like the interpreter", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "liminal";
+    SdfNode stairs = node(SdfNodeKind::Stairs);
+    stairs.size = glm::vec3(0.35f, 0.2f, 0.5f);
+    stairs.count = 5;
+    SdfNode cell = combo(SdfNodeKind::Union,
+                         {translate(glm::vec3(-0.8f, -1.0f, 0.0f), std::move(stairs)), box(glm::vec3(1.0f, 0.05f, 0.6f))}, 0.5f);
+    SdfNode warp = unary(SdfNodeKind::Warp, std::move(cell));
+    warp.amount = 0.08f;
+    warp.frequency = 0.9f;
+    warp.size = glm::vec3(1.0f, 0.0f, 1.0f);
+    SdfNode screw = unary(SdfNodeKind::Screw, std::move(warp));
+    screw.translation = glm::vec3(1.9f, 1.0f, 0.0f);
+    o.tree = treeOf(std::move(screw));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    o.stepScale = 0.8f;
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.5;
+    const auto render = [&](bool compile) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        copy.sdfs.push_back(c);
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    const auto interpreted = render(false);
+    const auto compiled = render(true);
+    long differing = 0;
+    long lit = 0;
+    for (std::uint32_t y = 0; y < compiled.height; ++y) {
+        for (std::uint32_t x = 0; x < compiled.width; ++x) {
+            for (int ch = 0; ch < 3; ++ch) {
+                differing += std::abs(int(interpreted.pixel(x, y)[ch]) - int(compiled.pixel(x, y)[ch])) > 2 ? 1 : 0;
+            }
+            lit += compiled.pixel(x, y)[0] + compiled.pixel(x, y)[1] + compiled.pixel(x, y)[2] > 30 ? 1 : 0;
+        }
+    }
+    INFO("differing channels " << differing << ", lit pixels " << lit);
+    CHECK(lit > static_cast<long>(compiled.width * compiled.height) / 20);
+    CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
     CHECK(ctx->errorCount() == 0);
 }
 

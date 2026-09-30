@@ -28,6 +28,7 @@
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "params/modulation.hpp"
+#include "params/palette.hpp"
 #include "params/parameter_set.hpp"
 #include "params/preset.hpp"
 #include "params/timeline.hpp"
@@ -1063,6 +1064,9 @@ private:
     params::Preset cueFrom_;      // base values captured when the current cue started (morphs)
     bool cueApplied_ = false;     // the current cue's preset has been applied at full weight
     StateMachine states_;
+    // ADR-1043: the project palette (empty unless the project has a "palette" block).
+    params::Palette palette_;
+    std::size_t paletteReported_ = 0;
     std::vector<WorldMacro> worldMacros_;
     WorldDirector director_;
     std::vector<LookPreset> looks_;

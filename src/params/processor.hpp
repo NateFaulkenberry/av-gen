@@ -57,11 +57,25 @@ struct ProcessorChain {
     float envelopeHoldMs = 0.0f;
     float envelopeFallPerSecond = 4.0f;
 
+    // ADR-1041: a critically (or under-) damped second-order follower after the envelope, so a change
+    // eases in AND out (continuous velocity) instead of cornering like the one-pole: x'' = w^2 (u - x)
+    // - 2 zeta w x', w = 2 pi springHz. 0 = off. springDamping (zeta) 1 is critical, < 1 overshoots
+    // and settles ("breathing"), > 1 is sluggish. Integrated in fixed sub-steps of at most
+    // kSpringStepSeconds, so it is frame-rate independent to within a sub-step.
+    float springHz = 0.0f;
+    float springDamping = 1.0f;
+
     bool remapEnabled = false;
     float remapInMin = 0.0f;
     float remapInMax = 1.0f;
     float remapOutMin = 0.0f;
     float remapOutMax = 1.0f;
+
+    // ADR-1041: the last stage. The chain outputs the running integral of the remapped value over time
+    // (units per second in, units out): a rate becomes a position -- a pace becomes a distance
+    // travelled, a flow speed becomes a phase. The output never jumps whatever the input does, and a
+    // zero rate holds it still. Seeks replay it like every other chain state (ADR-901).
+    bool integrate = false;
 
     // One sample of the delay stage's history: the chain's input at `time` on the chain's own clock.
     struct DelaySample {
@@ -94,6 +108,13 @@ struct ProcessorChain {
         double repeatTarget = std::numeric_limits<double>::quiet_NaN();
         float repeatValue = 0.0f;
         bool repeatEvent = false;
+
+        // ADR-1041: the spring's position and velocity (seeded to the first input, at rest), and the
+        // integrator's running total (double: a pace integrated over a four-minute film).
+        float springPosition = 0.0f;
+        float springVelocity = 0.0f;
+        bool springInitialised = false;
+        double integral = 0.0;
     };
 
     // x: raw signal value; event: true when the source fired this frame; dt: seconds.
@@ -108,6 +129,10 @@ struct ProcessorChain {
     [[nodiscard]] Delayed delay(float x, bool event, double dt, State& state) const;
 
     [[nodiscard]] double delaySeconds() const;
+
+    // ADR-1041: the spring's largest internal step (1/480 s): stable for springHz up to ~50 Hz.
+    static constexpr double kSpringStepSeconds = 1.0 / 480.0;
+    static constexpr float kMaxSpringHz = 50.0f;
 
     static constexpr float kMaxTimeMs = 60000.0f;
     // ADR-900: a delay is a stagger or an echo -- a beat, a bar -- not a second timeline. Four seconds

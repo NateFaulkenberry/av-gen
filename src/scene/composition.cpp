@@ -3305,7 +3305,9 @@ std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource*
             mix(static_cast<std::uint64_t>(c.curve));
             mix(static_cast<std::uint64_t>(c.threshold));
             mix(static_cast<std::uint64_t>(c.envelope));
-            mix((c.clampEnabled ? 1u : 0u) | (c.remapEnabled ? 2u : 0u));
+            mix((c.clampEnabled ? 1u : 0u) | (c.remapEnabled ? 2u : 0u) | (c.integrate ? 4u : 0u));
+            mix(bits(c.springHz)); // ADR-1041
+            mix(bits(c.springDamping));
         }
     }
     return key ^ (h + 0x7f4a7c159e3779b9ull + (key << 6) + (key >> 2));
@@ -4195,6 +4197,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     node.sceneAsset.reset();
     node.child.reset();
     node.positionParam = nullptr;
+    node.journeyDistanceParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
     node.visibleParam = nullptr;
@@ -4409,10 +4412,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
                                                      .defaultValue = cameraModeSetting_,
                                                      .hardMin = 0,
-                                                     .hardMax = 2,
+                                                     .hardMax = 3,
                                                      .softMin = 0,
-                                                     .softMax = 2,
-                                                     .label = "camera/mode (0 orbit, 1 free, 2 spline)"});
+                                                     .softMax = 3,
+                                                     .label = "camera/mode (0 orbit, 1 free, 2 spline, 3 journey)"});
     const float reachCam = 10.0f * std::max(radius_, 1.0f);
     cameraPosition_ = &params.add(vec3Desc(prefix_ + "camera/position", cameraPositionSetting_, -1e4f, 1e4f, -reachCam, reachCam));
     cameraTarget_ = &params.add(vec3Desc(prefix_ + "camera/target", cameraTargetSetting_, -1e4f, 1e4f, -reachCam, reachCam));
@@ -4432,6 +4435,21 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         &params.add(floatDesc(prefix_ + "camera/shake/rotation", 0.0f, 0.0f, 45.0f, 0.0f, 3.0f));
     cameraShakeStart_ =
         &params.add(floatDesc(prefix_ + "camera/shake/start", 0.0f, -1e6f, 1e6f, 0.0f, 600.0f));
+    // ADR-1042: the journey's controls, only for a scene that has a journey (so no other scene gains
+    // ten idle parameters). All ordinary parameters: the timeline keys them, routes add to them.
+    if (journeySetting_) {
+        const std::string j = prefix_ + "camera/journey/";
+        journeyDistance_ = &params.add(floatDesc(j + "distance", 0.0f, -1e6f, 1e6f, 0.0f, 500.0f));
+        journeyLookAhead_ = &params.add(floatDesc(j + "lookAhead", 4.0f, 0.05f, 200.0f, 0.5f, 20.0f));
+        journeyHeight_ = &params.add(floatDesc(j + "height", 1.6f, -100.0f, 100.0f, 0.0f, 4.0f));
+        journeyYaw_ = &params.add(floatDesc(j + "yaw", 0.0f, -720.0f, 720.0f, -180.0f, 180.0f));
+        journeyPitch_ = &params.add(floatDesc(j + "pitch", 0.0f, -85.0f, 85.0f, -60.0f, 60.0f));
+        journeyBob_ = &params.add(floatDesc(j + "bob", 0.0f, 0.0f, 2.0f, 0.0f, 0.1f));
+        journeyStride_ = &params.add(floatDesc(j + "stride", 1.4f, 0.05f, 20.0f, 0.5f, 3.0f));
+        journeySway_ = &params.add(floatDesc(j + "sway", 0.0f, 0.0f, 90.0f, 0.0f, 15.0f));
+        journeySwayRate_ = &params.add(floatDesc(j + "swayRate", 0.07f, 0.0f, 10.0f, 0.0f, 1.0f));
+        journeyRadius_ = &params.add(floatDesc(j + "radius", journeySetting_->radius, 0.0f, 10.0f, 0.0f, 1.0f));
+    }
     registerCameraChannels(params, reachCam);
     materialParams_.clear();
     for (const MaterialProgram& mp : materialPrograms_) {
@@ -5270,6 +5288,10 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.scaleParam =
         &params_->add(vec3Desc(base + "scale", node.transform.scale, 0.001f, 100.0f, 0.01f, 5.0f));
     node.visibleParam = &params_->add(boolDesc(base + "visible", node.visible));
+    if (node.journeyAnchor) { // ADR-1042
+        node.journeyDistanceParam =
+            &params_->add(floatDesc(base + "journey/distance", *node.journeyAnchor, -1e6f, 1e6f, 0.0f, 500.0f));
+    }
     {
         // ADR-903: the node's glow, after any material program, on everything it draws.
         params::ParamDesc<float> d = floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f);
@@ -5668,6 +5690,7 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
     node.splineParams = {};
     node.sdfParams = {};
     node.positionParam = nullptr;
+    node.journeyDistanceParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
     node.visibleParam = nullptr;
@@ -5717,6 +5740,7 @@ void Composition::detach() {
     }
     for (auto& node : nodes_) {
         node->positionParam = nullptr;
+        node->journeyDistanceParam = nullptr;
         node->rotationParam = nullptr;
         node->scaleParam = nullptr;
         node->visibleParam = nullptr;
@@ -5893,6 +5917,21 @@ Transform Composition::nodeTransform(const CompositionNode& node) const {
     }
     if (node.scaleParam != nullptr) {
         t.scale = node.scaleParam->value();
+    }
+    if (node.journeyAnchor && journeyPath_) {
+        // ADR-1042: on the journey, wrapped with the camera (one reference for the whole frame), facing
+        // along the path's horizontal heading; the node's own position is an offset in that frame.
+        const double distance = node.journeyDistanceParam != nullptr ? node.journeyDistanceParam->value()
+                                                                     : static_cast<double>(*node.journeyAnchor);
+        const double camera = journeyDistance_ != nullptr ? journeyDistance_->value() : 0.0;
+        const JourneySample at = journeyPath_->sampleWrapped(distance, camera);
+        glm::vec2 heading(at.tangent.x, at.tangent.z);
+        heading = glm::length(heading) > 1e-6f ? glm::normalize(heading) : glm::vec2(0.0f, 1.0f);
+        const glm::vec3 forward(heading.x, 0.0f, heading.y);
+        const glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::quat face = glm::angleAxis(std::atan2(heading.x, heading.y), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.position = at.position + right * t.position.x + glm::vec3(0.0f, t.position.y, 0.0f) + forward * t.position.z;
+        t.rotation = face * t.rotation;
     }
     return t;
 }
@@ -7664,6 +7703,42 @@ void Composition::registerCameraChannels(params::ParameterSet& params, float rea
     }
 }
 
+JourneyPose Composition::guardJourneyPose(JourneyPose pose) const {
+    if (!journeySetting_ || journeySetting_->collide.empty()) {
+        return pose;
+    }
+    const float radius = journeyRadius_ != nullptr ? journeyRadius_->value() : journeySetting_->radius;
+    if (radius <= 0.0f) {
+        return pose;
+    }
+    const std::string name = sanitise(prefix_) + journeySetting_->collide;
+    for (const SdfObject& so : scene_.sdfs) {
+        if (so.name != name || !so.visible) {
+            continue;
+        }
+        // The eye in the tree's frame; the guard pushes it out along the field's normal, twice (a
+        // corner can need a second push), and the aim moves with it so the view direction is kept.
+        const glm::mat4 toWorld = so.transform.matrix();
+        const glm::mat4 toLocal = glm::inverse(toWorld);
+        const float scale = std::max(so.transform.scale.x, 1e-6f);
+        glm::vec3 local = glm::vec3(toLocal * glm::vec4(pose.eye, 1.0f));
+        const float r = radius / scale;
+        for (int pass = 0; pass < 2; ++pass) {
+            const float d = so.tree.evaluate(local, currentTime_, &scene_.fields);
+            if (!(d < r)) {
+                break;
+            }
+            const glm::vec3 n = so.tree.normal(local, currentTime_, 0.01f, &scene_.fields);
+            local += n * (r - d);
+        }
+        const glm::vec3 eye = glm::vec3(toWorld * glm::vec4(local, 1.0f));
+        pose.target += eye - pose.eye;
+        pose.eye = eye;
+        break;
+    }
+    return pose;
+}
+
 CameraPose Composition::evaluateMainCamera() const {
     // Byte for byte the placement this file has always done, moved into a function so the camera
     // director can ask for it like it asks for any other camera's. Orbit lives only here: it
@@ -7697,6 +7772,24 @@ CameraPose Composition::evaluateMainCamera() const {
         pose.position = at.position + frameOffset;
         pose.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
         ensureDistinctAim(pose, at.tangent);
+    } else if (cameraMode == 3 && journeyPath_) {
+        // ADR-1042: the journey. Parameters when attached, the defaults otherwise.
+        const auto val = [](const params::Parameter<float>* p, float d) { return p != nullptr ? p->value() : d; };
+        JourneyView view;
+        view.distance = static_cast<double>(val(journeyDistance_, 0.0f));
+        view.lookAhead = val(journeyLookAhead_, 4.0f);
+        view.height = val(journeyHeight_, 1.6f);
+        view.yawDegrees = val(journeyYaw_, 0.0f);
+        view.pitchDegrees = val(journeyPitch_, 0.0f);
+        view.bob = val(journeyBob_, 0.0f);
+        view.stride = val(journeyStride_, 1.4f);
+        view.swayDegrees = val(journeySway_, 0.0f);
+        view.swayRate = val(journeySwayRate_, 0.07f);
+        view.time = currentTime_;
+        const JourneyPose jp = guardJourneyPose(journeyPose(*journeyPath_, view));
+        pose.position = jp.eye;
+        pose.target = jp.target;
+        ensureDistinctAim(pose);
     } else if (cameraMode == 1) {
         // Free camera: explicit position and target (keyable on the timeline, modulatable).
         pose.position = cameraPosition_ != nullptr ? cameraPosition_->value() : cameraPositionSetting_;
@@ -9560,6 +9653,9 @@ nlohmann::json Composition::toJson() const {
     if (!cameraSplineSetting_.empty()) {
         camera["spline"] = cameraSplineSetting_;
     }
+    if (journeySetting_) {
+        camera["journey"] = journeySetting_->toJson(); // ADR-1042
+    }
     {
         const glm::vec3 cp = cameraPosition_ != nullptr ? cameraPosition_->base() : cameraPositionSetting_;
         const glm::vec3 ct = cameraTarget_ != nullptr ? cameraTarget_->base() : cameraTargetSetting_;
@@ -9916,6 +10012,10 @@ nlohmann::json Composition::toJson() const {
                                                                 : eulerDegrees(node.transform.rotation));
         n["scale"] = vecToJson(node.scaleParam != nullptr ? node.scaleParam->base()
                                                           : node.transform.scale);
+        if (node.journeyAnchor) { // ADR-1042
+            n["journey"] = {{"distance", node.journeyDistanceParam != nullptr ? node.journeyDistanceParam->base()
+                                                                             : *node.journeyAnchor}};
+        }
         
         n["visible"] = node.visible;
         // Only when locked: an additive key that no existing scene carries, so a file written by
@@ -10470,7 +10570,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         comp->cameraOrbitSpeedSetting_ = *orbit;
         if (c.contains("mode") && c["mode"].is_number_integer()) {
-            comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 2);
+            comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 3);
+        }
+        if (c.contains("journey")) { // ADR-1042
+            auto settings = JourneySettings::fromJson(c["journey"]);
+            if (!settings) {
+                return std::unexpected(settings.error());
+            }
+            auto path = JourneyPath::build(*settings);
+            if (!path) {
+                return std::unexpected(path.error());
+            }
+            comp->journeySetting_ = std::move(*settings);
+            comp->journeyPath_ = std::move(*path);
         }
         if (c.contains("spline") && c["spline"].is_string()) {
             comp->cameraSplineSetting_ = c["spline"].get<std::string>();
@@ -11284,6 +11396,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(parent.error());
             }
             const std::string parentName = *parent; // applied after every node exists (forward references)
+            if (item.contains("journey")) { // ADR-1042: {"distance": metres along the journey}
+                const auto& jn = item.at("journey");
+                if (!jn.is_object() || (jn.contains("distance") && !jn.at("distance").is_number())) {
+                    return fail("node '{}': 'journey' must be an object with a numeric 'distance'", node.name);
+                }
+                node.journeyAnchor = jn.value("distance", 0.0f);
+            }
             auto position = readVec<3>(item, "position", node.transform.position);
             auto rotation = readVec<3>(item, "rotation", glm::vec3(0.0f));
             auto scale = readVec<3>(item, "scale", node.transform.scale);

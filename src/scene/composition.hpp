@@ -33,6 +33,7 @@
 #include "scene/rebuild_deferral.hpp"
 #include "stage/staging.hpp"
 #include "scene/sdf_object.hpp"
+#include "scene/journey.hpp"
 #include "scene/spline_params.hpp"
 #include "scene/floaters.hpp"
 #include "scene/particles.hpp"
@@ -393,6 +394,11 @@ struct CompositionNode {
     std::optional<bool> animationLoop;
 
     std::unique_ptr<class Composition> child;              // Scene (nested)
+    // ADR-1042: the node rides the scene's journey at this distance (metres along the path), wrapped with
+    // the camera; its position is then an offset in the path frame (x right, y up, z forward) and its
+    // rotation turns it after it faces along the path. Unset: an ordinary node.
+    std::optional<float> journeyAnchor;
+    params::Parameter<float>* journeyDistanceParam = nullptr;
     params::Parameter<glm::vec3>* positionParam = nullptr;
     params::Parameter<glm::vec3>* rotationParam = nullptr; // Euler degrees
     params::Parameter<glm::vec3>* scaleParam = nullptr;
@@ -1759,6 +1765,23 @@ private:
     params::Parameter<float>* cameraSplineT_ = nullptr;
     params::Parameter<float>* cameraLookAhead_ = nullptr;
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
+    // Camera mode 3 (the journey, ADR-1042): walks the periodic path of `journeySetting_` through a
+    // world repeated by the same screw, at camera/journey/distance metres, wrapping invisibly.
+    std::optional<JourneySettings> journeySetting_;
+    std::optional<JourneyPath> journeyPath_;
+    params::Parameter<float>* journeyDistance_ = nullptr;
+    params::Parameter<float>* journeyLookAhead_ = nullptr;
+    params::Parameter<float>* journeyHeight_ = nullptr;
+    params::Parameter<float>* journeyYaw_ = nullptr;
+    params::Parameter<float>* journeyPitch_ = nullptr;
+    params::Parameter<float>* journeyBob_ = nullptr;
+    params::Parameter<float>* journeyStride_ = nullptr;
+    params::Parameter<float>* journeySway_ = nullptr;
+    params::Parameter<float>* journeySwayRate_ = nullptr;
+    params::Parameter<float>* journeyRadius_ = nullptr;
+    // The eye pushed out of the named SDF by the collision guard (ADR-1042); a pure function of the
+    // frame's live tree, so seek-exact.
+    [[nodiscard]] JourneyPose guardJourneyPose(JourneyPose pose) const;
     // Camera shake (ADR-098): a camera-space offset, in every camera mode. `start` is the second
     // the impulse began -- a parameter and not a timer, which is what keeps a decaying shake a pure
     // function of the playhead. See scene::CameraShake.

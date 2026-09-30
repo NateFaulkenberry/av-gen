@@ -90,7 +90,13 @@ float mapPolarity(float x, Polarity polarity) {
 // hold; the first frame is its top.)
 float settled(const ProcessorChain& chain, float x) {
     ProcessorChain::State state;
-    return chain.process(x, false, 0.0, state);
+    const float y = chain.process(x, false, 0.0, state);
+    if (!chain.integrate) {
+        return y;
+    }
+    // ADR-1041: an integrating chain's output grows without settling; what the input decides is its
+    // rate, which one second's step reads.
+    return chain.process(x, false, 1.0, state);
 }
 
 // The largest deviation from `rest` an input held at `x` produces over a few frames: the full-scale

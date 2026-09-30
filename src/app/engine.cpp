@@ -315,7 +315,9 @@ private:
             }
             mix(static_cast<std::uint64_t>(c.curve) | (static_cast<std::uint64_t>(c.threshold) << 8u) |
                 (static_cast<std::uint64_t>(c.envelope) << 16u) | (c.clampEnabled ? 1ull << 24u : 0u) |
-                (c.remapEnabled ? 1ull << 25u : 0u));
+                (c.remapEnabled ? 1ull << 25u : 0u) | (c.integrate ? 1ull << 26u : 0u));
+            mix(bits(c.springHz)); // ADR-1041
+            mix(bits(c.springDamping));
         }
         routesKey_ = h;
         if (replaysRoutes_) {
@@ -667,6 +669,9 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     // re-register. Post parameters keep their current base values (post_ holds them).
     ensureControlSource();
     sources_.attach(bus_, params_);
+    if (!palette_.empty()) {
+        palette_.attach(params_); // ADR-1043
+    }
     if (params_.find("audio/inputGain") == nullptr) {
         inputGain_ = &params_.add(params::ParamDesc<float>{.path = "audio/inputGain",
                                                             .defaultValue = 1.0f,
@@ -1497,6 +1502,10 @@ void Engine::detachSceneParameters() {
     bar1BeatParam_ = nullptr;
     phraseBarsParam_ = nullptr;
     sectionPhrasesParam_ = nullptr;
+    // ADR-1043: the palette's parameters go with the set; installController re-registers them.
+    palette_.positionParam = nullptr;
+    palette_.saturationParam = nullptr;
+    palette_.valueParam = nullptr;
     if (auto* comp = composition()) {
         comp->detach();
     }
@@ -2298,6 +2307,9 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
+    }
+    if (!palette_.empty()) {
+        doc["palette"] = palette_.toJson(); // ADR-1043
     }
     if (!director_.mappings.empty()) {
         doc["director"] = director_.toJson();
@@ -3256,6 +3268,20 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     cueState_ = {};
     cueApplied_ = false;
+    // ADR-1043: the palette, attached now so the project's parameter values and the timeline find it.
+    if (!palette_.empty()) {
+        palette_.detach(params_);
+    }
+    palette_ = params::Palette{};
+    paletteReported_ = 0;
+    if (doc.contains("palette")) {
+        auto palette = params::Palette::fromJson(doc["palette"]);
+        if (!palette) {
+            return std::unexpected(palette.error());
+        }
+        palette_ = std::move(*palette);
+        palette_.attach(params_);
+    }
     states_ = StateMachine{};
     if (doc.contains("states")) {
         if (auto r = states_.fromJson(doc["states"]); !r) {
@@ -3436,6 +3462,10 @@ void Engine::newProject() {
     sources_.clear();
     shaderLayers_.clear();
     environmentPath_.clear();
+    if (!palette_.empty()) {
+        palette_.detach(params_); // ADR-1043
+    }
+    palette_ = params::Palette{};
     loadOrbScene(); // clears the parameter set and routes, re-registers sources/post/shaders
     // Every parameter the engine owns, not only post. `camera/lens`, `camera/exposure` and
     // `camera/focus` sit in the same never-cleared set and used to survive File > New, which made
@@ -5993,6 +6023,17 @@ void Engine::update(const FrameTime& time) {
     publishEntitySignals();
     publishStagingSignals(time); // ADR-930: last step's staging beats, as bus events
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
+    // ADR-1043: the palette, after the timeline and the routes that may move its three parameters, and
+    // before anything reads the colours it writes.
+    if (!palette_.empty()) {
+        palette_.apply(params_);
+        if (palette_.unresolved().size() > paletteReported_) {
+            for (std::size_t i = paletteReported_; i < palette_.unresolved().size(); ++i) {
+                log::warn("palette: no parameter '{}' to bind", palette_.unresolved()[i]);
+            }
+            paletteReported_ = palette_.unresolved().size();
+        }
+    }
     // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
     // whatever the routes wrote, so a route and a behaviour compose on one property.

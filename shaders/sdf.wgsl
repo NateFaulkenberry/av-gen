@@ -68,6 +68,9 @@ const SDF_DISPLACE_NOISE: u32 = 25u;
 const SDF_DISPLACE_VORONOI: u32 = 26u;
 const SDF_DISPLACE_WAVE: u32 = 27u;
 const SDF_DISPLACE_FIELD: u32 = 28u;
+const SDF_STAIRS: u32 = 29u;         // ADR-1040 (a primitive, appended)
+const SDF_SCREW: u32 = 30u;          // ADR-1040
+const SDF_WARP: u32 = 31u;           // ADR-1040
 
 const SDF_FAR: f32 = 1e9;
 const SDF_BEGIN: u32 = 0xFFFFu;
@@ -136,6 +139,30 @@ fn sdfCone(p: vec3<f32>, radius: f32, height: f32) -> f32 {
     return sqrt(d) * sign(s);
 }
 
+// ADR-1040: spatial::sdStairs, the same expressions in the same order.
+fn sdfStairs(p: vec3<f32>, size: vec3<f32>, thickness: f32, count: i32) -> f32 {
+    let run = max(size.x, 1e-4);
+    let rise = max(size.y, 1e-4);
+    let steps = f32(max(count, 1));
+    let u = (p.x * run + p.y * rise) / (run * run + rise * rise);
+    let k0 = floor(u);
+    var best = SDF_FAR;
+    for (var j = -1; j <= 1; j = j + 1) {
+        let i = k0 + f32(j);
+        let riser = vec2<f32>(i * run, clamp(p.y, i * rise, (i + 1.0) * rise));
+        let tread = vec2<f32>(clamp(p.x, i * run, (i + 1.0) * run), (i + 1.0) * rise);
+        best = min(best, min(length(p.xy - riser), length(p.xy - tread)));
+    }
+    let top = rise * (floor(p.x / run) + 1.0);
+    let zig = select(best, -best, p.y < top);
+    let slope = rise / run;
+    let under = select(-p.y, (slope * p.x - p.y - thickness) / sqrt(1.0 + slope * slope), thickness > 0.0);
+    let ends = max(-p.x, p.x - steps * run);
+    let d2 = max(zig, max(ends, under));
+    let dz = abs(p.z) - size.z;
+    return min(max(d2, dz), 0.0) + length(max(vec2<f32>(d2, dz), vec2<f32>(0.0)));
+}
+
 fn sdfPrimitive(n: SdfNodeGpu, p: vec3<f32>) -> f32 {
     let kind = n.kind;
     if (kind == SDF_SPHERE) {
@@ -161,6 +188,9 @@ fn sdfPrimitive(n: SdfNodeGpu, p: vec3<f32>) -> f32 {
     }
     if (kind == SDF_CONE) {
         return sdfCone(p, n.p0.x, n.p0.y);
+    }
+    if (kind == SDF_STAIRS) {
+        return sdfStairs(p, n.p1.xyz, n.p0.y, i32(n.p5.z));
     }
     return SDF_FAR;
 }
@@ -268,6 +298,38 @@ fn sdfWarpFold(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
     return p - 2.0 * min(dot(p, axis) - n.p0.w, 0.0) * axis;
 }
 
+// ADR-1040: spatial::screwPoint.
+fn sdfWarpScrew(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let count = i32(n.p5.z);
+    let t = n.p3.xyz;
+    if (count <= 0) {
+        let len2 = dot(t, t);
+        if (len2 < 1e-12) {
+            return p;
+        }
+        let k = sdfRnd(dot(p, t) / len2);
+        return p - k * t;
+    }
+    let cells = f32(count);
+    let sector = SDF_TWO_PI / cells;
+    let r = length(p.xz);
+    let a = select(atan2(p.z, p.x), 0.0, r == 0.0);
+    let k0 = sdfRnd(a / sector);
+    let rise = t.y;
+    let turn = cells * rise;
+    let w = select(0.0, sdfRnd((p.y - k0 * rise) / turn), abs(turn) > 1e-6);
+    let a2 = a - sector * k0;
+    return vec3<f32>(cos(a2) * r, p.y - (k0 + cells * w) * rise, sin(a2) * r);
+}
+
+// ADR-1040: the warp, p + amount * size * (vector value noise * 2 - 1) at p * frequency + translation.
+fn sdfWarpNoise(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
+    let x = p * n.p5.x + n.p3.xyz;
+    let w = vec3<f32>(valueNoise(x, n.seed), valueNoise(x + vec3<f32>(31.7), n.seed),
+                      valueNoise(x + vec3<f32>(67.3), n.seed));
+    return p + n.p2.w * n.p1.xyz * (w * 2.0 - 1.0);
+}
+
 fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
     let kind = n.kind;
     if (kind == SDF_TRANSLATE) {
@@ -296,6 +358,12 @@ fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
     }
     if (kind == SDF_FOLD) {
         return sdfWarpFold(n, p);
+    }
+    if (kind == SDF_SCREW) {
+        return sdfWarpScrew(n, p);
+    }
+    if (kind == SDF_WARP) {
+        return sdfWarpNoise(n, p);
     }
     return p; // SDF_RECURSE: level 0 is the node's own point
 }
@@ -332,10 +400,45 @@ fn sdfFinishUnaryField(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x
     return d + n.p2.w * fieldScalar(n.fieldSlot, wp);
 }
 
+// ADR-1040: spatial::screwSeam -- cap the distance at the cell boundary plus `offset` (p0.w).
+fn sdfFinishScrew(n: SdfNodeGpu, d: f32, p: vec3<f32>) -> f32 {
+    let margin = n.p0.w;
+    if (!(margin > 0.0)) {
+        return d;
+    }
+    let count = i32(n.p5.z);
+    let t = n.p3.xyz;
+    var boundary = SDF_FAR;
+    if (count <= 0) {
+        let len2 = dot(t, t);
+        if (len2 < 1e-12) {
+            return d;
+        }
+        let u = dot(p, t) / len2;
+        boundary = (0.5 - abs(u - sdfRnd(u))) * sqrt(len2);
+    } else {
+        let sector = SDF_TWO_PI / f32(count);
+        let r = length(p.xz);
+        let a = select(atan2(p.z, p.x), 0.0, r == 0.0);
+        let k0 = sdfRnd(a / sector);
+        boundary = r * sin(max(0.5 * sector - abs(a - sector * k0), 0.0));
+        let rise = t.y;
+        let turn = f32(count) * rise;
+        if (abs(turn) > 1e-6) {
+            let v = (p.y - k0 * rise) / turn;
+            boundary = min(boundary, (0.5 - abs(v - sdfRnd(v))) * abs(turn));
+        }
+    }
+    return min(d, max(boundary, 0.0) + margin);
+}
+
 fn sdfFinishUnary(n: SdfNodeGpu, d: f32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     let kind = n.kind;
     if (kind == SDF_SCALE) {
         return d * n.p1.w;
+    }
+    if (kind == SDF_SCREW) {
+        return sdfFinishScrew(n, d, p);
     }
     if (kind == SDF_DISPLACE_NOISE) {
         return sdfFinishUnaryNoise(n, d, p, t, world);
@@ -375,7 +478,7 @@ fn sdfEvaluate(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>
         }
         let n = sdfNodes[index];
         let kind = n.kind;
-        if (kind <= SDF_CONE) {
+        if (kind <= SDF_CONE || kind == SDF_STAIRS) {
             if (sp >= SDF_STACK) {
                 return SDF_FAR;
             }

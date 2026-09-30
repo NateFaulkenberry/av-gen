@@ -118,12 +118,13 @@ constexpr std::uint32_t kBeginMarker = 0xFFFFu;
 constexpr int kMaxSdfPackedNodes = kMaxSdfNodes * 2;
 constexpr float kTwoPi = 6.283185307179586f;
 
-constexpr std::array<const char*, 29> kKindNames = {
+constexpr std::array<const char*, 32> kKindNames = {
     "sphere",       "box",           "roundedBox",         "cylinder",         "capsule",   "torus",
     "plane",        "cone",          "union",              "intersection",     "difference", "smoothUnion",
     "smoothIntersection", "smoothDifference", "morph", "translate", "rotate",  "scale",     "twist",
     "bend",         "repeat",        "polarRepeat",        "mirror",           "fold",      "recurse",
     "displaceNoise", "displaceVoronoi", "displaceWave", "displaceField",
+    "stairs",       "screw",         "warp", // ADR-1040
 };
 
 bool isCombination(SdfNodeKind kind) {
@@ -131,11 +132,11 @@ bool isCombination(SdfNodeKind kind) {
 }
 
 bool isUnary(SdfNodeKind kind) {
-    return kind >= SdfNodeKind::Translate;
+    return kind >= SdfNodeKind::Translate && kind != SdfNodeKind::Stairs;
 }
 
 bool isDisplacement(SdfNodeKind kind) {
-    return kind >= SdfNodeKind::DisplaceNoise;
+    return kind >= SdfNodeKind::DisplaceNoise && kind <= SdfNodeKind::DisplaceField;
 }
 
 // The node that stands in for `n` once disabled nodes are removed: a disabled unary op passes
@@ -283,6 +284,37 @@ float sdCone(const glm::vec3& p, float radius, float height) {
     return std::sqrt(d) * signOf(s);
 }
 
+// ADR-1040: a straight flight of `count` steps, each `run` (size.x) deep and `rise` (size.y) high,
+// climbing along +X from x = 0 with its first riser at x = 0, `halfWidth` (size.z) either side of
+// z = 0. Solid below the treads, down to y = 0 when `thickness` is 0 (a block staircase) or to a
+// sloped underside `thickness` below the line through the inner corners (a floating flight). The
+// profile is the signed distance to the infinite zig-zag of risers and treads (the three steps about
+// the point's diagonal coordinate), intersected with the flight's x extent and its underside, then
+// extruded in z: exact near the treads and risers, a bound elsewhere.
+float sdStairs(const glm::vec3& p, const glm::vec3& size, float thickness, int count) {
+    const float run = std::max(size.x, 1e-4f);
+    const float rise = std::max(size.y, 1e-4f);
+    const float steps = static_cast<float>(std::max(count, 1));
+    const float u = (p.x * run + p.y * rise) / (run * run + rise * rise);
+    const float k0 = std::floor(u);
+    float best = kFar;
+    for (int j = -1; j <= 1; ++j) {
+        const float i = k0 + static_cast<float>(j);
+        const glm::vec2 riser(i * run, glm::clamp(p.y, i * rise, (i + 1.0f) * rise));
+        const glm::vec2 tread(glm::clamp(p.x, i * run, (i + 1.0f) * run), (i + 1.0f) * rise);
+        best = std::min(best, std::min(glm::length(glm::vec2(p.x, p.y) - riser), glm::length(glm::vec2(p.x, p.y) - tread)));
+    }
+    const float top = rise * (std::floor(p.x / run) + 1.0f);
+    const float zig = p.y < top ? -best : best;
+    const float slope = rise / run;
+    const float under =
+        thickness > 0.0f ? (slope * p.x - p.y - thickness) / std::sqrt(1.0f + slope * slope) : -p.y;
+    const float ends = std::max(-p.x, p.x - steps * run);
+    const float d2 = std::max(zig, std::max(ends, under));
+    const float dz = std::fabs(p.z) - size.z;
+    return std::min(std::max(d2, dz), 0.0f) + glm::length(glm::max(glm::vec2(d2, dz), glm::vec2(0.0f)));
+}
+
 float primitiveDistance(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
     switch (kind) {
     case SdfNodeKind::Sphere:
@@ -301,6 +333,8 @@ float primitiveDistance(SdfNodeKind kind, const NodeParams& n, const glm::vec3& 
         return sdPlane(p, n.axis, n.offset);
     case SdfNodeKind::Cone:
         return sdCone(p, n.radius, n.height);
+    case SdfNodeKind::Stairs:
+        return sdStairs(p, n.size, n.height, n.count);
     default:
         return kFar;
     }
@@ -360,6 +394,64 @@ float rnd(float x) {
     return std::floor(x + 0.5f);
 }
 
+// ADR-1040: the screw repeat. count == 0: cells are slabs along the translation T, cell k holds
+// the content moved by k*T (k = rnd(p.T / |T|^2)). count == n > 0: a helix about Y, n cells per turn;
+// cell k is the content turned by k * 360/n degrees (atan2(z, x) direction) and raised by k * T.y;
+// the cell is the angular sector nearest the point, on the winding nearest its height.
+glm::vec3 screwPoint(const NodeParams& n, const glm::vec3& p) {
+    if (n.count <= 0) {
+        const float len2 = glm::dot(n.translation, n.translation);
+        if (len2 < 1e-12f) {
+            return p;
+        }
+        const float k = rnd(glm::dot(p, n.translation) / len2);
+        return p - k * n.translation;
+    }
+    const float cells = static_cast<float>(n.count);
+    const float sector = kTwoPi / cells;
+    const float r = glm::length(glm::vec2(p.x, p.z));
+    const float a = r == 0.0f ? 0.0f : std::atan2(p.z, p.x);
+    const float k0 = rnd(a / sector);
+    const float rise = n.translation.y;
+    const float turn = cells * rise;
+    const float w = std::fabs(turn) > 1e-6f ? rnd((p.y - k0 * rise) / turn) : 0.0f;
+    const float a2 = a - sector * k0;
+    return glm::vec3(std::cos(a2) * r, p.y - (k0 + cells * w) * rise, std::sin(a2) * r);
+}
+
+// ADR-1040: the screw's seam guard. Only the point's own cell is evaluated, so near a cell boundary the
+// child's distance can overstate the distance to the next cell's content; with `offset` > 0 the result
+// is capped at the distance to the cell boundary plus `offset` (keep it above the hit and normal
+// epsilons), so a march steps onto the boundary and continues in the next cell instead of jumping into
+// it. 0 = no cap.
+float screwSeam(const NodeParams& n, const glm::vec3& p, float d) {
+    if (!(n.offset > 0.0f)) {
+        return d;
+    }
+    float boundary = kFar;
+    if (n.count <= 0) {
+        const float len2 = glm::dot(n.translation, n.translation);
+        if (len2 < 1e-12f) {
+            return d;
+        }
+        const float u = glm::dot(p, n.translation) / len2;
+        boundary = (0.5f - std::fabs(u - rnd(u))) * std::sqrt(len2);
+    } else {
+        const float sector = kTwoPi / static_cast<float>(n.count);
+        const float r = glm::length(glm::vec2(p.x, p.z));
+        const float a = r == 0.0f ? 0.0f : std::atan2(p.z, p.x);
+        const float k0 = rnd(a / sector);
+        boundary = r * std::sin(std::max(0.5f * sector - std::fabs(a - sector * k0), 0.0f));
+        const float rise = n.translation.y;
+        const float turn = static_cast<float>(n.count) * rise;
+        if (std::fabs(turn) > 1e-6f) {
+            const float v = (p.y - k0 * rise) / turn;
+            boundary = std::min(boundary, (0.5f - std::fabs(v - rnd(v))) * std::fabs(turn));
+        }
+    }
+    return std::min(d, std::max(boundary, 0.0f) + n.offset);
+}
+
 // The child's point for a domain op (displacements return p unchanged).
 glm::vec3 warpPoint(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
     switch (kind) {
@@ -413,6 +505,16 @@ glm::vec3 warpPoint(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
         const glm::vec3 axis = safeNormalize(n.axis);
         return p - 2.0f * std::min(glm::dot(p, axis) - n.offset, 0.0f) * axis;
     }
+    case SdfNodeKind::Screw:
+        return screwPoint(n, p);
+    case SdfNodeKind::Warp: {
+        // ADR-1040: p + amount * size (per-axis gain) * a smooth vector value noise in [-1, 1), sampled
+        // at p * frequency + translation (the phase: drive it to make the warp flow).
+        const glm::vec3 x = p * n.frequency + n.translation;
+        const glm::vec3 w(noise::valueNoise(x, n.seed), noise::valueNoise(x + glm::vec3(31.7f), n.seed),
+                          noise::valueNoise(x + glm::vec3(67.3f), n.seed));
+        return p + n.amount * n.size * (w * 2.0f - 1.0f);
+    }
     default:
         return p; // Recurse: level 0 is the node's own point; recurseStep makes the next levels
     }
@@ -446,6 +548,9 @@ float displace(SdfNodeKind kind, const NodeParams& n, float d, const glm::vec3& 
 float finishUnary(SdfNodeKind kind, const NodeParams& n, float d, const glm::vec3& p, double time, const FieldSet* fields) {
     if (kind == SdfNodeKind::Scale) {
         return d * n.scale;
+    }
+    if (kind == SdfNodeKind::Screw) {
+        return screwSeam(n, p, d);
     }
     if (isDisplacement(kind)) {
         return displace(kind, n, d, p, time, fields);
@@ -552,6 +657,9 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     }
     if (n.kind == SdfNodeKind::Scale && !(n.scale > 0.0f)) {
         return fail("sdf node 'scale': scale must be > 0");
+    }
+    if (n.kind == SdfNodeKind::Stairs && (!(n.size.x > 0.0f) || !(n.size.y > 0.0f) || n.count < 1)) {
+        return fail("sdf node 'stairs': size.x (run) and size.y (rise) must be > 0 and count >= 1");
     }
     if ((n.kind == SdfNodeKind::Plane || n.kind == SdfNodeKind::Fold) && glm::length(n.axis) < 1e-8f) {
         return fail("sdf node '{}' has a zero axis", label);
@@ -937,7 +1045,7 @@ std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name) {
 }
 
 bool sdfNodeIsPrimitive(SdfNodeKind kind) {
-    return kind <= SdfNodeKind::Cone;
+    return kind <= SdfNodeKind::Cone || kind == SdfNodeKind::Stairs;
 }
 
 int sdfNodeMaxChildren(SdfNodeKind kind) {
@@ -1313,6 +1421,8 @@ public:
         case SdfNodeKind::Torus: return let(indent, v, "sdfTorus(" + p + ", " + r + ".p0.x, " + r + ".p0.z)");
         case SdfNodeKind::Plane: return let(indent, v, "sdfPlane(" + p + ", " + r + ".p2.xyz, " + r + ".p0.w)");
         case SdfNodeKind::Cone: return let(indent, v, "sdfCone(" + p + ", " + r + ".p0.x, " + r + ".p0.y)");
+        case SdfNodeKind::Stairs:
+            return let(indent, v, "sdfStairs(" + p + ", " + r + ".p1.xyz, " + r + ".p0.y, i32(" + r + ".p5.z))");
         default: break;
         }
         if (isCombination(n->kind)) {
@@ -1402,6 +1512,8 @@ public:
         case SdfNodeKind::PolarRepeat: warp = "sdfWarpPolar(" + r + ", " + p + ")"; break;
         case SdfNodeKind::Mirror: warp = "sdfWarpMirror(" + r + ", " + p + ")"; break;
         case SdfNodeKind::Fold: warp = "sdfWarpFold(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Screw: warp = "sdfWarpScrew(" + r + ", " + p + ")"; break;
+        case SdfNodeKind::Warp: warp = "sdfWarpNoise(" + r + ", " + p + ")"; break;
         default: warp = p; break; // displacements leave the point alone
         }
         std::string q = p;
@@ -1412,6 +1524,7 @@ public:
         const std::string c = node(child, q, indent);
         switch (n->kind) {
         case SdfNodeKind::Scale: return let(indent, v, c + " * " + r + ".p1.w");
+        case SdfNodeKind::Screw: return let(indent, v, "sdfFinishScrew(" + r + ", " + c + ", " + p + ")");
         case SdfNodeKind::DisplaceNoise: return let(indent, v, "sdfFinishUnaryNoise(" + r + ", " + c + ", " + p + ", t, world)");
         case SdfNodeKind::DisplaceVoronoi:
             return let(indent, v, "sdfFinishUnaryVoronoi(" + r + ", " + c + ", " + p + ", t, world)");

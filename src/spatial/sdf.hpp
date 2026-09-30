@@ -51,6 +51,11 @@ enum class SdfNodeKind : std::uint8_t {
     Union, Intersection, Difference, SmoothUnion, SmoothIntersection, SmoothDifference, Morph,
     Translate, Rotate, Scale, Twist, Bend, Repeat, PolarRepeat, Mirror, Fold, Recurse,
     DisplaceNoise, DisplaceVoronoi, DisplaceWave, DisplaceField,
+    // ADR-1040 (appended so the GPU kind numbers of the kinds above are unchanged): a staircase
+    // primitive, the screw repeat (a cell repeated by a translation, or by a turn about Y plus a
+    // rise), and a smooth vector-noise domain warp. The range predicates in sdf.cpp and
+    // shaders/sdf.wgsl special-case them.
+    Stairs, Screw, Warp,
 };
 [[nodiscard]] const char* sdfNodeKindName(SdfNodeKind kind);
 [[nodiscard]] std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name);

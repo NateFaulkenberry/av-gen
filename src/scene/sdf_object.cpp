@@ -264,6 +264,16 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
     case SdfNodeKind::DisplaceField:
         out = {F::Amount};
         break;
+    case SdfNodeKind::Stairs: // ADR-1040: size = (run, rise, half width), height = underside thickness
+        out = {F::Size, F::Height, F::Count};
+        break;
+    case SdfNodeKind::Screw: // ADR-1040: translation = the cell step (y = the rise per cell of a helix),
+                             // offset = the seam guard's margin (0 = off)
+        out = {F::Translation, F::Count, F::Offset};
+        break;
+    case SdfNodeKind::Warp: // ADR-1040: size = per-axis gain, translation = the phase
+        out = {F::Amount, F::Frequency, F::Size, F::Translation};
+        break;
     }
     out.push_back(F::Enabled);
     return out;
