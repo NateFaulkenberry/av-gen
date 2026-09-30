@@ -1896,7 +1896,7 @@
       1.0
      ],
      "emissiveIntensity": 0.0,
-     "roughness": 0.05,
+     "roughness": 0.14,
      "metallic": 0.2,
      "program": "sgGlass"
     },

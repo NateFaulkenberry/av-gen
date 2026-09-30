@@ -842,7 +842,12 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 800,
-    "decayMs": 1600
+    "decayMs": 1600,
+    "gain": 1.25,
+    "offset": -0.25,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
    }
   },
   {
@@ -853,7 +858,12 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 800,
-    "decayMs": 1600
+    "decayMs": 1600,
+    "gain": 1.25,
+    "offset": -0.25,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
    }
   },
   {
@@ -864,7 +874,12 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 800,
-    "decayMs": 1600
+    "decayMs": 1600,
+    "gain": 1.25,
+    "offset": -0.25,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
    }
   },
   {
@@ -875,7 +890,12 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 800,
-    "decayMs": 1600
+    "decayMs": 1600,
+    "gain": 1.25,
+    "offset": -0.25,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
    }
   },
   {
@@ -1069,7 +1089,7 @@
   {
    "source": "visual.organic",
    "target": "scene/volumeDensity",
-   "amount": 0.0006,
+   "amount": 0.0004,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1410,7 +1430,7 @@
   {
    "source": "visual.organic",
    "target": "lightrig/SonicGarden/key/intensity",
-   "amount": -0.15,
+   "amount": -0.35,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1553,7 +1573,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/rim/intensity",
-   "amount": 1.4,
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2106,7 +2126,7 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/ground/material/roughness",
-   "amount": -0.55,
+   "amount": -0.42,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2417,8 +2437,24 @@
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 800,
+    "attackMs": 300,
     "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.silence",
+   "target": "procedural/hero/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -1.0,
+    "offset": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 300,
+    "decayMs": 2600
    }
   },
   {

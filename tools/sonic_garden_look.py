@@ -407,7 +407,7 @@ nodes.append(proc("seed",
 nodes.append(proc("facets",
                   {"kind": "box", "size": [3.1, 3.1, 3.1], "subdivisions": 1, "bevel": 0.45, "bevelSegments": 1},
                   {"kind": "single"}, xf((0, 2.6, 0)),
-                  mat((0.012, 0.02, 0.035), (0.55, 0.85, 1.0), 0.0, rough=0.05, metal=0.2, program="sgGlass"),
+                  mat((0.012, 0.02, 0.035), (0.55, 0.85, 1.0), 0.0, rough=0.14, metal=0.2, program="sgGlass"),
                   hierarchy={"recursionDepth": 2, "scalePerLevel": 0.98, "offsetPerLevel": [0, 0, 0],
                              "rotationPerLevel": [35.26, 45.0, 0.0], "colorPerLevel": False}))
 
@@ -650,7 +650,8 @@ def scalar(target, values, **chain):
 
 SLOW = {"attackMs": 800, "decayMs": 1600}
 # a family's forms appear from a weight of 0.2 and are full by 1 (x 1.25 - 0.25, clamped): a world does not carry
-# the other worlds' forms as small debris at the 0.05-0.15 weights the families leave each other
+# the other worlds' forms as small debris at the 0.05-0.15 weights the families leave each other. (A scalar()
+# route multiplies its own amount in, so GROW scales the family's value the same way.)
 GROW = dict(SLOW, gain=1.25, offset=-0.25, clampEnabled=True, clampMin=0.0, clampMax=1.0)
 MED = {"attackMs": 150, "decayMs": 500}
 FAMS = ("organic", "crystalline", "tectonic", "impact")
@@ -669,15 +670,15 @@ palette("env/sky/zenithColor", {"organic": (0.010, 0.004, 0.018), "crystalline":
 palette("env/sky/horizonColor", {"organic": (0.10, 0.034, 0.016), "crystalline": (0.012, 0.045, 0.075),
                                   "tectonic": (0.03, 0.008, 0.07), "impact": (0.004, 0.004, 0.005)}, **SLOW)
 palette("env/sky/sunColor", {"organic": (1.0, 0.62, 0.3), "crystalline": (0.75, 0.88, 1.0)}, **SLOW)
-scalar("env/sky/sunIntensity", {"organic": 4.0, "crystalline": 2.0}, **SLOW)
+scalar("env/sky/sunIntensity", {"organic": 4.0, "crystalline": 2.0}, **GROW)
 # sunSize and sunGlow are radians (the disc's angular radius and the aureole's width): the warm world's sun is
 # about 4 degrees across the radius, low and large as a dusk sun looks; the glass world's moon keeps the default
-scalar("env/sky/sunSize", {"organic": 0.04}, **SLOW)
-scalar("env/sky/sunGlow", {"organic": 0.14}, **SLOW)
+scalar("env/sky/sunSize", {"organic": 0.04}, **GROW)
+scalar("env/sky/sunGlow", {"organic": 0.14}, **GROW)
 scalar("env/sky/haze", {"organic": 0.1, "crystalline": -0.22, "tectonic": -0.05, "impact": -0.25}, **SLOW)
 palette("scene/fogColor", {"organic": (0.05, 0.02, 0.016), "crystalline": (0.006, 0.014, 0.028),
                             "tectonic": (0.022, 0.008, 0.05), "impact": (0.003, 0.003, 0.004)}, **SLOW)
-scalar("scene/volumeDensity", {"organic": 0.0006, "crystalline": 0.0002, "tectonic": 0.0018, "impact": 0.0003},
+scalar("scene/volumeDensity", {"organic": 0.0004, "crystalline": 0.0002, "tectonic": 0.0018, "impact": 0.0003},
        **SLOW)
 # The fog only MARCHES (lit air, shafts, the heart's glow in the haze) in the two worlds that are about air: the
 # warm hollow's haze and the heavy world's dust. Past the reach the surface pass integrates the same fog in closed
@@ -697,10 +698,10 @@ palette(RIG + "/ambientColor", {"organic": (0.16, 0.14, 0.34), "crystalline": (0
 scalar(RIG + "/key/azimuth", {"organic": 145.0, "crystalline": 55.0, "tectonic": -150.0, "impact": 90.0}, **SLOW)
 scalar(RIG + "/key/elevation", {"organic": 7.0, "crystalline": 38.0, "tectonic": 10.0, "impact": 60.0}, **SLOW)
 scalar(RIG + "/key/temperature", {"organic": -4200, "crystalline": 3000, "tectonic": 2500, "impact": 0}, **SLOW)
-scalar(RIG + "/key/intensity", {"organic": -0.15, "crystalline": 0.25, "tectonic": -0.55, "impact": -0.9}, **SLOW)
+scalar(RIG + "/key/intensity", {"organic": -0.35, "crystalline": 0.25, "tectonic": -0.55, "impact": -0.9}, **SLOW)
 scalar(RIG + "/rim/azimuth", {"organic": -150.0, "crystalline": -150.0, "tectonic": 150.0, "impact": 180.0}, **SLOW)
 scalar(RIG + "/rim/temperature", {"organic": -3500, "crystalline": 5000, "tectonic": 4500, "impact": 1500}, **SLOW)
-scalar(RIG + "/rim/intensity", {"organic": 0.4, "crystalline": 1.4, "tectonic": 0.2, "impact": -0.6}, **SLOW)
+scalar(RIG + "/rim/intensity", {"organic": 0.4, "crystalline": 1.0, "tectonic": 0.2, "impact": -0.6}, **SLOW)
 scalar(RIG + "/under/temperature", {"organic": -2000, "tectonic": 8000}, **SLOW)
 scalar(RIG + "/under/intensity", {"organic": 0.25, "tectonic": 0.9}, **SLOW)
 scalar(RIG + "/fill/intensity", {"organic": 0.25, "crystalline": 0.1}, **SLOW)
@@ -721,7 +722,7 @@ scalar("temporal/echo/strength", {"organic": 0.5, "crystalline": 0.25}, **SLOW)
 scalar("temporal/echo/decay", {"organic": 0.86, "crystalline": 0.55}, **SLOW)
 
 # ---- the ground: its roughness and the light in its veins are the world's
-scalar("procedural/ground/material/roughness", {"organic": 0.3, "crystalline": -0.55, "tectonic": 0.2,
+scalar("procedural/ground/material/roughness", {"organic": 0.3, "crystalline": -0.42, "tectonic": 0.2,
                                                 "impact": 0.25}, **SLOW)
 palette("procedural/ground/material/emissiveColor", {"organic": (1.0, 0.42, 0.24), "crystalline": (0.4, 0.75, 1.0),
                                                       "tectonic": (0.5, 0.15, 1.0)}, **SLOW)
@@ -743,8 +744,11 @@ R("visual.tectonic", "procedural/ridge/material/emissive", 0.4, **SLOW)
 
 # ---- the hero: a small seed in the lotus (organic), a spark in the gem (crystalline), a massive body (tectonic),
 # a hard knot (impact)
+# (hidden quickly and released slowly, so the warm world's seed never shares its first second with the core)
 R("visual.organic", "procedural/hero/source/scale", 1.0, op="multiply", gain=-1.25, offset=1.0, clampEnabled=True,
-  clampMin=0.0, clampMax=1.0, **SLOW)
+  clampMin=0.0, clampMax=1.0, attackMs=300, decayMs=1600)
+R("visual.silence", "procedural/hero/source/scale", 1.0, op="multiply", gain=-1.0, offset=1.0, clampEnabled=True,
+  clampMin=0.0, clampMax=1.0, attackMs=300, decayMs=2600)
 R("visual.crystalline", "procedural/hero/source/scale", 1.0, op="multiply", gain=-0.55, offset=1.0, **SLOW)
 R("visual.mass", "procedural/hero/source/scale", 1.0, op="multiply", gain=0.7, offset=1.0, **SLOW)
 R("visual.impact", "procedural/hero/source/scale", 1.0, op="multiply", gain=-0.45, offset=1.0, **SLOW)
