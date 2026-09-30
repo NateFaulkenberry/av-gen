@@ -1938,9 +1938,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             saveSettings();
         };
         panel_->onLiveMidiInput = [this](const std::string& filter) {
+            // The panel has already put the filter into the hub's map and reopened MIDI; this remembers it.
             settings_.live.midiInput = filter.empty() ? "*" : filter;
             saveSettings();
-            liveSonicWasOn_ = false; // re-applied by serviceLiveSonic on the next frame
         };
         panel_->onOpenLiveDemo = [this, executablePath] {
             if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
