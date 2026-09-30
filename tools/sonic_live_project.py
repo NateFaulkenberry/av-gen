@@ -27,7 +27,7 @@ What live play needs is put in (the live art pass; LIVE-ART-NOTES.md has the mea
      be extreme to register. Now:
        organic      warm, smooth, dark, clean, harmonic (the melody's movement no longer counts against it)
        crystalline  bright and clean: brightness^1.8 x (1 - roughness)^3
-       chaotic      roughness above about 0.15, led by roughness, with a little attack and unsteadiness
+       chaotic      roughness that is not a bell's (roughness x (1 - inharmonicity)), with a little attack
   4. MASS (heavy against light, which splits the chaotic family into its two faces) also reads the register: a
      distorted bass line is heavy (the pressure deep), a distorted high lead is light (the strike field).
   5. TWO CONTINUOUS CHANNELS, fast (tens to hundreds of ms), in every world, beside the slow identity:
@@ -63,6 +63,8 @@ OUT_SCENE = os.path.join(GARDEN, "sonic-live.scene.json")
 # The camera's hold: the master's key at this second (the middle of its push-in).
 HOLD_SECONDS = 10.75
 CAMERA_RAISE = 0.6
+TARGET_RAISE = 0.25
+LIFT_METRES = 0.8
 RIG = "lightrig/SonicGarden"
 
 
@@ -139,14 +141,16 @@ LIVE_GARDEN = [
     # to the chaotic family instead.
     M("crystalline", [("sonic.brightness.slow", 1.8, False), ("sonic.roughness.slow", 3.0, True)],
       "product", group="family"),
-    # rough, led by roughness: a clean synth sits at 0.05-0.1, a fully open saw or a single driven note at 0.2-0.3,
-    # a drive after the filter or a driven chord at 0.3-0.4, noise at 0.9. The threshold sits between the second
-    # and third: the top of a filter sweep is bright glass (buzzing, through grit), a driven chord or riff is the
-    # chaotic world. The master's mean of roughness, sharpness and unsteadiness gave a legato pad a third of the
-    # chaotic weight (its note rises count as attack); here attack and unsteadiness are 0.3 each against
-    # roughness's 3.
-    M("chaotic", [("sonic.roughness.slow", 3.0, False), ("sonic.sharpness.slow", 0.3, False),
-                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.5, 3.0, group="family"),
+    # rough: roughness that is not a bell's. The roughness dimension also counts inharmonic partials, so an FM bell
+    # played high read 0.33 rough and went to the strike field; `rasp` (below) is roughness x (1 - inharmonicity),
+    # which keeps distortion (inharmonicity 0.2) and noise (whose attack and unsteadiness carry it) and lets the
+    # bell go. A clean synth rasps 0.05-0.12, a fully open saw or a single note driven hard about 0.18, a driven
+    # chord or a drive after the filter 0.23-0.32. The threshold sits so the first is clean, the second a blend of
+    # glass and rough (and rough the longer it is held), the third the chaotic world. (A frame late: a source reads
+    # its own outputs from the frame before, which the slow tier does not notice.)
+    M("chaotic", [("visual.rasp", 3.0, False), ("sonic.sharpness.slow", 0.3, False),
+                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.38, 3.0, group="family"),
+    M("rasp", [("sonic.roughness.slow", 1.0, False), ("sonic.inharmonicity.slow", 1.0, True)], "product"),
     # heavy: loud AND full AND pitched AND low. The register term is what makes a distorted bass line the pressure
     # deep and a distorted high lead the strike field (notes.pitch holds the last note through rests).
     # (Loudness counts only a little -- energy^0.5 -- so a heavy world does not turn light in a rest.)
@@ -227,9 +231,21 @@ def retime(route):
     if s == "visual.crystalline" and t == RIG + "/key/intensity":
         # the master's +0.25 lit the observatory's floor into the largest pale area of the held frame and the
         # crystals' faces into grey cards; dimmer, the glass holds its light at its edges and the rings carry it
-        route["amount"] = -0.35
+        route["amount"] = -0.5
+    if s == "visual.crystalline" and t == RIG + "/ambientColor":
+        route["amount"] = round(route["amount"] * 0.6, 4)  # (and its ambient: the floor stays dark stone)
+    if s == "visual.crystalline" and t == "post/bloom/intensity":
+        # the master's 0.35 on top of the project's 0.4 hazed the dark glass milky once the gem and the rings were
+        # lit; live, the glass keeps its blacks
+        route["amount"] = 0.15
     if not ch:
         return route
+    if ch.get("gain") == 1.25 and ch.get("offset") == -0.25 and ch.get("clampEnabled"):
+        # GROW: a world's forms appear from a weight of 0.375 (the master's 0.2). Live, the world often sits between
+        # two families (warm keys: 0.33 garden, 0.67 glass), and at 0.2 the minority world's forms scattered through
+        # the majority's as small debris (mushroom caps as red discs among the crystals). The palettes still blend
+        # continuously; only the forms wait.
+        ch["gain"], ch["offset"] = 1.6, -0.6
     if ch.get("attackMs") == 800 and ch.get("decayMs") == 1600:  # SLOW and GROW: the family blends
         ch["attackMs"], ch["decayMs"] = SLOW["attackMs"], SLOW["decayMs"]
     if s == "visual.glow" and ch.get("attackMs") == 150:
@@ -281,7 +297,7 @@ def live_routes():
     # the colour: a closed filter is ember, an open one white-gold (organic) or white (crystalline)
     out += palette("lights/heart/color", {"glow": (0.0, 0.25, 0.45)}, **GLOW)
     out.append(R("visual.glow", "post/grade/temperature", -0.12, **GLOW))
-    out.append(R("visual.glow", "post/bloom/intensity", 0.25, **GLOW))
+    out.append(R("visual.glow", "post/bloom/intensity", 0.25, depth="visual.organic", **GLOW))
     out.append(R("visual.glow", "particles/spores/spawnRate", 40.0, depth="visual.organic", **GLOW))
     # soft -> sharp: a closed filter is seen through a wide aperture and thicker haze, an open one stopped down
     # (f/2 -> f/5: the skyline comes into focus) through clearer air; and the exposure opens a third of a stop
@@ -324,7 +340,9 @@ def live_routes():
     for tgt, amount in (("seed", 0.6), ("stalks", 0.35), ("petals", 0.3), ("outerpetals", 0.25), ("gills", 0.5)):
         out.append(R("visual.energy", "procedural/%s/material/emissive" % tgt, amount, depth="visual.organic",
                      attackMs=80, decayMs=400))
-    for tgt, amount in (("prisms", 0.25), ("spires", 0.3), ("facets", 0.25)):
+    # (in the observatory the rings too: a bell or a resonant sound that rings keeps them ringing, a dry pluck lets
+    # them go at once -- and a detuned or tremolo sound's own beating pulses them)
+    for tgt, amount in (("prisms", 0.25), ("spires", 0.3), ("facets", 0.25), ("halos", 0.8), ("meridians", 0.8)):
         out.append(R("visual.energy", "procedural/%s/material/emissive" % tgt, amount, depth="visual.crystalline",
                      attackMs=40, decayMs=300))
     # the lotus opens a little on each note and closes again: it breathes with the playing
@@ -352,11 +370,12 @@ def live_routes():
     out.append(R("visual.energy", "lights/note/intensity", 3.0, depth="visual.organic", attackMs=80, decayMs=400))
 
     # ---- pitch -> height: the core, the gem, the rings and the heart follow the melody's register, spanned for a
-    # keyboard (pitch 0.25 -> 0 m, 0.70 -> 1.1 m: A2 to A5)
+    # keyboard (pitch 0.25 -> 0 m, 0.70 -> 0.8 m: A2 to A5; the master's 1.1 m took the armillary out of the top
+    # of the held frame on high notes)
     for n in ("procedural/hero/transform/position", "procedural/seed/transform/position",
               "procedural/facets/transform/position", "procedural/halos/transform/position",
               "procedural/meridians/transform/position", "lights/heart/position"):
-        out.append(R("visual.lift", n, 1.1, comp=1, gain=2.2, offset=-0.55, clampEnabled=True, clampMin=0.0,
+        out.append(R("visual.lift", n, LIFT_METRES, comp=1, gain=2.2, offset=-0.55, clampEnabled=True, clampMin=0.0,
                      clampMax=1.0, attackMs=180, decayMs=400))
 
     # ---- 8. release -> trails: small by default, grown by held, legato playing
@@ -405,6 +424,7 @@ LIVE_DEFORMERS = {
 PETAL_START = 0.449
 SEED_RAISE = 0.4
 SEED_BODY = 0.4
+PETAL_CURL = 0.22
 
 
 def live_scene():
@@ -423,6 +443,9 @@ def live_scene():
     for node in s["nodes"]:
         if node["name"] == "petals":
             node["procedural"]["distribution"]["startAngle"] = PETAL_START
+            # and curled less (0.41 -> 0.22): their tips no longer rise across the seed, where two of them read as
+            # a pair of eyes
+            node["procedural"]["deformers"][0]["amount"] = PETAL_CURL
         if node["name"] == "seed":  # and the seed sits a little higher in the cup, clear of the petal tips
             pos = node["procedural"]["distributionTransform"]["position"]
             pos[1] = round(pos[1] + SEED_RAISE, 3)
@@ -488,7 +511,9 @@ def main():
     # (their dark undersides read as a hole in it); a little higher, the camera looks into the cup
     hold_pos = list(hold["camera/position"])
     hold_pos[1] = round(hold_pos[1] + CAMERA_RAISE, 3)
-    kp, kt, period = camera_drift(hold_pos, hold["camera/target"])
+    hold_tgt = list(hold["camera/target"])
+    hold_tgt[1] = round(hold_tgt[1] + TARGET_RAISE, 3)
+    kp, kt, period = camera_drift(hold_pos, hold_tgt)
     for track in tracks:
         if track.get("target") == "camera/position":
             track["keys"], track["loopLength"] = kp, period

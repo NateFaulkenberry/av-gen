@@ -50,12 +50,53 @@ first time. After that, AV Gen remembers your devices.
 6. **Play.** Try the brief's list: bass, pad, lead, pluck, FM, distorted, filtered, resonant, noisy, sustained,
    percussive. Then hold one note and sweep the synth's filter: the notes do not change, but the world should.
    The **Analysis** panel's **Sonic** section shows what AV Gen hears: the character as bars, the musical
-   context, and the visual families.
+   context, and the visual families. The next section says what each gesture should do.
+
+## What to try (and what you should see)
+
+The world has four faces, and the **sound** picks among them over about two seconds; the notes, the knobs and the
+rhythm act inside whichever face is showing. So change one thing at a time, and give a new patch a couple of
+seconds. In this order:
+
+1. **Before you play:** a dark night, the ground's veins faintly lit. That is the waiting world. It grows into a
+   world within a second of sound, and returns six to eight seconds after you stop (a pause keeps the world).
+2. **A soft, low pad with the filter fairly closed, a few long notes:** the **warm garden** (a lotus round a seed
+   of light, tendrils, mushrooms, a low orange sun). Each note swells the light and opens the lotus a little, low
+   notes in the mushrooms' gills and the lotus, high ones in the tendrils' tips; the light lasts as long as your
+   note does (a long release keeps it lit). Held, legato playing grows the tendrils and lengthens the trails.
+3. **Hold one note and sweep the filter slowly, all the way up and back.** The most important one. With the
+   filter closed the garden is dusk: dim, soft focus, thick air. As you open it the light rises, the air clears,
+   the focus sharpens and the ground's veins light up, within about a third of a second of the knob. Leave it open
+   and the world itself turns: the garden gives way to glass, and at the very top (a fully open saw is a raspy
+   sound) it cracks and throws off fragments. Close it and the garden grows back.
+4. **Same note, now turn up the distortion or drive** (a drive AFTER the filter, like a pedal, shows best: a drive
+   into a closed filter is filtered away before anyone hears it). First the light opens (more harmonics), then the
+   forms start to buzz and crack and fragments fly (roughness), and held there for a few seconds the heavy world
+   rises: violet air, basalt, a fissured mass. On a single note distortion and an open filter sound alike, so they
+   look alike at the top; on a chord or a riff, distortion goes all the way to the heavy world.
+5. **A bright pluck, an FM bell or a bright lead, played high:** the **glass observatory** (dark crystals, a gem in
+   rings of light). Notes ring the rings: high notes swing the ecliptic ring, low notes the meridians. The gem and
+   the rings rise with your register. A ringing sound keeps the rings lit; a dry pluck lets them go at once.
+6. **A fast arpeggio (16ths):** the rings keep turning and swinging in the pattern of your notes, stars stream; in
+   the garden, motes circle the seed and the tendrils ripple.
+7. **Chords, then denser chords:** the world swells: the gem and the rings open wide and a cluster of small gems
+   rises (in the garden, the lotus opens and glowing buds rise). Denser voicings, more of it.
+8. **A distorted bass riff:** the heavy world: the fissured mass heaves on each note, basalt rises. The first
+   seconds of the distortion shatter the world it was in.
+9. **Noise, drums, a noisy percussive patch:** the **strike field**: black, one hard light, and each hit a white
+   flash, a shock ring racing out along the ground and a burst of blades. A distorted high lead also lands here.
+10. **Stop.** After six to eight seconds of silence the world returns to the waiting night.
+
+If a patch lands in a world you did not expect, the Sonic section of the Analysis panel says why (for example a
+bright saw pad reads as glass, a warm electric piano between the garden and the glass). The Smoothing control
+makes all of this faster (below 1x) or calmer (above 1x); 1x is the demo's own live tuning.
 
 ## The rest of the Live panel
 
 - **Smoothing:** how quickly the visuals follow the sound. Below 1x they react faster and more nervously; above
-  1x they are calmer. 1x is the project's own tuning. AV Gen remembers the setting.
+  1x they are calmer. 1x is the project's own tuning: in the Sonic Live demo that is already a live tuning (the
+  world follows a new sound in about 2 s, the filter's light in about a third of a second), so start at 1x. AV Gen
+  remembers the setting.
 - **Anti-aliasing:** the live viewport's edge smoothing (the same setting as Settings > Rendering). For cleaner
   thin rings at some frame-rate cost, raise **Settings > Rendering > Lowest scale**.
 - The grey lines at the bottom are measurements:
@@ -86,6 +127,8 @@ interface add their own few milliseconds before any of this.
 | It feels late | Check the frame rate in the status bar: below about 40 fps, every response is a frame later. Settings > Rendering > Lowest scale trades sharpness for frame rate. With a DAW in the chain, use a small audio buffer (128 samples). |
 | Feedback or howling (microphone) | Use an interface input or BlackHole instead. |
 | Everything is dark before you play | That is the Sonic Garden's "silence" world. It grows in within a second of sound. |
+| Turning up distortion barely changes the world | Put the drive after the filter (or open the filter): a drive into a closed low-pass is removed by it, and the synth sounds nearly clean. On a single held note, distortion reads as brighter and rougher; chords and riffs show it most. |
+| A keyboard chosen by name does not connect | A named choice only connects a keyboard that is already plugged in (All MIDI inputs connects one on arrival). Plug it in, then choose it, or use All MIDI inputs. |
 
 ## Command line (optional)
 

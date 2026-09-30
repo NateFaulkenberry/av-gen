@@ -2177,7 +2177,7 @@
     "deformers": [
      {
       "kind": "bend",
-      "amount": 0.41,
+      "amount": 0.22,
       "axis": [
        0,
        0,

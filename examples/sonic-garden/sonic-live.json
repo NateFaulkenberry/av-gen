@@ -197,7 +197,7 @@
       "combine": "mean",
       "inputs": [
        {
-        "signal": "sonic.roughness.slow",
+        "signal": "visual.rasp",
         "weight": 3.0
        },
        {
@@ -211,7 +211,7 @@
        }
       ],
       "group": "family",
-      "bias": -0.5,
+      "bias": -0.38,
       "gain": 3.0
      },
      {
@@ -469,6 +469,21 @@
       ],
       "bias": -2.7,
       "gain": 4.95
+     },
+     {
+      "name": "rasp",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "sonic.roughness.slow",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.inharmonicity.slow",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
      },
      {
       "name": "grit",
@@ -906,8 +921,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -922,8 +937,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -938,8 +953,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -1184,8 +1199,8 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
@@ -1200,8 +1215,8 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
@@ -1248,7 +1263,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/ambientColor",
-   "amount": 0.1,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -1260,7 +1275,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/ambientColor",
-   "amount": 0.18,
+   "amount": 0.108,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1272,7 +1287,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/ambientColor",
-   "amount": 0.38,
+   "amount": 0.228,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -1488,7 +1503,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/key/intensity",
-   "amount": -0.35,
+   "amount": -0.5,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2074,7 +2089,7 @@
   {
    "source": "visual.crystalline",
    "target": "post/bloom/intensity",
-   "amount": 0.35,
+   "amount": 0.15,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2345,8 +2360,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -2361,8 +2376,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -2388,8 +2403,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -2937,8 +2952,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3008,8 +3023,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3024,8 +3039,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3040,8 +3055,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3056,8 +3071,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3072,8 +3087,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3088,8 +3103,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3104,8 +3119,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3120,8 +3135,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3333,8 +3348,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3349,8 +3364,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3365,8 +3380,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3381,8 +3396,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3397,8 +3412,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.25,
-    "offset": -0.25,
+    "gain": 1.6,
+    "offset": -0.6,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -4958,6 +4973,7 @@
    "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
+   "depthSource": "visual.organic",
    "chain": {
     "attackMs": 60,
     "decayMs": 250
@@ -5487,6 +5503,30 @@
    }
   },
   {
+   "source": "visual.energy",
+   "target": "procedural/halos/material/emissive",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.crystalline",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "visual.energy",
+   "target": "procedural/meridians/material/emissive",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.crystalline",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 300
+   }
+  },
+  {
    "source": "notes.noteOn",
    "target": "procedural/petals/deform/1/amount",
    "amount": -0.08,
@@ -5630,7 +5670,7 @@
   {
    "source": "visual.lift",
    "target": "procedural/hero/transform/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -5647,7 +5687,7 @@
   {
    "source": "visual.lift",
    "target": "procedural/seed/transform/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -5664,7 +5704,7 @@
   {
    "source": "visual.lift",
    "target": "procedural/facets/transform/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -5681,7 +5721,7 @@
   {
    "source": "visual.lift",
    "target": "procedural/halos/transform/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -5698,7 +5738,7 @@
   {
    "source": "visual.lift",
    "target": "procedural/meridians/transform/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -5715,7 +5755,7 @@
   {
    "source": "visual.lift",
    "target": "lights/heart/position",
-   "amount": 1.1,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -6117,7 +6157,7 @@
       "time": 0.0,
       "value": [
        1.0678,
-       2.2921,
+       2.5421,
        0.0
       ],
       "interp": "smooth"
@@ -6126,7 +6166,7 @@
       "time": 8.0,
       "value": [
        1.1179,
-       2.277,
+       2.527,
        0.0
       ],
       "interp": "smooth"
@@ -6135,7 +6175,7 @@
       "time": 16.0,
       "value": [
        1.099,
-       2.2079,
+       2.4579,
        0.0
       ],
       "interp": "smooth"
@@ -6144,7 +6184,7 @@
       "time": 24.0,
       "value": [
        1.0221,
-       2.223,
+       2.473,
        0.0
       ],
       "interp": "smooth"
@@ -6153,7 +6193,7 @@
       "time": 32.0,
       "value": [
        0.9322,
-       2.2921,
+       2.5421,
        0.0
       ],
       "interp": "smooth"
@@ -6162,7 +6202,7 @@
       "time": 40.0,
       "value": [
        0.8821,
-       2.277,
+       2.527,
        0.0
       ],
       "interp": "smooth"
@@ -6171,7 +6211,7 @@
       "time": 48.0,
       "value": [
        0.901,
-       2.2079,
+       2.4579,
        0.0
       ],
       "interp": "smooth"
@@ -6180,7 +6220,7 @@
       "time": 56.0,
       "value": [
        0.9779,
-       2.223,
+       2.473,
        0.0
       ],
       "interp": "smooth"
@@ -6189,7 +6229,7 @@
       "time": 64.0,
       "value": [
        1.0678,
-       2.2921,
+       2.5421,
        0.0
       ],
       "interp": "smooth"

@@ -43,17 +43,22 @@ def main():
         d = ImageDraw.Draw(canvas)
         r = app.get(ns, {})
         synth = next((e for t, e in reversed(events) if t <= ns), None)
+        patch = next((e["kind"][6:] for t, e in reversed(events) if t <= ns and e["kind"].startswith("patch:")), "")
         g = lambda k: float(r.get(k, 0.0) or 0.0)
         d.text((10, h + 6), f"{title}   t {(ns - start) / 1e9:5.2f} s", fill=(230, 230, 230))
         if synth:
-            d.text((10, h + 24), f"synth: cutoff {float(synth['cutoff']):6.0f} Hz  drive {float(synth['drive']):5.1f}",
-                   fill=(200, 200, 140))
-        d.text((10, h + 42), f"MIDI notes.active {g('notes.active'):.0f}  pitch {g('notes.pitch'):.2f}  "
-                             f"velocity {g('notes.velocity'):.2f}", fill=(140, 200, 240))
-        d.text((w // 2, h + 24), f"sound: brightness {g('sonic.brightness'):.2f}  roughness {g('sonic.roughness'):.2f}"
-                                 f"  warmth {g('sonic.warmth'):.2f}", fill=(240, 170, 140))
-        d.text((w // 2, h + 42), f"families: organic {g('visual.organic'):.2f}  crystalline "
-                                 f"{g('visual.crystalline'):.2f}  chaotic {g('visual.chaotic'):.2f}",
+            d.text((10, h + 24), f"synth {patch or '-'}: cutoff {float(synth['cutoff']):5.0f} Hz  drive "
+                                 f"{float(synth['drive']):4.1f}", fill=(200, 200, 140))
+        d.text((10, h + 42), f"MIDI held {g('notes.active'):.0f}  pitch {g('notes.pitch'):.2f}  "
+                             f"vel {g('notes.velocity'):.2f}", fill=(140, 200, 240))
+        d.text((w // 2 - 30, h + 6), f"sound: bright {g('sonic.brightness'):.2f}  rough {g('sonic.roughness'):.2f}"
+                                     f"  warm {g('sonic.warmth'):.2f}  energy {g('sonic.energy'):.2f}",
+               fill=(240, 170, 140))
+        d.text((w // 2 - 30, h + 24), f"fast: glow {g('visual.glow'):.2f}  grit {g('visual.grit'):.2f}  "
+                                      f"figure {g('visual.figure'):.2f}  stack {g('visual.stack'):.2f}",
+               fill=(240, 220, 150))
+        d.text((w // 2 - 30, h + 42), f"world: organic {g('visual.organic'):.2f}  glass {g('visual.crystalline'):.2f}"
+                                      f"  heavy {g('visual.tectonic'):.2f}  strike {g('visual.impact'):.2f}",
                fill=(170, 240, 170))
         name = os.path.join(tmp, f"{i:06d}.png")
         canvas.save(name)
