@@ -3274,7 +3274,9 @@ void ControlPanel::drawPathTrace() {
             tooltip("Stops after the current sample batch. A cancelled trace writes no file.");
         }
     } else {
-        if (ImGui::Button("Path trace") && onStartPathTrace) {
+        // "##start": the renderer choice above is a radio button also labelled "Path trace", and in one
+        // ID scope the two labels hash to one ID -- ImGui's "2 visible items with conflicting ID".
+        if (ImGui::Button("Path trace##start") && onStartPathTrace) {
             onStartPathTrace();
         }
         ImGui::SameLine();
