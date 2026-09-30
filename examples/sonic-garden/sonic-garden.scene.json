@@ -41,10 +41,11 @@
      "input": "worldPosition"
     },
     {
-     "kind": "triplanar",
+     "kind": "noise",
      "dst": 1,
      "srcA": 0,
-     "value": 0.11
+     "value": 0.11,
+     "seed": 2
     },
     {
      "kind": "noise",
@@ -1004,7 +1005,7 @@
    "range": 5.5,
    "radius": 0.2,
    "castsShadow": false,
-   "volumetric": 0.3
+   "volumetric": 0.0
   },
   {
    "id": "top",
@@ -1076,7 +1077,12 @@
    "sunGlow": 0.12,
    "intensity": 1.0,
    "background": true,
-   "useKeyLight": true
+   "useKeyLight": false,
+   "sunDirection": [
+    0.5693,
+    0.1219,
+    -0.813
+   ]
   }
  },
  "nodes": [

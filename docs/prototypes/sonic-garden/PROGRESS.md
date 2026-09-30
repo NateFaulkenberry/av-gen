@@ -25,7 +25,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | 3 sonic character | done | `src/sonic/character.*`, `src/sonic/sonic_runtime.*` |
 | 4 interpreter | done | `src/sonic/interpret_source.*` (source kind `interpret`) |
 | 5 test material + scene (engineering) | done | `tools/make_sonic_material.py`, `examples/sonic-garden/` |
-| 5 art (mappings, families, look, §34-36) | pass 1 done; **pass 2 in progress** (art agent, 2026-09-30, the second brief's PART 1) | see "Art pass 1" and "Art pass 2" below; `tools/sonic_garden_look.py` |
+| 5 art (mappings, families, look, §34-36) | pass 1 and **pass 2 done** (art agent, 2026-09-30; pass 2 is the second brief's PART 1) | see "Art pass 1" and "Art pass 2" below; `tools/sonic_garden_look.py`; review media in `23-sonic-garden/pass2/` |
 | 5 engineering follow-up | done (2026-09-30) | twist normals (ADR-1021), sky rebuild tolerance (ADR-1022), live-rate profile; see "Engineering follow-up" |
 | 6-7 | not started | live input and live MIDI are Phase 7; the owner's next brief is `01-brief-live.md` (not started: the owner reviews the art first) |
 
@@ -269,7 +269,7 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
   and warm), which confounds "same timbre, different context" there; the pad version is the clean §35
   demonstration.
 
-## Art pass 2 (art agent, 2026-09-30, `01-brief-live.md` PART 1) -- in progress
+## Art pass 2 (art agent, 2026-09-30, `01-brief-live.md` PART 1) -- done
 
 The owner's verdict on pass 1: promising, "visually primitive". Pass 2 keeps the mapping language (families,
 qualities, context, note gestures) and rebuilds what it is expressed through. Everything is still written by
@@ -288,9 +288,11 @@ qualities, context, note gestures) and rebuilds what it is expressed through. Ev
   round a small seed of light, in place of the orb; an armillary of platinum rings round the dark-glass gem;
   basalt monoliths with glowing seams; obsidian blades whose rims go white-hot on a strike; a shock ring that races
   out along the ground from each hit; per-world skylines (giant fungi, glass spires, a basalt ridge).
-- **Light:** the key and rim are fixed in the world (not to the camera) and placed per world by routes; the sky
-  takes its sun from the key (`useKeyLight`), so the warm world has a low sun behind the lotus, in frame, and a
-  camera move never drags it. A `note` light rides the pitch; a hard `top` spot exists only in the void.
+- **Light:** the key and rim are fixed in the world (not to the camera) and placed per world by routes (the rig's
+  authored elevation 20 plus the route). The sky's sun is **placed**, not taken from the key: the key's direction
+  is a blend of the families' and moves a little every frame with the sound, and a moving sun rebuilt the sky's
+  cube every frame (6-10 ms of CPU, measured). The warm world's deep orange dusk sun sits low behind the giant
+  fungi on the right. A `note` light rides the pitch; a hard `top` spot exists only in the void.
 - **Fog economy:** `scene/volumeMaxDistance` is routed from organic and tectonic only (exactly 0 below a weight of
   0.2), so the observatory and the void keep closed-form distance fog (ADR-705) and skip the 21 ms march.
 - **Camera:** a 50 mm lens (was 35) and one slow push-in (about 7 m in 21 s) holding the hero left of centre.
@@ -298,6 +300,69 @@ qualities, context, note gestures) and rebuilds what it is expressed through. Ev
   (register) split each family's note gesture so low notes answer low in the world and high notes high.
 - **Interpreter shaping is `x * gain + bias`** (then the curve), not `(x + bias) * gain`: a mapping meant to span
   pitch 0.38..0.54 is gain 6.25, bias -2.375.
+- **A route chain's envelope follows its output after gain/offset:** a "hide" route (gain -1.25, offset 1) falls
+  as the family rises, so its decay times the hide and its attack the reveal.
+- **Traps found by eye** (each cost an iteration): `env/sky/sunSize` and `sunGlow` are radians (the scene's authored
+  0.3 was harmless at sun intensity 0 and a 50-degree disc once lit); a distribution transform's scale scales the
+  ring radius too (the skylines were 870 m out); contour "cracks" on fBm need a very thin band (fBm bunches near
+  0.5) and Voronoi F1 bands read as spots; a backlit key forward-scatters through the march (the warm haze is
+  0.0004); a scene light's intensity is capped at 20x its authored value.
+
+### Pass 2 review media and results
+
+`~/Desktop/av-gen-review/23-sonic-garden/pass2/` (ART-NOTES.md there has the reasoning per world, the timescale
+table and the honest caveats): before/after with audio, the §34 grid and sequence, a still per world, §35 (pad and
+bell), §36. Made by `tools/sonic_garden_review.py render`, `assemble` and the new `beforeafter` step. §34, §35
+(pad) and §36 pass by eye, as in pass 1; the four worlds now also differ in light direction, sky, skyline, material
+and camera height.
+
+### Pass 2 cost (headless, 1080p, M2 Max, the same binary for both passes, interleaved; GPU p50 / wall p50, ms)
+
+| tier | pad | bell | bass | perc |
+|---|---|---|---|---|
+| default, pass 1 | 37.2 / 39.7 | 35.3 / 37.6 | 36.1 / 39.0 | 35.5 / 38.4 |
+| default, pass 2 | 43.4 / 46.3 | 21.1 / 23.8 | 44.1 / 47.3 | 20.3 / 23.3 |
+| preview, pass 1 | 18.4 / 20.8 | 16.6 / 18.9 | 17.5 / 20.0 | 17.2 / 19.8 |
+| preview, pass 2 | 23.7 / 26.6 | 18.7 / 21.3 | 24.8 / 27.8 | 18.2 / 21.1 |
+
+- The lit scene pass is 4.7-6.8 ms heavier: the materials and the new geometry.
+- The march (21-22 ms default, 4-5 ms preview) now runs only in the warm and heavy worlds.
+- CPU is unchanged from pass 1 once the sky's sun was placed rather than taken from the key: following the key cost
+  6-10 ms a frame in rebuilds.
+- Unpulled levers: `scene/volumeSteps` in the marching worlds; a distance gate on `sgGround`.
+- Records: `bench-c/` in the art agent's session scratchpad, not kept.
+
+### Next (after pass 2)
+
+- **PART 2 (live AA, engineering).** This scene is the test case: thin armillary rings (32 mm tubes, 4-5 px),
+  the shock ring (about 1 cm at the hit), tapering tendrils, emissive rims that go black to white in one frame on
+  a strike, contour lines in the materials, and deformation driven by sound. `temporal/echo` (organic 0.5,
+  crystalline 0.25) is a history accumulation of its own: hold it off, or identical, when comparing AA modes. The
+  pass 2 notes have the list.
+- **PARTs 15-16 (the live demo scene and its art direction, art agent).**
+  - Nothing here reads the file analysis directly, so live input needs no art change.
+  - Tune on real material first: the `high`/`low` register split (centred on this phrase's pitch-centre span,
+    0.38-0.54), `mass`'s bias, and the family sharpness.
+  - `glow` is the filter-sweep channel.
+  - The warm world's temporal echo ghosts the rippling tendrils: lower it for live play.
+- **Art debts recorded in the pass 2 notes:**
+  - the petals are ellipsoids (no point);
+  - the gem's top face goes pale (a cut-gem SDF would fix it);
+  - the note light is subtle;
+  - the glass floor mirrors the rim light near the camera at times.
+
+### Tests (art pass 2)
+
+At `d1f75757` plus the final look (the binary includes ADR-1023), under `tools/gpu-lock.sh`:
+
+- `avgen_tests "[sonic]"`: exit 0, 16 cases (pass 1's 15 plus `[adr1023]`), 334 assertions.
+- `avgen_tests "[liveness]"`: exit 0, 34 cases.
+- `avgen_tests "[material]"`: exit 0, 46 cases.
+- `avgen_render_tests "[material],[emission]"`: exit 0, 24 cases (23 passed, 1 skipped). ADR-1023 refactors the
+  helper that feeds the shader's emission flags.
+- `avgen --project examples/sonic-garden/sonic-garden.json --audit-routes`: all 371 routes and both timeline tracks
+  live. The one load-time hazard is the shock ring's scale route (a one-frame transient reaches 44% of its amount
+  at 60 fps). The ring still starts visibly small at a hit and races out.
 
 ## Engineering follow-up (engineering agent, 2026-09-30)
 

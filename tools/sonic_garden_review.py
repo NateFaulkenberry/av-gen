@@ -243,8 +243,10 @@ def before_after(args):
         # the earlier grid's quadrant i (960x540, its own label kept), and the new render scaled to match
         qx, qy = (i % 2) * 960, (i // 2) * 540
         left, right, title = (os.path.join(tmp, "%s%d.png" % (k, i)) for k in "lrt")
-        label_png(left, 960, 540, "before: " + args.before_name, None, scale=1.1)
-        label_png(right, 960, 540, "after: " + args.after_name, None, scale=1.1)
+        for path, text in ((left, "before: " + args.before_name), (right, "after: " + args.after_name)):
+            # drawn as a strip for the panel's foot, clear of the earlier grid's own label in its top-left corner
+            label_png(path, 960, 540, text, None, scale=1.1)
+            Image.open(path).crop((0, 0, 960, 44)).save(path)
         label_png(title, 1920, 1080, t, s, scale=1.3)
         out = os.path.join(tmp, "ba%d.mp4" % i)
         fc = ("[0:v]crop=960:540:%d:%d,setpts=PTS-STARTPTS[a];[1:v]scale=960:540:flags=lanczos,setpts=PTS-STARTPTS[b];"

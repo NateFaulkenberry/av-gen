@@ -777,7 +777,7 @@
   {
    "source": "visual.organic",
    "target": "env/sky/sunColor",
-   "amount": 0.62,
+   "amount": 0.44,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -789,43 +789,7 @@
   {
    "source": "visual.organic",
    "target": "env/sky/sunColor",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 800,
-    "decayMs": 1600
-   }
-  },
-  {
-   "source": "visual.crystalline",
-   "target": "env/sky/sunColor",
-   "amount": 0.75,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 800,
-    "decayMs": 1600
-   }
-  },
-  {
-   "source": "visual.crystalline",
-   "target": "env/sky/sunColor",
-   "amount": 0.88,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 800,
-    "decayMs": 1600
-   }
-  },
-  {
-   "source": "visual.crystalline",
-   "target": "env/sky/sunColor",
-   "amount": 1.0,
+   "amount": 0.17,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -837,23 +801,7 @@
   {
    "source": "visual.organic",
    "target": "env/sky/sunIntensity",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 800,
-    "decayMs": 1600,
-    "gain": 1.25,
-    "offset": -0.25,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0
-   }
-  },
-  {
-   "source": "visual.crystalline",
-   "target": "env/sky/sunIntensity",
-   "amount": 2.0,
+   "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -869,7 +817,7 @@
   {
    "source": "visual.organic",
    "target": "env/sky/sunSize",
-   "amount": 0.04,
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2437,8 +2385,8 @@
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 300,
-    "decayMs": 1600
+    "attackMs": 1600,
+    "decayMs": 200
    }
   },
   {

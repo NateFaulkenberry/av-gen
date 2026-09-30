@@ -208,7 +208,7 @@ programs = []
 # one, nothing in the void. The veins fade with distance so they never alias into a shimmer on the far plain.
 g = Prog("sgGround")
 g.op("input", 0, inp="worldPosition")
-g.op("triplanar", 1, 0, v=0.11)
+g.op("noise", 1, 0, v=0.11, seed=2)
 g.op("noise", 2, 0, v=0.42, seed=3)
 g.ridge(3, 2, 0.0009)
 g.op("noise", 2, 0, v=1.35, seed=8)
@@ -580,6 +580,8 @@ nodes.append(particles("dust", seed=31, position=[0, 0.9, 0], extent=[13, 0.9, 1
                        turbulenceScale=0.2, sizeStart=0.04, sizeEnd=0.028, colorStart=[0.5, 0.3, 1.0, 1],
                        colorEnd=[0.2, 0.08, 0.5, 0], emissive=1.4))
 
+_az, _el = math.radians(145.0), math.radians(7.0)
+SUN = [round(math.sin(_az) * math.cos(_el), 4), round(math.sin(_el), 4), round(math.cos(_az) * math.cos(_el), 4)]
 scene = {
     "format": "avgen-scene", "version": 1, "name": "sonic-garden",
     "camera": {"mode": 1, "position": [-6.8, 1.45, 19.5], "target": [1.3, 2.2, 0.0], "fov": 30.0, "orbitSpeed": 0.0},
@@ -594,7 +596,7 @@ scene = {
         # the note: where the melody is. It rides the pitch (low notes answer low, high notes high) at the
         # garden's edge, so a note lights the part of the world at its own height.
         {"id": "note", "name": "note", "type": "point", "position": [1.6, 1.0, 1.4], "color": [1, 1, 1],
-         "intensity": 0.0, "range": 5.5, "radius": 0.2, "castsShadow": False, "volumetric": 0.3},
+         "intensity": 0.0, "range": 5.5, "radius": 0.2, "castsShadow": False, "volumetric": 0.0},
         # the void's one light: a hard top light over the strike field (impact only)
         {"id": "top", "name": "top", "type": "spot", "position": [0.0, 15.0, 1.5], "direction": [0.0, -1.0, -0.1],
          "color": [1, 1, 1], "intensity": 30.0, "range": 40.0, "innerCone": 12.0, "outerCone": 24.0,
@@ -606,7 +608,11 @@ scene = {
         "sky": {"enabled": True, "zenithColor": [0.0, 0.0, 0.0], "horizonColor": [0.0, 0.0, 0.0],
                 "groundColor": [0.003, 0.003, 0.004], "haze": 0.35, "sunColor": [1.0, 0.8, 0.6],
                 "sunIntensity": 0.0, "sunSize": 0.035, "sunGlow": 0.12, "intensity": 1.0, "background": True,
-                "useKeyLight": True}},
+                # The sun is placed, not taken from the key: the key's direction is a blend of the families'
+                # and moves a little every frame with the sound, and a sun that moves past 0.25 mrad rebuilds
+                # the sky's lighting cube (ADR-1022) -- about 6 ms of CPU a frame when it followed the key. It
+                # sits where the warm world's key is (azimuth 145, 7 degrees up), the one world that shows it.
+                "useKeyLight": False, "sunDirection": SUN}},
     "nodes": nodes,
 }
 
@@ -669,11 +675,12 @@ palette("env/sky/zenithColor", {"organic": (0.010, 0.004, 0.018), "crystalline":
                                  "tectonic": (0.004, 0.001, 0.010), "impact": (0.0, 0.0, 0.0)}, **SLOW)
 palette("env/sky/horizonColor", {"organic": (0.10, 0.034, 0.016), "crystalline": (0.012, 0.045, 0.075),
                                   "tectonic": (0.03, 0.008, 0.07), "impact": (0.004, 0.004, 0.005)}, **SLOW)
-palette("env/sky/sunColor", {"organic": (1.0, 0.62, 0.3), "crystalline": (0.75, 0.88, 1.0)}, **SLOW)
-scalar("env/sky/sunIntensity", {"organic": 4.0, "crystalline": 2.0}, **GROW)
-# sunSize and sunGlow are radians (the disc's angular radius and the aureole's width): the warm world's sun is
-# about 4 degrees across the radius, low and large as a dusk sun looks; the glass world's moon keeps the default
-scalar("env/sky/sunSize", {"organic": 0.04}, **GROW)
+palette("env/sky/sunColor", {"organic": (1.0, 0.44, 0.17)}, **SLOW)
+scalar("env/sky/sunIntensity", {"organic": 2.2}, **GROW)
+# sunSize and sunGlow are radians (the disc's angular radius and the aureole's width): the warm world's sun is a
+# deep orange disc about 3.5 degrees in radius, low behind the giant fungi (a dusk sun looks large and low); the
+# other worlds show no sun
+scalar("env/sky/sunSize", {"organic": 0.03}, **GROW)
 scalar("env/sky/sunGlow", {"organic": 0.14}, **GROW)
 scalar("env/sky/haze", {"organic": 0.1, "crystalline": -0.22, "tectonic": -0.05, "impact": -0.25}, **SLOW)
 palette("scene/fogColor", {"organic": (0.05, 0.02, 0.016), "crystalline": (0.006, 0.014, 0.028),
@@ -744,9 +751,12 @@ R("visual.tectonic", "procedural/ridge/material/emissive", 0.4, **SLOW)
 
 # ---- the hero: a small seed in the lotus (organic), a spark in the gem (crystalline), a massive body (tectonic),
 # a hard knot (impact)
-# (hidden quickly and released slowly, so the warm world's seed never shares its first second with the core)
+# (The warm world hides the core quickly and gives it back slowly, so the seed never shares its first seconds with
+# it. A chain's envelope follows its OUTPUT after the gain and offset, so a hide -- whose output falls as the
+# family rises -- is timed by the decay, and the reveal by the attack. Silence hides the core too; the other worlds
+# grow it back in over a fraction of a second as their sound begins.)
 R("visual.organic", "procedural/hero/source/scale", 1.0, op="multiply", gain=-1.25, offset=1.0, clampEnabled=True,
-  clampMin=0.0, clampMax=1.0, attackMs=300, decayMs=1600)
+  clampMin=0.0, clampMax=1.0, attackMs=1600, decayMs=200)
 R("visual.silence", "procedural/hero/source/scale", 1.0, op="multiply", gain=-1.0, offset=1.0, clampEnabled=True,
   clampMin=0.0, clampMax=1.0, attackMs=300, decayMs=2600)
 R("visual.crystalline", "procedural/hero/source/scale", 1.0, op="multiply", gain=-0.55, offset=1.0, **SLOW)
