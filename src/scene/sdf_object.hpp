@@ -66,6 +66,17 @@ struct SdfObject {
     bool compile = false;
     bool castShadows = true;
     SdfLook look;                        // ADR-1002
+    // ADR-1044: surfaces. Empty = one surface, the material as it always was. Otherwise a compiled tree's
+    // node `material` ids pick one per hit, and its `color` multiplies the material's base colour and its
+    // `emission` the material's emission (colour x intensity) -- so author the material white with emission
+    // colour white and intensity 1, and give each surface its real albedo and emitted radiance.
+    // Parameters: surface/<k>/color, surface/<k>/emission. Compiled objects only (the interpreter shades
+    // every hit as surface 0).
+    struct Surface {
+        glm::vec3 color{1.0f};
+        glm::vec3 emission{0.0f};
+    };
+    std::vector<Surface> surfaces;
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material
     // program. Runtime only (the Composition writes it every frame); 1 is the surface as authored.
     float emissionGain = 1.0f;

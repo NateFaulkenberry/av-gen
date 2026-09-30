@@ -64,6 +64,9 @@ enum class SdfNodeKind : std::uint8_t {
 [[nodiscard]] bool sdfNodeIsPrimitive(SdfNodeKind kind);
 [[nodiscard]] int sdfNodeMaxChildren(SdfNodeKind kind); // 0 primitives, 1 unary ops, 8 combinations
 
+// ADR-1044: surfaces per SDF object (base colour and emission per surface id).
+inline constexpr int kMaxSdfSurfaces = 8;
+
 struct SdfNode {
     SdfNodeKind kind = SdfNodeKind::Sphere;
     // ADR-1001: an optional name. A named node's parameters are `node/<name>/<field>` instead of
@@ -85,6 +88,9 @@ struct SdfNode {
     float speed = 0.0f;
     int count = 0;
     std::uint32_t seed = 1;
+    // ADR-1044: the surface (0..kMaxSdfSurfaces-1) this subtree is shaded with, or -1 to inherit. Read
+    // only by a compiled tree (sdfSurface); structural (compiled in as a constant).
+    int material = -1;
     std::string reference;               // DisplaceField: field name
     std::vector<SdfNode> children;
     [[nodiscard]] nlohmann::json toJson() const;

@@ -236,6 +236,14 @@ TEST_CASE("Warp: zero amount is the identity, a masked axis is untouched, the ph
     CHECK(worst <= 0.5f + 1e-5f);
     CHECK(worst > 0.05f);
     CHECK(maxStep < 0.05f);
+    // The window: with offset 2 along z and a 1 m fade, the warp is exactly the identity beyond |z| = 2.
+    SdfNode windowed = w2;
+    windowed.axis = glm::vec3(0.0f, 0.0f, 1.0f);
+    windowed.offset = 2.0f;
+    windowed.rounding = 1.0f;
+    for (const glm::vec3& p : points({-0.2f, -2.0f, 2.0f}, {0.2f, 2.0f, 3.0f}, 5)) {
+        CHECK_THAT(static_cast<double>(treeOf(windowed).evaluate(p, 0.0)), WithinAbs(static_cast<double>(p.x), 1e-6));
+    }
 }
 
 TEST_CASE("Shell: a box becomes a room with walls of the given thickness", "[sdf][liminal]") {

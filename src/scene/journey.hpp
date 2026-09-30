@@ -109,4 +109,56 @@ struct JourneyPose {
 // and the walk bob. A pure function of its arguments.
 [[nodiscard]] JourneyPose journeyPose(const JourneyPath& path, const JourneyView& view);
 
+// ADR-1042 (chapters): one continuous journey through several worlds. Chapter c owns the global
+// distances [start_c, start_{c+1}); inside it the camera walks the chapter's own path at local distance
+// `from + (d - start)`, wrapped by the chapter's own screw, and everything is carried into the world by the
+// chapter frame (world = rotY(yaw) * local + offset, the composition-node convention, so the chapter's SDF
+// nodes take the same position and rotation). At a chapter's start the camera jumps from the last
+// chapter's world to this one: author both so the view is the same there (an identical threshold -- a
+// doorway flooded with light -- whose geometry matches in both), and nothing else can tell.
+// Nodes and lights a chapter lists are shown only while it is active (the others do not march).
+struct JourneyChapter {
+    std::string name;
+    double start = 0.0;          // the global distance where the chapter begins
+    double from = 0.0;           // the chapter path's own distance at `start`
+    JourneySettings world;       // its path, screw, wrap, collide object and radius
+    glm::vec3 offset{0.0f};      // the chapter frame
+    float yawDegrees = 0.0f;
+    std::vector<std::string> nodes;
+    std::vector<std::string> lights;
+
+    [[nodiscard]] glm::vec3 toWorldPoint(const glm::vec3& p) const;
+    [[nodiscard]] glm::vec3 toWorldDirection(const glm::vec3& d) const;
+};
+
+class Journey {
+public:
+    // The journey block: {"chapters": [ {chapter}, ... ]} (sorted by start), or one chapter's fields at the
+    // top level (`path`, `screw`, ...), which is a single chapter starting at 0.
+    static Result<Journey> fromJson(const nlohmann::json& j);
+    [[nodiscard]] nlohmann::json toJson() const;
+
+    [[nodiscard]] std::size_t size() const { return chapters_.size(); }
+    [[nodiscard]] const JourneyChapter& chapter(std::size_t i) const { return chapters_[i]; }
+    [[nodiscard]] const JourneyPath& path(std::size_t i) const { return paths_[i]; }
+    // The chapter a global distance falls in (the first one before its start).
+    [[nodiscard]] std::size_t chapterAt(double distance) const;
+    [[nodiscard]] double localDistance(std::size_t chapter, double distance) const {
+        return chapters_[chapter].from + (distance - chapters_[chapter].start);
+    }
+    // The camera: `view.distance` is global.
+    [[nodiscard]] JourneyPose pose(JourneyView view) const;
+    // A point riding the journey at `distance`, in the world, wrapped with the camera at `camera` when they
+    // share a chapter.
+    [[nodiscard]] JourneySample anchor(double distance, double camera) const;
+    // False for a node or light another chapter owns while the camera is not in it.
+    [[nodiscard]] bool nodeActive(const std::string& name, double camera) const;
+    [[nodiscard]] bool lightActive(const std::string& id, double camera) const;
+
+private:
+    std::vector<JourneyChapter> chapters_;
+    std::vector<JourneyPath> paths_;
+    bool singleForm_ = false;
+};
+
 } // namespace avgen::scene

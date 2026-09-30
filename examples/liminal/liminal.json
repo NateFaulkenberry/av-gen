@@ -73,23 +73,9 @@
    }
   },
   {
-   "source": "audio.rms",
-   "target": "camera/journey/distance",
-   "amount": 0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {
-    "attackMs": 400,
-    "decayMs": 2000,
-    "integrate": true
-   }
-  },
-  {
    "source": "audio.highMid",
    "target": "sdf/world/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -190,6 +176,34 @@
        34.5
       ],
       "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       38.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.0,
+      "value": [
+       40.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.0,
+      "value": [
+       41.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       49.0
+      ],
+      "interp": "smooth"
      }
     ]
    },
@@ -258,9 +272,30 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 40.0,
       "value": [
        0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.0,
+      "value": [
+       -35.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.0,
+      "value": [
+       -25.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -10.0
       ],
       "interp": "smooth"
      }
@@ -310,9 +345,23 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 40.0,
       "value": [
        0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.0,
+      "value": [
+       22.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       8.0
       ],
       "interp": "smooth"
      }
@@ -334,7 +383,7 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 48.0,
       "value": [
        2.5
       ],
@@ -381,7 +430,14 @@
      {
       "time": 32.0,
       "value": [
-       46.0
+       39.5
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       44.0
       ],
       "interp": "linear"
      }
@@ -423,7 +479,7 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 48.0,
       "value": [
        7.15,
        7.15,
@@ -469,7 +525,7 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 48.0,
       "value": [
        4.0,
        7.0,
@@ -480,7 +536,7 @@
     ]
    },
    {
-    "target": "sdf/lamps/node/roomLampAt/translation",
+    "target": "sdf/world/node/roomLampAt/translation",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -515,7 +571,7 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 48.0,
       "value": [
        4.0,
        13.95,
@@ -576,9 +632,127 @@
       "interp": "smooth"
      },
      {
-      "time": 32.0,
+      "time": 40.0,
       "value": [
        3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "palette/value",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.8,
+      "value": [
+       2.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.4,
+      "value": [
+       2.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.5,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/exposure/compensation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.8,
+      "value": [
+       3.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.4,
+      "value": [
+       3.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.5,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.0
       ],
       "interp": "smooth"
      }
@@ -591,15 +765,25 @@
    {
     "name": "muted",
     "colors": {
-     "wall": [
+     "plaster": [
       0.42,
       0.45,
       0.5
      ],
+     "floor": [
+      0.3,
+      0.31,
+      0.33
+     ],
+     "accent": [
+      0.55,
+      0.56,
+      0.6
+     ],
      "lamp": [
-      0.75,
-      0.85,
-      1.0
+      5.0,
+      5.6,
+      6.0
      ],
      "light": [
       0.7,
@@ -621,15 +805,25 @@
    {
     "name": "awake",
     "colors": {
-     "wall": [
+     "plaster": [
       0.55,
       0.42,
       0.38
      ],
+     "floor": [
+      0.35,
+      0.25,
+      0.22
+     ],
+     "accent": [
+      0.75,
+      0.35,
+      0.3
+     ],
      "lamp": [
-      1.0,
-      0.62,
-      0.35
+      6.0,
+      3.7,
+      2.1
      ],
      "light": [
       1.0,
@@ -651,15 +845,25 @@
    {
     "name": "recede",
     "colors": {
-     "wall": [
+     "plaster": [
       0.3,
       0.31,
       0.33
      ],
+     "floor": [
+      0.22,
+      0.22,
+      0.23
+     ],
+     "accent": [
+      0.34,
+      0.35,
+      0.37
+     ],
      "lamp": [
-      0.45,
-      0.5,
-      0.55
+      2.2,
+      2.5,
+      2.7
      ],
      "light": [
       0.5,
@@ -681,15 +885,25 @@
    {
     "name": "open",
     "colors": {
-     "wall": [
+     "plaster": [
       0.72,
       0.68,
       0.6
      ],
+     "floor": [
+      0.5,
+      0.46,
+      0.4
+     ],
+     "accent": [
+      0.85,
+      0.72,
+      0.5
+     ],
      "lamp": [
-      1.0,
-      0.92,
-      0.75
+      6.0,
+      5.5,
+      4.5
      ],
      "light": [
       1.0,
@@ -711,12 +925,36 @@
   ],
   "bindings": [
    {
-    "role": "wall",
-    "target": "sdf/world/material/baseColor"
+    "role": "plaster",
+    "target": "sdf/world/surface/0/color"
+   },
+   {
+    "role": "floor",
+    "target": "sdf/world/surface/1/color"
+   },
+   {
+    "role": "accent",
+    "target": "sdf/world/surface/2/color"
    },
    {
     "role": "lamp",
-    "target": "sdf/lamps/material/emissiveColor"
+    "target": "sdf/world/surface/3/emission"
+   },
+   {
+    "role": "plaster",
+    "target": "sdf/stairwell/surface/0/color"
+   },
+   {
+    "role": "floor",
+    "target": "sdf/stairwell/surface/1/color"
+   },
+   {
+    "role": "accent",
+    "target": "sdf/stairwell/surface/2/color"
+   },
+   {
+    "role": "lamp",
+    "target": "sdf/stairwell/surface/3/emission"
    },
    {
     "role": "fog",
@@ -777,6 +1015,6 @@
   "fps": 60,
   "output": "video",
   "startSeconds": 0.0,
-  "endSeconds": 32.0
+  "endSeconds": 48.0
  }
 }

@@ -12,6 +12,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -128,23 +129,13 @@ TEST_CASE("Journey: yaw turns left, pitch looks up, the bob follows distance not
     CHECK(scene::journeyPose(*built, v).eye.y == y0);
 }
 
-TEST_CASE("Journey: the example world's path is clear of the architecture at the deformations' maxima",
+TEST_CASE("Journey: every chapter of the example is clear of its architecture at the deformations' maxima",
           "[liminal][journey][adr1042]") {
     const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "liminal";
     const nlohmann::json doc = readJson(dir / "liminal.scene.json");
-    auto settings = scene::JourneySettings::fromJson(doc.at("camera").at("journey"));
-    REQUIRE(settings.has_value());
-    auto path = scene::JourneyPath::build(*settings);
-    REQUIRE(path.has_value());
-    nlohmann::json treeJson;
-    for (const auto& n : doc.at("nodes")) {
-        if (n.value("name", "") == settings->collide) {
-            treeJson = n.at("sdf").at("tree");
-        }
-    }
-    REQUIRE(!treeJson.is_null());
-    // The deformations at the limits the example's routes and keys can reach: the breath at its base plus
-    // the full bass route (0.08 + 0.22), at several phases; the room small and grown.
+    auto journey = scene::Journey::fromJson(doc.at("camera").at("journey"));
+    REQUIRE(journey.has_value());
+    REQUIRE(journey->size() >= 2);
     const auto set = [](nlohmann::json& node, const std::string& name, const char* field, const nlohmann::json& value,
                         const auto& self) -> void {
         if (node.value("name", "") == name) {
@@ -156,46 +147,97 @@ TEST_CASE("Journey: the example world's path is clear of the architecture at the
             }
         }
     };
-    float worst = 1e9f;
-    double worstAt = 0.0;
-    glm::vec3 worstEye(0.0f);
-    for (const float amount : {0.08f, 0.30f}) {
-        for (const float phase : {0.0f, 1.7f, 4.1f}) {
-            for (const bool grown : {false, true}) {
-                nlohmann::json t = treeJson;
-                set(t["root"], "breath", "amount", amount, set);
-                set(t["root"], "breath", "translation", nlohmann::json::array({phase, 0.0f, phase * 0.6f}), set);
-                if (grown) {
-                    set(t["root"], "room", "size", nlohmann::json::array({7.15f, 7.15f, 10.15f}), set);
-                    set(t["root"], "roomAt", "translation", nlohmann::json::array({4.0f, 7.0f, 0.0f}), set);
-                }
-                // The true distance: the screw's cell content in the cells either side of the eye (the
-                // screw alone evaluates only the eye's own cell, and its seam guard caps at the boundary).
-                REQUIRE(t["root"]["kind"] == "screw");
-                const nlohmann::json T = t["root"]["translation"];
-                const glm::vec3 step(T[0].get<float>(), T[1].get<float>(), T[2].get<float>());
-                auto content = spatial::SdfTree::fromJson(nlohmann::json{{"root", t["root"]["children"][0]}});
-                REQUIRE(content.has_value());
-                for (double d = 0.0; d < 2.0 * path->cellLength(); d += 0.1) {
-                    scene::JourneyView v;
-                    v.distance = d;
-                    const auto pose = scene::journeyPose(*path, v);
-                    float clearance = 1e9f;
-                    for (int k = -2; k <= 2; ++k) {
-                        clearance = std::min(clearance, content->evaluate(pose.eye - static_cast<float>(k) * step, 0.0));
+    for (std::size_t c = 0; c < journey->size(); ++c) {
+        const scene::JourneyChapter& chapter = journey->chapter(c);
+        const scene::JourneyPath& path = journey->path(c);
+        nlohmann::json treeJson;
+        for (const auto& n : doc.at("nodes")) {
+            if (n.value("name", "") == chapter.world.collide) {
+                treeJson = n.at("sdf").at("tree");
+            }
+        }
+        REQUIRE(!treeJson.is_null());
+        REQUIRE(treeJson["root"]["kind"] == "screw");
+        float worst = 1e9f;
+        double worstAt = 0.0;
+        glm::vec3 worstEye(0.0f);
+        // The deformations at the limits the example's routes and keys can reach: the breath at its base
+        // plus the full bass route (0.08 + 0.22), at several phases; the room small and grown.
+        for (const float amount : {0.08f, 0.30f}) {
+            for (const float phase : {0.0f, 1.7f, 4.1f}) {
+                for (const bool grown : {false, true}) {
+                    nlohmann::json t = treeJson;
+                    set(t["root"], "breath", "amount", amount, set);
+                    set(t["root"], "breath", "translation", nlohmann::json::array({phase, 0.0f, phase * 0.6f}), set);
+                    if (grown) {
+                        set(t["root"], "room", "size", nlohmann::json::array({7.15f, 7.15f, 10.15f}), set);
+                        set(t["root"], "roomAt", "translation", nlohmann::json::array({4.0f, 7.0f, 0.0f}), set);
                     }
-                    if (clearance < worst) {
-                        worst = clearance;
-                        worstAt = d;
-                        worstEye = pose.eye;
+                    // The true distance: the screw's cell content in the cells round the eye (the screw
+                    // alone evaluates only the eye's own cell, and its seam guard caps at the boundary).
+                    auto content = spatial::SdfTree::fromJson(nlohmann::json{{"root", t["root"]["children"][0]}});
+                    REQUIRE(content.has_value());
+                    for (double d = 0.0; d < 2.0 * path.cellLength(); d += 0.1) {
+                        scene::JourneyView v;
+                        v.distance = d; // chapter-local: the pose is in the chapter's own frame
+                        const auto pose = scene::journeyPose(path, v);
+                        float clearance = 1e9f;
+                        for (int k = -3; k <= 3; ++k) {
+                            clearance = std::min(clearance,
+                                                 content->evaluate(chapter.world.screw.applyPoint(pose.eye, -k), 0.0));
+                        }
+                        if (clearance < worst) {
+                            worst = clearance;
+                            worstAt = d;
+                            worstEye = pose.eye;
+                        }
                     }
                 }
             }
         }
+        INFO("chapter '" << chapter.name << "': closest approach " << worst << " m at distance " << worstAt << " m, eye ("
+                         << worstEye.x << ", " << worstEye.y << ", " << worstEye.z << ") (radius "
+                         << chapter.world.radius << ")");
+        CHECK(worst > chapter.world.radius);
     }
-    INFO("closest approach " << worst << " m at distance " << worstAt << " m, eye (" << worstEye.x << ", " << worstEye.y
-                              << ", " << worstEye.z << ") (radius " << settings->radius << ")");
-    CHECK(worst > settings->radius);
+}
+
+TEST_CASE("Journey chapters: the camera changes world at a chapter's start, nodes and lights follow the chapter",
+          "[liminal][journey][adr1042]") {
+    auto journey = scene::Journey::fromJson(nlohmann::json::parse(R"({ "chapters": [
+        { "name": "a", "start": 0, "path": [[0, 0, 0], [10, 0, 0]], "screw": { "translation": [20, 0, 0] },
+          "nodes": ["worldA", "shared"], "lights": ["lampA"] },
+        { "name": "b", "start": 30, "from": 5, "path": [[0, 0, 0], [0, 0, 10]], "screw": { "translation": [0, 0, 20] },
+          "offset": [0, 0, 500], "yaw": 90, "nodes": ["worldB", "shared"] } ] })"));
+    REQUIRE(journey.has_value());
+    CHECK(journey->chapterAt(0.0) == 0);
+    CHECK(journey->chapterAt(29.99) == 0);
+    CHECK(journey->chapterAt(30.0) == 1);
+    CHECK(journey->localDistance(1, 31.0) == 6.0);
+    scene::JourneyView v;
+    v.distance = 12.0;
+    const auto a = journey->pose(v);
+    CHECK(dist(a.eye, {12.0f, 1.6f, 0.0f}) < 1e-3f);
+    v.distance = 31.0; // chapter b at local 6: (0, 0, 6) in its path frame, turned 90 degrees and moved 500 m
+    const auto b = journey->pose(v);
+    const glm::vec3 local(0.0f, 1.6f, 6.0f);
+    const glm::vec3 turned = glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * local;
+    CHECK(dist(b.eye, turned + glm::vec3(0.0f, 0.0f, 500.0f)) < 1e-3f);
+    // Nodes: a chapter's nodes only while it is active; unlisted nodes always; a shared node always.
+    CHECK(journey->nodeActive("worldA", 10.0));
+    CHECK_FALSE(journey->nodeActive("worldB", 10.0));
+    CHECK_FALSE(journey->nodeActive("worldA", 40.0));
+    CHECK(journey->nodeActive("worldB", 40.0));
+    CHECK(journey->nodeActive("shared", 10.0));
+    CHECK(journey->nodeActive("shared", 40.0));
+    CHECK(journey->nodeActive("figure", 40.0));
+    CHECK(journey->lightActive("lampA", 10.0));
+    CHECK_FALSE(journey->lightActive("lampA", 40.0));
+    // A round trip through JSON keeps the chapters.
+    auto again = scene::Journey::fromJson(journey->toJson());
+    REQUIRE(again.has_value());
+    CHECK(again->size() == 2);
+    CHECK(dist(again->pose(v).eye, b.eye) < 1e-5f);
 }
 
 namespace {

@@ -75,6 +75,13 @@ def slab(ext: Extents, name: Optional[str] = None) -> dict:
     return translate(c, box(h, name=name))
 
 
+def surface(node: dict, k: int) -> dict:
+    """Shade this subtree with surface k of its SDF object (ADR-1044: plaster, floor, accent, a glowing
+    beacon...). The object lists its surfaces (`sdf_node(surfaces=...)`); ids need `compile: true`."""
+    node["material"] = int(k)
+    return node
+
+
 # ---- architecture -------------------------------------------------------------------------------
 
 def opening(ext: Extents, name: Optional[str] = None) -> dict:
@@ -113,7 +120,8 @@ def shell(child: dict, thickness: float, name: Optional[str] = None) -> dict:
     return _named({"kind": "shell", "offset": float(thickness), "children": [child]}, name)
 
 
-def room(interior: Extents, wall: float = 0.3, openings: Iterable[dict] = (), name: Optional[str] = None) -> dict:
+def room(interior: Extents, wall: float = 0.3, openings: Iterable[dict] = (), name: Optional[str] = None,
+         floor_surface: Optional[int] = None) -> dict:
     """A plain room: one box made hollow (`shell`) around its interior extents, walls `wall` thick, minus
     its openings (doorways, windows, open ends; cut a floor or ceiling away with an opening too).
 
@@ -125,12 +133,16 @@ def room(interior: Extents, wall: float = 0.3, openings: Iterable[dict] = (), na
     center = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]
     half = [(x1 - x0) / 2 + wall / 2, (y1 - y0) / 2 + wall / 2, (z1 - z0) / 2 + wall / 2]
     body = translate(center, shell(box(half, name=name), wall), name=(name + "At") if name else None)
+    if floor_surface is not None:
+        # A floor of its own surface: a 4 mm skin on the shell's floor (the nearer surface wins the id).
+        skin = surface(slab(((x0, x1), (y0 - 0.02, y0 + 0.004), (z0, z1))), floor_surface)
+        body = union(body, skin)
     return difference(body, *openings)
 
 
 def corridor(start: float, end: float, width: float = 3.0, height: float = 3.2, wall: float = 0.3,
              floor_y: float = 0.0, z: float = 0.0, open_start: bool = True, open_end: bool = True,
-             openings: Iterable[dict] = (), name: Optional[str] = None) -> dict:
+             openings: Iterable[dict] = (), name: Optional[str] = None, floor_surface: Optional[int] = None) -> dict:
     """A corridor along +X from x = start to x = end, interior `width` x `height`, with open ends."""
     interior = ((start, end), (floor_y, floor_y + height), (z - width / 2, z + width / 2))
     cuts = list(openings)
@@ -141,7 +153,7 @@ def corridor(start: float, end: float, width: float = 3.0, height: float = 3.2, 
     if open_end:
         cuts.append(opening(((end - depth, end + wall + depth), (floor_y, floor_y + height),
                              (z - width / 2, z + width / 2))))
-    return room(interior, wall=wall, openings=cuts, name=name)
+    return room(interior, wall=wall, openings=cuts, name=name, floor_surface=floor_surface)
 
 
 def stairway(origin: Vec3, steps: int, run: float = 0.3, rise: float = 0.18, width: float = 1.4,
@@ -192,14 +204,25 @@ def screw(cell: dict, translation: Vec3, count: int = 0, seam: float = 0.3, name
 
 
 def breathing(child: dict, amount: float = 0.1, frequency: float = 0.08, axes: Vec3 = (1.0, 0.0, 1.0),
-              phase: Vec3 = (0.0, 0.0, 0.0), seed: int = 1, name: Optional[str] = "breath") -> dict:
+              phase: Vec3 = (0.0, 0.0, 0.0), seed: int = 1, cell: Optional[Vec3] = None, fade: float = 4.0,
+              name: Optional[str] = "breath") -> dict:
     """A smooth domain warp: walls bow by up to `amount` metres over a wavelength of about 1/frequency.
     axes (1, 0, 1) keeps floors flat (props stay grounded). Drive `amount` with a spring route and the
     phase (`translation`) with an integrating route so the flow's speed, not its position, follows the
-    music."""
-    return _named({"kind": "warp", "amount": float(amount), "frequency": float(frequency),
-                   "size": [float(v) for v in axes], "translation": [float(v) for v in phase], "seed": int(seed),
-                   "children": [child]}, name)
+    music.
+
+    Inside a translation screw pass `cell` = the screw's translation: the warp then fades to zero over
+    `fade` metres before each seam, where the two cells' warps (sampled in each cell's own coordinates)
+    would otherwise disagree and the walls would jog."""
+    node = {"kind": "warp", "amount": float(amount), "frequency": float(frequency),
+            "size": [float(v) for v in axes], "translation": [float(v) for v in phase], "seed": int(seed),
+            "children": [child]}
+    if cell is not None:
+        length = math.sqrt(sum(float(v) * float(v) for v in cell))
+        node["axis"] = [float(v) for v in cell]
+        node["offset"] = length / 2.0
+        node["rounding"] = float(fade)
+    return _named(node, name)
 
 
 def screw_apply(point: Vec3, translation: Vec3, count: int, k: int) -> list:
@@ -212,10 +235,21 @@ def screw_apply(point: Vec3, translation: Vec3, count: int, k: int) -> list:
     return [x * c - z * s, y + k * translation[1], x * s + z * c]
 
 
-def sdf_node(name: str, tree: dict, material: dict, bounds: float = 2000.0, max_distance: float = 220.0,
-             step_scale: float = 0.8, look: Optional[dict] = None) -> dict:
-    """The composition node for a world tree, compiled, with sane march settings for large interiors."""
-    return {
+def sdf_node(name: str, tree: dict, material: Optional[dict] = None, bounds: float = 2000.0,
+             max_distance: float = 200.0, step_scale: float = 0.8, look: Optional[dict] = None,
+             surfaces: Optional[Sequence[dict]] = None, position: Vec3 = (0.0, 0.0, 0.0),
+             yaw: float = 0.0) -> dict:
+    """The composition node for a world tree, compiled, with sane march settings for large interiors.
+
+    With `surfaces` ([{"color": [r, g, b], "emission": [r, g, b]}, ...], linear RGB) the material is set to
+    white with a unit white emission, so each surface's colour IS its albedo and its emission its emitted
+    radiance; parameters `sdf/<name>/surface/<k>/color|emission` (bind them in the palette).
+    `position`/`yaw` place the world (a journey chapter's frame: pass the chapter's offset and yaw)."""
+    if surfaces:
+        material = {"baseColor": [1.0, 1.0, 1.0], "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 1.0,
+                    "roughness": (material or {}).get("roughness", 0.85), "metallic": 0.0}
+    material = material or {"baseColor": [0.6, 0.6, 0.62], "roughness": 0.85, "metallic": 0.0}
+    node = {
         "name": name, "kind": "sdf",
         "sdf": {
             "tree": {"root": tree}, "material": material, "renderMode": "raymarch",
@@ -225,4 +259,10 @@ def sdf_node(name: str, tree: dict, material: dict, bounds: float = 2000.0, max_
             "maxSteps": 192, "epsilon": 0.0012, "stepScale": step_scale, "normalEpsilon": 0.004,
             "maxDistance": max_distance,
         },
+        "position": [float(v) for v in position], "rotation": [0.0, float(yaw), 0.0],
     }
+    if surfaces:
+        node["sdf"]["surfaces"] = [{"color": list(map(float, s_["color"])),
+                                    "emission": list(map(float, s_.get("emission", [0.0, 0.0, 0.0])))}
+                                   for s_ in surfaces]
+    return node

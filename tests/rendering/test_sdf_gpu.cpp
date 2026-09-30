@@ -603,7 +603,11 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         warped.size = glm::vec3(1.0f, 0.0f, 0.6f);
         warped.translation = glm::vec3(0.4f, 1.7f, -2.2f);
         warped.seed = 9;
-        cases.push_back({"warp", treeOf(std::move(warped)), 1e-3f});
+        cases.push_back({"warp", treeOf(warped), 1e-3f});
+        warped.axis = glm::vec3(1.0f, 0.2f, 0.0f);
+        warped.offset = 0.9f;
+        warped.rounding = 0.4f;
+        cases.push_back({"warp windowed", treeOf(std::move(warped)), 1e-3f});
         SdfNode shell = unary(SdfNodeKind::Shell, box(glm::vec3(0.8f, 0.6f, 0.7f)));
         shell.offset = 0.15f;
         cases.push_back({"shell", treeOf(std::move(shell)), 1e-4f});
@@ -951,6 +955,81 @@ TEST_CASE("SDF compiled liminal kinds render like the interpreter", "[gpu][sdf]"
     INFO("differing channels " << differing << ", lit pixels " << lit);
     CHECK(lit > static_cast<long>(compiled.width * compiled.height) / 20);
     CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1044: a compiled tree shades each hit with the surface its node ids choose.
+TEST_CASE("SDF surfaces: a compiled tree picks each hit's surface by node material id", "[gpu][sdf][liminal]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "surfaces";
+    SdfNode left = translate(glm::vec3(-0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    SdfNode right = translate(glm::vec3(0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    right.material = 1;
+    SdfNode beacon = translate(glm::vec3(0.0f, 1.1f, 0.0f), sphere(0.3f));
+    beacon.material = 2;
+    o.tree = treeOf(combo(SdfNodeKind::Union, {std::move(left), std::move(right), std::move(beacon)}));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.0f);
+    o.boundsMax = glm::vec3(3.0f);
+    o.material.baseColor = glm::vec3(1.0f);
+    o.material.emissiveColor = glm::vec3(1.0f);
+    o.material.emissiveIntensity = 1.0f;
+    o.surfaces = {{glm::vec3(0.8f, 0.1f, 0.1f), glm::vec3(0.0f)},
+                  {glm::vec3(0.1f, 0.1f, 0.8f), glm::vec3(0.0f)},
+                  {glm::vec3(0.0f), glm::vec3(0.0f, 6.0f, 0.0f)}};
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](bool compile) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, 0.5, 192, 192);
+    };
+    const auto sums = [](const gpu::Image8& img, std::uint32_t x0, std::uint32_t x1, std::uint32_t y0, std::uint32_t y1) {
+        glm::dvec3 acc(0.0);
+        for (std::uint32_t y = y0; y < y1; ++y) {
+            for (std::uint32_t x = x0; x < x1; ++x) {
+                acc += glm::dvec3(img.pixel(x, y)[0], img.pixel(x, y)[1], img.pixel(x, y)[2]);
+            }
+        }
+        return acc;
+    };
+    const auto compiled = render(true);
+    // Find the object's screen extent from the picture itself: columns whose red or blue beat green.
+    long redDominant = 0;
+    long blueDominant = 0;
+    long greenGlow = 0;
+    for (std::uint32_t y = 0; y < compiled.height; ++y) {
+        for (std::uint32_t x = 0; x < compiled.width; ++x) {
+            const auto* px = compiled.pixel(x, y);
+            redDominant += (px[0] > px[2] + 20 && px[0] > px[1] + 20) ? 1 : 0;
+            blueDominant += (px[2] > px[0] + 20 && px[2] > px[1] + 20) ? 1 : 0;
+            greenGlow += (px[1] > px[0] + 60 && px[1] > px[2] + 60) ? 1 : 0;
+        }
+    }
+    INFO("red " << redDominant << ", blue " << blueDominant << ", green glow " << greenGlow);
+    CHECK(redDominant > 200);
+    CHECK(blueDominant > 200);
+    CHECK(greenGlow > 30);
+    // Left half redder than the right, right bluer than the left.
+    const auto l = sums(compiled, 0, compiled.width / 2, 0, compiled.height);
+    const auto r = sums(compiled, compiled.width / 2, compiled.width, 0, compiled.height);
+    CHECK(l.x > r.x);
+    CHECK(r.z > l.z);
+    // The interpreter shades every hit as surface 0 (documented): no blue-dominant pixels.
+    const auto interpreted = render(false);
+    long blueInterp = 0;
+    for (std::uint32_t y = 0; y < interpreted.height; ++y) {
+        for (std::uint32_t x = 0; x < interpreted.width; ++x) {
+            const auto* px = interpreted.pixel(x, y);
+            blueInterp += (px[2] > px[0] + 20 && px[2] > px[1] + 20) ? 1 : 0;
+        }
+    }
+    CHECK(blueInterp < blueDominant / 10);
     CHECK(ctx->errorCount() == 0);
 }
 

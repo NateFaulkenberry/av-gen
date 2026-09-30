@@ -40,6 +40,7 @@ struct SdfObjectUniforms {
     look1: vec4<f32>,       // edge colour rgb, max distance (0 = the bounds only)
     look2: vec4<f32>,       // shadow strength, shadow softness k, shadow steps, 1 = collect step statistics
     look3: vec4<f32>,       // shadow direction (world, towards the light)
+    surfaces: vec4<u32>,    // ADR-1044: x = surface records after the node offset, y = their count
 };
 
 // ADR-1002: step statistics, accumulated by the lit pass on every 4th pixel in x and y.
@@ -60,6 +61,10 @@ struct SdfStepStats {
 // @@SDF_FIELD_BEGIN@@
 fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     return sdfEvaluate(offset, count, p, t, world);
+}
+// ADR-1044: the surface id at p (a compiled tree replaces this; the interpreter shades surface 0).
+fn sdfSurface(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> u32 {
+    return 0u;
 }
 // @@SDF_FIELD_END@@
 
@@ -291,7 +296,16 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     let screenUv = vec2<f32>(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
     var out: SdfFragmentOut;
     // The local hit point is the ADR-030 `localPosition` material input.
-    var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
+    // ADR-1044: the hit's surface multiplies the material's base colour and emission.
+    var colorMul = vec3<f32>(1.0);
+    var emissiveMul = vec3<f32>(1.0);
+    if (sdf.surfaces.y > 0u) {
+        let id = min(sdfSurface(offset, count, pL, time, object.model), sdf.surfaces.y - 1u);
+        let rec = sdfNodes[offset + sdf.surfaces.x + id];
+        colorMul = rec.p0.xyz;
+        emissiveMul = rec.p1.xyz;
+    }
+    var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, colorMul, emissiveMul,
                               materialInstanceZero(pL), screenUv);
     // ADR-1002: the field's own occlusion, soft shadow and edge emission. A cheap version: occlusion and
     // shadow scale the whole shaded colour (lighting, the material's emission and the fog alike); the

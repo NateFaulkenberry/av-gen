@@ -328,7 +328,13 @@ fn sdfWarpNoise(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {
     let x = p * n.p5.x + n.p3.xyz;
     let w = vec3<f32>(valueNoise(x, n.seed), valueNoise(x + vec3<f32>(31.7), n.seed),
                       valueNoise(x + vec3<f32>(67.3), n.seed));
-    return p + n.p2.w * n.p1.xyz * (w * 2.0 - 1.0);
+    var fade = 1.0;
+    if (n.p0.w > 0.0) {
+        let along = abs(dot(p, sdfSafeNormalize(n.p2.xyz)));
+        let f = clamp((n.p0.w - along) / max(n.p0.z, 1e-4), 0.0, 1.0);
+        fade = f * f * (3.0 - 2.0 * f);
+    }
+    return p + n.p2.w * fade * n.p1.xyz * (w * 2.0 - 1.0);
 }
 
 fn sdfWarp(n: SdfNodeGpu, p: vec3<f32>) -> vec3<f32> {

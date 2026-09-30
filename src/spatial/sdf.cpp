@@ -100,6 +100,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -513,7 +514,15 @@ glm::vec3 warpPoint(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
         const glm::vec3 x = p * n.frequency + n.translation;
         const glm::vec3 w(noise::valueNoise(x, n.seed), noise::valueNoise(x + glm::vec3(31.7f), n.seed),
                           noise::valueNoise(x + glm::vec3(67.3f), n.seed));
-        return p + n.amount * n.size * (w * 2.0f - 1.0f);
+        // The window (offset > 0): the warp fades to zero over `rounding` metres before the planes
+        // dot(p, axis) = +-offset -- a screw's seams, where two cells' warps would otherwise disagree.
+        float fade = 1.0f;
+        if (n.offset > 0.0f) {
+            const float along = std::fabs(glm::dot(p, safeNormalize(n.axis)));
+            const float f = glm::clamp((n.offset - along) / std::max(n.rounding, 1e-4f), 0.0f, 1.0f);
+            fade = f * f * (3.0f - 2.0f * f);
+        }
+        return p + n.amount * fade * n.size * (w * 2.0f - 1.0f);
     }
     default:
         return p; // Recurse: level 0 is the node's own point; recurseStep makes the next levels
@@ -660,6 +669,9 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     }
     if (n.kind == SdfNodeKind::Scale && !(n.scale > 0.0f)) {
         return fail("sdf node 'scale': scale must be > 0");
+    }
+    if (n.material < -1 || n.material >= kMaxSdfSurfaces) {
+        return fail("sdf node '{}': material must be -1 (inherit) or 0..{}", label, kMaxSdfSurfaces - 1);
     }
     if (n.kind == SdfNodeKind::Shell && !(n.offset >= 0.0f)) {
         return fail("sdf node 'shell': offset (the wall thickness) must be >= 0");
@@ -841,6 +853,7 @@ void hashNode(StructHash& h, const SdfNode& n) {
     h.i32(n.count);
     h.u32(n.seed);
     h.str(n.reference);
+    h.i32(n.material);
     h.u32(static_cast<std::uint32_t>(n.children.size()));
     for (const SdfNode& child : n.children) {
         hashNode(h, child);
@@ -1121,6 +1134,9 @@ json SdfNode::toJson() const {
     if (reference != def.reference) {
         j["reference"] = reference;
     }
+    if (material != def.material) {
+        j["material"] = material; // ADR-1044
+    }
     if (!children.empty()) {
         json arr = json::array();
         for (const SdfNode& child : children) {
@@ -1168,6 +1184,7 @@ Result<SdfNode> SdfNode::fromJson(const json& j, int depth) {
     AVGEN_SDF_READ(n.count, "count", readInt);
     AVGEN_SDF_READ(n.seed, "seed", readU32);
     AVGEN_SDF_READ(n.reference, "reference", readString);
+    AVGEN_SDF_READ(n.material, "material", readInt); // ADR-1044
     if (j.contains("children")) {
         const json& arr = j.at("children");
         if (!arr.is_array()) {
@@ -1400,8 +1417,26 @@ namespace {
 
 class WgslEmitter {
 public:
-    WgslEmitter(std::vector<SdfNodeGpu>& table, const FieldSet* fields, bool emitSource)
-        : table_(table), fields_(fields), emit_(emitSource) {}
+    WgslEmitter(std::vector<SdfNodeGpu>& table, const FieldSet* fields, bool emitSource, bool ids = false)
+        : table_(table), fields_(fields), emit_(emitSource), ids_(ids) {}
+
+    // ADR-1044 (ids mode): the surface id variable of the distance variable `d` ("0u" when none).
+    [[nodiscard]] std::string idOf(const std::string& d) const {
+        const auto it = idOf_.find(d);
+        return it == idOf_.end() ? std::string("0u") : it->second;
+    }
+
+    // ADR-1044: node() with the surface-id bookkeeping: a node's own `material` overrides whatever its
+    // subtree chose.
+    std::string node(const SdfNode* n, const std::string& p, int indent) {
+        const std::string v = nodeImpl(n, p, indent);
+        if (ids_ && n != nullptr && n->material >= 0) {
+            const std::string m = fresh("m");
+            line(indent, "let " + m + " = " + std::to_string(n->material) + "u;");
+            idOf_[v] = m;
+        }
+        return v;
+    }
 
     // Emits the statements computing `node`'s distance at point expression `p`; returns the name of
     // the variable holding it. nullptr = the far value. Every call is kind-specialised (the exact
@@ -1409,7 +1444,7 @@ public:
     // the code its tree uses: a generic sdfPrimitive/sdfWarp/sdfFinishUnary per node inlines every
     // kind's body (fbm and voronoi included) at every node, which took Metal's compiler over ten
     // minutes and 2.9 GB on the example's 54-node tree.
-    std::string node(const SdfNode* n, const std::string& p, int indent) {
+    std::string nodeImpl(const SdfNode* n, const std::string& p, int indent) {
         const std::string v = fresh("d");
         if (n == nullptr) {
             line(indent, "let " + v + " = SDF_FAR;");
@@ -1467,8 +1502,30 @@ public:
             }
             const std::string first = node(kids[0], p, indent);
             line(indent, "var " + v + " = " + first + ";");
+            std::string mv;
+            if (ids_) {
+                mv = fresh("m");
+                line(indent, "var " + mv + " = " + idOf(first) + ";");
+                idOf_[v] = mv;
+            }
             for (std::size_t i = 1; i < kids.size(); ++i) {
                 const std::string c = node(kids[i], p, indent);
+                if (ids_) {
+                    // The surface is the child that makes the combined surface: the nearer for a union, the
+                    // farther for an intersection; a difference keeps its first child's (a cut's faces are
+                    // the solid's reveals).
+                    switch (n->kind) {
+                    case SdfNodeKind::Union:
+                    case SdfNodeKind::SmoothUnion:
+                        line(indent, "if (" + c + " < " + v + ") { " + mv + " = " + idOf(c) + "; }");
+                        break;
+                    case SdfNodeKind::Intersection:
+                    case SdfNodeKind::SmoothIntersection:
+                        line(indent, "if (" + c + " > " + v + ") { " + mv + " = " + idOf(c) + "; }");
+                        break;
+                    default: break;
+                    }
+                }
                 std::string op;
                 switch (n->kind) {
                 case SdfNodeKind::Union: op = "min(" + v + ", " + c + ")"; break;
@@ -1528,6 +1585,10 @@ public:
             line(indent, "let " + q + " = " + warp + ";");
         }
         const std::string c = node(child, q, indent);
+        if (ids_) {
+            idOf_[v] = idOf(c);
+            idOf_[c] = idOf(c);
+        }
         switch (n->kind) {
         case SdfNodeKind::Scale: return let(indent, v, c + " * " + r + ".p1.w");
         case SdfNodeKind::Screw: return let(indent, v, "sdfFinishScrew(" + r + ", " + c + ", " + p + ")");
@@ -1567,6 +1628,8 @@ private:
     std::vector<SdfNodeGpu>& table_;
     const FieldSet* fields_;
     bool emit_;
+    bool ids_ = false;
+    std::map<std::string, std::string> idOf_;
     std::string out_;
     int next_ = 0;
 };
@@ -1574,6 +1637,7 @@ private:
 void hashStructure(StructHash& h, const SdfNode& n) {
     h.u32(static_cast<std::uint32_t>(n.kind));
     h.boolean(n.enabled);
+    h.i32(n.material); // ADR-1044: compiled into sdfSurface as a constant
     h.u32(static_cast<std::uint32_t>(n.children.size()));
     for (const SdfNode& child : n.children) {
         hashStructure(h, child);
@@ -1590,6 +1654,13 @@ std::string sdfCompileWgsl(const SdfTree& tree, std::vector<SdfNodeGpu>& table, 
                       "fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {\n";
     src += e.source();
     src += "    return " + result + ";\n}\n";
+    // ADR-1044: the same tree again, tracking which surface makes the field at p (read once per hit).
+    std::vector<SdfNodeGpu> scratch;
+    WgslEmitter ids(scratch, fields, true, true);
+    const std::string idResult = ids.node(effective(tree.root), "p", 1);
+    src += "fn sdfSurface(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> u32 {\n";
+    src += ids.source();
+    src += "    return " + ids.idOf(idResult) + ";\n}\n";
     return src;
 }
 

@@ -28,6 +28,7 @@ members are ignored (a Scale node's `translation` does nothing). Every node has 
 | `torus` | radius (major), rounding (minor) | `q = (|p.xz| - radius, p.y); |q| - rounding` |
 | `plane` | axis, offset | `dot(p, normalize(axis)) - offset` (a zero axis is rejected by `validate`) |
 | `cone` | radius, height | apex at `+height/2`, base of `radius` at `-height/2`; Quilez `sdCone` with `w = (|p.xz|, p.y - height/2)`, `q = (radius, -height)`: `a = w - q clamp(dot(w,q)/dot(q,q), 0, 1)`, `b = w - q (clamp(w.x/q.x, 0, 1), 1)`, `k = sign(q.y)`, `d = min(dot(a,a), dot(b,b))`, `s = max(k (w.x q.y - w.y q.x), k (w.y - q.y))`, result `sqrt(d) sign(s)` |
+| `stairs` (ADR-1040) | size = (run, rise, half width), count (steps >= 1), height (underside thickness; 0 = solid to y = 0) | a flight climbing +X from x = 0: the signed distance to the infinite zig-zag of risers and treads (three steps about the point's diagonal coordinate `u = (x run + y rise)/(run^2 + rise^2)`), inside when `y < rise (floor(x/run) + 1)`; `max` with `max(-x, x - count run)` and the underside (`-y`, or the sloped plane `(slope x - y - height)/sqrt(1 + slope^2)`); extruded by `|z| - size.z`. Exact at treads and risers, a bound elsewhere |
 
 ### Combinations (1..8 children, folded in order)
 
@@ -60,6 +61,9 @@ A combination with no enabled children evaluates to `1e9` ("far").
 | `mirror` | size (mask: > 0 mirrors that axis) | `q_i = |p_i|` on masked axes | unchanged |
 | `fold` (ADR-1001) | axis (plane normal, normalised), offset | `q = p - 2 min(dot(p, n) - offset, 0) n`: the half-space behind the plane is reflected in front | unchanged (exact while the content does not cross the plane) |
 | `recurse` (ADR-1001) | count (levels after the first, 0..8), scale (> 0), translation, rotation, size (fold mask) | level 0 is `p`; `p_{l+1} = conj(R) fold(p_l) scale - translation`, `fold` = `|p_i|` where `size_i > 0` | `min_l child(p_l) / scale^l`: a bound (folds, rotations and uniform scale preserve distance) |
+| `screw` (ADR-1040) | translation, count, offset (seam guard) | count 0: `k = rnd(p.T/|T|^2)`, `q = p - k T`. count n: `sector = 2 pi/n`, `a = atan2(p.z, p.x)` (0 at r = 0), `k0 = rnd(a/sector)`, winding `w = rnd((p.y - k0 T.y)/(n T.y))`, `q = (cos(a - k0 sector) r, p.y - (k0 + n w) T.y, sin(a - k0 sector) r)` | unchanged, then with `offset` > 0 `min(d, boundary + offset)`, boundary = distance to the cell's slab faces (or sector sides and winding) |
+| `warp` (ADR-1040) | amount, frequency, size (per-axis gain), translation (phase), seed | `x = p frequency + translation`; `q = p + amount size (vec3(valueNoise(x), valueNoise(x + 31.7), valueNoise(x + 67.3)) 2 - 1)` | unchanged: a bound (Lipschitz about `1 + 2 amount frequency`); relax `stepScale` |
+| `shell` (ADR-1040) | offset (wall thickness) | `p` | `|child| - offset/2` (exact onion) |
 
 Twist and bend distort distances; ray marchers must under-step (a relaxation factor) or accept
 artefacts. The under-step needed grows with `amount` times the structure's extent along the warped

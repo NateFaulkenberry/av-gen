@@ -1767,8 +1767,9 @@ private:
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
     // Camera mode 3 (the journey, ADR-1042): walks the periodic path of `journeySetting_` through a
     // world repeated by the same screw, at camera/journey/distance metres, wrapping invisibly.
-    std::optional<JourneySettings> journeySetting_;
-    std::optional<JourneyPath> journeyPath_;
+    std::optional<Journey> journey_; // one or more chapters
+    // The camera's global journey distance this frame (0 without a journey).
+    [[nodiscard]] double journeyCameraDistance() const;
     params::Parameter<float>* journeyDistance_ = nullptr;
     params::Parameter<float>* journeyLookAhead_ = nullptr;
     params::Parameter<float>* journeyHeight_ = nullptr;
@@ -1781,7 +1782,7 @@ private:
     params::Parameter<float>* journeyRadius_ = nullptr;
     // The eye pushed out of the named SDF by the collision guard (ADR-1042); a pure function of the
     // frame's live tree, so seek-exact.
-    [[nodiscard]] JourneyPose guardJourneyPose(JourneyPose pose) const;
+    [[nodiscard]] JourneyPose guardJourneyPose(JourneyPose pose, std::size_t chapter) const;
     // Camera shake (ADR-098): a camera-space offset, in every camera mode. `start` is the second
     // the impulse began -- a parameter and not a timer, which is what keeps a decaying shake a pure
     // function of the playhead. See scene::CameraShake.

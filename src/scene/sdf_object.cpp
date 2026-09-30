@@ -275,7 +275,7 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
         out = {F::Offset};
         break;
     case SdfNodeKind::Warp: // ADR-1040: size = per-axis gain, translation = the phase
-        out = {F::Amount, F::Frequency, F::Size, F::Translation};
+        out = {F::Amount, F::Frequency, F::Size, F::Translation, F::Axis, F::Offset, F::Rounding};
         break;
     }
     out.push_back(F::Enabled);
@@ -529,6 +529,13 @@ json SdfObject::toJson() const {
     j["depthPrepass"] = depthPrepass;
     j["castShadows"] = castShadows;
     j["compile"] = compile;
+    if (!surfaces.empty()) { // ADR-1044
+        json arr = json::array();
+        for (const Surface& s : surfaces) {
+            arr.push_back(json{{"color", vecToJson(s.color)}, {"emission", vecToJson(s.emission)}});
+        }
+        j["surfaces"] = std::move(arr);
+    }
     j["look"] = json{{"aoStrength", look.aoStrength},         {"aoDistance", look.aoDistance},
                      {"edgeIntensity", look.edgeIntensity},   {"edgeWidth", look.edgeWidth},
                      {"edgeColor", vecToJson(look.edgeColor)}, {"shadowStrength", look.shadowStrength},
@@ -602,6 +609,25 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
     AVGEN_SDF_READ(o.depthPrepass, "depthPrepass", readBool);
     AVGEN_SDF_READ(o.castShadows, "castShadows", readBool);
     AVGEN_SDF_READ(o.compile, "compile", readBool);
+    if (j.contains("surfaces")) { // ADR-1044
+        const json& arr = j.at("surfaces");
+        if (!arr.is_array() || arr.size() > static_cast<std::size_t>(spatial::kMaxSdfSurfaces)) {
+            return fail("'surfaces' must be an array of at most {} {{color, emission}}", spatial::kMaxSdfSurfaces);
+        }
+        for (const json& sj : arr) {
+            if (!sj.is_object()) {
+                return fail("every surface must be an object {{color, emission}}");
+            }
+            Surface s;
+            auto c = readVec3(sj, "color", s.color);
+            if (!c) return std::unexpected(c.error());
+            auto e = readVec3(sj, "emission", s.emission);
+            if (!e) return std::unexpected(e.error());
+            s.color = *c;
+            s.emission = *e;
+            o.surfaces.push_back(s);
+        }
+    }
     if (j.contains("look")) {
         const json& lj = j.at("look");
         if (!lj.is_object()) {
@@ -662,6 +688,11 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.v3("bounds/max", "bounds/max", rest.boundsMax, -1e4f, 1e4f, -20.0f, 20.0f);
     r.i("resolution", rest.resolution, 2, 256, 8, 128);
     // ADR-1002: the march and the look, so a route, a state or the timeline can tune them.
+    for (std::size_t k = 0; k < rest.surfaces.size(); ++k) { // ADR-1044
+        const std::string base = "surface/" + std::to_string(k) + "/";
+        r.v3(base + "color", base + "color", rest.surfaces[k].color, 0.0f, 100.0f, 0.0f, 1.0f, true);
+        r.v3(base + "emission", base + "emission", rest.surfaces[k].emission, 0.0f, 1000.0f, 0.0f, 10.0f, true);
+    }
     r.i("march/maxSteps", rest.maxSteps, 1, 1024, 16, 512);
     r.f("march/epsilon", "march/epsilon", rest.epsilon, 1e-6f, 0.1f, 1e-4f, 0.01f);
     r.f("march/stepScale", "march/stepScale", rest.stepScale, 0.1f, 1.0f, 0.3f, 1.0f);
@@ -769,6 +800,10 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("bounds/min", live.boundsMin);
     index.copy("bounds/max", live.boundsMax);
     index.copy("resolution", live.resolution);
+    for (std::size_t k = 0; k < live.surfaces.size(); ++k) { // ADR-1044
+        index.copy("surface/" + std::to_string(k) + "/color", live.surfaces[k].color);
+        index.copy("surface/" + std::to_string(k) + "/emission", live.surfaces[k].emission);
+    }
     index.copy("march/maxSteps", live.maxSteps);
     index.copy("march/epsilon", live.epsilon);
     index.copy("march/stepScale", live.stepScale);

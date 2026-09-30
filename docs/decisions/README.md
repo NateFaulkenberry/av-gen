@@ -38,6 +38,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 990-999 | gv3/art-pass -- the GV3 targeted art pass (980-989 exhausted) |
 | 1000-1019 | proto/procedural-space |
 | 1020-1039 | proto/sonic-garden |
+| 1040-1059 | proto/liminal-space |
 | 701+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -615,3 +616,7 @@ confirm the citation you are about to change is your own.
 | [1022](ADR-1022-the-procedural-sky-rebuilds-past-a-tolerance.md) | The procedural sky rebuilds past a tolerance (1/128 relative per colour and scalar, 0.25 mrad on the sun, against the sky that was built; routed skies stop rebuilding the IBL chain every frame) | Accepted |
 | [1023](ADR-1023-a-program-that-shapes-the-materials-emission-keeps-its-routes-live.md) | A program that shapes the material's own emission keeps the routes into it live (`program-owns-emission` fires only when the emission does not read `materialEmission`) | Accepted |
 | [1024](ADR-1024-live-antialiasing-is-a-floor-and-the-adaptive-floor-is-a-setting.md) | Live antialiasing is a floor on the scene's FXAA (`QualitySettings::antialiasFloor`, 0 at every tier and required 0 offline; the live editor sets 0.75 from Settings) and the adaptive render scale's floor is a per-machine setting (the live jaggies were the 0.5 floor, not a missing algorithm) | Accepted |
+| [1040](ADR-1040-liminal-vocabulary-stairs-screw-warp-shell.md) | The liminal vocabulary: stairs, screw, warp and shell SDF nodes (a stair primitive; a screw repeat by a translation or a helix with a seam guard whose margin must exceed epsilon x maxDistance; a vector-noise domain warp with per-axis gain and a phase parameter; an exact shell. A morph between two rooms drew moire; grow a room by keying its box. proto/liminal-space) | Accepted |
+| [1041](ADR-1041-spring-and-integrate-chain-stages.md) | Spring and integrate route-chain stages (a second-order C1 follower and a rate-to-position integrator at the end of the chain, their state in the chain state so ADR-901 replays them; never put a depth on an integrating route. proto/liminal-space) | Accepted |
+| [1042](ADR-1042-the-journey-camera.md) | The journey camera (mode 3: a periodic centripetal Catmull-Rom path through a screw-repeated world, wrapped invisibly after S^n is a translation, distance/look/bob/sway parameters, an SDF collision guard, nodes that ride the journey. proto/liminal-space) | Accepted |
+| [1043](ADR-1043-the-project-palette.md) | The project palette (named states blended in OKLab, position/saturation/value parameters, bindings written after the timeline and routes. proto/liminal-space) | Accepted |

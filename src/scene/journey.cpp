@@ -3,6 +3,7 @@
 #include "core/noise.hpp"
 
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -251,6 +252,179 @@ JourneyPose journeyPose(const JourneyPath& path, const JourneyView& view) {
     const glm::vec3 look(std::cos(elevation) * heading.x, std::sin(elevation), std::cos(elevation) * heading.y);
     pose.target = pose.eye + look * std::max(view.lookAhead, 1.0f);
     return pose;
+}
+
+// ---- chapters ------------------------------------------------------------------------------------
+
+glm::vec3 JourneyChapter::toWorldPoint(const glm::vec3& p) const {
+    return toWorldDirection(p) + offset;
+}
+
+glm::vec3 JourneyChapter::toWorldDirection(const glm::vec3& d) const {
+    if (yawDegrees == 0.0f) {
+        return d;
+    }
+    return glm::angleAxis(glm::radians(yawDegrees), glm::vec3(0.0f, 1.0f, 0.0f)) * d;
+}
+
+namespace {
+
+Result<JourneyChapter> chapterFromJson(const nlohmann::json& j) {
+    auto world = JourneySettings::fromJson(j);
+    if (!world) {
+        return std::unexpected(world.error());
+    }
+    JourneyChapter c;
+    c.world = std::move(*world);
+    c.name = j.value("name", std::string{});
+    if (j.contains("start") && !j["start"].is_number()) {
+        return fail("journey chapter '{}': 'start' must be a number", c.name);
+    }
+    c.start = j.value("start", 0.0);
+    c.from = j.value("from", 0.0);
+    if (j.contains("offset")) {
+        const auto& o = j["offset"];
+        if (!o.is_array() || o.size() != 3 || !o[0].is_number() || !o[1].is_number() || !o[2].is_number()) {
+            return fail("journey chapter '{}': 'offset' must be [x, y, z]", c.name);
+        }
+        c.offset = glm::vec3(o[0].get<float>(), o[1].get<float>(), o[2].get<float>());
+    }
+    c.yawDegrees = j.value("yaw", 0.0f);
+    for (const char* key : {"nodes", "lights"}) {
+        if (!j.contains(key)) {
+            continue;
+        }
+        if (!j[key].is_array()) {
+            return fail("journey chapter '{}': '{}' must be an array of names", c.name, key);
+        }
+        for (const auto& n : j[key]) {
+            if (!n.is_string()) {
+                return fail("journey chapter '{}': '{}' must be an array of names", c.name, key);
+            }
+            (std::string(key) == "nodes" ? c.nodes : c.lights).push_back(n.get<std::string>());
+        }
+    }
+    return c;
+}
+
+} // namespace
+
+Result<Journey> Journey::fromJson(const nlohmann::json& j) {
+    if (!j.is_object()) {
+        return fail("journey: must be an object");
+    }
+    Journey out;
+    if (j.contains("chapters")) {
+        if (!j["chapters"].is_array() || j["chapters"].empty()) {
+            return fail("journey: 'chapters' must be a non-empty array");
+        }
+        for (const auto& cj : j["chapters"]) {
+            auto c = chapterFromJson(cj);
+            if (!c) {
+                return std::unexpected(c.error());
+            }
+            out.chapters_.push_back(std::move(*c));
+        }
+        std::stable_sort(out.chapters_.begin(), out.chapters_.end(),
+                         [](const JourneyChapter& a, const JourneyChapter& b) { return a.start < b.start; });
+    } else {
+        auto c = chapterFromJson(j);
+        if (!c) {
+            return std::unexpected(c.error());
+        }
+        out.chapters_.push_back(std::move(*c));
+        out.singleForm_ = true;
+    }
+    for (const JourneyChapter& c : out.chapters_) {
+        auto path = JourneyPath::build(c.world);
+        if (!path) {
+            return fail("journey chapter '{}': {}", c.name, path.error().message);
+        }
+        out.paths_.push_back(std::move(*path));
+    }
+    return out;
+}
+
+nlohmann::json Journey::toJson() const {
+    const auto chapterJson = [](const JourneyChapter& c) {
+        nlohmann::json j = c.world.toJson();
+        if (!c.name.empty()) {
+            j["name"] = c.name;
+        }
+        j["start"] = c.start;
+        j["from"] = c.from;
+        j["offset"] = {c.offset.x, c.offset.y, c.offset.z};
+        j["yaw"] = c.yawDegrees;
+        if (!c.nodes.empty()) {
+            j["nodes"] = c.nodes;
+        }
+        if (!c.lights.empty()) {
+            j["lights"] = c.lights;
+        }
+        return j;
+    };
+    if (singleForm_ && chapters_.size() == 1) {
+        return chapters_[0].world.toJson();
+    }
+    nlohmann::json arr = nlohmann::json::array();
+    for (const JourneyChapter& c : chapters_) {
+        arr.push_back(chapterJson(c));
+    }
+    return nlohmann::json{{"chapters", std::move(arr)}};
+}
+
+std::size_t Journey::chapterAt(double distance) const {
+    std::size_t c = 0;
+    for (std::size_t i = 1; i < chapters_.size(); ++i) {
+        if (distance >= chapters_[i].start) {
+            c = i;
+        }
+    }
+    return c;
+}
+
+JourneyPose Journey::pose(JourneyView view) const {
+    const std::size_t c = chapterAt(view.distance);
+    const JourneyChapter& ch = chapters_[c];
+    view.distance = localDistance(c, view.distance);
+    JourneyPose p = journeyPose(paths_[c], view);
+    p.eye = ch.toWorldPoint(p.eye);
+    p.target = ch.toWorldPoint(p.target);
+    return p;
+}
+
+JourneySample Journey::anchor(double distance, double camera) const {
+    const std::size_t c = chapterAt(distance);
+    const JourneyChapter& ch = chapters_[c];
+    const double local = localDistance(c, distance);
+    const double reference = chapterAt(camera) == c ? localDistance(c, camera) : local;
+    JourneySample s = paths_[c].sampleWrapped(local, reference);
+    s.position = ch.toWorldPoint(s.position);
+    s.tangent = ch.toWorldDirection(s.tangent);
+    return s;
+}
+
+bool Journey::nodeActive(const std::string& name, double camera) const {
+    const std::size_t active = chapterAt(camera);
+    for (std::size_t i = 0; i < chapters_.size(); ++i) {
+        if (i != active && std::find(chapters_[i].nodes.begin(), chapters_[i].nodes.end(), name) != chapters_[i].nodes.end()) {
+            // Listed by an inactive chapter: hidden, unless the active chapter lists it too.
+            return std::find(chapters_[active].nodes.begin(), chapters_[active].nodes.end(), name) !=
+                   chapters_[active].nodes.end();
+        }
+    }
+    return true;
+}
+
+bool Journey::lightActive(const std::string& id, double camera) const {
+    const std::size_t active = chapterAt(camera);
+    for (std::size_t i = 0; i < chapters_.size(); ++i) {
+        if (i != active && std::find(chapters_[i].lights.begin(), chapters_[i].lights.end(), id) != chapters_[i].lights.end()) {
+            return std::find(chapters_[active].lights.begin(), chapters_[active].lights.end(), id) !=
+                   chapters_[active].lights.end();
+        }
+    }
+    return true;
 }
 
 } // namespace avgen::scene

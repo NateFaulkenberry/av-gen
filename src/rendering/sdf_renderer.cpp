@@ -646,6 +646,18 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 }
             }
             SdfObjectUniforms u{};
+            // ADR-1044: a compiled object's surfaces ride after its node records (p0 = colour, p1 = emission).
+            if (compiled != nullptr && !object.surfaces.empty()) {
+                u.surfaces = glm::uvec4(static_cast<std::uint32_t>(im.packScratch.size()),
+                                        static_cast<std::uint32_t>(object.surfaces.size()), 0u, 0u);
+                for (const scene::SdfObject::Surface& s : object.surfaces) {
+                    spatial::SdfNodeGpu rec{};
+                    rec.fieldSlot = -1;
+                    rec.p0 = glm::vec4(s.color, 0.0f);
+                    rec.p1 = glm::vec4(s.emission, 0.0f);
+                    im.packScratch.push_back(rec);
+                }
+            }
             u.worldToLocal = glm::inverse(obj.model);
             u.boundsMin = glm::vec4(object.boundsMin, 0.0f);
             u.boundsMax = glm::vec4(object.boundsMax, 0.0f);

@@ -6,63 +6,132 @@
   "mode": 3,
   "fov": 62.0,
   "journey": {
-   "path": [
-    [
-     -15.0,
-     0.0,
-     0.0
-    ],
-    [
-     -9.0,
-     0.0,
-     0.25
-    ],
-    [
-     -5.0,
-     0.0,
-     0.0
-    ],
-    [
-     -1.5,
-     0.0,
-     0.0
-    ],
-    [
-     1.0,
-     0.0,
-     -1.6
-    ],
-    [
-     2.6,
-     0.0,
-     -0.2
-    ],
-    [
-     7.0,
-     1.5,
-     0.0
-    ],
-    [
-     11.6,
-     3.0,
-     0.0
-    ],
-    [
-     13.4,
-     3.0,
-     0.0
-    ]
-   ],
-   "screw": {
-    "translation": [
-     30.0,
-     3.0,
-     0.0
-    ],
-    "count": 0
-   },
-   "collide": "world",
-   "radius": 0.35
+   "chapters": [
+    {
+     "name": "climb",
+     "start": 0.0,
+     "from": 0.0,
+     "path": [
+      [
+       -15.0,
+       0.0,
+       0.0
+      ],
+      [
+       -9.0,
+       0.0,
+       0.25
+      ],
+      [
+       -5.0,
+       0.0,
+       0.0
+      ],
+      [
+       -1.5,
+       0.0,
+       0.0
+      ],
+      [
+       1.0,
+       0.0,
+       -1.6
+      ],
+      [
+       2.6,
+       0.0,
+       -0.2
+      ],
+      [
+       7.0,
+       1.5,
+       0.0
+      ],
+      [
+       11.6,
+       3.0,
+       0.0
+      ],
+      [
+       13.4,
+       3.0,
+       0.0
+      ]
+     ],
+     "screw": {
+      "translation": [
+       30.0,
+       3.0,
+       0.0
+      ],
+      "count": 0
+     },
+     "collide": "world",
+     "radius": 0.35,
+     "nodes": [
+      "world",
+      "figure"
+     ],
+     "lights": [
+      "roomLamp0",
+      "hallLamp0",
+      "roomLamp1",
+      "hallLamp1",
+      "roomLamp2",
+      "hallLamp2",
+      "roomLamp3",
+      "hallLamp3",
+      "roomLamp4",
+      "hallLamp4"
+     ]
+    },
+    {
+     "name": "penrose",
+     "start": 40.0,
+     "from": 0.0,
+     "path": [
+      [
+       4.0,
+       0.0,
+       -4.0
+      ],
+      [
+       4.0,
+       0.1,
+       -2.8
+      ],
+      [
+       4.0,
+       1.2,
+       0.0
+      ],
+      [
+       4.0,
+       2.3,
+       2.8
+      ]
+     ],
+     "screw": {
+      "translation": [
+       0.0,
+       2.4,
+       0.0
+      ],
+      "count": 4
+     },
+     "collide": "stairwell",
+     "radius": 0.35,
+     "offset": [
+      0.0,
+      0.0,
+      400.0
+     ],
+     "yaw": 0.0,
+     "nodes": [
+      "stairwell"
+     ]
+    }
+   ]
   }
  },
  "environment": {
@@ -122,35 +191,59 @@
             "kind": "difference",
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               -9.15,
-               1.6,
-               0.0
-              ],
+              "kind": "union",
               "children": [
                {
-                "kind": "shell",
-                "offset": 0.3,
+                "kind": "translate",
+                "translation": [
+                 -9.4,
+                 1.6,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "shell",
+                  "offset": 0.3,
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     6.25,
+                     1.75,
+                     1.65
+                    ],
+                    "name": "hall"
+                   }
+                  ]
+                 }
+                ],
+                "name": "hallAt"
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -9.4,
+                 -0.008,
+                 0.0
+                ],
                 "children": [
                  {
                   "kind": "box",
                   "size": [
-                   6.0,
-                   1.75,
-                   1.65
-                  ],
-                  "name": "hall"
+                   6.1,
+                   0.012,
+                   1.5
+                  ]
                  }
-                ]
+                ],
+                "material": 1
                }
-              ],
-              "name": "hallAt"
+              ]
              },
              {
               "kind": "translate",
               "translation": [
-               -15.15,
+               -15.65,
                1.6,
                0.0
               ],
@@ -189,30 +282,145 @@
             "kind": "difference",
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               4.0,
-               4.5,
-               0.0
-              ],
+              "kind": "union",
               "children": [
                {
-                "kind": "shell",
-                "offset": 0.3,
+                "kind": "translate",
+                "translation": [
+                 14.25,
+                 4.6,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "shell",
+                  "offset": 0.3,
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     1.4,
+                     1.75,
+                     1.65
+                    ],
+                    "name": "hallNext"
+                   }
+                  ]
+                 }
+                ],
+                "name": "hallNextAt"
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 14.25,
+                 2.992,
+                 0.0
+                ],
                 "children": [
                  {
                   "kind": "box",
                   "size": [
-                   7.15,
-                   4.65,
-                   7.15
-                  ],
-                  "name": "room"
+                   1.25,
+                   0.01200000000000001,
+                   1.5
+                  ]
                  }
+                ],
+                "material": 1
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               12.85,
+               4.6,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.6500000000000004,
+                 1.6,
+                 1.5
                 ]
                }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               15.65,
+               4.6,
+               0.0
               ],
-              "name": "roomAt"
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.6500000000000004,
+                 1.6,
+                 1.5
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "difference",
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 4.0,
+                 4.5,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "shell",
+                  "offset": 0.3,
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     7.15,
+                     4.65,
+                     7.15
+                    ],
+                    "name": "room"
+                   }
+                  ]
+                 }
+                ],
+                "name": "roomAt"
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 4.0,
+                 -0.008,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   7.0,
+                   0.012,
+                   7.0
+                  ]
+                 }
+                ],
+                "material": 1
+               }
+              ]
              },
              {
               "kind": "translate",
@@ -289,12 +497,13 @@
               "height": 0.0,
               "name": "flight"
              }
-            ]
+            ],
+            "material": 2
            },
            {
             "kind": "translate",
             "translation": [
-             13.15,
+             12.15,
              2.85,
              0.0
             ],
@@ -302,17 +511,66 @@
              {
               "kind": "box",
               "size": [
-               1.8499999999999996,
+               0.8499999999999996,
                0.1499999999999999,
                1.5
               ],
               "name": "bridge"
              }
-            ]
+            ],
+            "material": 1
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -9.0,
+             3.175,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               4.0,
+               0.03499999999999992,
+               0.25
+              ],
+              "name": "hallLamp"
+             }
+            ],
+            "material": 3
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             4.0,
+             8.95,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               4.0,
+               0.05,
+               0.6
+              ],
+              "name": "roomLamp"
+             }
+            ],
+            "name": "roomLampAt",
+            "material": 3
            }
           ]
          }
         ],
+        "axis": [
+         30.0,
+         3.0,
+         0.0
+        ],
+        "offset": 15.074813431681335,
+        "rounding": 4.0,
         "name": "breath"
        }
       ],
@@ -321,16 +579,16 @@
     },
     "material": {
      "baseColor": [
-      0.55,
-      0.56,
-      0.6
+      1.0,
+      1.0,
+      1.0
      ],
      "emissiveColor": [
-      0,
-      0,
-      0
+      1.0,
+      1.0,
+      1.0
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 1.0,
      "roughness": 0.85,
      "metallic": 0.0
     },
@@ -348,7 +606,7 @@
     "look": {
      "aoStrength": 0.7,
      "aoDistance": 1.6,
-     "edgeIntensity": 0.4,
+     "edgeIntensity": 0.15,
      "edgeWidth": 0.04,
      "edgeColor": [
       0.6,
@@ -363,23 +621,83 @@
     "epsilon": 0.0012,
     "stepScale": 0.8,
     "normalEpsilon": 0.004,
-    "maxDistance": 200.0
-   }
+    "maxDistance": 200.0,
+    "surfaces": [
+     {
+      "color": [
+       0.62,
+       0.63,
+       0.66
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.45,
+       0.44,
+       0.43
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.7,
+       0.66,
+       0.6
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       6.0,
+       5.8,
+       5.4
+      ]
+     }
+    ]
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
   },
   {
-   "name": "lamps",
+   "name": "stairwell",
    "kind": "sdf",
    "sdf": {
     "tree": {
      "root": {
       "kind": "screw",
       "translation": [
-       30.0,
-       3.0,
+       0.0,
+       2.4,
        0.0
       ],
-      "count": 0,
-      "offset": 0.3,
+      "count": 4,
+      "offset": 0.16,
       "children": [
        {
         "kind": "union",
@@ -387,61 +705,130 @@
          {
           "kind": "translate",
           "translation": [
-           -9.0,
-           3.17,
+           4.0,
+           0.0,
+           -3.0
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             0.0,
+             -90.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "stairs",
+              "size": [
+               0.5,
+               0.2,
+               1.0
+              ],
+              "count": 12,
+              "height": 0.3,
+              "name": "flightB"
+             }
+            ]
+           }
+          ],
+          "material": 2
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           4.0,
+           -0.15,
+           -4.0
+          ],
+          "children": [
+           {
+            "kind": "box",
+            "size": [
+             1.0,
+             0.15,
+             1.0
+            ]
+           }
+          ],
+          "material": 1
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           4.0,
+           2.25,
+           4.0
+          ],
+          "children": [
+           {
+            "kind": "box",
+            "size": [
+             1.0,
+             0.1499999999999999,
+             1.0
+            ]
+           }
+          ],
+          "material": 1
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           5.15,
+           1.2000000000000002,
            0.0
           ],
           "children": [
            {
             "kind": "box",
             "size": [
-             4.0,
-             0.030000000000000027,
-             0.25
+             0.1499999999999999,
+             4.8,
+             5.3
             ],
-            "name": "hallLamp"
+            "name": "wallB"
            }
           ]
          },
          {
           "kind": "translate",
           "translation": [
-           4.0,
-           8.95,
-           0.0
+           5.0,
+           3.5999999999999996,
+           4.0
           ],
           "children": [
            {
             "kind": "box",
             "size": [
-             4.0,
-             0.05,
-             0.6
-            ],
-            "name": "roomLamp"
+             0.019999999999999574,
+             1.2,
+             0.5999999999999999
+            ]
            }
           ],
-          "name": "roomLampAt"
+          "material": 3
          }
         ]
        }
       ],
-      "name": "lampClimb"
+      "name": "penrose"
      }
     },
     "material": {
      "baseColor": [
-      0.0,
-      0.0,
-      0.0
+      1.0,
+      1.0,
+      1.0
      ],
      "emissiveColor": [
       1.0,
-      0.95,
-      0.85
+      1.0,
+      1.0
      ],
-     "emissiveIntensity": 6.0,
-     "roughness": 1.0,
+     "emissiveIntensity": 1.0,
+     "roughness": 0.85,
      "metallic": 0.0
     },
     "renderMode": "raymarch",
@@ -456,117 +843,77 @@
      2000.0
     ],
     "look": {
-     "aoStrength": 0.6,
-     "aoDistance": 1.5
+     "aoStrength": 0.7,
+     "aoDistance": 1.6
     },
     "castShadows": false,
     "depthPrepass": false,
     "compile": true,
     "maxSteps": 192,
     "epsilon": 0.0012,
-    "stepScale": 0.9,
+    "stepScale": 0.8,
     "normalEpsilon": 0.004,
-    "maxDistance": 200.0
-   }
-  },
-  {
-   "name": "stone0",
-   "kind": "gltf",
-   "asset": "../../assets/kenney/rock_tallB.glb",
+    "maxDistance": 120.0,
+    "surfaces": [
+     {
+      "color": [
+       0.62,
+       0.63,
+       0.66
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.45,
+       0.44,
+       0.43
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.7,
+       0.66,
+       0.6
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       6.0,
+       5.8,
+       5.4
+      ]
+     }
+    ]
+   },
    "position": [
-    -23.5,
-    -3.0,
-    -4.5
+    0.0,
+    0.0,
+    400.0
    ],
    "rotation": [
     0.0,
-    25.0,
-    0.0
-   ],
-   "scale": [
-    2.2,
-    2.2,
-    2.2
-   ]
-  },
-  {
-   "name": "stone1",
-   "kind": "gltf",
-   "asset": "../../assets/kenney/rock_tallB.glb",
-   "position": [
-    6.5,
     0.0,
-    -4.5
-   ],
-   "rotation": [
-    0.0,
-    25.0,
     0.0
-   ],
-   "scale": [
-    2.2,
-    2.2,
-    2.2
-   ]
-  },
-  {
-   "name": "stone2",
-   "kind": "gltf",
-   "asset": "../../assets/kenney/rock_tallB.glb",
-   "position": [
-    36.5,
-    3.0,
-    -4.5
-   ],
-   "rotation": [
-    0.0,
-    25.0,
-    0.0
-   ],
-   "scale": [
-    2.2,
-    2.2,
-    2.2
-   ]
-  },
-  {
-   "name": "stone3",
-   "kind": "gltf",
-   "asset": "../../assets/kenney/rock_tallB.glb",
-   "position": [
-    66.5,
-    6.0,
-    -4.5
-   ],
-   "rotation": [
-    0.0,
-    25.0,
-    0.0
-   ],
-   "scale": [
-    2.2,
-    2.2,
-    2.2
-   ]
-  },
-  {
-   "name": "stone4",
-   "kind": "gltf",
-   "asset": "../../assets/kenney/rock_tallB.glb",
-   "position": [
-    96.5,
-    9.0,
-    -4.5
-   ],
-   "rotation": [
-    0.0,
-    25.0,
-    0.0
-   ],
-   "scale": [
-    2.2,
-    2.2,
-    2.2
    ]
   },
   {
