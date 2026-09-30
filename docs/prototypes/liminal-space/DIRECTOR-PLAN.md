@@ -212,20 +212,24 @@ Four craft rules from the research (rule 8):
 
 Palette states. Hex values are sRGB starting points to be judged on screen; the engineer's palette block
 interpolates them in OKLab.
+- The same keys, the timeline of the slow voice, and each section's planned speed and coupling are data in
+  `tools/liminal/all-you-got.sections.json` (`palette_keys`, `palette_timeline`, `intent`).
+- `tools/liminal/colour_script.py` draws them as one strip over the song, at
+  `~/Desktop/av-gen-review/24-liminal-space/plan/colour-script.png`.
 
 | key | where | feeling | walls / floor | air (fog, void) | light | accent | gamut |
 |---|---|---|---|---|---|---|---|
 | **K0 Grey dawn** | intro, bars 1-17 | uncertainty, isolation | pale cool plaster `#C9CCD0` / `#9EA3A8` | pale grey-blue `#BAC2CA`, lighter than the walls | soft cool window light `#E6EAEE` | the beacon, small, low-chroma amber `#E2B06E`; the sun patch from bar 6, `#E9D2A6` | near-neutral; warm only in the beacon and the sun patch |
-| **K1 Alive** | dance, 18-25 | curiosity, awakening | warmer plaster `#D8D2CC`; single wall planes of deep rose `#C2456B` (Barragán) | depth into **deep ultramarine** `#2F3C8C` | warm shafts from high windows `#F5D9A8` | beacon `#F2A54A` | rose and ultramarine, first saturation |
+| **K1 Alive** | dance, 18-25 | curiosity, awakening | warmer plaster `#D8D2CC`; single wall planes of deep rose `#C2456B` (Barragán) | depth into **deep cobalt blue** `#3A52B8`, saturated but luminous | warm shafts from high windows `#F5D9A8` | beacon `#F2A54A` | rose and cobalt, first saturation |
 | **K2 Dusk interior** | verse 1, 26-41 | intimacy, still wandering | warm grey `#CFC3B8`; rose muted to `#A8667A` | dusk blue `#5A6B9A`, lower chroma | lamp pools `#F0B36B`, one per room | beacon | warm and cool, moderate |
 | **K3 Surrender** | "let it go", 42-48 | introspection, surrender | grey `#B9B7B8` | grey-lilac `#AAA8B0` | dim and even; the sun patch `#E9D2A6` is the only warm thing | beacon faint `#D9B58A` | almost grey |
 | **K4 Restless** | build and verse 2, 49-58 | complication | `#C8C4BF` | teal from windows `#4F8A8B` | lamp amber `#EDAE62` | rose `#B05A70` | split-complementary, more variety |
 | **K5 Again** | bridge, 59-66 | "have I been here before?" | K2 exactly (the rhyme) | K2 | K2, but the lamp pools fall from the other side | a trace of gold in the beacon | K2 |
 | **K6 Gold spreading** | "feel it grow", 67-73 | growth, possibility | warm light spreading over the walls `#E9D9B8` | warm haze `#D8D0A8` | **gold `#F7C85C` spreading out from the beacon, bar by bar** | through the far doorway only: **clear sky `#7FB8E8`, white sun `#FFF6E0`** (the withheld quality, glimpsed) | warm, widening |
 | **K7 Held** | break, 74-75 | the breath | K6 frozen, value -10 % | K6 | K6 | the far doorway glows | K6 |
-| **K8 Ember** | "is that all you", 76-83 | questioning, tension | one hue: amber-brown `#7A4A30` | amber haze `#8C4A22`, luminous, not dark | sodium amber `#FF9A3C` at regular intervals | the beacon, same hue, brighter `#FFB050` | **one hue (about 45-60°)**, the tightest mask |
-| **K9 Cracks** | "is that all?", 84-91 | the loop almost breaks | K8, lighter | K8 | K8 | **slivers of sky blue `#8CC4F0` leak through wall seams**, grow, close again (false arrivals) | K8 plus a leak |
-| **K10 Open** | final chorus, 92-99 | release, acceptance | lit warm white `#F2E8DA`, soft blue shadows `#6F8FC0` | **sky**: `#8EC5EE` to a warm horizon `#F6E7C8` | **daylight**: sun `#FFF4DC` | the rose and ultramarine planes return `#E07A8F`, `#3F5FBF`; every beacon lit | the full wheel, for the first time |
+| **K8 Ember** | "is that all you", 76-83 | questioning, tension | one hue: amber-brown `#946040` | amber haze `#B8662A`, luminous, not dark | sodium amber `#FFA54A` at regular intervals | the beacon, same hue, brighter `#FFB85A` | **one hue (about 45-60°)**, the tightest mask |
+| **K9 Cracks** | "is that all?", 84-91 | the loop almost breaks | K8, lighter `#A06A48` | K8, lighter `#C07636` | K8 | **slivers of sky blue `#8CC4F0` leak through wall seams**, grow, close again (false arrivals) | K8 plus a leak |
+| **K10 Open** | final chorus, 92-99 | release, acceptance | lit warm white `#F2E8DA`, soft blue shadows `#6F8FC0` | **sky**: `#8EC5EE` to a warm horizon `#F6E7C8` | **daylight**: sun `#FFF4DC` | the rose and cobalt planes return `#E07A8F`, `#3F5FBF`; every beacon lit | the full wheel, for the first time |
 | **K11 Clear** | call and response, 100-113 | freedom, forward movement | K10, brighter | K10, clearer (fog pushed far out) | K10; at bar 108 the brightest value in the film | K10 | full, moderate chroma: clear, not garish |
 | **K12 White** | outro, 114-116 | acceptance | toward white-gold haze `#F8F1E4` | white-gold | even light (Turrell) | none | chroma falling to about 0.3; **ends in light, not black** |
 
@@ -307,7 +311,7 @@ coupling as modulation).
 - a sparse two-bar call and response;
 - the bass pulse at bar 6 (11.01 s);
 - the riser from bar 13;
-- the "all you got" chop from 30.5 s;
+- the "all you got" chop from 28.6 s (bar 14);
 - a one-beat gap on bar 17 beat 4 (36.88 s).
 
 **What we see.**
@@ -361,7 +365,7 @@ breathing begins. A very low-frequency warp and ±1.5 % of room scale make the s
 through a slow spring (rule 9: bass is large, heavy and slow). **Colour:** K0 → K1 over the first two bars.
 **Coupling:** 0.7.
 
-**The hook.** The "all you got" chop (once a bar, 30.5-54.6 s) is a voice, so it goes to the voice's behaviour:
+**The hook.** The "all you got" chop (once a bar, 28.6-54.6 s) is a voice, so it goes to the voice's behaviour:
 **the beacon high on the far wall glows a little warmer with each "all you got"**. It is one soft swell per bar,
 the only thing in the hall that answers the hook. It makes the owner's "all you got" motif visible without a
 visual hit on every repetition.
@@ -411,7 +415,7 @@ up the loneliness that the rest of the film resolves.
 - **Bar 42 (90.28-92.48 s):** the bass and kick are out for exactly one bar under "let it go". The only real
   silence of the low end until bar 74.
 - **Bars 43-48:** the kick and bass return alone, stripped and exposed. The bright synths are gone, and "let it
-  go" repeats every half bar until about 99 s.
+  go" repeats every half bar to about 105 s, through the whole stripped groove.
 
 **What we see.**
 - **Bar 42, everything stops.** The camera has come to the top of a long stair that descends into fog, and it
@@ -618,7 +622,7 @@ harmony descending to F every four bars. "Let it go", repeated.
   - This is **unfolding, not breaking**. The planes move in order, symmetrically, and keep their relationships.
     There is no debris and nothing tumbles. The addendum asks the end to be "more coherent, less fragmented", so
     the building opens the way a map unfolds.
-  - The palette opens to the whole wheel for the first time: sky blue, white sun, the rose and ultramarine planes
+  - The palette opens to the whole wheel for the first time: sky blue, white sun, the rose and cobalt planes
     from the dance section returning, and the plaster lit warm.
 - **The climb:** a long stair goes up from the landing into the open. It began inside and ends in the air
   (Belvedere). **The camera climbs it with a clear direction**, steadily, on axis, and the fog is pushed far out to

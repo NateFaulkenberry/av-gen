@@ -1,45 +1,613 @@
 {
  "song": "All You Got (the owner's song; ~/Desktop/All You Got.wav, never committed)",
  "analyst": "space-art, 2026-09-30; see docs/prototypes/liminal-space/SONG-ANALYSIS.md",
- "grid": {"downbeat_s": 0.0, "tempo": [[1, 109.0], [76, 111.0]], "bars": 116, "meter": "4/4",
-          "note": "bar 1 starts at 0 s; bars 1-75 at 109 BPM (2.2018 s), bars 76-116 at 111 BPM (2.1622 s); from the WAV's cue markers, confirmed by the kick onsets"},
+ "grid": {
+  "downbeat_s": 0.0,
+  "tempo": [
+   [
+    1,
+    109.0
+   ],
+   [
+    76,
+    111.0
+   ]
+  ],
+  "bars": 116,
+  "meter": "4/4",
+  "note": "bar 1 starts at 0 s; bars 1-75 at 109 BPM (2.2018 s), bars 76-116 at 111 BPM (2.1622 s); from the WAV's cue markers, confirmed by the kick onsets"
+ },
  "sections": [
-  {"id": "Intro", "bar0": 1, "bar1": 17, "name": "Cinematic intro", "note": "bar 1 is silent; sparse from bar 2, bass pulse from bar 6, riser from bar 13, the 'all you got' chop from 30.5 s, a one-beat gap before bar 18"},
-  {"id": "Dance", "bar0": 18, "bar1": 25, "name": "First dance section ('all you got')"},
-  {"id": "Verse 1", "bar0": 26, "bar1": 41, "name": "Verse 1 and pre-chorus ('How little do I know' ... 'let it go')"},
-  {"id": "Let go", "bar0": 42, "bar1": 48, "name": "'Let it go' breakdown (bar 42: bass and kick out; then a stripped groove)"},
-  {"id": "Build", "bar0": 49, "bar1": 50, "name": "Synth rebuild"},
-  {"id": "Verse 2", "bar0": 51, "bar1": 58, "name": "Verse 2 ('do you wanna have fun?')"},
-  {"id": "Bridge", "bar0": 59, "bar1": 66, "name": "Bridge ('how little do I know' x4)"},
-  {"id": "Grow", "bar0": 67, "bar1": 73, "name": "'Feel it grow' (the lift to F; pivot bar 67)"},
-  {"id": "Break", "bar0": 74, "bar1": 75, "name": "Break (drums out)"},
-  {"id": "All you", "bar0": 76, "bar1": 83, "name": "'Is that all you' (111 BPM, eighth-note pulse, no sub)"},
-  {"id": "Is that all", "bar0": 84, "bar1": 91, "name": "'Is that all?' (the beat returns; the fill on bar 91 beats 3-4)"},
-  {"id": "Let go II", "bar0": 92, "bar1": 99, "name": "Final chorus ('let it go')"},
-  {"id": "For your life", "bar0": 100, "bar1": 113, "name": "Call and response ('steps in a process / for your life')"},
-  {"id": "Out", "bar0": 114, "bar1": 116, "name": "Outro"}
+  {
+   "id": "Intro",
+   "bar0": 1,
+   "bar1": 17,
+   "name": "Cinematic intro",
+   "note": "bar 1 is silent; sparse from bar 2, bass pulse from bar 6, riser from bar 13, the 'all you got' chop from 28.6 s (bar 14), a one-beat gap before bar 18",
+   "intent": {
+    "space": "A corridor, stair back to its start",
+    "speed": [
+     0.0,
+     0.8
+    ],
+    "coupling": 0.15,
+    "breathing": false,
+    "figure": false,
+    "palette": "K0"
+   }
+  },
+  {
+   "id": "Dance",
+   "bar0": 18,
+   "bar1": 25,
+   "name": "First dance section ('all you got')",
+   "intent": {
+    "space": "B great hall",
+    "speed": [
+     1.4,
+     1.7
+    ],
+    "coupling": 0.7,
+    "breathing": true,
+    "figure": true,
+    "palette": "K1"
+   }
+  },
+  {
+   "id": "Verse 1",
+   "bar0": 26,
+   "bar1": 41,
+   "name": "Verse 1 and pre-chorus ('How little do I know' ... 'let it go')",
+   "intent": {
+    "space": "C enfilade",
+    "speed": [
+     1.0,
+     1.2
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": true,
+    "palette": "K2"
+   }
+  },
+  {
+   "id": "Let go",
+   "bar0": 42,
+   "bar1": 48,
+   "name": "'Let it go' breakdown (bar 42: bass and kick out; then a stripped groove)",
+   "intent": {
+    "space": "B stairhead over the void, then down",
+    "speed": [
+     0.0,
+     0.6
+    ],
+    "coupling": 0.25,
+    "breathing": false,
+    "figure": true,
+    "palette": "K3",
+    "note": "bar 42 is total stillness (coupling 0)"
+   }
+  },
+  {
+   "id": "Build",
+   "bar0": 49,
+   "bar1": 50,
+   "name": "Synth rebuild",
+   "intent": {
+    "space": "narrow passage",
+    "speed": [
+     0.2,
+     0.6
+    ],
+    "coupling": 0.4,
+    "breathing": false,
+    "figure": false,
+    "palette": "K3>K4"
+   }
+  },
+  {
+   "id": "Verse 2",
+   "bar0": 51,
+   "bar1": 58,
+   "name": "Verse 2 ('do you wanna have fun?')",
+   "intent": {
+    "space": "D crossing stairwell",
+    "speed": [
+     1.1,
+     1.3
+    ],
+    "coupling": 0.6,
+    "breathing": true,
+    "figure": false,
+    "palette": "K4"
+   }
+  },
+  {
+   "id": "Bridge",
+   "bar0": 59,
+   "bar1": 66,
+   "name": "Bridge ('how little do I know' x4)",
+   "intent": {
+    "space": "C enfilade again, the same move",
+    "speed": [
+     1.1,
+     1.1
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": false,
+    "palette": "K5"
+   }
+  },
+  {
+   "id": "Grow",
+   "bar0": 67,
+   "bar1": 73,
+   "name": "'Feel it grow' (the lift to F; pivot bar 67)",
+   "intent": {
+    "space": "C the tiny room growing; the sky through a doorway",
+    "speed": [
+     0.9,
+     1.4
+    ],
+    "coupling": 0.6,
+    "breathing": true,
+    "figure": false,
+    "palette": "K6"
+   }
+  },
+  {
+   "id": "Break",
+   "bar0": 74,
+   "bar1": 75,
+   "name": "Break (drums out)",
+   "intent": {
+    "space": "stopped in that doorway",
+    "speed": [
+     0.0,
+     0.0
+    ],
+    "coupling": 0.0,
+    "breathing": false,
+    "figure": false,
+    "palette": "K7"
+   }
+  },
+  {
+   "id": "All you",
+   "bar0": 76,
+   "bar1": 83,
+   "name": "'Is that all you' (111 BPM, eighth-note pulse, no sub)",
+   "intent": {
+    "space": "A corridor again, one hue, compressing; dolly zoom bars 76-79",
+    "speed": [
+     1.8,
+     2.2
+    ],
+    "coupling": 0.8,
+    "breathing": false,
+    "figure": false,
+    "palette": "K8"
+   }
+  },
+  {
+   "id": "Is that all",
+   "bar0": 84,
+   "bar1": 91,
+   "name": "'Is that all?' (the beat returns; the fill on bar 91 beats 3-4)",
+   "intent": {
+    "space": "D Penrose stairwell; cracks of sky",
+    "speed": [
+     1.6,
+     2.0
+    ],
+    "coupling": 0.9,
+    "breathing": true,
+    "figure": false,
+    "palette": "K9"
+   }
+  },
+  {
+   "id": "Let go II",
+   "bar0": 92,
+   "bar1": 99,
+   "name": "Final chorus ('let it go')",
+   "intent": {
+    "space": "E the open: the building unfolds, a stair up into the sky",
+    "speed": [
+     1.4,
+     1.6
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": false,
+    "palette": "K10"
+   }
+  },
+  {
+   "id": "For your life",
+   "bar0": 100,
+   "bar1": 113,
+   "name": "Call and response ('steps in a process / for your life')",
+   "intent": {
+    "space": "E the parts standing free; bar 108 beside the figure",
+    "speed": [
+     0.3,
+     1.2
+    ],
+    "coupling": 0.45,
+    "breathing": true,
+    "figure": true,
+    "palette": "K11"
+   }
+  },
+  {
+   "id": "Out",
+   "bar0": 114,
+   "bar1": 116,
+   "name": "Outro",
+   "intent": {
+    "space": "white-gold haze",
+    "speed": [
+     0.0,
+     0.3
+    ],
+    "coupling": 0.0,
+    "breathing": false,
+    "figure": true,
+    "palette": "K12"
+   }
+  }
  ],
  "vocals": [
-  {"t0": 30.5, "t1": 54.6, "text": "'all you got' vocal chop, about once per bar", "confidence": "medium (recognised on an excerpt only)"},
-  {"t0": 55.3, "t1": 60.9, "text": "How little do I know? (x3)", "confidence": "medium"},
-  {"t0": 61.5, "t1": 63.7, "text": "Take steps in the process, breathe and grow", "confidence": "high"},
-  {"t0": 63.7, "t1": 67.6, "text": "How little do I know? / How little do I know, I know?", "confidence": "high"},
-  {"t0": 68.4, "t1": 69.9, "text": "Can you tell me it's fine though?", "confidence": "high"},
-  {"t0": 70.2, "t1": 72.4, "text": "it's steps in the process, feel and grow", "confidence": "high"},
-  {"t0": 72.4, "t1": 78.5, "text": "Come on, tell me what you wanna (x2) / maybe cause a little drama", "confidence": "high"},
-  {"t0": 78.5, "t1": 81.1, "text": "if you feel it, say it, let it show", "confidence": "high"},
-  {"t0": 81.1, "t1": 85.1, "text": "can you tell me it's fine though? / can you tell me we'll be fine though?", "confidence": "high"},
-  {"t0": 85.1, "t1": 87.5, "text": "I know, get a little peace of mind though", "confidence": "high"},
-  {"t0": 87.5, "t1": 89.6, "text": "It's steps in a process, let it go", "confidence": "high"},
-  {"t0": 90.0, "t1": 99.3, "text": "[let it go], repeated every half bar", "confidence": "medium"},
-  {"t0": 110.1, "t1": 119.0, "text": "do you wanna have fun? / as the fires keep burning / and the world stops turning / and everyone under the sun / takes steps in the process to heal and grow", "confidence": "low (placed by the lyric order and the section start; not recognised)"},
-  {"t0": 117.5, "t1": 127.5, "text": "tell me you're the one / to make the world stop hurting / and my heart keep pumping / while everyone under the sun / take steps in the process to feel it grow", "confidence": "medium"},
-  {"t0": 127.5, "t1": 140.8, "text": "how little do I know? (x4) / steps in the process, breathe and grow / how little do I know? (x2)", "confidence": "medium"},
-  {"t0": 140.0, "t1": 148.0, "text": "tell me it'll be fine though? / how little do I know? / steps in the process, feel it grow", "confidence": "medium"},
-  {"t0": 148.0, "t1": 160.7, "text": "[feel it grow], repeated", "confidence": "medium (clearly heard at 157-160 s)"},
-  {"t0": 164.6, "t1": 180.6, "text": "is that all you (x4) / is that all you got? (x2)", "confidence": "high"},
-  {"t0": 181.9, "t1": 199.1, "text": "is that all? / is that all you got? / is that all? / is that all I show you? / is that all? / is that all you got? / is that all? / is that all?", "confidence": "medium"},
-  {"t0": 199.1, "t1": 216.6, "text": "[let it go], repeated", "confidence": "high"},
-  {"t0": 216.6, "t1": 247.8, "text": "just steps in a process / for your life / (make you feel right), call and response", "confidence": "high"}
+  {
+   "t0": 28.6,
+   "t1": 54.6,
+   "text": "'all you got' vocal chop (with 'I'll show you'), about once a bar",
+   "confidence": "high (recognised in two independent runs; words at 28.8, 29.7, 31.1, 32.9, 34.5, 37.0, 39.2 s ...)"
+  },
+  {
+   "t0": 55.3,
+   "t1": 60.9,
+   "text": "How little do I know? (x3)",
+   "confidence": "medium"
+  },
+  {
+   "t0": 61.5,
+   "t1": 63.7,
+   "text": "Take steps in the process, breathe and grow",
+   "confidence": "high"
+  },
+  {
+   "t0": 63.7,
+   "t1": 67.6,
+   "text": "How little do I know? / How little do I know, I know?",
+   "confidence": "high"
+  },
+  {
+   "t0": 68.4,
+   "t1": 69.9,
+   "text": "Can you tell me it's fine though?",
+   "confidence": "high"
+  },
+  {
+   "t0": 70.2,
+   "t1": 72.4,
+   "text": "it's steps in the process, feel and grow",
+   "confidence": "high"
+  },
+  {
+   "t0": 72.4,
+   "t1": 78.5,
+   "text": "Come on, tell me what you wanna (x2) / maybe cause a little drama",
+   "confidence": "high"
+  },
+  {
+   "t0": 78.5,
+   "t1": 81.1,
+   "text": "if you feel it, say it, let it show",
+   "confidence": "high"
+  },
+  {
+   "t0": 81.1,
+   "t1": 85.1,
+   "text": "can you tell me it's fine though? / can you tell me we'll be fine though?",
+   "confidence": "high"
+  },
+  {
+   "t0": 85.1,
+   "t1": 87.5,
+   "text": "I know, get a little peace of mind though",
+   "confidence": "high"
+  },
+  {
+   "t0": 87.5,
+   "t1": 89.6,
+   "text": "It's steps in a process, let it go",
+   "confidence": "high"
+  },
+  {
+   "t0": 90.0,
+   "t1": 105.0,
+   "text": "[let it go], repeated every half bar through the stripped groove",
+   "confidence": "high (heard to 105 s)"
+  },
+  {
+   "t0": 109.8,
+   "t1": 118.7,
+   "text": "do you wanna have fun? / as the fires keep burning / and the world stops turning / and everyone under the sun / takes steps in the process to heal and grow",
+   "confidence": "medium (recognised on a short window: 'as if I was keep burning' 111.5, 'and the world stops turning' 113.1, 'healing' 117.8)"
+  },
+  {
+   "t0": 118.7,
+   "t1": 127.5,
+   "text": "tell me you're the one / to make the world stop hurting / and my heart keep pumping / while everyone under the sun / take steps in the process to feel it grow",
+   "confidence": "medium"
+  },
+  {
+   "t0": 127.5,
+   "t1": 140.8,
+   "text": "how little do I know? (x4) / steps in the process, breathe and grow / how little do I know? (x2)",
+   "confidence": "medium"
+  },
+  {
+   "t0": 140.0,
+   "t1": 145.0,
+   "text": "tell me it'll be fine though? / how little do I know? / steps in the process, feel it grow",
+   "confidence": "medium"
+  },
+  {
+   "t0": 145.0,
+   "t1": 160.6,
+   "text": "[feel it grow], repeated through the whole section",
+   "confidence": "high (recognised continuously 145.0-160.6 s)"
+  },
+  {
+   "t0": 164.6,
+   "t1": 180.6,
+   "text": "is that all you (x4) / is that all you got? (x2)",
+   "confidence": "high"
+  },
+  {
+   "t0": 181.9,
+   "t1": 199.1,
+   "text": "is that all? / is that all you got? / is that all? / is that all I show you? / is that all? / is that all you got? / is that all? / is that all?",
+   "confidence": "medium"
+  },
+  {
+   "t0": 199.1,
+   "t1": 216.6,
+   "text": "[let it go], repeated",
+   "confidence": "high"
+  },
+  {
+   "t0": 216.6,
+   "t1": 247.8,
+   "text": "just steps in a process / for your life / (make you feel right), call and response",
+   "confidence": "high"
+  }
+ ],
+ "palette_keys": {
+  "_roles": "air = fog and void (the far air); walls = plaster; light = the key light of the section; accent = the beacon, a colour plane, or the glimpse. sRGB starting points; the palette block interpolates in OKLab.",
+  "K0": {
+   "name": "Grey dawn",
+   "air": "#BAC2CA",
+   "walls": "#C9CCD0",
+   "light": "#E6EAEE",
+   "accent": "#E2B06E"
+  },
+  "K1": {
+   "name": "Alive",
+   "air": "#3A52B8",
+   "walls": "#D8D2CC",
+   "light": "#F5D9A8",
+   "accent": "#C2456B"
+  },
+  "K2": {
+   "name": "Dusk interior",
+   "air": "#5A6B9A",
+   "walls": "#CFC3B8",
+   "light": "#F0B36B",
+   "accent": "#A8667A"
+  },
+  "K3": {
+   "name": "Surrender",
+   "air": "#AAA8B0",
+   "walls": "#B9B7B8",
+   "light": "#E9D2A6",
+   "accent": "#D9B58A"
+  },
+  "K4": {
+   "name": "Restless",
+   "air": "#4F8A8B",
+   "walls": "#C8C4BF",
+   "light": "#EDAE62",
+   "accent": "#B05A70"
+  },
+  "K5": {
+   "name": "Again",
+   "air": "#5A6B9A",
+   "walls": "#CFC3B8",
+   "light": "#F0B36B",
+   "accent": "#F2B85A"
+  },
+  "K6": {
+   "name": "Gold spreading",
+   "air": "#D8D0A8",
+   "walls": "#E9D9B8",
+   "light": "#F7C85C",
+   "accent": "#7FB8E8"
+  },
+  "K7": {
+   "name": "Held",
+   "air": "#C2BA95",
+   "walls": "#D2C3A5",
+   "light": "#DEB453",
+   "accent": "#72A5D0"
+  },
+  "K8": {
+   "name": "Ember",
+   "air": "#B8662A",
+   "walls": "#946040",
+   "light": "#FFA54A",
+   "accent": "#FFB85A"
+  },
+  "K9": {
+   "name": "Cracks",
+   "air": "#C07636",
+   "walls": "#A06A48",
+   "light": "#FFA54A",
+   "accent": "#8CC4F0"
+  },
+  "K10": {
+   "name": "Open",
+   "air": "#8EC5EE",
+   "walls": "#F2E8DA",
+   "light": "#FFF4DC",
+   "accent": "#E07A8F"
+  },
+  "K11": {
+   "name": "Clear",
+   "air": "#A5D2F2",
+   "walls": "#F7EFE4",
+   "light": "#FFF8E8",
+   "accent": "#E88A9C"
+  },
+  "K12": {
+   "name": "White",
+   "air": "#F8F1E4",
+   "walls": "#F8F1E4",
+   "light": "#FFFAF0",
+   "accent": "#F4EDE2"
+  }
+ },
+ "palette_timeline": [
+  [
+   0.0,
+   0.0,
+   "K0"
+  ],
+  [
+   37.43,
+   41.84,
+   "K1"
+  ],
+  [
+   55.05,
+   63.85,
+   "K2"
+  ],
+  [
+   90.28,
+   92.48,
+   "K3"
+  ],
+  [
+   105.69,
+   110.09,
+   "K4"
+  ],
+  [
+   127.71,
+   136.51,
+   "K5"
+  ],
+  [
+   145.32,
+   156.33,
+   "K6"
+  ],
+  [
+   160.73,
+   161.83,
+   "K7"
+  ],
+  [
+   164.6,
+   165.14,
+   "K8"
+  ],
+  [
+   182.43,
+   197.57,
+   "K9"
+  ],
+  [
+   199.73,
+   201.89,
+   "K10"
+  ],
+  [
+   217.03,
+   234.33,
+   "K11"
+  ],
+  [
+   247.3,
+   253.79,
+   "K12"
+  ]
+ ],
+ "synch_points": [
+  [
+   2.2,
+   "the music begins"
+  ],
+  [
+   11.01,
+   "the bass pulse"
+  ],
+  [
+   36.88,
+   "one-beat gap"
+  ],
+  [
+   37.43,
+   "the hall"
+  ],
+  [
+   55.05,
+   "the voice"
+  ],
+  [
+   90.28,
+   "let it go: stop"
+  ],
+  [
+   110.09,
+   "verse 2"
+  ],
+  [
+   145.32,
+   "the lift to F"
+  ],
+  [
+   160.73,
+   "break"
+  ],
+  [
+   165.14,
+   "111 BPM: the loop"
+  ],
+  [
+   182.43,
+   "the beat returns"
+  ],
+  [
+   198.65,
+   "the fill"
+  ],
+  [
+   199.73,
+   "the release"
+  ],
+  [
+   234.33,
+   "the last lift"
+  ],
+  [
+   247.3,
+   "ring-out"
+  ]
  ]
 }
