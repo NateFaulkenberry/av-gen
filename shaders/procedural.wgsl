@@ -498,12 +498,29 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
             p2 = p2 + fxVertexOffset(p2, nRef, now, fxFlags, fxLanes);
         }
     }
+    // ADR-1021. cross(J t1, J t2) = det(J) J^-T n: the rebuilt normal is the outward one times the
+    // sign of the chain's Jacobian determinant. The deformers are continuous from the identity and
+    // do not change that sign; only a mirror does -- the instance scale, the object matrix, or a path
+    // deformer run backwards along its spline -- so the flip is taken from those. (It used to be
+    // taken from the angle to the *undeformed* normal, which turned any twist past a quarter turn
+    // inside out.)
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
     } else {
         nw = normalize(nw);
-        if (dot(nw, nRef) < 0.0) {
+        let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
+        var handedness = determinant(objectLinear) * s.x * s.y * s.z;
+        let deformerCount = u32(proc.timeInfo.y + 0.5);
+        for (var i = 0u; i < 8u; i = i + 1u) {
+            if (i >= deformerCount) { break; }
+            let d = proc.deformers[i];
+            if (deformerCode(d) == DEFORM_PATH && d.params.x >= 0.0 && d.params.y < 0.0 &&
+                d.centerAmount.w > 0.5) {
+                handedness = -handedness;
+            }
+        }
+        if (handedness < 0.0) {
             nw = -nw;
         }
     }

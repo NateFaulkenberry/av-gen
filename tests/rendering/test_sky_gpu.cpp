@@ -298,6 +298,43 @@ TEST_CASE("the procedural sky is deterministic and built once", "[sky][gpu]") {
     CHECK(gpu::hashImage(renderWith(renderer, s)) == base);
 }
 
+// ADR-1022. Routes through slow chains move a sky by parts per million a frame, and each of those
+// frames used to run the whole IBL chain. A drift inside the tolerance keeps the built cube; the
+// drift adds up against the sky that was built, so a slow change still lands.
+TEST_CASE("a sky drifting inside the rebuild tolerance is not rebuilt", "[sky][gpu][adr1022]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    scene::Scene s = metalSphereScene();
+    s.environment.sky.zenithColor = {0.20f, 0.30f, 0.60f};
+    (void)renderWith(renderer, s);
+    const std::uint64_t first = rendering::environmentBuildCount();
+
+    // Thirty frames of a settling chain: a hundredth of a percent a frame.
+    for (int i = 0; i < 30; ++i) {
+        s.environment.sky.zenithColor *= 1.0001f;
+        (void)renderWith(renderer, s);
+    }
+    CHECK(rendering::environmentBuildCount() == first);
+
+    // A real change rebuilds at once...
+    s.environment.sky.zenithColor = {0.40f, 0.30f, 0.60f};
+    (void)renderWith(renderer, s);
+    CHECK(rendering::environmentBuildCount() == first + 1);
+    // ...and so does a slow drift once it has added up past the tolerance.
+    int frames = 0;
+    const std::uint64_t before = rendering::environmentBuildCount();
+    while (rendering::environmentBuildCount() == before && frames < 200) {
+        s.environment.sky.zenithColor *= 1.001f;
+        (void)renderWith(renderer, s);
+        ++frames;
+    }
+    CHECK(rendering::environmentBuildCount() == before + 1);
+    CHECK(frames < 20);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("the irradiance the sky builds matches the CPU reference in shape", "[sky][gpu]") {
     // The GPU chain integrates the same analytic sky the CPU reference does, so a diffuse surface
     // facing the sun must come out brighter than one facing away from it, by roughly the ratio the

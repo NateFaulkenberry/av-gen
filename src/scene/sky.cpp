@@ -72,6 +72,37 @@ std::uint64_t SkyRuntime::hash() const {
     return h.value();
 }
 
+namespace {
+
+constexpr float kSkyRelativeTolerance = 1.0f / 128.0f;
+// The chord between two unit vectors is their angle to first order; a cosine this close to 1 is not
+// representable in float.
+constexpr float kSkySunChordTolerance = 2.5e-4f; // 0.25 mrad
+
+bool colourWithin(const glm::vec3& a, const glm::vec3& b) {
+    const float scale = std::max({a.r, a.g, a.b, b.r, b.g, b.b});
+    const glm::vec3 d = glm::abs(a - b);
+    return std::max({d.r, d.g, d.b}) <= kSkyRelativeTolerance * scale + 1e-7f;
+}
+
+bool scalarWithin(float a, float b) {
+    return std::abs(a - b) <= kSkyRelativeTolerance * std::max(std::abs(a), std::abs(b)) + 1e-7f;
+}
+
+} // namespace
+
+bool skyWithinRebuildTolerance(const SkyRuntime& built, const SkyRuntime& current) {
+    return colourWithin(built.zenithColor, current.zenithColor) &&
+           colourWithin(built.horizonColor, current.horizonColor) &&
+           colourWithin(built.groundColor, current.groundColor) &&
+           colourWithin(built.sunColor, current.sunColor) && scalarWithin(built.hazeWidth, current.hazeWidth) &&
+           scalarWithin(built.sunIntensity, current.sunIntensity) &&
+           scalarWithin(built.sunAngularRadius, current.sunAngularRadius) &&
+           scalarWithin(built.sunGlowWidth, current.sunGlowWidth) &&
+           scalarWithin(built.intensity, current.intensity) &&
+           glm::length(built.sunDirection - current.sunDirection) <= kSkySunChordTolerance;
+}
+
 const PunctualLight* skyKeyLight(const std::vector<PunctualLight>& lights) {
     const PunctualLight* firstDirectional = nullptr;
     for (const PunctualLight& light : lights) {

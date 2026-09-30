@@ -609,7 +609,12 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         }
         const std::uint64_t hash = sky.hash() * 1000003ull + static_cast<std::uint64_t>(envSettings.cubeSize) * 8191ull +
                                    static_cast<std::uint64_t>(envSettings.prefilteredSize);
-        if (skyBuilt_ && hash == skyHash_ && ibl_.valid) {
+        // ADR-1022: a sky within the rebuild tolerance of the one on screen is the one on screen.
+        // Routes through slow chains move it by parts per million a frame, and without this every
+        // one of those frames paid the whole chain (about 20 ms at 1080p in the Sonic Garden).
+        const bool sameSizes = envSettings.cubeSize == builtSkyCube_ && envSettings.prefilteredSize == builtSkyPrefiltered_;
+        if (skyBuilt_ && ibl_.valid &&
+            (hash == skyHash_ || (sameSizes && scene::skyWithinRebuildTolerance(builtSky_, sky)))) {
             skyDeferral_.deferring = false;
             return;
         }
@@ -668,6 +673,9 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         setIbl(*built);
         skyBuilt_ = true;
         skyHash_ = hash;
+        builtSky_ = sky;
+        builtSkyCube_ = envSettings.cubeSize;
+        builtSkyPrefiltered_ = envSettings.prefilteredSize;
         return;
     }
     if (&scene == environmentScene_ && scene.identity == environmentIdentity_ && id == environmentTexture_ &&

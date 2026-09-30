@@ -34,6 +34,21 @@ struct SkyRuntime {
     [[nodiscard]] std::uint64_t hash() const; // changes exactly when a rebuild is needed
 };
 
+// ADR-1022: whether the lighting cube built from `built` still stands for `current`, so the
+// renderer can skip the rebuild. A sky driven by routes through slow chains moves by a few parts in
+// a million a frame as the chains settle, and every one of those moves used to rebuild the whole
+// cube, irradiance and prefilter chain (about 20 ms a frame at 1080p). The tolerances:
+//   * each colour (zenith, horizon, ground, sun) within 1/128 of its own largest channel, so a
+//     channel near zero beside a bright one cannot force a rebuild on its own;
+//   * the intensity, sun intensity, haze, glow and disc widths within 1/128 relative;
+//   * the sun direction within 0.25 mrad, a quarter of a texel of the offline tier's 1024 face.
+// Measured against a rebuild on every frame (Sonic Garden pad and morph, 780 frames): no pixel
+// differs by more than 1 in 8 bits, and the builds fell from 781 to 246. 1/64 was also within 1 but
+// changed twice as many pixels; 1/32 reached 2.
+// Comparing against the sky that was *built*, not last frame's, means a slow drift still rebuilds
+// once it has added up; nothing lags by more than the tolerance.
+[[nodiscard]] bool skyWithinRebuildTolerance(const SkyRuntime& built, const SkyRuntime& current);
+
 // The key light a sky takes its sun from: the first enabled directional light with role Key, else
 // the first enabled directional light, else null.
 [[nodiscard]] const PunctualLight* skyKeyLight(const std::vector<PunctualLight>& lights);
