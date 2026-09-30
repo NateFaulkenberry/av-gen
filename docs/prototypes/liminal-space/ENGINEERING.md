@@ -244,3 +244,24 @@ numbers go in PROGRESS-eng.md once the example exists.
   path through doorways.
 - The repository: ADR-027, ADR-091, ADR-870, ADR-901, ADR-1000-1005, `docs/sdf.md`,
   `docs/prototypes/procedural-space/{ARCHITECTURE,RESEARCH,REPORT}.md`.
+
+## Addendum after implementation (2026-09-30, 20:00)
+
+What the build taught, and what the art agent's director plan added:
+
+- **Chapters** (the plan's rank-1 need): one continuous journey through several worlds. Each chapter has its
+  own path, screw, collide object and frame; its SDF nodes and lights are hidden while the camera is elsewhere,
+  so a parked world costs nothing. The swap is a jump in world position at a journey distance, hidden in light
+  (ADR-1042).
+- **Surfaces** (rank 4): a material id per node, compiled into a per-hit `sdfSurface`, so plaster, floor, accent
+  and a beacon are one march instead of four (ADR-1044).
+- **The screw's seam** needs a guard margin above `epsilon x maxDistance`, or the seam planes draw as stripes in
+  the distance; and a seam must cross continuous geometry (the middle of a corridor), never the end of a wall.
+- **A CSG difference is a bound near its cut**: shallow doorway cuts made the collision guard flinch at a door;
+  the library cuts deep.
+- **`morph` between two rooms** drew moire across a whole wall (a blend of distant surfaces is not a surface);
+  rooms grow by keyed dimensions instead (the `shell` node makes that one box).
+- **The warp inside a screw** disagreed across seams (each cell samples its own coordinates); it now fades out
+  before each seam.
+- **Measured** (M2 Max): the example costs about 60 ms of GPU at 1080p and 20 ms at 960x540; the SDF march is
+  two thirds of that and the volumetric fog a third.
