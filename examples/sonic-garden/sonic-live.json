@@ -211,7 +211,7 @@
        }
       ],
       "group": "family",
-      "bias": -0.55,
+      "bias": -0.5,
       "gain": 3.0
      },
      {
@@ -1488,7 +1488,7 @@
   {
    "source": "visual.crystalline",
    "target": "lightrig/SonicGarden/key/intensity",
-   "amount": 0.25,
+   "amount": -0.35,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2129,7 +2129,7 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/ground/material/roughness",
-   "amount": -0.42,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2270,7 +2270,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/ground/material/emissive",
-   "amount": 0.07,
+   "amount": 0.0315,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2303,7 +2303,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/ground/material/emissive",
-   "amount": 0.15,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -2807,7 +2807,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/seed/material/emissive",
-   "amount": 0.9,
+   "amount": 0.405,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2830,7 +2830,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/seed/material/emissive",
-   "amount": 0.6,
+   "amount": 1.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3156,7 +3156,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/stalks/material/emissive",
-   "amount": 0.45,
+   "amount": 0.2025,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3167,7 +3167,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/stalks/material/emissive",
-   "amount": 0.5,
+   "amount": 1.25,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3179,7 +3179,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/caps/material/emissive",
-   "amount": 0.3,
+   "amount": 0.135,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3190,7 +3190,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/caps/material/emissive",
-   "amount": 0.35,
+   "amount": 0.875,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3202,7 +3202,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/capstems/material/emissive",
-   "amount": 0.15,
+   "amount": 0.0675,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3213,7 +3213,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/capstems/material/emissive",
-   "amount": 0.15,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3225,7 +3225,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/petals/material/emissive",
-   "amount": 0.4,
+   "amount": 0.18,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3236,7 +3236,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/petals/material/emissive",
-   "amount": 0.35,
+   "amount": 0.875,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -3248,7 +3248,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/outerpetals/material/emissive",
-   "amount": 0.3,
+   "amount": 0.135,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3259,7 +3259,7 @@
   {
    "source": "visual.glow",
    "target": "procedural/outerpetals/material/emissive",
-   "amount": 0.3,
+   "amount": 0.75,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -4837,6 +4837,17 @@
    }
   },
   {
+   "source": "visual.crystalline",
+   "target": "procedural/facets/material/roughness",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 1000
+   }
+  },
+  {
    "source": "visual.glow",
    "target": "procedural/gills/material/emissive",
    "amount": 0.6,
@@ -4962,6 +4973,51 @@
    "chain": {
     "attackMs": 60,
     "decayMs": 250
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "camera/lens/aperture",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "scene/volumeDensity",
+   "amount": -0.00022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.organic",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "camera/exposure/compensation",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "visual.organic",
+   "target": "camera/exposure/compensation",
+   "amount": -0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 1000
    }
   },
   {
@@ -5266,7 +5322,7 @@
   {
    "source": "visual.grit",
    "target": "post/lens/chromaticAberration",
-   "amount": 0.25,
+   "amount": 0.15,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5452,6 +5508,32 @@
    "chain": {
     "attackMs": 260,
     "decayMs": 1500
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "procedural/outerpetals/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.organicLo",
+   "chain": {
+    "gain": 0.07,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/spores/burst",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.organicHi",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
    }
   },
   {
@@ -5896,7 +5978,7 @@
   {
    "source": "visual.silence",
    "target": "lightrig/SonicGarden/key/intensity",
-   "amount": -0.7,
+   "amount": -0.95,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5907,7 +5989,7 @@
   {
    "source": "visual.silence",
    "target": "lightrig/SonicGarden/rim/intensity",
-   "amount": 0.3,
+   "amount": -0.85,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5917,8 +5999,8 @@
   },
   {
    "source": "visual.silence",
-   "target": "lightrig/SonicGarden/rim/temperature",
-   "amount": 6000.0,
+   "target": "camera/exposure/compensation",
+   "amount": -0.35,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5944,7 +6026,7 @@
       "time": 0.0,
       "value": [
        -5.3,
-       1.6,
+       2.2,
        16.3
       ],
       "interp": "smooth"
@@ -5953,7 +6035,7 @@
       "time": 8.0,
       "value": [
        -4.7343,
-       1.72,
+       2.32,
        16.4611
       ],
       "interp": "smooth"
@@ -5962,7 +6044,7 @@
       "time": 16.0,
       "value": [
        -4.5,
-       1.6,
+       2.2,
        16.85
       ],
       "interp": "smooth"
@@ -5971,7 +6053,7 @@
       "time": 24.0,
       "value": [
        -4.7343,
-       1.48,
+       2.08,
        17.2389
       ],
       "interp": "smooth"
@@ -5980,7 +6062,7 @@
       "time": 32.0,
       "value": [
        -5.3,
-       1.6,
+       2.2,
        17.4
       ],
       "interp": "smooth"
@@ -5989,7 +6071,7 @@
       "time": 40.0,
       "value": [
        -5.8657,
-       1.72,
+       2.32,
        17.2389
       ],
       "interp": "smooth"
@@ -5998,7 +6080,7 @@
       "time": 48.0,
       "value": [
        -6.1,
-       1.6,
+       2.2,
        16.85
       ],
       "interp": "smooth"
@@ -6007,7 +6089,7 @@
       "time": 56.0,
       "value": [
        -5.8657,
-       1.48,
+       2.08,
        16.4611
       ],
       "interp": "smooth"
@@ -6016,7 +6098,7 @@
       "time": 64.0,
       "value": [
        -5.3,
-       1.6,
+       2.2,
        16.3
       ],
       "interp": "smooth"

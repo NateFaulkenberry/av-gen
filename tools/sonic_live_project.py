@@ -62,6 +62,7 @@ OUT_SCENE = os.path.join(GARDEN, "sonic-live.scene.json")
 
 # The camera's hold: the master's key at this second (the middle of its push-in).
 HOLD_SECONDS = 10.75
+CAMERA_RAISE = 0.6
 RIG = "lightrig/SonicGarden"
 
 
@@ -145,7 +146,7 @@ LIVE_GARDEN = [
     # chaotic weight (its note rises count as attack); here attack and unsteadiness are 0.3 each against
     # roughness's 3.
     M("chaotic", [("sonic.roughness.slow", 3.0, False), ("sonic.sharpness.slow", 0.3, False),
-                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.55, 3.0, group="family"),
+                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.5, 3.0, group="family"),
     # heavy: loud AND full AND pitched AND low. The register term is what makes a distorted bass line the pressure
     # deep and a distorted high lead the strike field (notes.pitch holds the last note through rests).
     # (Loudness counts only a little -- energy^0.5 -- so a heavy world does not turn light in a rest.)
@@ -204,14 +205,34 @@ GLOW = {"attackMs": 60, "decayMs": 250}     # the filter channel's routes (the m
 GRIT = {"attackMs": 40, "decayMs": 300}     # the distortion channel's routes
 
 
+ORGANIC_LIGHT = ("stalks", "caps", "capstems", "petals", "outerpetals", "seed", "gills", "ground")
+
+
 def retime(route):
-    """The master's route timing, for live play."""
+    """The master's routes, retimed and rebalanced for live play."""
     ch = route.get("chain")
+    s, t = route["source"], route["target"]
+    # The filter must be SEEN in the garden: its own light is dimmer (x 0.45) and the filter's share of it larger
+    # (x 2.5), so a closed filter is a garden at dusk and an open one a garden ablaze. In the master the family's
+    # base light dominated and a whole sweep barely changed the picture.
+    node = t.split("/")[1] if t.startswith("procedural/") else ""
+    if t.endswith("material/emissive") and node in ORGANIC_LIGHT:
+        if s == "visual.organic":
+            route["amount"] = round(route["amount"] * 0.45, 4)
+        elif s == "visual.glow" and route.get("depthSource") == "visual.organic":
+            route["amount"] = round(route["amount"] * 2.5, 4)
+    if s == "visual.crystalline" and t == "procedural/ground/material/roughness":
+        route["amount"] = 0.1  # the master's -0.42 polished the floor, which mirrored the key as a pale sheet across
+        # the lower half of the held frame; live, the observatory stands on dark matte stone
+    if s == "visual.crystalline" and t == RIG + "/key/intensity":
+        # the master's +0.25 lit the observatory's floor into the largest pale area of the held frame and the
+        # crystals' faces into grey cards; dimmer, the glass holds its light at its edges and the rings carry it
+        route["amount"] = -0.35
     if not ch:
         return route
     if ch.get("attackMs") == 800 and ch.get("decayMs") == 1600:  # SLOW and GROW: the family blends
         ch["attackMs"], ch["decayMs"] = SLOW["attackMs"], SLOW["decayMs"]
-    if route["source"] == "visual.glow" and ch.get("attackMs") == 150:
+    if s == "visual.glow" and ch.get("attackMs") == 150:
         ch["attackMs"], ch["decayMs"] = GLOW["attackMs"], GLOW["decayMs"]
     return route
 
@@ -249,6 +270,8 @@ def live_routes():
 
     # ---- 5a. glow: the filter opens the world's light and detail (on top of the master's glow routes)
     out.append(R("visual.glow", "procedural/hero/material/emissive", 0.35, depth="visual.crystalline", **GLOW))
+    # (the gem's broad faces mirrored the sky as pale cards; a less polished gem keeps its light at the edges)
+    out.append(R("visual.crystalline", "procedural/facets/material/roughness", 0.2, **SLOW))
     out.append(R("visual.glow", "procedural/gills/material/emissive", 0.6, depth="visual.organic", **GLOW))
     out.append(R("visual.glow", "procedural/buds/material/emissive", 0.8, depth="visual.organic", **GLOW))
     for n in ("halos", "meridians"):
@@ -260,6 +283,12 @@ def live_routes():
     out.append(R("visual.glow", "post/grade/temperature", -0.12, **GLOW))
     out.append(R("visual.glow", "post/bloom/intensity", 0.25, **GLOW))
     out.append(R("visual.glow", "particles/spores/spawnRate", 40.0, depth="visual.organic", **GLOW))
+    # soft -> sharp: a closed filter is seen through a wide aperture and thicker haze, an open one stopped down
+    # (f/2 -> f/5: the skyline comes into focus) through clearer air; and the exposure opens a third of a stop
+    out.append(R("visual.glow", "camera/lens/aperture", 3.0, attackMs=120, decayMs=400))
+    out.append(R("visual.glow", "scene/volumeDensity", -0.00022, depth="visual.organic", attackMs=120, decayMs=400))
+    out.append(R("visual.glow", "camera/exposure/compensation", 0.5, attackMs=120, decayMs=400))
+    out.append(R("visual.organic", "camera/exposure/compensation", -0.2, **SLOW))  # a closed filter is dusk
 
     # ---- 5b. grit: distortion roughens, sets the forms buzzing, lights the cracks, throws off fragments (every
     # deformer named here is added by the live scene at amount 0, so a clean sound is the master's look)
@@ -280,7 +309,7 @@ def live_routes():
     out.append(R("visual.grit", "particles/glints/speed", 3.0, **GRIT))
     # and the image hardens a little: contrast, and a trace of colour fringing at the edges
     out.append(R("visual.grit", "post/grade/contrast", 0.12, **GRIT))
-    out.append(R("visual.grit", "post/lens/chromaticAberration", 0.25, **GRIT))
+    out.append(R("visual.grit", "post/lens/chromaticAberration", 0.15, **GRIT))
 
     # ---- 7. a note is a gesture. The organic swell rises (120-250 ms) ...
     for tgt, amount, depth, a, d in (("seed", 0.8, "visual.organic", 150, 1400),
@@ -303,6 +332,10 @@ def live_routes():
                  decayMs=1300))
     out.append(R("notes.noteOn", "procedural/outerpetals/deform/1/amount", -0.07, depth="visual.organic",
                  attackMs=260, decayMs=1500))
+    # a low note swells the whole lotus a little (broad and slow); a high one throws a few motes from the tendrils
+    out.append(R("notes.noteOn", "procedural/outerpetals/source/scale", 1.0, op="multiply", gain=0.07, offset=1.0,
+                 depth="visual.organicLo", attackMs=300, decayMs=1800))
+    out.append(R("notes.noteOn", "particles/spores/burst", 10.0, depth="visual.organicHi", attackMs=0, decayMs=90))
     # the observatory's rings swing on a note and ring down (high notes the ecliptic, low the meridians)
     out.append(R("notes.noteOn", "procedural/halos/transform/rotation", 9.0, comp=0, depth="visual.crystalHi",
                  attackMs=50, decayMs=900))
@@ -339,9 +372,11 @@ def live_routes():
     out += palette(RIG + "/ambientColor", {"silence": (0.05, 0.07, 0.16)}, **quiet)
     out += palette("procedural/ground/material/emissiveColor", {"silence": (0.35, 0.55, 1.0)}, **quiet)
     out.append(R("visual.silence", "procedural/ground/material/emissive", 0.05, **quiet))
-    out.append(R("visual.silence", RIG + "/key/intensity", -0.7, **quiet))
-    out.append(R("visual.silence", RIG + "/rim/intensity", 0.3, **quiet))
-    out.append(R("visual.silence", RIG + "/rim/temperature", 6000.0, **quiet))
+    # (with no family the rig sits at its authored lights: a key and a rim from the camera's side that lit the
+    # bare floor into a grey sheet; the waiting world turns them down)
+    out.append(R("visual.silence", RIG + "/key/intensity", -0.95, **quiet))
+    out.append(R("visual.silence", RIG + "/rim/intensity", -0.85, **quiet))
+    out.append(R("visual.silence", "camera/exposure/compensation", -0.35, **quiet))
     return out
 
 
@@ -366,10 +401,32 @@ LIVE_DEFORMERS = {
 }
 
 
+# The inner petals, turned half a petal (a gap nearer the held camera), and the seed raised 0.3 m in their cup.
+PETAL_START = 0.449
+SEED_RAISE = 0.4
+SEED_BODY = 0.4
+
+
 def live_scene():
     with open(MASTER_SCENE) as f:
         s = json.load(f)
     s["name"] = "sonic-live"
+    # The seed glows through its body, not only at its rim: the living-tissue program (sgFlesh) keeps the light at
+    # the grazing edge (0.07 at the centre), so the backlit seed read under the held camera as a luminous ring round
+    # a dark core -- a hole. sgSeed is sgFlesh with a body of light (0.4).
+    flesh = next(prog for prog in s["materialPrograms"] if prog["name"] == "sgFlesh")
+    seed_prog = copy.deepcopy(flesh)
+    seed_prog["name"] = "sgSeed"
+    body = next(op for op in seed_prog["ops"] if op["kind"] == "constant" and op["dst"] == 4)
+    body["constant"] = [SEED_BODY] * 4
+    s["materialPrograms"].append(seed_prog)
+    for node in s["nodes"]:
+        if node["name"] == "petals":
+            node["procedural"]["distribution"]["startAngle"] = PETAL_START
+        if node["name"] == "seed":  # and the seed sits a little higher in the cup, clear of the petal tips
+            pos = node["procedural"]["distributionTransform"]["position"]
+            pos[1] = round(pos[1] + SEED_RAISE, 3)
+            node["procedural"]["material"]["program"] = "sgSeed"
     seen = set()
     for node in s["nodes"]:
         extra = LIVE_DEFORMERS.get(node["name"])
@@ -427,7 +484,11 @@ def main():
     tracks = live.get("timeline", {}).get("tracks", [])
     hold = {t["target"]: value_at(t, HOLD_SECONDS) for t in tracks
             if t.get("target") in ("camera/position", "camera/target")}
-    kp, kt, period = camera_drift(hold["camera/position"], hold["camera/target"])
+    # the hold, raised 0.6 m: from the master's low eye line the lotus's near petals rose in front of the seed
+    # (their dark undersides read as a hole in it); a little higher, the camera looks into the cup
+    hold_pos = list(hold["camera/position"])
+    hold_pos[1] = round(hold_pos[1] + CAMERA_RAISE, 3)
+    kp, kt, period = camera_drift(hold_pos, hold["camera/target"])
     for track in tracks:
         if track.get("target") == "camera/position":
             track["keys"], track["loopLength"] = kp, period

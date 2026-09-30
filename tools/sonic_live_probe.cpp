@@ -347,7 +347,7 @@ constexpr std::array<PatchSpec, 8> kPatches{{
     {"pad",       Osc::Saw,   700.f,  0.8f, 1.f,  false, 0.35f, 0.5f, 1.0f,  1.2f,  0.0f, 0.2f,  1.4f, 0.f, 1.f,  false, 0.f, 1.008f, 0.42f},
     {"keys",      Osc::Saw,   1800.f, 0.7f, 1.f,  false, 0.01f, 0.8f, 0.6f,  0.5f,  0.8f, 0.4f,  1.4f, 0.f, 1.f,  false, 0.f, 1.005f, 0.30f},
     {"pluck",     Osc::Saw,   1400.f, 1.2f, 1.f,  false, 0.002f, 0.25f, 0.0f, 0.15f, 2.2f, 0.12f, 1.4f, 0.f, 1.f,  false, 0.f, 1.004f, 0.45f},
-    {"lead",      Osc::Saw,   7000.f, 1.0f, 1.f,  false, 0.004f, 0.4f, 0.8f,  0.12f, 0.0f, 0.2f,  1.4f, 0.f, 1.f,  false, 0.f, 1.006f, 0.35f},
+    {"lead",      Osc::Saw,   7000.f, 1.0f, 1.f,  false, 0.004f, 0.4f, 0.8f,  0.12f, 0.0f, 0.2f,  1.4f, 0.f, 1.f,  false, 0.f, 1.003f, 0.35f},
     {"bell",      Osc::Fm,    12000.f, 0.7f, 1.f, false, 0.002f, 2.2f, 0.0f,  1.5f,  0.0f, 0.2f,  1.4f, 7.0f, 1.4f, false, 0.f, 1.0f,   0.50f},
     {"bass",      Osc::Saw,   450.f,  1.4f, 1.f,  false, 0.003f, 0.35f, 0.6f, 0.08f, 1.6f, 0.15f, 1.4f, 0.f, 1.f,  false, 0.f, 1.007f, 0.45f},
     {"distbass",  Osc::Saw,   900.f,  1.2f, 28.f, true,  0.003f, 0.35f, 0.7f, 0.08f, 2.0f, 0.18f, 1.4f, 0.f, 1.f,  false, 0.f, 1.009f, 0.30f},
@@ -662,21 +662,23 @@ void scenario(const std::string& name, Player& p) {
     } else if (name == "patches") {
         p.waitUntil(patchesGesture(p, 1.0) + 1.0);
     } else if (name == "play") {
-        // A play-through: the idle world, then each gesture in turn, and back to silence.
+        // A play-through: the idle world, then each gesture in turn, and back to silence. The order runs warm to
+        // bright to dense to rhythmic to glass, then the two knobs (the filter, the drive) into the heavy riff,
+        // the strike field, and a last soft note.
         double t = 3.0;
         t = lowSoft(p, t);
         t = highBright(p, t);
         t = chords(p, t + 0.5);
         t = arpeggio(p, t + 0.5);
+        usePatch(p, "bell");
+        const std::array<int, 12> bell{72, 79, 76, 84, 83, 79, 88, 91, 86, 84, 79, 96};
+        for (std::size_t i = 0; i < bell.size(); ++i) {
+            p.note(t + 0.6 * static_cast<double>(i), bell[i], 100, 0.3);
+        }
+        t += 0.6 * static_cast<double>(bell.size()) + 2.0;
         t = sweepGesture(p, t + 0.5);
         t = driveGesture(p, t + 0.5);
         t = distorted(p, t);
-        usePatch(p, "bell");
-        for (int i = 0; i < 8; ++i) {
-            const std::array<int, 8> bell{72, 79, 76, 84, 83, 79, 88, 91};
-            p.note(t + 0.55 * i, bell[static_cast<std::size_t>(i)], 100, 0.3);
-        }
-        t += 0.55 * 8 + 3.0;
         usePatch(p, "perc");
         for (int i = 0; i < 16; ++i) {
             p.note(t + 0.227 * i, 60 + (i % 3) * 7, i % 4 == 0 ? 127 : 90, 0.05);
