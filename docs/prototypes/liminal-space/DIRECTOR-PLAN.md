@@ -38,6 +38,24 @@ demonstrate something the renderer can do?* The emotional line is the addendum's
 
 That line is a series of changes of kind, never a ramp of intensity.
 
+### The film at a glance
+
+| # | section | bars | time (s) | feeling | where we are | camera (m/s) | palette | coupling | the moment |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Intro | 1-17 | 0.00-37.43 | quiet, a subtle wrongness | the first corridor; a stair that returns to it | 0-0.8, holds | K0 grey dawn | 0.15 | the opening frame comes back (about 22 s) |
+| 2 | Dance | 18-25 | 37.43-55.05 | the world comes alive | the great hall: shafts, a rose wall, the tiny figure | 1.4-1.7 | K1 alive | 0.7 | the hall revealed on the downbeat after the one-beat gap |
+| 3 | Verse 1 | 26-41 | 55.05-90.28 | intimacy, wandering | the enfilade of lamp-lit rooms | 1.0-1.2 | K2 dusk | 0.5 | the figure lost behind a doorframe |
+| 4 | "Let it go" | 42-48 | 90.28-105.69 | surrender, breathing out | the stairhead above a sea of fog; then down | 0, then 0.4-0.6 | K3 grey | 0, then 0.25 | everything stops for bar 42 |
+| 5 | Rebuild, verse 2 | 49-58 | 105.69-127.71 | complication | the crossing stairwell | 1.1-1.3, reversals | K4 restless | 0.6 | a window into the verse-1 rooms from an impossible angle |
+| 6 | Bridge | 59-66 | 127.71-145.32 | "have I been here before?" | the enfilade again, the same move, the light flipped | 1.1 | K5 = K2 | 0.5 | the figure's doorway, empty |
+| 7 | "Feel it grow" | 67-73 | 145.32-160.73 | the first hope | a tiny room growing into a hall; gold spreading | 0.9 → 1.4 | K6 gold | 0.6 | daylight seen through a doorway, for the first time |
+| 8 | Break | 74-75 | 160.73-165.14 | the held breath | stopped in that doorway | 0 | K7 held | 0 | total stillness |
+| 9 | "Is that all you" | 76-83 | 165.14-182.43 | tension, the loop | the first corridor again, one hue, compressing | 1.8-2.2 | K8 ember | 0.8 | the beacon that never gets closer |
+| 10 | "Is that all?" | 84-91 | 182.43-199.73 | the loop almost breaks | the Penrose stairwell; cracks of daylight | 1.6-2.0 | K9 cracks | 0.9 | the fill: the beacon's light fills the frame |
+| 11 | Final chorus | 92-99 | 199.73-217.03 | release, acceptance | the open: the building unfolds, a stair up into the sky | 1.4-1.6 | K10 open | 0.5 | through the beacon, on the downbeat |
+| 12 | Call and response | 100-113 | 217.03-247.30 | forward, understanding | the building's parts standing free; the figure | 1.2, then still | K11 clear | 0.5 → 0.4 | bar 108: the whole labyrinth seen from above |
+| 13 | Outro | 114-116 | 247.30-253.79 | acceptance | white-gold haze | → 0 | K12 white | 0 | ends in light |
+
 ## 2. The world: a strange dream of an ordinary building
 
 **What it is made of.**
@@ -100,12 +118,13 @@ the film; the figure and the sun patch support them.
 - **What it is:** one ordinary flight with a landing and a single rail, Escher's device. It is always the same stair
   design, so it is recognisable.
 - **Its arc:**
-  - climbed in the intro, where it arrives somewhere it cannot (the first wrongness);
+  - climbed in the intro, where it arrives somewhere it cannot (the first spatial impossibility; the sun patch was
+    the first, smaller, wrongness);
   - seen from above across the great hall, crossing other flights;
   - descended into fog at "let it go", because quietening reads as descent (rule 9);
   - flights crossing at contradictory levels in verse 2;
-  - a square stairwell climbed forever in "is that all?", four flights up and back at the same landing, which is
-    the Penrose loop made of real topology;
+  - a square stairwell climbed forever in "is that all?", four flights up to what is the same landing again, which
+    is the Penrose loop made of real topology;
   - at the release, a stair that starts indoors and ends in open air (Escher's Belvedere);
   - in the open, stairs standing free and leading up.
 
@@ -180,10 +199,13 @@ Four craft rules from the research (rule 8):
 1. **Build it additively on grey.** Each chapter adds one hue family (GRIS).
 2. **Key chroma and lightness separately.** Chroma is energy and arousal; lightness is mood and valence (Valdez
    and Mehrabian). Nothing is black-dominant.
-3. **Withhold one quality: daylight.** Clear sky blue and warm white sun appear nowhere in the building. Windows show
-   only fog, and all light is lamps and the beacon until the doorway at "feel it grow" frames it. It fills the world
-   only at bar 92 (WALL-E's green, Oz's door). The known failure is leakage, so every emitter is policed (fog, sky,
-   bounce, emissives, grade).
+3. **Withhold one thing: the sky.**
+   - No window shows sky, and no light comes from a visible sun, until the doorway at "feel it grow" frames them.
+     They fill the world only at bar 92 (WALL-E's green, Oz's door).
+   - Until then the windows admit only diffuse fog-light, and the rest is lamps and the beacon.
+   - The sun patch is **sunlight with no sun**: a low-chroma amber promise, not the thing itself.
+   - The known failure is leakage, so every emitter is policed (fog, void, bounce, emissives, grade). Clear sky blue
+     and white sunlight belong to K6's doorway, K9's cracks and K10 onward, and nowhere else.
 4. **Use two timescales** (Scriabin). The slow voice is about ten palette states, moved by `palette/position`. The
    fast voice is a drift of a few degrees of fog hue that follows the chord each bar: Cm cooler, F warmer, smoothed
    over a bar. It is felt as life, not seen as change.
@@ -193,7 +215,7 @@ interpolates them in OKLab.
 
 | key | where | feeling | walls / floor | air (fog, void) | light | accent | gamut |
 |---|---|---|---|---|---|---|---|
-| **K0 Grey dawn** | intro, bars 1-17 | uncertainty, isolation | pale cool plaster `#C9CCD0` / `#9EA3A8` | pale grey-blue `#BAC2CA`, lighter than the walls | soft cool window light `#E6EAEE` | the beacon, small, low-chroma amber `#E2B06E` | near-neutral, one warm point |
+| **K0 Grey dawn** | intro, bars 1-17 | uncertainty, isolation | pale cool plaster `#C9CCD0` / `#9EA3A8` | pale grey-blue `#BAC2CA`, lighter than the walls | soft cool window light `#E6EAEE` | the beacon, small, low-chroma amber `#E2B06E`; the sun patch from bar 6, `#E9D2A6` | near-neutral; warm only in the beacon and the sun patch |
 | **K1 Alive** | dance, 18-25 | curiosity, awakening | warmer plaster `#D8D2CC`; single wall planes of deep rose `#C2456B` (Barragán) | depth into **deep ultramarine** `#2F3C8C` | warm shafts from high windows `#F5D9A8` | beacon `#F2A54A` | rose and ultramarine, first saturation |
 | **K2 Dusk interior** | verse 1, 26-41 | intimacy, still wandering | warm grey `#CFC3B8`; rose muted to `#A8667A` | dusk blue `#5A6B9A`, lower chroma | lamp pools `#F0B36B`, one per room | beacon | warm and cool, moderate |
 | **K3 Surrender** | "let it go", 42-48 | introspection, surrender | grey `#B9B7B8` | grey-lilac `#AAA8B0` | dim and even; the sun patch `#E9D2A6` is the only warm thing | beacon faint `#D9B58A` | almost grey |
@@ -230,6 +252,46 @@ Everywhere else the palette moves over four to eight bars.
 
 Bloom stays near the POC's 0.25 at threshold 1, and there is no grain.
 
+## 6a. Objects in the world
+
+The brief's §8 hypothesis is adopted, thinned by the addendum's "do not populate every room". Each layer's
+response to the music follows its place in the hierarchy.
+
+| layer | what | how it moves | why |
+|---|---|---|---|
+| **Architecture** | everything built | the only thing that deforms, and only continuously: breathing, proportion drift, growth, compression, unfolding | the world is the subject |
+| **The figure** (hero) | one tiny human silhouette (motif 3) | **never moves, never deforms, never reacts** | the brief's "a stable object surrounded by a dramatically transforming environment" gives scale and contrast. It is the still point. |
+| **One living thing** (optional) | a single small plant or sapling from the existing nature assets, standing in the sun patch of the first corridor | stable; a faint sway only in the release's open air | the only living thing in the building, lonely and hopeful. It is the landmark that proves the loop corridor is the same corridor (The Exit 8's baseline). In the release it stands in real daylight: the fake sun has become the real one. It is used only if it passes the shot test and its licence allows it. |
+| **The beacon** | a light in a doorway | answers the voice only | the way forward, and the self |
+| **Motes** | particles in the light shafts | the most reactive layer (the hats) | fine, small, bright: the high end |
+
+**Nothing else.** No furniture, rocks, mushrooms or creatures. An empty building is the point.
+
+## 6b. Effects
+
+- **Used:**
+  - **fog and aerial perspective**, the main tool, doing most of the work;
+  - **volumetric shafts and halos**, few;
+  - **restrained bloom**;
+  - **the pencil edge line**, fogged;
+  - **motes**;
+  - **the palette-driven grade**;
+  - **natural motion blur** while the camera moves (it smooths the loop's faster walk);
+  - **one dolly zoom** (bars 76-79);
+  - a faint static vignette.
+- **Not used**, because each is either an audio-visualiser cliché or breaks the dream's clarity:
+  - chromatic aberration or colour separation;
+  - glitch effects;
+  - grain;
+  - camera shake;
+  - flashes and strobes;
+  - lens flares;
+  - pulsing vignettes;
+  - kaleidoscopes;
+  - depth-of-field racking.
+
+  The distorted-synth idea of §5 of the brief is carried by the near-field tremble alone.
+
 ## 7. The film, section by section
 
 Times are in seconds and bars (`SONG-ANALYSIS.md`). "Speed" is the camera's walking speed. "Coupling" is how
@@ -257,11 +319,11 @@ coupling as modulation).
   pauses at the first side doorway to look into an empty room.
 - **The first wrongness (bar 6):** when the bass pulse enters, a patch of warm sunlight lies on the corridor
   floor, though the windows face only fog. It is the first thing that is wrong, and it is small.
-- **The loop (bars 8-12):** the corridor ends at a stair going up. The camera climbs it, turns on the landing,
-  climbs again, and arrives at the top in **the same corridor**, seen from its far end. The sun patch and the
-  beacon are there, now behind it.
-  - This is the "map move" (Panic Room) that teaches the space, and the first impossibility, shown in one view: the
-    stair we just climbed is visible through a doorway **below** us.
+- **The loop (bars 8-12):** partway down, a side opening leads to a stair going up. The camera climbs it, turns on
+  the landing, climbs again, and steps out at the top into **the same corridor, at its beginning**. The frame is
+  the film's opening frame again: the same side doorway, the sun patch, and the beacon still far away at the end.
+  - This is the "map move" (Panic Room) that teaches the space. It is also the first impossibility, shown in one
+    view by the rhyme of the frame (Marienbad): we climbed two flights and arrived where we started.
   - It is unhurried and not dramatic. The viewer should half-notice it.
 - **The riser (bars 13-17):** the camera finds a second stair, wider, rising towards brighter light. With the
   riser it climbs a little faster, and the light ahead grows. At the top, on the gap (bar 17 beat 4), it stops for
@@ -299,9 +361,15 @@ breathing begins. A very low-frequency warp and ±1.5 % of room scale make the s
 through a slow spring (rule 9: bass is large, heavy and slow). **Colour:** K0 → K1 over the first two bars.
 **Coupling:** 0.7.
 
+**The hook.** The "all you got" chop (once a bar, 30.5-54.6 s) is a voice, so it goes to the voice's behaviour:
+**the beacon high on the far wall glows a little warmer with each "all you got"**. It is one soft swell per bar,
+the only thing in the hall that answers the hook. It makes the owner's "all you got" motif visible without a
+visual hit on every repetition.
+
 **Why:** "The world suddenly feels alive," not "more geometry". Energy is expressed as scale, light, colour and
 confidence, while the loneliness stays: one tiny figure in an empty hall. The "all you got" hook is a groove here,
-not a question. The same words come back at bar 76 as a question, and the space will answer differently.
+not a question. The same words come back at bar 76 as a question, and the beacon answers them in the same way from
+the end of the loop corridor. That rhyme is the motif.
 
 ---
 
@@ -484,6 +552,10 @@ stops on bar 83 beat 3 (181.35 s).
   beat, so the pulse is in the space.
 - **The dolly zoom:** the beacon at the end **never gets closer**. As the camera walks, the field of view widens
   so the far doorway holds its size while the corridor stretches (Vertigo; the tension of effort without arrival).
+  - This happens on the first pass only, bars 76-79: roughly 60 m to 25 m from the doorway while the field of view
+    opens from 45° to 90°.
+  - With each "is that all you" the beacon swells exactly as it did for "all you got" in the hall. It is the same
+    answer to the same words, now out of reach.
 - **The first pass:** at the end of the phrase the camera passes through a side doorway and is **at the start of
   the same corridor**. The sun patch has moved; nothing else has.
 - **Compression:** each pass the corridor is a little narrower and a little lower. There is no bass, so there is
@@ -543,6 +615,9 @@ harmony descending to F every four bars. "Let it go", repeated.
   - It is standing on a landing in the open air. The ceiling is gone and there is sky.
   - The walls of the stairwell it came through are **separating**, drifting slowly apart in the daylight like the
     petals of something opening.
+  - This is **unfolding, not breaking**. The planes move in order, symmetrically, and keep their relationships.
+    There is no debris and nothing tumbles. The addendum asks the end to be "more coherent, less fragmented", so
+    the building opens the way a map unfolds.
   - The palette opens to the whole wheel for the first time: sky blue, white sun, the rose and ultramarine planes
     from the dance section returning, and the plaster lit warm.
 - **The climb:** a long stair goes up from the landing into the open. It began inside and ends in the air
@@ -576,27 +651,28 @@ it **up** a stair into daylight. The same words and the same motif, in the oppos
     it.
   - Each "for your life" is phrase-long, and the camera passes one doorway per call: "steps in a process" made
     literal, calmly.
-- **Bar 108:** the camera arrives beside the figure and turns to look where it looks. **Below them lies the whole
-  building:**
-  - the first corridor;
-  - the hall;
-  - the enfilade;
-  - the Penrose stairwell;
-  - the growing room.
-  - Every space of the film is laid out and **coherent**, its impossible connections visible at last as one
-    beautiful object.
-- **The alignment:** the scattered fragments drift into alignment, so from this one point they read as **a single
-  doorway framing the sun** (Whitney's differential alignment; the single-viewpoint illusion of OK Go's video). It
-  is the film's one optical trick, kept for the moment the labyrinth makes sense.
+- **Bars 108-109, looking back:** the camera arrives beside the figure and turns to look where it looks. Far below,
+  small and roofless in the fog, lies **the first corridor**, where the film began. It is the only room left
+  whole: the place we were lost in, seen at last from outside and small.
+- **Bars 110-113, looking forward:** the camera turns back towards the sun. The scattered doorframes and wall
+  planes ahead drift slowly into alignment until, from this one point, they read as **a single doorway framing the
+  sun** (Whitney's differential alignment; the single-viewpoint illusion of OK Go's video).
+  - The beacon, which was always one room away, turns out to be the sun.
+  - It is the film's one optical trick, kept for the moment the labyrinth makes sense.
 
-**Camera:** 1.2 m/s climbing, arriving and turning at bar 108, then almost still, rising slowly. **Architecture:**
-the fragments settle, then align. **Colour:** K10 → K11. The brightest value in the film is at bar 108, and chroma
-is moderate: clarity, not spectacle. **Coupling:** 0.5 → 0.4.
+**Camera:** 1.2 m/s climbing, arriving and turning at bar 108, then almost still, rising slowly and turning to the
+sun by bar 110. **Architecture:** the fragments settle, then align. **Colour:** K10 → K11. The brightest value in
+the film is at bar 108, and chroma is moderate: clarity, not spectacle. **Coupling:** 0.5 → 0.4.
 
 **Why:** the culmination "should feel like it has progressed somewhere rather than merely becoming more intense".
-The labyrinth seen whole from above is Superliminal's resolution: the confusion resolves when seen from the right
-place. The figure, lost at the start of verse 1, is found. The song's loudest bars are the film's calmest
-understanding. That is the contrast the owner asked for.
+Two simple images carry it:
+- looking back at the corridor, now small, says how far the walk has come;
+- the fragments aligning into one doorway is Superliminal's resolution: confusion resolves when seen from the right
+  place.
+
+The figure, lost at the start of verse 1, is found. The song's loudest bars are the film's calmest understanding.
+That is the contrast the owner asked for. Only one space is shown from above, deliberately: a panorama of every
+room would be a demonstration.
 
 ---
 
@@ -628,7 +704,7 @@ everything.** The coupling column in §7 scales them all.
 | **The eighth-note pulse** (bars 76-83) | none | **Architecture passing**: sodium lights spaced so they pass overhead with the pulse at the camera's speed | the loop | everywhere else |
 | **Hats and high percussion** (7-16 kHz onsets) | attack 50 ms, release 0.6 s | **Motes glint** in the light shafts; a faint shimmer on the fogged edge lines. Highs are small, fine and bright. | dance, "feel it grow" (motes rise), "is that all?" (offbeat glints) | "let it go", the break, "is that all you" (no hats in the music) |
 | **Noise sweeps at phrase ends** (spectral flatness peaks) | a one-bar envelope | **Nearby surfaces tremble**: tiny, high-frequency, only within a few metres. Roughness is local and jagged. | about eight phrase ends (bars 29, 33, 41, 54, 58, 62, 66, 99) | everywhere else. It is rare on purpose. |
-| **The voice** (centre-panned harmonic energy, 250 Hz-4 kHz) | attack 0.2 s, release 1.5 s | **The beacon warms and brightens a little; the gaze eases towards it.** The voice steers attention (Chion). | wherever the voice sings, most of all "let it go" and "feel it grow" | the break; instrumental passages (the gaze wanders) |
+| **The voice** (centre-panned harmonic energy, 250 Hz-4 kHz) | attack 0.2 s, release 1.5 s | **The beacon warms and brightens a little; the gaze eases towards it.** The voice steers attention (Chion). | wherever the voice sings, most of all "let it go" and "feel it grow"; one soft swell per "all you got" (bars 14-25) and per "is that all you" (bars 76-83), the hook's rhyme | the break; instrumental passages (the gaze wanders) |
 | **Harmony** (the bar's chord) | one-bar crossfade | **Fog hue drifts a few degrees** (Cm cool, F warm): the fast colour voice | throughout, at a very small depth | none |
 | **Section** (the score) | the timeline, 4-8 bar curves | **Palette position, coupling, camera speed, architecture state**: the slow voices | throughout | — |
 | **Silence** | — | **Real absence**: the breathing stops, the motes hang, the camera holds | bar 1; bar 17 beat 4 (one beat); bar 42; bars 74-75; bar 91 beats 3-4; the tail | — |
@@ -659,8 +735,8 @@ threshold at a phrase boundary, and each swap is a moment the music also turns.
 
 The release at bar 92 is earned by four things set up earlier and withheld until then:
 
-1. **Daylight** has been withheld for 200 s, glimpsed once through a doorway at "feel it grow", and then taken away
-   by the loop.
+1. **The sky and the sun** have been withheld for 200 s, glimpsed once through a doorway at "feel it grow", and
+   then taken away by the loop.
 2. **The beacon** has been visible and unreachable since the first shot. At bar 92 we pass through it.
 3. **The palette** has been narrowed to one hue for 34 s just before. Opening to the full wheel is the largest
    colour change the film can make, and it is made once.
@@ -753,6 +829,21 @@ anything visible.
 |---|---|
 | **Chapters** are not ready | Run the whole film in two cells: the corridor (A) and a combined stairwell and hall (B + D). Morph the corridor into the enfilade. Let the release open cell A itself (the walls separate and the ceiling lifts). The loop still returns to the first corridor, and the arc survives. |
 | **One material per world** | Colour planes become light instead of paint: the rose comes from coloured light falling on the plaster. The palette still works, with less graphic power. |
-| **The figure** reads wrong | Drop it. Scale comes from door heights, risers and rails. The bar-108 arrival becomes the camera alone at the top, looking down on the whole building. |
+| **The figure** reads wrong | Drop it. Scale comes from door heights, risers and rails. The bar-108 arrival becomes the camera alone at the top, looking back at the first corridor and then turning to the sun. |
 | **Performance** in the open (long rays and many fragments) | Fog out far fragments sooner, and bring `maxDistance` in to the fog's reach. The release reads through light and sky more than geometry. |
 | The **room-growth** or **separation** transforms clip the camera | Author the path along the transform's invariant axis (the room grows away from the path), and rely on the collision guard as a safety net. |
+
+## 15. What LIVE can inherit later (a separate deliverable)
+
+The addendum makes LIVE a separate experiment, so nothing here is compromised for it. The vocabulary of §8
+transfers without the timeline:
+- breathing from the live bass;
+- the walker's pace from the live tempo and energy (`integrate`, with a floor so it never stops unless asked);
+- motes from the live hats;
+- the tremble from live roughness;
+- the beacon from a live voice or a chosen MIDI channel;
+- palette position and coupling on two MIDI controls;
+- the cells and their screws as an endless world to walk.
+
+What LIVE cannot inherit is the story: the withheld daylight, the loop and the exit are authored, and belong to
+the film.
