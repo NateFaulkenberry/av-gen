@@ -1,6 +1,6 @@
 # Sonic Garden POC: progress
 
-Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020).
+Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1022).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
 the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
@@ -26,7 +26,8 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | 4 interpreter | done | `src/sonic/interpret_source.*` (source kind `interpret`) |
 | 5 test material + scene (engineering) | done | `tools/make_sonic_material.py`, `examples/sonic-garden/` |
 | 5 art (mappings, families, look, §34-36) | pass 1 done (art agent, 2026-09-30) | see "Art pass 1" below; `tools/sonic_garden_look.py` |
-| 6-7 | not started | live input and live MIDI are Phase 7 |
+| 5 engineering follow-up | done (2026-09-30) | twist normals (ADR-1021), sky rebuild tolerance (ADR-1022), live-rate profile; see "Engineering follow-up" |
+| 6-7 | not started | live input and live MIDI are Phase 7; the owner's next brief is `01-brief-live.md` (not started: the owner reviews the art first) |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
 
@@ -235,7 +236,7 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 
 ### Found while doing it (for the engineering agent)
 
-- **Twist deformers invert normals past 90 degrees of turn.** `shaders/procedural.wgsl`, `vs_proc`: the finite-
+- **(Fixed by ADR-1021, see "Engineering follow-up".) Twist deformers invert normals past 90 degrees of turn.** `shaders/procedural.wgsl`, `vs_proc`: the finite-
   difference normal is flipped whenever `dot(nw, nRef) < 0`, where `nRef` is the *undeformed* normal. Any twist whose
   angle passes 90 degrees (always, once `speed * t` has run for a while) turns the band of faces around the axis inside
   out: a sphere with `twist speed 0.3` renders a black equator from about 5 s on (the caps, whose normals lie along the
@@ -244,7 +245,7 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
   and spins are `time.seconds` rotation routes (which rebuild the instance cloud per frame, cheap for these nodes,
   and are held inside the +-360 degree parameter range for 31.5 s).
 - Interpreter parameters clamp silently: `bias` is +-4 and `gain` +-16, so a mapping authored with bias -9 runs at -4.
-- **The sky's lighting cube is rebuilt every frame.** The world palettes drive `env/sky/zenithColor`,
+- **(Fixed by ADR-1022.) The sky's lighting cube is rebuilt every frame.** The world palettes drive `env/sky/zenithColor`,
   `horizonColor` and `haze` through slow chains, which never quite settle, and the renderer rebuilds the procedural
   sky (a 1024 cube with prefiltered mips) whenever a sky value moves. Measured by A/B on 10 s of the pad at 1080p:
   38.5 s with the 25 sky routes, 32.4 s without, so about 20 ms a frame. The log's "procedural sky built in ~110 ms"
@@ -260,12 +261,108 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 
 ### Next
 
-- Engineering: the twist normal fix above (with a render test); Phase 6/7 as planned. When live input arrives, the
+- Engineering: the twist fix and the sky fix are done (ADR-1021, ADR-1022) and the live-rate profile taken;
+  Phase 6/7 wait for the owner's art review (the next brief is `01-brief-live.md`). When live input arrives, the
   families and gestures here need no change (they read bus signals), but `silence` and the slow tier will define how
   a live world starts and how fast it changes; tune `mass`'s bias and the family sharpness on real material first.
 - Art: the §35 bell sustained section is still partly organic (0.34: a slow, single bell note genuinely reads soft
   and warm), which confounds "same timbre, different context" there; the pad version is the clean §35
   demonstration.
+
+## Engineering follow-up (engineering agent, 2026-09-30)
+
+The art is final; nothing here changes how the Sonic Garden looks (measured below).
+
+### 1. Twist normals (ADR-1021) -- fixed
+
+- Cause: `vs_proc` flipped the finite-difference normal when it faced away from the *undeformed* normal, so any
+  twist past 90 degrees rendered its band inside out.
+- Fix: the flip comes from the chain's handedness only (object-matrix determinant x instance scale sign x a path
+  deformer with negative `pathScale`). It is computed *before* the three `deformChain` calls: the same arithmetic
+  placed after them cost 2 ms GPU a frame at 1080p (shadow 0.85 -> 2.4 ms) with identical images. Where it is now,
+  the Sonic Garden's GPU median is 37.09 ms against head's 36.96 (same binary, shader directory swapped).
+- Test: `[adr1021]` in `tests/rendering/test_procedural_gpu.cpp` renders a sphere twisted by a half-turn phase,
+  by +-344 degrees, and with speed 0.3 at 10 s, against the plain sphere. Before: mean abs diff 74 / 37 / 72, 17% /
+  12% / 16% of the lit sphere darkened, 6 failed assertions. After: passes.
+- Frame diffs (960x540, head binary; before = head shaders, after = fixed; noise floor = a second head render,
+  bit-identical everywhere):
+
+  | project | 1 s | 12 s | 20 s | reading |
+  |---|---|---|---|---|
+  | Sonic Garden pad, bell, perc, morph, context-pad | 0 | 0 | 0 | bit-identical (also at 6 s) |
+  | Sonic Garden bass | 0.00% px | 0.10% px | 0.22% px | the fractured hero's folded facets (below) |
+  | Temple | 0.01% px | 0 | 0 | |
+  | Worlds | 0 | 0.6% px | 29% px, mean 5.9 | its pillars/spiral twist speed passes 90 deg |
+  | Helix | 0.04% px | 17% px, mean 2.4 | 17% px, mean 2.2 | world twist, speed 0.15 |
+  | Hyperspace | 1.7% px | 2.7% px | 19% px, mean 1.5 | world twist along the tunnel |
+  | Cathedral | 2.9% px | 5.3% px | 14% px, mean 0.5 | rosette/ornaments speed 0.35/0.5 |
+  | Chamber | 12% px, mean 0.2 | 4.9% | 7.6% | world ring twist along a 100 m+ tunnel |
+  | Lab | 0.45% px | 0.47% | 0.44% | the D_twist column |
+
+  Every change measured is on twisted geometry whose angle had passed 90 degrees (Helix and Worlds inspected by
+  eye: the twisted blades and pillars now shade consistently with the key, where some faces were lit as if
+  facing away). Triptychs of before/after/diff were made in the session scratchpad, not kept. The one change that is not a twist past 90 degrees is folds: where the bass hero's noise and
+  displacement fold facets over, the old test forced their normals back and the fragment stage's `frontFacing`
+  correction then darkened them. 0.1-0.2% of the bass's pixels, small dark flecks on the core become lit.
+- The art's workaround (spins as `time.seconds` rotation routes, no twist speed) is no longer needed but is left as
+  it is: the art is final.
+
+### 2. The sky rebuilding every frame (ADR-1022) -- fixed
+
+`scene::skyWithinRebuildTolerance`: the renderer keeps the built cube while every sky colour is within 1/128 of
+its brightest channel + 1e-5, every scalar within 1/128 + 1e-5, and the sun within 0.25 mrad of the sky it was
+*built* from (so drift adds up and still rebuilds). Against a rebuild on every frame, same session, head shaders:
+
+| clip | builds before -> after | render time | frames differing | worst pixel |
+|---|---|---|---|---|
+| pad 0-10 s, 960x540 | 301 -> 75 | 17.8 -> 13.6 s | 254 of 300 | 1 level (mean 0.02) |
+| morph 8-24 s, 640x360 | 481 -> 169 | 20.3 -> 16.6 s | 479 of 480 | 1 level (mean 0.01) |
+| perc 0-12 s, 960x540 | 361 -> 111 | | 304 of 360 | 1 level |
+| night-shift 0-20 s (sequence-keyed sky) | 2 -> 2 | 23.0 -> 23.1 s | 0 | 0 |
+
+GV3 was suggested as the sky-routed project, but it sets `env/sky/*` only as static parameters; night-shift keys
+its sky's colours on a sequence and is unchanged. Seeks build the exact sky; playback may carry one up to the
+tolerance old (at most one 8-bit level on this material).
+
+### 3. Live-rate profile (§29 criterion 7)
+
+Headless fixed-step playback (`--headless --range 6: --frames 360 --bench-json`), Apple M2 Max, Metal, 12 warm-up
+frames, 348 measured. "1080 preview" is `--tier preview` at 1920x1080 (the editor's preview scale); "360" is
+640x360 at the default tier. The editor window itself was not driven (no display session); headless is the same
+renderer without ImGui. GPU = timestamp median; CPU = the render thread's own work excluding the wait on the GPU.
+
+| variant | size / tier | wall p50 / p90 ms | GPU p50 ms | CPU (excl. GPU wait) ms | top GPU passes (ms) | sky builds /360 |
+|---|---|---|---|---|---|---|
+| pad | 1080 default | 40.1 / 45.6 | 37.4 | 1.3 | volume.march 21.0, scene 12.4 | 95 |
+| bell | 1080 default | 37.9 / 44.2 | 35.4 | 1.1 | volume.march 21.0, scene 10.3 | 102 |
+| bass | 1080 default | 39.1 / 44.4 | 36.2 | 1.5 | volume.march 21.0, scene 11.0 | 94 |
+| perc | 1080 default | 38.4 / 44.4 | 35.6 | 1.5 | volume.march 21.0, scene 10.7 | 120 |
+| pad | 1080 preview | 20.9 / 26.5 | 18.4 | 1.1 | scene 11.3, volume.march 4.5 | 95 |
+| bell | 1080 preview | 19.0 / 25.2 | 16.6 | 1.0 | scene 9.5, volume.march 4.5 | 102 |
+| bass | 1080 preview | 20.3 / 25.5 | 17.5 | 1.4 | scene 10.2, volume.march 4.5 | 94 |
+| perc | 1080 preview | 21.9 / 29.3 | 17.0 | 2.5 | scene 9.9, volume.march 3.9 | 120 |
+| pad | 640x360 | 15.6 / 21.7 | 13.2 | 1.0 | scene 6.0, volume.march 5.7 | 95 |
+| bell | 640x360 | 13.8 / 25.0 | 11.6 | 0.9 | volume.march 5.7, scene 4.3 | 102 |
+| bass | 640x360 | 14.4 / 30.3 | 12.3 | 0.8 | volume.march 5.7, scene 5.0 | 94 |
+| perc | 640x360 | 14.8 / 21.3 | 12.5 | 1.0 | volume.march 5.7, scene 5.0 | 120 |
+
+Before the sky fix (head binary, 1080 default): wall p50 43.2-45.3 ms, CPU 6.7-6.9 ms, 360 of 360 frames rebuilt
+the sky; the environment update was 6.1-6.5 ms a frame, now 1.6-2.1 ms.
+
+The sonic subsystem's own cost, per frame, from the same runs: the whole signal update (which includes the Sonic
+Character walk, the note context and the publish) 3-9 us; all modulation (the two interpret sources and 251 routes)
+16-37 us; the scene evaluation (controller) 0.3-0.6 ms. The load-time timbre pass is unchanged (about 0.2 s per
+20 s of audio). The Sonic Garden's frame is GPU-bound and the sonic system is not a measurable part of it.
+
+Architectural findings, recorded, not optimised:
+- **The volumetric march is 56% of the 1080 frame**: 21.0 ms, constant across the four worlds, although three of
+  them run almost no fog (crystalline 0.0002 density). It is the default tier's 48 steps at a 960x540 target; the
+  preview tier cuts it to 4.5 ms. For live use at 1080 the preview tier or a density-gated march is the lever.
+- **The remaining sky rebuilds are p90 spikes**: each build at the default tier is about 6 ms of blocking CPU
+  (47 ms at the offline tier's 1024 faces), and 26-33% of frames still build while the worlds are moving. The p90
+  wall is 5-6 ms above the median for that reason. Amortising the prefilter across frames would remove the spike;
+  not done (not needed for correctness, and the p50 is GPU-bound).
+- At preview tier 1080 the garden runs at about 48-53 fps, at 640x360 about 65-72 fps: live use is viable.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
@@ -367,6 +464,14 @@ Full CPU suite (`avgen_tests`, under the GPU lock), at `c6d2475e`:
 - `avgen_render_tests` was not run: no renderer or shader code changed.
 - The Analysis panel's Sonic section compiles and is wired, but I did not see it on screen (ImGui is not
   captured headless).
+
+Engineering follow-up, at `41aa1cf7`, reconfigured, both suites under `tools/gpu-lock.sh`, one after the other:
+
+- `avgen_tests`: exit code 0; 3,903 cases, 3,883 passed, 19 skipped, 1 failed as expected (the `[!shouldfail]`
+  slope lean, `test_character_lab_slopes.cpp:187`).
+- `avgen_render_tests`: exit code 0; 556 cases, 555 passed, 1 skipped.
+- New cases: `[adr1021]` (GPU, twist normals), `[adr1022]` (unit tolerance, and a GPU case counting
+  `environmentBuildCount()` through the renderer).
 
 ## Open items / known limits
 
