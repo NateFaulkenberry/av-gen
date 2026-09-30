@@ -54,7 +54,7 @@
       "children": [
        {
         "kind": "twist",
-        "amount": 0.0,
+        "amount": 0.012,
         "name": "spiral",
         "children": [
          {
@@ -349,7 +349,7 @@
     0.42,
     1.0
    ],
-   "intensity": 45.0,
+   "intensity": 60.0,
    "range": 18.0,
    "castsShadow": false
   },
@@ -366,7 +366,7 @@
     0.42,
     1.0
    ],
-   "intensity": 45.0,
+   "intensity": 60.0,
    "range": 18.0,
    "castsShadow": false
   },
@@ -383,7 +383,7 @@
     0.42,
     1.0
    ],
-   "intensity": 45.0,
+   "intensity": 60.0,
    "range": 18.0,
    "castsShadow": false
   },
@@ -400,7 +400,7 @@
     0.42,
     1.0
    ],
-   "intensity": 45.0,
+   "intensity": 60.0,
    "range": 18.0,
    "castsShadow": false
   },

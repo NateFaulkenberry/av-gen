@@ -327,7 +327,7 @@ SPRING = 15.0    # the vault's springing height above the floor
 WALL = 13.0      # the outer walls (|z|)
 
 
-def hall_structure(imposts=True):
+def hall_structure(imposts=True, smooth=None):
     y = lambda h: Y0 + h
     # Base, shaft and impost as three repeated rows (not one repeated union): one unary level fewer.
     piers = mirror((0, 0, 1), rep((BAY, 0, 0), T((0, y(SPRING / 2), NAVE), rbox((0.85, SPRING / 2, 0.85), 0.1, name="pier"),
@@ -341,6 +341,8 @@ def hall_structure(imposts=True):
     portals = T((BAY / 2, y(4.6), WALL), rep((BAY, 0, 0), box((1.5, 4.6, 1.2), name="portal"), name="portals"))
     walls = mirror((0, 0, 1), D(slab_x(WALL, 0.5, y(-1), y(SPRING + 1)), portals))
     parts = [floor_plane(), vault, walls, piers, bases] + ([imposts_] if imposts else []) + [ribs]
+    if smooth is not None:
+        return SU(smooth, *parts, name="hall")
     return U(*parts, name="hall")
 
 
@@ -569,7 +571,7 @@ def radial_lights():
     # A dim lamp in the oculus (looked at straight on, a bright one fills the frame with its halo), four
     # blue lamps between the rings, and the restrained green low in the chapels' ring.
     return [point_light("oculus", (0, Y0 + 34, 0), BLUE_LIGHT, 90.0, 40.0)] + \
-           [point_light(f"ring{i}", (18 * math.cos(a), Y0 + 20, 18 * math.sin(a)), BLUE_LIGHT, 45.0, 18.0)
+           [point_light(f"ring{i}", (18 * math.cos(a), Y0 + 20, 18 * math.sin(a)), BLUE_LIGHT, 60.0, 18.0)
             for i, a in enumerate([k * math.pi / 2 + math.pi / 4 for k in range(4)])] + \
            [point_light(f"chapel{i}", (36 * math.cos(a), Y0 + 3, 36 * math.sin(a)), GREEN_LIGHT, 20.0, 12.0)
             for i, a in enumerate([k * math.pi / 2 for k in range(4)])]
@@ -579,22 +581,22 @@ def preset_radial():
     # The eye stands at the centre and looks straight up: every polar repeat becomes rotational symmetry
     # about the view axis. The twist is about that same (vertical) axis, so it winds columns and ribs into
     # a spiral without breaking the symmetry.
-    root = R((0, 0, 0), twist(0.0, rotunda_structure(), name="spiral"), name="turn")
+    root = R((0, 0, 0), twist(0.012, rotunda_structure(), name="spiral"), name="turn")
     sc = scene("Radial Architecture", root, still_camera((0.25, Y0 + 1.7, 0.15), (0.6, Y0 + 70.0, 0.35), 84.0),
                env=environment(0.022), lights=radial_lights(), march={"stepScale": 0.7})
     routes = [
         # Mid sets the radial density: the inner ring gains columns as the mids rise.
         route("audio.mid", P("ringA", "count"), 8.0, attack=900, decay=4000),
         route("audio.highMid", P("domeRibs", "count"), 12.0, attack=900, decay=4000),
-        # Low-mids wind the whole rotunda into a spiral about the view axis, slowly.
-        route("audio.lowMid", P("spiral", "amount"), 0.035, attack=2500, decay=7000),
+        # Low-mids wind the whole rotunda further into its spiral about the view axis, slowly.
+        route("audio.lowMid", P("spiral", "amount"), 0.03, attack=2500, decay=7000),
         # Each bar turns the rotunda by a whole bay of the outer ring or back: a combination lock.
         route("random.bar", P("turn", "rotation"), 15.0, component=1,
               extra={"chain": dict(step_chain(), attackMs=600, decayMs=600)}),
         route("audio.treble", "sdf/space/look/edge/intensity", 1.6, attack=60, decay=900),
     ]
     pr = project("radial", "radial-architecture.scene.json", routes=routes,
-                 params={"sdf/space/look/edge/intensity": 3.2},
+                 params={"sdf/space/look/edge/intensity": 3.6},
                  sources=[random_source("bar", "music.bar", 1009)])
     return {"radial-architecture": (pr, sc)}
 
@@ -675,29 +677,29 @@ def show_values(stage):
         "state": 0.0, "hroll": 0.0, "hfold": FOLD_NEAR_OFF, "hrad": 0, "nave": NAVE, "bay": BAY, "round": 0.1,
         "nestCount": 0, "rules": 0.0, "spin": 0.0, "density": 0.028, "eye": eye, "target": hall_t, "heart": 0.0,
         "edge": 2.6, "edgeW": 0.05, "fov": 68.0, "lampY": Y0 + 11.0, "lamp": 80.0, "turn": 0.0, "scatter": 1.0,
-        "ev": -0.2,
+        "ev": -0.2, "sat": 1.15,
     }
     if stage == "Proportion":
         v.update(nave=8.5, bay=9.5, rules=0.2)
     elif stage == "Strange":
-        v.update(nave=8.5, bay=9.5, hroll=0.006, rules=0.55)
+        v.update(nave=8.5, bay=9.5, hroll=0.006, rules=0.55, sat=1.2)
     elif stage == "Folded":
-        v.update(nave=8.5, bay=9.5, hroll=0.004, hfold=-20.0, rules=0.8, heart=12.0, ev=-0.1)
+        v.update(nave=8.5, bay=9.5, hroll=0.004, hfold=-20.0, rules=0.8, heart=12.0, ev=-0.1, sat=1.25)
     elif stage == "Cathedral":
         v.update(nave=8.5, bay=9.5, state=1.0, hroll=0.004, hfold=-20.0, nestCount=4, rules=0.8,
-                 heart=30.0, target=[22.0, Y0 + 5.5, 0.0], density=0.026, ev=-0.05)
+                 heart=30.0, target=[22.0, Y0 + 5.5, 0.0], density=0.026, ev=-0.05, sat=1.25)
     elif stage == "Mathematical":
         # the hall returns as pure symmetry: four copies of its vault about the line of sight
         # (the chamber turned a quarter so each sector holds a colonnade, its portals and a strip of floor)
         v.update(hrad=4, rules=0.4, eye=AXIS_EYE, target=[40.0, 0.0, 0.0], fov=58.0, lampY=0.0, lamp=10.0,
-                 density=0.028, turn=90.0, edgeW=0.06, scatter=0.6, ev=0.05)
+                 density=0.028, turn=90.0, edgeW=0.06, scatter=0.6, ev=0.05, sat=1.32)
     elif stage == "Abstraction":
         v.update(hrad=6, hroll=0.02, hfold=-24.0, rules=1.0, spin=1.0, eye=AXIS_EYE, target=[40.0, 0.0, 0.0],
                  fov=50.0, lampY=0.0, lamp=12.0, density=0.028, edge=3.6, edgeW=0.075, turn=90.0, scatter=0.6,
-                 ev=0.25)
+                 ev=0.25, sat=1.5)
     elif stage == "Unwinding":
         v.update(hrad=3, hroll=0.008, rules=0.5, spin=0.5, eye=AXIS_EYE, target=[40.0, 0.0, 0.0], fov=58.0,
-                 lampY=0.0, lamp=16.0, density=0.026, turn=90.0, edgeW=0.06, scatter=0.7, ev=0.05)
+                 lampY=0.0, lamp=16.0, density=0.026, turn=90.0, edgeW=0.06, scatter=0.7, ev=0.05, sat=1.3)
     elif stage == "Reformed":
         # the hall again, under new rules: a wider nave, a slower rhythm, round columns
         v.update(nave=10.0, bay=11.0, round=0.8, rules=0.3)
@@ -715,6 +717,7 @@ def show_values(stage):
         "camera/fov": [v["fov"]], "lights/heart/intensity": [v["heart"]], "sdf/space/look/edge/intensity": [v["edge"]],
         "sdf/space/look/edge/width": [v["edgeW"]], P("hspin", "rotation"): [0.0, v["turn"], 90.0],
         "scene/volumeScattering": [v["scatter"]], "camera/exposure/compensation": [v["ev"]],
+        "post/grade/saturation": [v["sat"]],
     }
     for i in range(5):
         out[f"lights/nave{i}/position"] = [10.0 + 16.0 * i, v["lampY"], 0.0]
@@ -792,6 +795,34 @@ def preset_showcase():
     return {"showcase": (pr, sc)}
 
 
+# ---- Experiment (section 40): smooth blending and subtraction as rules ---------------------------------
+
+def preset_experiment():
+    """The hall whose joints the music melts, and a void the music carves out of it.
+
+    - melt: the hall's union is a smooth union; its blend radius k is the rule. At 0 the joints are
+      crisp; as k grows every joint (pier to floor, pier to vault, rib to vault) rounds into the next,
+      the creases the edge light traces disappear, and the building turns into a cave.
+    - void: a sphere subtracted from the whole space, radius 0 at rest. Its radius is the rule: the
+      building is carved open and the haze shows through."""
+    hall = hall_structure(smooth=0.0)
+    root = D(hall, T((24.0, Y0 + 8.0, 0.0), N("sphere", radius=0.0, name="void"), name="voidAt"), name="carved")
+    sc = scene("Experiment: melt and void", root, HALL_CAMERA, env=environment(), lights=nave_lights(),
+               march={"stepScale": 0.7, "maxSteps": 200})
+    # Every 4 bars the next rule: crisp -> melted -> carved -> melted and carved; the bass moves the melt
+    # within each step. (A band alone would leave Rebuild's near-constant bass holding one melt all along.)
+    steps = [(0.0, 0.0), (2.5, 0.0), (0.0, 12.0), (1.5, 12.0)]
+    presets = [{"name": f"exp/{i}", "values": {P("hall", "smooth"): [k], P("void", "radius"): [r]}}
+               for i, (k, r) in enumerate(steps)]
+    routes = [
+        route("audio.bass", P("hall", "smooth"), 0.6, attack=2000, decay=5000),
+        route("audio.treble", "sdf/space/look/edge/intensity", 2.0, attack=60, decay=900),
+    ]
+    pr = project("experiment", "experiment-melt-void.scene.json", routes=routes, presets=presets,
+                 states=fold_states("Exp", steps, every=4, cycle=16, seconds=2.5))
+    return {"experiment-melt-void": (pr, sc)}
+
+
 # ---- validation (the interpreter's limits, docs/sdf.md) ----------------------------------------------
 
 UNARY = {"translate", "rotate", "scale", "twist", "bend", "repeat", "polarRepeat", "mirror", "fold", "recurse",
@@ -828,6 +859,7 @@ PRESETS = {
     "radial": preset_radial,
     "explosion": preset_explosion,
     "showcase": preset_showcase,
+    "experiment": preset_experiment,
 }
 
 

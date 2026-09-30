@@ -19,7 +19,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
 | 2 research | done | `RESEARCH.md`: A (the existing ray marcher) plus E, which comes free; F (a compiled SDF) was the fallback, and measurement made it necessary (ADR-1003) |
 | 3-6 foundation | done and verified on the GPU | ADR-1001 (morph, fold, recurse, names, `count`/`axis`), ADR-1002 (look, march cap, step statistics, prepass and shadow switches), ADR-1003 (compiled trees), `examples/space` |
 | 4 instrumentation | done, measured | see "Performance" |
-| 7, 8, 11 look, presets, evaluation | in progress (art agent, from 01:21 on 2026-09-30) | see "Art pass" |
+| 7, 8, 11 look, presets, evaluation | done (art agent, 2026-09-30 01:21-03:45) | see "Art pass"; media and `ART-NOTES.md` in `~/Desktop/av-gen-review/22-procedural-space/` |
 
 ## What exists (engine)
 
@@ -214,11 +214,21 @@ t = 30 s.
   angle ("hspin") turns the space inside the kaleidoscope.
   - The macro knob `macros/rules` is the `depthSource` of every band route that bends a rule (0 in the
     normal hall, 1.0 at the drop); `macros/spin` gates the kaleidoscope's own routes.
-  - Critic (preview mode, hand-written inputs, bar-aligned pseudo-shots): v1 28 issues (9 medium), v2
-    23 (6 medium, 2 strengths: cuts on the beat, saturation follows the arc; the climax is now the
-    visual peak). v3 adds a per-stage exposure arc (+0.25 EV at the drop) and more air in the
-    kaleidoscope against the shimmer and exposure findings. Reports:
-    `~/.creative-critic/jobs/<job>/report.md`, job ids in `ART-NOTES.md` in the review folder.
+  - Critic (preview mode, hand-written inputs, one bar-aligned pseudo-shot per 8-bar phrase, the stages
+    as segments): v1 28 issues (9 medium); v2 23 (6); v4 24 (7); **v5 (final) 23 (6 medium), 2
+    strengths** (cuts on the beat; saturation follows the intended arc, Spearman 1.0; creative intent,
+    colour, lighting 1.0; the drop is the visual peak). What remains: shimmer in the kaleidoscope (a
+    rotating pattern defeats the metric's global motion compensation), the Critic's music-energy proxy
+    ranking Rebuild's bass-only intro highest, and repeated composition (the still camera). Jobs:
+    `job_1a0f0f956d02a77ff`, `job_1a0f1110706d849d7`, `job_1a0f128c987d5173b`, `job_1a0f13ea0def6b11c`
+    (`~/.creative-critic/jobs/<job>/report.md`).
+- **The experiment** (`experiment-melt-void.json`, section 40): smooth blending (the hall's union is a
+  smooth union; its blend radius is the rule) and subtraction (a spherical void) stepped every 4 bars.
+  Kept out of the showcase: the melt erases the creases the edge light draws.
+- **Final media** (review folder): `showcase.mp4` (v5), `showcase-stages.png`, `preset-<name>.mp4` and
+  `.png` for the five presets, `experiment-melt-void.mp4` and `.png`, `ART-NOTES.md`. Clip windows (song
+  time): hall 57-84, cathedral 118-143, folding 163-192.5, radial 133-158, explosion 148-177,
+  experiment 163-192.5.
 - **The test** `[space]` in `tests/unit/test_space_example.cpp` now also loads every art project,
   checks every route and preset path resolves, every state names a preset, and the eye is in open space
   in every preset (it caught Geometry Explosion's last stage putting a pier through the eye).
@@ -228,6 +238,17 @@ t = 30 s.
 - **Offline speed at 1080p with the volumetric march: about 9.7 fps** (a 226 s showcase is about
   12 minutes).
 - Review media and the Critic's reports: `~/Desktop/av-gen-review/22-procedural-space/`.
+
+## For the engineering agent (from the art pass)
+
+- **Profile the final presets:** `showcase.json` at the kaleidoscope stages (2:28-3:12; 200 steps, step
+  scale 0.65, eye on the axis), `recursive-cathedral.json` (5 levels), and the volumetric march (about
+  16 ms of a 1080p frame). Offline 1080p ran at 8.3-13.5 fps per clip, 9.1 for the showcase.
+- **The unary-nesting limit (8) binds the art**, not the node count: the showcase and Folding Space sit
+  at 8. Relaxing `validate` for compiled trees (they have no stacks) would allow the roll, the
+  kaleidoscope, the bend and a second fold together.
+- **The depth prepass + GTAO lattice** on grazing SDF floors (the art presets turn the prepass off).
+- **Volumetric jitter** shows as speckle in lamp halos with no temporal accumulation.
 
 ## Next steps (engineering)
 

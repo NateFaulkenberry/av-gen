@@ -30,7 +30,7 @@
   "post/output/vignette": 0.4,
   "post/output/grain": 0.0,
   "scene/volumeJitter": 0.5,
-  "sdf/space/look/edge/intensity": 3.2
+  "sdf/space/look/edge/intensity": 3.6
  },
  "sources": [
   {
@@ -70,7 +70,7 @@
   {
    "source": "audio.lowMid",
    "target": "sdf/space/node/spiral/amount",
-   "amount": 0.035,
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,

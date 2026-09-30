@@ -26,7 +26,7 @@
   "post/bloom/threshold": 1.0,
   "post/bloom/emissionWeight": 1.0,
   "post/grade/contrast": 1.1,
-  "post/grade/saturation": 1.25,
+  "post/grade/saturation": 1.15,
   "post/output/vignette": 0.4,
   "post/output/grain": 0.0,
   "scene/volumeJitter": 0.5,
@@ -688,6 +688,9 @@
     "camera/exposure/compensation": [
      -0.2
     ],
+    "post/grade/saturation": [
+     1.15
+    ],
     "lights/nave0/position": [
      10.0,
      4.0,
@@ -833,6 +836,9 @@
     ],
     "camera/exposure/compensation": [
      -0.2
+    ],
+    "post/grade/saturation": [
+     1.15
     ],
     "lights/nave0/position": [
      10.0,
@@ -980,6 +986,9 @@
     "camera/exposure/compensation": [
      -0.2
     ],
+    "post/grade/saturation": [
+     1.2
+    ],
     "lights/nave0/position": [
      10.0,
      4.0,
@@ -1125,6 +1134,9 @@
     ],
     "camera/exposure/compensation": [
      -0.1
+    ],
+    "post/grade/saturation": [
+     1.25
     ],
     "lights/nave0/position": [
      10.0,
@@ -1272,6 +1284,9 @@
     "camera/exposure/compensation": [
      -0.05
     ],
+    "post/grade/saturation": [
+     1.25
+    ],
     "lights/nave0/position": [
      10.0,
      4.0,
@@ -1417,6 +1432,9 @@
     ],
     "camera/exposure/compensation": [
      0.05
+    ],
+    "post/grade/saturation": [
+     1.32
     ],
     "lights/nave0/position": [
      10.0,
@@ -1564,6 +1582,9 @@
     "camera/exposure/compensation": [
      0.25
     ],
+    "post/grade/saturation": [
+     1.5
+    ],
     "lights/nave0/position": [
      10.0,
      0.0,
@@ -1710,6 +1731,9 @@
     "camera/exposure/compensation": [
      0.05
     ],
+    "post/grade/saturation": [
+     1.3
+    ],
     "lights/nave0/position": [
      10.0,
      0.0,
@@ -1855,6 +1879,9 @@
     ],
     "camera/exposure/compensation": [
      -0.2
+    ],
+    "post/grade/saturation": [
+     1.15
     ],
     "lights/nave0/position": [
      10.0,
