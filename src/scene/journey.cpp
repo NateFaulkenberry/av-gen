@@ -249,7 +249,20 @@ JourneyPose journeyPose(const JourneyPath& path, const JourneyView& view) {
     heading = glm::vec2(heading.x * c + heading.y * s, -heading.x * s + heading.y * c);
     elevation = std::clamp(elevation + glm::radians(view.pitchDegrees + swayPitch), glm::radians(-85.0f),
                            glm::radians(85.0f));
-    const glm::vec3 look(std::cos(elevation) * heading.x, std::sin(elevation), std::cos(elevation) * heading.y);
+    glm::vec3 look(std::cos(elevation) * heading.x, std::sin(elevation), std::cos(elevation) * heading.y);
+    if (view.lookAtWeight > 0.0f) {
+        // The point, carried by the same wrap as the camera, so the gaze does not jump at a wrap.
+        const long long w = path.wraps(view.distance);
+        const glm::vec3 at = path.settings().screw.applyPoint(view.lookAt, static_cast<int>(-w * path.wrapCells()));
+        const glm::vec3 to = at - pose.eye;
+        if (glm::length(to) > 1e-4f) {
+            const float k = std::clamp(view.lookAtWeight, 0.0f, 1.0f);
+            const glm::vec3 blended = look * (1.0f - k) + glm::normalize(to) * k;
+            if (glm::length(blended) > 1e-4f) {
+                look = glm::normalize(blended);
+            }
+        }
+    }
     pose.target = pose.eye + look * std::max(view.lookAhead, 1.0f);
     return pose;
 }
@@ -387,6 +400,12 @@ JourneyPose Journey::pose(JourneyView view) const {
     const std::size_t c = chapterAt(view.distance);
     const JourneyChapter& ch = chapters_[c];
     view.distance = localDistance(c, view.distance);
+    // The look-at point from the world into the chapter's frame.
+    glm::vec3 local = view.lookAt - ch.offset;
+    if (ch.yawDegrees != 0.0f) {
+        local = glm::angleAxis(glm::radians(-ch.yawDegrees), glm::vec3(0.0f, 1.0f, 0.0f)) * local;
+    }
+    view.lookAt = local;
     JourneyPose p = journeyPose(paths_[c], view);
     p.eye = ch.toWorldPoint(p.eye);
     p.target = ch.toWorldPoint(p.target);

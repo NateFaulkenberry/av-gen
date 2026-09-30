@@ -4198,6 +4198,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     node.child.reset();
     node.positionParam = nullptr;
     node.journeyDistanceParam = nullptr;
+    node.tintParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
     node.visibleParam = nullptr;
@@ -4449,6 +4450,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         journeySway_ = &params.add(floatDesc(j + "sway", 0.0f, 0.0f, 90.0f, 0.0f, 15.0f));
         journeySwayRate_ = &params.add(floatDesc(j + "swayRate", 0.07f, 0.0f, 10.0f, 0.0f, 1.0f));
         journeyRadius_ = &params.add(floatDesc(j + "radius", journey_->chapter(0).world.radius, 0.0f, 10.0f, 0.0f, 1.0f));
+        journeyLookAt_ = &params.add(vec3Desc(j + "lookAt", glm::vec3(0.0f), -1e5f, 1e5f, -100.0f, 100.0f));
+        journeyLookAtWeight_ = &params.add(floatDesc(j + "lookAtWeight", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f));
     }
     registerCameraChannels(params, reachCam);
     materialParams_.clear();
@@ -5288,6 +5291,11 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.scaleParam =
         &params_->add(vec3Desc(base + "scale", node.transform.scale, 0.001f, 100.0f, 0.01f, 5.0f));
     node.visibleParam = &params_->add(boolDesc(base + "visible", node.visible));
+    if (node.tint) { // ADR-1044
+        params::ParamDesc<glm::vec3> d = vec3Desc(base + "tint", *node.tint, 0.0f, 8.0f, 0.0f, 1.0f);
+        d.isColor = true;
+        node.tintParam = &params_->add(std::move(d));
+    }
     if (node.journeyAnchor) { // ADR-1042
         node.journeyDistanceParam =
             &params_->add(floatDesc(base + "journey/distance", *node.journeyAnchor, -1e6f, 1e6f, 0.0f, 500.0f));
@@ -5691,6 +5699,7 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
     node.sdfParams = {};
     node.positionParam = nullptr;
     node.journeyDistanceParam = nullptr;
+    node.tintParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
     node.visibleParam = nullptr;
@@ -5741,6 +5750,7 @@ void Composition::detach() {
     for (auto& node : nodes_) {
         node->positionParam = nullptr;
         node->journeyDistanceParam = nullptr;
+        node->tintParam = nullptr;
         node->rotationParam = nullptr;
         node->scaleParam = nullptr;
         node->visibleParam = nullptr;
@@ -7805,6 +7815,8 @@ CameraPose Composition::evaluateMainCamera() const {
         view.swayDegrees = val(journeySway_, 0.0f);
         view.swayRate = val(journeySwayRate_, 0.07f);
         view.time = currentTime_;
+        view.lookAt = journeyLookAt_ != nullptr ? journeyLookAt_->value() : glm::vec3(0.0f);
+        view.lookAtWeight = val(journeyLookAtWeight_, 0.0f);
         const JourneyPose jp = guardJourneyPose(journey_->pose(view), journey_->chapterAt(view.distance));
         pose.position = jp.eye;
         pose.target = jp.target;
@@ -8174,6 +8186,16 @@ void Composition::applyParameters() {
             e.emissionGain = (child != nullptr ? child->entities[k].emissionGain : 1.0f) * emissiveBoost;
             if (e.style == MeshStyle::Lit) {
                 e.material.roughness = std::clamp(range.restRoughness[k] * roughnessScale, 0.0f, 1.0f);
+            }
+            if (node.tint) { // ADR-1044
+                if (range.restBaseColor.size() != range.entityCount) {
+                    range.restBaseColor.assign(range.entityCount, glm::vec3(1.0f));
+                    for (std::size_t q = 0; q < range.entityCount && range.firstEntity + q < scene_.entities.size(); ++q) {
+                        range.restBaseColor[q] = scene_.entities[range.firstEntity + q].material.baseColor;
+                    }
+                }
+                const glm::vec3 tint = node.tintParam != nullptr ? node.tintParam->value() : *node.tint;
+                e.material.baseColor = range.restBaseColor[k] * tint;
             }
             if (fading) {
                 // Capture before the first write, once. `restOpacity` is empty on a freshly built
@@ -10036,6 +10058,10 @@ nlohmann::json Composition::toJson() const {
                                                                 : eulerDegrees(node.transform.rotation));
         n["scale"] = vecToJson(node.scaleParam != nullptr ? node.scaleParam->base()
                                                           : node.transform.scale);
+        if (node.tint) { // ADR-1044
+            const glm::vec3 t = node.tintParam != nullptr ? node.tintParam->base() : *node.tint;
+            n["tint"] = {t.x, t.y, t.z};
+        }
         if (node.journeyAnchor) { // ADR-1042
             n["journey"] = {{"distance", node.journeyDistanceParam != nullptr ? node.journeyDistanceParam->base()
                                                                              : *node.journeyAnchor}};
@@ -11415,6 +11441,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(parent.error());
             }
             const std::string parentName = *parent; // applied after every node exists (forward references)
+            if (item.contains("tint")) { // ADR-1044
+                const auto& tj = item.at("tint");
+                if (!tj.is_array() || tj.size() != 3 || !tj[0].is_number() || !tj[1].is_number() || !tj[2].is_number()) {
+                    return fail("node '{}': 'tint' must be [r, g, b]", node.name);
+                }
+                node.tint = glm::vec3(tj[0].get<float>(), tj[1].get<float>(), tj[2].get<float>());
+            }
             if (item.contains("journey")) { // ADR-1042: {"distance": metres along the journey}
                 const auto& jn = item.at("journey");
                 if (!jn.is_object() || (jn.contains("distance") && !jn.at("distance").is_number())) {

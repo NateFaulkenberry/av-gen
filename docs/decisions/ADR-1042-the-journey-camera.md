@@ -35,12 +35,25 @@ positions are 3D keys authored blind against geometry.
   `nodes/<name>/journey/distance`, wrapped with the camera, facing along the path's heading; its position
   becomes an offset in the path frame (x right, y up, z forward).
 
+- **Chapters** (added the same night): `"journey": {"chapters": [...]}`. Chapter c owns the global
+  distances `[start_c, start_{c+1})`; inside it the camera walks the chapter's own path at
+  `from + (d - start)`, wrapped by its own screw, carried into the world by the chapter frame (`offset`,
+  `yaw`, the composition-node convention, so its SDF nodes take the same position and rotation). Nodes and
+  lights a chapter lists are hidden or switched off while the camera is in another chapter, so a parked
+  world costs no march. The swap is a cut in world position at a distance; hide it in a white-out or a
+  threshold whose geometry is identical in both worlds.
+- **A look-at blend**: `camera/journey/lookAt` (a world point, in the journey's unwrapped frame) and
+  `camera/journey/lookAtWeight` (0..1) ease the aim towards a point (the beacon); it holds still across a
+  wrap. `camera/fov` is keyable in every mode (the dolly zoom).
+
 ## Consequences
 
 - Holds are two equal distance keys; audio adds pace through an `integrate` route (ADR-1041).
 - Everything visible must be periodic under S^wrapCells: deformations inside the screw, lights and props
   replicated over the covered cells (`tools/liminal_sdf.py:screw_apply`). Non-periodic things pop at the
   wrap.
+- A swap is at a journey DISTANCE: a route that adds pace moves it in time, out of a white-out keyed to hide
+  it. Keep audio pace off the distance ahead of a swap.
 - No camera roll (the pose has no up vector), so no screw about the travel axis.
 - The walk bob follows the unwrapped distance, so the wrap itself is exact only with no bob; with a bob it
   stays continuous (no pop), which is what the eye needs.

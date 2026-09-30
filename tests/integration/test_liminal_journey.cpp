@@ -382,3 +382,57 @@ TEST_CASE("Palette in the engine: the timeline moves it, it writes its targets, 
     CHECK(saved["palette"]["states"].size() == 2);
     CHECK(saved["palette"]["saturation"].get<float>() == 0.8f);
 }
+
+TEST_CASE("Journey look-at: the gaze eases to a world point and holds still across a wrap", "[liminal][journey][adr1042]") {
+    scene::JourneySettings s;
+    s.path = {{0.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f}};
+    s.screw.translation = {20.0f, 0.0f, 0.0f};
+    auto built = scene::JourneyPath::build(s);
+    REQUIRE(built.has_value());
+    scene::JourneyView v;
+    v.distance = 5.0;
+    v.lookAt = {5.0f, 1.6f, -10.0f}; // straight to the left
+    v.lookAtWeight = 1.0f;
+    auto pose = scene::journeyPose(*built, v);
+    CHECK(glm::normalize(pose.target - pose.eye).z < -0.999f);
+    v.lookAtWeight = 0.5f;
+    pose = scene::journeyPose(*built, v);
+    const glm::vec3 half = glm::normalize(pose.target - pose.eye);
+    CHECK_THAT(static_cast<double>(half.x), WithinAbs(static_cast<double>(-half.z), 1e-3)); // 45 degrees
+    // One wrap on, the same point one wrap on (the unwrapped frame) gives the same aim.
+    v.distance = 25.0;
+    v.lookAt = {25.0f, 1.6f, -10.0f};
+    const glm::vec3 again = glm::normalize(scene::journeyPose(*built, v).target - scene::journeyPose(*built, v).eye);
+    CHECK(dist(again, half) < 1e-4f);
+}
+
+TEST_CASE("Node tint: an opt-in colour multiplier a palette can bind", "[liminal][palette][adr1044]") {
+    app::Engine engine{app::EngineMode::Offline};
+    REQUIRE(engine.setCompositionJson(nlohmann::json::parse(R"({ "format": "avgen-scene", "version": 1, "name": "tint",
+        "nodes": [ { "kind": "orb", "name": "plain", "position": [0, 0, 0] },
+                   { "kind": "orb", "name": "figure", "position": [3, 0, 0], "tint": [0.5, 0.25, 1.0] } ] })"))
+                .has_value());
+    CHECK(engine.params().find("nodes/plain/tint") == nullptr);
+    auto* tint = engine.params().findAs<glm::vec3>("nodes/figure/tint");
+    REQUIRE(tint != nullptr);
+    engine.update(FrameTime{0.0, 0.0, 0});
+    const auto* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    glm::vec3 plain(0.0f);
+    glm::vec3 tinted(0.0f);
+    for (const auto& e : engine.scene().entities) {
+        if (e.transform.position.x < 1.5f) {
+            plain = e.material.baseColor;
+        } else {
+            tinted = e.material.baseColor;
+        }
+    }
+    CHECK(dist(tinted, plain * glm::vec3(0.5f, 0.25f, 1.0f)) < 1e-4f);
+    tint->setBase({0.1f, 0.1f, 0.1f});
+    engine.update(FrameTime{1.0 / 60.0, 1.0 / 60.0, 1});
+    for (const auto& e : engine.scene().entities) {
+        if (e.transform.position.x > 1.5f) {
+            CHECK(dist(e.material.baseColor, plain * 0.1f) < 1e-4f);
+        }
+    }
+}

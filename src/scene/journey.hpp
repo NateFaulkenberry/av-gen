@@ -98,6 +98,11 @@ struct JourneyView {
     float swayDegrees = 0.0f; // amplitude of a slow drift of the aim (the searching gaze)
     float swayRate = 0.07f;   // Hz
     double time = 0.0;        // seconds (the sway's clock)
+    // A world point the gaze eases towards (the beacon): the aim is the path's look turned towards it by
+    // `lookAtWeight` (0 = the path's look, 1 = straight at the point). The point is in the journey's
+    // unwrapped frame (as if the camera never wrapped), so it holds still across a wrap.
+    glm::vec3 lookAt{0.0f};
+    float lookAtWeight = 0.0f;
 };
 
 struct JourneyPose {
