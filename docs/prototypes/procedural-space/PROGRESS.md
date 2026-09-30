@@ -298,6 +298,14 @@ t = 30 s.
 - **New test** (`[space]`): the Infinite Hall's music moves every routed rule, two fresh engines give
   bit-identical rules and compiled tables over 20 s, and with no audio nothing moves.
 
+## Suites at `1808fa65` (run 04:16-05:20, after ADR-1005 and the new `[space]` test)
+
+- `tools/gpu-lock.sh build/release/tests/avgen_tests`: **binary exit 0**; 3,900 cases: 3,880 passed,
+  19 skipped, 1 failed as expected (the `[!shouldfail]` slope lean). 10,057,077 assertions.
+- `tools/gpu-lock.sh build/release/tests/avgen_render_tests`: **binary exit 0**; 556 cases: 555 passed,
+  1 skipped, 0 failed. The SDF shadow-map probe is tagged `[.probe]` (hidden): it does not run by
+  default; it runs, and fails as documented, only when selected (e.g. `"[sdf]"`).
+
 ## ADR-1005 (the art agent's nesting request)
 
 `SdfTree::validate(SdfEvaluator::Compiled)` skips the interpreter's stack checks; `SdfObject`
