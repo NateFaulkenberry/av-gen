@@ -305,7 +305,7 @@ def P(node, field):
 
 # ---- the frame every space is authored in ------------------------------------------------------------
 #
-# The interpreter's point stack binds a tree to 8 nested unary operators on any path (docs/sdf.md,
+# The interpreter's point stack binds an interpreted tree to 8 nested unary operators on any path (docs/sdf.md,
 # "Validation and limits"), so no node is spent on pivots: every space is authored with its floor at
 # y = Y0, which puts the origin at the hall's mid-height, on its axis. Roll (a twist about x), bend
 # (about z) and the radial repeat (about y) then all pivot on the eye's own line of sight, with no
@@ -829,7 +829,10 @@ UNARY = {"translate", "rotate", "scale", "twist", "bend", "repeat", "polarRepeat
          "displaceNoise", "displaceVoronoi", "displaceWave", "displaceField"}
 
 
-def check_tree(root, label):
+def check_tree(root, label, compiled=False):
+    """The engine's limits (docs/sdf.md): 96 nodes and depth 16 for every tree; the interpreter's point
+    stack (8 nested unary operators) only when the tree is interpreted. A compiled tree (ADR-1005) has no
+    stack, so its unary nesting is bound by the depth alone."""
     count = 0
     names = set()
 
@@ -847,7 +850,7 @@ def check_tree(root, label):
         return worst
 
     depth, unary = walk(root, 1, 0)
-    ok = count <= 96 and depth <= 12 and unary <= 8
+    ok = count <= 96 and depth <= 16 and (compiled or unary <= 8)
     print(f"  {label}: {count} nodes, depth {depth}, unary nesting {unary}" + ("" if ok else "  <-- OVER THE LIMIT"))
     assert ok, label
 
@@ -865,7 +868,8 @@ PRESETS = {
 
 def write(files):
     for stem, (pr, sc) in files.items():
-        check_tree(sc["nodes"][0]["sdf"]["tree"]["root"], stem)
+        sdf = sc["nodes"][0]["sdf"]
+        check_tree(sdf["tree"]["root"], stem, compiled=sdf.get("compile", False))
         (OUT / f"{stem}.scene.json").write_text(json.dumps(sc, indent=1) + "\n")
         (OUT / f"{stem}.json").write_text(json.dumps(pr, indent=1) + "\n")
         print("wrote", OUT / f"{stem}.json")

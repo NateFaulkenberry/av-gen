@@ -412,7 +412,8 @@ std::optional<SdfRenderMode> sdfRenderModeFromName(std::string_view name) {
 // ---- SdfObject -----------------------------------------------------------------------------------
 
 Result<void> SdfObject::validate() const {
-    if (auto ok = tree.validate(); !ok) {
+    // ADR-1005: a compiled object is validated for the compiled evaluator (no interpreter stacks).
+    if (auto ok = tree.validate(compile ? spatial::SdfEvaluator::Compiled : spatial::SdfEvaluator::Interpreter); !ok) {
         return fail("sdf '{}': {}", name, ok.error().message);
     }
     if (!(boundsMax.x > boundsMin.x && boundsMax.y > boundsMin.y && boundsMax.z > boundsMin.z)) {

@@ -85,16 +85,24 @@ struct SdfNode {
 };
 // ADR-1001 raised these from 64 and 8 for architectural trees (a state, its rules, a mirror, a
 // repetition, a placement and a primitive is already 7 levels). The limits that bind the GPU are the
-// two 8-entry interpreter stacks, which validate() checks independently of depth.
+// two 8-entry interpreter stacks, which validate() checks independently of depth. ADR-1005 raised the
+// depth to 16 and lifted the stack checks for compiled trees (SdfEvaluator::Compiled), which have no
+// stacks: an interpreted tree is still bound by the stacks, a compiled one by the depth.
 constexpr int kMaxSdfNodes = 96;
-constexpr int kMaxSdfDepth = 12;
+constexpr int kMaxSdfDepth = 16;
 constexpr int kMaxSdfStack = 8;
 constexpr int kMaxSdfLoops = 2;       // nested Recurse nodes (the interpreter's loop frames)
 constexpr int kMaxSdfRecurseLevels = 8;
 
+// Which evaluator a tree is validated for (ADR-1005). The interpreter (shaders/sdf.wgsl, and
+// evaluatePacked) runs a program with two kMaxSdfStack-entry stacks; a compiled tree (sdfCompileWgsl)
+// is straight-line code with no stacks, so only the node, depth and loop limits apply to it.
+enum class SdfEvaluator { Interpreter, Compiled };
+
 struct SdfTree {
     SdfNode root;
-    [[nodiscard]] Result<void> validate() const;   // node count, depth, child arity
+    // Node count, depth, child arity, parameters and names; for the interpreter also the two stacks.
+    [[nodiscard]] Result<void> validate(SdfEvaluator evaluator = SdfEvaluator::Interpreter) const;
     [[nodiscard]] int nodeCount() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     // Distance at `p` (tree-local space) and time. `fields` for DisplaceField (0 when null).

@@ -864,6 +864,71 @@ TEST_CASE("SDF compiled trees render like the interpreter", "[gpu][sdf]") {
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SDF compiled trees deeper than the interpreter's stacks render (ADR-1005)", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    addBox(s, "wall", {0.0f, -1.0f, -2.0f}, {3.0f, 0.2f, 3.0f}, {0.2f, 0.3f, 0.9f});
+    // Ten nested translations of 0.05 (two past the 8-entry point stack) and one of 0.5: the same
+    // surface, so the compiled deep tree must render like the interpreted shallow one.
+    SdfNode cube = unary(SdfNodeKind::Rotate, box(glm::vec3(0.6f, 0.4f, 0.5f)));
+    cube.rotationDegrees = glm::vec3(30.0f, -45.0f, 12.0f);
+    const SdfNode content = combo(SdfNodeKind::Union, {sphere(0.8f), translate(glm::vec3(-0.8f, 0.3f, 0.0f), cube)});
+    SdfNode deep = content;
+    for (int i = 0; i < spatial::kMaxSdfStack + 2; ++i) {
+        deep = translate(glm::vec3(0.05f, 0.0f, 0.0f), deep);
+    }
+    const auto object = [](SdfNode root, bool compile) {
+        scene::SdfObject o;
+        o.name = "blob";
+        o.tree.root = std::move(root);
+        o.compile = compile;
+        o.boundsMin = glm::vec3(-3.5f);
+        o.boundsMax = glm::vec3(3.5f);
+        o.look.aoStrength = 0.7f;
+        o.look.edgeIntensity = 2.0f;
+        return o;
+    };
+    const scene::SdfObject deepCompiled = object(deep, true);
+    const scene::SdfObject shallow = object(translate(glm::vec3(0.5f, 0.0f, 0.0f), content), false);
+    REQUIRE(deepCompiled.validate());
+    REQUIRE(shallow.validate());
+    REQUIRE_FALSE(object(deep, false).validate());
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.75;
+    const auto render = [&](const scene::SdfObject* o) {
+        scene::Scene copy = s;
+        if (o != nullptr) {
+            copy.sdfs.push_back(*o);
+        }
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    const auto countDiffering = [](const auto& a, const auto& b) {
+        long differing = 0;
+        for (std::uint32_t y = 0; y < a.height; ++y) {
+            for (std::uint32_t x = 0; x < a.width; ++x) {
+                for (int ch = 0; ch < 3; ++ch) {
+                    differing += std::abs(int(a.pixel(x, y)[ch]) - int(b.pixel(x, y)[ch])) > 2 ? 1 : 0;
+                }
+            }
+        }
+        return differing;
+    };
+    const auto reference = render(&shallow);
+    const auto compiled = render(&deepCompiled);
+    const auto empty = render(nullptr);
+    const long budget = static_cast<long>(compiled.width * compiled.height) / 100;
+    // The object is drawn (it differs from the scene without it) ...
+    CHECK(countDiffering(compiled, empty) > budget);
+    // ... and it is the same surface as the shallow tree's.
+    CHECK(countDiffering(compiled, reference) < budget);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF rendering is deterministic across fresh renderers", "[gpu][sdf]") {
     auto ctx = makeContext();
     scene::Scene s = baseScene();

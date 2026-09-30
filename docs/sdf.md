@@ -95,13 +95,24 @@ child of a unary op (the op then applies to `1e9`, e.g. `scale` yields `1e9 * sc
 
 `SdfTree::validate` fails when:
 
-- the tree has more than `kMaxSdfNodes` = 96 nodes or is deeper than `kMaxSdfDepth` = 12 levels (root = 1;
-  ADR-1001 raised both from 64 and 8; the binding limits are the stacks below);
+- the tree has more than `kMaxSdfNodes` = 96 nodes or is deeper than `kMaxSdfDepth` = 16 levels (root = 1;
+  ADR-1001 raised them from 64 and 8, ADR-1005 the depth from 12 to 16);
 - more than `kMaxSdfLoops` = 2 enabled `recurse` nodes are nested, or a `recurse` has `count` > 8;
 - a node `name` is not letters, digits, `_` and `-`, is all digits, or is used twice in the tree;
 - arity is wrong: primitives have children, a unary op does not have exactly one enabled child, a combination has 0 or more than 8 children;
 - a parameter is not finite; `radius`, `height`, `rounding`, `size.xyz` or `count` is negative; a `scale` node's `scale` is not > 0; a `plane` has a zero axis;
-- the packed program would exceed `2 * kMaxSdfNodes` = 128 nodes, or need more than `kMaxSdfStack` = 8 distance or point stack entries (impossible within the depth limit, but checked).
+- the packed program would exceed `2 * kMaxSdfNodes` nodes;
+- **for the interpreter only** (`validate()`, the default, or `validate(SdfEvaluator::Interpreter)`):
+  it would need more than `kMaxSdfStack` = 8 distance or point stack entries. In practice the point
+  stack binds: no path may nest more than 8 unary operators.
+
+**Compiled trees (ADR-1005).** A compiled tree (`compile: true` on the object, ADR-1003) is
+straight-line WGSL with no stacks, so `SdfObject::validate` checks it with
+`validate(SdfEvaluator::Compiled)`, which skips the two stack checks. Its unary nesting is then bound
+only by the depth (up to 15 unary operators over a primitive). If a compiled object's variant is
+unavailable (its compilation failed), the renderer falls back to the interpreter only when the tree
+fits the stacks; otherwise the object is not drawn, with a warning, rather than drawn wrong. The
+same tree with `compile: false` is refused when it loads.
 
 `SdfNode::fromJson` also refuses nesting deeper than 12 levels. A disabled unary op may be the child
 of another (it passes through); a disabled primitive or combination under a unary op is an error.

@@ -1073,7 +1073,7 @@ Result<SdfNode> SdfNode::fromJson(const json& j, int depth) {
 
 // ---- SdfTree -----------------------------------------------------------------------------------
 
-Result<void> SdfTree::validate() const {
+Result<void> SdfTree::validate(SdfEvaluator evaluator) const {
     int count = 0;
     if (auto ok = validateNode(root, 1, count); !ok) {
         return ok;
@@ -1082,12 +1082,15 @@ Result<void> SdfTree::validate() const {
     if (m.nodes > kMaxSdfPackedNodes) {
         return fail("sdf tree packs to {} nodes (max {})", m.nodes, kMaxSdfPackedNodes);
     }
-    if (m.distStack > kMaxSdfStack) {
+    // ADR-1005: the stacks are the interpreter's; a compiled tree has none.
+    const bool stacks = evaluator == SdfEvaluator::Interpreter;
+    if (stacks && m.distStack > kMaxSdfStack) {
         return fail("sdf tree needs a distance stack of {} (max {}); nest wide combinations less deeply",
                     m.distStack, kMaxSdfStack);
     }
-    if (m.pointStack > kMaxSdfStack) {
-        return fail("sdf tree nests {} unary operations (max {})", m.pointStack, kMaxSdfStack);
+    if (stacks && m.pointStack > kMaxSdfStack) {
+        return fail("sdf tree nests {} unary operations (max {} interpreted; compile it to lift this)", m.pointStack,
+                    kMaxSdfStack);
     }
     if (const int loops = recurseNesting(effective(root)); loops > kMaxSdfLoops) {
         return fail("sdf tree nests {} recurse nodes (max {})", loops, kMaxSdfLoops);

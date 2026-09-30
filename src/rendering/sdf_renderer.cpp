@@ -618,6 +618,17 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 spatial::sdfCompileTable(object.tree, im.packScratch, &scene.fields);
                 count = static_cast<int>(im.packScratch.size());
             } else {
+                // ADR-1005: a compiled tree may exceed the interpreter's stacks. If its compilation is
+                // unavailable it is not drawn, rather than drawn wrong by an overflowing interpreter.
+                if (object.compile) {
+                    if (auto fits = object.tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                        if (im.warnedObjects.insert(object.name).second) {
+                            log::warn("sdf '{}' not drawn: its compiled variant is unavailable and {}", object.name,
+                                      fits.error().message);
+                        }
+                        continue;
+                    }
+                }
                 count = spatial::packSdfTree(object.tree, im.packScratch, &scene.fields);
                 if (count <= 0 || count > 2 * spatial::kMaxSdfNodes) {
                     continue;

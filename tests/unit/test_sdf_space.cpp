@@ -418,3 +418,54 @@ TEST_CASE("SDF compile: WGSL source, parameter table and structural key", "[sdf]
     rekinded.root.children[0].children[2].kind = SdfNodeKind::Sphere;
     CHECK(spatial::sdfCompileKey(rekinded) != key);
 }
+
+TEST_CASE("SDF compiled trees are not bound by the interpreter's stacks (ADR-1005)", "[sdf][space]") {
+    // Ten nested unary operators: two past the interpreter's 8-entry point stack.
+    constexpr int kNesting = spatial::kMaxSdfStack + 2;
+    SdfNode deep = sphere(1.0f);
+    for (int i = 0; i < kNesting; ++i) {
+        deep = translate({0.1f, 0.0f, 0.0f}, deep);
+    }
+    const SdfTree tree = treeOf(deep);
+    // The interpreter refuses it; the compiled evaluator accepts it.
+    CHECK_FALSE(tree.validate());
+    CHECK_FALSE(tree.validate(spatial::SdfEvaluator::Interpreter));
+    CHECK(tree.validate(spatial::SdfEvaluator::Compiled));
+    // The CPU reference evaluates it exactly (the translations add up to 1 along x).
+    CHECK_THAT(tree.evaluate(glm::vec3(1.0f, 0.0f, 0.0f), 0.0), WithinAbs(-1.0f, 1e-5f));
+    CHECK_THAT(tree.evaluate(glm::vec3(3.0f, 0.0f, 0.0f), 0.0), WithinAbs(1.0f, 1e-5f));
+    // It compiles to straight-line WGSL, one table record per node, with no stack in sight.
+    std::vector<spatial::SdfNodeGpu> table;
+    const std::string src = spatial::sdfCompileWgsl(tree, table);
+    CHECK(table.size() == static_cast<std::size_t>(kNesting + 1));
+    CHECK(src.find("fn sdfField(") != std::string::npos);
+    CHECK(src.find("pts[") == std::string::npos);
+
+    // An SdfObject is validated for the evaluator it asks for.
+    scene::SdfObject o;
+    o.name = "deep";
+    o.tree = tree;
+    o.compile = false;
+    CHECK_FALSE(o.validate());
+    o.compile = true;
+    CHECK(o.validate());
+    // ... including when it is loaded from JSON: `compile` is read before the check.
+    const auto loaded = scene::SdfObject::fromJson(o.toJson());
+    REQUIRE(loaded);
+    CHECK(loaded->compile);
+    nlohmann::json interpreted = o.toJson();
+    interpreted["compile"] = false;
+    CHECK_FALSE(scene::SdfObject::fromJson(interpreted));
+
+    // The other limits still hold for compiled trees: depth (kMaxSdfDepth) ...
+    SdfNode tooDeep = sphere(1.0f);
+    for (int i = 0; i < spatial::kMaxSdfDepth; ++i) {
+        tooDeep = translate({0.0f, 0.0f, 0.0f}, tooDeep);
+    }
+    CHECK_FALSE(treeOf(tooDeep).validate(spatial::SdfEvaluator::Compiled));
+    CHECK(treeOf(tooDeep.children[0]).validate(spatial::SdfEvaluator::Compiled));
+    // ... and arity.
+    SdfNode twoChildren = translate({0.0f, 0.0f, 0.0f}, deep);
+    twoChildren.children.push_back(sphere(1.0f));
+    CHECK_FALSE(treeOf(twoChildren).validate(spatial::SdfEvaluator::Compiled));
+}
