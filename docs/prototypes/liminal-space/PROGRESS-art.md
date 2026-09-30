@@ -21,7 +21,7 @@ these are the art side's. Newest state first.*
   so `lyric_times.py` decodes with scipy and passes an array.
 - **Review media:** `~/Desktop/av-gen-review/24-liminal-space/analysis/` (plots and `bars.json`).
 
-## Status (Phase A complete, 19:30 on 2026-09-30; handed back to the coordinator)
+## Status (Phase A complete, 19:20 on 2026-09-30; handed back to the coordinator)
 
 - [x] Brief and addendum read in full.
 - [x] `ART-RESEARCH.md`: ten rules, sources with tags ([P]/[S]/[SR]/[M]), what is adopted and rejected, and what
@@ -47,6 +47,24 @@ these are the art side's. Newest state first.*
 - [x] The colour script as data (`palette_keys`, `palette_timeline`, `intent`, `shots`, `synch_points` in the
   sections file) and as a picture: `tools/liminal/colour_script.py` →
   `~/Desktop/av-gen-review/24-liminal-space/plan/colour-script.png`.
+
+- [x] Calibration notes against the engineer's first example (`DIRECTOR-PLAN.md` §12b), and the needs statuses
+  checked against ADR-1040 to 1043 as landed (§13).
+
+Phase A commits, oldest first:
+- `fb6fd9e7`
+- `10705f89`
+- `ab58d5d0`
+- `0796ebf0`
+- `1842620e`
+- `eecaaf9c`
+- `68540563`
+- `12a8e3ec`
+- `6fc4359b`
+- `c9c63462`
+- `22f3ce1a`
+- `a9b688fd`
+- and this notes update.
 
 ## Next (Phase B, a new handoff: implement the video on the engineer's infrastructure)
 
