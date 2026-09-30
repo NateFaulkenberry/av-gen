@@ -533,6 +533,45 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         wave.axis = glm::vec3(1.0f, 0.3f, -0.4f);
         cases.push_back({"displace wave", treeOf(std::move(wave)), 1e-4f});
     }
+    // ADR-1001: morph, fold and recurse (including the recurse loop jumping back over a subtree,
+    // nested twice, and a morph inside a recurse level).
+    {
+        auto base = [] {
+            return combo(SdfNodeKind::SmoothUnion, {sphere(0.5f), translate(glm::vec3(0.5f, 0.2f, 0.0f), box(glm::vec3(0.3f)))},
+                         0.25f);
+        };
+        for (const float amount : {0.0f, 0.35f, 1.0f, 1.6f, 2.0f}) {
+            SdfNode morph = combo(SdfNodeKind::Morph,
+                                  {sphere(1.0f), box(glm::vec3(0.7f, 0.4f, 0.9f)), translate(glm::vec3(0.3f, 0.0f, 0.0f), sphere(0.4f))},
+                                  0.5f);
+            morph.amount = amount;
+            cases.push_back({"morph " + std::to_string(amount), treeOf(std::move(morph)), 1e-4f});
+        }
+        SdfNode folded = unary(SdfNodeKind::Fold, translate(glm::vec3(0.7f, 0.2f, 0.0f), base()));
+        folded.axis = glm::vec3(1.0f, 0.4f, -0.3f);
+        folded.offset = 0.2f;
+        cases.push_back({"fold", treeOf(std::move(folded)), 1e-4f});
+        SdfNode recursed = unary(SdfNodeKind::Recurse, translate(glm::vec3(0.9f, 0.0f, 0.3f), base()));
+        recursed.count = 3;
+        recursed.scale = 2.0f;
+        recursed.translation = glm::vec3(1.0f, 0.5f, 0.8f);
+        recursed.rotationDegrees = glm::vec3(0.0f, 25.0f, 10.0f);
+        recursed.size = glm::vec3(1.0f, 0.0f, 1.0f);
+        cases.push_back({"recurse", treeOf(std::move(recursed)), 1e-4f});
+        SdfNode inner = unary(SdfNodeKind::Recurse,
+                              combo(SdfNodeKind::Morph, {box(glm::vec3(0.4f)), sphere(0.5f)}, 0.5f));
+        inner.children[0].amount = 0.4f;
+        inner.count = 2;
+        inner.scale = 1.7f;
+        inner.translation = glm::vec3(0.6f, 0.0f, 0.0f);
+        inner.size = glm::vec3(1.0f);
+        SdfNode outer = unary(SdfNodeKind::Recurse, combo(SdfNodeKind::Union, {std::move(inner), sphere(0.2f)}, 0.5f));
+        outer.count = 2;
+        outer.scale = 2.5f;
+        outer.translation = glm::vec3(0.0f, 1.2f, 0.4f);
+        outer.size = glm::vec3(0.0f, 1.0f, 1.0f);
+        cases.push_back({"recurse nested", treeOf(std::move(outer)), 1e-4f});
+    }
     cases.push_back({"complex", treeOf(complexTree()), 1e-3f});
     checkParity(*ctx, harness, cases, fields, 1.37);
 }
@@ -763,6 +802,131 @@ TEST_CASE("SDF mesh mode draws the surface-nets mesh and caches it by hash", "[g
     const Coverage a = coverage(marched);
     const Coverage b = coverage(meshed);
     CHECK(std::abs(a.pixels - b.pixels) < a.pixels / 10);
+}
+
+// ADR-1003: a tree compiled to WGSL renders the picture the interpreter does, with the look terms
+// on (they evaluate the field too), and a parameter change reuses the compiled pipeline.
+TEST_CASE("SDF compiled trees render like the interpreter", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "blob";
+    SdfNode nest = unary(SdfNodeKind::Recurse, translate(glm::vec3(0.9f, 0.0f, 0.0f), complexTree()));
+    nest.count = 2;
+    nest.scale = 2.2f;
+    nest.translation = glm::vec3(1.0f, 0.0f, 0.4f);
+    nest.size = glm::vec3(1.0f, 0.0f, 1.0f);
+    SdfNode morph = combo(SdfNodeKind::Morph, {sphere(1.2f), std::move(nest)}, 0.5f);
+    morph.amount = 0.6f;
+    o.tree = treeOf(std::move(morph));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    o.look.aoStrength = 0.7f;
+    o.look.edgeIntensity = 2.0f;
+    addBox(s, "wall", {0.0f, -1.0f, -2.0f}, {3.0f, 0.2f, 3.0f}, {0.2f, 0.3f, 0.9f});
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.75;
+    const auto render = [&](bool compile, float amount) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        c.tree.root.amount = amount;
+        copy.sdfs.push_back(c);
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    for (const float amount : {0.0f, 0.6f, 1.0f}) {
+        INFO("morph amount " << amount);
+        const auto interpreted = render(false, amount);
+        const auto compiled = render(true, amount);
+        REQUIRE(interpreted.width == compiled.width);
+        long differing = 0;
+        int worst = 0;
+        for (std::uint32_t y = 0; y < compiled.height; ++y) {
+            for (std::uint32_t x = 0; x < compiled.width; ++x) {
+                for (int ch = 0; ch < 3; ++ch) {
+                    const int delta = std::abs(int(interpreted.pixel(x, y)[ch]) - int(compiled.pixel(x, y)[ch]));
+                    worst = std::max(worst, delta);
+                    differing += delta > 2 ? 1 : 0;
+                }
+            }
+        }
+        INFO("channels differing by more than 2: " << differing << ", worst " << worst);
+        // Float reassociation differs between the two programs; a handful of edge-mask threshold
+        // pixels may flip. The surface itself must agree.
+        CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("SDF compiled trees deeper than the interpreter's stacks render (ADR-1005)", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    addBox(s, "wall", {0.0f, -1.0f, -2.0f}, {3.0f, 0.2f, 3.0f}, {0.2f, 0.3f, 0.9f});
+    // Ten nested translations of 0.05 (two past the 8-entry point stack) and one of 0.5: the same
+    // surface, so the compiled deep tree must render like the interpreted shallow one.
+    SdfNode cube = unary(SdfNodeKind::Rotate, box(glm::vec3(0.6f, 0.4f, 0.5f)));
+    cube.rotationDegrees = glm::vec3(30.0f, -45.0f, 12.0f);
+    const SdfNode content = combo(SdfNodeKind::Union, {sphere(0.8f), translate(glm::vec3(-0.8f, 0.3f, 0.0f), cube)});
+    SdfNode deep = content;
+    for (int i = 0; i < spatial::kMaxSdfStack + 2; ++i) {
+        deep = translate(glm::vec3(0.05f, 0.0f, 0.0f), deep);
+    }
+    const auto object = [](SdfNode root, bool compile) {
+        scene::SdfObject o;
+        o.name = "blob";
+        o.tree.root = std::move(root);
+        o.compile = compile;
+        o.boundsMin = glm::vec3(-3.5f);
+        o.boundsMax = glm::vec3(3.5f);
+        o.look.aoStrength = 0.7f;
+        o.look.edgeIntensity = 2.0f;
+        return o;
+    };
+    const scene::SdfObject deepCompiled = object(deep, true);
+    const scene::SdfObject shallow = object(translate(glm::vec3(0.5f, 0.0f, 0.0f), content), false);
+    REQUIRE(deepCompiled.validate());
+    REQUIRE(shallow.validate());
+    REQUIRE_FALSE(object(deep, false).validate());
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.75;
+    const auto render = [&](const scene::SdfObject* o) {
+        scene::Scene copy = s;
+        if (o != nullptr) {
+            copy.sdfs.push_back(*o);
+        }
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    const auto countDiffering = [](const auto& a, const auto& b) {
+        long differing = 0;
+        for (std::uint32_t y = 0; y < a.height; ++y) {
+            for (std::uint32_t x = 0; x < a.width; ++x) {
+                for (int ch = 0; ch < 3; ++ch) {
+                    differing += std::abs(int(a.pixel(x, y)[ch]) - int(b.pixel(x, y)[ch])) > 2 ? 1 : 0;
+                }
+            }
+        }
+        return differing;
+    };
+    const auto reference = render(&shallow);
+    const auto compiled = render(&deepCompiled);
+    const auto empty = render(nullptr);
+    const long budget = static_cast<long>(compiled.width * compiled.height) / 100;
+    // The object is drawn (it differs from the scene without it) ...
+    CHECK(countDiffering(compiled, empty) > budget);
+    // ... and it is the same surface as the shallow tree's.
+    CHECK(countDiffering(compiled, reference) < budget);
+    CHECK(ctx->errorCount() == 0);
 }
 
 TEST_CASE("SDF rendering is deterministic across fresh renderers", "[gpu][sdf]") {

@@ -1,0 +1,777 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Procedural Space showcase",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   -3.8,
+   0.0
+  ],
+  "target": [
+   40,
+   -0.20000000000000018,
+   0
+  ],
+  "fov": 68.0,
+  "orbitSpeed": 0.0,
+  "distance": 22.0,
+  "height": 6.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "fogColor": [
+   0.017,
+   0.011,
+   0.066
+  ],
+  "lightRig": "space-art.rig.json",
+  "volumeDensity": 0.028,
+  "volumeAbsorption": 1.0,
+  "volumeMaxDistance": 140.0,
+  "volumeScattering": 1.0
+ },
+ "nodes": [
+  {
+   "name": "space",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "morph",
+      "amount": 0.0,
+      "name": "state",
+      "children": [
+       {
+        "kind": "rotate",
+        "rotation": [
+         0,
+         0,
+         90
+        ],
+        "name": "hspin",
+        "children": [
+         {
+          "kind": "twist",
+          "amount": 0.0,
+          "name": "hroll",
+          "children": [
+           {
+            "kind": "polarRepeat",
+            "count": 0,
+            "name": "hradial",
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0,
+               0,
+               -90
+              ],
+              "children": [
+               {
+                "kind": "fold",
+                "axis": [
+                 -1.0,
+                 0.0,
+                 0.0
+                ],
+                "offset": -110.0,
+                "name": "hfold",
+                "children": [
+                 {
+                  "kind": "union",
+                  "name": "hall",
+                  "children": [
+                   {
+                    "kind": "plane",
+                    "axis": [
+                     0,
+                     1,
+                     0
+                    ],
+                    "offset": -7.0
+                   },
+                   {
+                    "kind": "difference",
+                    "children": [
+                     {
+                      "kind": "plane",
+                      "axis": [
+                       0,
+                       -1,
+                       0
+                      ],
+                      "offset": -8.0
+                     },
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0,
+                       8.0,
+                       0
+                      ],
+                      "children": [
+                       {
+                        "kind": "rotate",
+                        "rotation": [
+                         0,
+                         0,
+                         90
+                        ],
+                        "children": [
+                         {
+                          "kind": "cylinder",
+                          "radius": 7.0,
+                          "height": 8000,
+                          "name": "vaultBore"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "mirror",
+                    "size": [
+                     0,
+                     0,
+                     1
+                    ],
+                    "children": [
+                     {
+                      "kind": "difference",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0,
+                         0.5,
+                         13.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           4000,
+                           8.5,
+                           0.5
+                          ]
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         4.0,
+                         -2.4000000000000004,
+                         13.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "repeat",
+                          "size": [
+                           8.0,
+                           0,
+                           0
+                          ],
+                          "name": "portals",
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             1.5,
+                             4.6,
+                             1.2
+                            ],
+                            "name": "portal"
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "mirror",
+                    "size": [
+                     0,
+                     0,
+                     1
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       8.0,
+                       0,
+                       0
+                      ],
+                      "name": "piers",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0,
+                         0.5,
+                         7.0
+                        ],
+                        "name": "pierAt",
+                        "children": [
+                         {
+                          "kind": "roundedBox",
+                          "size": [
+                           0.85,
+                           7.5,
+                           0.85
+                          ],
+                          "rounding": 0.1,
+                          "name": "pier"
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "mirror",
+                    "size": [
+                     0,
+                     0,
+                     1
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       8.0,
+                       0,
+                       0
+                      ],
+                      "name": "bases",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0,
+                         -6.65,
+                         7.0
+                        ],
+                        "name": "baseAt",
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           1.3,
+                           0.35,
+                           1.3
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "mirror",
+                    "size": [
+                     0,
+                     0,
+                     1
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       8.0,
+                       0,
+                       0
+                      ],
+                      "name": "imposts",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0,
+                         7.65,
+                         7.0
+                        ],
+                        "name": "impostAt",
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           1.2,
+                           0.35,
+                           1.2
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "repeat",
+                    "size": [
+                     8.0,
+                     0,
+                     0
+                    ],
+                    "name": "ribs",
+                    "children": [
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0,
+                       8.0,
+                       0
+                      ],
+                      "children": [
+                       {
+                        "kind": "intersection",
+                        "children": [
+                         {
+                          "kind": "rotate",
+                          "rotation": [
+                           0,
+                           0,
+                           90
+                          ],
+                          "children": [
+                           {
+                            "kind": "torus",
+                            "radius": 7.0,
+                            "rounding": 0.45,
+                            "name": "rib"
+                           }
+                          ]
+                         },
+                         {
+                          "kind": "plane",
+                          "axis": [
+                           0,
+                           -1,
+                           0
+                          ],
+                          "offset": 0.0
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "name": "cathedral",
+        "children": [
+         {
+          "kind": "plane",
+          "axis": [
+           0,
+           1,
+           0
+          ],
+          "offset": -7.0
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           22.0,
+           -7.0,
+           0
+          ],
+          "name": "nestAt",
+          "children": [
+           {
+            "kind": "recurse",
+            "count": 0,
+            "scale": 2.1,
+            "translation": [
+             0,
+             0,
+             0
+            ],
+            "rotation": [
+             0,
+             0,
+             0
+            ],
+            "size": [
+             0,
+             0,
+             0
+            ],
+            "name": "nest",
+            "children": [
+             {
+              "kind": "union",
+              "name": "chamber",
+              "children": [
+               {
+                "kind": "difference",
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0,
+                   10.0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "cylinder",
+                    "radius": 24.7,
+                    "height": 20.0
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0,
+                   10.0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "cylinder",
+                    "radius": 23.3,
+                    "height": 22.0
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "polarRepeat",
+                  "count": 8,
+                  "name": "doors",
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     24.0,
+                     7.5,
+                     0
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       2.5,
+                       7.5,
+                       3.6
+                      ],
+                      "name": "door"
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "difference",
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0,
+                   20.0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "sphere",
+                    "radius": 24.7
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0,
+                   20.0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "sphere",
+                    "radius": 23.3
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "plane",
+                  "axis": [
+                   0,
+                   1,
+                   0
+                  ],
+                  "offset": 20.0
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0,
+                   44.0,
+                   0
+                  ],
+                  "children": [
+                   {
+                    "kind": "cylinder",
+                    "radius": 4.800000000000001,
+                    "height": 6.0,
+                    "name": "oculus"
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0,
+                 20.0,
+                 0
+                ],
+                "children": [
+                 {
+                  "kind": "torus",
+                  "radius": 23.3,
+                  "rounding": 0.55
+                 }
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0,
+                 11.25,
+                 0
+                ],
+                "children": [
+                 {
+                  "kind": "polarRepeat",
+                  "count": 16,
+                  "name": "pilasters",
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     22.9,
+                     10.0,
+                     0
+                    ],
+                    "children": [
+                     {
+                      "kind": "roundedBox",
+                      "size": [
+                       0.45,
+                       10.0,
+                       0.6
+                      ],
+                      "rounding": 0.08
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.014,
+      0.015,
+      0.026
+     ],
+     "emissiveColor": [
+      0.15,
+      1.0,
+      0.55
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.2
+    },
+    "renderMode": "raymarch",
+    "boundsMin": [
+     -2000,
+     -400,
+     -2000
+    ],
+    "boundsMax": [
+     2000,
+     400,
+     2000
+    ],
+    "look": {
+     "aoStrength": 0.8,
+     "aoDistance": 2.0,
+     "edgeIntensity": 2.6,
+     "edgeWidth": 0.05,
+     "edgeColor": [
+      0.2,
+      0.7,
+      1.0
+     ],
+     "shadowStrength": 0.0,
+     "shadowSoftness": 10.0,
+     "shadowDirection": [
+      0.35,
+      1.0,
+      0.25
+     ],
+     "shadowSteps": 32
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "compile": true,
+    "maxSteps": 200,
+    "epsilon": 0.0012,
+    "stepScale": 0.65,
+    "normalEpsilon": 0.004,
+    "maxDistance": 260.0
+   }
+  }
+ ],
+ "lights": [
+  {
+   "name": "nave0",
+   "type": "point",
+   "position": [
+    10,
+    4.0,
+    0
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 80.0,
+   "range": 24.0,
+   "castsShadow": false
+  },
+  {
+   "name": "nave1",
+   "type": "point",
+   "position": [
+    26,
+    4.0,
+    0
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 80.0,
+   "range": 24.0,
+   "castsShadow": false
+  },
+  {
+   "name": "nave2",
+   "type": "point",
+   "position": [
+    42,
+    4.0,
+    0
+   ],
+   "color": [
+    0.22,
+    0.42,
+    1.0
+   ],
+   "intensity": 80.0,
+   "range": 24.0,
+   "castsShadow": false
+  },
+  {
+   "name": "nave3",
+   "type": "point",
+   "position": [
+    58,
+    4.0,
+    0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 80.0,
+   "range": 24.0,
+   "castsShadow": false
+  },
+  {
+   "name": "nave4",
+   "type": "point",
+   "position": [
+    74,
+    4.0,
+    0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 80.0,
+   "range": 24.0,
+   "castsShadow": false
+  },
+  {
+   "name": "heart",
+   "type": "point",
+   "position": [
+    22.0,
+    -5.8,
+    0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 0.0,
+   "range": 16.0,
+   "castsShadow": false
+  }
+ ]
+}

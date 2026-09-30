@@ -1,0 +1,285 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "infinite-hall.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5
+ },
+ "sources": [
+  {
+   "kind": "random",
+   "name": "bar",
+   "settings": {
+    "trigger": "music.bar",
+    "seed": 1004
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/pierAt/translation",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/baseAt/translation",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/impostAt/translation",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/vaultBore/radius",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/rib/radius",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/piers/size",
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/bases/size",
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/imposts/size",
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/ribs/size",
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/piers/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/bases/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/imposts/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   }
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/ribs/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "order/square",
+   "values": {
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ]
+   }
+  },
+  {
+   "name": "order/round",
+   "values": {
+    "sdf/space/node/pier/rounding": [
+     0.8
+    ]
+   }
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 30.0
+ },
+ "states": {
+  "initial": "Square",
+  "states": [
+   {
+    "name": "Square",
+    "preset": "order/square",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 8,
+      "from": "Round"
+     }
+    ]
+   },
+   {
+    "name": "Round",
+    "preset": "order/round",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 8,
+      "from": "Square"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -7,7 +7,8 @@ An SDF is a tree of `SdfNode`s. `SdfTree::evaluate(p, time, fields)` returns the
 tree-local point (negative inside); `normal` differentiates it; `meshSdf` turns it into a `MeshData`;
 `packSdfTree` flattens it into the `SdfNodeGpu` array that `shaders/sdf.wgsl` interprets, and
 `evaluatePacked` is the CPU copy of that interpreter (tests hold both paths to within 1e-5).
-Everything is pure and deterministic. JSON names are lower-case camel (`roundedBox`, `smoothUnion`,
+Everything is pure and deterministic. Any node may carry a `name` (ADR-1001); a named node's
+parameters are `node/<name>/<field>` instead of `node/<index>/<field>`. JSON names are lower-case camel (`roundedBox`, `smoothUnion`,
 `polarRepeat`, `displaceNoise`, ...).
 
 ## Node reference
@@ -40,6 +41,7 @@ members are ignored (a Scale node's `translation` does nothing). Every node has 
 | `smoothUnion` | `smin(d, c, k)` |
 | `smoothIntersection` | `-smin(-d, -c, k)` |
 | `smoothDifference` | `-smin(-d, c, k)` |
+| `morph` (ADR-1001) | `a = clamp(amount, 0, k-1)`, `i = floor(a)`: `c_i + (c_{i+1} - c_i)(a - i)`. Only `c_i` and `c_{i+1}` (only `c_i` at an integer `a`) are evaluated and packed: a settled morph costs one child. One float switches or morphs between structural states |
 
 with the polynomial `smin(a, b, k): h = clamp(0.5 + 0.5 (b - a) / k, 0, 1); mix(b, a, h) - k h (1 - h)`.
 A combination with no enabled children evaluates to `1e9` ("far").
@@ -56,9 +58,16 @@ A combination with no enabled children evaluates to `1e9` ("far").
 | `repeat` | size (cell per axis, 0 = none), count (copies per side, 0 = infinite) | per axis with `size_i > 0`: `q_i = p_i - size_i clamp(rnd(p_i / size_i), -count, count)` (no clamp when count = 0), `rnd(x) = floor(x + 0.5)` | unchanged |
 | `polarRepeat` | count (about Y; 0 = no-op) | `sector = 2 pi / count; a = atan2(p.z, p.x); a' = a - sector rnd(a / sector); (cos a' r, p.y, sin a' r)`, `r = |p.xz|` | unchanged |
 | `mirror` | size (mask: > 0 mirrors that axis) | `q_i = |p_i|` on masked axes | unchanged |
+| `fold` (ADR-1001) | axis (plane normal, normalised), offset | `q = p - 2 min(dot(p, n) - offset, 0) n`: the half-space behind the plane is reflected in front | unchanged (exact while the content does not cross the plane) |
+| `recurse` (ADR-1001) | count (levels after the first, 0..8), scale (> 0), translation, rotation, size (fold mask) | level 0 is `p`; `p_{l+1} = conj(R) fold(p_l) scale - translation`, `fold` = `|p_i|` where `size_i > 0` | `min_l child(p_l) / scale^l`: a bound (folds, rotations and uniform scale preserve distance) |
 
 Twist and bend distort distances; ray marchers must under-step (a relaxation factor) or accept
-artefacts. `rnd` is spelt `floor(x + 0.5)` on both paths because WGSL's `round` is half-to-even.
+artefacts. The under-step needed grows with `amount` times the structure's extent along the warped
+axis (an unmeasured starting point: `stepScale` 0.8 for small amounts, lower as the artefacts --
+holes and shimmering silhouettes -- appear). `displace*` breaks the bound by up to
+`amount`. `repeat` of content that reaches past half its cell (a wall thicker than half the
+spacing, an asymmetric doorway) is only correct near the cell centre; keep repeated content
+inside its cell or use `mirror` + `repeat`. `rnd` is spelt `floor(x + 0.5)` on both paths because WGSL's `round` is half-to-even.
 
 ### Displacements (exactly one child; `t = float(time)`)
 
@@ -86,12 +95,27 @@ child of a unary op (the op then applies to `1e9`, e.g. `scale` yields `1e9 * sc
 
 `SdfTree::validate` fails when:
 
-- the tree has more than `kMaxSdfNodes` = 64 nodes or is deeper than `kMaxSdfDepth` = 8 levels (root = 1);
+- the tree has more than `kMaxSdfNodes` = 96 nodes or is deeper than `kMaxSdfDepth` = 16 levels (root = 1;
+  ADR-1001 raised them from 64 and 8, ADR-1005 the depth from 12 to 16);
+- more than `kMaxSdfLoops` = 2 enabled `recurse` nodes are nested, or a `recurse` has `count` > 8;
+- a node `name` is not letters, digits, `_` and `-`, is all digits, or is used twice in the tree;
 - arity is wrong: primitives have children, a unary op does not have exactly one enabled child, a combination has 0 or more than 8 children;
 - a parameter is not finite; `radius`, `height`, `rounding`, `size.xyz` or `count` is negative; a `scale` node's `scale` is not > 0; a `plane` has a zero axis;
-- the packed program would exceed `2 * kMaxSdfNodes` = 128 nodes, or need more than `kMaxSdfStack` = 8 distance or point stack entries (impossible within the depth limit, but checked).
+- the packed program would exceed `2 * kMaxSdfNodes` nodes;
+- **for the interpreter only** (`validate()`, the default, or `validate(SdfEvaluator::Interpreter)`):
+  it would need more than `kMaxSdfStack` = 8 distance or point stack entries. In practice the point
+  stack binds: no path may nest more than 8 unary operators.
 
-`SdfNode::fromJson` also refuses nesting deeper than 8 levels.
+**Compiled trees (ADR-1005).** A compiled tree (`compile: true` on the object, ADR-1003) is
+straight-line WGSL with no stacks, so `SdfObject::validate` checks it with
+`validate(SdfEvaluator::Compiled)`, which skips the two stack checks. Its unary nesting is then bound
+only by the depth (up to 15 unary operators over a primitive). If a compiled object's variant is
+unavailable (its compilation failed), the renderer falls back to the interpreter only when the tree
+fits the stacks; otherwise the object is not drawn, with a warning, rather than drawn wrong. The
+same tree with `compile: false` is refused when it loads.
+
+`SdfNode::fromJson` also refuses nesting deeper than 12 levels. A disabled unary op may be the child
+of another (it passes through); a disabled primitive or combination under a unary op is an error.
 
 ## Packed execution (the GPU scheme)
 
@@ -108,6 +132,7 @@ the behaviour:
 | combination | n | `n == 0`: `push(1e9)`. Otherwise the top `n` entries `dist[sp-n .. sp-1]` are the children in evaluation order: `d = dist[sp-n]; d = op(d, dist[sp-n+j])` for `j = 1..n-1`; drop them and `push(d)` |
 | unary BEGIN | 0xFFFF | before the subtree: `pts[pp++] = cur`; domain ops set `cur = warp(kind, cur)` (Scale divides by `scale`); displacements leave `cur` unchanged |
 | unary END | 1 | after the subtree: `cur = pts[--pp]` (the op's own local point); then Scale does `dist[sp-1] *= scale`, displacements do `dist[sp-1] += term(cur)`, other domain ops nothing |
+| recurse BEGIN/END | 0xFFFF / 1 | BEGIN also pushes a loop frame (level 0, acc = far, inv = 1). END pops the level's distance into `acc = min(acc, d inv)`; while `level < count` it steps `cur` to the next level, divides `inv` by `scale` and jumps back to the record after BEGIN (its index is in the END record's `fieldSlot`); then it restores `cur`, pushes `acc` and pops the frame |
 
 The packer emits combinations as **binary folds**: a combination with enabled children
 `c0 .. ck-1` is emitted as `c0, c1, OP(2), c2, OP(2), ..., ck-1, OP(2)`; `k == 1` emits nothing; `k == 0`
@@ -216,6 +241,22 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
 - `boundsMin/Max` is the tree-local box the object lives in. Raymarch: the ray enters and leaves it
   (nothing outside is drawn, and the projected box is the quad that gets rasterised, so a tight box
   is the single biggest performance lever). Mesh: the meshing domain.
+- `maxDistance` (ADR-1002) caps the march in tree-local units (0 = the bounds only); the lit pass
+  and the depth prepass apply it identically.
+- `look` (ADR-1002, raymarch only, every term off at 0): `aoStrength`/`aoDistance` (5 taps along
+  the normal), `edgeIntensity`/`edgeWidth`/`edgeColor` (emission where the normal taken at `edgeWidth`
+  disagrees with the surface normal: creases and edges glow, flats do not; added to colour and to
+  the bloom target),
+  `shadowStrength`/`shadowSoftness`/`shadowDirection`/`shadowSteps` (a Quilez penumbra march
+  towards a world direction). Occlusion and shadow scale the whole shaded colour (the cheap
+  version: emission and fog included); edges are added after them.
+- `compile` (ADR-1003, default false): draw the object with its tree compiled to WGSL instead of
+  the interpreter. Roughly 15x faster per evaluation on the space example; a structural change
+  (kind, child, `enabled`) compiles a new pipeline (seconds on first sight of a structure);
+  parameter changes never do.
+- `depthPrepass`, `castShadows` (ADR-1002, default true): whether the object is marched again into
+  the depth prepass and into the shadow maps. Off saves a full march each; the lit pass still writes
+  depth, but prepass readers (GTAO, the screen-space shadow mask, contact shadows) no longer see it.
 - `maxSteps`, `epsilon` (hit threshold, scaled by distance so it is screen-space constant),
   `stepScale` (relaxation; displaced or twisted trees need < 1) and `normalEpsilon` are raymarch
   only. `resolution` is mesh only.
@@ -241,13 +282,16 @@ in Mesh mode; Raymarch evaluates the tree every frame on the GPU.
 | `material/emissive`, `material/roughness`, `material/metallic` | float |
 | `bounds/min`, `bounds/max` | vec3 |
 | `resolution` | int |
-| `node/<i>/<field>` | per node, see below |
+| `node/<i or name>/<field>` | per node, see below |
+| `march/maxSteps` (int), `march/epsilon`, `march/stepScale`, `march/maxDistance` | float (ADR-1002) |
+| `look/ao/{strength,distance}`, `look/edge/{intensity,width,color}`, `look/shadow/{strength,softness,direction,steps}` | ADR-1002 |
 
 `<i>` is the node's **1-based pre-order index over enabled and disabled nodes**, so disabling a
 node does not renumber its siblings. Only the members a kind uses are registered, plus `enabled`
 on every node; the label is `"<kind>/<field>"` (e.g. `smoothUnion/smooth`) while the path stays
 `node/1/smooth`. Fields: `radius`, `height`, `size`, `rounding`, `offset`, `translation`,
-`rotation`, `scale`, `amount`, `smooth`, `frequency`, `speed`, `enabled`. `SdfParameters` also
+`rotation`, `scale`, `amount`, `smooth`, `frequency`, `speed`, `enabled`, and (ADR-1001) `axis`
+(fold) and `count` (int: repeat, polarRepeat, recurse; a route into it rounds to the nearest). `SdfParameters` also
 carries `nodeAmount`, `nodeRadius` and `nodeSmooth` vectors with one slot per node (null where the
 kind has no such member) for cheap live modulation.
 
@@ -292,6 +336,7 @@ Bind groups of the raymarch pipeline (`shaders/sdf_raymarch.wgsl`):
 | 1 | 1 | `SdfObjectUniforms` — worldToLocal, bounds, node offset/count/maxSteps, epsilon/stepScale/normalEpsilon/time, the NDC rect (dynamic offset) |
 | 1 | 2 | `array<SdfNodeGpu>` read-only storage: every object's packed program, concatenated |
 | 1 | 3 | `FieldBlock` (`shaders/fields.wgsl`) for `displaceField` |
+| 1 | 4 | `SdfStepStats` (ADR-1002): 8 atomic u32, read-write storage, fragment only |
 | 2 | 0-5 | material sampler + textures (`pbr_shade.wgsl`); never sampled here (texture mask 0) |
 | 3 | 0-3 | IBL (`pbr_shade.wgsl`) |
 
@@ -341,3 +386,15 @@ Both interpreters must change together or the parity test fails:
 5. Tests: a case in `tests/unit/test_sdf.cpp`, and one in the parity list of
    `tests/rendering/test_sdf_gpu.cpp` (CPU/GPU within 1e-4, 1e-3 for noise) — plus the JSON name
    in `docs/sdf.md`'s node reference above.
+
+### Step statistics (ADR-1002)
+
+The lit raymarch pass samples every 4th pixel in x and y (every raymarched object) and accumulates
+the sum and maximum of the march steps, the ray count, the hits, and the rays that ran out of steps
+(neither hit nor left the bounds or `maxDistance`) into a 32-byte storage buffer. The buffer is
+cleared before the pass and copied into one of three MapRead slots; `collectTimings` maps and reads
+them a few frames late. `SdfStats` carries `sampledRays`, `avgSteps`, `maxSteps`, `hitRatio` and
+`exhaustedRatio`; the Render stats lines show them, and `--headless --frames N` prints their medians
+("sdf march (median of N frames): ..."). A high `exhaustedRatio` means `maxSteps` is too low for the
+view or `stepScale` too small; a high average with a low hit ratio means rays are grazing or
+travelling far through empty space (lower `maxDistance`, or tighten the bounds).

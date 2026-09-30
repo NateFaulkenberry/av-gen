@@ -2671,6 +2671,11 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
     if (stats.sdf.objects > 0) {
         ImGui::Text("sdf: %u objects (%u raymarched, %u meshed)", stats.sdf.objects, stats.sdf.raymarchObjects,
                     stats.sdf.meshObjects);
+        if (stats.sdf.sampledRays > 0) { // ADR-1002
+            ImGui::Text("sdf march: pass %.2f ms  steps avg %.1f max %u  hit %.0f%%  out of steps %.1f%%",
+                        stats.sdf.raymarchMs, stats.sdf.avgSteps, stats.sdf.maxSteps, 100.0 * stats.sdf.hitRatio,
+                        100.0 * stats.sdf.exhaustedRatio);
+        }
     }
     ImGui::TextDisabled("%s / %s", stats.adapter.c_str(), stats.backend.c_str());
 
@@ -2719,6 +2724,11 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
         ImGui::Text("sdf: %u objects (%u raymarched, %u meshed)  %u packed nodes  %u mesh tris  pass %.3f ms",
                     stats.sdf.objects, stats.sdf.raymarchObjects, stats.sdf.meshObjects, stats.sdf.packedNodes,
                     stats.sdf.meshTriangles, stats.sdf.raymarchMs);
+        if (stats.sdf.sampledRays > 0) { // ADR-1002
+            ImGui::Text("sdf march: steps avg %.1f max %u  hit %.0f%%  out of steps %.1f%%  (%u sampled rays)",
+                        stats.sdf.avgSteps, stats.sdf.maxSteps, 100.0 * stats.sdf.hitRatio,
+                        100.0 * stats.sdf.exhaustedRatio, stats.sdf.sampledRays);
+        }
     }
     if (stats.particles.systems > 0) {
         ImGui::Text("particles: %u systems  %u capacity  %u emitted  simulate %.3f ms", stats.particles.systems,

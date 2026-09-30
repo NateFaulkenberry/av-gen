@@ -6307,6 +6307,32 @@ int Application::runHeadless() {
             log::info("gpu frame median {:.2f} ms; pass medians (sum {:.2f}):{}",
                       record.gpuMs.valid() ? record.gpuMs.p50 : -1.0, sum, breakdown);
         }
+        // ADR-1002: the SDF march's sampled step statistics, medians over the same steady window.
+        {
+            const std::size_t first = std::min(warmup, frameStats.size());
+            std::vector<double> avg;
+            std::vector<double> mx;
+            std::vector<double> hit;
+            std::vector<double> exhausted;
+            for (std::size_t f = first; f < frameStats.size(); ++f) {
+                const rendering::SdfStats& s = frameStats[f].sdf;
+                if (s.raymarchObjects > 0 && s.sampledRays > 0) {
+                    avg.push_back(s.avgSteps);
+                    mx.push_back(static_cast<double>(s.maxSteps));
+                    hit.push_back(s.hitRatio);
+                    exhausted.push_back(s.exhaustedRatio);
+                }
+            }
+            if (!avg.empty()) {
+                const auto median = [](std::vector<double>& v) {
+                    std::sort(v.begin(), v.end());
+                    return v[v.size() / 2];
+                };
+                log::info("sdf march (median of {} frames): steps avg {:.1f} max {:.0f}  hit {:.1f}%  "
+                          "out of steps {:.1f}%",
+                          avg.size(), median(avg), median(mx), 100.0 * median(hit), 100.0 * median(exhausted));
+            }
+        }
         // The workload the timings were taken over, and the CPU stage split, both as medians over
         // the same window. `varied` says whether any counter moved: when it did not, these are
         // exact for every measured frame rather than a summary of several values.

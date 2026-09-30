@@ -1,0 +1,184 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "experiment-melt-void.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/hall/smooth",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "exp/0",
+   "values": {
+    "sdf/space/node/hall/smooth": [
+     0.0
+    ],
+    "sdf/space/node/void/radius": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "exp/1",
+   "values": {
+    "sdf/space/node/hall/smooth": [
+     2.5
+    ],
+    "sdf/space/node/void/radius": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "exp/2",
+   "values": {
+    "sdf/space/node/hall/smooth": [
+     0.0
+    ],
+    "sdf/space/node/void/radius": [
+     12.0
+    ]
+   }
+  },
+  {
+   "name": "exp/3",
+   "values": {
+    "sdf/space/node/hall/smooth": [
+     1.5
+    ],
+    "sdf/space/node/void/radius": [
+     12.0
+    ]
+   }
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 30.0
+ },
+ "states": {
+  "initial": "Exp0",
+  "states": [
+   {
+    "name": "Exp0",
+    "preset": "exp/0",
+    "transition": {
+     "seconds": 2.5,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 16,
+      "from": "Exp3"
+     }
+    ]
+   },
+   {
+    "name": "Exp1",
+    "preset": "exp/1",
+    "transition": {
+     "seconds": 2.5,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Exp0"
+     }
+    ]
+   },
+   {
+    "name": "Exp2",
+    "preset": "exp/2",
+    "transition": {
+     "seconds": 2.5,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Exp1"
+     }
+    ]
+   },
+   {
+    "name": "Exp3",
+    "preset": "exp/3",
+    "transition": {
+     "seconds": 2.5,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Exp2"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,316 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "geometry-explosion.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "audio.highMid",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/nest/scale",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/space/node/roll/amount",
+   "amount": 0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 6000
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "explode/0",
+   "values": {
+    "sdf/space/node/rows/size": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     2
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/radial/count": [
+     0
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "explode/1",
+   "values": {
+    "sdf/space/node/rows/size": [
+     14.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     3
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "sdf/space/node/radial/count": [
+     0
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "explode/2",
+   "values": {
+    "sdf/space/node/rows/size": [
+     14.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     3
+    ],
+    "sdf/space/node/nest/count": [
+     3
+    ],
+    "sdf/space/node/radial/count": [
+     0
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "explode/3",
+   "values": {
+    "sdf/space/node/rows/size": [
+     14.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     3
+    ],
+    "sdf/space/node/nest/count": [
+     3
+    ],
+    "sdf/space/node/radial/count": [
+     6
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "explode/4",
+   "values": {
+    "sdf/space/node/rows/size": [
+     14.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     3
+    ],
+    "sdf/space/node/nest/count": [
+     3
+    ],
+    "sdf/space/node/radial/count": [
+     6
+    ],
+    "sdf/space/node/roll/amount": [
+     0.03
+    ]
+   }
+  },
+  {
+   "name": "explode/5",
+   "values": {
+    "sdf/space/node/rows/size": [
+     13.0,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/rows/count": [
+     4
+    ],
+    "sdf/space/node/nest/count": [
+     4
+    ],
+    "sdf/space/node/radial/count": [
+     9
+    ],
+    "sdf/space/node/roll/amount": [
+     0.05
+    ]
+   }
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 30.0
+ },
+ "states": {
+  "initial": "Explode0",
+  "states": [
+   {
+    "name": "Explode0",
+    "preset": "explode/0",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 8,
+      "from": "Explode5"
+     }
+    ]
+   },
+   {
+    "name": "Explode1",
+    "preset": "explode/1",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Explode0"
+     }
+    ]
+   },
+   {
+    "name": "Explode2",
+    "preset": "explode/2",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Explode1"
+     }
+    ]
+   },
+   {
+    "name": "Explode3",
+    "preset": "explode/3",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Explode2"
+     }
+    ]
+   },
+   {
+    "name": "Explode4",
+    "preset": "explode/4",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Explode3"
+     }
+    ]
+   },
+   {
+    "name": "Explode5",
+    "preset": "explode/5",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Explode4"
+     }
+    ]
+   }
+  ]
+ }
+}

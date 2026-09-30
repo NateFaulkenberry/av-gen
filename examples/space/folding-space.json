@@ -1,0 +1,274 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "folding-space.scene.json"
+  }
+ },
+ "parameters": {
+  "lightrig/SpaceArt/key/intensity": 0.2,
+  "lightrig/SpaceArt/rim/intensity": 0.08,
+  "scene/brightness": 1.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 1.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.25,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5,
+  "sdf/space/node/fold/axis": [
+   -0.7500000000000001,
+   0.49999999999999994,
+   0.4330127018922193
+  ],
+  "sdf/space/node/fold/offset": -110.0
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "audio.lowMid",
+   "target": "sdf/space/node/bend/amount",
+   "amount": 0.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 7000
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "sdf/space/node/roll/amount",
+   "amount": 0.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 8000
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/pierAt/translation",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/baseAt/translation",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/impostAt/translation",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/vaultBore/radius",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/space/node/rib/radius",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 6000
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "fold/0",
+   "values": {
+    "sdf/space/node/bend/amount": [
+     0.0
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ],
+    "sdf/space/node/fold/offset": [
+     -110.0
+    ]
+   }
+  },
+  {
+   "name": "fold/1",
+   "values": {
+    "sdf/space/node/bend/amount": [
+     0.016
+    ],
+    "sdf/space/node/roll/amount": [
+     0.0
+    ],
+    "sdf/space/node/fold/offset": [
+     -110.0
+    ]
+   }
+  },
+  {
+   "name": "fold/2",
+   "values": {
+    "sdf/space/node/bend/amount": [
+     0.016
+    ],
+    "sdf/space/node/roll/amount": [
+     0.02
+    ],
+    "sdf/space/node/fold/offset": [
+     -110.0
+    ]
+   }
+  },
+  {
+   "name": "fold/3",
+   "values": {
+    "sdf/space/node/bend/amount": [
+     0.008
+    ],
+    "sdf/space/node/roll/amount": [
+     0.02
+    ],
+    "sdf/space/node/fold/offset": [
+     -18.0
+    ]
+   }
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 30.0
+ },
+ "states": {
+  "initial": "Fold0",
+  "states": [
+   {
+    "name": "Fold0",
+    "preset": "fold/0",
+    "transition": {
+     "seconds": 3.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 16,
+      "from": "Fold3"
+     }
+    ]
+   },
+   {
+    "name": "Fold1",
+    "preset": "fold/1",
+    "transition": {
+     "seconds": 3.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Fold0"
+     }
+    ]
+   },
+   {
+    "name": "Fold2",
+    "preset": "fold/2",
+    "transition": {
+     "seconds": 3.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Fold1"
+     }
+    ]
+   },
+   {
+    "name": "Fold3",
+    "preset": "fold/3",
+    "transition": {
+     "seconds": 3.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Fold2"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -50,6 +50,13 @@ struct SdfStats {
     std::uint32_t meshUploads = 0;      // mesh buffers (re)uploaded this frame
     double raymarchMs = -1.0;           // GPU time of the last measured raymarch pass (-1 = none / unavailable)
     double cpuUpdateMs = 0.0;           // packing + upload time this frame
+    // ADR-1002: march step statistics of the lit raymarch pass, sampled on every 4th pixel in x and y
+    // (every raymarched object's quad), read back a few frames late. `sampledRays` 0 = none yet.
+    std::uint32_t sampledRays = 0;
+    double avgSteps = 0.0;              // mean march steps per sampled ray
+    std::uint32_t maxSteps = 0;         // the most steps any sampled ray took
+    double hitRatio = 0.0;              // share of sampled rays that hit a surface
+    double exhaustedRatio = 0.0;        // share that stopped on the step budget (neither hit nor left)
 };
 
 // Group 1 binding 1 of the raymarch pass (144 bytes, in a 256-byte dynamic-offset slot). Mirrors
@@ -61,8 +68,13 @@ struct SdfObjectUniforms {
     glm::uvec4 info;       // node offset, node count, max steps, 0
     glm::vec4 march;       // epsilon, step scale, normal epsilon, time
     glm::vec4 rect;        // NDC rect: xmin, ymin, xmax, ymax
+    // ADR-1002 (scene::SdfLook and the march cap)
+    glm::vec4 look0;       // ao strength, ao distance, edge intensity, edge width
+    glm::vec4 look1;       // edge colour rgb, max distance (0 = bounds only)
+    glm::vec4 look2;       // shadow strength, shadow softness, shadow steps, 1 = collect step statistics
+    glm::vec4 look3;       // shadow direction (world, towards the light), 0
 };
-static_assert(sizeof(SdfObjectUniforms) == 144);
+static_assert(sizeof(SdfObjectUniforms) == 208);
 
 class SdfRenderer {
 public:
