@@ -83,8 +83,11 @@ struct SdfNode {
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<SdfNode> fromJson(const nlohmann::json& j, int depth = 0);
 };
-constexpr int kMaxSdfNodes = 64;
-constexpr int kMaxSdfDepth = 8;
+// ADR-1001 raised these from 64 and 8 for architectural trees (a state, its rules, a mirror, a
+// repetition, a placement and a primitive is already 7 levels). The limits that bind the GPU are the
+// two 8-entry interpreter stacks, which validate() checks independently of depth.
+constexpr int kMaxSdfNodes = 96;
+constexpr int kMaxSdfDepth = 12;
 constexpr int kMaxSdfStack = 8;
 constexpr int kMaxSdfLoops = 2;       // nested Recurse nodes (the interpreter's loop frames)
 constexpr int kMaxSdfRecurseLevels = 8;

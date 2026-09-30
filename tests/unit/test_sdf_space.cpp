@@ -150,6 +150,14 @@ TEST_CASE("SDF fold reflects the half-space behind its plane", "[sdf][space]") {
     oblique.root.offset = 0.4f;
     checkPackedParity(oblique);
     CHECK(lipschitzEstimate(oblique) <= 1.001f);
+    // A disabled fold under another unary op passes through (a rule switched off by `enabled`).
+    SdfNode wrapped = unary(SdfNodeKind::Twist, f);
+    wrapped.children[0].enabled = false;
+    const SdfTree off = treeOf(wrapped);
+    REQUIRE(off.validate());
+    CHECK(off.evaluate({-2, 0, 0}, 0.0) > 1.0f); // no mirror image any more
+    CHECK_THAT(off.evaluate({2, 0, 0}, 0.0), WithinAbs(-0.5, 1e-6));
+    checkPackedParity(off);
     // A zero axis is refused, as it is for a plane.
     SdfTree bad = t;
     bad.root.axis = glm::vec3(0.0f);

@@ -1,0 +1,72 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "SpaceNocturne",
+ "description": "Procedural Space POC: a cold high key down the architecture, a violet rim, deep blue ambient. Neutral; the art agent owns it.",
+ "keyIntensity": 1.6,
+ "ambientIntensity": 0.05,
+ "ambientColor": [
+  0.3,
+  0.32,
+  0.62
+ ],
+ "ambientTemperature": 12000,
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 250.0,
+   "elevation": 58.0,
+   "distance": 2.0,
+   "intensity": 1.0,
+   "color": [
+    0.62,
+    0.74,
+    1.0
+   ],
+   "temperature": 9500,
+   "castsShadow": true,
+   "shadowStrength": 0.85,
+   "softness": 1.4,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "azimuth": 80.0,
+   "elevation": 18.0,
+   "distance": 2.0,
+   "intensity": 0.35,
+   "color": [
+    0.58,
+    0.4,
+    1.0
+   ],
+   "temperature": 11000,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "accent",
+   "type": "directional",
+   "role": "fill",
+   "azimuth": 180.0,
+   "elevation": -12.0,
+   "distance": 2.0,
+   "intensity": 0.08,
+   "color": [
+    0.35,
+    1.0,
+    0.62
+   ],
+   "temperature": 8000,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  }
+ ]
+}

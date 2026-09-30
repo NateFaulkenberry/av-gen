@@ -587,7 +587,10 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
         if (childCount != 1) {
             return fail("sdf node '{}' needs exactly one child (got {})", label, childCount);
         }
-        if (!n.children[0].enabled) {
+        // A disabled unary child passes through to its own child (effective()), so only a disabled
+        // primitive or combination leaves this op without a child (ADR-1001: a rule node such as a
+        // fold can be switched off by its `enabled` parameter wherever it sits).
+        if (!n.children[0].enabled && !isUnary(n.children[0].kind)) {
             return fail("sdf node '{}': its child must be enabled", label);
         }
     } else {
