@@ -689,6 +689,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     });
     panel("Performance", ImVec2(560, 700), [&] { drawPerformanceDashboard(engine, stats); });
     panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
+    panel("Live", ImVec2(420, 460), [&] { drawLive(engine); });
     panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
     panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
     // Full item width: the label column the other panels reserve is for sliders, and an article
@@ -2348,7 +2349,7 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
 // (the slow tier as a tick on each), the musical context in numbers, and the interpreter's visual signals. Shown
 // only when the project has a `sonic` block; everything here is also on the bus and in `--sonic-trace`.
 void ControlPanel::drawSonic(app::Engine& engine) {
-    const sonic::SonicSetup* setup = engine.sonicSetup();
+    const sonic::SonicSetup* setup = engine.activeSonicSetup();
     if (setup == nullptr || !ImGui::CollapsingHeader("Sonic", ImGuiTreeNodeFlags_DefaultOpen)) {
         return;
     }
@@ -2377,7 +2378,11 @@ void ControlPanel::drawSonic(app::Engine& engine) {
                         static_cast<double>(t.flatness), static_cast<double>(t.dissonance),
                         static_cast<double>(t.rolloffHz));
     ImGui::Separator();
-    ImGui::TextDisabled("MUSICAL CONTEXT  (%zu notes)", setup->notes.notes.size());
+    if (engine.liveSonic()) {
+        ImGui::TextDisabled("MUSICAL CONTEXT  (live MIDI)");
+    } else {
+        ImGui::TextDisabled("MUSICAL CONTEXT  (%zu notes)", setup->notes.notes.size());
+    }
     const sonic::MusicalContext& c = rt.context();
     ImGui::Text("active %d   pitch %s   range %.0f st   velocity %.2f", c.active, sonic::pitchName(c.pitch).c_str(),
                 static_cast<double>(c.range), static_cast<double>(c.velocity));

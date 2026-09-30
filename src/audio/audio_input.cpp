@@ -206,6 +206,11 @@ Result<void> AudioInput::open(const std::string& deviceName, std::uint32_t sampl
     config.capture.channels = 0; // native channel count; downmixed in the callback
     config.capture.pDeviceID = selected ? &*selected : nullptr;
     config.sampleRate = sampleRate; // 0 = native; otherwise miniaudio resamples
+    // ADR-1025: a short period. The analysis runs a hop (512 samples) as soon as its last sample lands, and at
+    // miniaudio's default 10 ms period that sample waited for the rest of its 480-frame block: measured on a
+    // BlackHole loopback, 128 frames takes several milliseconds off audio -> bus for a live instrument. The callback
+    // only downmixes and copies, so 375 calls a second cost nothing measurable.
+    config.periodSizeInFrames = 128;
     config.dataCallback = &Impl::dataCallback;
     config.pUserData = &s;
 
@@ -232,8 +237,9 @@ Result<void> AudioInput::open(const std::string& deviceName, std::uint32_t sampl
         s.release();
         return fail("cannot start capture device: {}", reason);
     }
-    log::info("audio input '{}' opened: {} Hz ({} Hz native), {} ch in", s.deviceNameCache, s.sampleRate,
-              s.device.capture.internalSampleRate, s.channels);
+    log::info("audio input '{}' opened: {} Hz ({} Hz native), {} ch in, {}-frame period", s.deviceNameCache,
+              s.sampleRate, s.device.capture.internalSampleRate, s.channels,
+              s.device.capture.internalPeriodSizeInFrames);
     return {};
 }
 

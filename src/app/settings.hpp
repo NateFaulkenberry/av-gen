@@ -111,6 +111,15 @@ struct AppSettings {
     // and no memory of which ones they were.
     ui::PreviewViewState preview;
 
+    // ---- live Sonic input (ADR-1025) ----
+    // The devices a person plays through on this machine, so "plug in the keyboard and it works" survives a
+    // restart. Not in the project: the same live project must open on another machine with that machine's rig.
+    struct LiveInput {
+        std::string audioInput;     // capture device name (substring match); "" = none chosen yet
+        std::string midiInput = "*"; // MIDI source filter: "*" every source, else a name substring
+        float smoothing = 1.0f;     // multiplier on the Sonic Character's time constants (0.25..4)
+    } live;
+
     // ---- ai ----
     ai::AiSettings ai;
 

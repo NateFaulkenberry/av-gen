@@ -54,6 +54,8 @@ struct SonicSetup {
     std::uint64_t trackFrames = 0;        // the frame count `timbre` was computed for
     double timbreMillis = 0.0;            // what the pass cost (the performance report)
     nlohmann::json document;              // the project's `sonic` block as loaded (saved back as is)
+    bool live = false;                    // `"live": true`: made to be played (ADR-1025); the live editor enables
+                                          // live input when it opens the project
 
     // Parses a project's `sonic` block. `baseDir` resolves a relative `notes` path. Loads the notes; does not
     // analyse timbre (that needs the track: `analyse`).
@@ -102,6 +104,14 @@ public:
     // Writes this render frame's values: the character, the timbre, the context at `seconds`, and the events since
     // the last publish. `setup` null publishes zeros (once) and nothing else.
     void publish(const SonicSetup* setup, signals::SignalBus& bus, double seconds);
+    // The same, with the musical context read from `notes` instead of the setup's file track (ADR-1025: the live
+    // note track, on the live clock). `setup` must not be null.
+    void publish(const SonicSetup& setup, const NoteTrack& notes, signals::SignalBus& bus, double seconds);
+
+    // Multiplies every medium- and slow-tier time constant (ADR-1025: the live panel's "smoothing"). 1 is the
+    // character as specified, and is what the file path always uses.
+    void setTimeScale(float scale) { timeScale_ = scale; }
+    [[nodiscard]] float timeScale() const { return timeScale_; }
 
     void reset();
 
@@ -146,6 +156,7 @@ private:
     double lastPublish_ = std::numeric_limits<double>::quiet_NaN();
     bool zeroed_ = false;
     MusicalContext context_;
+    float timeScale_ = 1.0f;
 };
 
 } // namespace avgen::sonic

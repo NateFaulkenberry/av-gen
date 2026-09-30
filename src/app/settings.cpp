@@ -56,6 +56,7 @@ json AppSettings::toJson() const {
         {"titleSafe", preview.guides.safe.titleFraction},
         {"toolbar", preview.toolbar},
     };
+    doc["live"] = json{{"audioInput", live.audioInput}, {"midiInput", live.midiInput}, {"smoothing", live.smoothing}};
     doc["ai"] = ai.toJson();
     return doc;
 }
@@ -100,6 +101,14 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
                 return fail("general.appearance must be System, Dark or Light");
             }
         }
+    }
+    if (const auto lv = doc.find("live"); lv != doc.end() && lv->is_object()) {
+        out.live.audioInput = lv->value("audioInput", out.live.audioInput);
+        out.live.midiInput = lv->value("midiInput", out.live.midiInput);
+        if (out.live.midiInput.empty()) {
+            out.live.midiInput = "*";
+        }
+        out.live.smoothing = std::clamp(lv->value("smoothing", out.live.smoothing), 0.25f, 4.0f);
     }
     if (const auto pv = doc.find("outputPreview"); pv != doc.end() && pv->is_object()) {
         // A name this build does not know is a hard failure rather than a silent fall back to the

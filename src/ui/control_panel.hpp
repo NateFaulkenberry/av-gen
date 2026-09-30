@@ -12,6 +12,8 @@
 #include <array>
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
+#include "audio/audio_input.hpp"
+#include "control/midi.hpp"
 #include "assets/asset_catalog.hpp"
 #include "app/asset_browser.hpp"
 #include "app/examples.hpp"
@@ -200,6 +202,11 @@ public:
     std::function<void()> onChooseRenderOutput;
     std::function<void(const std::string&)> onUseAudioInput; // "" = default device
     std::function<void()> onStopAudioInput;
+    // ADR-1025: the Live panel. Audio input by name ("" = none), MIDI source filter ("*" = every source), smoothing.
+    std::function<void(const std::string&)> onLiveAudioInput;
+    std::function<void(const std::string&)> onLiveMidiInput;
+    std::function<void(float)> onLiveSmoothing;
+    std::function<void()> onOpenLiveDemo;
     // Outputs (1.2): the host owns the OutputManager; the tab edits descriptors and asks to reopen.
     app::OutputManager* outputs = nullptr;
     std::function<void()> onOutputsChanged; // re-open windows after add/remove/edit
@@ -415,6 +422,7 @@ private:
     void drawParameters(app::Engine& engine);
     void drawAnalysis(app::Engine& engine);
     void drawSonic(app::Engine& engine); // ADR-1020: the Sonic Garden diagnostic view
+    void drawLive(app::Engine& engine);  // ADR-1025: live Sonic input (devices, status, enable, AA, feel)
     void drawPerformance(app::Engine& engine, const FrameStats& stats);
     // §13. The dashboard: where the frame's time goes, what it contains, and the arms that take a
     // subsystem away. Separate from `drawPerformance`, which is Control's compact summary line.
@@ -579,6 +587,10 @@ private:
     int learnTarget_ = 0;
     bool learnAsEvent_ = false;
     int inputDevice_ = 0;
+    // ADR-1025: the Live panel's device lists, rescanned every few seconds.
+    std::vector<audio::AudioDeviceInfo> liveAudioDevices_;
+    std::vector<control::MidiDeviceInfo> liveMidiDevices_;
+    double liveLastScan_ = -1e9;
     int newOutputDisplay_ = 0;
     bool newOutputFullscreen_ = true;
     char shareName_[64] = "avgen";

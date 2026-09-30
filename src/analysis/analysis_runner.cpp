@@ -85,6 +85,9 @@ void AnalysisRunner::threadMain(std::stop_token token) {
             frame.beat = beat.beat;
             frame.beatPhase = beat.phase;
             frame.beatCount = beat.beatCount;
+            if (tap_ != nullptr) {
+                tap_->onFrame(frame);
+            }
             {
                 const std::lock_guard lock(historyMutex_);
                 if (history_.size() < kHistorySize) {

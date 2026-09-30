@@ -25,6 +25,11 @@ target_link_libraries(avgen_help_lint PRIVATE avgen_core)
 add_executable(avgen_music_report music_report.cpp)
 target_link_libraries(avgen_music_report PRIVATE avgen_core)
 
+# A stand-in for a MIDI keyboard and a synth (ADR-1025): a CoreMIDI virtual source plus a small synthesizer played
+# into an audio output (BlackHole), for measuring and testing live Sonic input without the owner's hardware.
+add_executable(avgen_sonic_probe sonic_live_probe.cpp)
+target_link_libraries(avgen_sonic_probe PRIVATE avgen_core miniaudio::miniaudio)
+
 
 # The viewport overlay, rasterised into a PNG with no window and no GPU (ADR-194).
 #

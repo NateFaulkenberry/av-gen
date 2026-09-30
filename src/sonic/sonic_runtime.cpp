@@ -34,6 +34,12 @@ Result<SonicSetup> SonicSetup::fromJson(const nlohmann::json& j, const std::file
     }
     SonicSetup s;
     s.document = j;
+    if (const auto l = j.find("live"); l != j.end()) {
+        if (!l->is_boolean()) {
+            return fail("'sonic.live' must be true or false");
+        }
+        s.live = l->get<bool>();
+    }
     if (const auto c = j.find("character"); c != j.end()) {
         if (auto r = s.character.applyJson(*c); !r) {
             return std::unexpected(r.error());
@@ -155,8 +161,10 @@ void SonicRuntime::declare(signals::SignalBus& bus) {
 
 void SonicRuntime::reset() {
     const SonicSignals ids = ids_;
+    const float timeScale = timeScale_;
     *this = SonicRuntime{};
     ids_ = ids;
+    timeScale_ = timeScale;
 }
 
 void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double dt) {
@@ -226,9 +234,10 @@ void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double
         // so the first seconds of a piece are not spent climbing from zero (an EMA's bias correction).
         const double warm = openSeconds_[i] > 0.0 ? dt / openSeconds_[i] : 1.0;
         const float target = instant_[i];
-        const double tau = target > medium_[i] ? d.attack : d.release;
+        const double scale = static_cast<double>(timeScale_);
+        const double tau = (target > medium_[i] ? d.attack : d.release) * scale;
         medium_[i] += static_cast<float>(std::max(alpha(dt, tau), warm)) * (target - medium_[i]);
-        slow_[i] += static_cast<float>(std::max(alpha(dt, d.slow), warm)) * (medium_[i] - slow_[i]);
+        slow_[i] += static_cast<float>(std::max(alpha(dt, d.slow * scale), warm)) * (medium_[i] - slow_[i]);
     }
     primed_ = true;
 
@@ -253,9 +262,11 @@ void SonicRuntime::advance(const SonicSetup& setup, const analysis::AnalysisTrac
         // Back in time: start again. The character is history, and the history a play reaches is from zero.
         const SonicSignals ids = ids_;
         const double lastPublish = lastPublish_;
+        const float timeScale = timeScale_;
         *this = SonicRuntime{};
         ids_ = ids;
         lastPublish_ = lastPublish;
+        timeScale_ = timeScale;
     }
     const double hop = static_cast<double>(track.config().hopSize) / static_cast<double>(track.config().sampleRate);
     while (cursor_ < frames.size() && frames[cursor_].timeSeconds <= seconds) {
@@ -287,6 +298,15 @@ void SonicRuntime::publish(const SonicSetup* setup, signals::SignalBus& bus, dou
         }
         return;
     }
+    publish(*setup, setup->notes, bus, seconds);
+}
+
+void SonicRuntime::publish(const SonicSetup& setupRef, const NoteTrack& notes, signals::SignalBus& bus,
+                           double seconds) {
+    if (ids_.transient == signals::kInvalidSignal) {
+        return;
+    }
+    const SonicSetup* setup = &setupRef;
     zeroed_ = false;
     for (std::size_t i = 0; i < kDimensionCount; ++i) {
         bus.set(ids_.medium[i], medium_[i]);
@@ -310,7 +330,7 @@ void SonicRuntime::publish(const SonicSetup* setup, signals::SignalBus& bus, dou
     bus.set(ids_.levelSlope, slopeDb_);
 
     const ContextScale& k = setup->scale;
-    context_ = contextAt(setup->notes, seconds, setup->context);
+    context_ = contextAt(notes, seconds, setup->context);
     const MusicalContext& c = context_;
     bus.set(ids_.active, static_cast<float>(c.active));
     bus.set(ids_.polyphony, norm01(static_cast<float>(c.active) / k.polyphony));
@@ -337,7 +357,7 @@ void SonicRuntime::publish(const SonicSetup* setup, signals::SignalBus& bus, dou
     const double from = std::isnan(lastPublish_) ? seconds - 1e-3 : lastPublish_;
     NoteEvents e;
     if (seconds > from && seconds - from <= 0.25) {
-        e = eventsBetween(setup->notes, from, seconds, setup->context);
+        e = eventsBetween(notes, from, seconds, setup->context);
     }
     bus.setEvent(ids_.noteOn, e.noteOn, e.onVelocity);
     bus.setEvent(ids_.noteOff, e.noteOff, 1.0f);

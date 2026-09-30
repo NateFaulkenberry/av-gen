@@ -45,6 +45,7 @@
 #include <functional>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <deque>
 #include <memory>
 #include <optional>
@@ -280,6 +281,11 @@ struct AppOptions {
     std::optional<std::uint32_t> renderWidth, renderHeight;
     // Live control (1.1): --input [device], --osc-port <n>, --list-audio-devices, --list-midi
     std::optional<std::string> input;
+    // ADR-1025: live Sonic input. --live turns it on in the editor; --midi sets the MIDI source filter for this
+    // run; --sonic-live-log writes one row per frame (host times and the sonic/notes/timbre/visual signals).
+    bool live = false;
+    std::optional<std::string> midi;
+    std::optional<std::string> sonicLiveLog;
     std::optional<int> oscPort;
     bool listAudioDevices = false;
     bool listMidi = false;
@@ -440,6 +446,14 @@ private:
     void serviceRenderPreview();
     // ADR-764: the Director panel's preview stills, rendered from a scratch copy between frames.
     void serviceDirectorStills();
+    // ADR-1025: keeps live Sonic input matched to this machine's settings (the remembered audio input and MIDI
+    // source, the smoothing) and writes the --sonic-live-log row. Once per frame, after the engine update.
+    void serviceLiveSonic();
+    void writeLiveSonicLog(std::uint64_t presentNs, double gpuMs);
+    bool liveSonicWasOn_ = false;
+    std::unique_ptr<std::ofstream> liveLog_;
+    std::vector<std::pair<std::string, signals::SignalId>> liveLogColumns_;
+    std::uint64_t liveLogFrames_ = 0;
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();

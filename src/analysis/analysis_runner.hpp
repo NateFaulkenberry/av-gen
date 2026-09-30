@@ -16,12 +16,25 @@
 
 namespace avgen::analysis {
 
+// Something that wants every frame the runner produces, on the analysis thread, in order (ADR-1025: the live
+// Sonic path's timbre stage). `onFrame` runs after the beat fields are filled and before the frame is published.
+// It must not block or take long: it shares the thread with the analyzer.
+class FrameTap {
+public:
+    virtual ~FrameTap() = default;
+    virtual void onFrame(const AnalysisFrame& frame) = 0;
+};
+
 class AnalysisRunner {
 public:
     AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream, BeatTrackerConfig beatConfig = {});
     ~AnalysisRunner();
     AnalysisRunner(const AnalysisRunner&) = delete;
     AnalysisRunner& operator=(const AnalysisRunner&) = delete;
+
+    // Installs the tap every produced frame is shown to (null: none). Only before start(): the thread reads
+    // the pointer without synchronisation. The tap must outlive the runner.
+    void setTap(FrameTap* tap) { tap_ = tap; }
 
     void start();
     void stop();
@@ -46,6 +59,7 @@ private:
     Analyzer analyzer_;
     BeatTracker beatTracker_; // fills the beat fields of every frame
     TripleBuffer<AnalysisFrame> frames_;
+    FrameTap* tap_ = nullptr;
     std::jthread thread_;
     std::atomic<bool> running_{false};
     std::atomic<double> hopMicros_{0.0};

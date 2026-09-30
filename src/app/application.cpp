@@ -174,6 +174,11 @@ std::string usageText() {
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
            "  --input [name]      analyze a live capture device (substring of its name; default device)\n"
+           "  --live              turn live Sonic input on: MIDI notes and the audio input drive the Sonic\n"
+           "                      Character and musical context (ADR-1025; a project with sonic.live does it)\n"
+           "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
+           "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
+           "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
@@ -380,6 +385,18 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
                 options.input = std::string(argv[i + 1]);
                 ++i;
             }
+        } else if (arg == "--live") {
+            options.live = true;
+        } else if (arg == "--midi") {
+            auto v = need(i, "--midi");
+            if (!v) return std::unexpected(v.error());
+            options.midi = *v;
+            ++i;
+        } else if (arg == "--sonic-live-log") {
+            auto v = need(i, "--sonic-live-log");
+            if (!v) return std::unexpected(v.error());
+            options.sonicLiveLog = *v;
+            ++i;
         } else if (arg == "--osc-port") {
             auto v = need(i, "--osc-port");
             if (!v) return std::unexpected(v.error());
@@ -1886,6 +1903,38 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
         };
         panel_->onStopAudioInput = [this] { engine_->stopAudioInput(); };
+        // ADR-1025: the Live panel. Device choices are this machine's, so they go to the settings file.
+        panel_->onLiveAudioInput = [this](const std::string& name) {
+            if (name.empty()) {
+                engine_->stopAudioInput();
+            } else if (auto r = engine_->useAudioInput(name); !r) {
+                panel_->setStatus("audio input: " + r.error().message);
+                return;
+            }
+            settings_.live.audioInput = name;
+            saveSettings();
+        };
+        panel_->onLiveMidiInput = [this](const std::string& filter) {
+            settings_.live.midiInput = filter.empty() ? "*" : filter;
+            saveSettings();
+            liveSonicWasOn_ = false; // re-applied by serviceLiveSonic on the next frame
+        };
+        panel_->onOpenLiveDemo = [this, executablePath] {
+            if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
+                for (const auto& ex : *examples) {
+                    if (ex.name == "Sonic Live") {
+                        beginOpen(ex.file);
+                        return;
+                    }
+                }
+            }
+            panel_->setStatus("the Sonic Live example was not found");
+        };
+        panel_->onLiveSmoothing = [this](float smoothing) {
+            settings_.live.smoothing = std::clamp(smoothing, 0.25f, 4.0f);
+            engine_->setLiveSonicSmoothing(settings_.live.smoothing);
+            saveSettings();
+        };
         panel_->onChooseRenderOutput = [this] {
             // Two different questions, because a video is a file and a sequence is a directory full
             // of them. Asking for a file name when the answer is a folder is how the output path of
@@ -1962,6 +2011,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         if (auto r = engine_->useAudioInput(*options.input); !r) {
             log::error("audio input: {}", r.error().message);
             if (panel_) panel_->setStatus(r.error().message);
+        }
+    }
+    // ADR-1025.
+    if (options.live && !options.headless) {
+        if (auto r = engine_->setLiveSonic(true); !r) {
+            log::error("live sonic: {}", r.error().message);
+        }
+    }
+    if (options.sonicLiveLog && !options.headless) {
+        liveLog_ = std::make_unique<std::ofstream>(*options.sonicLiveLog);
+        if (!*liveLog_) {
+            log::error("--sonic-live-log: cannot write '{}'", *options.sonicLiveLog);
+            liveLog_.reset();
         }
     }
     if (options.scene) {
@@ -4901,6 +4963,7 @@ int Application::runLive() {
         // render that ended, failed or was cancelled several minutes ago.
         serviceRenderPreview();
         serviceDirectorStills();
+        serviceLiveSonic();
         // Input diagnostics (AVGEN_UI_SELFTEST=1): logs what ImGui and SDL each see of the
         // pointer, plus the raw event counts, so "the UI does not react to clicks" can be traced
         // to the event routing rather than the widgets.
@@ -5170,6 +5233,9 @@ int Application::runLive() {
         const auto workEnd = std::chrono::steady_clock::now();
         const auto presentStart = workEnd;
         context_->present();
+        if (liveLog_ && engine_->liveSonic()) {
+            writeLiveSonicLog(sonic::hostNowNs(), lastGpuFrameMs_);
+        }
         if (uiCaptureDone_) {
             break;   // --capture-ui, without --capture-ui-stay: the picture is written, we are done
         }
@@ -6542,6 +6608,68 @@ int Application::runHeadless() {
     log::info("headless run complete: {} block(s) of {} frames at {} fps; GPU errors: {}",
               schedule.size(), frames, options_.offlineFps, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+// ---- ADR-1025: live Sonic input --------------------------------------------------------------------------------
+
+void Application::serviceLiveSonic() {
+    if (panel_ == nullptr) {
+        return;
+    }
+    const bool on = engine_->liveSonic();
+    if (on && !liveSonicWasOn_) {
+        // Just turned on (by the panel, a live project or --live): this machine's rig. The MIDI filter goes into
+        // the hub's map, where the Control tab shows it too; --midi overrides it for the run.
+        const std::string filter = options_.midi ? *options_.midi : settings_.live.midiInput;
+        auto& hub = engine_->control();
+        if (!hub.map().midiEnabled || hub.map().midiFilter != filter) {
+            hub.map().midiEnabled = true;
+            hub.map().midiFilter = filter;
+            hub.applyIo();
+        }
+        engine_->setLiveSonicSmoothing(settings_.live.smoothing);
+        if (!engine_->hasLiveInput() && !options_.input && !settings_.live.audioInput.empty()) {
+            if (auto r = engine_->useAudioInput(settings_.live.audioInput); !r) {
+                panel_->setStatus("live audio input '" + settings_.live.audioInput + "': " + r.error().message);
+                log::warn("live sonic: audio input '{}': {}", settings_.live.audioInput, r.error().message);
+            }
+        }
+    }
+    liveSonicWasOn_ = on;
+}
+
+void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
+    const signals::SignalBus& bus = engine_->signals();
+    if (liveLogColumns_.empty()) {
+        for (std::size_t i = 0; i < bus.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            const auto& info = bus.info(id);
+            const std::string& name = info.name;
+            if (name.starts_with("sonic.") || name.starts_with("timbre.") || name.starts_with("notes.") ||
+                name.starts_with("visual.")) {
+                liveLogColumns_.emplace_back(name, id);
+            }
+        }
+        *liveLog_ << "frame,liveSeconds,frameNs,presentNs,gpuMs,midiMessages,notesReceived,held,audioFrames,"
+                     "audioDropped,snapshotToFrameMs";
+        for (const auto& [name, id] : liveLogColumns_) {
+            *liveLog_ << ',' << name;
+        }
+        *liveLog_ << '\n';
+    }
+    const auto st = engine_->liveSonicStatus();
+    *liveLog_ << liveLogFrames_++ << ',' << fmt::format("{:.6f}", engine_->liveSonicSeconds()) << ','
+              << engine_->liveSonicFrameNs() << ',' << presentNs
+              << ',' << fmt::format("{:.3f}", gpuMs) << ',' << st.midiMessages << ',' << st.notes << ',' << st.held
+              << ',' << st.audioFrames << ',' << st.audioDropped << ',' << fmt::format("{:.3f}", st.snapshotToFrameMs);
+    for (const auto& [name, id] : liveLogColumns_) {
+        *liveLog_ << ',' << fmt::format("{:.5g}", static_cast<double>(bus.value(id)));
+    }
+    *liveLog_ << '\n';
 }
 
 } // namespace avgen::app

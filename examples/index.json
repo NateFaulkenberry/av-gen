@@ -323,6 +323,12 @@
       "description": "The Sonic Garden POC (ADR-1020): one MIDI phrase through a pad, an FM bell, a distorted bass and noisy percussion. The Sonic Character, the notes' musical context and the interpret source's visual families drive a hero form, organic and crystalline structures, shards, spores and the camera. Variants per sound are in sonic-garden/variants/; the audio comes from tools/make_sonic_material.py.",
       "name": "Sonic Garden",
       "project": "sonic-garden/sonic-garden.json"
+    },
+    {
+      "category": "Lab",
+      "description": "Play the Sonic Garden live (ADR-1025): a MIDI keyboard and a synth's audio input drive the same Sonic Character, musical context and worlds as the file version. Opening it turns live input on; pick the devices in the Live panel (View > Live). See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
+      "name": "Sonic Live",
+      "project": "sonic-garden/sonic-live.json"
     }
   ]
 }

@@ -546,6 +546,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     ensureControlSource();
     // First on the bus, and in the one order a seek replay's bus also uses (ADR-870).
     declareFrameSignals(bus_, audioSignals_, timeSignals_, clock_.music, clock_.sonic);
+    liveSonic_.declare(bus_); // ADR-1025: the same ids (declaring is idempotent)
     stateProgressSignal_ = bus_.declare("state.progress");
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
@@ -2757,6 +2758,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         if (auto r = setSonic(block != doc.end() ? *block : nlohmann::json(), dir); !r) {
             warn("sonic: " + r.error().message);
         }
+        // ADR-1025: a project made to be played turns live input on in the live editor; any other turns it off.
+        if (mode_ == EngineMode::Live && controlHub_.liveIo()) {
+            static_cast<void>(setLiveSonic(sonic_ != nullptr && sonic_->live));
+        }
     }
     stage(2);
     // The audio is the project's too. A document that names none means silence, not whatever was
@@ -4081,7 +4086,10 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         // nothing in it. Opening one for a buffer of no samples would hold the sound card for a
         // project that has none.
         if (mode_ == EngineMode::Live && player_) {
-            runner_.reset();
+            // A live input's runner is not the player's: a project with no audio must not deafen it (ADR-1025).
+            if (!input_) {
+                runner_.reset();
+            }
             static_cast<void>(player_->setSource(nullptr));
         }
         track_.reset();
@@ -4106,7 +4114,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
             return std::unexpected(r.error());
         }
         runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, player_->analysisStream());
-        runner_->start();
+        startRunner();
     }
     // The whole-track analysis, in *both* modes.
     //
@@ -4760,7 +4768,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     }
     analyzerConfig_.sampleRate = input->sampleRate();
     runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, input->analysisStream());
-    runner_->start();
+    startRunner();
     input_ = std::move(input);
     audioFile_.reset();
     audioPath_.clear();
@@ -5021,10 +5029,14 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     clock.music.publish(bus);
     // ADR-1020: the Sonic Character walks the analysis frames up to this instant (the hop clock, like the
     // classifier), and the musical context is read at it. No setup: zeros, and no work.
-    if (sonic_ && track_ != nullptr && !track_->empty()) {
-        clock.sonic.advance(*sonic_, *track_, time.renderTime);
+    // ADR-1025: while live input runs, the live session publishes these instead (after this, on the engine's own
+    // bus); a replay bus then carries nothing sonic, like any other live-only signal.
+    if (!liveSonic_.running()) {
+        if (sonic_ && track_ != nullptr && !track_->empty()) {
+            clock.sonic.advance(*sonic_, *track_, time.renderTime);
+        }
+        clock.sonic.publish(sonic_.get(), bus, time.renderTime);
     }
-    clock.sonic.publish(sonic_.get(), bus, time.renderTime);
     return pulse;
 }
 
@@ -5047,6 +5059,9 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     in.duration = durationSeconds();
     in.playing = isPlaying();
     const bool pulse = advanceClock(clock_, bus_, time, newAnalysisFrame, in);
+    if (liveSonic_.running()) {
+        liveSonic_.frame(*activeSonicSetup(), liveTimbre_.get(), bus_, liveFrameSeconds_, liveFrameNs_);
+    }
 
     sourceContext_.time = time;
     sourceContext_.audioPosition = in.position;
@@ -5879,6 +5894,12 @@ void Engine::applySectionActions() {
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
+    if (liveSonic_.running()) {
+        // ADR-1025: the live clock's reading for this frame, taken before the MIDI is drained, so every message
+        // drained this frame is at or before the instant the frame publishes.
+        liveFrameNs_ = sonic::hostNowNs();
+        liveFrameSeconds_ = liveSonic_.seconds(liveFrameNs_);
+    }
 
     // ADR-186: the frame's detail policy, written before anything reads it. Applied every frame
     // rather than once at the setter, because a controller may replace its scene (a project load,
@@ -6352,6 +6373,59 @@ void Engine::refreshSonicTimbre() {
     sonicRevision_ = audioRevision_;
     clock_.sonic.reset();
     log::info("sonic: timbre of {} analysis frames in {:.1f} ms", sonic_->timbre.size(), sonic_->timbreMillis);
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+// ---- ADR-1025: live Sonic input ---------------------------------------------------------------------------------
+
+void Engine::startRunner() {
+    // Every live runner gets the timbre tap, dormant until live input is on (one atomic load per frame). The old
+    // tap goes only now, after the old runner (reset by the caller) has stopped calling it.
+    liveTimbre_ = std::make_unique<sonic::LiveTimbre>(analyzerConfig_,
+                                                      sonic_ ? sonic_->timbreConfig : sonic::TimbreConfig{});
+    liveTimbre_->setEnabled(liveSonic_.running());
+    runner_->setTap(liveTimbre_.get());
+    runner_->start();
+}
+
+Result<void> Engine::setLiveSonic(bool enabled) {
+    if (!enabled) {
+        if (liveSonic_.running()) {
+            liveSonic_.end();
+            if (liveTimbre_) {
+                liveTimbre_->setEnabled(false);
+            }
+            clock_.sonic.reset();
+            log::info("sonic: live input off");
+        }
+        return {};
+    }
+    if (mode_ != EngineMode::Live) {
+        return fail("live Sonic input needs the live engine");
+    }
+    if (liveSonic_.running()) {
+        return {};
+    }
+    liveSonic_.begin();
+    if (liveTimbre_) {
+        // What was queued while it was off is stale; the tap was not producing, but be exact.
+        sonic::TimbreSnapshot stale;
+        while (liveTimbre_->pop(stale)) {
+        }
+        liveTimbre_->setEnabled(true);
+    }
+    liveFrameNs_ = sonic::hostNowNs();
+    liveFrameSeconds_ = liveSonic_.seconds(liveFrameNs_);
+    log::info("sonic: live input on ({}; audio: {})", sonic_ ? "the project's character" : "the default character",
+              input_ ? input_->deviceName() : (runner_ ? std::string("the playing file") : std::string("none yet")));
+    return {};
+}
+
+bool Engine::liveSonicMidi(const control::MidiMessage& message) {
+    return liveSonic_.midi(message, liveFrameSeconds_);
 }
 
 } // namespace avgen::app

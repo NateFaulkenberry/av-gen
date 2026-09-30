@@ -11,6 +11,7 @@
 #include "app/camera_director.hpp"
 #include "app/control_hub.hpp"
 #include "app/music_runtime.hpp"
+#include "sonic/live.hpp"
 #include "sonic/sonic_runtime.hpp"
 #include "app/render_settings.hpp"
 #include "app/scene_states.hpp"
@@ -475,6 +476,25 @@ public:
     void stopAudioInput();
     [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
     [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
+
+    // ---- live Sonic input (ADR-1025) ----
+    // Live notes from the MIDI input (every source the control map's MIDI filter admits) and live timbre from
+    // whatever the live analysis runner hears -- the audio input when one is open, else the playing file -- feed the
+    // Sonic Character and Musical Context in place of the project's MIDI file and precomputed timbre. Live mode only
+    // (an error otherwise). Off: nothing live runs and the file path is exactly as before. A project whose `sonic`
+    // block says `"live": true` turns it on when the live editor opens it; any other project turns it off.
+    [[nodiscard]] Result<void> setLiveSonic(bool enabled);
+    [[nodiscard]] bool liveSonic() const { return liveSonic_.running(); }
+    // Called by ControlHub for every MIDI message; true when the note model used it.
+    bool liveSonicMidi(const control::MidiMessage& message);
+    [[nodiscard]] sonic::LiveSonic::Status liveSonicStatus() const { return liveSonic_.status(liveFrameSeconds_); }
+    // The live panel's smoothing: a multiplier on the character's time constants (1 = as the project specifies).
+    void setLiveSonicSmoothing(float scale) { liveSonic_.setSmoothing(scale); }
+    [[nodiscard]] float liveSonicSmoothing() const { return liveSonic_.runtime().timeScale(); }
+    [[nodiscard]] const sonic::LiveTimbre* liveTimbre() const { return liveTimbre_.get(); }
+    // Seconds on the live clock at the start of the current frame.
+    [[nodiscard]] double liveSonicSeconds() const { return liveFrameSeconds_; }
+    [[nodiscard]] std::uint64_t liveSonicFrameNs() const { return liveFrameNs_; }
     // Tempo source (saved in the project's "control" block as "tempoSource").
     void setTempoSource(TempoSource source);
     [[nodiscard]] TempoSource tempoSource() const { return tempoSource_; }
@@ -955,7 +975,14 @@ public:
     [[nodiscard]] const MusicRuntime& music() const { return clock_.music; }
     // ADR-1020: the Sonic Garden subsystem. Null when the project has no `sonic` block, and then it does nothing.
     [[nodiscard]] const sonic::SonicSetup* sonicSetup() const { return sonic_.get(); }
-    [[nodiscard]] const sonic::SonicRuntime& sonicRuntime() const { return clock_.sonic; }
+    // The runtime the bus is fed from: the live session's while live input is on, else the file walk's.
+    [[nodiscard]] const sonic::SonicRuntime& sonicRuntime() const {
+        return liveSonic_.running() ? liveSonic_.runtime() : clock_.sonic;
+    }
+    // The setup in force: the project's, or (live input with no `sonic` block) the default character.
+    [[nodiscard]] const sonic::SonicSetup* activeSonicSetup() const {
+        return sonic_ ? sonic_.get() : (liveSonic_.running() ? &liveDefaults_ : nullptr);
+    }
     // Installs a `sonic` block (as a project's would be read, paths relative to `baseDir`), or removes the
     // subsystem with a null json. Analyses the loaded track's timbre when there is one.
     [[nodiscard]] Result<void> setSonic(const nlohmann::json& block, const std::filesystem::path& baseDir);
@@ -1290,6 +1317,8 @@ private:
     std::filesystem::path audioPath_;
     analysis::AnalyzerConfig analyzerConfig_;
     std::unique_ptr<audio::AudioPlayer> player_;
+    // ADR-1025: the live timbre stage the runner feeds. Declared before `runner_` so it outlives it.
+    std::unique_ptr<sonic::LiveTimbre> liveTimbre_;
     std::unique_ptr<analysis::AnalysisRunner> runner_;
     std::shared_ptr<analysis::AnalysisTrack> track_;
     SignalClock clock_; // ADR-870: the live signal pipeline's carried state
@@ -1297,6 +1326,13 @@ private:
     std::shared_ptr<sonic::SonicSetup> sonic_;
     std::uint64_t sonicRevision_ = 0;
     void refreshSonicTimbre();
+    // ADR-1025: live Sonic input.
+    sonic::LiveSonic liveSonic_;
+    sonic::SonicSetup liveDefaults_;  // the character when live input runs under a project with no `sonic` block
+    double liveFrameSeconds_ = 0.0;
+    std::uint64_t liveFrameNs_ = 0;
+    // Starts the runner just built, with the live timbre tap installed (live mode).
+    void startRunner();
     double lastRenderTime_ = 0.0;
     EngineStats stats_;
 };
