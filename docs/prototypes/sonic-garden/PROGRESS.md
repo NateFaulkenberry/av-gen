@@ -98,7 +98,7 @@ running status; SMPTE timing is refused. Live MIDI (Phase 7) would append to the
 - **Both files are written by `tools/sonic_garden_look.py`** (art pass 1). Edit the tool, run it, then run the
   variants tool. The scene and the master's `sonic`, `sources`, `routes`, `timeline` and `parameters` are its output;
   hand edits to them are overwritten. The node and mapping inventory is in "Art pass 1" below.
-- `sonic-garden.json`: the **master project** (the pad's audio, the `sonic` block, two interpret sources, 241 routes,
+- `sonic-garden.json`: the **master project** (the pad's audio, the `sonic` block, two interpret sources, 251 routes,
   a keyed camera). `--audit-routes` finds every route live.
 - `variants/*.json`: the master with only the audio and notes swapped. **Don't edit these**: edit the master, then
   run `python3 tools/sonic_garden_variants.py`. Its `--width/--height/--out` flags write low-res copies elsewhere.
@@ -197,14 +197,35 @@ Not acted on: F002 (cuts off the beat: the "cuts" are the joins between four ren
 nothing new after 0.13 s": it is the calm world by design), F008 (bass and perc "share a composition": the same
 camera move is the point of §34; the representative frames were the first, still-forming ones).
 
-### The scene (17 nodes)
+Second pass on the final sequence, `job_1a0f2444b7c997dcd`, compared with the first (`critic compare`): still 0
+high; the whole-frame onset response fell from 98% of regions at 12% of mean luma to 94% at 9%; the bass's
+high-frequency motion share from 28% to 13%; perc jitter from 0.18 to 0.06. The perc's "camera shake" remains
+(its blade bursts fill much of the frame, which the global-motion estimate reads as camera motion), and three low
+"long flash" findings in the dark perc world, where small absolute changes are large ratios. Accepted as the light
+world's character; not iterated further.
+
+### Review media: `tools/sonic_garden_review.py`
+
+```
+python3 tools/sonic_garden_review.py render --out <dir> [--size 1920x1080] [--stills-at 17]
+python3 tools/sonic_garden_review.py assemble --out <dir> --review ~/Desktop/av-gen-review/23-sonic-garden
+```
+
+`render` regenerates the variants, takes the `--sonic-trace` CSVs (CPU), and renders all seven variants and four
+supersampled stills in one `gpu-lock.sh` batch (about 16 minutes at 1080p: 85 s per 21.5 s file, 125 s per 31.5 s
+file). `assemble` builds the grid, the sequence with audio, the stills sheet, and the §35/§36 videos with section
+labels and corner readouts drawn from the traces. Both steps were run end to end at 320x180 before commit.
+
+### The scene (20 nodes)
 
 `ground` (150 m, undulating, with a swell only the heavy world raises), `horizon` (a far ring of mesas), `hero` (a
 lumpy sphere: noise, sine breath, twist without speed, displacement), `facets` (a gem: a chamfered cube with two
-rotated hierarchy copies), organic `stalks` (tubes), `caps` + `capstems` (lathe-profile tubes), `petals`,
-crystalline `prisms` + `spires` (cubes stood on a vertex and stretched: rhombohedra, the one faceted crystal the
-primitives allow), `halos` (three thin tori), chaotic `shards` (blades on a spiral) and `slabs` (monoliths that
-rise out of the ground), particles `spores`, `glints`, `sparks`, `dust`, and a `heart` point light inside the hero.
+rotated hierarchy copies), organic `stalks` (tubes), `caps` + `gills` + `capstems` (lathe-profile tubes; the gills a
+glowing lip), `buds` (glowing bulbs raised only by dense chords: organic x stack), `petals`, crystalline `prisms` +
+`spires` (cubes stood on a vertex and stretched: rhombohedra, the one faceted crystal the primitives allow),
+`cluster` (small gems raised only by dense chords: crystalline x stack), `halos` (three thin tori), chaotic `shards`
+(blades on a spiral) and `slabs` (monoliths that rise out of the ground), particles `spores`, `glints`, `sparks`,
+`dust`, and a `heart` point light inside the hero.
 The camera is keyed (`timeline`): a low wide establishing view from the front left, an arc right and in, closest on
 the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 
@@ -225,7 +246,9 @@ the stabs, a lift at the end. Weight lowers it by up to 1 m and tips it up.
 
 ### Next
 
-- Engineering: the twist normal fix above (with a render test); Phase 6/7 as planned.
+- Engineering: the twist normal fix above (with a render test); Phase 6/7 as planned. When live input arrives, the
+  families and gestures here need no change (they read bus signals), but `silence` and the slow tier will define how
+  a live world starts and how fast it changes; tune `mass`'s bias and the family sharpness on real material first.
 - Art: the §35 bell sustained section starts half organic (a slow, single bell note genuinely reads soft and warm),
   which confounds "same timbre, different context" there; the pad version is the clean §35 demonstration.
 

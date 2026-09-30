@@ -1700,7 +1700,7 @@
   {
    "source": "visual.organic",
    "target": "procedural/hero/material/emissive",
-   "amount": 0.22,
+   "amount": 0.15,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -2117,6 +2117,19 @@
   },
   {
    "source": "visual.organic",
+   "target": "procedural/gills/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "curve": "power",
+    "curveAmount": 1.4,
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.organic",
    "target": "procedural/capstems/source/scale",
    "amount": 1.0,
    "op": "multiply",
@@ -2142,6 +2155,19 @@
    }
   },
   {
+   "source": "visual.organic",
+   "target": "procedural/buds/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "curve": "power",
+    "curveAmount": 1.4,
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
    "source": "visual.sustain",
    "target": "procedural/caps/source/scale",
    "amount": 1.0,
@@ -2152,6 +2178,54 @@
     "offset": 0.75,
     "attackMs": 800,
     "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.sustain",
+   "target": "procedural/gills/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.45,
+    "offset": 0.75,
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.radiance",
+   "target": "procedural/gills/material/emissive",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "procedural/gills/material/emissive",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.organic",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "procedural/buds/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.organic",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1500
    }
   },
   {
@@ -2239,6 +2313,19 @@
   {
    "source": "visual.crystalline",
    "target": "procedural/halos/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "curve": "power",
+    "curveAmount": 1.3,
+    "attackMs": 800,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.crystalline",
+   "target": "procedural/cluster/source/scale",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -2550,7 +2637,7 @@
   {
    "source": "notes.noteOn",
    "target": "procedural/hero/material/emissive",
-   "amount": 0.6,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.organic",
@@ -2611,6 +2698,18 @@
    "source": "notes.noteOn",
    "target": "procedural/spires/material/emissive",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.crystalline",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "procedural/cluster/material/emissive",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.crystalline",
@@ -2952,6 +3051,41 @@
     "offset": 1.0,
     "attackMs": 400,
     "decayMs": 1000
+   }
+  },
+  {
+   "source": "visual.stack",
+   "target": "procedural/gills/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.3,
+    "offset": 1.0,
+    "attackMs": 400,
+    "decayMs": 1000
+   }
+  },
+  {
+   "source": "visual.stack",
+   "target": "procedural/buds/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "visual.stack",
+   "target": "procedural/cluster/source/scale",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 1500
    }
   },
   {

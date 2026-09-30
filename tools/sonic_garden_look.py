@@ -180,7 +180,7 @@ nodes.append(proc("stalks",
                              "samplesPerSegment": 8}},
                   {"kind": "radial", "count": 18, "radius": 3.5, "orientation": "outward"},
                   xf((0, 0, 0)),
-                  mat((0.035, 0.022, 0.018), (1.0, 0.5, 0.22), 0.05, rough=0.55),
+                  mat((0.025, 0.016, 0.013), (1.0, 0.5, 0.22), 0.05, rough=0.55),
                   variation={"seed": 5, "rotation": [0.2, 0.5, 0.2], "scale": [0.25, 0.4, 0.25],
                              "position": [0.7, 0, 0.7]},
                   materialVariation={"valueRandom": 0.2, "emissiveRandom": 0.7},
@@ -197,6 +197,14 @@ nodes.append(proc("caps", cap, CAPS, xf((0, 0.62, 0)),
                   variation=CAPVAR, materialVariation={"emissiveRandom": 0.5},
                   deformers=[{"kind": "sine", "amount": 0.03, "frequency": 2.0, "speed": 0.7, "axis": [0, 1, 0],
                               "displacementAxis": [1, 0, 1]}]))
+# Gills: a flatter copy of the cap profile hung upside down under each cap (the same distribution and seed, so they
+# stay aligned), glowing, and a little wider than the cap, so from above they show as a luminous lip.
+gill = {"kind": "tube", "tubeRadius": 0.64, "tubeTaper": 1.0, "tubeSides": 28, "tubeSegments": 10, "tubeTwist": 0.0,
+        "tubeCaps": True, "curve": {"kind": "catmullRom", "generator": "points",
+                                    "points": cap_profile(height=0.16), "samplesPerSegment": 6}}
+nodes.append(proc("gills", gill, CAPS, xf((0, 0.625, 0)),
+                  mat((0.08, 0.04, 0.05), (1.0, 0.42, 0.3), 0.9, rough=0.6),
+                  sourceTransform=xf(rot=(180, 0, 0)), variation=CAPVAR, materialVariation={"emissiveRandom": 0.4}))
 nodes.append(proc("capstems",
                   {"kind": "tube", "tubeRadius": 0.07, "tubeTaper": 0.7, "tubeSides": 8, "tubeSegments": 10,
                    "tubeTwist": 0.0, "tubeCaps": True,
@@ -204,6 +212,19 @@ nodes.append(proc("capstems",
                              "end": [0.0, 0.66, 0.0], "samplesPerSegment": 6}},
                   CAPS, xf((0, 0, 0)),
                   mat((0.1, 0.07, 0.06), (1.0, 0.45, 0.3), 0.1, rough=0.7), variation=CAPVAR))
+
+# Buds: glowing bulbs that only dense chords raise (organic x stack) -- the harmony blossoms. "Dense: many
+# overlapping forms, layered geometry, crowded composition" (brief §14).
+nodes.append(proc("buds",
+                  {"kind": "sphere", "radius": 0.13, "segments": 20, "rings": 14},
+                  {"kind": "spiral", "count": 44, "radius": 2.3, "radiusGrowth": 3.2, "turns": 4, "spiralHeight": 0.0,
+                   "orientation": "outward"},
+                  xf((0, 0.35, 0)),
+                  mat((0.2, 0.08, 0.06), (1.0, 0.5, 0.25), 1.3, rough=0.5),
+                  variation={"seed": 23, "position": [0.5, 0.4, 0.5], "scale": [0.45, 0.45, 0.45]},
+                  materialVariation={"emissiveRandom": 0.6, "hueGradient": 0.06},
+                  deformers=[{"kind": "sine", "amount": 0.02, "frequency": 3.0, "speed": 1.1, "axis": [0, 1, 0],
+                              "displacementAxis": [1, 0.5, 1]}]))
 
 # Petals cradling the hero: flattened lobes, tipped up and out, that sway with the breath.
 nodes.append(proc("petals",
@@ -236,6 +257,16 @@ nodes.append(proc("spires", GEM,
                   sourceTransform=ON_VERTEX,
                   variation={"seed": 22, "scale": [0.2, 0.4, 0.2], "rotation": [0.15, 0.6, 0.15]},
                   materialVariation={"hueGradient": 0.05, "valueRandom": 0.2}))
+# A cluster of small gems between the rings that only dense chords raise (crystalline x stack).
+nodes.append(proc("cluster", GEM,
+                  {"kind": "spiral", "count": 36, "radius": 5.2, "radiusGrowth": 2.2, "turns": 3, "spiralHeight": 0.0,
+                   "orientation": "outward"},
+                  xf((0, 0.55, 0), scale=(0.45, 1.3, 0.45)),
+                  mat((0.05, 0.065, 0.1), (0.35, 0.7, 1.0), 0.05, rough=0.42, metal=0.1),
+                  sourceTransform=ON_VERTEX,
+                  variation={"seed": 29, "scale": [0.3, 0.5, 0.3], "rotation": [0.3, 3.1, 0.3],
+                             "position": [0.4, 0.0, 0.4]},
+                  materialVariation={"hueGradient": 0.05, "valueRandom": 0.25}))
 nodes.append(proc("halos",
                   {"kind": "torus", "majorRadius": 2.7, "minorRadius": 0.02, "majorSegments": 192,
                    "minorSegments": 8},
@@ -392,7 +423,7 @@ palette("procedural/hero/material/emissiveColor", {"organic": (1.0, 0.4, 0.2), "
                                                      "tectonic": (0.5, 0.12, 1.0), "impact": (1.0, 1.0, 0.92)},
         **SLOW)
 scalar("procedural/hero/material/roughness", {"crystalline": -0.34, "tectonic": 0.35, "impact": 0.1}, **SLOW)
-scalar("procedural/hero/material/emissive", {"organic": 0.22, "crystalline": 0.04}, **SLOW)
+scalar("procedural/hero/material/emissive", {"organic": 0.15, "crystalline": 0.04}, **SLOW)
 scalar("procedural/hero/material/metallic", {"crystalline": 0.5, "impact": 0.3}, **SLOW)
 palette("procedural/hero/material/baseColor", {"organic": (0.26, 0.09, 0.06), "crystalline": (0.16, 0.22, 0.3),
                                                  "tectonic": (0.012, 0.008, 0.03), "impact": (0.02, 0.02, 0.02)},
@@ -420,9 +451,13 @@ R("time.seconds", "procedural/halos/transform/rotation", 10.0, comp=1, offset=-1
 R("time.seconds", "procedural/shards/transform/rotation", -10.0, comp=1, offset=-16.0)
 
 # ---- organic
-for n in ("stalks", "caps", "capstems", "petals"):
+for n in ("stalks", "caps", "gills", "capstems", "petals", "buds"):
     R("visual.organic", "procedural/%s/source/scale" % n, 1.0, op="multiply", curve="power", curveAmount=1.4, **SLOW)
-R("visual.sustain", "procedural/caps/source/scale", 1.0, op="multiply", gain=0.45, offset=0.75, **SLOW)
+for n in ("caps", "gills"):
+    R("visual.sustain", "procedural/%s/source/scale" % n, 1.0, op="multiply", gain=0.45, offset=0.75, **SLOW)
+R("visual.radiance", "procedural/gills/material/emissive", 0.4, **MED)
+R("notes.noteOn", "procedural/gills/material/emissive", 1.0, depth="visual.organic", attackMs=0, decayMs=1800)
+R("notes.noteOn", "procedural/buds/material/emissive", 1.2, depth="visual.organic", attackMs=0, decayMs=1500)
 R("visual.breath", "procedural/stalks/deform/1/amount", 0.18, attackMs=400, decayMs=1200)
 R("visual.breath", "procedural/petals/deform/1/amount", 0.3, attackMs=500, decayMs=1500)
 R("visual.radiance", "procedural/stalks/material/emissive", 0.15, **MED)
@@ -430,7 +465,7 @@ R("visual.radiance", "procedural/caps/material/emissive", 0.25, **MED)
 R("visual.swarm", "particles/spores/spawnRate", 70.0, depth="visual.organic", attackMs=300, decayMs=900)
 
 # ---- crystalline
-for n in ("prisms", "spires", "halos"):
+for n in ("prisms", "spires", "halos", "cluster"):
     R("visual.crystalline", "procedural/%s/source/scale" % n, 1.0, op="multiply", curve="power", curveAmount=1.3,
       **SLOW)
 R("visual.radiance", "procedural/prisms/material/emissive", 0.05, **MED)
@@ -456,12 +491,13 @@ R("visual.grain", "particles/sparks/spawnRate", 80.0, depth="visual.impact", att
 # ---- the same MIDI note, different gestures: the family the sound belongs to decides what a note-on looks like.
 # organic: a slow swell of light; crystalline: a precise ring; tectonic: a heave of the mass (below); impact: the
 # audio's transients strike (the next block).
-R("notes.noteOn", "procedural/hero/material/emissive", 0.6, depth="visual.organic", attackMs=0, decayMs=1400)
+R("notes.noteOn", "procedural/hero/material/emissive", 0.45, depth="visual.organic", attackMs=0, decayMs=1400)
 R("notes.noteOn", "procedural/stalks/material/emissive", 0.5, depth="visual.organic", attackMs=0, decayMs=1600)
 R("notes.noteOn", "procedural/caps/material/emissive", 0.8, depth="visual.organic", attackMs=0, decayMs=1800)
 R("notes.noteOn", "particles/spores/burst", 6.0, depth="visual.organic", attackMs=0, decayMs=120)
 R("notes.noteOn", "procedural/prisms/material/emissive", 0.35, depth="visual.crystalline", attackMs=0, decayMs=90)
 R("notes.noteOn", "procedural/spires/material/emissive", 0.6, depth="visual.crystalline", attackMs=0, decayMs=90)
+R("notes.noteOn", "procedural/cluster/material/emissive", 0.8, depth="visual.crystalline", attackMs=0, decayMs=90)
 R("notes.noteOn", "procedural/halos/material/emissive", 5.0, depth="visual.crystalline", attackMs=0, decayMs=320)
 R("notes.noteOn", "procedural/facets/material/emissive", 0.4, depth="visual.crystalline", attackMs=0, decayMs=150)
 R("notes.noteOn", "particles/glints/burst", 25.0, depth="visual.crystalline", attackMs=0, decayMs=60)
@@ -505,8 +541,12 @@ R("visual.stack", "procedural/petals/source/scale", 1.0, op="multiply", gain=0.5
   decayMs=1000)
 R("visual.stack", "procedural/halos/source/scale", 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=300,
   decayMs=900)
-R("visual.stack", "procedural/caps/source/scale", 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=400,
-  decayMs=1000)
+for n in ("caps", "gills"):
+    R("visual.stack", "procedural/%s/source/scale" % n, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=400,
+      decayMs=1000)
+# the chord layers rise and fall with the density of the harmony
+R("visual.stack", "procedural/buds/source/scale", 1.0, op="multiply", attackMs=500, decayMs=1500)
+R("visual.stack", "procedural/cluster/source/scale", 1.0, op="multiply", attackMs=500, decayMs=1500)
 R("notes.noteOn", "lights/heart/intensity", 6.0, depth="visual.stack", attackMs=0, decayMs=650)
 R("notes.noteOn", "particles/spores/burst", 30.0, depth="visual.stack", attackMs=0, decayMs=90)
 R("notes.noteOn", "particles/glints/burst", 40.0, depth="visual.stack", attackMs=0, decayMs=70)
@@ -549,7 +589,8 @@ master["parameters"] = {
     "temporal/echo/enabled": True, "temporal/echo/strength": 0.0, "temporal/echo/decay": 0.0,
     "temporal/echo/frames": 8.0,
     "camera/exposure/mode": 0, "camera/exposure/compensation": -0.3,
-    "env/sky/enabled": True, "env/sky/background": True, "env/sky/intensity": 0.18, "lightrig/SonicGarden/keyIntensity": 2.6,
+    "env/sky/enabled": True, "env/sky/background": True, "env/sky/intensity": 0.18,
+    "lightrig/SonicGarden/keyIntensity": 2.6,
     "post/dof/enabled": True, "post/dof/physical": True, "camera/lens/useExplicitFov": False,
     "scene/volumeJitter": 0.4, "scene/volumeSteps": 48,
     "camera/lens/focalLength": 35.0, "camera/lens/aperture": 2.2, "camera/focus/mode": 2,
