@@ -610,6 +610,27 @@ audio via BlackHole.
   - `04-live-panel-and-viewport.png`.
   - The clips are about 15 fps, because `--live-capture` re-renders each frame at 640x360.
 
+### Resume here (PARTS 9-14 state, for a cold successor)
+
+- Done and committed on `proto/sonic-garden`:
+  - `6b855427`: the implementation;
+  - `ee6f1092`: ADR-1025, the quickstart, the measurements and the tools;
+  - `16638fed`: a Live panel fix.
+- The tree builds: `cmake --preset release && cmake --build --preset release`.
+- Suites:
+  - `avgen_tests` at `ee6f1092`: exit 0; 3,931 cases, 3,911 passed, 19 skipped, 1 failed as expected (the
+    `[!shouldfail]` slope lean). `16638fed` changes only `application.cpp`, which neither test binary compiles.
+  - `avgen_render_tests`: run it under `tools/gpu-lock.sh` if this line has no result:
+    `tools/gpu-lock.sh build/release/tests/avgen_render_tests; echo $?`
+- The review media are in place: `~/Desktop/av-gen-review/23-sonic-garden/live/` (3 clips, 2 curve plots and CSVs,
+  the panel screenshot).
+- Next:
+  - the coordinator merges;
+  - PARTS 15-16 go to the art agent (below);
+  - PART 22 is the owner's (`LIVE-QUICKSTART.md`).
+- No real MIDI device was enumerated on this Mac during the work (`avgen --list-midi` listed none; the SE49 was
+  not connected). BlackHole 2ch and an Apogee HAL driver are installed.
+
 ### For the art agent (PARTS 15-16)
 
 - The demo is the garden master with no audio or MIDI file, `sonic.live: true`, and the camera held at the
