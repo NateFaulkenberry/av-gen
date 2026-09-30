@@ -244,6 +244,14 @@ sharpen.
   sample, round trip);
 - the engine (signals, save round trip, two-engine determinism, seek equals play, absent block means zeros).
 
+Full CPU suite (`avgen_tests`, under the GPU lock), at `c6d2475e`:
+
+- Binary exit code 0: 3,902 cases, 3,882 passed, 19 skipped, and 1 failed as expected (the `[!shouldfail]` slope
+  lean).
+- `avgen_render_tests` was not run: no renderer or shader code changed.
+- The Analysis panel's Sonic section compiles and is wired, but I did not see it on screen (ImGui is not
+  captured headless).
+
 ## Open items / known limits
 
 - A full mix is one sound: the timbre describes the mix. Per-instrument tracking is future work (§28).
