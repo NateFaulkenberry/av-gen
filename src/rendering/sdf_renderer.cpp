@@ -93,9 +93,17 @@ struct SdfRenderer::Impl {
         std::uint64_t meshHash = 0;
         std::uint64_t lastUsed = 0;
     };
+    // ADR-1003: the three raymarch pipelines of one module (the interpreter's, or a compiled tree's).
+    struct Pipelines {
+        wgpu::RenderPipeline lit;
+        wgpu::RenderPipeline depth;
+        wgpu::RenderPipeline shadow;
+        bool failed = false;
+    };
     struct RaymarchItem {
         std::size_t objectIndex; // into scene.sdfs
         std::uint32_t offset;    // dynamic offset into both uniform buffers
+        const Pipelines* compiled = nullptr; // null: the interpreter's pipelines
     };
     struct MeshItem {
         std::size_t objectIndex;
@@ -110,6 +118,8 @@ struct SdfRenderer::Impl {
 
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     Result<void> createRaymarchPipeline(const wgpu::ShaderModule& module);
+    Result<Pipelines> buildPipelines(const wgpu::ShaderModule& module);
+    const Pipelines* compiledPipelines(const scene::SdfObject& object, const spatial::FieldSet* fields);
     void ensureNodeBuffer(std::uint64_t bytes);
     void rebuildGroups();
 
@@ -133,6 +143,21 @@ struct SdfRenderer::Impl {
     wgpu::Buffer nodes;
     std::uint64_t nodeBytes = 0;
     wgpu::Buffer fieldBlock;
+    // ADR-1002: step statistics. The lit pass atomically accumulates into `stats` (cleared before the
+    // pass); a copy lands in one of three MapRead slots and is read a few frames later.
+    static constexpr std::uint64_t kStatsBytes = 32; // sumSteps, maxSteps, rays, hits, exhausted, pad x3
+    struct StatsSlot {
+        wgpu::Buffer read;
+        wgpu::Future mapFuture{};
+        bool inFlight = false;
+        bool ready = false;
+        bool failed = false;
+    };
+    wgpu::Buffer stats;
+    std::array<StatsSlot, 3> statsSlots;
+    std::size_t nextStatsSlot = 0;
+    int copiedStatsSlot = -1;
+    SdfStats lastStepStats;
     wgpu::BindGroup sdfGroup;
     wgpu::BindGroup meshGroup;
     // ADR-703: the entity object layout's binding 2 (FXL's per-entity effect records). A meshed SDF
@@ -149,6 +174,11 @@ struct SdfRenderer::Impl {
     std::vector<RaymarchItem> raymarchItems;
     std::vector<MeshItem> meshItems;
     std::set<std::string> warnedObjects;
+    // ADR-1003: compiled variants by spatial::sdfCompileKey, and the resolved pass source they splice.
+    std::map<std::uint64_t, Pipelines> compiledVariants;
+    std::string raymarchSource;
+    std::vector<spatial::SdfNodeGpu> compileScratch;
+    std::uint32_t compilesThisFrame = 0;
     double lastRaymarchMs = -1.0;
     bool passThisFrame = false;
     std::uint64_t frame = 0;
@@ -160,7 +190,15 @@ struct SdfRenderer::Impl {
 SdfRenderer::SdfRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : impl_(std::make_unique<Impl>(context, shaders)) {}
 
-SdfRenderer::~SdfRenderer() = default;
+SdfRenderer::~SdfRenderer() {
+    // A pending MapAsync callback holds a raw StatsSlot pointer: let it complete while the slot exists.
+    for (auto& slot : impl_->statsSlots) {
+        if (slot.inFlight) {
+            impl_->context.waitFor(slot.mapFuture, 2'000'000'000ull);
+            slot.inFlight = false;
+        }
+    }
+}
 
 Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFormat depthFormat,
                                const wgpu::BindGroupLayout& frameLayout, const wgpu::BindGroupLayout& objectLayout,
@@ -186,8 +224,8 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     }
     {
         // Raymarch group 1: 0 = ObjectUniforms (dynamic), 1 = SdfObjectUniforms (dynamic),
-        // 2 = packed nodes (read-only storage), 3 = field block.
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        // 2 = packed nodes (read-only storage), 3 = field block, 4 = step statistics (ADR-1002).
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -206,6 +244,10 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
         entries[3].visibility = wgpu::ShaderStage::Fragment;
         entries[3].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[3].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        entries[4].binding = 4;
+        entries[4].visibility = wgpu::ShaderStage::Fragment;
+        entries[4].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[4].buffer.minBindingSize = Impl::kStatsBytes;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "sdf-object-layout";
         desc.entryCount = entries.size();
@@ -228,6 +270,20 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
         im.objectUniforms = device.CreateBuffer(&desc);
         desc.label = "sdf-march-uniforms";
         im.sdfUniforms = device.CreateBuffer(&desc);
+    }
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "sdf-step-stats";
+        desc.size = Impl::kStatsBytes;
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc | wgpu::BufferUsage::CopyDst;
+        im.stats = device.CreateBuffer(&desc);
+        for (auto& slot : im.statsSlots) {
+            wgpu::BufferDescriptor readDesc{};
+            readDesc.label = "sdf-step-stats-read";
+            readDesc.size = Impl::kStatsBytes;
+            readDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+            slot.read = device.CreateBuffer(&readDesc);
+        }
     }
     im.ensureNodeBuffer(kNodeStride * 128);
     auto raymarch = im.shaders.load("sdf_raymarch.wgsl");
@@ -273,7 +329,7 @@ Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelin
     return pipeline;
 }
 
-Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module) {
+Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgpu::ShaderModule& module) {
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
     wgpu::FragmentState fragment{};
@@ -324,11 +380,68 @@ Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule&
     if (!shadowPipeline) {
         return std::unexpected(shadowPipeline.error());
     }
-    raymarchPipeline = *pipeline;
-    raymarchDepthPipeline = *depthPipeline;
-    raymarchShadowPipeline = *shadowPipeline;
+    Pipelines out;
+    out.lit = *pipeline;
+    out.depth = *depthPipeline;
+    out.shadow = *shadowPipeline;
+    return out;
+}
+
+Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module) {
+    auto built = buildPipelines(module);
+    if (!built) {
+        return std::unexpected(built.error());
+    }
+    raymarchPipeline = built->lit;
+    raymarchDepthPipeline = built->depth;
+    raymarchShadowPipeline = built->shadow;
+    compiledVariants.clear(); // a reload changes the pass source every variant was spliced into
+    if (auto source = shaders.loadSource("sdf_raymarch.wgsl")) {
+        raymarchSource = std::move(*source);
+    }
     return {};
 }
+
+// ADR-1003: the compiled pipelines for this object's tree structure, building them on first use.
+// Null when the object does not ask for compilation or its variant failed (the interpreter draws it).
+const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const scene::SdfObject& object,
+                                                                         const spatial::FieldSet* fields) {
+    if (!object.compile || raymarchSource.empty()) {
+        return nullptr;
+    }
+    const std::uint64_t key = spatial::sdfCompileKey(object.tree);
+    if (auto it = compiledVariants.find(key); it != compiledVariants.end()) {
+        return it->second.failed ? nullptr : &it->second;
+    }
+    constexpr std::string_view kBegin = "// @@SDF_FIELD_BEGIN@@";
+    constexpr std::string_view kEnd = "// @@SDF_FIELD_END@@";
+    const auto b = raymarchSource.find(kBegin);
+    const auto e = raymarchSource.find(kEnd);
+    Pipelines& slot = compiledVariants[key];
+    if (b == std::string::npos || e == std::string::npos || e < b) {
+        slot.failed = true;
+        log::warn("sdf '{}': the raymarch shader has no sdfField markers; drawing it interpreted", object.name);
+        return nullptr;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const std::string field = spatial::sdfCompileWgsl(object.tree, compileScratch, fields);
+    const std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
+    auto module = shaders.compile(source, "sdf-raymarch-compiled");
+    Result<Pipelines> built = module ? buildPipelines(*module) : Result<Pipelines>(std::unexpected(module.error()));
+    ++compilesThisFrame;
+    if (!built) {
+        slot.failed = true;
+        log::warn("sdf '{}': compiling the tree failed, drawing it interpreted: {}", object.name, built.error().message);
+        return nullptr;
+    }
+    slot = *built;
+    log::info("sdf '{}': compiled tree variant {:016x} ({} node records) in {:.1f} ms", object.name, key,
+              compileScratch.size(),
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    return &slot;
+}
+
+
 
 void SdfRenderer::Impl::ensureNodeBuffer(std::uint64_t bytes) {
     if (nodes && nodeBytes >= bytes) {
@@ -346,7 +459,10 @@ void SdfRenderer::Impl::ensureNodeBuffer(std::uint64_t bytes) {
 void SdfRenderer::Impl::rebuildGroups() {
     const auto& device = context.device();
     {
-        std::array<wgpu::BindGroupEntry, 4> entries{};
+        std::array<wgpu::BindGroupEntry, 5> entries{};
+        entries[4].binding = 4;
+        entries[4].buffer = stats;
+        entries[4].size = kStatsBytes;
         entries[0].binding = 0;
         entries[0].buffer = objectUniforms;
         entries[0].size = sizeof(ObjectUniforms);
@@ -401,6 +517,52 @@ void SdfRenderer::collectTimings() {
         }
     }
     stats_.raymarchMs = im.passThisFrame ? im.lastRaymarchMs : -1.0;
+    // ADR-1002: map the slot the last pass copied into, and read any slot that has landed.
+    if (im.stats) {
+        if (im.copiedStatsSlot >= 0) {
+            Impl::StatsSlot& slot = im.statsSlots[static_cast<std::size_t>(im.copiedStatsSlot)];
+            slot.inFlight = true;
+            slot.ready = false;
+            slot.failed = false;
+            Impl::StatsSlot* raw = &slot;
+            slot.mapFuture = slot.read.MapAsync(
+                wgpu::MapMode::Read, 0, Impl::kStatsBytes, wgpu::CallbackMode::AllowProcessEvents,
+                [](wgpu::MapAsyncStatus status, wgpu::StringView, Impl::StatsSlot* s) {
+                    s->ready = status == wgpu::MapAsyncStatus::Success;
+                    s->failed = status != wgpu::MapAsyncStatus::Success;
+                },
+                raw);
+            im.copiedStatsSlot = -1;
+        }
+        im.context.processEvents();
+        for (auto& slot : im.statsSlots) {
+            if (!slot.inFlight) {
+                continue;
+            }
+            if (slot.ready) {
+                const auto* data = static_cast<const std::uint32_t*>(slot.read.GetConstMappedRange(0, Impl::kStatsBytes));
+                if (data != nullptr) {
+                    const double rays = data[2];
+                    im.lastStepStats.sampledRays = data[2];
+                    im.lastStepStats.avgSteps = rays > 0.0 ? data[0] / rays : 0.0;
+                    im.lastStepStats.maxSteps = data[1];
+                    im.lastStepStats.hitRatio = rays > 0.0 ? data[3] / rays : 0.0;
+                    im.lastStepStats.exhaustedRatio = rays > 0.0 ? data[4] / rays : 0.0;
+                }
+                slot.read.Unmap();
+                slot.inFlight = false;
+                slot.ready = false;
+            } else if (slot.failed) {
+                slot.inFlight = false;
+                slot.failed = false;
+            }
+        }
+    }
+    stats_.sampledRays = im.lastStepStats.sampledRays;
+    stats_.avgSteps = im.lastStepStats.avgSteps;
+    stats_.maxSteps = im.lastStepStats.maxSteps;
+    stats_.hitRatio = im.lastStepStats.hitRatio;
+    stats_.exhaustedRatio = im.lastStepStats.exhaustedRatio;
 }
 
 bool SdfRenderer::hasRaymarchWork() const {
@@ -449,9 +611,28 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             if (!projectedRect(viewProj * obj.model, object.boundsMin, object.boundsMax, rect)) {
                 continue; // off screen
             }
-            const int count = spatial::packSdfTree(object.tree, im.packScratch, &scene.fields);
-            if (count <= 0 || count > 2 * spatial::kMaxSdfNodes) {
-                continue;
+            // ADR-1003: a compiled object uploads its per-node parameter table; the interpreter its program.
+            const Impl::Pipelines* compiled = im.compiledPipelines(object, &scene.fields);
+            int count = 0;
+            if (compiled != nullptr) {
+                spatial::sdfCompileTable(object.tree, im.packScratch, &scene.fields);
+                count = static_cast<int>(im.packScratch.size());
+            } else {
+                // ADR-1005: a compiled tree may exceed the interpreter's stacks. If its compilation is
+                // unavailable it is not drawn, rather than drawn wrong by an overflowing interpreter.
+                if (object.compile) {
+                    if (auto fits = object.tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                        if (im.warnedObjects.insert(object.name).second) {
+                            log::warn("sdf '{}' not drawn: its compiled variant is unavailable and {}", object.name,
+                                      fits.error().message);
+                        }
+                        continue;
+                    }
+                }
+                count = spatial::packSdfTree(object.tree, im.packScratch, &scene.fields);
+                if (count <= 0 || count > 2 * spatial::kMaxSdfNodes) {
+                    continue;
+                }
             }
             // packSdfTree resolves DisplaceField references to FieldSet indices; the GPU slot of
             // an enabled, uploaded field is the same index. Disabled, missing or unbound: -1.
@@ -477,10 +658,16 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                                 std::clamp(sdfShadowSteps_, 8u, 1024u));
             u.march = glm::vec4(object.epsilon, object.stepScale, object.normalEpsilon, static_cast<float>(time.renderTime));
             u.rect = rect;
+            const scene::SdfLook& look = object.look;
+            u.look0 = glm::vec4(look.aoStrength, look.aoDistance, look.edgeIntensity, look.edgeWidth);
+            u.look1 = glm::vec4(look.edgeColor, object.maxDistance);
+            u.look2 = glm::vec4(look.shadowStrength, look.shadowSoftness,
+                                static_cast<float>(std::clamp(look.shadowSteps, 1, 256)), 1.0f);
+            u.look3 = glm::vec4(look.shadowDirection, 0.0f);
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
-            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset});
+            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, compiled});
             ++stats_.raymarchObjects;
             stats_.packedNodes += static_cast<std::uint32_t>(count);
         } else {
@@ -586,20 +773,38 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
     desc.colorAttachments = attachments.data();
     desc.depthStencilAttachment = &depthAttachment;
     desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("sdf") : nullptr;
+    // ADR-1002: a free slot gets this pass's step statistics; with none free (the readback is behind)
+    // the pass still accumulates, and nothing is copied.
+    Impl::StatsSlot* statsSlot = nullptr;
+    if (im.stats) {
+        encoder.ClearBuffer(im.stats, 0, Impl::kStatsBytes);
+        for (std::size_t k = 0; k < im.statsSlots.size(); ++k) {
+            const std::size_t index = (im.nextStatsSlot + k) % im.statsSlots.size();
+            if (!im.statsSlots[index].inFlight) {
+                statsSlot = &im.statsSlots[index];
+                im.copiedStatsSlot = static_cast<int>(index);
+                im.nextStatsSlot = (index + 1) % im.statsSlots.size();
+                break;
+            }
+        }
+    }
     wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
-    pass.SetPipeline(im.raymarchPipeline);
     pass.SetBindGroup(0, frameBindGroup);
     pass.SetBindGroup(3, iblBindGroup);
     for (const auto& item : im.raymarchItems) {
         if (item.objectIndex >= scene.sdfs.size()) {
             continue;
         }
+        pass.SetPipeline(item.compiled != nullptr ? item.compiled->lit : im.raymarchPipeline);
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
         pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
         pass.Draw(6);
     }
     pass.End();
+    if (statsSlot != nullptr) {
+        encoder.CopyBufferToBuffer(im.stats, 0, statsSlot->read, 0, Impl::kStatsBytes);
+    }
     im.passThisFrame = true;
     stats_.raymarchMs = im.lastRaymarchMs;
 }
@@ -611,10 +816,18 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
     if (!im.initialised || im.raymarchItems.empty()) {
         return;
     }
-    pass.SetPipeline(reducedSteps ? im.raymarchShadowPipeline : im.raymarchDepthPipeline);
     for (const auto& item : im.raymarchItems) {
+        if (item.compiled != nullptr) {
+            pass.SetPipeline(reducedSteps ? item.compiled->shadow : item.compiled->depth);
+        } else {
+            pass.SetPipeline(reducedSteps ? im.raymarchShadowPipeline : im.raymarchDepthPipeline);
+        }
         if (item.objectIndex >= scene.sdfs.size()) {
             continue;
+        }
+        const scene::SdfObject& object = scene.sdfs[item.objectIndex];
+        if (reducedSteps ? !object.castShadows : !object.depthPrepass) {
+            continue; // ADR-1002: opted out of this depth-only march
         }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
         pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());

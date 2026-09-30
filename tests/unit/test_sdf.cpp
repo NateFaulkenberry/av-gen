@@ -872,11 +872,11 @@ TEST_CASE("SDF JSON tolerates missing members and rejects bad ones", "[sdf]") {
     CHECK_FALSE(SdfTree::fromJson(nlohmann::json::parse("[]")));
     // Nesting deeper than the depth limit is refused while parsing.
     std::string deep;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < kMaxSdfDepth + 2; ++i) {
         deep += R"({"kind": "translate", "children": [)";
     }
     deep += R"({"kind": "sphere"})";
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < kMaxSdfDepth + 2; ++i) {
         deep += "]}";
     }
     CHECK_FALSE(SdfTree::fromJson(nlohmann::json::parse(deep)));
@@ -907,13 +907,21 @@ TEST_CASE("SDF validate: limits on depth, arity, counts and parameters", "[sdf]"
     CHECK(treeOf(complexTree()).validate());
     CHECK(treeOf(sphere(1.0f)).validate());
 
-    // Depth: 8 levels pass, 9 fail.
+    // Depth: kMaxSdfDepth levels pass, one more fails. Single-child unions keep both interpreter
+    // stacks at 1, so this is the depth limit alone.
     SdfNode chain = sphere(1.0f);
-    for (int i = 0; i < 7; ++i) {
-        chain = translate({0.1f, 0.0f, 0.0f}, chain);
+    for (int i = 0; i < kMaxSdfDepth - 1; ++i) {
+        chain = combo(SdfNodeKind::Union, {chain});
     }
     CHECK(treeOf(chain).validate());
-    CHECK_FALSE(treeOf(translate({0.1f, 0.0f, 0.0f}, chain)).validate());
+    CHECK_FALSE(treeOf(combo(SdfNodeKind::Union, {chain})).validate());
+    // Unary nesting is bounded by the point stack (kMaxSdfStack), whatever the depth limit.
+    SdfNode unaryChain = sphere(1.0f);
+    for (int i = 0; i < kMaxSdfStack; ++i) {
+        unaryChain = translate({0.1f, 0.0f, 0.0f}, unaryChain);
+    }
+    CHECK(treeOf(unaryChain).validate());
+    CHECK_FALSE(treeOf(translate({0.1f, 0.0f, 0.0f}, unaryChain)).validate());
 
     // Arity.
     CHECK_FALSE(treeOf(combo(SdfNodeKind::Union, {})).validate());
@@ -932,11 +940,14 @@ TEST_CASE("SDF validate: limits on depth, arity, counts and parameters", "[sdf]"
     std::vector<SdfNode> eight(8, sphere(1.0f));
     CHECK(treeOf(combo(SdfNodeKind::Union, eight)).validate());
 
-    // Node count: 1 + 8 + 64 = 73 > 64.
+    // Node count: 1 + 8 + 64 = 73 <= kMaxSdfNodes (96); two of those under one union, 147, is over.
     std::vector<SdfNode> groups(8, combo(SdfNodeKind::Union, eight));
     const SdfTree big = treeOf(combo(SdfNodeKind::Union, groups));
     CHECK(big.nodeCount() == 73);
-    CHECK_FALSE(big.validate());
+    CHECK(big.validate());
+    const SdfTree tooBig = treeOf(combo(SdfNodeKind::Union, {big.root, big.root}));
+    CHECK(tooBig.nodeCount() == 147);
+    CHECK_FALSE(tooBig.validate());
     // 1 + 7 + 8 = 16 nodes is fine.
     std::vector<SdfNode> seven(7, sphere(1.0f));
     seven.push_back(combo(SdfNodeKind::Union, eight));
