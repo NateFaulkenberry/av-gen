@@ -225,26 +225,36 @@
               ]
              },
              {
-              "kind": "polarRepeat",
-              "count": 16,
-              "name": "pilasters",
+              "kind": "rotate",
+              "rotation": [
+               0,
+               11.25,
+               0
+              ],
               "children": [
                {
-                "kind": "translate",
-                "translation": [
-                 22.9,
-                 10.0,
-                 0
-                ],
+                "kind": "polarRepeat",
+                "count": 16,
+                "name": "pilasters",
                 "children": [
                  {
-                  "kind": "roundedBox",
-                  "size": [
-                   0.45,
+                  "kind": "translate",
+                  "translation": [
+                   22.9,
                    10.0,
-                   0.6
+                   0
                   ],
-                  "rounding": 0.08
+                  "children": [
+                   {
+                    "kind": "roundedBox",
+                    "size": [
+                     0.45,
+                     10.0,
+                     0.6
+                    ],
+                    "rounding": 0.08
+                   }
+                  ]
                  }
                 ]
                }
@@ -329,7 +339,7 @@
     1.0,
     0.52
    ],
-   "intensity": 30.0,
+   "intensity": 40.0,
    "range": 16.0,
    "castsShadow": false
   },
@@ -363,7 +373,7 @@
     0.42,
     1.0
    ],
-   "intensity": 50.0,
+   "intensity": 70.0,
    "range": 18.0,
    "castsShadow": false
   }

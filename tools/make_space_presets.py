@@ -243,7 +243,12 @@ BASE_PARAMS = {
     "post/grade/contrast": 1.1,
     "post/grade/saturation": 1.25,
     "post/output/vignette": 0.4,
-    "post/output/grain": 0.015,
+    # No film grain: it adds per-frame noise everywhere, which the Critic measures as shimmer (whole-frame
+    # temporal std 0.95 with 0.015 grain, 0.03 without, on a static hall).
+    "post/output/grain": 0.0,
+    # A lower jitter on the volumetric march: the lamp halos' temporal noise falls by a third (0.61 -> 0.43)
+    # at no cost; lower still slices the halo.
+    "scene/volumeJitter": 0.5,
 }
 
 
@@ -369,14 +374,24 @@ def hall_rhythm_routes(amount, depth=None, rows=("piers", "bases", "imposts", "r
 
 def preset_hall():
     sc = scene("Infinite Hall", hall_structure(), HALL_CAMERA, env=environment(), lights=nave_lights())
-    routes = hall_widening_routes(2.2) + hall_rhythm_routes(-2.0) + [
+    step = dict(step_chain(), attackMs=1100, decayMs=1100)
+    routes = hall_widening_routes(3.0) + hall_rhythm_routes(-2.0) + [
+        # Each bar re-spaces the colonnade or not: the rhythm of the architecture is re-ruled on the downbeat.
+        *[route("random.bar", P(n, "size"), -2.5, component=0, extra={"chain": step})
+          for n in ("piers", "bases", "imposts", "ribs")],
         # Treble lights the edges: fine detail emerges with the hats.
         route("audio.treble", "sdf/space/look/edge/intensity", 2.4, attack=60, decay=900),
-        # Each phrase (8 bars) rounds every pier into a column or squares it again: a discrete re-ruling.
-        route("random.phrase", P("pier", "rounding"), 0.7, extra={"chain": step_chain()}),
     ]
-    pr = project("hall", "infinite-hall.scene.json", routes=routes,
-                 sources=[random_source("phrase", "music.phrase", 1004)])
+    # Each phrase (8 bars) changes the order of the architecture: square piers, then round columns, then back.
+    presets = [{"name": "order/square", "values": {P("pier", "rounding"): [0.1]}},
+               {"name": "order/round", "values": {P("pier", "rounding"): [0.8]}}]
+    states = {"initial": "Square", "states": [
+        {"name": "Square", "preset": "order/square", "transition": {"seconds": 1.2, "easing": "smooth", "quantize": "bar"},
+         "triggers": [{"kind": "bar", "every": 8, "from": "Round"}]},
+        {"name": "Round", "preset": "order/round", "transition": {"seconds": 1.2, "easing": "smooth", "quantize": "bar"},
+         "triggers": [{"kind": "bar", "every": 8, "from": "Square"}]}]}
+    pr = project("hall", "infinite-hall.scene.json", routes=routes, presets=presets, states=states,
+                 sources=[random_source("bar", "music.bar", 1004)])
     return {"infinite-hall": (pr, sc)}
 
 
@@ -403,7 +418,9 @@ def rotunda_chamber(pilasters=True):
     dome = D(T((0, CH, 0), N("sphere", radius=CR + 0.7)), T((0, CH, 0), N("sphere", radius=CR - 0.7)),
              plane((0, 1, 0), CH), T((0, CH + CR, 0), cyl(CR * 0.2, 6.0, name="oculus")))
     cornice = T((0, CH, 0), torus(CR - 0.7, 0.55))
-    pilasters_ = polar(16, T((CR - 1.1, CH / 2, 0), rbox((0.45, CH / 2, 0.6), 0.08)), name="pilasters")
+    # Half a sector off the doorways' angles (16 pilasters share the 8 doors' angles otherwise, and one
+    # would stand in the doorway, blocking the tunnel through the levels).
+    pilasters_ = R((0, 11.25, 0), polar(16, T((CR - 1.1, CH / 2, 0), rbox((0.45, CH / 2, 0.6), 0.08)), name="pilasters"))
     return U(drum, dome, cornice, *([pilasters_] if pilasters else []), name="chamber")
 
 
@@ -425,9 +442,9 @@ CATHEDRAL_CAMERA = still_camera((0, Y0 + 2.4, 0), (CATHEDRAL_AT, Y0 + 5.0, 0), 6
 def preset_cathedral():
     # One lamp at the heart of the recursion (inside the smallest rotunda: its light leaves through every
     # nested doorway) and one under the outer dome.
-    lights = [point_light("heart", (CATHEDRAL_AT, Y0 + 1.2, 0), GREEN_LIGHT, 30.0, 16.0),
+    lights = [point_light("heart", (CATHEDRAL_AT, Y0 + 1.2, 0), GREEN_LIGHT, 40.0, 16.0),
               point_light("dome", (CATHEDRAL_AT, Y0 + 30.0, 0), BLUE_LIGHT, 160.0, 40.0),
-              point_light("inner", (CATHEDRAL_AT - 6.0, Y0 + 9.0, 0), BLUE_LIGHT, 50.0, 18.0)]
+              point_light("inner", (CATHEDRAL_AT - 6.0, Y0 + 9.0, 0), BLUE_LIGHT, 70.0, 18.0)]
     sc = scene("Recursive Cathedral", cathedral_structure(4), CATHEDRAL_CAMERA, env=environment(), lights=lights)
     routes = [
         # High-mid energy opens further levels of the nesting: the fine detail is the smaller cathedrals.
@@ -491,10 +508,10 @@ def preset_folding():
     sc = scene("Folding Space", hall_rules(), HALL_CAMERA, env=environment(), lights=nave_lights(),
                march={"stepScale": 0.6, "maxSteps": 200})
     steps = [  # (bend, roll, fold offset): flat -> curled -> turned over -> folded
-        (0.0, 0.0, OFF),
-        (0.012, 0.0, OFF),
-        (0.012, 0.018, OFF),
-        (0.006, 0.018, -30.0),
+        (0.0, 0.0, FOLD_NEAR_OFF),
+        (0.016, 0.0, FOLD_NEAR_OFF),
+        (0.016, 0.02, FOLD_NEAR_OFF),
+        (0.008, 0.02, -18.0),
     ]
     presets = [{"name": f"fold/{i}", "values": {P("bend", "amount"): [b], P("roll", "amount"): [r], P("fold", "offset"): [o]}}
                for i, (b, r, o) in enumerate(steps)]
@@ -503,7 +520,7 @@ def preset_folding():
         route("audio.energy", P("roll", "amount"), 0.004, attack=3000, decay=8000),
         route("audio.treble", "sdf/space/look/edge/intensity", 2.0, attack=60, decay=900),
     ] + hall_widening_routes(1.5)
-    params = {P("fold", "axis"): fold_axis(45, 0)}
+    params = {P("fold", "axis"): fold_axis(30, 30), P("fold", "offset"): FOLD_NEAR_OFF}
     pr = project("folding", "folding-space.scene.json", routes=routes, params=params, presets=presets,
                  states=fold_states("Fold", steps))
     return {"folding-space": (pr, sc)}
@@ -549,10 +566,13 @@ def rotunda_structure(chapels=True):
 
 
 def radial_lights():
-    return [point_light("oculus", (0, Y0 + 44, 0), BLUE_LIGHT, 300.0, 60.0),
-            point_light("core", (0, Y0 + 6, 0), GREEN_LIGHT, 25.0, 14.0)] + \
-           [point_light(f"ring{i}", (18 * math.cos(a), Y0 + 20, 18 * math.sin(a)), BLUE_LIGHT, 40.0, 16.0)
-            for i, a in enumerate([k * math.pi / 2 + math.pi / 4 for k in range(4)])]
+    # A dim lamp in the oculus (looked at straight on, a bright one fills the frame with its halo), four
+    # blue lamps between the rings, and the restrained green low in the chapels' ring.
+    return [point_light("oculus", (0, Y0 + 34, 0), BLUE_LIGHT, 90.0, 40.0)] + \
+           [point_light(f"ring{i}", (18 * math.cos(a), Y0 + 20, 18 * math.sin(a)), BLUE_LIGHT, 45.0, 18.0)
+            for i, a in enumerate([k * math.pi / 2 + math.pi / 4 for k in range(4)])] + \
+           [point_light(f"chapel{i}", (36 * math.cos(a), Y0 + 3, 36 * math.sin(a)), GREEN_LIGHT, 20.0, 12.0)
+            for i, a in enumerate([k * math.pi / 2 for k in range(4)])]
 
 
 def preset_radial():
@@ -574,6 +594,7 @@ def preset_radial():
         route("audio.treble", "sdf/space/look/edge/intensity", 1.6, attack=60, decay=900),
     ]
     pr = project("radial", "radial-architecture.scene.json", routes=routes,
+                 params={"sdf/space/look/edge/intensity": 3.2},
                  sources=[random_source("bar", "music.bar", 1009)])
     return {"radial-architecture": (pr, sc)}
 
@@ -592,7 +613,7 @@ def preset_explosion():
     # Twisting here is about the vertical axis through the eye (one unary level, not the roll's three):
     # the radial copies spiral as they rise.
     root = U(floor_plane(), twist(0.0, content, name="roll"))
-    lights = [point_light("gateLight", (22, Y0 + 9, 0), BLUE_LIGHT, 90.0, 26.0),
+    lights = [point_light("gateLight", (22, Y0 + 9, 0), BLUE_LIGHT, 130.0, 28.0),
               point_light("far", (60, Y0 + 12, 0), GREEN_LIGHT, 60.0, 30.0)]
     sc = scene("Geometry Explosion", root, still_camera(EYE, (40, Y0 + 8.0, 0), 70.0), env=environment(0.024),
                lights=lights, march={"stepScale": 0.65, "maxSteps": 200})
@@ -604,7 +625,8 @@ def preset_explosion():
         dict(size=14.0, count=3, nest=3, radial=0, roll=0.0),
         dict(size=14.0, count=3, nest=3, radial=6, roll=0.0),
         dict(size=14.0, count=3, nest=3, radial=6, roll=0.03),
-        dict(size=11.0, count=4, nest=4, radial=9, roll=0.05),
+        # (a row spacing of 11 put a gate's plane through the eye at x = 22 - 2 * 11; 13 keeps the nearest 4 behind it)
+        dict(size=13.0, count=4, nest=4, radial=9, roll=0.05),
     ]
     presets = [{"name": f"explode/{i}", "values": {
         P("rows", "size"): [st["size"], 0.0, 0.0], P("rows", "count"): [st["count"]],
@@ -633,89 +655,114 @@ def preset_explosion():
 SHOW_STAGES = [
     # name, transition seconds, easing, trigger bar (counted from the song's first downbeat; from the previous stage)
     ("Normal", 0.0, "smooth", None),
+    ("Proportion", 6.0, "smooth", 16),    # bar 17 (30 s): the first fill; the hall re-proportions itself
     ("Strange", 8.0, "smooth", 32),       # bar 33 (59.6 s): the hats enter
     ("Folded", 6.0, "smooth", 48),        # bar 49 (89 s): the mids start to climb
     ("Cathedral", 8.0, "smooth", 64),     # bar 65 (118.6 s)
-    ("Lattice", 5.0, "smooth", 80),       # bar 81 (148 s): the build to the drop
+    ("Mathematical", 8.0, "smooth", 80),  # bar 81 (148 s): the build to the drop
     ("Abstraction", 2.0, "easeIn", 88),   # bar 89 (163 s): the drop (music.drop is a second trigger)
-    ("Reforming", 8.0, "smooth", 104),    # bar 105 (192.5 s)
-    ("Reformed", 8.0, "smooth", 112),     # bar 113 (207 s): the last section
+    ("Unwinding", 8.0, "smooth", 104),    # bar 105 (192.5 s)
+    ("Reformed", 10.0, "smooth", 112),    # bar 113 (207 s): the last section
 ]
 
 FOLD_NEAR_OFF = -110.0   # a fold plane just beyond the visible fog: its approach is visible from the start
+AXIS_EYE = [0.0, 0.0, 0.0]
 
 
 def show_values(stage):
     eye, hall_t = list(EYE), [40.0, Y0 + 6.8, 0.0]
     v = {  # every stage writes every value, so every transition interpolates all of them
-        "state": 0.0, "hroll": 0.0, "hbend": 0.0, "hfold": FOLD_NEAR_OFF, "nave": NAVE, "bay": BAY, "round": 0.1,
-        "nestCount": 0, "lrad": 0, "ltwist": 0.0,
-        "rules": 0.0, "density": 0.028, "eye": eye, "target": hall_t, "heart": 0.0, "edge": 2.6, "fov": 68.0,
+        "state": 0.0, "hroll": 0.0, "hfold": FOLD_NEAR_OFF, "hrad": 0, "nave": NAVE, "bay": BAY, "round": 0.1,
+        "nestCount": 0, "rules": 0.0, "spin": 0.0, "density": 0.028, "eye": eye, "target": hall_t, "heart": 0.0,
+        "edge": 2.6, "edgeW": 0.05, "fov": 68.0, "lampY": Y0 + 11.0, "lamp": 80.0, "turn": 0.0, "scatter": 1.0,
+        "ev": -0.2,
     }
-    if stage == "Strange":
-        v.update(hroll=0.006, hbend=0.004, rules=0.55)
+    if stage == "Proportion":
+        v.update(nave=8.5, bay=9.5, rules=0.2)
+    elif stage == "Strange":
+        v.update(nave=8.5, bay=9.5, hroll=0.006, rules=0.55)
     elif stage == "Folded":
-        v.update(hroll=0.004, hbend=0.005, hfold=-20.0, rules=0.8, heart=12.0)
+        v.update(nave=8.5, bay=9.5, hroll=0.004, hfold=-20.0, rules=0.8, heart=12.0, ev=-0.1)
     elif stage == "Cathedral":
-        v.update(state=1.0, hroll=0.004, hbend=0.005, hfold=-20.0, nestCount=4, rules=0.8, heart=30.0,
-                 target=[22.0, Y0 + 5.5, 0.0], density=0.026)
-    elif stage == "Lattice":
-        v.update(state=2.0, nestCount=4, rules=0.3, target=[40.0, Y0 + 8.0, 0.0], density=0.032, edge=1.3)
+        v.update(nave=8.5, bay=9.5, state=1.0, hroll=0.004, hfold=-20.0, nestCount=4, rules=0.8,
+                 heart=30.0, target=[22.0, Y0 + 5.5, 0.0], density=0.026, ev=-0.05)
+    elif stage == "Mathematical":
+        # the hall returns as pure symmetry: four copies of its vault about the line of sight
+        # (the chamber turned a quarter so each sector holds a colonnade, its portals and a strip of floor)
+        v.update(hrad=4, rules=0.4, eye=AXIS_EYE, target=[40.0, 0.0, 0.0], fov=58.0, lampY=0.0, lamp=10.0,
+                 density=0.028, turn=90.0, edgeW=0.06, scatter=0.6, ev=0.05)
     elif stage == "Abstraction":
-        # the eye rises onto the kaleidoscope's axis and the view narrows (68 -> 46 degrees) as the drop lands
-        v.update(state=2.0, nestCount=4, lrad=6, ltwist=0.025, rules=1.0, eye=[0.0, 0.0, 0.0], target=[40.0, 0.0, 0.0],
-                 density=0.042, edge=1.5, fov=46.0)
-    elif stage == "Reforming":
-        v.update(state=1.0, nestCount=5, lrad=6, ltwist=0.025, rules=0.6, heart=30.0, target=[22.0, Y0 + 5.5, 0.0],
-                 density=0.026, fov=60.0)
+        v.update(hrad=6, hroll=0.02, hfold=-24.0, rules=1.0, spin=1.0, eye=AXIS_EYE, target=[40.0, 0.0, 0.0],
+                 fov=50.0, lampY=0.0, lamp=12.0, density=0.028, edge=3.6, edgeW=0.075, turn=90.0, scatter=0.6,
+                 ev=0.25)
+    elif stage == "Unwinding":
+        v.update(hrad=3, hroll=0.008, rules=0.5, spin=0.5, eye=AXIS_EYE, target=[40.0, 0.0, 0.0], fov=58.0,
+                 lampY=0.0, lamp=16.0, density=0.026, turn=90.0, edgeW=0.06, scatter=0.7, ev=0.05)
     elif stage == "Reformed":
         # the hall again, under new rules: a wider nave, a slower rhythm, round columns
-        v.update(state=0.0, nave=9.0, bay=10.0, round=0.8, rules=0.3, heart=0.0)
+        v.update(nave=10.0, bay=11.0, round=0.8, rules=0.3)
     y = lambda h: Y0 + h
-    return {
-        P("state", "amount"): [v["state"]], P("hroll", "amount"): [v["hroll"]], P("hbend", "amount"): [v["hbend"]],
-        P("hfold", "offset"): [v["hfold"]],
+    out = {
+        P("state", "amount"): [v["state"]], P("hroll", "amount"): [v["hroll"]], P("hfold", "offset"): [v["hfold"]],
+        P("hradial", "count"): [v["hrad"]],
         P("pierAt", "translation"): [0.0, y(SPRING / 2), v["nave"]], P("baseAt", "translation"): [0.0, y(0.35), v["nave"]],
         P("impostAt", "translation"): [0.0, y(SPRING - 0.35), v["nave"]], P("vaultBore", "radius"): [v["nave"]],
         P("rib", "radius"): [v["nave"]], P("pier", "rounding"): [v["round"]],
         P("piers", "size"): [v["bay"], 0.0, 0.0], P("bases", "size"): [v["bay"], 0.0, 0.0],
         P("imposts", "size"): [v["bay"], 0.0, 0.0], P("ribs", "size"): [v["bay"], 0.0, 0.0],
-        P("nest", "count"): [v["nestCount"]], P("lradial", "count"): [v["lrad"]], P("ltwist", "amount"): [v["ltwist"]],
-        "macros/rules": [v["rules"]], "scene/volumeDensity": [v["density"]],
-        "camera/position": v["eye"], "camera/target": v["target"], "lights/heart/intensity": [v["heart"]],
-        "sdf/space/look/edge/intensity": [v["edge"]], "camera/fov": [v["fov"]],
+        P("nest", "count"): [v["nestCount"]], "macros/rules": [v["rules"]], "macros/spin": [v["spin"]],
+        "scene/volumeDensity": [v["density"]], "camera/position": v["eye"], "camera/target": v["target"],
+        "camera/fov": [v["fov"]], "lights/heart/intensity": [v["heart"]], "sdf/space/look/edge/intensity": [v["edge"]],
+        "sdf/space/look/edge/width": [v["edgeW"]], P("hspin", "rotation"): [0.0, v["turn"], 90.0],
+        "scene/volumeScattering": [v["scatter"]], "camera/exposure/compensation": [v["ev"]],
     }
+    for i in range(5):
+        out[f"lights/nave{i}/position"] = [10.0 + 16.0 * i, v["lampY"], 0.0]
+        out[f"lights/nave{i}/intensity"] = [v["lamp"]]
+    return out
+
+
+def showcase_hall():
+    """The hall under its whole rule chain. The two rotations turn the view axis (x) into the local y axis,
+    so the twist ("hroll", a roll that grows with distance), the radial repeat ("hradial", a kaleidoscope
+    about the line of sight) and the outer rotation's own angle ("hspin", turning the space inside the
+    kaleidoscope, as a kaleidoscope's object chamber turns) all act about the line of sight. Then one fold
+    plane. Five unary levels, with the hall's own three: the interpreter's limit of eight."""
+    content = fold((-1, 0, 0), FOLD_NEAR_OFF, hall_structure(), name="hfold")
+    return R((0, 0, 90), twist(0.0, polar(0, R((0, 0, -90), content), name="hradial"), name="hroll"), name="hspin")
 
 
 def preset_showcase():
-    hall = roll(bend(0.0, fold((-1, 0, 0), FOLD_NEAR_OFF, hall_structure(), name="hfold"), name="hbend"), "hroll")
-    cath = cathedral_structure(0)
-    lat = lattice_rules(lattice_structure(), "l")
-    root = morph(0.0, hall, cath, lat, name="state")
+    root = morph(0.0, showcase_hall(), cathedral_structure(0), name="state")
     lights = nave_lights() + [point_light("heart", (CATHEDRAL_AT, Y0 + 1.2, 0), GREEN_LIGHT, 0.0, 16.0)]
     sc = scene("Procedural Space showcase", root, HALL_CAMERA, env=environment(), lights=lights,
                march={"stepScale": 0.65, "maxSteps": 200})
-    depth = "macro.rules"
-    rules = {"depthSource": depth}
+    rules = {"depthSource": "macro.rules"}
+    step = lambda ms: dict(step_chain(), attackMs=ms, decayMs=ms)
     routes = hall_widening_routes(1.8) + hall_rhythm_routes(-1.5) + [
         # the hall's rules, with the music's authority set by the stage
-        route("audio.lowMid", P("hbend", "amount"), 0.006, attack=2500, decay=7000, extra=rules),
-        route("audio.energy", P("hroll", "amount"), 0.008, attack=3000, decay=8000, extra=rules),
-        # each phrase squares the piers or rounds them into columns; each bar tilts the fold plane or not
-        route("random.phrase", P("pier", "rounding"), 0.7, extra={"chain": dict(step_chain(), attackMs=900, decayMs=900)}),
-        route("random.bar", P("hfold", "axis"), 0.9, component=1,
-              extra={"chain": dict(step_chain(), attackMs=900, decayMs=900), **rules}),
+        route("audio.energy", P("hroll", "amount"), 0.010, attack=3000, decay=8000, extra=rules),
+        # each phrase squares the piers or rounds them into columns (in every stage: it is an order, not a distortion)
+        route("random.phrase", P("pier", "rounding"), 0.7, extra={"chain": step(900)}),
+        # each bar re-spaces the colonnade or not (the rhythm), and tilts the fold plane or not
+        route("random.bar", P("piers", "size"), -2.5, component=0, extra={"chain": step(1100), **rules}),
+        route("random.bar", P("bases", "size"), -2.5, component=0, extra={"chain": step(1100), **rules}),
+        route("random.bar", P("imposts", "size"), -2.5, component=0, extra={"chain": step(1100), **rules}),
+        route("random.bar", P("ribs", "size"), -2.5, component=0, extra={"chain": step(1100), **rules}),
+        route("random.bar", P("hfold", "axis"), 0.9, component=1, extra={"chain": step(900), **rules}),
+        # the kaleidoscope: each phrase adds or removes sectors, each bar two more or not; it turns slowly
+        route("random.phrase", P("hradial", "count"), 4.0, extra={"chain": step_chain(), "depthSource": "macro.spin"}),
+        route("random.bar2", P("hradial", "count"), 2.0, extra={"chain": step_chain(), "depthSource": "macro.spin"}),
+        # and each bar turns the kaleidoscope's chamber to a new angle (eased over a second and a half)
+        route("random.turn", P("hspin", "rotation"), 60.0, component=1, attack=1500, decay=1500,
+              extra={"depthSource": "macro.spin"}),
         # the cathedral's: high-mids open nesting levels, bass sets the ratio, each bar aligns or turns the levels
         route("audio.highMid", P("nest", "count"), 2.0, attack=1200, decay=5000, extra=rules),
         route("audio.bass", P("nest", "scale"), 0.3, attack=1500, decay=6000),
-        route("random.bar", P("nest", "rotation"), 22.5, component=1,
-              extra={"chain": dict(step_chain(), attackMs=700, decayMs=700), **rules}),
-        # the lattice's: mids densify the grid; energy winds the spiral; each phrase changes the symmetry order
-        route("audio.mid", P("lattice", "size"), -2.0, attack=900, decay=4500),
-        route("audio.energy", P("ltwist", "amount"), 0.015, attack=2500, decay=7000, extra=rules),
-        route("random.phrase", P("lradial", "count"), 4.0, extra={"chain": step_chain(), **rules}),
+        route("random.bar", P("nest", "rotation"), 22.5, component=1, extra={"chain": step(700), **rules}),
         # light: treble lights the edges; the overall energy raises the lamps, slowly
         route("audio.treble", "sdf/space/look/edge/intensity", 1.2, attack=60, decay=900),
+        route("audio.highMid", "sdf/space/look/edge/intensity", 1.2, attack=400, decay=3000, extra=rules),
     ] + [route("audio.energy", f"lights/nave{i}/intensity", 40.0, attack=2000, decay=6000) for i in range(5)] + [
         # a drift of five units down the axis over the whole song: barely perceptible, never the motion
         route("lfo.drift", "camera/position", 5.0, component=0), route("lfo.drift", "camera/target", 5.0, component=0),
@@ -736,8 +783,9 @@ def preset_showcase():
     params[P("hfold", "axis")] = fold_axis(30, 30)
     pr = project("showcase", "showcase.scene.json", routes=routes, params=params, presets=presets,
                  states={"initial": "Normal", "states": states},
-                 sources=[macro_source({"rules": 0.0}), random_source("bar", "music.bar", 1011),
-                          random_source("phrase", "music.phrase", 1012),
+                 sources=[macro_source({"rules": 0.0, "spin": 0.0}), random_source("bar", "music.bar", 1011),
+                          random_source("bar2", "music.bar", 1013), random_source("phrase", "music.phrase", 1012),
+                          random_source("turn", "music.bar", 1014),
                           {"kind": "lfo", "name": "drift", "settings": {"shape": "saw"}}], end=226.3)
     pr["parameters"]["sources/drift/rate"] = 1.0 / 226.3
     pr["parameters"]["sources/drift/phase"] = 0.0

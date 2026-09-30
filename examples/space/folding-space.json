@@ -28,12 +28,14 @@
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.25,
   "post/output/vignette": 0.4,
-  "post/output/grain": 0.015,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5,
   "sdf/space/node/fold/axis": [
-   -0.7071067811865476,
-   0.7071067811865475,
-   0.0
-  ]
+   -0.7500000000000001,
+   0.49999999999999994,
+   0.4330127018922193
+  ],
+  "sdf/space/node/fold/offset": -110.0
  },
  "sources": [],
  "routes": [
@@ -145,7 +147,7 @@
      0.0
     ],
     "sdf/space/node/fold/offset": [
-     -1000.0
+     -110.0
     ]
    }
   },
@@ -153,13 +155,13 @@
    "name": "fold/1",
    "values": {
     "sdf/space/node/bend/amount": [
-     0.012
+     0.016
     ],
     "sdf/space/node/roll/amount": [
      0.0
     ],
     "sdf/space/node/fold/offset": [
-     -1000.0
+     -110.0
     ]
    }
   },
@@ -167,13 +169,13 @@
    "name": "fold/2",
    "values": {
     "sdf/space/node/bend/amount": [
-     0.012
+     0.016
     ],
     "sdf/space/node/roll/amount": [
-     0.018
+     0.02
     ],
     "sdf/space/node/fold/offset": [
-     -1000.0
+     -110.0
     ]
    }
   },
@@ -181,13 +183,13 @@
    "name": "fold/3",
    "values": {
     "sdf/space/node/bend/amount": [
-     0.006
+     0.008
     ],
     "sdf/space/node/roll/amount": [
-     0.018
+     0.02
     ],
     "sdf/space/node/fold/offset": [
-     -30.0
+     -18.0
     ]
    }
   }

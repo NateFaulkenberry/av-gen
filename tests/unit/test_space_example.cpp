@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -100,4 +101,67 @@ TEST_CASE("the procedural space example packs the same program on two fresh engi
     const auto b = run();
     REQUIRE(a.size() == b.size());
     CHECK(std::memcmp(a.data(), b.data(), a.size() * sizeof(spatial::SdfNodeGpu)) == 0);
+}
+
+// The art presets and the showcase (tools/make_space_presets.py writes them). A route or a preset value
+// whose path does not exist is a silent no-op, so a renamed node would quietly take a rule out of the
+// music's reach; and a state whose preset puts the eye inside the architecture renders a black frame.
+TEST_CASE("the procedural space art presets load, every rule the music drives exists, and every state leaves the "
+          "eye in open space",
+          "[space][sdf][example]") {
+    if (!audioPresent()) {
+        SKIP("assets/audio/night-shift.wav is not generated");
+    }
+    const std::vector<std::string> projects = {"infinite-hall",       "recursive-cathedral", "folding-space",
+                                               "radial-architecture", "geometry-explosion",  "showcase"};
+    for (const std::string& name : projects) {
+        INFO(name);
+        const std::filesystem::path path =
+            std::filesystem::path(AVGEN_SOURCE_DIR) / "examples/space" / (name + ".json");
+        app::Engine engine(app::EngineMode::Offline);
+        auto loaded = engine.loadProject(path);
+        if (!loaded) {
+            FAIL(loaded.error().message);
+        }
+        testsupport::stepFrames(engine, 2);
+        REQUIRE(engine.scene().sdfs.size() == 1);
+        CHECK(engine.scene().sdfs[0].validate());
+
+        const nlohmann::json doc = testsupport::readJson(path);
+        for (const auto& route : doc["routes"]) {
+            const std::string target = route["target"].get<std::string>();
+            INFO(target);
+            CHECK(engine.params().find(target) != nullptr);
+        }
+        std::vector<std::string> presetNames;
+        for (const auto& preset : doc["presets"]) {
+            presetNames.push_back(preset["name"].get<std::string>());
+            for (const auto& [p, value] : preset["values"].items()) {
+                INFO(presetNames.back() << ": " << p);
+                CHECK(engine.params().find(p) != nullptr);
+            }
+        }
+        if (doc.contains("states")) {
+            for (const auto& state : doc["states"]["states"]) {
+                const std::string preset = state["preset"].get<std::string>();
+                INFO("state " << state["name"].get<std::string>() << " -> " << preset);
+                CHECK(std::find(presetNames.begin(), presetNames.end(), preset) != presetNames.end());
+            }
+        }
+
+        // The eye is in open space at the start and in every preset (the showcase's presets move it).
+        auto eyeClear = [&](const std::string& when) {
+            INFO(when);
+            const params::IParameter* eye = engine.params().find("camera/position");
+            REQUIRE(eye != nullptr);
+            const glm::vec3 p(eye->baseComponent(0), eye->baseComponent(1), eye->baseComponent(2));
+            CHECK(engine.scene().sdfs[0].tree.evaluate(p, 0.0) > 0.3f);
+        };
+        eyeClear("as loaded");
+        for (const std::string& preset : presetNames) {
+            REQUIRE(engine.recallPreset(preset));
+            testsupport::stepFrames(engine, 2);
+            eyeClear(preset);
+        }
+    }
 }

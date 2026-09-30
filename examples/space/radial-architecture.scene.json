@@ -324,7 +324,7 @@
    "type": "point",
    "position": [
     0,
-    37.0,
+    27.0,
     0
    ],
    "color": [
@@ -332,25 +332,8 @@
     0.42,
     1.0
    ],
-   "intensity": 300.0,
-   "range": 60.0,
-   "castsShadow": false
-  },
-  {
-   "name": "core",
-   "type": "point",
-   "position": [
-    0,
-    -1.0,
-    0
-   ],
-   "color": [
-    0.22,
-    1.0,
-    0.52
-   ],
-   "intensity": 25.0,
-   "range": 14.0,
+   "intensity": 90.0,
+   "range": 40.0,
    "castsShadow": false
   },
   {
@@ -366,8 +349,8 @@
     0.42,
     1.0
    ],
-   "intensity": 40.0,
-   "range": 16.0,
+   "intensity": 45.0,
+   "range": 18.0,
    "castsShadow": false
   },
   {
@@ -383,8 +366,8 @@
     0.42,
     1.0
    ],
-   "intensity": 40.0,
-   "range": 16.0,
+   "intensity": 45.0,
+   "range": 18.0,
    "castsShadow": false
   },
   {
@@ -400,8 +383,8 @@
     0.42,
     1.0
    ],
-   "intensity": 40.0,
-   "range": 16.0,
+   "intensity": 45.0,
+   "range": 18.0,
    "castsShadow": false
   },
   {
@@ -417,8 +400,76 @@
     0.42,
     1.0
    ],
-   "intensity": 40.0,
-   "range": 16.0,
+   "intensity": 45.0,
+   "range": 18.0,
+   "castsShadow": false
+  },
+  {
+   "name": "chapel0",
+   "type": "point",
+   "position": [
+    36.0,
+    -4.0,
+    0.0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 20.0,
+   "range": 12.0,
+   "castsShadow": false
+  },
+  {
+   "name": "chapel1",
+   "type": "point",
+   "position": [
+    2.204364238465236e-15,
+    -4.0,
+    36.0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 20.0,
+   "range": 12.0,
+   "castsShadow": false
+  },
+  {
+   "name": "chapel2",
+   "type": "point",
+   "position": [
+    -36.0,
+    -4.0,
+    4.408728476930472e-15
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 20.0,
+   "range": 12.0,
+   "castsShadow": false
+  },
+  {
+   "name": "chapel3",
+   "type": "point",
+   "position": [
+    -6.613092715395707e-15,
+    -4.0,
+    -36.0
+   ],
+   "color": [
+    0.22,
+    1.0,
+    0.52
+   ],
+   "intensity": 20.0,
+   "range": 12.0,
    "castsShadow": false
   }
  ]

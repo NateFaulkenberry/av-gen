@@ -55,6 +55,7 @@
          0,
          90
         ],
+        "name": "hspin",
         "children": [
          {
           "kind": "twist",
@@ -62,17 +63,17 @@
           "name": "hroll",
           "children": [
            {
-            "kind": "rotate",
-            "rotation": [
-             0,
-             0,
-             -90
-            ],
+            "kind": "polarRepeat",
+            "count": 0,
+            "name": "hradial",
             "children": [
              {
-              "kind": "bend",
-              "amount": 0.0,
-              "name": "hbend",
+              "kind": "rotate",
+              "rotation": [
+               0,
+               0,
+               -90
+              ],
               "children": [
                {
                 "kind": "fold",
@@ -567,153 +568,34 @@
                 ]
                },
                {
-                "kind": "polarRepeat",
-                "count": 16,
-                "name": "pilasters",
-                "children": [
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   22.9,
-                   10.0,
-                   0
-                  ],
-                  "children": [
-                   {
-                    "kind": "roundedBox",
-                    "size": [
-                     0.45,
-                     10.0,
-                     0.6
-                    ],
-                    "rounding": 0.08
-                   }
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ]
-         }
-        ]
-       },
-       {
-        "kind": "rotate",
-        "rotation": [
-         0,
-         0,
-         90
-        ],
-        "children": [
-         {
-          "kind": "twist",
-          "amount": 0.0,
-          "name": "ltwist",
-          "children": [
-           {
-            "kind": "polarRepeat",
-            "count": 0,
-            "name": "lradial",
-            "children": [
-             {
-              "kind": "rotate",
-              "rotation": [
-               0,
-               0,
-               -90
-              ],
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 8.0,
-                 1.0,
+                "kind": "rotate",
+                "rotation": [
+                 0,
+                 11.25,
                  0
                 ],
-                "name": "latticeAt",
                 "children": [
                  {
-                  "kind": "repeat",
-                  "size": [
-                   16.0,
-                   16.0,
-                   16.0
-                  ],
-                  "name": "lattice",
+                  "kind": "polarRepeat",
+                  "count": 16,
+                  "name": "pilasters",
                   "children": [
                    {
-                    "kind": "union",
-                    "name": "cell",
+                    "kind": "translate",
+                    "translation": [
+                     22.9,
+                     10.0,
+                     0
+                    ],
                     "children": [
                      {
-                      "kind": "mirror",
+                      "kind": "roundedBox",
                       "size": [
-                       0,
-                       0,
-                       1
+                       0.45,
+                       10.0,
+                       0.6
                       ],
-                      "children": [
-                       {
-                        "kind": "translate",
-                        "translation": [
-                         0,
-                         -2.5,
-                         5.0
-                        ],
-                        "children": [
-                         {
-                          "kind": "box",
-                          "size": [
-                           0.5,
-                           5.5,
-                           0.5
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0,
-                       3.0,
-                       0
-                      ],
-                      "children": [
-                       {
-                        "kind": "intersection",
-                        "children": [
-                         {
-                          "kind": "rotate",
-                          "rotation": [
-                           0,
-                           0,
-                           90
-                          ],
-                          "children": [
-                           {
-                            "kind": "torus",
-                            "radius": 5.0,
-                            "rounding": 0.45
-                           }
-                          ]
-                         },
-                         {
-                          "kind": "plane",
-                          "axis": [
-                           0,
-                           -1,
-                           0
-                          ],
-                          "offset": 0.0
-                         }
-                        ]
-                       }
-                      ]
+                      "rounding": 0.08
                      }
                     ]
                    }

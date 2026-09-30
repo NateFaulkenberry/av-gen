@@ -28,11 +28,12 @@
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.25,
   "post/output/vignette": 0.4,
-  "post/output/grain": 0.015,
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5,
   "sdf/space/node/state/amount": 0.0,
   "sdf/space/node/hroll/amount": 0.0,
-  "sdf/space/node/hbend/amount": 0.0,
   "sdf/space/node/hfold/offset": -110.0,
+  "sdf/space/node/hradial/count": 0,
   "sdf/space/node/pierAt/translation": [
    0.0,
    0.5,
@@ -72,9 +73,8 @@
    0.0
   ],
   "sdf/space/node/nest/count": 0,
-  "sdf/space/node/lradial/count": 0,
-  "sdf/space/node/ltwist/amount": 0.0,
   "macros/rules": 0.0,
+  "macros/spin": 0.0,
   "scene/volumeDensity": 0.028,
   "camera/position": [
    0.0,
@@ -86,9 +86,46 @@
    -0.20000000000000018,
    0.0
   ],
+  "camera/fov": 68.0,
   "lights/heart/intensity": 0.0,
   "sdf/space/look/edge/intensity": 2.6,
-  "camera/fov": 68.0,
+  "sdf/space/look/edge/width": 0.05,
+  "sdf/space/node/hspin/rotation": [
+   0.0,
+   0.0,
+   90.0
+  ],
+  "scene/volumeScattering": 1.0,
+  "lights/nave0/position": [
+   10.0,
+   4.0,
+   0.0
+  ],
+  "lights/nave0/intensity": 80.0,
+  "lights/nave1/position": [
+   26.0,
+   4.0,
+   0.0
+  ],
+  "lights/nave1/intensity": 80.0,
+  "lights/nave2/position": [
+   42.0,
+   4.0,
+   0.0
+  ],
+  "lights/nave2/intensity": 80.0,
+  "lights/nave3/position": [
+   58.0,
+   4.0,
+   0.0
+  ],
+  "lights/nave3/intensity": 80.0,
+  "lights/nave4/position": [
+   74.0,
+   4.0,
+   0.0
+  ],
+  "lights/nave4/intensity": 80.0,
   "sdf/space/node/hfold/axis": [
    -0.7500000000000001,
    0.49999999999999994,
@@ -106,6 +143,10 @@
      {
       "name": "rules",
       "default": 0.0
+     },
+     {
+      "name": "spin",
+      "default": 0.0
      }
     ]
    }
@@ -120,10 +161,26 @@
   },
   {
    "kind": "random",
+   "name": "bar2",
+   "settings": {
+    "trigger": "music.bar",
+    "seed": 1013
+   }
+  },
+  {
+   "kind": "random",
    "name": "phrase",
    "settings": {
     "trigger": "music.phrase",
     "seed": 1012
+   }
+  },
+  {
+   "kind": "random",
+   "name": "turn",
+   "settings": {
+    "trigger": "music.bar",
+    "seed": 1014
    }
   },
   {
@@ -244,22 +301,9 @@
    }
   },
   {
-   "source": "audio.lowMid",
-   "target": "sdf/space/node/hbend/amount",
-   "amount": 0.006,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 2500,
-    "decayMs": 7000
-   },
-   "depthSource": "macro.rules"
-  },
-  {
    "source": "audio.energy",
    "target": "sdf/space/node/hroll/amount",
-   "amount": 0.008,
+   "amount": 0.01,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -285,6 +329,66 @@
   },
   {
    "source": "random.bar",
+   "target": "sdf/space/node/piers/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/bases/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/imposts/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.bar",
+   "target": "sdf/space/node/ribs/size",
+   "amount": -2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 1100,
+    "decayMs": 1100
+   },
+   "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.bar",
    "target": "sdf/space/node/hfold/axis",
    "amount": 0.9,
    "op": "add",
@@ -297,6 +401,45 @@
     "decayMs": 900
    },
    "depthSource": "macro.rules"
+  },
+  {
+   "source": "random.phrase",
+   "target": "sdf/space/node/hradial/count",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "depthSource": "macro.spin"
+  },
+  {
+   "source": "random.bar2",
+   "target": "sdf/space/node/hradial/count",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "depthSource": "macro.spin"
+  },
+  {
+   "source": "random.turn",
+   "target": "sdf/space/node/hspin/rotation",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 1500
+   },
+   "depthSource": "macro.spin"
   },
   {
    "source": "audio.highMid",
@@ -339,44 +482,6 @@
    "depthSource": "macro.rules"
   },
   {
-   "source": "audio.mid",
-   "target": "sdf/space/node/lattice/size",
-   "amount": -2.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 4500
-   }
-  },
-  {
-   "source": "audio.energy",
-   "target": "sdf/space/node/ltwist/amount",
-   "amount": 0.015,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 2500,
-    "decayMs": 7000
-   },
-   "depthSource": "macro.rules"
-  },
-  {
-   "source": "random.phrase",
-   "target": "sdf/space/node/lradial/count",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "threshold": "binary",
-    "thresholdLevel": 0.5
-   },
-   "depthSource": "macro.rules"
-  },
-  {
    "source": "audio.treble",
    "target": "sdf/space/look/edge/intensity",
    "amount": 1.2,
@@ -387,6 +492,19 @@
     "attackMs": 60,
     "decayMs": 900
    }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "sdf/space/look/edge/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 3000
+   },
+   "depthSource": "macro.rules"
   },
   {
    "source": "audio.energy",
@@ -475,11 +593,11 @@
     "sdf/space/node/hroll/amount": [
      0.0
     ],
-    "sdf/space/node/hbend/amount": [
-     0.0
-    ],
     "sdf/space/node/hfold/offset": [
      -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
@@ -528,13 +646,10 @@
     "sdf/space/node/nest/count": [
      0
     ],
-    "sdf/space/node/lradial/count": [
-     0
-    ],
-    "sdf/space/node/ltwist/amount": [
+    "macros/rules": [
      0.0
     ],
-    "macros/rules": [
+    "macros/spin": [
      0.0
     ],
     "scene/volumeDensity": [
@@ -550,14 +665,214 @@
      -0.20000000000000018,
      0.0
     ],
+    "camera/fov": [
+     68.0
+    ],
     "lights/heart/intensity": [
      0.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
+    ]
+   }
+  },
+  {
+   "name": "show/proportion",
+   "values": {
+    "sdf/space/node/state/amount": [
+     0.0
+    ],
+    "sdf/space/node/hroll/amount": [
+     0.0
+    ],
+    "sdf/space/node/hfold/offset": [
+     -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
+    ],
+    "sdf/space/node/pierAt/translation": [
+     0.0,
+     0.5,
+     8.5
+    ],
+    "sdf/space/node/baseAt/translation": [
+     0.0,
+     -6.65,
+     8.5
+    ],
+    "sdf/space/node/impostAt/translation": [
+     0.0,
+     7.65,
+     8.5
+    ],
+    "sdf/space/node/vaultBore/radius": [
+     8.5
+    ],
+    "sdf/space/node/rib/radius": [
+     8.5
+    ],
+    "sdf/space/node/pier/rounding": [
+     0.1
+    ],
+    "sdf/space/node/piers/size": [
+     9.5,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/bases/size": [
+     9.5,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/imposts/size": [
+     9.5,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/ribs/size": [
+     9.5,
+     0.0,
+     0.0
+    ],
+    "sdf/space/node/nest/count": [
+     0
+    ],
+    "macros/rules": [
+     0.2
+    ],
+    "macros/spin": [
+     0.0
+    ],
+    "scene/volumeDensity": [
+     0.028
+    ],
+    "camera/position": [
+     0.0,
+     -3.8,
+     0.0
+    ],
+    "camera/target": [
+     40.0,
+     -0.20000000000000018,
+     0.0
+    ],
     "camera/fov": [
      68.0
+    ],
+    "lights/heart/intensity": [
+     0.0
+    ],
+    "sdf/space/look/edge/intensity": [
+     2.6
+    ],
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
     ]
    }
   },
@@ -570,67 +885,64 @@
     "sdf/space/node/hroll/amount": [
      0.006
     ],
-    "sdf/space/node/hbend/amount": [
-     0.004
-    ],
     "sdf/space/node/hfold/offset": [
      -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
      0.5,
-     7.0
+     8.5
     ],
     "sdf/space/node/baseAt/translation": [
      0.0,
      -6.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/impostAt/translation": [
      0.0,
      7.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/vaultBore/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/rib/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/pier/rounding": [
      0.1
     ],
     "sdf/space/node/piers/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/bases/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/imposts/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/ribs/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/nest/count": [
      0
     ],
-    "sdf/space/node/lradial/count": [
-     0
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.0
-    ],
     "macros/rules": [
      0.55
+    ],
+    "macros/spin": [
+     0.0
     ],
     "scene/volumeDensity": [
      0.028
@@ -645,14 +957,68 @@
      -0.20000000000000018,
      0.0
     ],
+    "camera/fov": [
+     68.0
+    ],
     "lights/heart/intensity": [
      0.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
-    "camera/fov": [
-     68.0
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
     ]
    }
   },
@@ -665,67 +1031,64 @@
     "sdf/space/node/hroll/amount": [
      0.004
     ],
-    "sdf/space/node/hbend/amount": [
-     0.005
-    ],
     "sdf/space/node/hfold/offset": [
      -20.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
      0.5,
-     7.0
+     8.5
     ],
     "sdf/space/node/baseAt/translation": [
      0.0,
      -6.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/impostAt/translation": [
      0.0,
      7.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/vaultBore/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/rib/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/pier/rounding": [
      0.1
     ],
     "sdf/space/node/piers/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/bases/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/imposts/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/ribs/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/nest/count": [
      0
     ],
-    "sdf/space/node/lradial/count": [
-     0
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.0
-    ],
     "macros/rules": [
      0.8
+    ],
+    "macros/spin": [
+     0.0
     ],
     "scene/volumeDensity": [
      0.028
@@ -740,14 +1103,68 @@
      -0.20000000000000018,
      0.0
     ],
+    "camera/fov": [
+     68.0
+    ],
     "lights/heart/intensity": [
      12.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
-    "camera/fov": [
-     68.0
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.1
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
     ]
    }
   },
@@ -760,67 +1177,64 @@
     "sdf/space/node/hroll/amount": [
      0.004
     ],
-    "sdf/space/node/hbend/amount": [
-     0.005
-    ],
     "sdf/space/node/hfold/offset": [
      -20.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
      0.5,
-     7.0
+     8.5
     ],
     "sdf/space/node/baseAt/translation": [
      0.0,
      -6.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/impostAt/translation": [
      0.0,
      7.65,
-     7.0
+     8.5
     ],
     "sdf/space/node/vaultBore/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/rib/radius": [
-     7.0
+     8.5
     ],
     "sdf/space/node/pier/rounding": [
      0.1
     ],
     "sdf/space/node/piers/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/bases/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/imposts/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/ribs/size": [
-     8.0,
+     9.5,
      0.0,
      0.0
     ],
     "sdf/space/node/nest/count": [
      4
     ],
-    "sdf/space/node/lradial/count": [
-     0
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.0
-    ],
     "macros/rules": [
      0.8
+    ],
+    "macros/spin": [
+     0.0
     ],
     "scene/volumeDensity": [
      0.026
@@ -835,31 +1249,85 @@
      -1.5,
      0.0
     ],
+    "camera/fov": [
+     68.0
+    ],
     "lights/heart/intensity": [
      30.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
-    "camera/fov": [
-     68.0
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.05
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
     ]
    }
   },
   {
-   "name": "show/lattice",
+   "name": "show/mathematical",
    "values": {
     "sdf/space/node/state/amount": [
-     2.0
+     0.0
     ],
     "sdf/space/node/hroll/amount": [
      0.0
     ],
-    "sdf/space/node/hbend/amount": [
-     0.0
-    ],
     "sdf/space/node/hfold/offset": [
      -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     4
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
@@ -906,38 +1374,89 @@
      0.0
     ],
     "sdf/space/node/nest/count": [
-     4
-    ],
-    "sdf/space/node/lradial/count": [
      0
     ],
-    "sdf/space/node/ltwist/amount": [
+    "macros/rules": [
+     0.4
+    ],
+    "macros/spin": [
      0.0
     ],
-    "macros/rules": [
-     0.3
-    ],
     "scene/volumeDensity": [
-     0.032
+     0.028
     ],
     "camera/position": [
      0.0,
-     -3.8,
+     0.0,
      0.0
     ],
     "camera/target": [
      40.0,
-     1.0,
+     0.0,
      0.0
+    ],
+    "camera/fov": [
+     58.0
     ],
     "lights/heart/intensity": [
      0.0
     ],
     "sdf/space/look/edge/intensity": [
-     1.3
+     2.6
     ],
-    "camera/fov": [
-     68.0
+    "sdf/space/look/edge/width": [
+     0.06
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     90.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     0.05
+    ],
+    "lights/nave0/position": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     10.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     10.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     10.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     10.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     10.0
     ]
    }
   },
@@ -945,16 +1464,16 @@
    "name": "show/abstraction",
    "values": {
     "sdf/space/node/state/amount": [
-     2.0
+     0.0
     ],
     "sdf/space/node/hroll/amount": [
-     0.0
-    ],
-    "sdf/space/node/hbend/amount": [
-     0.0
+     0.02
     ],
     "sdf/space/node/hfold/offset": [
-     -110.0
+     -24.0
+    ],
+    "sdf/space/node/hradial/count": [
+     6
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
@@ -1001,19 +1520,16 @@
      0.0
     ],
     "sdf/space/node/nest/count": [
-     4
-    ],
-    "sdf/space/node/lradial/count": [
-     6
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.025
+     0
     ],
     "macros/rules": [
      1.0
     ],
+    "macros/spin": [
+     1.0
+    ],
     "scene/volumeDensity": [
-     0.042
+     0.028
     ],
     "camera/position": [
      0.0,
@@ -1025,31 +1541,85 @@
      0.0,
      0.0
     ],
+    "camera/fov": [
+     50.0
+    ],
     "lights/heart/intensity": [
      0.0
     ],
     "sdf/space/look/edge/intensity": [
-     1.5
+     3.6
     ],
-    "camera/fov": [
-     46.0
+    "sdf/space/look/edge/width": [
+     0.075
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     90.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     0.25
+    ],
+    "lights/nave0/position": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     12.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     12.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     12.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     12.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     12.0
     ]
    }
   },
   {
-   "name": "show/reforming",
+   "name": "show/unwinding",
    "values": {
     "sdf/space/node/state/amount": [
-     1.0
+     0.0
     ],
     "sdf/space/node/hroll/amount": [
-     0.0
-    ],
-    "sdf/space/node/hbend/amount": [
-     0.0
+     0.008
     ],
     "sdf/space/node/hfold/offset": [
      -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     3
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
@@ -1096,38 +1666,89 @@
      0.0
     ],
     "sdf/space/node/nest/count": [
-     5
-    ],
-    "sdf/space/node/lradial/count": [
-     6
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.025
+     0
     ],
     "macros/rules": [
-     0.6
+     0.5
+    ],
+    "macros/spin": [
+     0.5
     ],
     "scene/volumeDensity": [
      0.026
     ],
     "camera/position": [
      0.0,
-     -3.8,
+     0.0,
      0.0
     ],
     "camera/target": [
-     22.0,
-     -1.5,
+     40.0,
+     0.0,
      0.0
     ],
+    "camera/fov": [
+     58.0
+    ],
     "lights/heart/intensity": [
-     30.0
+     0.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
-    "camera/fov": [
-     60.0
+    "sdf/space/look/edge/width": [
+     0.06
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     90.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     0.7
+    ],
+    "camera/exposure/compensation": [
+     0.05
+    ],
+    "lights/nave0/position": [
+     10.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     16.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     16.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     16.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     16.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     0.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     16.0
     ]
    }
   },
@@ -1140,67 +1761,64 @@
     "sdf/space/node/hroll/amount": [
      0.0
     ],
-    "sdf/space/node/hbend/amount": [
-     0.0
-    ],
     "sdf/space/node/hfold/offset": [
      -110.0
+    ],
+    "sdf/space/node/hradial/count": [
+     0
     ],
     "sdf/space/node/pierAt/translation": [
      0.0,
      0.5,
-     9.0
+     10.0
     ],
     "sdf/space/node/baseAt/translation": [
      0.0,
      -6.65,
-     9.0
+     10.0
     ],
     "sdf/space/node/impostAt/translation": [
      0.0,
      7.65,
-     9.0
+     10.0
     ],
     "sdf/space/node/vaultBore/radius": [
-     9.0
+     10.0
     ],
     "sdf/space/node/rib/radius": [
-     9.0
+     10.0
     ],
     "sdf/space/node/pier/rounding": [
      0.8
     ],
     "sdf/space/node/piers/size": [
-     10.0,
+     11.0,
      0.0,
      0.0
     ],
     "sdf/space/node/bases/size": [
-     10.0,
+     11.0,
      0.0,
      0.0
     ],
     "sdf/space/node/imposts/size": [
-     10.0,
+     11.0,
      0.0,
      0.0
     ],
     "sdf/space/node/ribs/size": [
-     10.0,
+     11.0,
      0.0,
      0.0
     ],
     "sdf/space/node/nest/count": [
      0
     ],
-    "sdf/space/node/lradial/count": [
-     0
-    ],
-    "sdf/space/node/ltwist/amount": [
-     0.0
-    ],
     "macros/rules": [
      0.3
+    ],
+    "macros/spin": [
+     0.0
     ],
     "scene/volumeDensity": [
      0.028
@@ -1215,14 +1833,68 @@
      -0.20000000000000018,
      0.0
     ],
+    "camera/fov": [
+     68.0
+    ],
     "lights/heart/intensity": [
      0.0
     ],
     "sdf/space/look/edge/intensity": [
      2.6
     ],
-    "camera/fov": [
-     68.0
+    "sdf/space/look/edge/width": [
+     0.05
+    ],
+    "sdf/space/node/hspin/rotation": [
+     0.0,
+     0.0,
+     90.0
+    ],
+    "scene/volumeScattering": [
+     1.0
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "lights/nave0/position": [
+     10.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave0/intensity": [
+     80.0
+    ],
+    "lights/nave1/position": [
+     26.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave1/intensity": [
+     80.0
+    ],
+    "lights/nave2/position": [
+     42.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave2/intensity": [
+     80.0
+    ],
+    "lights/nave3/position": [
+     58.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave3/intensity": [
+     80.0
+    ],
+    "lights/nave4/position": [
+     74.0,
+     4.0,
+     0.0
+    ],
+    "lights/nave4/intensity": [
+     80.0
     ]
    }
   }
@@ -1243,6 +1915,22 @@
     "preset": "show/normal"
    },
    {
+    "name": "Proportion",
+    "preset": "show/proportion",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 16,
+      "from": "Normal"
+     }
+    ]
+   },
+   {
     "name": "Strange",
     "preset": "show/strange",
     "transition": {
@@ -1254,7 +1942,7 @@
      {
       "kind": "bar",
       "every": 32,
-      "from": "Normal"
+      "from": "Proportion"
      }
     ]
    },
@@ -1291,10 +1979,10 @@
     ]
    },
    {
-    "name": "Lattice",
-    "preset": "show/lattice",
+    "name": "Mathematical",
+    "preset": "show/mathematical",
     "transition": {
-     "seconds": 5.0,
+     "seconds": 8.0,
      "easing": "smooth",
      "quantize": "bar"
     },
@@ -1318,19 +2006,19 @@
      {
       "kind": "bar",
       "every": 88,
-      "from": "Lattice"
+      "from": "Mathematical"
      },
      {
       "kind": "signal",
       "signal": "music.drop",
       "threshold": 0.5,
-      "from": "Lattice"
+      "from": "Mathematical"
      }
     ]
    },
    {
-    "name": "Reforming",
-    "preset": "show/reforming",
+    "name": "Unwinding",
+    "preset": "show/unwinding",
     "transition": {
      "seconds": 8.0,
      "easing": "smooth",
@@ -1348,7 +2036,7 @@
     "name": "Reformed",
     "preset": "show/reformed",
     "transition": {
-     "seconds": 8.0,
+     "seconds": 10.0,
      "easing": "smooth",
      "quantize": "bar"
     },
@@ -1356,7 +2044,7 @@
      {
       "kind": "bar",
       "every": 112,
-      "from": "Reforming"
+      "from": "Unwinding"
      }
     ]
    }

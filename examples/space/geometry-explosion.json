@@ -28,7 +28,8 @@
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.25,
   "post/output/vignette": 0.4,
-  "post/output/grain": 0.015
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5
  },
  "sources": [],
  "routes": [
@@ -184,7 +185,7 @@
    "name": "explode/5",
    "values": {
     "sdf/space/node/rows/size": [
-     11.0,
+     13.0,
      0.0,
      0.0
     ],

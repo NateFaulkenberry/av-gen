@@ -28,7 +28,9 @@
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.25,
   "post/output/vignette": 0.4,
-  "post/output/grain": 0.015
+  "post/output/grain": 0.0,
+  "scene/volumeJitter": 0.5,
+  "sdf/space/look/edge/intensity": 3.2
  },
  "sources": [
   {

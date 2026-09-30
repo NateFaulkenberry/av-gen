@@ -19,7 +19,7 @@ Resume from here. Branch `proto/procedural-space` in `../av-gen-space`. The ADR 
 | 2 research | done | `RESEARCH.md`: A (the existing ray marcher) plus E, which comes free; F (a compiled SDF) was the fallback, and measurement made it necessary (ADR-1003) |
 | 3-6 foundation | done and verified on the GPU | ADR-1001 (morph, fold, recurse, names, `count`/`axis`), ADR-1002 (look, march cap, step statistics, prepass and shadow switches), ADR-1003 (compiled trees), `examples/space` |
 | 4 instrumentation | done, measured | see "Performance" |
-| 7, 8, 11 look, presets, evaluation | the art agent's | see "For the art agent" |
+| 7, 8, 11 look, presets, evaluation | in progress (art agent, from 01:21 on 2026-09-30) | see "Art pass" |
 
 ## What exists (engine)
 
@@ -186,6 +186,48 @@ t = 30 s.
     shadowing use `look/shadow/*`. The example sets `castShadows: false`.
   - The cathedral misses 16 % of its rays (it has open sky). They show the background colour, so the
     art agent may want a backdrop.
+
+## Art pass (the art agent; resume here)
+
+- **Everything is generated.** `python3 tools/make_space_presets.py [key ...]` writes
+  `examples/space/<preset>.json` + `.scene.json` for `hall`, `cathedral`, `folding`, `radial`,
+  `explosion` and `showcase`, and checks every tree against the interpreter's limits (96 nodes, depth
+  12, 8 nested unary operators; the last is the one that binds: `validate` rejects a tree whose unary
+  nesting passes the 8-entry point stack, compiled or not). Edit the generator, not the JSON.
+- **The frame:** every space is authored with its floor at `Y0 = -7`, so the origin is on the hall's
+  axis at mid-height and roll (twist about x), bend (about z) and the radial repeat pivot on the line
+  of sight with no translate nodes (each would cost a unary level).
+- **The look** (section 26): `space-art.rig.json` (cold backlight 0.2, violet rim 0.08, green
+  under-light), air = fog = background `[0.017, 0.011, 0.066]`, the volumetric march on
+  (`volumeMaxDistance` 140) so five point lamps down the nave scatter into halos (the two far ones
+  green), dark rough material, cyan edges (ADR-1004 fogs them), exposure -0.2 EV, bloom 0.25.
+  `depthPrepass: false` on every art preset: with it on, GTAO left a 2-pixel lattice on grazing SDF
+  floors (A/B at the same frame), and it is a second march.
+- **The showcase** (`showcase.json`): one morph over two structures (the hall under its rule chain, the
+  nested rotunda), nine scene states on the song's phrase map: Normal, Proportion @16, Strange @32
+  (roll), Folded @48 (an oblique fold plane), Cathedral @64 (morph to the nested rotunda), Mathematical
+  @80 (back to the hall under a 4-fold radial repeat about the line of sight, the eye on the axis),
+  Abstraction @88 or `music.drop` (6-12 sectors, the roll winds them, the "chamber" turns each bar),
+  Unwinding @104 (sectors shed one by one), Reformed @112 (the hall, wider, round columns). The hall's
+  chain is `R(0,0,90) > twist "hroll" > polarRepeat "hradial" > R(0,0,-90) > fold "hfold" > hall`: the
+  rotations make the view axis the twist's and the radial repeat's axis, and the outer rotation's y
+  angle ("hspin") turns the space inside the kaleidoscope.
+  - The macro knob `macros/rules` is the `depthSource` of every band route that bends a rule (0 in the
+    normal hall, 1.0 at the drop); `macros/spin` gates the kaleidoscope's own routes.
+  - Critic (preview mode, hand-written inputs, bar-aligned pseudo-shots): v1 28 issues (9 medium), v2
+    23 (6 medium, 2 strengths: cuts on the beat, saturation follows the arc; the climax is now the
+    visual peak). v3 adds a per-stage exposure arc (+0.25 EV at the drop) and more air in the
+    kaleidoscope against the shimmer and exposure findings. Reports:
+    `~/.creative-critic/jobs/<job>/report.md`, job ids in `ART-NOTES.md` in the review folder.
+- **The test** `[space]` in `tests/unit/test_space_example.cpp` now also loads every art project,
+  checks every route and preset path resolves, every state names a preset, and the eye is in open space
+  in every preset (it caught Geometry Explosion's last stage putting a pier through the eye).
+- **Stills of a later stage need a render from 0**: scene states count bars from the render's start.
+  Render the whole song small (`--size 480x270`, 90 s) and sample frames
+  (`tools/contact_sheet.py --video ... --times ...`).
+- **Offline speed at 1080p with the volumetric march: about 9.7 fps** (a 226 s showcase is about
+  12 minutes).
+- Review media and the Critic's reports: `~/Desktop/av-gen-review/22-procedural-space/`.
 
 ## Next steps (engineering)
 
