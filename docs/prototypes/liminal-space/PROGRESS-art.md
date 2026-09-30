@@ -24,20 +24,20 @@ these are the art side's. Newest state first.*
 ## Status (Phase A: research, song analysis, director plan; hand back by about 21:30 on 2026-09-30)
 
 - [x] Brief and addendum read in full.
-- [x] Research launched as two background research passes (visual/camera; audiovisual/colour), re-weighted to the
-  addendum's emotional direction (loneliness, wandering, repetition, colour returning as feeling).
-- [x] Song analysis, first pass: the WAV's cue chunk carries `Tempo: 109.0` at sample 0 and `Tempo: 111.0` at
-  sample 7,926,605 (165.138 s), exactly the start of bar 76. The song is exactly 116 bars: 75 at 109 BPM and 41 at
-  111 BPM. A line fitted to the kick onsets gives 108.99 and 110.99 BPM, so the markers are right and the downbeat is
-  at 0 s.
-- [ ] Lyric timing (local recogniser) and section map; `SONG-ANALYSIS.md`.
-- [ ] `ART-RESEARCH.md` from the research reports, with adoptions.
-- [ ] `DIRECTOR-PLAN.md` with the needs-from-engineering list.
+- [x] `ART-RESEARCH.md` committed (`10705f89`): ten rules, sources with tags, adoptions and rejections.
+- [x] `SONG-ANALYSIS.md` committed (`ab58d5d0`) with `tools/liminal/all-you-got.sections.json` (14 sections, bars
+  and seconds, placed vocal lines) and plots in `~/Desktop/av-gen-review/24-liminal-space/analysis/`.
+  - 116 bars; 109 BPM to bar 75, 111 BPM from bar 76 (165.14 s), a step.
+  - Key C Dorian (Cm-Cm-Gm-F), lifting to F at bar 67; the final loop is a descending Ab-G-F-F.
+  - Three texture families: sparse (intro, break, "is that all you", outro), the C groove, and the F world
+    ("feel it grow" previews the ending).
+  - The "let it go" drop is one bar (42); the only drums-out passage is bars 74-75.
+- [ ] `DIRECTOR-PLAN.md` with the ranked needs-from-engineering list (in progress, 19:00).
 
 ## Next
 
-1. Finish the section map from the per-bar table plus the lyric timing; write `tools/liminal/all-you-got.sections.json`
-   and run `song_analysis.py --sections ... --lyrics ...` for the plots.
-2. Write and commit `SONG-ANALYSIS.md` (draft first).
-3. Write `ART-RESEARCH.md` when the research reports come back.
-4. Write `DIRECTOR-PLAN.md`.
+1. Write and commit `DIRECTOR-PLAN.md` (draft first, then refine).
+2. Hand back to the coordinator by about 21:30 with the research adoptions, the section table, the plan per
+   section, the ranked needs list and the commit shas.
+3. Phase B (a new handoff): implement the video on the engineer's infrastructure (journey camera, palette block,
+   stairs/screw/warp, spring/integrate), test renders, analyzer passes.
