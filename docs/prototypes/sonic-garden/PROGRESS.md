@@ -742,9 +742,14 @@ sharpness 4; a world's forms appear from a weight of 0.375 and are full by 0.8; 
   +1.9 ms GPU in the glass, heavy and strike worlds. The garden is dearer only because a soft pad now lands there and
   marches its air; the live fog march runs 24 steps (garden at the default tier 43.8 -> 33.2 ms at 1080p), which
   took every world in the live run about 8 ms cheaper (38.0 -> 29.7 ms p50).
-- **Tests:** `tools/gpu-lock.sh`-held run of `build/release/tests/avgen_tests "[sonic]"`: binary exit 0, "All tests
-  passed (206898 assertions in 27 test cases)". No engine code changed; `--audit-routes` on the live project: 452/452
-  routes and both tracks live, 0 warnings.
+- **Tests:** `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` at the hand-back (22:23, after the last
+  change): exit 0, "All tests passed (206899 assertions in 27 test cases)". No engine code changed (only `tools/`,
+  `examples/sonic-garden/sonic-live*.json` and these docs); `--audit-routes` on the live project: 452/452 routes and
+  both tracks live, 0 warnings.
+- **Review media:** `~/Desktop/av-gen-review/23-sonic-garden/live-art/`: a full-quality clip (1280x720, 30 fps, the
+  probe's own recording rendered through the file path) and a live-captured clip (the real app, 640x360, 8-18 fps)
+  per PART 15 test, the play-through both ways, the filter and distortion curves (before and after), the Live panel
+  at the Preview tier, one still per state, and LIVE-ART-NOTES.md.
 - **Found for the engineer (not changed):** a MIDI input chosen by name does not connect a source that appears later
   (`onSourceAdded` connects only under the wildcard); once in eight runs All MIDI inputs connected the probe's new
   virtual source about 2.7 s late.
