@@ -29,22 +29,79 @@ docs/prototypes/liminal-space/PROGRESS-art.md`.
   - The clap check (`claps2.py`) and the hook-word timing (`words.py`, `vocenv.py`) are there.
 - **Review media:** `~/Desktop/av-gen-review/24-liminal-space/pass2/`.
 
+### Pass 2: how the film is built (read this first)
+
+- **The generator:**
+  - `python3 tools/liminal/make_all_you_got_pass2.py` writes `examples/liminal/all-you-got-pass2{,.scene,.rig}.json`;
+  - `--kit` writes a stills project of every world.
+- **Modules,** all in `tools/liminal/`:
+  - `kit.py`: about 40 primitive props, the faceted mannequin, room shells;
+  - `rooms2.py`: the living room, bedroom, kitchen, hallway, study, bathroom and gallery;
+  - `outdoor2.py`: the terrain, trees, mountains, lanterns, stair, summit, sun, the tree of rooms, the sky
+    furniture;
+  - `intro2.py`: the seed and the house;
+  - `film2.py`: shots as journey chapters with exact cuts, on a replica of the engine's spline, plus tracks,
+    routes, events and the palette;
+  - `film_build.py`: bars 0-40;
+  - `film_build2.py`: bars 41-115 and the tail.
+- **Track order matters.** A `replace` track overwrites everything before it in the list, and it holds its
+  first and last values outside its keys.
+  - So the constant base tracks are written first, then the builder's `add` tracks.
+  - Never add a second replace track on a target that is already keyed; merge them. A late single-key track
+    once froze the seed's core for the whole intro.
+- **The pinned engine.** The engineer edits shaders in the shared tree, and the binary loads shaders from the
+  source tree.
+  - So render with `$S/liminal2/avgen.sh`: a copied binary plus `git archive <commit> shaders`, exported via
+    `AVGEN_SHADER_DIR`.
+  - It is currently `bin-d7c5e75b`, which has all seven systems.
+  - To re-pin, run `B=$S/liminal2/bin-<sha>`, copy `build/release/src/avgen` into it, run
+    `git archive <sha> shaders | tar -x -C $B`, and edit `avgen.sh`. Only do it when no source file is newer
+    than the binary.
+- **Validate:** `./build/release/src/avgen --project examples/liminal/all-you-got-pass2.json --audit-routes /tmp/a.json
+  2>&1 | grep -i "warn\|error"` must print nothing but the "0 warning(s)" line.
+- **Preview:** `tools/gpu-lock.sh $S/liminal2/avgen.sh --headless --project examples/liminal/all-you-got-pass2.json
+  --render <out.mp4> --range 0:258 --size 960x540 --fps 30 --codec h264 --quality 80`.
+  - It renders at about 63 fps, so about 2 minutes plus compiles.
+  - **Stills** need motion blur off: at a low fps each frame's "previous frame" is seconds earlier, and the blur
+    smears it.
+- **Measure:** `python3 tools/liminal/pass2_av.py --video <mp4> --out <dir>`.
+  - v1 (`$S/liminal2/v1-full.mp4`) measured 17 of 18 BIG CLAPs unmistakable (C02 visible), and quarter lock of
+    +11 to +26 dB in most sections.
+  - The weak sections were the stair (bars 99-106), bridge 2 and bridge 1, now being fixed.
+
 ### Pass 2 checklist
 
 - [x] Phase 1 analysis and Phase 2 critique of pass 1 (`PASS2-PLAN.md` §1-2).
 - [x] The timeline re-mapped to owner numbering, with every BIG CLAP in seconds and the lyric times
   (`pass2_grid.py`, `PASS2-PLAN.md` §4-6).
-- [x] The art needs sent to the coordinator for the engineer (`PASS2-PLAN.md` §9).
-- [ ] The world kit as data: props, rooms, outdoors, mannequin, palettes (`tools/liminal/props.py`,
-  `rooms.py`), and the generator `tools/liminal/make_all_you_got_pass2.py`, which writes
-  `examples/liminal/all-you-got-pass2{,.scene,.rig}.json`.
-- [ ] Stills of each room through `tools/gpu-lock.sh` (the existing binary; do not rebuild while the engineer
-  is mid-change).
-- [ ] Pulses and claps as timeline keys; switch to the engineer's systems as they land (text, beat envelopes,
-  breathing, corruption, sweep, line width).
-- [ ] Section renders, then `pass2_av.py`, the Critic and viewing; iterate.
-- [ ] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
-- [ ] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0; REPORT-pass2 text.
+- [x] The art needs sent to the coordinator. The engineer delivered all seven systems:
+  - the beat grid (ADR-1045);
+  - text (1046);
+  - the line look (1047);
+  - breathing (1048);
+  - mosh (1049);
+  - the sweep (1050);
+  - object animation (a route recipe).
+- [x] The world kit and every world, as data (commits `c471a4cb`, `5b740615`).
+- [x] The whole film assembled: 36 shots, 18 BIG CLAPs each with its own treatment, 256 words. v1 preview at
+  `$S/liminal2/v1-full.mp4`.
+- [ ] Fixes after v1, in code but not yet rendered:
+  - the terrain ribs;
+  - the stair camera path;
+  - ceiling words with tilt 0;
+  - the summit at the stair top;
+  - bridge 2's eighth pulse;
+  - the cursor reset;
+  - track order;
+  - the dawn sky;
+  - stars;
+  - sky furniture;
+  - the tree canopy and its camera.
+- [ ] Next: render stills of the chorus, dawn, bridge T and the tree to check those fixes. Then v2 full at 960x540,
+  `pass2_av.py`, the Critic (`critic_pass2.py --submit`), then iterate.
+- [ ] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4` at 1920x1080 with
+  `--particle-warmup 120`.
+- [ ] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0; the REPORT-pass2 text.
 
 ## RESUME HERE (Phase B: building and rendering the video, 2026-09-30 night)
 

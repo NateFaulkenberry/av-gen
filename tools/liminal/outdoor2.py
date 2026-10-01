@@ -24,11 +24,11 @@ def ground(x: float, z: float) -> float:
     return -(HILL_A * math.sin(x * HILL_FX) + HILL_B * math.sin(z * HILL_FZ))
 
 
-def terrain(size=160.0, pitch=4.0, k=FLOOR):
-    """The ground: a slab (top at y = 0) with raised grid strips every `pitch` metres, both displaced by the two
-    waves (9 nodes). Its outline reaches the horizon; fog takes the far lines."""
+def terrain(size=160.0, pitch=3.0, k=FLOOR):
+    """The ground: a slab (top at y = 0) with raised grid ribs every `pitch` metres, both displaced by the two
+    waves (9 nodes). The ribs are big enough (16 cm wide, 9 cm proud) for the march to find them on the hills."""
     slab = X(((-size, size), (-4.0, 0.0), (-size, size)))
-    grid = U(K.repeat([0, 0, pitch], 0, box([size, 0.035, 0.05])), K.repeat([pitch, 0, 0], 0, box([0.05, 0.035, size])))
+    grid = U(K.repeat([0, 0, pitch], 0, box([size, 0.09, 0.08])), K.repeat([pitch, 0, 0], 0, box([0.08, 0.09, size])))
     body = U(slab, K.I(grid, box([size, 0.5, size])))
     w1 = K.wave(body, HILL_A, HILL_FX, [1.0, 0.0, 0.0])
     w2 = K.wave(w1, HILL_B, HILL_FZ, [0.0, 0.0, 1.0])
@@ -125,3 +125,24 @@ def tree_branch_group(indices, k=FILL):
                              "children": [R([0, yaw + 90.0, 0], lantern_room(k))]})
         parts += [branch, room]
     return U(*parts)
+
+
+def sky_furniture(k=K.FILL):
+    """The house's furniture adrift in the sky (the final chorus): a couch, an armchair, a lamp, a TV, a chair and
+    a table, each turning on its own named node (`sf<i>`), scattered over the hills (about 90 nodes)."""
+    pieces = [(K.couch(2.0, 0.88, 0.82), (-9.0, 11.0, -6.0)), (K.armchair(), (7.0, 13.5, -12.0)),
+              (K.floor_lamp(1.6), (-3.0, 15.0, -18.0)), (K.chair(), (12.0, 9.5, -3.0)),
+              (K.round_table(0.45, 0.72), (-14.0, 8.5, -16.0))]
+    parts = []
+    for i, (piece, at) in enumerate(pieces):
+        parts.append(K.T(at, K.R([0, 0, 0], K.T([0, -0.5, 0], piece), name=f"sf{i}")))
+    return K.U(*parts)
+
+
+def tree_canopy(k=K.GLOW):
+    """Leaves of light at the top of the tree of rooms: a dome of small glowing cubes (about 10 nodes)."""
+    top = 1.2 + TREE_STEP * TREE_ROOMS + 1.5
+    ring1 = K.T([0, top, 0], K.polar(9, K.T([2.4, 0, 0], K.R([30, 0, 30], K.box([0.28, 0.28, 0.28])))))
+    ring2 = K.T([0, top + 1.6, 0], K.R([0, 20, 0], K.polar(6, K.T([1.4, 0, 0], K.R([10, 0, 45], K.box([0.24, 0.24, 0.24]))))))
+    crown = K.T([0, top + 2.8, 0], K.R([45, 0, 45], K.box([0.35, 0.35, 0.35])))
+    return K.S(K.U(ring1, ring2, crown), k)

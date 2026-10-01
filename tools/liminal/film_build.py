@@ -144,6 +144,11 @@ def seed_state_keys(b: Builder):
         S_(bar, 2.0, cell=[0.06, 0.06, 0.06], cells=[0.45 + 0.05 * k] * 3, innerRot=[0, 45 * (k + 1), 0])
         S_(bar, 3.0, frameRot=[0, 45 * k + 22.5, 0], cell=[0.0, 0.0, 0.0])
         S_(bar, 4.0, inner=0.65 + 0.04 * k, frame=1.25 + 0.1 * k)
+    # the end: the world collapses back into the cursor, which blinks twice and goes out (255-258 s)
+    st.append((255.0, {"core": [0.6, 0.6, 0.6], "frame": 0.0, "inner": 0.0, "cell": [0.0, 0.0, 0.0], "ray": [0.0, 0.0, 0.0],
+                       "ringCube": [0.0, 0.0, 0.0], "floor": [0.0, 0.0, 0.0], "coreRot": [0.0, 0.0, 0.0]}))
+    for tt, v in ((255.55, 0.03), (256.1, 0.0), (256.5, 0.03), (256.9, 0.0), (257.3, 0.03), (257.65, 0.0)):
+        st.append((tt, {"core": [v, v, v]}))
     # ring: one eighth of a turn on every eighth note through bars 5-8 (a clock hand)
     ring = []
     for i in range(32):
@@ -318,13 +323,12 @@ def build(film: Film, add_world, palette_index, grid_settings):
                                                        (t(17) + 0.3, base, "step")])
     # the quarter pulse in the house: lines, the lamp, the furniture hops; strong at first, settling
     g_rel = b.gate("gRel", t(17), t(24, 4))
-    f.track("sources/song/pulseDecay", [(0.0, 0.3), (t(17), 0.42), (t(25), 0.3)])
+    f.track("sources/song/pulseDecay", [(0.0, 0.3), (t(17), 0.42), (t(25), 0.3), (t(49, 4), 0.3), (t(50), 0.22), (t(58), 0.16),
+                                        (t(66), 0.3)])
     for o, amt in (("livShell", 3.0), ("livSofa", 4.0), ("livMedia", 4.0), ("livShelf", 4.0)):
         b.pulse(f"sdf/{o}/look/edge/intensity", amt, "quarter", g_rel)
     f.route("grid.song.quarter", "lights/livLamp/intensity", 3.0, depth=g_rel)
     for node, obj, h in (("livTable", "livSofa", 0.035), ("livArm", "livMedia", 0.04), ("livPlant", "livShelf", 0.05)):
-        base = _node_translation(liv, obj, node)
-        f.track(f"sdf/{obj}/node/{node}/translation", [(t(17) + 0.31, base, "step")])
         f.route("grid.song.quarter", f"sdf/{obj}/node/{node}/translation", h, component=1, depth=g_rel)
     # ALL YOU GOT on the TV, once a bar with the chop (17-24), and the room's lines carry the downbeat
     for bar in range(17, 25):

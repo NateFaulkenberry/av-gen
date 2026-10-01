@@ -40,6 +40,12 @@ GRID = {"origin": G.BAR1, "beatsPerBar": 4, "tempo": [{"bar": 1, "bpm": 109}, {"
 ROLES = ["wall", "furn", "furn2", "figure", "fog", "fill", "glow", "screen", "canvas", "canvas2", "glass", "word",
          "accent", "jewel1", "jewel2", "jewel3", "jewel4", "jewel5", "jewel6"]
 JEWELS = {"P9jewels": ["#FF3355", "#3D7BFF", "#FFB33D", "#FFFFFF", "#FF7AB8", "#5CF0FF"]}
+SKY = {  # zenith, horizon, sun
+    "P8growth": ("#06051C", "#3A1A4A", "#FFD27A"),
+    "P11open": ("#02040E", "#30206E", "#FFC86B"),
+    "P12summit": ("#04020C", "#6A1A6A", "#FFFFFF"),
+    "P13dawn": ("#0A1038", "#FF8A5C", "#FFE8C0"),
+}
 
 
 def P(name, wall, furn, furn2, figure, fog, glow, screen, canvas, canvas2, glass, word, accent, fill="#050507"):
@@ -50,6 +56,8 @@ def P(name, wall, furn, furn2, figure, fog, glow, screen, canvas, canvas2, glass
     jewels = JEWELS.get(name, [furn, furn2, wall, accent, canvas, screen])
     for i, h in enumerate(jewels):
         roles[f"jewel{i + 1}"] = srgb(h)
+    zen, hor, sun = SKY.get(name, (fog, fog, glow))
+    roles["zenith"], roles["horizon"], roles["sun"] = srgb(zen), srgb(hor), srgb(sun)
     return name, roles
 
 
@@ -80,8 +88,8 @@ PALETTES = [
       "#0A1A4A", "#FFFFFF", "#FFC86B", fill="#02040E"),
     P("P12summit", "#FFFFFF", "#FF5FD0", "#5CFFE0", "#FFFFFF", "#08041A", "#FFFFFF", "#FFFFFF", "#FF5FD0", "#5CFFE0",
       "#1A0A3A", "#FFFFFF", "#FFE35C", fill="#05030E"),
-    P("P13dawn", "#FFE3C0", "#FFD0B0", "#FFB89A", "#FFF4E8", "#FF9E7A", "#FFE3B0", "#FFE3B0", "#FFB89A", "#FFE3B0",
-      "#FFD0B0", "#FFFFFF", "#FFE3B0", fill="#2A1A20"),
+    P("P13dawn", "#FFE3C0", "#FFD0B0", "#FFB89A", "#FFF4E8", "#5A2236", "#FFE3B0", "#FFE3B0", "#FFB89A", "#FFE3B0",
+      "#FFD0B0", "#FFFFFF", "#FFE3B0", fill="#0E0810"),
 ]
 PALETTE_INDEX = {name: i for i, (name, _) in enumerate(PALETTES)}
 
@@ -121,10 +129,10 @@ def environment(fog_hex="#04061A", stem="all-you-got-pass2"):
     return {"intensity": 0.0, "background": fog, "fogColor": fog, "lightRig": f"{stem}.rig.json",
             "volumeDensity": 0.022, "volumeAbsorption": 1.0, "volumeEmission": 0.0, "volumeScattering": 0.0,
             "volumeMaxDistance": 0.0, "volumeLocalLights": 0.0,
-            "sky": {"enabled": False, "background": False, "useKeyLight": False, "zenithColor": fog,
+            "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": fog,
                     "horizonColor": fog, "groundColor": fog, "sunColor": [1.0, 0.9, 0.8],
-                    "sunDirection": [0.0, 0.2, -1.0], "sunIntensity": 0.0, "sunSize": 0.02, "sunGlow": 0.05,
-                    "intensity": 0.0}}
+                    "sunDirection": [0.0, 0.05, -1.0], "sunIntensity": 0.0, "sunSize": 0.03, "sunGlow": 0.08,
+                    "intensity": 1.0}}
 
 
 PARAMS = {"temporal/mosh/enabled": True, "temporal/mosh/amount": 0.0, "temporal/mosh/shift": 0.0,
@@ -139,6 +147,10 @@ def palettes(film: Film):
     for name, roles in PALETTES:
         film.palette(name, **roles)
     film.bind("fog", "scene/fogColor")
+    film.bind("zenith", "env/sky/zenithColor")
+    film.bind("horizon", "env/sky/horizonColor")
+    film.bind("fog", "env/sky/groundColor")
+    film.bind("sun", "env/sky/sunColor")
 
 
 # =============================================================================================================
@@ -210,20 +222,17 @@ def build_film(end=END, stem="all-you-got-pass2"):
     from liminal_text import place_words
     film = Film(end=end)
     palettes(film)
+    # base tracks FIRST: a replace track overwrites everything before it in the list, so the constant bases
+    # must come before the builder's add-mode tracks (hue sweeps, exposure washes, mosh breakdowns)
+    base = [("post/bloom/intensity", 0.35), ("camera/exposure/compensation", 0.0), ("post/grade/hueShift", 0.0),
+            ("post/lens/chromaticAberration", 0.0), ("post/lens/distortion", 0.0), ("temporal/mosh/amount", 0.0),
+            ("temporal/mosh/shift", 0.0), ("post/sweep/intensity", 0.0), ("post/sweep/wash", 0.0), ("palette/saturation", 1.0)]
+    for target, v in base:
+        film.track(target, [(0.0, v), (end, v)])
     b = FB.build(film, add_world, PALETTE_INDEX, GRID)
     # the slow voices
     film.track("palette/position", b.pal + [(end, b.pal[-1][1], "step")])
     film.track("camera/breath/amount", sorted(b.breath) + [(end, b.breath[-1][1])])
-    film.track("post/bloom/intensity", [(0.0, 0.35), (end, 0.35)])
-    film.track("camera/exposure/compensation", [(0.0, 0.0), (end, 0.0)])
-    film.track("post/grade/hueShift", [(0.0, 0.0), (end, 0.0)])
-    film.track("post/lens/chromaticAberration", [(0.0, 0.0), (end, 0.0)])
-    film.track("post/lens/distortion", [(0.0, 0.0), (end, 0.0)])
-    film.track("temporal/mosh/amount", [(0.0, 0.0), (end, 0.0)])
-    film.track("temporal/mosh/shift", [(0.0, 0.0), (end, 0.0)])
-    for target, v in (("post/sweep/progress", 0.0), ("post/sweep/intensity", 0.0), ("post/sweep/wash", 0.0)):
-        film.track(target, [(0.0, v), (end, v)])
-    film.track("palette/saturation", [(0.0, 1.0), (end, 1.0)])
     film.track("palette/value", sorted(b.val, key=lambda k: k[0]) + [(end, 1.0)])
     # cuts: no motion blur on the first frame of a shot (its previous frame is another camera)
     mb = [(0.0, 0.35, "step")]

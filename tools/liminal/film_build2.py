@@ -39,7 +39,8 @@ def build_part2(b, end):
     b.world("gal", gal)
     far = {"max_distance": 260.0}
     land = {"objects": [
-        ("landGround", OD.terrain(), "wall", (-170, -12, -170), (170, 6, 170), dict(far, edge_pixels=1.8)),
+        ("landGround", OD.terrain(), "wall", (-170, -12, -170), (170, 6, 170),
+         dict(far, edge_pixels=1.8, step_scale=0.55, edge_intensity=5.0)),
         ("landMtn", OD.mountains(), "furn2", (-130, -10, -175), (130, 60, -90), far),
         ("landTrees", OD.grove([("pine", -7, -9, 3.4), ("pine", -10, -14, 4.2), ("round", 8, -11, 3.6),
                                 ("pine", 13, -19, 4.6), ("round", -16, -22, 4.2), ("pine", 4, -26, 4.0),
@@ -50,7 +51,7 @@ def build_part2(b, end):
          "furn2", (-14, -6, -12), (14, 4, 6), far)],
         "lights": []}
     b.world("land", land)
-    tree = {"objects": [("treeTrunk", OD.tree_trunk(), "wall", (-1, -2.5, -1), (1, 36, 1), far),
+    tree = {"objects": [("treeTrunk", K.U(OD.tree_trunk(), OD.tree_canopy()), "wall", (-3.5, -2.5, -3.5), (3.5, 40, 3.5), far),
                         ("treeA", OD.tree_branch_group(range(0, 5)), "furn", (-6, -1, -6), (6, 13, 6), far),
                         ("treeB", OD.tree_branch_group(range(5, 10)), "furn2", (-6, 9, -6), (6, 24, 6), far),
                         ("treeC", OD.tree_branch_group(range(10, 14)), "furn", (-6, 20, -6), (6, 34, 6), far)],
@@ -60,11 +61,18 @@ def build_part2(b, end):
                        ("ringHigh", OD.lantern_ring(24.0, 9, 22.0, "ringHighRot"), "furn", (-30, 16, -30), (30, 30, 30), far),
                        ("stair", K.T([-14.0, OD.ground(-14, 0) - 0.2, 0.0], OD.sky_stair(40, 0.45, 0.32, 2.4)), "furn2",
                         (-15, -3, -3), (5, 15, 3), far),
-                       ("summit", K.T([10.0, 12.6, 0.0], OD.summit()), "wall", (3, 11, -7), (17, 14.5, 7), far),
+                       ("summit", K.T([10.0, 14.2, 0.0], OD.summit()), "wall", (3, 12.5, -7), (17, 16.0, 7), far),
                        ("sun", K.T([0.0, -8.0, -150.0], K.T([0, 0, 0], OD.sun_disc(9.0), name="sunAt")), "furn2",
-                        (-30, -30, -160), (30, 60, -140), far)],
+                        (-30, -40, -160), (30, 60, -140), far),
+                       ("skyFurn", OD.sky_furniture(), "furn", (-17, 5, -21), (15, 18, -1), far)],
            "lights": []}
     b.world("sky", sky)
+    f.nodes.append({"name": "stars", "kind": "particles", "particles": {
+        "capacity": 3500, "spawnRate": 3500.0, "shape": "box", "position": [0.0, 70.0, -40.0], "extent": [170.0, 40.0, 140.0],
+        "lifetimeMin": 900.0, "lifetimeMax": 1000.0, "speedMin": 0.0, "speedMax": 0.0, "spread": 1.0, "gravity": [0.0, 0.0, 0.0],
+        "sizeStart": 0.22, "sizeEnd": 0.22, "blend": "additive", "colorStart": [0.85, 0.9, 1.0, 0.9],
+        "colorEnd": [0.85, 0.9, 1.0, 0.9]}})
+    b.worlds["sky"]["names"].append("stars")
     b.world("discoLiv", {"objects": [("livDisco", disco_floor(liv["interior"], 0.6), "furn", (-2.7, -0.05, -2.3), (2.7, 0.1, 2.3))],
                          "lights": []})
     b.world("discoKit", {"objects": [("kitDisco", disco_floor(kit_["interior"], 0.6), "furn", (-2.3, -0.05, -1.9), (2.3, 0.1, 1.9))],
@@ -109,16 +117,16 @@ def build_part2(b, end):
         "stu": [
             [((-1.0, 1.75, -1.69), (0, 0, 1), 0.3, -4), ((0.0, 0.762, -1.45), (0, 1, 0), 0.12, 15), ((0.3, 1.55, -1.66), (0, 0, 1), 0.36, 0)],
             [((-1.79, 2.15, 0.6), (1, 0, 0), 0.28, 0), ((-0.3, 0.01, 0.6), (0, 1, 0), 0.4, -20), ((1.79, 1.7, -0.9), (-1, 0, 0), 0.44, 6)],
-            [((0.4, 2.59, -0.3), (0, -1, 0), 0.34, 180), ((0.2, 0.95, -0.72), (0, 0, 1), 0.08, 0), ((1.79, 1.6, 0.2), (-1, 0, 0), 0.22, 0)],
+            [((0.4, 2.59, -0.3), (0, -1, 0), 0.34, 0), ((0.2, 0.95, -0.72), (0, 0, 1), 0.08, 0), ((1.79, 1.6, 0.2), (-1, 0, 0), 0.22, 0)],
             [((-0.9, 2.3, -1.69), (0, 0, 1), 0.2, 0), ((-0.9, 2.02, -1.69), (0, 0, 1), 0.2, 0), ((-0.9, 1.68, -1.69), (0, 0, 1), 0.3, 0)]],
         "bath": [
             [((0.75, 1.62, -1.37), (0, 0, 1), 0.16, 0), ((-1.02, 0.6, 0.25), (0, 1, 0), 0.24, 90), ((0.0, 0.01, 0.6), (0, 1, 0), 0.5, 0)],
-            [((-0.6, 2.25, -1.39), (0, 0, 1), 0.3, 8), ((-1.49, 1.8, -0.5), (1, 0, 0), 0.18, 0), ((0.2, 2.59, 0.2), (0, -1, 0), 0.4, 180)],
+            [((-0.6, 2.25, -1.39), (0, 0, 1), 0.3, 8), ((-1.49, 1.8, -0.5), (1, 0, 0), 0.18, 0), ((0.2, 2.59, 0.2), (0, -1, 0), 0.4, 0)],
             [((1.49, 1.9, 0.2), (-1, 0, 0), 0.32, -10), ((1.49, 1.45, 0.2), (-1, 0, 0), 0.32, 0), ((1.49, 0.95, 0.2), (-1, 0, 0), 0.32, 10)],
             [((-0.3, 1.2, -1.39), (0, 0, 1), 0.5, 0), ((0.75, 1.42, -1.37), (0, 0, 1), 0.16, 0), ((0.4, 0.01, -0.4), (0, 1, 0), 0.6, 30)]],
         "bed": [
             [((-0.3, 2.25, -1.79), (0, 0, 1), 0.28, 0), ((-0.3, 0.56, -0.2), (0, 1, 0), 0.3, 0), ((1.99, 1.6, 0.55), (-1, 0, 0), 0.4, 0)],
-            [((-1.99, 2.2, 0.3), (1, 0, 0), 0.24, 0), ((-1.35, 0.56, -1.55), (0, 1, 0), 0.07, 0), ((0.0, 2.59, 0.4), (0, -1, 0), 0.5, 180)],
+            [((-1.99, 2.2, 0.3), (1, 0, 0), 0.24, 0), ((-1.35, 0.56, -1.55), (0, 1, 0), 0.07, 0), ((0.0, 2.59, 0.4), (0, -1, 0), 0.5, 0)],
             [((1.0, 2.0, -1.79), (0, 0, 1), 0.2, 12), ((1.5, 1.7, -1.79), (0, 0, 1), 0.14, -12), ((0.6, 1.3, -1.79), (0, 0, 1), 0.3, 6)],
             [((-1.2, 1.4, 1.79), (0, 0, -1), 0.34, 0), ((-0.3, 1.1, 1.79), (0, 0, -1), 0.34, 0), ((0.6, 0.8, 1.79), (0, 0, -1), 0.34, 0)]],
     }
@@ -188,7 +196,6 @@ def build_part2(b, end):
         else:
             b.shot(name, t0, t1, eye, look, keys=(world,), fov=62.0, sway=1.6)
     g_v2 = b.gate("gV2", t(49, 4), t(66))
-    f.track("sources/song/pulseDecay", [(t(49, 4), 0.3), (t(50), 0.22), (t(58), 0.16), (t(66), 0.3)])
     for o in ("stuShell", "stuFurn", "livShell", "livSofa", "livMedia", "livShelf", "bedShell", "bedFurn", "kitShell",
               "kitCounter", "kitTable"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.5, "quarter", g_v2)
@@ -293,7 +300,7 @@ def build_part2(b, end):
     for i, (wd, beat, pos) in enumerate((("FEEL", 1.0, (-0.9, 2.45, -1.0)), ("IT", 1.5, (0.0, 2.6, -0.5)), ("GROW", 2.0, (0.9, 2.45, -1.0)),
                                          ("FEEL", 3.0, (-1.4, 2.0, 2.19)), ("IT", 3.5, (2.59, 2.2, 0.0)), ("GROW", 4.0, (0.0, 2.6, 0.6)))):
         nrm = (0, 0, -1) if pos[2] > 2.0 else ((-1, 0, 0) if pos[0] > 2.5 else (0, -1, 0))
-        b.word(wd, t(66, beat), t(67), pos, nrm, 0.3, style="rise", role="word", tilt=180 if nrm == (0, -1, 0) else 0,
+        b.word(wd, t(66, beat), t(67), pos, nrm, 0.3, style="rise", role="word", tilt=0,
                name=f"fig66_{i}", tin=0.15)
 
     # =========================================================================================================
@@ -311,13 +318,18 @@ def build_part2(b, end):
                                                 (tb + 0.42, 1.0, "step")])
     # the camera spirals up the trunk with the blooms, then pulls out to see the whole tree; then it lands
     spiral = []
-    for k in range(0, 15):
-        a = math.radians(30.0 + 24.0 * k)
-        r = 8.0
-        y = 2.2 + 1.95 * k
+    for k in range(0, 9):
+        a = math.radians(20.0 + 22.0 * k)
+        r = 6.6
+        y = 1.8 + 2.15 * k * 1.25
         spiral.append([r * math.cos(a), y, -r * math.sin(a)])
-    b.shot("tree", t(67), t(71), spiral[:9], None, keys=("tree", "land"),
-           look_keys=[(t(67), (0.0, 3.0, 0.0)), (t(69), (0.0, 9.0, 0.0)), (t(71), (0.0, 16.0, 0.0))], fov=66.0, ease_kind="linear")
+    look_tree = []
+    for i, tb in enumerate(blooms):
+        if t(67) - 0.01 <= tb <= t(71) + 0.01:
+            (x, y, z), _yaw = OD.tree_room_pose(i)
+            look_tree.append((tb, (x * 0.45, y + 0.4, z * 0.45)))
+    look_tree = [(t(67), (0.0, 7.0, 0.0))] + look_tree + [(t(71), (0.0, 22.0, 0.0))]
+    b.shot("tree", t(67), t(71), spiral, None, keys=("tree", "land", "sky"), look_keys=look_tree, fov=68.0, ease_kind="linear")
     b.shot("treeReveal", t(71), t(73), [[10.0, 18.0, 12.0], [17.0, 20.0, 19.0], [24.0, 21.0, 26.0]], None, keys=("tree", "land", "sky"),
            look_keys=[(t(71), (0.0, 17.0, 0.0)), (t(73), (0.0, 14.0, 0.0))], fov=62.0)
     r12, yaw12 = OD.tree_room_pose(12)
@@ -335,6 +347,7 @@ def build_part2(b, end):
     g_b1 = b.gate("gB1", t(67), t(73))
     for o in ("treeA", "treeB", "treeC", "treeTrunk"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "half", g_b1)
+        f.track(f"sdf/{o}/surface/{K.GLOW}/emission", hold_keys(0.0, end, [4.0, 4.0, 4.0]))
     b.val += [(t(73), 1.0, "smooth"), (t(74, 4), 0.55, "smooth"), (t(75) - 0.01, 0.55, "step"), (t(75), 1.0, "step")]
 
     # =========================================================================================================
@@ -380,7 +393,10 @@ def build_part2(b, end):
     f.track("sdf/galShell/look/edge/intensity", hold_keys(0.0, end, 2.0))
     # the eighth thump also pulses the room's lines lightly; the pulse stops on 82.3 with everything
     g_b2 = b.gate("gB2", t(75), t(82, 3))
-    b.pulse("sdf/galShell/look/edge/intensity", 1.5, "eighth", g_b2)
+    b.pulse("sdf/galShell/look/edge/intensity", 2.5, "eighth", g_b2)
+    for name in items:
+        b.pulse(f"sdf/{name}/look/edge/intensity", 4.0, "eighth", g_b2)
+    b.pulse("sdf/galMan/look/edge/intensity", 2.0, "quarter", g_b2)
     # C17 (78.2.5) GOT?: a colourful sparkle explosion
     c = b.clap("c17", t(78, 2.5), release=1.2)
     f.route(c, "post/grade/hueShift", 2.2)
@@ -486,11 +502,20 @@ def build_part2(b, end):
     f.route("grid.song.quarter", "post/grade/hueShift", 0.22, depth=g_ch)
     f.track("sdf/ringLow/node/ringLowRot/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, 9.0 * end, 0.0])])
     f.track("sdf/ringHigh/node/ringHighRot/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, -6.0 * end, 0.0])])
+    for i in range(5):
+        rate = [11.0, -8.0, 6.0, -14.0, 9.0][i]
+        f.track(f"sdf/skyFurn/node/sf{i}/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"),
+                                                    (end, [rate * end * 0.3, rate * end, rate * end * 0.2])])
+    b.pulse("sdf/skyFurn/look/edge/intensity", 3.0, "quarter", g_ch)
     # bars 99-106: the staircase; IT'S JUST STEPS IN A PROCESS on the risers, FOR YOUR LIFE in the sky
     sx0 = -14.0
     sy0 = gy(-14, 0) - 0.2
-    stair_eye = [[sx0 - 6.0, sy0 + 2.2, 2.2], [sx0 - 1.0, sy0 + 2.0, 1.6], [sx0 + 6.0, sy0 + 5.2, 0.9], [sx0 + 13.0, sy0 + 9.6, 0.6],
-                 [sx0 + 19.0, sy0 + 14.2, 0.4]]
+    slope = 0.32 / 0.45
+
+    def on_stair(dx, z):
+        return [sx0 + dx, sy0 + min(max(dx, 0.0), 18.0) * slope + 1.85, z]
+    stair_eye = [on_stair(-6.0, 2.4), on_stair(-1.5, 1.4), on_stair(3.0, 0.6), on_stair(8.0, 0.2), on_stair(13.0, 0.0),
+                 on_stair(17.0, 0.0), on_stair(20.5, 0.0)]
     b.shot("stair", t(99), t(107), stair_eye, None, keys=("land", "sky"),
            look_keys=[(t(99), (sx0 + 6.0, sy0 + 3.0, 0.0)), (t(103), (sx0 + 16.0, sy0 + 10.0, 0.0)), (t(107), (10.0, 14.0, 0.0))],
            fov=64.0, ease_kind="linear")
@@ -506,10 +531,10 @@ def build_part2(b, end):
                role="accent", name=f"fyl{rep}", intensity=5.0, tin=0.4, rotation=[0.0, -90.0, 0.0])
     b.pulse("sdf/stair/look/edge/intensity", 3.0, "quarter", g_ch)
     # bars 107-112: the summit; LET IT GO chants in the ring; fireworks of geometry on 2 and 4
-    sum_eye = [[4.0, 14.5, 4.0], [8.0, 15.0, 6.0], [13.0, 15.4, 4.0], [15.0, 15.8, -1.0]]
+    sum_eye = [[5.5, 16.0, 3.5], [8.5, 16.1, 4.8], [12.5, 16.2, 3.6], [14.5, 16.3, -0.8]]
     b.shot("summit", t(107), t(114), sum_eye, None, keys=("land", "sky", "tree"),
-           look_keys=[(t(107), (10.0, 13.5, -4.0)), (t(109), (0.0, 22.0, 0.0)), (t(111), (-10.0, 20.0, -10.0)),
-                      (t(112, 3), (10.0, 13.0, 0.0)), (t(113), (10.0, 13.0, 0.0)), (t(114), (10.0, 16.0, 0.0))],
+           look_keys=[(t(107), (10.0, 15.5, -4.0)), (t(109), (0.0, 22.0, 0.0)), (t(111), (-10.0, 20.0, -10.0)),
+                      (t(112, 3), (10.0, 15.0, 0.0)), (t(113), (10.0, 15.0, 0.0)), (t(114), (10.0, 18.0, 0.0))],
            fov=[(t(107), 66.0), (t(112, 3), 66.0), (t(113), 50.0), (t(113) + 0.4, 84.0), (t(114), 76.0)], ease_kind="linear",
            moves=[(t(107), 0.0), (t(113), 0.92), (t(114), 1.0)])
     k = 0
@@ -517,7 +542,7 @@ def build_part2(b, end):
         for half, b0 in ((0, 1.0), (1, 3.0)):
             for j, wd in enumerate(("LET", "IT", "GO")):
                 a = math.radians((bar - 107) * 60.0 + half * 30.0 + j * 10.0)
-                pos = (10.0 + 9.0 * math.cos(a), 17.0 + 1.0 * j, -9.0 * math.sin(a))
+                pos = (10.0 + 9.0 * math.cos(a), 18.6 + 1.0 * j, -9.0 * math.sin(a))
                 nrm = (-math.cos(a), 0.0, math.sin(a))
                 b.word(wd, t(bar, b0 + 0.5 * j), t(bar, b0 + 0.5 * j) + G.BAR2, pos, nrm, 0.9, style="flash", role="word",
                        name=f"chC{k:02d}", intensity=6.0, tin=0.08, tout=0.3)
@@ -565,12 +590,11 @@ def build_part2(b, end):
     f.track("temporal/mosh/shift", [(0.0, 0.0), (252.5, 0.0, "smooth"), (254.95, 30.0, "step"), (255.0, 0.0, "step")], mode="add")
     # the collapse: the seed again, the cursor blinking twice, then out
     b.shot("cursor", 255.0, end, [[0.0, 0.25, 6.2], [0.0, 0.25, 6.15]], (0.0, 0.0, 0.0), keys=("seed",), fov=46.0)
-    for nm_ in ("core",):
-        pass
-    f.track("sdf/seed/node/core/size", [(255.0, [0.6, 0.6, 0.6], "easeIn"), (255.6, [0.03, 0.03, 0.03], "step"),
-                                       (256.1, [0.0, 0.0, 0.0], "step"), (256.5, [0.03, 0.03, 0.03], "step"),
-                                       (256.9, [0.0, 0.0, 0.0], "step"), (257.3, [0.03, 0.03, 0.03], "step"),
-                                       (257.6, [0.0, 0.0, 0.0], "step")], mode="replace")
+    zero = [0.0, 0.0, 0.0]
+    for node, field in (("cell", "size"), ("ray", "size"), ("ringCube", "size"), ("floor", "size")):
+        f.track(f"sdf/seed/node/{node}/{field}", [(254.9, zero, "step")], mode="replace") if False else None
+    for node in ("frame", "frameX", "frameY", "frameZ", "inner", "innerX", "innerY", "innerZ", "cell", "ray", "ringCube", "floor"):
+        f.track(f"sdf/seed/node/{node}/size", [(0.0, zero, "step"), (end, zero, "step")], mode="multiply") if False else None
     b.palette_at(255.0, "P0boot")
     b.breath += [(t(113), 0.0), (end, 0.0)]
 
