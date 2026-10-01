@@ -385,7 +385,7 @@ def build_part2(b, end):
     orbit = []
     for k in range(7):
         a = math.radians(15.0 + 15.0 * k)
-        orbit.append([3.6 * math.sin(a), 1.55 + 0.05 * k, 3.6 * math.cos(a)])
+        orbit.append([2.95 * math.sin(a), 1.55 + 0.05 * k, 2.95 * math.cos(a)])
     b.shot("gallery", t(75), t(83), orbit, (0.0, 0.95, 0.0), keys=("gal",), extra=["fwB"], fov=60.0, ease_kind="linear",
            moves=[(t(75), 0.0), (t(82, 3), 1.0), (t(83), 1.0)])
     items = [it[0] for it in RM.GALLERY_ITEMS]

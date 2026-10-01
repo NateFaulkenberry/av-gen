@@ -217,7 +217,30 @@ def U_(*parts):
     return K.U(*parts)
 
 
-def build_film(end=END, stem="all-you-got-pass2"):
+def check_clearance(film, step=0.1, warn=0.18):
+    """The eye's distance to every SDF object of its shot (rest geometry, CPU), sampled through each shot: the
+    closest approach per shot, and every shot that comes within `warn` metres of a surface."""
+    import sdf_eval
+    trees = {n["name"]: n["sdf"]["tree"]["root"] for n in film.nodes if n.get("kind") == "sdf"}
+    print("clearance (closest approach of the eye to a surface, per shot):")
+    for s in film.shots:
+        worst = (1e9, None, None)
+        tt = s["t0"] + 0.01
+        while tt < s["t1"] - 0.01:
+            cam = film.camera_at(tt)
+            if cam:
+                eye = cam[0]
+                for nm_ in s["nodes"]:
+                    if nm_ in trees and nm_ not in ("landGround", "stars"):
+                        d = sdf_eval.evaluate(trees[nm_], eye)
+                        if d < worst[0]:
+                            worst = (d, nm_, round(tt, 2))
+            tt += step
+        flag = "  <-- TOO CLOSE" if worst[0] < warn else ""
+        print(f"  {s['name']:<12} {worst[0]:7.3f} m  ({worst[1]} at {worst[2]} s){flag}")
+
+
+def build_film(end=END, stem="all-you-got-pass2", clearance=False):
     import film_build as FB
     from liminal_text import place_words
     film = Film(end=end)
@@ -252,6 +275,8 @@ def build_film(end=END, stem="all-you-got-pass2"):
     film.events += out["events"]
     film.routes += out["routes"]
     film.bindings += out["bindings"]
+    if clearance:
+        check_clearance(film)
     path = film.write(OUT, stem, GRID, environment(stem=stem), PARAMS)
     print(f"wrote {path}: {len(film.shots)} shots, {len(film.nodes)} nodes, {len(film.routes)} routes, "
           f"{len(film.events)} grid events, {len(b.words)} words")
@@ -297,11 +322,12 @@ def main():
     ap.add_argument("--kit", action="store_true")
     ap.add_argument("--palette", default="P2allyougot")
     ap.add_argument("--end", type=float, default=END)
+    ap.add_argument("--clearance", action="store_true", help="check every shot's eye against its SDF objects (CPU)")
     a = ap.parse_args()
     if a.kit:
         build_kit(a.palette)
     else:
-        build_film(a.end)
+        build_film(a.end, clearance=a.clearance)
 
 
 if __name__ == "__main__":
