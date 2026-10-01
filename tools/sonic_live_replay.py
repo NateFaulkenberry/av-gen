@@ -82,6 +82,8 @@ def main():
     ap.add_argument("--render", help="also render a review clip (mp4) of the replay")
     ap.add_argument("--size", default="1280x720")
     ap.add_argument("--title", default="")
+    ap.add_argument("--no-lock", action="store_true",
+                    help="render without taking tools/gpu-lock.sh (the caller already holds it)")
     a = ap.parse_args()
 
     with open(a.events) as f:
@@ -139,8 +141,10 @@ def render_clip(a, project, trace, events, rec0):
     w, h = (int(x) for x in a.size.split("x"))
     tmp = tempfile.mkdtemp(prefix="sonic-replay-")
     video = os.path.join(tmp, "render.mp4")
-    cmd = [os.path.join(REPO, "tools", "gpu-lock.sh"), AVGEN, "--headless", "--project", project, "--render", video,
+    cmd = [AVGEN, "--headless", "--project", project, "--render", video,
            "--range", f"{t0:.3f}:{t1:.3f}", "--size", a.size, "--quality", "92", "--particle-warmup", "120"]
+    if not a.no_lock:
+        cmd.insert(0, os.path.join(REPO, "tools", "gpu-lock.sh"))
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(video):
         sys.stderr.write(r.stdout[-4000:] + r.stderr[-4000:])
