@@ -461,6 +461,10 @@ def build(film: Film, add_world, palette_index, grid_settings):
     f.route("grid.song.quarter", "lights/hallLamp/intensity", 2.5, depth=g_v1)
     for o in ("bedFurn", "livSofa", "kitTable"):
         f.route("grid.song.quarter", f"sdf/{o}/surface/{K.GLOW}/emission", 2.0, depth=g_v1)
+    # the curtains sway once a bar; the TV's screen flickers on the eighths (verse 1, and on through verse 2)
+    for obj, node in (("livShell", "livCurtain"), ("bedShell", "bedCurtain")):
+        f.route("grid.song.bar.wave", f"sdf/{obj}/node/{node}/amount", 0.03, depth=g_v1)
+    f.route("grid.song.eighth", f"sdf/livMedia/surface/{K.SCREEN}/emission", 1.6, depth=b.gate("gTV", t(25), t(66)))
     # the clock hands tick on the quarter (a sixth of a turn each beat, a hand that keeps time)
     for clock_obj, clock in (("livMedia", "livClock"), ("kitShell", "kitClock")):
         f.route("grid.song.bar.phase", f"sdf/{clock_obj}/node/{clock}M/rotation", -360.0, component=2)

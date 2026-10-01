@@ -331,6 +331,15 @@
       "curve": "linear"
      },
      {
+      "channel": "gTV",
+      "time": 55.04587,
+      "units": "seconds",
+      "hold": 90.22522935779818,
+      "attack": 0.05,
+      "release": 0.05,
+      "curve": "linear"
+     },
+     {
       "channel": "c07",
       "time": 100.73394,
       "units": "seconds",
@@ -4363,6 +4372,45 @@
    "enabled": true,
    "chain": {},
    "depthSource": "grid.song.gV1",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.bar.wave",
+   "target": "sdf/livShell/node/livCurtain/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV1",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.bar.wave",
+   "target": "sdf/bedShell/node/bedCurtain/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV1",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/livMedia/surface/3/emission",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gTV",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
