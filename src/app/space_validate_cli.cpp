@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -119,9 +120,14 @@ int runSpaceValidateCommand(int argc, char** argv) {
                 if (t.value("target", std::string()) != "camera/journey/distance" || !t.contains("keys")) continue;
                 for (const auto& k : t["keys"]) {
                     const auto& v = k.value("value", nlohmann::json());
-                    if (v.is_array() && !v.empty() && v[0].is_number()) options.journeyDistances.push_back(v[0].get<double>());
-                    else if (v.is_number()) options.journeyDistances.push_back(v.get<double>());
+                    double d = 0.0;
+                    if (v.is_array() && !v.empty() && v[0].is_number()) d = v[0].get<double>();
+                    else if (v.is_number()) d = v.get<double>();
+                    else continue;
+                    options.journeyDistances.push_back(d);
+                    options.journeyKeys.emplace_back(k.value("time", 0.0), d);
                 }
+                std::sort(options.journeyKeys.begin(), options.journeyKeys.end());
             }
         }
         scenePath = std::filesystem::path(input).parent_path() / rel;

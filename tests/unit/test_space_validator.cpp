@@ -302,3 +302,37 @@ TEST_CASE("Space validator: wall pieces need a wall; rules are data and merge ov
     CHECK(text.find("Warnings: ") != std::string::npos);
     CHECK(text.find("PASS") != std::string::npos);
 }
+
+TEST_CASE("Space validator: entities shown at different times are not checked against each other", "[space][liminal][adr1051]") {
+    auto figure = [](const std::string& id, double t0, double t1) {
+        json body = unionOf({boxAt(0, 0.8, 0, 0.2, 0.8, 0.15)});
+        return place(body, 0.0, 0.0, 0, {{"category", "mannequin"}, {"id", id}, {"t0", t0}, {"t1", t1}});
+    };
+    const json apart = scene(unionOf({figure("PoseA", 10, 20), figure("PoseB", 30, 40)}));
+    CHECK(find(run(apart), "intersection", "PoseA") == nullptr);
+    const json together = scene(unionOf({figure("PoseA", 10, 35), figure("PoseB", 30, 40)}));
+    CHECK(find(run(together), "intersection", "PoseA") != nullptr);
+}
+
+TEST_CASE("Space validator: a camera path is checked only against what is present when the camera passes",
+          "[space][liminal][adr1051]") {
+    json s = scene(unionOf({}));
+    json man = unionOf({boxAt(0, 1.6, 0, 0.3, 0.3, 0.3)});
+    man["entity"] = {{"category", "mannequin"}, {"id", "Late"}, {"t0", 60.0}, {"t1", 70.0}};
+    s["nodes"].push_back(sdfObject("man", man));
+    s["camera"] = json{{"mode", 3},
+                       {"journey", {{"chapters", json::array({json{{"name", "walk"}, {"start", 0.0},
+                                                                   {"path", {{-2.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}}},
+                                                                   {"screw", {{"translation", {100.0, 0.0, 0.0}}, {"count", 0}}},
+                                                                   {"nodes", {"shell", "furniture", "man"}}}})}}}};
+    auto runAt = [&](double t0, double t1) {
+        avgen::scene::SpaceValidateOptions o;
+        o.journeyDistances = {0.0, 4.0};
+        o.journeyKeys = {{t0, 0.0}, {t1, 4.0}};
+        auto r = avgen::scene::validateSpace(s, avgen::scene::defaultSpaceRules(), o);
+        REQUIRE(r.has_value());
+        return *r;
+    };
+    CHECK(find(runAt(35.0, 40.0), "cameraPath", "walk") == nullptr); // he is not there yet
+    CHECK(find(runAt(62.0, 66.0), "cameraPath", "walk") != nullptr); // the camera walks through him
+}

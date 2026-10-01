@@ -47,6 +47,10 @@ struct SpaceValidateOptions {
     // chapter's path is checked over the span the keys visit inside it, and unvisited chapters are skipped;
     // otherwise the whole authored path (first to last control point) is checked.
     std::vector<double> journeyDistances;
+    // The same keys with their times, (seconds, metres), sorted by time. When set, each camera-path sample
+    // is given the time the film reaches it, and is checked only against what is present then (entities with
+    // `t0`/`t1` spans; an object whose entities all have spans is present only inside them).
+    std::vector<std::pair<double, double>> journeyKeys;
 };
 
 // The built-in rules: categories, poses, tolerances.

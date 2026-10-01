@@ -625,6 +625,17 @@ bool listHas(const json& v, const std::string& s) {
     return false;
 }
 
+// Two entities that are never shown at the same time (both carry `t0`/`t1` and the spans do not overlap)
+// are never checked against each other: the poses of one figure, a prop swapped for another.
+bool coexist(const SpEntity& a, const SpEntity& b) {
+    if (a.t0 < 0.0 || b.t0 < 0.0) return true;
+    return a.t0 < b.t1 && b.t0 < a.t1;
+}
+
+bool presentAt(const SpEntity& e, double t) {
+    return e.t0 < 0.0 || (t >= e.t0 && t < e.t1);
+}
+
 // ---- reading the scene ----------------------------------------------------------------------------------
 
 void collectParts(SpCtx& ctx, const json& n, const glm::mat4& toTree, const glm::mat4& objWorld, float scale,
@@ -1078,6 +1089,7 @@ void checkIntersections(SpCtx& ctx, const SpGroup& g, const std::string& gname) 
             if (!a.geom.ok || !b.geom.ok || !a.frameOk || !b.frameOk) continue;
             if (a.category == "room" && b.category == "room") continue;
             if (mayIntersect(ctx, a, b)) continue;
+            if (!coexist(a, b)) continue;
             if (!intersect(a.geom.worldBox, b.geom.worldBox).valid()) continue;
             const bool anchored = (!a.anchor.empty() && a.anchor == b.id) || (!b.anchor.empty() && b.anchor == a.id);
             // Against a room, the floor is the floor check's business: sample above it.
@@ -1444,7 +1456,7 @@ void checkRelationships(SpCtx& ctx, const SpGroup& g, const std::string& gname) 
             for (int j : g.entities) {
                 const SpEntity& o = ctx.entities[j];
                 if (&o == &e || !o.geom.ok || o.category == "room" || o.anchor == e.id) continue;
-                if (mayIntersect(ctx, e, o)) continue;
+                if (mayIntersect(ctx, e, o) || !coexist(e, o)) continue;
                 if (!intersect(clear.worldBox, o.geom.worldBox).valid()) continue;
                 const SpOverlap ov = overlapOf(clear, o.geom);
                 if (ov.depth > 0.03f) {
@@ -1517,7 +1529,7 @@ void checkOpenings(SpCtx& ctx, const SpGroup& g, const std::string& gname) {
                     const glm::vec3 p = wall->point(u, v, d);
                     for (int j : g.entities) {
                         const SpEntity& o = ctx.entities[j];
-                        if (&o == &e || !o.geom.ok || o.category == "room" || o.text) continue;
+                        if (&o == &e || !o.geom.ok || o.category == "room" || o.text || !coexist(e, o)) continue;
                         const std::string og = ctx.groupOf(o.category);
                         if (og == "architecture" || o.category == "rug" || o.category == "curtains" ||
                             og == "character") continue;
@@ -1713,6 +1725,7 @@ std::vector<SpObstacle> obstaclesOn(const SpCtx& ctx, const SpGroup& g, const Sp
     for (int j : g.entities) {
         const SpEntity& o = ctx.entities[j];
         if (&o == &self || o.category == "room" || o.category == "rug" || !o.geom.worldBox.valid()) continue;
+        if (!coexist(self, o)) continue;
         if (o.text) continue;
         const SpBox& b = o.geom.worldBox;
         const float d0 = std::min(w.depth(b.lo), w.depth(b.hi));
@@ -1995,6 +2008,31 @@ void checkCameraPaths(SpCtx& ctx, const json& scene) {
                 }
             }
         }
+        // The time the film reaches path metre s (global distance d), from the distance keys; -1 = unknown.
+        auto timeAt = [&](double s) -> double {
+            const auto& keys = ctx.options.journeyKeys;
+            const double d = ch.start + (s - ch.from);
+            for (std::size_t k = 0; k + 1 < keys.size(); ++k) {
+                const double d0 = keys[k].second, d1 = keys[k + 1].second;
+                if ((d >= std::min(d0, d1) && d <= std::max(d0, d1))) {
+                    const double u = std::abs(d1 - d0) < 1e-9 ? 0.0 : (d - d0) / (d1 - d0);
+                    return keys[k].first + u * (keys[k + 1].first - keys[k].first);
+                }
+            }
+            return -1.0;
+        };
+        // An object is present at t unless all of its entities carry spans and none covers t.
+        auto objectPresent = [&](int oi, double t) {
+            if (t < 0.0) return true;
+            bool any = false;
+            for (const SpEntity& e : ctx.entities) {
+                if (e.object != oi) continue;
+                if (e.t0 < 0.0) return true;
+                any = true;
+                if (presentAt(e, t)) return true;
+            }
+            return !any;
+        };
         struct Run {
             double s0 = 0, s1 = 0;
             float worst = kInf;
@@ -2004,8 +2042,10 @@ void checkCameraPaths(SpCtx& ctx, const json& scene) {
         for (double s = sBegin; s <= sEnd + 1e-6; s += step) {
             const glm::vec3 local = path.sample(s).position + glm::vec3(0.0f, eye, 0.0f);
             const glm::vec3 p = ch.toWorldPoint(local);
+            const double when = ctx.options.journeyKeys.empty() ? -1.0 : timeAt(s);
             for (int oi : objs) {
                 const SpObject& o = ctx.objects[oi];
+                if (!objectPresent(oi, when)) continue;
                 if (!o.geom.tree.root.children.empty() || o.geom.ok) {
                     const glm::vec3 tl = glm::vec3(glm::inverse(o.world) * glm::vec4(p, 1.0f));
                     if (o.hasMarch && !o.march.contains(tl)) continue;
