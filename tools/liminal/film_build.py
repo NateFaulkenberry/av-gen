@@ -166,6 +166,15 @@ class Builder:
         if hit is None:
             hit = self.f.in_view(t0 + at, sx, sy, 8.0)
         pos, n, tilt, dist = hit
+        if kw.pop("stand", False):
+            # stand the word upright on the ground, facing the camera across the hill (a sign, not a carpet)
+            h = kw.get("height") or k * dist
+            eye = self.f.camera_at(t0 + at)[0]
+            dx, dz = eye[0] - pos[0], eye[2] - pos[2]
+            L = math.hypot(dx, dz) or 1.0
+            n = [dx / L, 0.0, dz / L]
+            pos = [pos[0], pos[1] + h * 0.5 + 0.08, pos[2]]
+            tilt = 0.0
         tilt = kw.pop("tilt", 0.0) + tilt
         return self.word(text, t0, t1, pos, n, kw.pop("height", None) or k * dist, tilt=tilt, **kw)
 

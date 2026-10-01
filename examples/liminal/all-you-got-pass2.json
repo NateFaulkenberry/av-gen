@@ -6939,8 +6939,8 @@
   },
   {
    "source": "grid.song.gotSpark",
-   "target": "particles/fwB/burst",
-   "amount": 1400.0,
+   "target": "particles/fwG/burst",
+   "amount": 2600.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -10224,16 +10224,21 @@
    "source": "grid.song.chA00",
    "target": "nodes/chA00/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA00",
-   "target": "nodes/chA00/emissiveBoost",
+   "target": "nodes/chA00/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10246,16 +10251,21 @@
    "source": "grid.song.chA01",
    "target": "nodes/chA01/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA01",
-   "target": "nodes/chA01/emissiveBoost",
+   "target": "nodes/chA01/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10268,16 +10278,21 @@
    "source": "grid.song.chA02",
    "target": "nodes/chA02/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA02",
-   "target": "nodes/chA02/emissiveBoost",
+   "target": "nodes/chA02/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10290,16 +10305,21 @@
    "source": "grid.song.chA03",
    "target": "nodes/chA03/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA03",
-   "target": "nodes/chA03/emissiveBoost",
+   "target": "nodes/chA03/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10312,16 +10332,21 @@
    "source": "grid.song.chA04",
    "target": "nodes/chA04/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA04",
-   "target": "nodes/chA04/emissiveBoost",
+   "target": "nodes/chA04/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10334,16 +10359,21 @@
    "source": "grid.song.chA05",
    "target": "nodes/chA05/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA05",
-   "target": "nodes/chA05/emissiveBoost",
+   "target": "nodes/chA05/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10356,16 +10386,21 @@
    "source": "grid.song.chA06",
    "target": "nodes/chA06/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA06",
-   "target": "nodes/chA06/emissiveBoost",
+   "target": "nodes/chA06/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10378,16 +10413,21 @@
    "source": "grid.song.chA07",
    "target": "nodes/chA07/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA07",
-   "target": "nodes/chA07/emissiveBoost",
+   "target": "nodes/chA07/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10400,16 +10440,21 @@
    "source": "grid.song.chA08",
    "target": "nodes/chA08/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA08",
-   "target": "nodes/chA08/emissiveBoost",
+   "target": "nodes/chA08/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10422,16 +10467,21 @@
    "source": "grid.song.chA09",
    "target": "nodes/chA09/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA09",
-   "target": "nodes/chA09/emissiveBoost",
+   "target": "nodes/chA09/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10444,16 +10494,21 @@
    "source": "grid.song.chA10",
    "target": "nodes/chA10/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA10",
-   "target": "nodes/chA10/emissiveBoost",
+   "target": "nodes/chA10/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10466,16 +10521,21 @@
    "source": "grid.song.chA11",
    "target": "nodes/chA11/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA11",
-   "target": "nodes/chA11/emissiveBoost",
+   "target": "nodes/chA11/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10488,16 +10548,21 @@
    "source": "grid.song.chA12",
    "target": "nodes/chA12/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA12",
-   "target": "nodes/chA12/emissiveBoost",
+   "target": "nodes/chA12/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10510,16 +10575,21 @@
    "source": "grid.song.chA13",
    "target": "nodes/chA13/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA13",
-   "target": "nodes/chA13/emissiveBoost",
+   "target": "nodes/chA13/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10532,16 +10602,21 @@
    "source": "grid.song.chA14",
    "target": "nodes/chA14/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA14",
-   "target": "nodes/chA14/emissiveBoost",
+   "target": "nodes/chA14/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10554,16 +10629,21 @@
    "source": "grid.song.chA15",
    "target": "nodes/chA15/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA15",
-   "target": "nodes/chA15/emissiveBoost",
+   "target": "nodes/chA15/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10576,16 +10656,21 @@
    "source": "grid.song.chA16",
    "target": "nodes/chA16/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA16",
-   "target": "nodes/chA16/emissiveBoost",
+   "target": "nodes/chA16/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10598,16 +10683,21 @@
    "source": "grid.song.chA17",
    "target": "nodes/chA17/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA17",
-   "target": "nodes/chA17/emissiveBoost",
+   "target": "nodes/chA17/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10620,16 +10710,21 @@
    "source": "grid.song.chA18",
    "target": "nodes/chA18/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA18",
-   "target": "nodes/chA18/emissiveBoost",
+   "target": "nodes/chA18/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10642,16 +10737,21 @@
    "source": "grid.song.chA19",
    "target": "nodes/chA19/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA19",
-   "target": "nodes/chA19/emissiveBoost",
+   "target": "nodes/chA19/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10664,16 +10764,21 @@
    "source": "grid.song.chA20",
    "target": "nodes/chA20/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA20",
-   "target": "nodes/chA20/emissiveBoost",
+   "target": "nodes/chA20/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10686,16 +10791,21 @@
    "source": "grid.song.chA21",
    "target": "nodes/chA21/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA21",
-   "target": "nodes/chA21/emissiveBoost",
+   "target": "nodes/chA21/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10708,16 +10818,21 @@
    "source": "grid.song.chA22",
    "target": "nodes/chA22/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA22",
-   "target": "nodes/chA22/emissiveBoost",
+   "target": "nodes/chA22/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10730,16 +10845,21 @@
    "source": "grid.song.chA23",
    "target": "nodes/chA23/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA23",
-   "target": "nodes/chA23/emissiveBoost",
+   "target": "nodes/chA23/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10752,16 +10872,21 @@
    "source": "grid.song.chA24",
    "target": "nodes/chA24/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA24",
-   "target": "nodes/chA24/emissiveBoost",
+   "target": "nodes/chA24/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10774,16 +10899,21 @@
    "source": "grid.song.chA25",
    "target": "nodes/chA25/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA25",
-   "target": "nodes/chA25/emissiveBoost",
+   "target": "nodes/chA25/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10796,16 +10926,21 @@
    "source": "grid.song.chA26",
    "target": "nodes/chA26/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA26",
-   "target": "nodes/chA26/emissiveBoost",
+   "target": "nodes/chA26/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10818,16 +10953,21 @@
    "source": "grid.song.chA27",
    "target": "nodes/chA27/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA27",
-   "target": "nodes/chA27/emissiveBoost",
+   "target": "nodes/chA27/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10840,16 +10980,21 @@
    "source": "grid.song.chA28",
    "target": "nodes/chA28/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA28",
-   "target": "nodes/chA28/emissiveBoost",
+   "target": "nodes/chA28/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10862,16 +11007,21 @@
    "source": "grid.song.chA29",
    "target": "nodes/chA29/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA29",
-   "target": "nodes/chA29/emissiveBoost",
+   "target": "nodes/chA29/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10884,16 +11034,21 @@
    "source": "grid.song.chA30",
    "target": "nodes/chA30/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA30",
-   "target": "nodes/chA30/emissiveBoost",
+   "target": "nodes/chA30/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10906,16 +11061,21 @@
    "source": "grid.song.chA31",
    "target": "nodes/chA31/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA31",
-   "target": "nodes/chA31/emissiveBoost",
+   "target": "nodes/chA31/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10928,16 +11088,21 @@
    "source": "grid.song.chA32",
    "target": "nodes/chA32/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA32",
-   "target": "nodes/chA32/emissiveBoost",
+   "target": "nodes/chA32/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10950,16 +11115,21 @@
    "source": "grid.song.chA33",
    "target": "nodes/chA33/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA33",
-   "target": "nodes/chA33/emissiveBoost",
+   "target": "nodes/chA33/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10972,16 +11142,21 @@
    "source": "grid.song.chA34",
    "target": "nodes/chA34/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA34",
-   "target": "nodes/chA34/emissiveBoost",
+   "target": "nodes/chA34/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -10994,16 +11169,21 @@
    "source": "grid.song.chA35",
    "target": "nodes/chA35/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA35",
-   "target": "nodes/chA35/emissiveBoost",
+   "target": "nodes/chA35/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11016,16 +11196,21 @@
    "source": "grid.song.chA36",
    "target": "nodes/chA36/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA36",
-   "target": "nodes/chA36/emissiveBoost",
+   "target": "nodes/chA36/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11038,16 +11223,21 @@
    "source": "grid.song.chA37",
    "target": "nodes/chA37/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA37",
-   "target": "nodes/chA37/emissiveBoost",
+   "target": "nodes/chA37/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11060,16 +11250,21 @@
    "source": "grid.song.chA38",
    "target": "nodes/chA38/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA38",
-   "target": "nodes/chA38/emissiveBoost",
+   "target": "nodes/chA38/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11082,16 +11277,21 @@
    "source": "grid.song.chA39",
    "target": "nodes/chA39/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA39",
-   "target": "nodes/chA39/emissiveBoost",
+   "target": "nodes/chA39/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11104,16 +11304,21 @@
    "source": "grid.song.chA40",
    "target": "nodes/chA40/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA40",
-   "target": "nodes/chA40/emissiveBoost",
+   "target": "nodes/chA40/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11126,16 +11331,21 @@
    "source": "grid.song.chA41",
    "target": "nodes/chA41/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA41",
-   "target": "nodes/chA41/emissiveBoost",
+   "target": "nodes/chA41/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11148,16 +11358,21 @@
    "source": "grid.song.chA42",
    "target": "nodes/chA42/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA42",
-   "target": "nodes/chA42/emissiveBoost",
+   "target": "nodes/chA42/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11170,16 +11385,21 @@
    "source": "grid.song.chA43",
    "target": "nodes/chA43/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA43",
-   "target": "nodes/chA43/emissiveBoost",
+   "target": "nodes/chA43/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11192,16 +11412,21 @@
    "source": "grid.song.chA44",
    "target": "nodes/chA44/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA44",
-   "target": "nodes/chA44/emissiveBoost",
+   "target": "nodes/chA44/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11214,16 +11439,21 @@
    "source": "grid.song.chA45",
    "target": "nodes/chA45/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA45",
-   "target": "nodes/chA45/emissiveBoost",
+   "target": "nodes/chA45/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11236,16 +11466,21 @@
    "source": "grid.song.chA46",
    "target": "nodes/chA46/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA46",
-   "target": "nodes/chA46/emissiveBoost",
+   "target": "nodes/chA46/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -11258,16 +11493,21 @@
    "source": "grid.song.chA47",
    "target": "nodes/chA47/scale",
    "op": "multiply",
-   "amount": 1.0
+   "amount": 1.0,
+   "chain": {
+    "springHz": 4.0,
+    "springDamping": 0.9
+   }
   },
   {
    "source": "grid.song.chA47",
-   "target": "nodes/chA47/emissiveBoost",
+   "target": "nodes/chA47/position",
+   "component": 1,
    "op": "add",
-   "amount": 6.0,
+   "amount": 0.25,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 4.0,
+    "springDamping": 0.9
    }
   },
   {
@@ -52959,18 +53199,9 @@
      {
       "time": 0.0,
       "value": [
-       0.0,
-       1.5,
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 172.38491,
-      "value": [
-       0.0,
-       1.5,
-       0.0
+       19.393,
+       28.148,
+       -15.051
       ],
       "interp": "step"
      },

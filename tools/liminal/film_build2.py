@@ -403,7 +403,7 @@ def build_part2(b, end):
     for k in range(7):
         a = math.radians(15.0 + 15.0 * k)
         orbit.append([2.95 * math.sin(a), 1.55 + 0.05 * k, 2.95 * math.cos(a)])
-    b.shot("gallery", t(75), t(83), orbit, (0.0, 0.95, 0.0), keys=("gal",), extra=["fwB"], fov=60.0, ease_kind="linear",
+    b.shot("gallery", t(75), t(83), orbit, (0.0, 0.95, 0.0), keys=("gal",), extra=["fwG"], fov=60.0, ease_kind="linear",
            moves=[(t(75), 0.0), (t(82, 3), 1.0), (t(83), 1.0)])
     items = [it[0] for it in RM.GALLERY_ITEMS]
     for n_i, name in enumerate(items):
@@ -551,9 +551,9 @@ def build_part2(b, end):
             pat = pats[(2 * (bar - 91) + half) % 4]
             for j, wd in enumerate(("LET", "IT", "GO")):
                 tw = t(bar, b0 + 0.5 * j)
-                b.word_at(wd, tw, tw + G.BAR2 * 1.5, ("ground", gy), pat[j][0], pat[j][1], k=0.075, style="flash",
-                          role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=3.0, tin=0.1, tout=0.35,
-                          tilt=-8 + 16 * ((k * 7) % 3) / 2.0)
+                b.word_at(wd, tw, tw + G.BAR2 * 1.5, ("ground", gy), pat[j][0], pat[j][1] + 0.12, k=0.085, style="rise",
+                          role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=3.0, tin=0.15, tout=0.35,
+                          stand=True)
                 k += 1
     g_ch = b.gate("gChorus", t(91), t(113))
     b.pulse("sdf/landGround/look/edge/intensity", 2.0, "quarter", g_ch)
@@ -630,9 +630,13 @@ def build_part2(b, end):
         cb = b.clap(f"crash{em}", t(113), release=0.1)
         f.route(cb, f"particles/{em}/burst", 2600.0)
     # GOT? in the gallery: one sparkle from the room's heart
-    fw_pos["fwB"].insert(0, (t(78, 2.5) - 0.05, [0.0, 1.5, 0.0]))
+    f.nodes.append({"name": "fwG", "kind": "particles", "particles": {
+        "capacity": 6000, "spawnRate": 0.0, "burst": 0.0, "shape": "sphere", "position": [0.0, 1.4, 0.0],
+        "extent": [1.2, 0.6, 1.2], "lifetimeMin": 0.8, "lifetimeMax": 1.6, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
+        "speedMin": 1.0, "speedMax": 3.2, "gravity": [0.0, -1.2, 0.0], "drag": 1.2, "sizeStart": 0.035, "sizeEnd": 0.0,
+        "blend": "additive", "colorStart": [1.0, 0.85, 1.0, 1.0], "colorEnd": [0.3, 0.9, 1.0, 0.0], "emissive": 4.0}})
     cb = b.clap("gotSpark", t(78, 2.5), release=0.08)
-    f.route(cb, "particles/fwB/burst", 1400.0)
+    f.route(cb, "particles/fwG/burst", 2600.0)
     for em, ks in fw_pos.items():
         ks.sort()
         f.track(f"particles/{em}/position", [(0.0, ks[0][1], "step")] + [(tt, p, "step") for tt, p in ks])
