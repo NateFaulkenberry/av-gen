@@ -622,8 +622,10 @@ def build_part2(b, end):
             f.route(c, "sdf/ringLow/look/edge/intensity", 10.0)
             f.route(c, "post/bloom/intensity", 0.6)
             em = ["fwA", "fwB", "fwC"][n_fw % 3]
-            a = math.radians(40.0 + 77.0 * n_fw)
-            fw_pos[em].append((tb - 0.05, [10.0 + 15.0 * math.cos(a), 25.0 + 4.0 * ((n_fw * 5) % 3), -15.0 * math.sin(a)]))
+            # where the camera is looking: across the top of the frame, left, right, centre, 22-30 m out
+            sx, sy = [(-0.55, 0.45), (0.5, 0.55), (0.0, 0.62), (-0.3, 0.3), (0.62, 0.35), (-0.62, 0.6)][n_fw % 6]
+            pos = f.in_view(tb, sx, sy, 22.0 + 4.0 * (n_fw % 3))[0]
+            fw_pos[em].append((tb - 0.05, [round(v, 3) for v in pos]))
             cb = b.clap(f"fwb{bar}{int(bt)}", tb, release=0.06)
             f.route(cb, f"particles/{em}/burst", 900.0)
             n_fw += 1
