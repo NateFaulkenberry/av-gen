@@ -131,7 +131,7 @@
   "post/dof/physical": true,
   "camera/lens/useExplicitFov": false,
   "scene/volumeJitter": 0.4,
-  "scene/volumeSteps": 48,
+  "scene/volumeSteps": 24,
   "camera/lens/focalLength": 50.0,
   "camera/lens/aperture": 2.0,
   "camera/focus/mode": 2

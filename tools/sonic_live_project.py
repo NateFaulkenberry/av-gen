@@ -198,6 +198,7 @@ LIVE_WORLD = [
 ]
 ACCENT = {"visual.organic": "visual.organicAccent", "visual.crystalline": "visual.crystalAccent",
           "visual.tectonic": "visual.tectonicAccent"}
+LIVE_VOLUME_STEPS = 24
 FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more clearly in a three-way blend
 
 
@@ -555,6 +556,11 @@ def main():
         elif track.get("target") == "camera/target":
             track["keys"], track["loopLength"] = kt, period
     live.setdefault("render", {})["path"] = "renders/sonic-live"
+    # The air: the garden's and the heavy world's fog march, 48 steps in the master, is the costliest pass of a live
+    # frame at the default tier (43.8 ms GPU for the garden at 1080p; 33.2 at 24 steps, 29.4 at 16, measured on the
+    # probe's pad). 24 is what the Preview tier already marches (at a quarter of the resolution); offline renders are
+    # unaffected (the offline tier's step floor, ADR-919, raises it).
+    live.setdefault("parameters", {})["scene/volumeSteps"] = LIVE_VOLUME_STEPS
 
     with open(OUT_SCENE, "w") as f:
         json.dump(live_scene(), f, indent=1)
