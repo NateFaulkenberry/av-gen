@@ -19,7 +19,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 5 | object animation on beat sources (routes from the grid; no new engine code) | **done** | 1045 | `[beatgrid]` "spin, bob and pulse an SDF prop" |
 | 6 | simulation corruption: data mosh + channel shift (temporal `mosh`) | **done** | 1049 | `[adr1049]` (GPU) |
 | 7 | spectrum-sweep transition (`post/sweep/*`) | **done** | 1050 | `[adr1050]` (CPU and GPU) |
-| - | tint on moving figures (pass 1 gap 2) | if cheap | | |
+| - | tint on moving figures (pass 1 gap 2) | **not reproducible at this head**: still, walking, keyed, journey-anchored and palette-bound figures all take the tint (renders checked); regression test added | 1044 | `[tint]` |
 
 **Resume here:** build the next undone row. Each system: code, a test, an ADR, the guide entry below, then
 `git commit -- <paths>`.
@@ -174,6 +174,13 @@ grid into them. Tested recipe (seek-exact):
   `surface/<k>/edge` for one surface's lines). Mesh nodes: `nodes/<n>/emissiveBoost`.
 - Gate any of these to a section with `"depthSource": "grid.song.<gate>"` (an event with `until`).
 - An SDF node changes with the whole world's march (no rebuild): animate as many as you like.
+
+#### The figure's tint (pass 1 gap 2)
+
+Rechecked: a walking (`Walk_Loop`), keyed or journey-anchored figure takes `nodes/<n>/tint`, including when the
+palette binds it. The tint is **opt-in**: the node needs `"tint": [r, g, b]` in the scene, or
+`nodes/<n>/tint` does not exist and a palette binding to it does nothing. If a figure still renders pale, check
+that first, then tell me the scene and time.
 
 #### 6. Corruption: data mosh and channel shift (ADR-1049)
 
