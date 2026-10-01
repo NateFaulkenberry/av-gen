@@ -24,11 +24,19 @@ parts must touch the anchor: seat, feet, elbows, hands, head).
 from __future__ import annotations
 
 import math
+import os
 import sys
 
-import figure3 as F
-import kit as K
-import props3 as PR
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools"))
+
+import figure3 as F  # noqa: E402
+import kit as K  # noqa: E402
+import liminal_space as _ls  # noqa: E402
+
+_ls.instrument_kit(K)
+
+import props3 as PR  # noqa: E402
 from figure3 import add, mul, norm, rot_axis
 
 FLOOR = K.X(((-3.0, 3.0), (-0.6, 0.0), (-3.0, 3.0)))
@@ -132,6 +140,26 @@ def window():
             "groups": {"feet": ["foot"]}}
 
 
+def table_group(eid_prefix=None, room=None):
+    """The kitchen chair at the origin facing +Z and the table in front of it (near edge z = 0.35)."""
+    ent = (lambda i, **kw: dict({"id": f"{eid_prefix}{i}", "room": room}, **kw)) if eid_prefix else (lambda i, **kw: None)
+    return K.U(K.chair(entity=ent("Chair", anchor=f"{eid_prefix}Table")), K.place(K.table(1.1, 0.75, 0.75, entity=ent("Table")), (0.0, 0.0, 0.35 + 0.375)))
+
+
+def desk_group(eid_prefix=None, room=None):
+    """The office chair at the origin facing +Z; the desk, its CRT monitor and keyboard 0.6 m in front, facing it."""
+    import liminal_space as ls
+    ent = (lambda i, **kw: dict({"id": f"{eid_prefix}{i}", "room": room}, **kw)) if eid_prefix else (lambda i, **kw: None)
+    chair = PR.office_chair()
+    mon, kb = PR.crt_monitor(), PR.keyboard()
+    if eid_prefix:
+        ls.tag(chair, "chair", id=f"{eid_prefix}Chair", room=room, anchor=f"{eid_prefix}Desk", seatHeight=0.47)
+        ls.tag(mon, "monitor", id=f"{eid_prefix}Monitor", room=room)
+        ls.tag(kb, "prop", id=f"{eid_prefix}Keyboard", room=room)
+    return K.U(chair, K.place(K.U(K.desk(1.3, 0.62, 0.75, entity=ent("Desk")), K.place(mon, (-0.2, 0.75, -0.06)), K.place(kb, (-0.2, 0.75, 0.16))),
+                              (-0.2, 0.0, 0.6), 180.0))
+
+
 @tableau
 def table():
     # the chair at the origin facing +Z, pulled in; the table's near edge at z = 0.35
@@ -149,8 +177,7 @@ def table():
                     "palm": [-sg, 0.0, 0.0]}
     pose = {"P": P, "Up": up_p, "U": up_s, "F": [0, 0, 1], "head": {"pitch": hpitch}, "hands": hands,
             "feet": {"R": {"ankle": [-0.12, 0.05, 0.4], "pole": [0, 0.4, 1]}, "L": {"ankle": [0.13, 0.05, 0.36], "pole": [0, 0.4, 1]}}}
-    anchor = lambda: K.U(K.chair(), K.place(K.table(1.1, 0.75, 0.75), (0.0, 0.0, 0.35 + 0.375)))
-    return {"pose": pose, "anchor": (anchor, (0.0, 0.0, 0.0), 0.0), "category": "chair", "posture": "sit",
+    return {"pose": pose, "anchor": (table_group, (0.0, 0.0, 0.0), 0.0), "category": "chair", "posture": "sit",
             "groups": {"seat": ["thigh", "pelvis"], "feet": ["foot"], "elbows": ["farm", "elbow"]}}
 
 
@@ -201,9 +228,7 @@ def desk():
                  "palm": [0.0, 1.0, 0.0]} for s, sg in (("R", -1.0), ("L", 1.0))}
     pose = {"P": P, "Up": up_p, "U": up_s, "F": [0, 0, 1], "head": {"pitch": -2.0}, "hands": hands,
             "feet": {"R": {"ankle": [-0.13, 0.05, 0.42], "pole": [0, 0.4, 1]}, "L": {"ankle": [0.12, 0.05, 0.38], "pole": [0, 0.4, 1]}}}
-    anchor = lambda: K.U(PR.office_chair(), K.place(K.U(K.desk(1.3, 0.62, 0.75), K.place(PR.crt_monitor(), (-0.2, 0.75, -0.06)),
-                                                         K.place(PR.keyboard(), (-0.2, 0.75, 0.16))), (-0.2, 0.0, 0.6), 180.0))
-    return {"pose": pose, "anchor": (anchor, (0.0, 0.0, 0.0), 0.0), "category": "office_chair", "posture": "sit",
+    return {"pose": pose, "anchor": (desk_group, (0.0, 0.0, 0.0), 0.0), "category": "office_chair", "posture": "sit",
             "groups": {"seat": ["thigh", "pelvis"], "feet": ["foot"], "forearms": ["farm", "hand"]}}
 
 
@@ -225,6 +250,43 @@ def stair():
     pose = {"P": [0.0, 0.935, 0.0], "U": pitch(-3), "head": {"pitch": -24.0},
             "hands": {"R": {"wrist": [-0.21, 0.68, -0.02]}, "L": {"wrist": [0.22, 0.68, -0.02]}},
             "feet": {"R": {"ankle": [-0.11, 0.05, 0.0]}, "L": {"ankle": [0.11, 0.05, 0.04]}}}
+    return {"pose": pose, "anchor": (lambda: FLOOR, (0.0, 0.0, 0.0), 0.0), "category": "floor", "posture": "stand",
+            "groups": {"feet": ["foot"]}}
+
+
+@tableau
+def floor_sit():
+    # on the floor, the back against a wall 0.3 m behind, knees up, forearms on the knees, the head down
+    up_p, up_s = pitch(-12), pitch(-4)
+    P = [0.0, 0.072, -0.12]
+    pose = {"P": P, "Up": up_p, "U": up_s, "F": [0, 0, 1], "head": {"pitch": 38.0},
+            "hands": {"R": {"wrist": [0.06, 0.58, 0.3], "elbow": [-0.17, 0.62, 0.2], "dir": [0.6, -0.4, 0.3]},
+                      "L": {"wrist": [-0.04, 0.6, 0.33], "elbow": [0.18, 0.64, 0.22], "dir": [-0.6, -0.5, 0.3]}},
+            "feet": {"R": {"ankle": [-0.13, 0.05, 0.4], "pole": [0, 1, 0.2]}, "L": {"ankle": [0.14, 0.05, 0.43], "pole": [0, 1, 0.2]}}}
+    wall = K.X(((-1.5, 1.5), (0.0, 2.6), (-0.6, -0.31)))
+    return {"pose": pose, "anchor": (lambda: wall, (0.0, 0.0, 0.0), 0.0), "category": "floor", "posture": "floor",
+            "groups": {"seat": ["pelvis"], "feet": ["foot"], "back": ["chest", "pelvis"]}}
+
+
+@tableau
+def gallery():
+    # bridge 2: upright on a chair in the middle of the room of objects, hands on the knees, head a little down
+    up_p, up_s = pitch(2), pitch(6)
+    P = [0.0, 0.46 + 0.097, -0.02]
+    pose = {"P": P, "Up": up_p, "U": up_s, "F": [0, 0, 1], "head": {"pitch": 14.0},
+            "hands": {s: {"wrist": [sg * 0.12, 0.6, 0.36], "pole": [sg * 0.4, 0.0, -1.0], "dir": [0.0, -0.4, 1.0],
+                          "palm": [0.0, 1.0, 0.0]} for s, sg in (("R", -1.0), ("L", 1.0))},
+            "feet": {"R": {"ankle": [-0.12, 0.05, 0.42], "pole": [0, 0.4, 1]}, "L": {"ankle": [0.12, 0.05, 0.42], "pole": [0, 0.4, 1]}}}
+    return {"pose": pose, "anchor": (K.chair, (0.0, 0.0, 0.0), 0.0), "category": "chair", "posture": "sit",
+            "groups": {"seat": ["thigh", "pelvis"], "feet": ["foot"]}}
+
+
+@tableau
+def hill():
+    # the dawn: standing on the hilltop, facing the sunrise, arms hanging, the head lifted a little
+    pose = {"P": [0.0, 0.935, 0.0], "U": pitch(-2), "head": {"pitch": -9.0},
+            "hands": {"R": {"wrist": [-0.22, 0.69, 0.0]}, "L": {"wrist": [0.22, 0.69, 0.0]}},
+            "feet": {"R": {"ankle": [-0.11, 0.05, 0.02]}, "L": {"ankle": [0.11, 0.05, -0.02]}}}
     return {"pose": pose, "anchor": (lambda: FLOOR, (0.0, 0.0, 0.0), 0.0), "category": "floor", "posture": "stand",
             "groups": {"feet": ["foot"]}}
 

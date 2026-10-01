@@ -81,7 +81,7 @@ def rooms(palette="P3night", validate=True):
     import rooms3 as RM3
     film = Film(end=60.0)
     P2.palettes(film)
-    house = RM3.ground_floor()
+    house = {**RM3.ground_floor(), **RM3.basement(), **RM3.upstairs()}
     worlds = {}
     for key, room in house.items():
         worlds[key] = W.add_world(film, room)
@@ -95,6 +95,15 @@ def rooms(palette="P3night", validate=True):
         (("kit",), "kitMan", (1.8, 1.5, -3.0), (0.0, 0.9, -4.9)),
         (("hall",), "hallMan", (3.4, 1.6, 1.9), (4.3, 1.4, -2.0)),
         (("hall",), "hallMan", (4.4, 2.6, -2.6), (3.4, 0.8, 0.4)),
+        (("lau", "sto"), None, (0.3, -1.4, 1.8), (-2.0, -2.2, -1.0)),
+        (("sto", "lau"), None, (4.4, -1.35, 1.8), (1.5, -2.2, -1.5)),
+        (("boi",), None, (3.8, -1.3, -2.8), (-0.5, -2.0, -6.0)),
+        (("bed",), "bedLie", (0.7, 4.45, 0.9), (-1.6, 3.4, 0.0)),
+        (("bed",), "bedEdge", (-0.6, 4.35, 1.9), (-1.7, 3.6, 0.5)),
+        (("bath",), "bathMirror", (2.0, 4.4, -0.3), (4.6, 3.9, 0.9)),
+        (("bath",), "bathToilet", (2.0, 4.45, 0.0), (3.0, 3.4, 2.0)),
+        (("stu",), "stuDesk", (0.6, 4.45, -3.0), (-1.0, 3.7, -6.0)),
+        (("stu",), "stuFloor", (0.8, 4.4, -2.9), (-2.4, 3.3, -4.2)),
     ]
     for i, (keys, fig, eye, look) in enumerate(views):
         names, lights = [], []

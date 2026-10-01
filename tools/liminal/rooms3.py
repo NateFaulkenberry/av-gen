@@ -255,6 +255,174 @@ def ground_floor():
     return {"liv": living_room(), "kit": kitchen(), "hall": hall()}
 
 
+# =============================================================================================================
+# THE BASEMENT (let it go, bars 42-49): where the house keeps what it cannot let go of
+# =============================================================================================================
+
+def laundry():
+    """A washer and a dryer on the left wall, a basket, a rack of boxes on the back wall, a high window, a bare bulb.
+    Doors: the storage room (right wall), the boiler room (back wall)."""
+    rid = "laundry"
+    ext = ((-2.6, 0.9), (DOWN, DOWN + CEIL), (-2.2, 2.2))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("+x", 0.0, 0.9, "LaundryStorageDoor"), ("-z", -0.6, 0.9, "LaundryBoilerDoor")]
+    shell = U(*shell_with(ext, rid, doors=doors, windows=[("+z", -1.0, 0.9, 0.45, 2.0)], tiled=True, dado=False),
+              window_on("+z", ext, -1.0, 0.9, 0.45, 2.0, eid="LaundryWindow", room=rid),
+              place(tag(PR.floor_bulb(0.5), "hangingLamp", "LaundryBulb", rid), (-0.9, y1, 0.2)))
+    furn = U(place(tag(PR.washing_machine(), "appliance", "Washer", rid), (x0 + 0.33, y0, -0.4), 90.0),
+             place(tag(PR.dryer(), "appliance", "Dryer", rid), (x0 + 0.33, y0, 0.3), 90.0),
+             place(tag(PR.laundry_basket(), "prop", "Basket", rid), (-1.3, y0, 1.4), 15.0),
+             place(tag(PR.shelving(1.4, 1.9, 0.45), "shelf", "LaundryRack", rid), (-1.6, y0, z0 + 0.25)),
+             place(K.boxes(entity={"id": "LaundryBoxes", "room": rid}), (-0.25, y0, 1.6), -20.0))
+    return {"id": rid, "interior": ext,
+            "objects": [("lauShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("lauFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05))],
+            "lights": [("lauBulb", (-0.9, y1 - 0.6, 0.2), "lamp")],
+            "anchors": {"washer": (x0 + 0.33, y0 + 0.5, -0.4), "window": (-1.0, y0 + 2.2, z1), "rack": (-1.6, y0 + 1.0, z0)}}
+
+
+def storage():
+    """Racks of boxes, boxes stacked on the floor, an old chair upside down on a box (tilted on purpose), the
+    basement stair down from the hall. Doors: the laundry (left wall), the boiler room (back wall)."""
+    rid = "storage"
+    ext = ((1.05, 4.95), (DOWN, DOWN + CEIL), (-2.2, 2.2))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("-x", 0.0, 0.9, "StorageLaundryDoor"), ("-z", 3.0, 0.9, "StorageBoilerDoor")]
+    shell = U(*shell_with(ext, rid, doors=doors, tiled=True, dado=False),
+              place(tag(PR.floor_bulb(0.45), "hangingLamp", "StorageBulb", rid), (3.0, y1, 0.0)))
+    furn = U(place(tag(PR.shelving(1.4, 1.9, 0.45), "shelf", "RackA", rid), (x1 - 0.25, y0, 0.9), -90.0),
+             place(tag(PR.shelving(1.4, 1.9, 0.45), "shelf", "RackB", rid), (2.2, y0, z1 - 0.25), 180.0),
+             place(K.boxes(entity={"id": "BoxesA", "room": rid}), (2.0, y0, -1.2), 25.0),
+             place(K.boxes(entity={"id": "BoxesB", "room": rid}), (3.9, y0, -1.5), -10.0),
+             place(K.boxes(entity={"id": "BoxesC", "room": rid}), (1.6, y0, 0.9), 70.0))
+    return {"id": rid, "interior": ext,
+            "objects": [("stoShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("stoFurn", furn, "furn2", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05))],
+            "lights": [("stoBulb", (3.0, y1 - 0.55, 0.0), "lamp")],
+            "anchors": {"rackA": (x1 - 0.25, y0 + 1.0, 0.9), "rackB": (2.2, y0 + 1.0, z1), "centre": (3.0, y0 + 1.2, 0.0)}}
+
+
+def boiler_room():
+    """The water heater and its pipes, a workbench with a pegboard, boxes, a bulb. Doors: the laundry and storage
+    (front wall)."""
+    rid = "boilerRoom"
+    ext = ((-2.6, 4.95), (DOWN, DOWN + CEIL), (-6.4, -2.35))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("+z", -0.6, 0.9, "BoilerLaundryDoor"), ("+z", 3.0, 0.9, "BoilerStorageDoor")]
+    pipes = U(K.SEG([x0 + 0.2, y1 - 0.15, z0 + 0.3], [x1 - 0.2, y1 - 0.15, z0 + 0.3], 0.04),
+              K.SEG([x0 + 0.2, y1 - 0.28, z0 + 0.45], [x1 - 0.2, y1 - 0.28, z0 + 0.45], 0.03))
+    shell = U(*shell_with(ext, rid, doors=doors, tiled=False, dado=False, boards="z"),
+              S(pipes, ACCENT),
+              place(tag(PR.floor_bulb(0.4), "hangingLamp", "BoilerBulb", rid), (1.2, y1, -4.4)))
+    furn = U(place(tag(PR.water_heater(), "waterHeater", "WaterHeater", rid), (x1 - 0.5, y0, z0 + 0.5)),
+             place(tag(PR.workbench(), "table", "Workbench", rid), (-0.4, y0, z0 + 0.32)),
+             place(K.boxes(entity={"id": "BoilerBoxes", "room": rid}), (x0 + 0.5, y0, -3.0), 40.0),
+             place(K.boxes(entity={"id": "BoilerBoxes2", "room": rid}), (1.5, y0, -3.3), -15.0))
+    return {"id": rid, "interior": ext,
+            "objects": [("boiShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("boiFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y1, z1 + 0.05))],
+            "lights": [("boiBulb", (1.2, y1 - 0.5, -4.4), "lamp")],
+            "anchors": {"heater": (x1 - 0.5, y0 + 1.0, z0 + 0.5), "bench": (-0.4, y0 + 1.2, z0 + 0.3), "centre": (1.2, y0 + 1.2, -4.4)}}
+
+
+def basement():
+    return {"lau": laundry(), "sto": storage(), "boi": boiler_room()}
+
+
+# =============================================================================================================
+# UPSTAIRS (verse 2, bars 50-65): the bedroom, the bathroom, the study, off a landing
+# =============================================================================================================
+
+def bedroom():
+    """The bed with its head against the left wall, a nightstand and a lamp, a wardrobe, the front window over the
+    street with curtains, a chair, a rug, a painting over the bed, a pendant. Door: the landing (right wall).
+    Tableaux: bed (lying), bed_edge (sitting on its side)."""
+    rid = "bedroom"
+    ext = ((-2.6, 1.2), (UP, UP + CEIL), (-2.2, 2.2))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("+x", -1.4, 0.9, "BedroomDoor")]
+    shell = U(*shell_with(ext, rid, doors=doors, windows=[("+z", -0.6, 1.2, 1.3, 0.9)]),
+              window_on("+z", ext, -0.6, 1.2, 1.3, 0.9, curtains="bedCurtain", eid="BedroomWindow", room=rid),
+              on_wall(K.painting(1.0, 0.55, motif="horizon", entity={"id": "BedPainting", "room": rid}), "-x", ext, 0.0, y0 + 1.6))
+    bed_at, bed_yaw = (x0 + 1.09, y0, 0.0), 90.0
+    furn = U(place(tag(PR.bed3(), "bed", "Bed", rid, seatHeight=0.52, surfaceHeight=0.52), bed_at, bed_yaw, name="bedAt"),
+             place(K.nightstand(entity={"id": "Nightstand", "room": rid}), (x0 + 0.27, y0, -1.05)),
+             place(K.table_lamp(0.45, entity={"id": "BedLamp", "room": rid}), (x0 + 0.27, y0 + 0.55, -1.05)),
+             place(tag(PR.wardrobe3(1.0, 2.0, 0.58), "wardrobe", "Wardrobe", rid), (0.3, y0, z0 + 0.3)),
+             place(K.rug(1.6, 1.0, entity={"id": "BedRug", "room": rid}), (0.2, y0, 0.0), 90.0),
+             place(K.chair(entity={"id": "BedroomChair", "room": rid}), (0.6, y0, 1.45), -150.0),
+             place(PR.pendant(0.5, name="bedPendant", eid="BedPendant", room=rid), (-0.6, y1, 0.0)))
+    edge_at, edge_yaw = fig_from_anchor("bed_edge", bed_at, bed_yaw)
+    figs = figure_objects(rid, [("bedLie", "bed", *fig_from_anchor("bed", bed_at, bed_yaw), "Bed"),
+                                ("bedEdge", "bed_edge", edge_at, edge_yaw, "Bed")])
+    return {"id": rid, "interior": ext,
+            "objects": [("bedShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("bedFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y1, z1 + 0.05))] + figs,
+            "lights": [("bedLamp", (x0 + 0.27, y0 + 0.95, -1.05), "lamp"), ("bedPend", (-0.6, y1 - 0.75, 0.0), "lamp")],
+            "anchors": {"bed": (bed_at[0] + 0.3, y0 + 0.6, 0.0), "window": (-0.6, y0 + 1.5, z1), "door": (x1, y0 + 1.0, -1.4),
+                        "wardrobe": (0.3, y0 + 1.0, z0)}}
+
+
+def bathroom():
+    """A tub along the left wall, the vanity and its mirror on the right wall, the toilet against the front wall, a
+    small high window, a towel rail. Door: the landing (back wall). Tableaux: mirror, toilet."""
+    rid = "bathroom"
+    ext = ((1.35, 4.95), (UP, UP + CEIL), (-0.6, 2.2))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("-z", 2.1, 0.8, "BathroomDoor")]
+    shell = U(*shell_with(ext, rid, doors=doors, windows=[("+z", 4.2, 0.6, 0.6, 1.5)], tiled=True),
+              window_on("+z", ext, 4.2, 0.6, 0.6, 1.5, eid="BathroomWindow", room=rid),
+              on_wall(K.mirror_frame(0.6, 0.8, entity={"id": "BathMirror", "room": rid}), "+x", ext, 0.75, y0 + 1.55))
+    vanity_at, vanity_yaw = (x1 - 0.24, y0, 0.75), -90.0
+    toilet_at, toilet_yaw = (3.0, y0, z1 - 0.32), 180.0
+    furn = U(place(K.bathtub(entity={"id": "Bathtub", "room": rid}), (x0 + 0.42, y0, 1.25)),
+             place(tag(PR.vanity(), "sink", "Vanity", rid), vanity_at, vanity_yaw),
+             place(tag(PR.toilet(), "toilet", "Toilet", rid, seatHeight=0.42), toilet_at, toilet_yaw),
+             on_wall(U(X(((-0.35, 0.35), (-0.012, 0.012), (0.05, 0.08))), K.mirror([1, 0, 0], X(((0.33, 0.36), (-0.02, 0.02), (0.0, 0.08))))),
+                     "-z", ext, 3.8, y0 + 1.1))
+    figs = figure_objects(rid, [("bathMirror", "mirror", *fig_from_anchor("mirror", vanity_at, vanity_yaw), "Vanity"),
+                                ("bathToilet", "toilet", *fig_from_anchor("toilet", toilet_at, toilet_yaw), "Toilet")])
+    return {"id": rid, "interior": ext,
+            "objects": [("bathShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("bathFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 1.3, z1 + 0.05))] + figs,
+            "lights": [("bathLamp", (3.1, y1 - 0.3, 0.8), "lamp")],
+            "anchors": {"mirror": (x1, y0 + 1.55, 0.75), "toilet": (3.0, y0 + 0.6, z1 - 0.3), "tub": (x0 + 0.42, y0 + 0.6, 1.25),
+                        "door": (2.1, y0 + 1.0, z0)}}
+
+
+def study():
+    """The desk under the back window with its CRT monitor (static on its screen) and an office chair, a bookcase,
+    the globe, a ceiling fan, a bare stretch of wall to sit against. Door: the landing (right wall). Tableaux: desk,
+    floor_sit."""
+    rid = "study"
+    ext = ((-2.6, 1.2), (UP, UP + CEIL), (-6.4, -2.35))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("+x", -3.0, 0.9, "StudyDoor")]
+    shell = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.9, 1.2, 1.1, 1.05)]),
+              window_on("-z", ext, -0.9, 1.2, 1.1, 1.05, eid="StudyWindow", room=rid),
+              place(tag(U(K.ceiling_fan(name="stuFan"), K.CY([0, -0.02, 0], 0.08, 0.04)), "ceilingFan", "CeilingFan", rid), (-0.8, y1, -4.3)),
+              on_wall(K.painting(0.8, 0.55, motif="horizon", entity={"id": "StudyPainting", "room": rid}), "+x", ext, -5.0, y0 + 1.6))
+    # the desk against the back wall under the window, its front (+Z) to the room; the chair in front of it
+    desk_at = (-0.9, y0, z0 + 0.46)
+    fig_at = (desk_at[0] - 0.2, y0, desk_at[2] + 0.6)
+    group = place(TB.desk_group("Study", rid), fig_at, 180.0)
+    furn = U(group, place(K.globe(0.16, name="stuGlobe", entity={"id": "Globe", "room": rid}), (-0.25, y0 + 0.75, z0 + 0.3)))
+    shelf = place(K.bookshelf(0.9, 1.9, 0.3, entity={"id": "StudyBookcase", "room": rid}), (x1 - 0.16, y0, -3.6), -90.0)
+    figs = figure_objects(rid, [("stuDesk", "desk", fig_at, 180.0, "StudyChair"),
+                                ("stuFloor", "floor_sit", (x0 + 0.3, y0, -4.2), 90.0, None)])
+    return {"id": rid, "interior": ext,
+            "objects": [("stuShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("stuFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05)),
+                        ("stuShelf", shelf, "furn2", (x1 - 0.5, y0 - 0.05, -4.2), (x1 + 0.05, y0 + 2.0, -3.0))] + figs,
+            "lights": [("stuLamp", (-0.2, y0 + 1.6, z0 + 0.5), "lamp"), ("stuScreen", (-1.1, y0 + 1.0, z0 + 0.9), "screen")],
+            "anchors": {"desk": (desk_at[0], y0 + 0.9, desk_at[2]), "monitor": (-1.1, y0 + 1.0, z0 + 0.31), "window": (-0.9, y0 + 1.6, z0),
+                        "wall": (x0, y0 + 1.0, -4.2), "door": (x1, y0 + 1.0, -3.0), "fan": (-0.8, y1 - 0.3, -4.3)}}
+
+
+def upstairs():
+    return {"bed": bedroom(), "bath": bathroom(), "stu": study()}
+
+
 if __name__ == "__main__":
-    for key, room in ground_floor().items():
+    for key, room in {**ground_floor(), **basement(), **upstairs()}.items():
         print(key, room["id"], [(o[0], K.count(o[1])[0]) for o in room["objects"]])
