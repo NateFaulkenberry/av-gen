@@ -26,33 +26,38 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
 
 ### Phase B status
 
-- [x] Generator v1: seven worlds (corridor with storeys repeating forever, hall, enfilade, void stairhead, grow
-  room, Penrose stairwell, the open), nine chapters, the walk integrated from a speed profile and fitted to the
-  plan's timing sheet, the K0-K12 palette, thresholds of light at every swap, sparse routes (bass breathing,
-  voice to beacon, treble tremble) scaled by a timeline `coupling` source.
-- [ ] Stills across the song; look calibration (luminous air, plaster, no edges).
-- [ ] Short test render (intro into bar 18; "let it go" into the build) + `liminal_critic.py temporal` + Critic.
-- [ ] Full render v1 -> `~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4`.
-- [ ] Analysis, final pass, `all-you-got-final.mp4`.
+- [x] Generator v1 (commit `88b15d6d`): seven worlds, nine chapters, the fitted walk, K0-K12, thresholds of
+  light, sparse routes scaled by a timeline `coupling` source.
+- [x] Stills across the song (`scratchpad/liminal/s2`, one every 4 s): the structure works end to end.
+  Calibrated (`15709f1d`): lamp panels plaster when dark, hall air, quieter teal, a small sun, denser void.
+- [x] Short test renders in `~/Desktop/av-gen-review/24-liminal-space/tests/`: `test-a-intro-hall.mp4`
+  (0-62 s) and `test-b-letgo-verse2.mp4` (86-118 s), 1280x720.
+  - `liminal_critic.py temporal`: 0 snaps, 0 flicker; aggression-activity correlation 0.90 (A); one minor
+    colour-too-fast at the riser's white-out; "let it go" 36 % below its neighbours (good contrast).
+  - Creative Critic (job `job_1a0f54d3da394134a`, preview, test A): clipped highlights at the thresholds (47 %
+    of pixels), camera wobble (medium), shimmer in the hall (the motes read as snow), flat low-contrast intro;
+    audio reactivity not evaluated (an error in the Critic's analyzer).
+  - Revised (`cc43f1b3`): sun patches in the hall (SDF soft shadow), finer motes, windows glow, the riser's
+    light across four bars, the stairhead looks out at the figure and the void, thresholds as luminous haze
+    (fog x3, +1.7 EV) instead of clipped white, contrast 1.12, less bob.
+- [ ] Full render v1 (running at 22:34): `~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4`, 1920x1080,
+  30 fps, h264 q90, the song muxed. Script: `scratchpad/liminal/full-v1.sh` via `scratchpad/liminal/gpu-when-free.sh`
+  (polls the lock every 0.3 s, then runs through `tools/gpu-lock.sh`).
+- [ ] Analysis of v1 (temporal + Critic + my own viewing against the addendum), the final pass, `all-you-got-final.mp4`.
 - [ ] REPORT.md (the brief's 22 ten items) + copy in the review folder.
 
-## Where things are
+### How to analyse a render
 
-- **Worktree:** `/Users/natefaulkenberry/Documents/GitHub/av-gen-liminal`, branch `proto/liminal-space`. Commit
-  only the art paths with `git commit -- <paths>`: `docs/prototypes/liminal-space/{ART-RESEARCH,SONG-ANALYSIS,
-  DIRECTOR-PLAN,PROGRESS-art}.md` and `tools/liminal/`. The engineer builds and renders in the same worktree; the
-  art side does not build or render in Phase A.
-- **Governing documents:** `00-brief.md` (the owner's brief and lyrics) and `01-addendum-emotion.md` (the owner's
-  emotional art direction; it wins where they differ). Read both in full before changing the plan.
-- **The song:** `~/Desktop/All You Got.wav`. Never commit, copy, cache or upload it. Refer to it by path.
-- **Analysis tools:** `tools/liminal/song_analysis.py` (numpy/scipy/matplotlib: tempo map, bar grid, per-bar
-  features, self-similarity, novelty, plots) and `tools/liminal/lyric_times.py` (faster-whisper on the CPU, local,
-  for timing the sung phrases). A scratch venv with both sets of dependencies is at
-  `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/venv`
-  (it may be gone in a new session: `python3.12 -m venv v && v/bin/pip install numpy scipy matplotlib faster-whisper`;
-  the uv Python is `~/.local/bin/python3.12`). Note: faster-whisper's own decoder fails with the installed PyAV,
-  so `lyric_times.py` decodes with scipy and passes an array.
-- **Review media:** `~/Desktop/av-gen-review/24-liminal-space/analysis/` (plots and `bars.json`).
+```sh
+S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/liminal
+V=~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4
+python3 tools/liminal_critic.py temporal --video $V --audio ~/Desktop/"All You Got.wav" \
+    --sections tools/liminal/all-you-got.sections.json --video-start 0 --out $S/temporal-v1
+python3 tools/liminal_critic.py inputs --project examples/liminal/all-you-got.json \
+    --sections tools/liminal/all-you-got.sections.json --video $V --video-start 0 --out $S/critic-v1
+cd ../creative-critic && .venv/bin/critic submit --inputs $S/critic-v1/inputs.json --mode preview --session liminal --track v1 --wait
+$S/sheet.sh $V $S/v1-sheet.png 5 384 1 10 20 ...   # contact sheets of chosen seconds (no labels: ffmpeg has no drawtext)
+```
 
 ## Status (Phase A complete, 19:20 on 2026-09-30; handed back to the coordinator)
 

@@ -482,8 +482,9 @@ TEST_CASE("All You Got: every chapter's walk is clear of its world", "[liminal][
         if (root["kind"] == "warp" && root.value("count", 0) == 1) {
             root = root["children"][0];
         }
-        // The world as the camera meets it.
-        set(root, "breath", "amount", 0.36f, set);
+        // The world as the camera meets it: the breathing at its largest (the bass route's 0.22 m at full depth,
+        // 1.6 times that in the release).
+        set(root, "breath", "amount", chapter.name == "open" ? 0.36f : 0.22f, set);
         if (chapter.name == "loop") {
             set(root, "wallL", "translation", vec(0.0f, 0.0f, 0.32f), set);
             set(root, "wallR", "translation", vec(0.0f, 0.0f, -0.32f), set);
