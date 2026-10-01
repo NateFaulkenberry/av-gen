@@ -21,8 +21,19 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 7 | spectrum-sweep transition (`post/sweep/*`) | **done** | 1050 | `[adr1050]` (CPU and GPU) |
 | - | tint on moving figures (pass 1 gap 2) | **not reproducible at this head**: still, walking, keyed, journey-anchored and palette-bound figures all take the tint (renders checked); regression test added | 1044 | `[tint]` |
 
-**Resume here:** build the next undone row. Each system: code, a test, an ADR, the guide entry below, then
-`git commit -- <paths>`.
+**Resume here:** all seven Phase 4 systems are built, tested, documented below and committed (ADRs 1045-1050;
+the commits `bcf2516b`..`b25b5e3d` on `proto/liminal-space`). The art agent's needs list (relayed by the
+coordinator) is covered: text from a data block, beat envelopes with gain and a section mask, breathing on the
+journey, mosh and channel shift, the sweep, and the line look (pixel width, per-surface colour). What a
+successor might do next, if the art agent asks:
+- a panel row for `temporal/mosh/*` (the echo has one; the mosh is reachable by parameters only);
+- mesh text with the SDF edge look (today it reads through emission and bloom);
+- SDF capsule-stroke glyphs inside the march, if mesh text does not sit right in the line-drawn world;
+- the sweep before bloom (today the band's own light does not bloom; key bloom with it).
+
+Each system: code, a test, an ADR, a guide entry below, then `git commit -- <paths>`. Never commit the art
+agent's paths (`tools/liminal/`, `examples/liminal/all-you-got*`, PROGRESS-art.md). **Running the temporal GPU
+tests rewrites four tracked PNGs at the repo root (`temporal-*.png`): restore them with `git checkout --`.**
 
 ### The owner's numbering (AUTHORITATIVE; the analysis numbers the count-in as bar 1)
 
