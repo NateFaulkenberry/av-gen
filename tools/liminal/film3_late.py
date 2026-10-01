@@ -277,7 +277,7 @@ def build(b):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.5, "quarter", g_b3)
     for o in ("livShell", "kitShell", "hallShell"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "half", g_b3)
-        f.route("grid.song.quarter.wave", f"sdf/{o}/transform/scale", 0.015, depth=g_b3)
+        f.route("grid.song.quarter.wave", f"sdf/{o}/transform/scale", 0.008, depth=g_b3)
     for lamp in ("livLamp", "livSideLamp", "kitPend", "hallLamp", "hallLamp2"):
         f.route("grid.song.quarter", f"lights/{lamp}/intensity", 3.0, depth=g_b3)
     # IS THAT ALL? on the floors (it swells with the quarter's smooth wave, it does not bounce)
@@ -304,7 +304,7 @@ def build(b):
     # the bass fill (90.4) throws the front door open; the open's light floods in
     f.track("sdf/hallShell/node/frontDoorSwing/rotation", [(0.0, [0.0, 0.0, 0.0], "step"), (t(90, 4) - 0.001, [0.0, 0.0, 0.0], "easeOut"),
                                                          (t(90, 4) + 0.25, [0.0, -105.0, 0.0], "smooth"), (t(91), [0.0, -100.0, 0.0], "step")])
-    c = b.clap("sweep", t(91), attack=G.BAR2 / 2, release=0.6, curve="smooth")
+    c = b.clap("sweep", t(91), attack=0.3, release=0.6, curve="smooth")
     f.route(c, "camera/exposure/compensation", 2.2)
     f.route(c, "post/bloom/intensity", 1.8)
     f.route(c, "palette/saturation", 0.8)
@@ -436,7 +436,7 @@ def build(b):
     f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -40.0, 0.0], "step"), (t(114), [0.0, -6.0, 0.0], "smooth"),
                                               (252.3, [0.0, 26.0, 0.0], "smooth"), (end, [0.0, 36.0, 0.0])])
     b.val += [(t(114), 1.0, "smooth"), (253.0, 1.6, "smooth"), (254.8, 4.5, "smooth"), (255.0, 5.0, "step"), (255.01, 1.0, "step")]
-    f.track("camera/exposure/compensation", [(0.0, 0.0), (252.0, 0.0, "smooth"), (254.9, 2.6, "step"), (255.0, 0.0, "step")], mode="add")
+    f.track("camera/exposure/compensation", [(0.0, 0.0), (252.0, 0.0, "smooth"), (254.9, 1.9, "step"), (255.0, 0.0, "step")], mode="add")
     f.track("temporal/mosh/amount", [(0.0, 0.0), (253.0, 0.0, "smooth"), (254.3, 0.5, "smooth"), (254.95, 0.95, "step"),
                                      (255.0, 0.0, "step")], mode="add")
     f.track("temporal/mosh/shift", [(0.0, 0.0), (253.4, 0.0, "smooth"), (254.95, 30.0, "step"), (255.0, 0.0, "step")], mode="add")
@@ -459,62 +459,33 @@ def build(b):
 
 def colour_wave(b):
     """Section 30, 90.3 -> 91.1: a wave of coloured light that travels through the house, not a screen wipe. The world
-    wave (ADR-1055) enters by the front door and runs back through the hall past the camera: in its band every line
-    and every glow takes the rainbow's hue and the surfaces catch its light; behind it the lines are left in the
-    open's blue (the trail) as the palette turns to the final chorus's. The engine's travelling beam runs with it
-    (it also lights the meshes: the words), and so do a front of coloured point lights and a flare of each object's
-    lines as the front reaches it."""
+    wave (ADR-1055) starts at the back of the house and runs forward through the hall past the camera and on out of
+    the front door, so for most of its travel the band is in front of us: inside it every line and glow takes the
+    rainbow's hue and the surfaces catch its light; behind it (around us first, then all the way to the door) the
+    lines are left in the open's blue. The door then opens onto white and the palette turns with the cut."""
     f = b.f
     t0, t1 = t(90, 3), t(91)
     end = f.end
-    origin, direction = [3.85, 1.2, 2.6], [0.0, 0.0, -1.0]
+    origin, direction = [3.85, 1.2, -6.6], [0.0, 0.0, 1.0]
     f.track("post/wave/origin", [(0.0, origin, "step"), (end, origin, "step")])
     f.track("post/wave/direction", [(0.0, direction, "step"), (end, direction, "step")])
-    f.track("post/wave/progress", [(0.0, -2.0, "step"), (t0 - 0.06, -2.0, "linear"), (t1 + 0.1, 10.8, "step")])
-    f.track("post/wave/width", [(0.0, 0.75, "step"), (end, 0.75, "step")])
+    # the front: fast through the back of the house (behind us), slower once it is ahead of the camera, out of the
+    # door as the door opens
+    f.track("post/wave/progress", [(0.0, 0.0, "step"), (t0 - 0.2, 0.0, "linear"), (t0 + 0.13, 7.1, "linear"),
+                                   (t(90, 4) + 0.13, 9.0, "linear"), (t1 + 0.02, 11.2, "step")])
+    f.track("post/wave/width", [(0.0, 0.6, "step"), (end, 0.6, "step")])
     f.track("post/wave/hue", [(0.0, 0.0, "step"), (end, 0.0, "step")])
     f.track("post/wave/hueSpan", [(0.0, 1.0, "step"), (end, 1.0, "step")])
-    f.track("post/wave/intensity", [(0.0, 0.0, "step"), (t0 - 0.08, 0.0, "smooth"), (t0 + 0.06, 3.2, "smooth"),
-                                    (t1 - 0.05, 3.2, "smooth"), (t1 + 0.15, 0.0, "step")])
-    f.track("post/wave/edgeTint", [(0.0, 0.0, "step"), (t0 - 0.08, 0.0, "smooth"), (t0 + 0.04, 1.0, "smooth"),
+    f.track("post/wave/intensity", [(0.0, 0.0, "step"), (t0 - 0.22, 0.0, "smooth"), (t0 - 0.1, 2.2, "smooth"),
+                                    (t1 - 0.05, 2.2, "smooth"), (t1 + 0.1, 0.0, "step")])
+    f.track("post/wave/edgeTint", [(0.0, 0.0, "step"), (t0 - 0.22, 0.0, "smooth"), (t0 - 0.12, 1.0, "smooth"),
                                    (t1 + 0.05, 1.0, "smooth"), (t1 + 0.2, 0.0, "step")])
-    f.track("post/wave/trail", [(0.0, 0.0, "step"), (t0 - 0.05, 0.0, "smooth"), (t0 + 0.12, 1.0, "smooth"),
+    f.track("post/wave/trail", [(0.0, 0.0, "step"), (t0 - 0.2, 0.0, "smooth"), (t0 - 0.05, 1.0, "smooth"),
                                 (t1 - 0.01, 1.0, "step"), (t1, 0.0, "step")])
     trail = [round(c, 5) for c in (0.1, 0.58, 1.0)]       # the open's night-sky blue lines (P11 'wall' #5CC8FF)
     f.track("post/wave/trailColor", [(0.0, trail, "step"), (end, trail, "step")])
-    zs = (2.4, -6.6)
-    hues = [(1.0, 0.25, 0.6), (1.0, 0.6, 0.15), (0.3, 1.0, 0.5), (0.2, 0.7, 1.0), (0.75, 0.3, 1.0)]
-    for i, (x, col) in enumerate(zip((2.95, 3.35, 3.75, 4.15, 4.55), hues)):
-        name = f"wave{i}"
-        f.point_light(name, (x, 1.3 + 0.25 * (i % 2), zs[0]), col, 0.0, 2.8, vol=1.5)
-        f.track(f"lights/{name}/position", [(0.0, [x, 1.3, zs[0]], "step"), (t0 - 0.05, [x, 1.3, zs[0]], "linear"),
-                                           (t1, [x, 1.4, zs[1]], "step")])
-        f.track(f"lights/{name}/intensity", [(0.0, 0.0, "step"), (t0 - 0.05, 0.0, "smooth"), (t0 + 0.15, 40.0, "smooth"),
-                                            (t1 - 0.1, 40.0, "smooth"), (t1, 0.0, "step")])
-    # the lines catch the colour as the front passes each object's middle (front at z(t) = 2.4 - 9 (t - t0)/(t1 - t0)):
-    # a flash of line light tinted by one channel of the surface's edge multiplier, a different hue per object, so the
-    # colour travels through the hall object by object
-    tints = [(0, 3.0), (2, 3.0), (1, 2.5), (0, 2.0), (2, 2.5)]
-    for j, (o, zc) in enumerate((("hallFurn", 0.6), ("hallDisco", 0.0), ("hallStair", -2.5), ("hallShell", -2.0),
-                                 ("livShell", -0.5))):
-        tc = t0 + (zs[0] - zc) / (zs[0] - zs[1]) * (t1 - t0)
-        c = b.clap(f"wave_{o}", tc, attack=0.06, release=0.45)
-        f.route(c, f"sdf/{o}/look/edge/intensity", 10.0)
-        comp, amt = tints[j % len(tints)]
-        for k in (K.FILL, K.FLOOR, K.ACCENT):
-            f.route(c, f"sdf/{o}/surface/{k}/edge", amt, component=comp)
-    b.palette_at(t0 + 0.1, "P11open", ramp=t1 - t0 - 0.1)
-    # the engine's travelling beam (ADR-207/702): a rainbow front of light that adds colour to every surface it crosses,
-    # entering by the front door and running back through the hall past the camera (until ADR-1055's wave lands)
-    f.effects = getattr(f, "effects", []) + [{
-        "id": "colourWave", "type": "travelBeam", "name": "Colour wave", "owner": {"kind": "world"}, "enabled": True, "order": 0,
-        "activation": "window", "timing": {"delay": 0, "lifetime": 0, "fadeIn": 0.12, "fadeOut": 0.6, "windowStart": round(t0 - 0.05, 3),
-                                           "windowSeconds": round(t1 - t0 + 0.4, 3), "repeatSeconds": 0},
-        "parameters": {"propagation": {"kind": "directional", "direction": "explicit", "explicitDirection": [0, 0, -1], "speed": 9.0,
-                                       "range": 14.0, "frontWidth": 1.4, "trailLength": 5.0, "falloff": 1.2, "startOffset": 0.0,
-                                       "verticalExtent": 6.0, "verticalGrowth": 0.0, "ringCount": 0, "beamRadius": 0},
-                       "appearance": {"color": [1, 0.3, 0.8], "intensity": 2.6, "edgeColor": [1, 1, 1], "edgeIntensity": 5.0, "width": 1.0,
-                                      "rainbow": True, "rainbowSpeed": 0.6, "rainbowScale": 0.22, "rainbowSaturation": 0.95,
-                                      "rainbowBrightness": 1.4},
-                       "sparkle": {"enabled": False}, "response": {"ground": 1, "foliage": 1, "surface": 1, "emissive": 1},
-                       "source": {"kind": "world", "position": [3.85, 1.2, 2.6]}}}]
+    # each hall object's lines flare as the front reaches its middle (z(t) = -6.6 + progress)
+    for o, zc in (("hallStair", -2.5), ("hallShell", 0.0), ("hallFurn", 0.6), ("hallDisco", 1.2)):
+        tc = t0 + 0.13 + (zc - 0.5) / (2.4 - 0.5) * (t(90, 4) - t0) if zc > 0.5 else t0 - 0.2 + (zc + 6.6) / 7.1 * 0.33
+        c = b.clap(f"wave_{o}", tc, attack=0.05, release=0.4)
+        f.route(c, f"sdf/{o}/look/edge/intensity", 8.0)

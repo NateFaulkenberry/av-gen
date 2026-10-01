@@ -66,7 +66,7 @@ def build(b):
     b.show("livHands", s2, s3)
 
     # ---- the impact (17.1): we are in. A white flash; the furniture lands around him (he does not move) ------
-    c = b.clap("impact", ENTRY, release=2.0)
+    c = b.clap("impact", ENTRY, release=1.3)
     f.route(c, "camera/exposure/compensation", 2.6)
     f.route(c, "post/bloom/intensity", 2.0)
     f.route(c, "post/lens/chromaticAberration", 0.8)
@@ -98,7 +98,7 @@ def build(b):
     for o in ("livSofa", "livShelf"):
         f.route("grid.song.quarter", f"sdf/{o}/surface/{K.GLOW}/emission", 2.0, depth=g_v1)
     # the walls breathe: the room's shell swells 1.2 % on the smooth quarter wave (a world that listens)
-    f.route("grid.song.quarter.wave", "sdf/livShell/transform/scale", 0.012, depth=b.gate("gLivBreath", ENTRY + 0.4, t(33)))
+    f.route("grid.song.quarter.wave", "sdf/livShell/transform/scale", 0.006, depth=b.gate("gLivBreath", ENTRY + 0.4, t(33)))
     f.route("grid.song.bar.wave", "sdf/livShell/node/livCurtain/amount", 0.03, depth=b.gate("gCurtain", ENTRY, t(33)))
     f.route("grid.song.eighth", f"sdf/livMedia/surface/{K.SCREEN}/emission", 1.6, depth=b.gate("gTV", ENTRY, t(91)))
     f.route("grid.song.bar.phase", "sdf/livDecor/node/livClockM/rotation", -360.0, component=2)
@@ -186,7 +186,7 @@ def build(b):
     for o in ("kitCounter", "kitTable"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "quarter", g_k)
     b.pulse("sdf/kitShell/look/edge/intensity", 2.5, "bar", g_k)
-    f.route("grid.song.quarter.wave", "sdf/kitShell/transform/scale", 0.01, depth=g_k)
+    f.route("grid.song.quarter.wave", "sdf/kitShell/transform/scale", 0.005, depth=g_k)
     f.route("grid.song.bar.phase", "sdf/kitShell/node/kitClockM/rotation", -360.0, component=2)
     # C05 (36.4): levitation -- the plate and cup, the kettle and the empty chair jump and hang, then drift down
     c = b.clap("c05", t(36, 4), release=0.4)

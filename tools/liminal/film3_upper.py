@@ -79,7 +79,7 @@ def build(b):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "eighth", g_lig)
     for bulb in ("lauBulb", "stoBulb", "boiBulb"):
         f.route("grid.song.quarter", f"lights/{bulb}/intensity", 3.0, depth=g_lig)
-        f.route("grid.song.quarter.wave", f"sdf/{bulb[:3]}Shell/transform/scale", 0.01, depth=g_lig)
+        f.route("grid.song.quarter.wave", f"sdf/{bulb[:3]}Shell/transform/scale", 0.005, depth=g_lig)
     # C07 (45.4): every word in the storage room flashes and flies off its wall
     c = b.clap("c07", t(45, 4), release=0.5)
     f.route(c, "post/bloom/intensity", 1.4)
@@ -151,7 +151,7 @@ def build(b):
     for lamp in ("bedLamp", "bedPend", "bathLamp", "stuLamp"):
         f.route("grid.song.quarter", f"lights/{lamp}/intensity", 2.5, depth=g_v2)
     for o in ("bedShell", "bathShell", "stuShell"):
-        f.route("grid.song.quarter.wave", f"sdf/{o}/transform/scale", 0.012, depth=g_v2)
+        f.route("grid.song.quarter.wave", f"sdf/{o}/transform/scale", 0.006, depth=g_v2)
     f.route("grid.song.bar.wave", "sdf/bedShell/node/bedCurtain/amount", 0.04, depth=g_v2)
     f.track("sdf/stuCeil/node/stuFan/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, 300.0 * end, 0.0])])
     f.track("sdf/stuFurn/node/stuGlobe/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (113.1, [0.0, 2600.0, 0.0], "step"),

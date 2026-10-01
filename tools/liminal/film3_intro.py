@@ -61,7 +61,7 @@ def build(b):
     f.track("sdf/street/node/gridClip/size", [(0.0, [0.0, 0.5, 0.0], "step"), (t(1) - 0.001, [0.0, 0.5, 0.0], "easeOut"),
                                               (t(1) + 0.9, [190.0, 0.5, 190.0], "step")])
     f.track("sdf/street/look/edge/intensity", [(0.0, 0.0, "step"), (t(1), 9.0, "step"), (t(1, 3), 3.5, "smooth"), (37.0, 3.5)])
-    c = b.clap("splash", t(1), release=1.4)
+    c = b.clap("splash", t(1), release=0.9)
     f.route(c, "camera/exposure/compensation", 2.0)
     f.route(c, "post/bloom/intensity", 1.6)
     f.route(c, "post/lens/chromaticAberration", 0.7)

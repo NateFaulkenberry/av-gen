@@ -113,7 +113,7 @@
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
-      "release": 1.4,
+      "release": 0.9,
       "curve": "exp",
       "strength": 1.0
      },
@@ -420,7 +420,7 @@
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
-      "release": 2.0,
+      "release": 1.3,
       "curve": "exp",
       "strength": 1.0
      },
@@ -1399,52 +1399,42 @@
       "curve": "linear"
      },
      {
-      "channel": "wave_hallFurn",
-      "time": 198.86734,
-      "units": "seconds",
-      "attack": 0.06,
-      "hold": 0.0,
-      "release": 0.45,
-      "curve": "exp",
-      "strength": 1.0
-     },
-     {
-      "channel": "wave_hallDisco",
-      "time": 198.93942,
-      "units": "seconds",
-      "attack": 0.06,
-      "hold": 0.0,
-      "release": 0.45,
-      "curve": "exp",
-      "strength": 1.0
-     },
-     {
       "channel": "wave_hallStair",
-      "time": 199.23972,
+      "time": 198.64169,
       "units": "seconds",
-      "attack": 0.06,
+      "attack": 0.05,
       "hold": 0.0,
-      "release": 0.45,
+      "release": 0.4,
       "curve": "exp",
       "strength": 1.0
      },
      {
       "channel": "wave_hallShell",
-      "time": 199.17966,
+      "time": 198.75789,
       "units": "seconds",
-      "attack": 0.06,
+      "attack": 0.05,
       "hold": 0.0,
-      "release": 0.45,
+      "release": 0.4,
       "curve": "exp",
       "strength": 1.0
      },
      {
-      "channel": "wave_livShell",
-      "time": 198.99948,
+      "channel": "wave_hallFurn",
+      "time": 198.80958,
       "units": "seconds",
-      "attack": 0.06,
+      "attack": 0.05,
       "hold": 0.0,
-      "release": 0.45,
+      "release": 0.4,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "wave_hallDisco",
+      "time": 198.98027,
+      "units": "seconds",
+      "attack": 0.05,
+      "hold": 0.0,
+      "release": 0.4,
       "curve": "exp",
       "strength": 1.0
      },
@@ -1452,7 +1442,7 @@
       "channel": "sweep",
       "time": 199.73221,
       "units": "seconds",
-      "attack": 1.0810810810810811,
+      "attack": 0.3,
       "hold": 0.0,
       "release": 0.6,
       "curve": "smooth",
@@ -5363,7 +5353,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/livShell/transform/scale",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5864,7 +5854,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/kitShell/transform/scale",
-   "amount": 0.01,
+   "amount": 0.005,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6127,7 +6117,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/lauShell/transform/scale",
-   "amount": 0.01,
+   "amount": 0.005,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6153,7 +6143,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/stoShell/transform/scale",
-   "amount": 0.01,
+   "amount": 0.005,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6179,7 +6169,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/boiShell/transform/scale",
-   "amount": 0.01,
+   "amount": 0.005,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6743,7 +6733,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/bedShell/transform/scale",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6756,7 +6746,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/bathShell/transform/scale",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6769,7 +6759,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/stuShell/transform/scale",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -8690,7 +8680,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/livShell/transform/scale",
-   "amount": 0.015,
+   "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -8716,7 +8706,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/kitShell/transform/scale",
-   "amount": 0.015,
+   "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -8742,7 +8732,7 @@
   {
    "source": "grid.song.quarter.wave",
    "target": "sdf/hallShell/transform/scale",
-   "amount": 0.015,
+   "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -8896,129 +8886,19 @@
    "depthMax": 1.0
   },
   {
-   "source": "grid.song.wave_hallFurn",
-   "target": "sdf/hallFurn/look/edge/intensity",
-   "amount": 10.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallFurn",
-   "target": "sdf/hallFurn/surface/0/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallFurn",
-   "target": "sdf/hallFurn/surface/1/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallFurn",
-   "target": "sdf/hallFurn/surface/6/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallDisco",
-   "target": "sdf/hallDisco/look/edge/intensity",
-   "amount": 10.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallDisco",
-   "target": "sdf/hallDisco/surface/0/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallDisco",
-   "target": "sdf/hallDisco/surface/1/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallDisco",
-   "target": "sdf/hallDisco/surface/6/edge",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "enabled": true,
-   "chain": {}
-  },
-  {
    "source": "grid.song.wave_hallStair",
    "target": "sdf/hallStair/look/edge/intensity",
-   "amount": 10.0,
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallStair",
-   "target": "sdf/hallStair/surface/0/edge",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallStair",
-   "target": "sdf/hallStair/surface/1/edge",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallStair",
-   "target": "sdf/hallStair/surface/6/edge",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
    "enabled": true,
    "chain": {}
   },
   {
    "source": "grid.song.wave_hallShell",
    "target": "sdf/hallShell/look/edge/intensity",
-   "amount": 10.0,
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -9026,39 +8906,9 @@
    "chain": {}
   },
   {
-   "source": "grid.song.wave_hallShell",
-   "target": "sdf/hallShell/surface/0/edge",
-   "amount": 2.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallShell",
-   "target": "sdf/hallShell/surface/1/edge",
-   "amount": 2.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_hallShell",
-   "target": "sdf/hallShell/surface/6/edge",
-   "amount": 2.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_livShell",
-   "target": "sdf/livShell/look/edge/intensity",
-   "amount": 10.0,
+   "source": "grid.song.wave_hallFurn",
+   "target": "sdf/hallFurn/look/edge/intensity",
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -9066,32 +8916,12 @@
    "chain": {}
   },
   {
-   "source": "grid.song.wave_livShell",
-   "target": "sdf/livShell/surface/0/edge",
-   "amount": 2.5,
+   "source": "grid.song.wave_hallDisco",
+   "target": "sdf/hallDisco/look/edge/intensity",
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_livShell",
-   "target": "sdf/livShell/surface/1/edge",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.wave_livShell",
-   "target": "sdf/livShell/surface/6/edge",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": -1,
    "enabled": true,
    "chain": {}
   },
@@ -66828,7 +66658,7 @@
       "value": [
        3.85,
        1.2,
-       2.6
+       -6.6
       ],
       "interp": "step"
      },
@@ -66837,7 +66667,7 @@
       "value": [
        3.85,
        1.2,
-       2.6
+       -6.6
       ],
       "interp": "step"
      }
@@ -66856,7 +66686,7 @@
       "value": [
        0.0,
        0.0,
-       -1.0
+       1.0
       ],
       "interp": "step"
      },
@@ -66865,7 +66695,7 @@
       "value": [
        0.0,
        0.0,
-       -1.0
+       1.0
       ],
       "interp": "step"
      }
@@ -66882,21 +66712,35 @@
      {
       "time": 0.0,
       "value": [
-       -2.0
+       0.0
       ],
       "interp": "step"
      },
      {
-      "time": 198.59113,
+      "time": 198.45113,
       "value": [
-       -2.0
+       0.0
       ],
       "interp": "linear"
      },
      {
-      "time": 199.83221,
+      "time": 198.78113,
       "value": [
-       10.8
+       7.1
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 199.32167,
+      "value": [
+       9.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 199.75221,
+      "value": [
+       11.2
       ],
       "interp": "step"
      }
@@ -66913,14 +66757,14 @@
      {
       "time": 0.0,
       "value": [
-       0.75
+       0.6
       ],
       "interp": "step"
      },
      {
       "time": 258.0,
       "value": [
-       0.75
+       0.6
       ],
       "interp": "step"
      }
@@ -66990,28 +66834,28 @@
       "interp": "step"
      },
      {
-      "time": 198.57113,
+      "time": 198.43113,
       "value": [
        0.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 198.71113,
+      "time": 198.55113,
       "value": [
-       3.2
+       2.2
       ],
       "interp": "smooth"
      },
      {
       "time": 199.68221,
       "value": [
-       3.2
+       2.2
       ],
       "interp": "smooth"
      },
      {
-      "time": 199.88221,
+      "time": 199.83221,
       "value": [
        0.0
       ],
@@ -67035,14 +66879,14 @@
       "interp": "step"
      },
      {
-      "time": 198.57113,
+      "time": 198.43113,
       "value": [
        0.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 198.69113,
+      "time": 198.53113,
       "value": [
        1.0
       ],
@@ -67080,14 +66924,14 @@
       "interp": "step"
      },
      {
-      "time": 198.60113,
+      "time": 198.45113,
       "value": [
        0.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 198.77113,
+      "time": 198.60113,
       "value": [
        1.0
       ],
@@ -67132,416 +66976,6 @@
        0.1,
        0.58,
        1.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave0/position",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       2.95,
-       1.3,
-       2.4
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       2.95,
-       1.3,
-       2.4
-      ],
-      "interp": "linear"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       2.95,
-       1.4,
-       -6.6
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave0/intensity",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       0.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 198.80113,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.63221,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave1/position",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       3.35,
-       1.3,
-       2.4
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       3.35,
-       1.3,
-       2.4
-      ],
-      "interp": "linear"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       3.35,
-       1.4,
-       -6.6
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave1/intensity",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       0.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 198.80113,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.63221,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave2/position",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       3.75,
-       1.3,
-       2.4
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       3.75,
-       1.3,
-       2.4
-      ],
-      "interp": "linear"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       3.75,
-       1.4,
-       -6.6
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave2/intensity",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       0.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 198.80113,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.63221,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave3/position",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       4.15,
-       1.3,
-       2.4
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       4.15,
-       1.3,
-       2.4
-      ],
-      "interp": "linear"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       4.15,
-       1.4,
-       -6.6
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave3/intensity",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       0.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 198.80113,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.63221,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave4/position",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       4.55,
-       1.3,
-       2.4
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       4.55,
-       1.3,
-       2.4
-      ],
-      "interp": "linear"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       4.55,
-       1.4,
-       -6.6
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "lights/wave4/intensity",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.60113,
-      "value": [
-       0.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 198.80113,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.63221,
-      "value": [
-       40.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       0.0
       ],
       "interp": "step"
      }
@@ -68262,7 +67696,7 @@
      {
       "time": 254.9,
       "value": [
-       2.6
+       1.9
       ],
       "interp": "step"
      },
@@ -69572,20 +69006,6 @@
       "time": 182.43491,
       "value": [
        10.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 198.75113,
-      "value": [
-       10.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 199.73221,
-      "value": [
-       11.0
       ],
       "interp": "step"
      },
