@@ -20,7 +20,7 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 | c | journey camera, wrap, guard, nodes on the journey, **chapters**, look-at blend (ADR-1042) | done |
 | d | project `palette` (ADR-1043) | done |
 | e | surfaces (a material id per node) and node `tint` (ADR-1044); the walking figure | done |
-| f | `examples/liminal/` (48 s) via `tools/make_liminal_example.py`; capture in `~/Desktop/av-gen-review/24-liminal-space/eng/` | done (capture is of the 32 s version; re-render after the chapter version) |
+| f | `examples/liminal/` (48 s) via `tools/make_liminal_example.py`; capture in `~/Desktop/av-gen-review/24-liminal-space/eng/` | done (`liminal-example.mp4`, 48 s, 1280x720, rendered at 18.9 fps) |
 | 3 | analyzer: `tools/liminal_critic.py` (Critic inputs for an SDF project + the section 16 temporal checks) | done (see below) |
 
 ## Test commands
@@ -174,8 +174,16 @@ tools/gpu-lock.sh ./build/release/src/avgen --headless --project <p> --frames 15
 | 7 beacon with volumetrics, sun patch | existing (light `volumetric`, emissive surface); not yet rendered here |
 | 8 figure bound to the palette | done (`nodes/<n>/tint`) |
 | 9 motes near the camera across the wrap | open: anchor a particle emitter to the journey at the camera's distance; world-space particles will jump at a wrap, keep lifetimes short |
-| 10 near-field tremble | open (small: a warp windowed by distance from the camera) |
+| 10 near-field tremble | done (`tremble()`: a warp with count 1, centred on the camera every frame; wrap it round the whole tree) |
 | 11 section map to the analyzer | done (`tools/liminal_critic.py inputs` / `temporal` read `tools/liminal/all-you-got.sections.json`) |
+
+## Known issues
+
+- A faint jagged edge where the corridor stub meets the seam at floor level (about 28 s in the example): the
+  seam guard lets a ray step up to the margin into the next cell; smaller margins trade it against seam stripes.
+- The helix chapter's corners show the same at wall joints (margin 0.16 there).
+- The example's look is engineering-grey on purpose; the art direction replaces palette, light and air.
+- Motes across the wrap (need 9) are not built.
 
 ## Notes for a successor
 
