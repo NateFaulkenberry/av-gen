@@ -1,0 +1,10 @@
+{
+ "categories": {
+  "wallCupboard": {"group": "furniture", "mayIntersect": ["room"], "mounts": "wall"},
+  "appliance": {"group": "furniture", "rests": "floor"},
+  "waterHeater": {"group": "furniture", "rests": "floor"}
+ },
+ "poses": {
+  "floorSit": {"support": "floor"}
+ }
+}

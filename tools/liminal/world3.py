@@ -31,10 +31,24 @@ def figure_surfaces():
     return s
 
 
+def flatten_entities(node, inside=False):
+    """One entity per prop: a kit call nested in another (the table inside coffee_table(), the couch inside
+    armchair()) tags its own node too, and the validator would read the parent and the child as two objects in one
+    volume. Keep the outermost annotation; `part` markers stay."""
+    if isinstance(node, dict):
+        if inside:
+            node.pop("entity", None)
+        here = inside or isinstance(node.get("entity"), dict)
+        for c in node.get("children", []):
+            flatten_entities(c, here)
+    return node
+
+
 def add_world(film, room: dict, edge_width=0.011, edge_intensity=4.0, max_distance=30.0):
     names = []
     for obj in room["objects"]:
         name, tree, role, bmin, bmax = obj[:5]
+        flatten_entities(tree)
         opts = dict(edge_width=edge_width, edge_intensity=edge_intensity, max_distance=max_distance)
         if len(obj) > 5:
             opts.update(obj[5])

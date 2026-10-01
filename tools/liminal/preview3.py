@@ -76,13 +76,53 @@ def tableaux(palette="P3night"):
     return stills(film, "all-you-got-pass3-tableaux", palette)
 
 
+def rooms(palette="P3night", validate=True):
+    """The pass 3 house's ground floor, three or four views a room, each showing one tableau."""
+    import rooms3 as RM3
+    film = Film(end=60.0)
+    P2.palettes(film)
+    house = RM3.ground_floor()
+    worlds = {}
+    for key, room in house.items():
+        worlds[key] = W.add_world(film, room)
+    figs = {o[0] for room in house.values() for o in room["objects"] if o[2] == "figure"}
+    views = [  # (room keys, figure shown, eye, look)
+        (("liv",), "livThinker", (-0.6, 1.55, 1.9), (1.3, 0.85, -1.2)),
+        (("liv",), "livLie", (0.6, 1.6, 1.7), (-2.1, 0.6, 0.3)),
+        (("liv",), "livHands", (0.2, 1.4, -1.4), (-2.0, 0.8, 0.4)),
+        (("liv",), "livWindow", (1.4, 1.55, -1.6), (-0.6, 1.3, 2.0)),
+        (("liv", "kit"), "kitMan", (-1.75, 1.55, -1.4), (0.0, 0.9, -4.8)),
+        (("kit",), "kitMan", (1.8, 1.5, -3.0), (0.0, 0.9, -4.9)),
+        (("hall",), "hallMan", (3.4, 1.6, 1.9), (4.3, 1.4, -2.0)),
+        (("hall",), "hallMan", (4.4, 2.6, -2.6), (3.4, 0.8, 0.4)),
+    ]
+    for i, (keys, fig, eye, look) in enumerate(views):
+        names, lights = [], []
+        for k in keys:
+            names += [n for n in worlds[k][0] if n not in figs or n == fig]
+            lights += worlds[k][1]
+        e = list(eye)
+        film.shot(f"v{i}", i * 1.0, (i + 1) * 1.0, [e, [e[0] + 0.01, e[1], e[2] - 0.01]], look, nodes=names, lights=lights, fov=62)
+    film.end = float(len(views))
+    path = stills(film, "all-you-got-pass3-rooms", palette)
+    if validate:
+        import json
+        import liminal_space as ls
+        scene = json.load(open(path.replace(".json", ".scene.json")))
+        rep = ls.validate(path)
+        print(ls.text(rep))
+    return path
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["tableaux"])
+    ap.add_argument("what", choices=["tableaux", "rooms"])
     ap.add_argument("--palette", default="P3night")
     a = ap.parse_args()
     if a.what == "tableaux":
         tableaux(a.palette)
+    elif a.what == "rooms":
+        rooms(a.palette)
 
 
 if __name__ == "__main__":

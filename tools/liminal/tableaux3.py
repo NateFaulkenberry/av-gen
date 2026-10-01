@@ -240,16 +240,24 @@ def build(name, fig_name):
     return fig, anchor, spec
 
 
+VALIDATOR_POSE = {"thinker": "thinker", "couch_lie": "couchLying", "head_hands": "headInHands", "window": "window",
+                  "table": "elbowsOnTable", "mirror": "mirror", "toilet": "toilet", "bed": "bedLying", "desk": "desk",
+                  "bed_edge": "sit", "stair": "stand", "floor_sit": "floorSit", "gallery": "sit", "hill": "stand"}
+
+
 def placed(name, fig_name, at=(0.0, 0.0, 0.0), yaw=0.0, room=None, anchor_id=None, t0=None, t1=None):
     """The tableau's figure placed in a room: (tree, bounds lo, bounds hi). The figure's frame goes to `at`,
-    turned `yaw`; the anchor furniture belongs to the room, placed with the same transform composed with the
-    tableau's anchor placement (`anchor_place()`)."""
+    turned `yaw`; the anchor furniture belongs to the room (rooms3.fig_from_anchor puts the figure where its
+    furniture is). The figure is tagged for the validator: its pose, its anchor, and for a seated pose the hip
+    point that rests on the seat."""
+    import liminal_space as ls
     fig, _, spec = build(name, fig_name)
     tree = K.place(fig.tree, at, yaw)
     lo, hi = F.placed_bounds(fig.bounds(), at, yaw)
-    import props3
-    props3.entity(fig.tree, fig_name, "mannequin", room, anchor=anchor_id, pose=spec["posture"], tableau=name,
-                  hip=[round(v, 4) for v in fig.points["pelvis"]], t0=t0, t1=t1)
+    P = fig.points["pelvis"]
+    hip = [P[0], P[1] - 0.097, P[2]] if spec["posture"] == "sit" else list(P)
+    ls.tag(fig.tree, "mannequin", id=fig_name, room=room, anchor=anchor_id, pose=VALIDATOR_POSE.get(name, "stand"),
+           tableau=name, hip=[round(v, 4) for v in hip], t0=t0, t1=t1)
     return tree, lo, hi
 
 

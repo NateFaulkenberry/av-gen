@@ -178,3 +178,59 @@ def bed3(w=1.5, l=2.05, k=FILL, soft=ACCENT):
              S(X(((-hw - 0.03, hw + 0.03), (0.0, 1.05), (-hl - 0.065, -hl))), k),
              S(K.mirror([1, 0, 0], T([w / 4, 0.52, -0.72], pillow(w / 2 - 0.12, 0.34, 0.12, soft))), soft),
              S(X(((-hw + 0.01, hw - 0.01), (0.52, 0.55), (0.1, hl - 0.015))), k))
+
+
+# ---- case furniture standing ON the floor (the kit's cabinet, wardrobe and counter float 5-6 cm) --------------
+def low_cabinet(w=1.4, h=0.48, d=0.42, doors=3, k=FILL):
+    """A low sideboard on a plinth from y = 0, with door lines (about 8 nodes)."""
+    return S(K.D(U(X(((-w / 2, w / 2), (0.06, h), (-d / 2, d / 2))), X(((-w / 2 + 0.04, w / 2 - 0.04), (0.0, 0.06), (-d / 2 + 0.04, d / 2 - 0.04)))),
+                 T([0, h / 2 + 0.03, d / 2], K.repeat([w / doors, 0, 0], 1 if doors == 3 else 0, box([0.006, h / 2 - 0.06, 0.03])))), k)
+
+
+def wardrobe3(w=1.0, h=2.0, d=0.58, k=FILL):
+    """A wardrobe on a plinth from y = 0: two doors (a split and two handles) (about 10 nodes)."""
+    return S(U(K.D(X(((-w / 2, w / 2), (0.0, h), (-d / 2, d / 2))), X(((-0.006, 0.006), (0.12, h - 0.06), (d / 2 - 0.02, d / 2 + 0.1))),
+                   X(((-w / 2 + 0.02, w / 2 - 0.02), (h - 0.2, h - 0.19), (d / 2 - 0.02, d / 2 + 0.1))),
+                   X(((-w / 2 - 0.1, w / 2 + 0.1), (0.0, 0.07), (d / 2 - 0.03, d)))),
+               K.mirror([1, 0, 0], X(((0.05, 0.075), (h * 0.5, h * 0.6), (d / 2, d / 2 + 0.03))))), k)
+
+
+def counter3(w=2.6, h=0.9, d=0.6, sink_x=None, k=FILL, top=ACCENT):
+    """A kitchen counter from y = 0: a toe-kick plinth, cupboards with door lines, a worktop, a sink cut (about 12
+    nodes)."""
+    body = K.D(U(X(((-w / 2, w / 2), (0.1, h - 0.04), (-d / 2, d / 2))), X(((-w / 2, w / 2), (0.0, 0.1), (-d / 2, d / 2 - 0.07)))),
+               K.I(T([w / 8, h / 2, d / 2], K.repeat([w / 4, 0, 0], 0, box([0.006, h / 2 - 0.1, 0.03]))),
+                   X(((-w / 2 + 0.05, w / 2 - 0.05), (0, h), (0, d)))))
+    cuts = [X(((sink_x - 0.25, sink_x + 0.25), (h - 0.15, h + 0.1), (-d / 2 + 0.1, d / 2 - 0.08)))] if sink_x is not None else []
+    worktop = K.D(X(((-w / 2 - 0.02, w / 2 + 0.02), (h - 0.04, h), (-d / 2, d / 2 + 0.03))), *cuts)
+    return U(S(body, k), S(worktop, top))
+
+
+def wall_cupboard(w=1.2, h=0.6, d=0.32, k=FILL):
+    """A wall cupboard (its back on z = 0): doors and handles (about 7 nodes)."""
+    return S(U(K.D(X(((-w / 2, w / 2), (-h / 2, h / 2), (0.0, d))), X(((-0.005, 0.005), (-h / 2 + 0.04, h / 2 - 0.04), (d - 0.02, d + 0.1)))),
+               K.mirror([1, 0, 0], X(((0.05, 0.07), (-h / 2 + 0.06, -h / 2 + 0.18), (d, d + 0.025))))), k)
+
+
+def side_table(k=FILL):
+    """A small square side table (about 6 nodes)."""
+    return S(U(X(((-0.22, 0.22), (0.52, 0.56), (-0.22, 0.22))), K.mirror([1, 0, 1], X(((0.17, 0.2), (0.0, 0.52), (0.17, 0.2))))), k)
+
+
+def floor_bulb(drop=0.5, k=FILL):
+    """A bare bulb on a cord from the ceiling (origin at the ceiling point) (about 5 nodes)."""
+    return U(S(K.CY([0, -drop / 2, 0], 0.006, drop), k), S(K.SP([0, -drop - 0.05, 0], 0.055), GLOW),
+             S(K.CY([0, -drop + 0.01, 0], 0.025, 0.04), k))
+
+
+def pendant(drop=0.85, name=None, eid=None, room=None, k=FILL):
+    """A pendant lamp (origin at the ceiling point): a ceiling rose, the cord, the shade, the bulb. Named, its root
+    rotate is the pivot (`sdf/<o>/node/<name>/rotation` swings it) (about 11 nodes)."""
+    body = U(S(K.CY([0, -0.02, 0], 0.07, 0.04), k),
+             S(K.CY([0, -drop / 2, 0], 0.01, drop), k),
+             S(K.D(T([0, -drop - 0.08, 0], R([180, 0, 0], K.cone(0.22, 0.3))), X(((-1, 1), (-drop - 1, -drop - 0.17), (-1, 1)))), GLOW),
+             S(K.SP([0, -drop - 0.12, 0], 0.05), GLOW))
+    node = R([0, 0, 0], body, name=name) if name else body
+    if eid:
+        entity(node, eid, "hangingLamp", room)
+    return node
