@@ -11,7 +11,7 @@ namespace avgen::params::liveness {
 namespace {
 
 // THE table. Ids are stable: an evaluator ingests them and a validator refuses by them.
-constexpr std::array<RuleInfo, 26> kRules{{
+constexpr std::array<RuleInfo, 27> kRules{{
     {"disabled", "route|track", "dead", "The route or track is switched off (or the whole timeline is)."},
     {"unknown-source", "route", "dead", "The source is not a signal on the bus, so the route never binds."},
     {"unknown-depth-source", "route", "dead", "The depth source is not a signal on the bus, so the route never binds."},
@@ -70,6 +70,10 @@ constexpr std::array<RuleInfo, 26> kRules{{
      "nodes/<terrain>/water/tears/<setting> on a water that draws no tears -- its amount is 0 and no route or "
      "track lifts it, so the surface is drawn by the pipeline with the tear code compiled out -- or the fixed "
      "`direction` of seams that follow the wind (ADR-916)."},
+    {"transform-step", "route", "hazard",
+     "A beat-grid pulse or event (it rises in one frame) moves a position or translation with nothing to smooth "
+     "it: the object teleports on every beat and reads as a random jump (ADR-1053). Use the division's `.wave`, "
+     "or a chain with springHz or attackMs."},
 }};
 
 std::string componentText(int component) {
@@ -307,6 +311,20 @@ std::vector<Finding> Registry::checkRoute(const ModRoute& route, const Facts& fa
                                        ProcessorChain::kMaxDelayMs)));
     }
 
+    // ADR-1053: a stepping beat-grid signal into a position teleports the object on every beat.
+    {
+        const std::string& t = route.target;
+        const auto ends = [&t](std::string_view sfx) { return t.size() >= sfx.size() && t.compare(t.size() - sfx.size(), sfx.size(), sfx) == 0; };
+        const bool transform = (t.starts_with("sdf/") && (ends("/transform/position") || (t.find("/node/") != std::string::npos && ends("/translation")))) ||
+                               (t.starts_with("nodes/") && ends("/position"));
+        const std::string& src = route.source;
+        const bool smoothSource = src.ends_with(".wave") || src.ends_with(".phase");
+        const bool smoothed = route.chain.springHz > 0.0f || route.chain.attackMs > 0.0f;
+        if (transform && src.starts_with("grid.") && !smoothSource && !smoothed) {
+            out.push_back(make("transform-step", Verdict::Hazard,
+                               fmt::format("'{}' rises in one frame and moves '{}' with no smoothing: it jumps", src, t)));
+        }
+    }
     const double fps = facts.frameRate();
     if (flatChain(route.chain, route.polarity, source.minValue, source.maxValue)) {
         out.push_back(make("flat-chain", Verdict::Dead,

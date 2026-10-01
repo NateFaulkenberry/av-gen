@@ -770,3 +770,25 @@ TEST_CASE("The scene's facts see a timeline source's mode and its pulses", "[liv
     CHECK(s.isEvent);
     CHECK(s.pulses.empty());
 }
+
+TEST_CASE("transform-step: a beat-grid pulse into a position with no smoothing is a jump (ADR-1053)",
+          "[liveness][liminal][adr1053]") {
+    World w;
+    w.params.add(ParamDesc<glm::vec3>{.path = "sdf/room/node/kettle/translation", .defaultValue = glm::vec3(0.0f),
+                                      .hardMin = glm::vec3(-100.0f), .hardMax = glm::vec3(100.0f)});
+    w.facts.signals["grid.song.quarter"] = SignalFacts{.exists = true};
+    w.facts.signals["grid.song.quarter.wave"] = SignalFacts{.exists = true};
+    ModRoute r = World::route("grid.song.quarter", "sdf/room/node/kettle/translation");
+    r.component = 1;
+    r.amount = 0.12f;
+    CHECK(has(w.check(r), "transform-step"));
+    // The same pulse through a spring, the smooth wave, or into a colour: no jump.
+    ModRoute sprung = r;
+    sprung.chain.springHz = 6.0f;
+    CHECK_FALSE(has(w.check(sprung), "transform-step"));
+    ModRoute wave = r;
+    wave.source = "grid.song.quarter.wave";
+    CHECK_FALSE(has(w.check(wave), "transform-step"));
+    ModRoute colour = World::route("grid.song.quarter", "orb/color");
+    CHECK_FALSE(has(w.check(colour), "transform-step"));
+}

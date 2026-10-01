@@ -3,6 +3,7 @@
 #include "app/route_audit_cli.hpp"
 #include "app/sonic_trace_cli.hpp"
 #include "app/space_validate_cli.hpp"
+#include "app/jump_trace_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
 #include "core/log.hpp"
@@ -16,6 +17,10 @@ int main(int argc, char** argv) {
     // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
     if (argc > 1 && std::string(argv[1]) == "--validate-space") {
         return avgen::app::runSpaceValidateCommand(argc, argv);
+    }
+    // ADR-1053: the jump trace plays a project offline (no window, no GPU) and reports transforms that step.
+    if (argc > 1 && std::string(argv[1]) == "--trace-jumps") {
+        return avgen::app::runJumpTraceCommand(argc, argv);
     }
     auto options = avgen::app::parseArgs(argc, argv);
     if (!options) {
