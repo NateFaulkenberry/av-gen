@@ -973,7 +973,7 @@ def build(check_only=False, end=SONG_END):
     fit("l", ch_l, bt(76), bt(83, 3), 34.0)
     ch_p = chapter("penrose", "penrose", "penrose", bt(83, 4), 1.2)
     fit("p", ch_p, bt(84), bt(90), P["penrose"].at_point[18])
-    ch_e = chapter("open", "open", "open", bt(91, 4) + 0.15, 1.6)
+    ch_e = chapter("open", "open", "open", bt(91, 4) + 0.25, 1.6)
     fit("e1", ch_e, bt(92), bt(100), P["open"].at_point[7])
     fit("e2", ch_e, bt(100), bt(108), P["open"].at_point[15] - 0.1)
     walk.integrate(end)
@@ -1133,7 +1133,7 @@ def build(check_only=False, end=SONG_END):
     threshold(bt(66, 3), bt(66, 4) + 0.05, bt(67) + 0.15, bt(67) + 1.6, 1.5, 1.2)    # the tiny room's light
     threshold(bt(75, 3), bt(75, 4) + 0.2, bt(76) + 0.1, bt(76) + 0.9, 1.5, 1.2)      # into the light; the loop
     threshold(bt(83, 3), bt(83, 4) - 0.1, bt(84) + 0.1, bt(84) + 0.9, 1.4, 1.0)      # the pulse stops
-    threshold(bt(91, 3), bt(91, 4), bt(92) + 0.3, bt(93), 1.7, 1.5)        # the fill: the brightest door
+    threshold(bt(91, 2), bt(91, 4) + 0.1, bt(92) + 0.3, bt(93), 1.7, 1.5)  # the fill: the brightest door, over two beats
     value.extend([(bt(42) + 0.6, 0.74), (bt(48), 0.74), (bt(50), 1.0)])
 
     value.extend([(bt(114), 1.0), (bt(116), 1.35), (end, 1.45)])
