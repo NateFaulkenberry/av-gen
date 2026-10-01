@@ -421,7 +421,12 @@ def world_hall():
     nw_y = B_ENTRY_Y + 1.52
     nowhere = union(landing([8.0, nw_y, 5.1], 1.6, 1.8, thickness=0.3),
                     stairway([8.0, nw_y, 6.0], 17, run=0.3, rise=0.18, width=1.4, direction="+z", thickness=0.3))
-    tree = union(building, entry, stair, fig, nowhere)
+    # Patches of sun on the floor where the high windows' light lands (the sun from +Z, high): the windows at
+    # y 9.6-15.6 on the +Z wall project to z -7.6..-0.5 on the floor, 5 m further along x.
+    patches = translate([B_L / 2 + 5.1 - 4.4 / 2, 0.0, -4.05], {"kind": "repeat", "size": [4.4, 0.0, 0.0], "count": 1,
+                                                                "children": [slab(((-0.85, 0.85), (-0.01, 0.016), (-3.55, 3.55)))]})
+    patches = surface(patches, SUN)
+    tree = union(building, entry, stair, fig, nowhere, patches)
     tree = breathing(tree, amount=0.0, frequency=0.05, axes=(1.0, 0.0, 1.0), name="breath")
     return tremble(tree, amount=0.0, frequency=3.0, radius=3.5, fade=2.0)
 
@@ -483,7 +488,7 @@ def path_enfilade(turn=True):
 # the crossing stairwell beyond (verse 2): a bridge, a flight up that the camera turns back from, a flight
 # down, a doorway in a wall plane full of light.
 # ======================================================================================================
-D_FIG = (4.4, 0.0, 2.0)
+D_FIG = (4.0 + 22 * 0.3 + 0.15, -22 * 0.18, 2.0)   # 22 steps down flight R, facing the void
 D_L_STEPS = 19
 D_LOW_Y = -D_L_STEPS * 0.18          # -3.42
 D_FOOT_L = 4.0 + D_L_STEPS * 0.3      # 9.7
@@ -495,10 +500,10 @@ D_Z3 = -4.0 - D_DOWN * 0.3           # the far flight's foot (z)
 
 
 def world_void():
-    rep_x = {"kind": "repeat", "size": [0.0, 6.0, 7.0], "count": 0,
-             "children": [slab(((-1.0, 1.0), (-1.6, 1.6), (-0.7, 0.7)))]}
-    rep_z = {"kind": "repeat", "size": [7.0, 6.0, 0.0], "count": 0,
-             "children": [slab(((-0.7, 0.7), (-1.6, 1.6), (-1.0, 1.0)))]}
+    rep_x = {"kind": "repeat", "size": [0.0, 9.0, 12.0], "count": 0,
+             "children": [slab(((-1.0, 1.0), (-1.7, 1.7), (-1.0, 1.0)))]}
+    rep_z = {"kind": "repeat", "size": [12.0, 9.0, 0.0], "count": 0,
+             "children": [slab(((-1.0, 1.0), (-1.7, 1.7), (-1.0, 1.0)))]}
     far = union(difference(slab(((48.0, 48.6), (-90.0, 40.0), (-40.0, 40.0))), translate([48.3, 0.0, 0.0], rep_x)),
                 difference(slab(((-30.0, 48.0), (-90.0, 40.0), (30.0, 30.6))), translate([0.0, 0.0, 30.3], rep_z)))
     door = slab(((-4.0, -2.0), (0.0, 3.2), (-0.75, 0.75)))
@@ -696,8 +701,8 @@ def world_open():
                 ACCENT),
         stairway([24.0, -4.0, -14.0], 24, run=0.3, rise=0.18, width=1.4, direction="+z", thickness=0.3),
         union(landing([30.0, 3.0, 13.0], 3.0, 3.0), slab(((29.6, 30.4), (-30.0, 2.7), (12.6, 13.4)))))
-    cx, cy, cz = 22.0, -40.0, -30.0
-    corr = difference(shellbox(((cx - 20.3, cx + 20.3), (cy - 0.3, cy + 4.75), (cz - 1.9, cz + 1.9)), 0.3),
+    cx, cy, cz = 70.0, -26.0, -40.0   # ahead-left of the top landing, 40 m down: seen at bar 108
+    corr = difference(shellbox(((cx - 20.3, cx + 20.3), (cy - 0.3, cy + 4.75), (cz - 1.9, cz + 1.9)), 0.3, FLOOR),
                       slab(((cx - 19.9, cx + 19.9), (cy + 4.0, cy + 6.0), (cz - 1.6, cz + 1.6))),
                       translate([cx + 1.5, cy + 2.4, cz - 1.75], {"kind": "repeat", "size": [3.0, 0.0, 0.0], "count": 6,
                                                                   "children": [box([0.55, 1.55, 0.6])]}))
@@ -719,8 +724,8 @@ def path_open():
             [(2.0 + E_TOP_X) / 2, E_TOP_Y / 2, 0.0], [E_TOP_X - 0.3, E_TOP_Y - 0.05, 0.0], [E_TOP_X + 1.5, E_BR_Y, 0.0],
             [bx0 + 7.0, E_BR_Y, 0.05], [bx0 + 11.6, E_BR_Y, -0.05], [bx1 - 0.6, E_BR_Y, 0.0],
             [bx1 + 0.3, E_BR_Y + 0.05, 0.0], [bx1 + up_run / 2, (E_BR_Y + E_HIGH_Y) / 2, 0.0],
-            [bx1 + up_run - 0.2, E_HIGH_Y - 0.05, 0.0], [hx0 + 0.8, E_HIGH_Y, -0.3], [hx0 + 1.7, E_HIGH_Y, -0.9],
-            [hx0 + 2.4, E_HIGH_Y, -1.0], [hx0 + 3.6, E_HIGH_Y, -1.0]]
+            [bx1 + up_run - 0.2, E_HIGH_Y - 0.05, 0.0], [hx0 + 0.8, E_HIGH_Y, -0.5], [hx0 + 1.8, E_HIGH_Y, -1.75],
+            [hx0 + 2.3, E_HIGH_Y, -2.0], [hx0 + 3.5, E_HIGH_Y, -2.05]]
 
 
 # ======================================================================================================
@@ -768,8 +773,13 @@ def build(check_only=False, end=SONG_END):
     beacon_hex = {"K0": "#E2B06E", "K1": "#F2A54A", "K2": "#F2A54A", "K3": "#D9B58A", "K4": "#F2A54A",
                   "K5": "#F2B85A", "K6": "#F7C85C", "K7": "#F7C85C", "K8": "#FFB85A", "K9": "#FFB85A",
                   "K10": "#FFF4DC", "K11": "#FFF8E8", "K12": "#FFFAF0"}
-    sky_zen = {"K6": "#7FB8E8", "K7": "#72A5D0", "K10": "#8EC5EE", "K11": "#A5D2F2", "K12": "#F8F1E4"}
-    sky_hor = {"K6": "#F6E7C8", "K7": "#E8D9B8", "K10": "#F6E7C8", "K11": "#FBF0DC", "K12": "#FFFAF0"}
+    # The sky is also the interior's ambient light (the procedural sky lights every surface through its IBL),
+    # so these are the light colours of each place as much as what a window shows: warm walls under a cool
+    # ceiling in the hall, dusk with a warm horizon in the rooms, sodium in the loop, daylight at the end.
+    sky_zen = {"K1": "#A9B9E6", "K2": "#7F8FBE", "K5": "#7F8FBE", "K6": "#7FB8E8", "K7": "#72A5D0", "K8": "#C9824A",
+               "K9": "#CF8C54", "K10": "#8EC5EE", "K11": "#A5D2F2", "K12": "#F8F1E4"}
+    sky_hor = {"K1": "#F3D8B0", "K2": "#C9A98E", "K5": "#C9A98E", "K6": "#F6E7C8", "K7": "#E8D9B8", "K8": "#F0A060",
+               "K9": "#F2A866", "K10": "#F6E7C8", "K11": "#FBF0DC", "K12": "#FFFAF0"}
     states = []
     for i in range(13):
         name = f"K{i}"
@@ -788,7 +798,9 @@ def build(check_only=False, end=SONG_END):
         states.append({"name": name, "colors": {
             "walls": walls, "floor": mul(walls, 0.66), "dark": mul(walls, 0.3), "air": air, "light": light,
             "accent": accent, "beacon": hexlin(beacon_hex[name]), "lamp": light, "skyglow": sky_glow,
-            "zenith": zen, "horizon": hor, "ambient": mix(light, air, 0.5), "figure": mul(walls, 0.12),
+            "zenith": zen, "horizon": hor, "ground": mul(walls, 0.85) if name not in ("K10", "K11", "K12") else hor,
+            "ambient": mix(light, air, 0.2 if name in ("K1", "K2", "K5", "K6", "K7", "K10", "K11") else 0.5),
+            "figure": mul(walls, 0.035),
         }})
 
     # ---- worlds -----------------------------------------------------------------------------------
@@ -805,11 +817,7 @@ def build(check_only=False, end=SONG_END):
         seam = 0.0012 * maxd[w]
         node = sdf_node(w, tree, surfaces=surfaces_default(), step_scale=0.8, max_distance=maxd[w],
                         look={"aoStrength": looks[w], "aoDistance": 1.4}, position=OFFSET[w])
-        if w == "hall":
-            # The high windows throw patches of sun on the floor and the rose wall: the field's own soft
-            # shadow towards the sun (ADR-1002), which darkens what the sun cannot see.
-            node["sdf"]["look"].update({"shadowStrength": 0.6, "shadowSoftness": 6.0,
-                                        "shadowDirection": [-0.25, 0.62, 0.74], "shadowSteps": 40})
+        pass
         nodes.append(node)
         print(f"world {w}: {n} nodes, depth {depth}, seam floor {seam:.3f}")
 
@@ -824,7 +832,7 @@ def build(check_only=False, end=SONG_END):
     nodes.append(figure("figHall", wpt("hall", [B_FIG[0] + 0.3, B_FIG[1], B_FIG[2]]), 90.0))
     nodes.append(figure("figWalk", [0.0, 0.0, 0.0], 0.0, state="Walk_Loop", journey=0.0))
     nodes.append(figure("figVoid", wpt("void", list(D_FIG)), 90.0))
-    nodes.append(figure("figTop", wpt("open", [E_HX0 + 2.3, E_HIGH_Y, 0.9]), 90.0))
+    nodes.append(figure("figTop", wpt("open", [E_HX0 + 3.9, E_HIGH_Y, 1.3]), 90.0))
 
     # ---- motes: dust hanging in the light (the hall's shafts, the growing room's gold) -------------------
     def motes(name, world, centre, extent, rate, color):
@@ -833,7 +841,16 @@ def build(check_only=False, end=SONG_END):
             "lifetimeMin": 9.0, "lifetimeMax": 16.0, "speedMin": 0.01, "speedMax": 0.06, "spread": 1.0,
             "gravity": [0.0, 0.004, 0.0], "sizeStart": 0.011, "sizeEnd": 0.0, "blend": "additive",
             "colorStart": color + [0.32], "colorEnd": color + [0.0]}}
-    nodes.append(motes("motesHall", "hall", [B_L / 2, 8.0, 0.0], [B_L / 2, 7.5, B_W - 0.5], 450.0, [1.0, 0.85, 0.6]))
+    # The hall's shafts: dust drifting down the sunlight from each high window, so the beams are made of the
+    # motes that hang in them (the fog itself does not shadow; a beam of dust does not need it to).
+    sun_dir = [0.25, -0.62, -0.74]
+    for k in range(-2, 3):
+        x = B_L / 2 + 4.4 * k
+        nodes.append({"name": f"shaft{k + 2}", "kind": "particles", "particles": {
+            "capacity": 12000, "spawnRate": 320.0, "shape": "box", "position": wpt("hall", [x - 0.6, 12.6, B_W - 0.6]),
+            "extent": [0.75, 2.9, 0.25], "lifetimeMin": 22.0, "lifetimeMax": 28.0, "direction": sun_dir, "spread": 0.025,
+            "speedMin": 0.55, "speedMax": 0.62, "gravity": [0.0, 0.0, 0.0], "drag": 0.0, "sizeStart": 0.04,
+            "sizeEnd": 0.03, "blend": "additive", "colorStart": [1.0, 0.86, 0.6, 0.09], "colorEnd": [1.0, 0.8, 0.55, 0.0]}})
     nodes.append(motes("motesGrow", "grow", [9.0, 4.0, 0.0], [8.0, 4.0, 5.5], 350.0, [1.0, 0.8, 0.45]))
 
     # ---- lights ---------------------------------------------------------------------------------------
@@ -860,11 +877,11 @@ def build(check_only=False, end=SONG_END):
         L["enfilade2"].append(point(f"lampB{r}", "enfilade", [2.4 + C_L * r, 2.4, -1.5], [1.0, 0.72, 0.42], 9.0, 7.5))
     L["void"].append(point("voidBeacon", "void", [40.0, -6.0, 18.0], [1.0, 0.7, 0.4], 30.0, 40.0, 0.4))
     L["grow"].append(point("goldLight", "grow", [G_L0 - 0.6, 2.2, 0.0], [1.0, 0.78, 0.36], 6.0, 6.0, 0.8))
-    L["grow"].append(sun_light("daySunG", [-0.97, -0.17, 0.0], [1.0, 0.96, 0.88], 0.0))
+    L["grow"].append(sun_light("daySunG", [0.55, -0.6, 0.58], [1.0, 0.94, 0.84], 0.0))
     for k in range(5):
         L["penrose"].append(point(f"pBeacon{k}", "penrose", _helix([P_R + 1.6, P_RISE + 1.4, P_DOOR_Z], k),
                                   [1.0, 0.65, 0.3], 6.0, 6.0))
-    L["open"].append(sun_light("daySun", [-0.97, -0.17, 0.0], [1.0, 0.96, 0.88], 2.0))
+    L["open"].append(sun_light("daySun", [0.55, -0.6, 0.58], [1.0, 0.93, 0.82], 2.6))
 
     # ======================================================================================================
     # THE WALK. Speed keys per section; fitted so the camera arrives where the plan says, on the beat.
@@ -993,9 +1010,11 @@ def build(check_only=False, end=SONG_END):
     paths = {"corridor": path_intro(), "hall": path_hall(), "enfilade": path_enfilade(), "void": path_void(),
              "enfilade2": path_enfilade(turn=False), "grow": path_grow(), "loop": path_loop(),
              "penrose": path_penrose(), "open": path_open()}
-    chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall", "motesHall"],
+    # (The dust nodes belong to no chapter: they simulate from the first frame, so a beam is full when the
+    # camera arrives; 1000 m from every other world, they are never in another chapter's view.)
+    chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall"],
                      "enfilade": ["enfilade", "figWalk"],
-                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow", "motesGrow"],
+                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow"],
                      "loop": ["corridor"],
                      "penrose": ["penrose"], "open": ["open", "figTop"]}
     chapter_lights = {"corridor": L["corridor"], "hall": L["hall"], "enfilade": L["enfilade"], "void": L["void"],
@@ -1006,7 +1025,7 @@ def build(check_only=False, end=SONG_END):
         journey.append({"name": ch["name"], "start": round(ch["start"], 4), "from": round(ch["from"], 4),
                         "path": [[round(v, 4) for v in p] for p in paths[ch["path"]]],
                         "screw": {"translation": [5000.0, 0.0, 0.0], "count": 0}, "collide": ch["world"],
-                        "radius": 0.28, "offset": OFFSET[ch["world"]], "yaw": 0.0,
+                        "radius": 0.14, "offset": OFFSET[ch["world"]], "yaw": 0.0,
                         "nodes": chapter_nodes[ch["name"]], "lights": chapter_lights[ch["name"]]})
 
     # ======================================================================================================
@@ -1032,7 +1051,8 @@ def build(check_only=False, end=SONG_END):
            (bt(59), 0.0), (bt(62, 3), 0.0), (bt(63, 2), 24.0), (bt(64), 20.0), (bt(64, 3), 0.0),
            (bt(67), 0.0), (bt(116), 0.0)]
     # Bar 108: turn to the figure's gaze (down to the corridor); bar 110: back to the sun.
-    yaw = [k for k in yaw if k[0] < bt(108)] + [(bt(108), 0.0), (bt(108) + 2.6, 55.0), (bt(110), 58.0),
+    yaw = [k for k in yaw if k[0] < bt(92)] + [(bt(92), 0.0), (bt(92) + 0.8, 0.0), (bt(93, 3), 28.0), (bt(94, 3), 4.0),
+                                                (bt(96), 0.0)] + [(bt(108), 0.0), (bt(108) + 2.6, 52.0), (bt(110), 54.0),
                                                  (bt(111, 3), 0.0), (end, 0.0)]
     T.append(track("camera/journey/yaw", yaw, interp="easeInOut"))
     pitch = [(0, 0.0), (bt(18), 0.0), (bt(18) + 1.5, 12.0), (bt(20), 18.0), (bt(21), 22.0), (bt(22), 6.0),
@@ -1040,25 +1060,25 @@ def build(check_only=False, end=SONG_END):
              (bt(47, 3), 26.0), (bt(48) + 1.0, -4.0), (bt(49), 0.0), (bt(56), 0.0), (bt(57), -24.0),
              (bt(58), -6.0), (bt(58, 4), 0.0), (bt(70), 0.0), (bt(84), 0.0), (bt(84) + 0.8, 14.0), (bt(89), 16.0),
              (bt(90), 2.0), (bt(92), 0.0), (bt(92) + 1.5, 8.0), (bt(99), 8.0), (bt(100), 4.0), (bt(107), 4.0),
-             (bt(108), 0.0), (bt(108) + 2.6, -38.0), (bt(110), -38.0), (bt(111, 3), 4.0), (bt(113), 6.0),
+             (bt(108), 0.0), (bt(108) + 2.6, -38.0), (bt(110), -39.0), (bt(111, 3), 4.0), (bt(113), 6.0),
              (end, 6.0)]
     T.append(track("camera/journey/pitch", pitch, interp="easeInOut"))
     T.append(track("camera/journey/lookAhead", [(0, 3.0), (bt(84), 3.0), (bt(84) + 0.5, 4.0), (bt(90), 4.0),
                                                 (bt(90) + 1.0, 3.0), (end, 3.0)]))
-    sway = [(0, 0.0), (bt(2), 0.0), (bt(3), 1.6), (bt(17), 1.6), (bt(18), 0.6), (bt(26), 1.8), (bt(41), 1.8),
-            (bt(42), 0.0), (bt(43), 0.0), (bt(44), 1.0), (bt(51), 2.6), (bt(58), 2.6), (bt(59), 1.8),
+    sway = [(0, 0.0), (bt(2), 0.0), (bt(3), 1.2), (bt(17), 1.2), (bt(18), 0.5), (bt(26), 1.4), (bt(41), 1.4),
+            (bt(42), 0.0), (bt(43), 0.0), (bt(44), 0.8), (bt(51), 2.0), (bt(58), 2.0), (bt(59), 1.4),
             (bt(67), 0.8), (bt(74), 0.0), (bt(76), 0.0), (bt(76) + 1.0, 0.4), (bt(84), 0.6), (bt(92), 0.8),
             (bt(108), 0.6), (bt(114), 0.0), (end, 0.0)]
     T.append(track("camera/journey/sway", sway))
-    T.append(track("camera/journey/swayRate", [(0, 0.06), (end, 0.06)]))
-    bob = [(0, 0.0), (bt(2), 0.0), (bt(2) + 2.0, 0.009), (bt(17), 0.009), (bt(18), 0.007), (bt(26), 0.01),
-           (bt(42), 0.01), (bt(43), 0.008), (bt(76), 0.008), (bt(76) + 0.8, 0.014), (bt(84), 0.011),
-           (bt(92), 0.007), (end, 0.007)]
+    T.append(track("camera/journey/swayRate", [(0, 0.045), (end, 0.045)]))
+    bob = [(0, 0.0), (bt(2), 0.0), (bt(2) + 2.0, 0.004), (bt(17), 0.004), (bt(18), 0.003), (bt(26), 0.005),
+           (bt(42), 0.005), (bt(43), 0.004), (bt(76), 0.004), (bt(76) + 0.8, 0.007), (bt(84), 0.005),
+           (bt(92), 0.003), (end, 0.003)]
     T.append(track("camera/journey/bob", bob))
     T.append(track("camera/journey/stride", [(0, 1.3), (bt(76), 1.3), (bt(76) + 0.8, 2.16), (bt(84), 2.16),
                                              (bt(84) + 0.8, 1.4), (end, 1.4)]))
     T.append(track("camera/journey/height", [(0, 1.6), (bt(110), 1.6), (bt(113), 1.75), (end, 1.75)]))
-    T.append(track("camera/journey/radius", [(0, 0.28), (end, 0.28)]))
+    T.append(track("camera/journey/radius", [(0, 0.14), (end, 0.14)]))
     # The beacon gaze: the voice steers attention. Hall: the beacon high on the far wall.
     beacon_hall = wpt("hall", [B_L + 1.6, 10.8, 0.0])
     T.append(track("camera/journey/lookAt", [(0, beacon_hall), (bt(75), beacon_hall),
@@ -1087,26 +1107,31 @@ def build(check_only=False, end=SONG_END):
     T.append(track("palette/position", clean, interp="easeInOut"))
 
     # Thresholds of light: lightness and exposure up and down around each chapter swap.
-    value = [(0, 1.0)]
+    # (and the slow brightening of the air with the bass pulse at bar 6 -- the music's first growth, answered
+    # by the light, not by motion; and "let it go" dimmer than everything around it)
+    value = [(0, 1.0), (bt(6), 1.0), (bt(8), 1.07), (bt(13), 1.07)]
     expo = [(0, 0.0)]
 
     fog_spikes = []
 
-    def threshold(t_in, t_peak0, t_peak1, t_out, v=1.7, ev=1.7):
+    def threshold(t_in, t_peak0, t_peak1, t_out, v=1.45, ev=1.1, v_in=1.0):
         """A threshold of light: the air thickens and brightens and the exposure opens, so the frame becomes a
         luminous haze (bright, never clipped flat) in which the world is swapped; then it clears."""
-        value.extend([(t_in, 1.0), (t_peak0, v), (t_peak1, v), (t_out, 1.0)])
+        value.extend([(t_in, v_in), (t_peak0, v), (t_peak1, v), (t_out, 1.0)])
         expo.extend([(t_in, 0.0), (t_peak0, ev), (t_peak1, ev), (t_out, 0.0)])
         fog_spikes.append((t_in, t_peak0, t_peak1, t_out))
-    threshold(bt(14, 3), bt(17, 3), bt(18) + 0.15, bt(19), 1.8, 1.9)       # the riser into the hall
+    threshold(bt(14, 3), bt(17, 3), bt(18) + 0.15, bt(19), 1.5, 1.2, 1.07)  # the riser into the hall
     threshold(bt(25, 2), bt(25, 4), bt(26) + 0.2, bt(26) + 1.4)             # the way on, into the rooms
-    threshold(bt(41, 1), bt(41, 3) - 0.3, bt(41, 3) + 0.25, bt(42) - 0.1, 1.6, 1.6)   # into the stairhead
+    threshold(bt(41, 1), bt(41, 3) - 0.3, bt(41, 3) + 0.25, bt(42) - 0.1, 1.4, 1.0)   # into the stairhead
     threshold(bt(58, 3), bt(58, 4), bt(59) + 0.2, bt(59) + 1.4)            # back into the rooms
-    threshold(bt(66, 3), bt(66, 4) + 0.05, bt(67) + 0.15, bt(67) + 1.6, 1.8, 1.8)    # the tiny room's light
-    threshold(bt(75, 3), bt(75, 4) + 0.2, bt(76) + 0.1, bt(76) + 0.9, 1.8, 1.9)      # into the light; the loop
-    threshold(bt(83, 3), bt(83, 4) - 0.1, bt(84) + 0.1, bt(84) + 0.9, 1.6, 1.6)      # the pulse stops
-    threshold(bt(91, 3), bt(91, 4), bt(92) + 0.3, bt(93), 2.0, 2.2)        # the fill: the brightest door
+    threshold(bt(66, 3), bt(66, 4) + 0.05, bt(67) + 0.15, bt(67) + 1.6, 1.5, 1.2)    # the tiny room's light
+    threshold(bt(75, 3), bt(75, 4) + 0.2, bt(76) + 0.1, bt(76) + 0.9, 1.5, 1.2)      # into the light; the loop
+    threshold(bt(83, 3), bt(83, 4) - 0.1, bt(84) + 0.1, bt(84) + 0.9, 1.4, 1.0)      # the pulse stops
+    threshold(bt(91, 3), bt(91, 4), bt(92) + 0.3, bt(93), 1.7, 1.5)        # the fill: the brightest door
+    value.extend([(bt(42) + 0.6, 0.86), (bt(48), 0.86), (bt(50), 1.0)])
     value.extend([(bt(114), 1.0), (bt(116), 1.35), (end, 1.45)])
+    value.sort()
+    expo.sort()
     expo.extend([(bt(114), 0.0), (bt(116), 0.9), (end, 1.2)])
     T.append(track("palette/value", value))
     T.append(track("camera/exposure/compensation", expo))
@@ -1115,9 +1140,9 @@ def build(check_only=False, end=SONG_END):
                                           (bt(75, 4), 0.85), (bt(76), 1.0), (bt(114), 1.0), (end, 0.6)]))
 
     # World air: how thick the luminous fog is, per place (pure functions of time; chapters swap in light).
-    dens = [(0, 0.03), (bt(17, 3), 0.03), (bt(18), 0.016), (bt(25, 4), 0.016), (bt(26), 0.03), (bt(41, 3), 0.03),
-            (bt(42) - 0.2, 0.04), (bt(58, 4), 0.04), (bt(59), 0.03), (bt(66, 4), 0.03), (bt(67), 0.024),
-            (bt(72), 0.012), (bt(75, 4), 0.012), (bt(76), 0.034), (bt(83, 4), 0.034), (bt(84), 0.028),
+    dens = [(0, 0.03), (bt(17, 3), 0.03), (bt(18), 0.011), (bt(25, 4), 0.011), (bt(26), 0.03), (bt(41, 3), 0.03),
+            (bt(42) - 0.2, 0.05), (bt(48), 0.05), (bt(50), 0.04), (bt(58, 4), 0.04), (bt(59), 0.03), (bt(66, 4), 0.03), (bt(67), 0.024),
+            (bt(70), 0.014), (bt(73), 0.004), (bt(75, 4), 0.004), (bt(76), 0.034), (bt(83, 4), 0.034), (bt(84), 0.028),
             (bt(91, 4), 0.028), (bt(92), 0.007), (bt(100), 0.005), (bt(113), 0.005), (bt(116), 0.03), (end, 0.04)]
     dens0 = list(dens)
 
@@ -1129,13 +1154,13 @@ def build(check_only=False, end=SONG_END):
         return dens0[-1][1]
     for (a, b, c, d) in fog_spikes:
         dens = [k for k in dens if not (a < k[0] < d)]
-        dens += [(a, dens_at(a)), (b, max(dens_at(b), 0.03) * 3.0), (c, max(dens_at(c), 0.03) * 3.0), (d, dens_at(d))]
+        dens += [(a, dens_at(a)), (b, max(dens_at(b), 0.03) * 7.0), (c, max(dens_at(c), 0.03) * 7.0), (d, dens_at(d))]
         dens.sort()
     T.append(track("scene/volumeDensity", dens))
-    T.append(track("scene/volumeEmission", [(0, 1.0), (bt(17, 4), 1.0), (bt(18), 0.55), (bt(25, 4), 0.55),
+    T.append(track("scene/volumeEmission", [(0, 1.0), (bt(17, 4), 1.0), (bt(18), 0.3), (bt(25, 4), 0.3),
                                             (bt(26), 1.0), (end, 1.0)]))
     T.append(track("lightrig/AllYouGot/ambientIntensity", [
-        (0, 1.0), (bt(18), 0.75), (bt(26), 0.7), (bt(42), 0.85), (bt(51), 0.7), (bt(67), 0.8), (bt(76), 0.8),
+        (0, 1.0), (bt(18), 1.3), (bt(25, 4), 1.3), (bt(26), 0.7), (bt(42), 0.85), (bt(51), 0.7), (bt(67), 0.8), (bt(76), 0.8),
         (bt(84), 0.8), (bt(92), 0.7), (end, 0.9)]))
 
     # The sun patch: on the corridor floor with the bass pulse (bar 6); in the loop it has moved.
@@ -1143,6 +1168,7 @@ def build(check_only=False, end=SONG_END):
         (0, [0.0, 0.0, 0.0]), (bt(6), [0.0, 0.0, 0.0]), (bt(7), [1.7, 1.3, 0.75]), (bt(17), [1.7, 1.3, 0.75]),
         (bt(18), [0.0, 0.0, 0.0]), (bt(75), [0.0, 0.0, 0.0]), (bt(76), [1.4, 0.8, 0.35]), (end, [1.4, 0.8, 0.35])]))
     T.append(track(f"sdf/void/surface/{SUN}/emission", [(0, [1.5, 1.15, 0.7]), (end, [1.5, 1.15, 0.7])]))
+    T.append(track(f"sdf/hall/surface/{SUN}/emission", [(0, [2.6, 2.0, 1.25]), (end, [2.6, 2.0, 1.25])]))
     T.append(track("sdf/void/node/sunSlide/translation", [(bt(42), [D_FOOT_L + 0.9, D_LOW_Y - 0.009, -2.6]),
                                                            (bt(51), [D_FOOT_L + 2.3, D_LOW_Y - 0.009, -1.6])], interp="linear"))
     # Emission levels (the palette multiplies them by the colour): lamps, beacons, the sky glow, thresholds.
@@ -1151,8 +1177,10 @@ def build(check_only=False, end=SONG_END):
         T.append(track(f"sdf/{wname}/surface/{SKY}/emission", [(0, [2.5, 2.5, 2.5]), (end, [2.5, 2.5, 2.5])]))
     T.append(track(f"sdf/corridor/surface/{LAMP}/emission", [(0, [0.0, 0.0, 0.0]), (bt(75, 4), [0.0, 0.0, 0.0]),
                                                              (bt(76), [6.0, 6.0, 6.0]), (end, [6.0, 6.0, 6.0])]))
-    for wname, lvl in (("hall", 8.0), ("void", 8.0), ("open", 10.0)):
+    for wname, lvl in (("hall", 3.2), ("open", 3.6)):
         T.append(track(f"sdf/{wname}/surface/{LAMP}/emission", [(0, [lvl] * 3), (end, [lvl] * 3)]))
+    T.append(track(f"sdf/void/surface/{LAMP}/emission", [(0, [3.2] * 3), (bt(41, 4), [3.2] * 3), (bt(42), [0.6] * 3),
+                                                         (bt(48), [0.6] * 3), (bt(50), [3.2] * 3), (end, [3.2] * 3)]))
     T.append(track(f"sdf/enfilade/surface/{LAMP}/emission", [(0, [5.0, 5.0, 5.0]), (end, [5.0, 5.0, 5.0])]))
     T.append(track("lights/riserLight/intensity", [(0, 0.0), (bt(14), 0.0), (bt(17), 40.0), (end, 40.0)]))
     T.append(track("lights/hallSun/intensity", [(0, 4.5), (end, 4.5)]))
@@ -1210,8 +1238,8 @@ def build(check_only=False, end=SONG_END):
                                                   (bt(74), 120.0), (bt(75), 90.0), (end, 90.0)]))
     T.append(track("lights/goldLight/range", [(0, 6.0), (bt(67), 6.0), (bt(73), 30.0), (end, 30.0)]))
     T.append(track("lights/daySunG/intensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 2.0), (end, 2.0)]))
-    T.append(track("env/sky/sunIntensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 6.0), (bt(75, 4), 6.0),
-                                            (bt(76), 0.0), (bt(91, 4), 0.0), (bt(92), 7.0), (end, 7.0)]))
+    T.append(track("env/sky/sunIntensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 30.0), (bt(75, 4), 30.0),
+                                            (bt(76), 0.0), (bt(91, 4), 0.0), (bt(92), 40.0), (end, 40.0)]))
 
     # The Penrose stairwell's seams: they open onto sky a little wider each time round, then close.
     crack = [(0, 0.0), (bt(84), 0.0), (bt(85, 3), 0.18), (bt(86, 3), 0.04), (bt(87), 0.3), (bt(88), 0.08),
@@ -1307,7 +1335,7 @@ def build(check_only=False, end=SONG_END):
     bindings += [{"role": "air", "target": "scene/fogColor"},
                  {"role": "zenith", "target": "env/sky/zenithColor"},
                  {"role": "horizon", "target": "env/sky/horizonColor"},
-                 {"role": "horizon", "target": "env/sky/groundColor"},
+                 {"role": "ground", "target": "env/sky/groundColor"},
                  {"role": "ambient", "target": "lightrig/AllYouGot/ambientColor"},
                  {"role": "figure", "target": "nodes/figHall/tint"}, {"role": "figure", "target": "nodes/figWalk/tint"},
                  {"role": "figure", "target": "nodes/figVoid/tint"}, {"role": "figure", "target": "nodes/figTop/tint"}]
@@ -1328,8 +1356,8 @@ def build(check_only=False, end=SONG_END):
                         "volumeJitter": 0.5, "volumeLocalLights": 1.0,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                                 "zenithColor": k0air, "horizonColor": k0air, "groundColor": k0air,
-                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.995, 0.06, 0.03],
-                                "sunIntensity": 0.0, "sunSize": 0.25, "sunGlow": 0.06, "intensity": 0.75}},
+                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.9967, 0.0785, 0.0209],
+                                "sunIntensity": 0.0, "sunSize": 0.012, "sunGlow": 0.02, "intensity": 0.9}},
         "nodes": nodes,
         "lights": lights,
     }

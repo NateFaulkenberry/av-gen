@@ -132,7 +132,7 @@
       "count": 0
      },
      "collide": "corridor",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -216,7 +216,7 @@
       "count": 0
      },
      "collide": "hall",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -225,8 +225,7 @@
      "yaw": 0.0,
      "nodes": [
       "hall",
-      "figHall",
-      "motesHall"
+      "figHall"
      ],
      "lights": [
       "hallSun"
@@ -317,7 +316,7 @@
       "count": 0
      },
      "collide": "enfilade",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -456,7 +455,7 @@
       "count": 0
      },
      "collide": "void",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -531,7 +530,7 @@
       "count": 0
      },
      "collide": "enfilade",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -608,7 +607,7 @@
       "count": 0
      },
      "collide": "grow",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -616,8 +615,7 @@
      ],
      "yaw": 0.0,
      "nodes": [
-      "grow",
-      "motesGrow"
+      "grow"
      ],
      "lights": [
       "goldLight",
@@ -664,7 +662,7 @@
       "count": 0
      },
      "collide": "corridor",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -801,7 +799,7 @@
       "count": 0
      },
      "collide": "penrose",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -897,22 +895,22 @@
       [
        40.58,
        12.42,
-       -0.3
+       -0.5
       ],
       [
-       41.48,
+       41.58,
        12.42,
-       -0.9
+       -1.75
       ],
       [
-       42.18,
+       42.08,
        12.42,
-       -1.0
+       -2.0
       ],
       [
-       43.38,
+       43.28,
        12.42,
-       -1.0
+       -2.05
       ]
      ],
      "screw": {
@@ -924,7 +922,7 @@
       "count": 0
      },
      "collide": "open",
-     "radius": 0.28,
+     "radius": 0.14,
      "offset": [
       0.0,
       0.0,
@@ -987,14 +985,14 @@
     0.85
    ],
    "sunDirection": [
-    0.995,
-    0.06,
-    0.03
+    0.9967,
+    0.0785,
+    0.0209
    ],
    "sunIntensity": 0.0,
-   "sunSize": 0.25,
-   "sunGlow": 0.06,
-   "intensity": 0.75
+   "sunSize": 0.012,
+   "sunGlow": 0.02,
+   "intensity": 0.9
   }
  },
  "nodes": [
@@ -2263,6 +2261,46 @@
               ]
              }
             ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             13.900000000000002,
+             0.0,
+             -4.05
+            ],
+            "children": [
+             {
+              "kind": "repeat",
+              "size": [
+               4.4,
+               0.0,
+               0.0
+              ],
+              "count": 1,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 0.003,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.85,
+                   0.013000000000000001,
+                   3.55
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 5
            }
           ]
          }
@@ -2301,15 +2339,7 @@
     ],
     "look": {
      "aoStrength": 0.5,
-     "aoDistance": 1.4,
-     "shadowStrength": 0.6,
-     "shadowSoftness": 6.0,
-     "shadowDirection": [
-      -0.25,
-      0.62,
-      0.74
-     ],
-     "shadowSteps": 40
+     "aoDistance": 1.4
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -2979,8 +3009,8 @@
                     "kind": "repeat",
                     "size": [
                      0.0,
-                     6.0,
-                     7.0
+                     9.0,
+                     12.0
                     ],
                     "count": 0,
                     "children": [
@@ -2996,8 +3026,8 @@
                         "kind": "box",
                         "size": [
                          1.0,
-                         1.6,
-                         0.7
+                         1.7,
+                         1.0
                         ]
                        }
                       ]
@@ -3040,8 +3070,8 @@
                    {
                     "kind": "repeat",
                     "size": [
-                     7.0,
-                     6.0,
+                     12.0,
+                     9.0,
                      0.0
                     ],
                     "count": 0,
@@ -3057,8 +3087,8 @@
                        {
                         "kind": "box",
                         "size": [
-                         0.7,
-                         1.6,
+                         1.0,
+                         1.7,
                          1.0
                         ]
                        }
@@ -5274,9 +5304,9 @@
                  {
                   "kind": "translate",
                   "translation": [
-                   22.0,
-                   -37.775,
-                   -30.0
+                   70.0,
+                   -23.775,
+                   -40.0
                   ],
                   "children": [
                    {
@@ -5287,26 +5317,27 @@
                       "kind": "box",
                       "size": [
                        20.15,
-                       2.3749999999999987,
+                       2.3750000000000004,
                        1.7499999999999987
                       ]
                      }
                     ]
                    }
-                  ]
+                  ],
+                  "material": 1
                  },
                  {
                   "kind": "translate",
                   "translation": [
-                   22.0,
-                   -35.0,
-                   -30.0
+                   70.0,
+                   -21.0,
+                   -40.0
                   ],
                   "children": [
                    {
                     "kind": "box",
                     "size": [
-                     19.9,
+                     19.900000000000002,
                      1.0,
                      1.6000000000000014
                     ]
@@ -5316,9 +5347,9 @@
                  {
                   "kind": "translate",
                   "translation": [
-                   23.5,
-                   -37.6,
-                   -31.75
+                   71.5,
+                   -23.6,
+                   -41.75
                   ],
                   "children": [
                    {
@@ -5347,17 +5378,17 @@
                {
                 "kind": "translate",
                 "translation": [
-                 42.75,
-                 -38.4,
-                 -30.0
+                 90.75,
+                 -24.4,
+                 -40.0
                 ],
                 "children": [
                  {
                   "kind": "box",
                   "size": [
-                   0.14999999999999858,
-                   1.6000000000000014,
-                   0.6999999999999993
+                   0.15000000000000568,
+                   1.5999999999999996,
+                   0.7000000000000028
                   ]
                  }
                 ],
@@ -5681,8 +5712,8 @@
    "kind": "gltf",
    "asset": "../../assets/quaternius/animations/UAL1_Standard.glb",
    "position": [
-    4.4,
-    0.0,
+    10.75,
+    -3.96,
     3002.0
    ],
    "rotation": [
@@ -5712,9 +5743,9 @@
    "kind": "gltf",
    "asset": "../../assets/quaternius/animations/UAL1_Standard.glb",
    "position": [
-    42.08,
+    43.68,
     12.42,
-    6000.9
+    6001.3
    ],
    "rotation": [
     0.0,
@@ -5739,45 +5770,251 @@
    }
   },
   {
-   "name": "motesHall",
+   "name": "shaft0",
    "kind": "particles",
    "particles": {
-    "capacity": 20000,
-    "spawnRate": 450.0,
+    "capacity": 12000,
+    "spawnRate": 320.0,
     "shape": "box",
     "position": [
-     11.0,
-     8.0,
-     1000.0
+     1.5999999999999992,
+     12.6,
+     1010.4
     ],
     "extent": [
-     11.0,
-     7.5,
-     10.5
+     0.75,
+     2.9,
+     0.25
     ],
-    "lifetimeMin": 9.0,
-    "lifetimeMax": 16.0,
-    "speedMin": 0.01,
-    "speedMax": 0.06,
-    "spread": 1.0,
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 28.0,
+    "direction": [
+     0.25,
+     -0.62,
+     -0.74
+    ],
+    "spread": 0.025,
+    "speedMin": 0.55,
+    "speedMax": 0.62,
     "gravity": [
      0.0,
-     0.004,
+     0.0,
      0.0
     ],
-    "sizeStart": 0.011,
-    "sizeEnd": 0.0,
+    "drag": 0.0,
+    "sizeStart": 0.04,
+    "sizeEnd": 0.03,
     "blend": "additive",
     "colorStart": [
      1.0,
-     0.85,
+     0.86,
      0.6,
-     0.32
+     0.09
     ],
     "colorEnd": [
      1.0,
-     0.85,
+     0.8,
+     0.55,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "shaft1",
+   "kind": "particles",
+   "particles": {
+    "capacity": 12000,
+    "spawnRate": 320.0,
+    "shape": "box",
+    "position": [
+     6.0,
+     12.6,
+     1010.4
+    ],
+    "extent": [
+     0.75,
+     2.9,
+     0.25
+    ],
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 28.0,
+    "direction": [
+     0.25,
+     -0.62,
+     -0.74
+    ],
+    "spread": 0.025,
+    "speedMin": 0.55,
+    "speedMax": 0.62,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.04,
+    "sizeEnd": 0.03,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.86,
      0.6,
+     0.09
+    ],
+    "colorEnd": [
+     1.0,
+     0.8,
+     0.55,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "shaft2",
+   "kind": "particles",
+   "particles": {
+    "capacity": 12000,
+    "spawnRate": 320.0,
+    "shape": "box",
+    "position": [
+     10.4,
+     12.6,
+     1010.4
+    ],
+    "extent": [
+     0.75,
+     2.9,
+     0.25
+    ],
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 28.0,
+    "direction": [
+     0.25,
+     -0.62,
+     -0.74
+    ],
+    "spread": 0.025,
+    "speedMin": 0.55,
+    "speedMax": 0.62,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.04,
+    "sizeEnd": 0.03,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.86,
+     0.6,
+     0.09
+    ],
+    "colorEnd": [
+     1.0,
+     0.8,
+     0.55,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "shaft3",
+   "kind": "particles",
+   "particles": {
+    "capacity": 12000,
+    "spawnRate": 320.0,
+    "shape": "box",
+    "position": [
+     14.8,
+     12.6,
+     1010.4
+    ],
+    "extent": [
+     0.75,
+     2.9,
+     0.25
+    ],
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 28.0,
+    "direction": [
+     0.25,
+     -0.62,
+     -0.74
+    ],
+    "spread": 0.025,
+    "speedMin": 0.55,
+    "speedMax": 0.62,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.04,
+    "sizeEnd": 0.03,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.86,
+     0.6,
+     0.09
+    ],
+    "colorEnd": [
+     1.0,
+     0.8,
+     0.55,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "shaft4",
+   "kind": "particles",
+   "particles": {
+    "capacity": 12000,
+    "spawnRate": 320.0,
+    "shape": "box",
+    "position": [
+     19.2,
+     12.6,
+     1010.4
+    ],
+    "extent": [
+     0.75,
+     2.9,
+     0.25
+    ],
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 28.0,
+    "direction": [
+     0.25,
+     -0.62,
+     -0.74
+    ],
+    "spread": 0.025,
+    "speedMin": 0.55,
+    "speedMax": 0.62,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.04,
+    "sizeEnd": 0.03,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.86,
+     0.6,
+     0.09
+    ],
+    "colorEnd": [
+     1.0,
+     0.8,
+     0.55,
      0.0
     ]
    }
@@ -6065,14 +6302,14 @@
    "name": "daySunG",
    "type": "directional",
    "direction": [
-    -0.97,
-    -0.17,
-    0.0
+    0.55,
+    -0.6,
+    0.58
    ],
    "color": [
     1.0,
-    0.96,
-    0.88
+    0.94,
+    0.84
    ],
    "intensity": 0.0,
    "castsShadow": false,
@@ -6172,16 +6409,16 @@
    "name": "daySun",
    "type": "directional",
    "direction": [
-    -0.97,
-    -0.17,
-    0.0
+    0.55,
+    -0.6,
+    0.58
    ],
    "color": [
     1.0,
-    0.96,
-    0.88
+    0.93,
+    0.82
    ],
-   "intensity": 2.0,
+   "intensity": 2.6,
    "castsShadow": false,
    "volumetric": 0.0
   }
