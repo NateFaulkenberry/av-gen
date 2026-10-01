@@ -1380,11 +1380,21 @@
      },
      {
       "channel": "wave_hallFurn",
+      "time": 198.86734,
+      "units": "seconds",
+      "attack": 0.06,
+      "hold": 0.0,
+      "release": 0.45,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "wave_hallDisco",
       "time": 198.93942,
       "units": "seconds",
-      "attack": 0.05,
+      "attack": 0.06,
       "hold": 0.0,
-      "release": 0.35,
+      "release": 0.45,
       "curve": "exp",
       "strength": 1.0
      },
@@ -1392,9 +1402,9 @@
       "channel": "wave_hallStair",
       "time": 199.23972,
       "units": "seconds",
-      "attack": 0.05,
+      "attack": 0.06,
       "hold": 0.0,
-      "release": 0.35,
+      "release": 0.45,
       "curve": "exp",
       "strength": 1.0
      },
@@ -1402,19 +1412,19 @@
       "channel": "wave_hallShell",
       "time": 199.17966,
       "units": "seconds",
-      "attack": 0.05,
+      "attack": 0.06,
       "hold": 0.0,
-      "release": 0.35,
+      "release": 0.45,
       "curve": "exp",
       "strength": 1.0
      },
      {
-      "channel": "wave_hallDisco",
-      "time": 199.17966,
+      "channel": "wave_livShell",
+      "time": 198.99948,
       "units": "seconds",
-      "attack": 0.05,
+      "attack": 0.06,
       "hold": 0.0,
-      "release": 0.35,
+      "release": 0.45,
       "curve": "exp",
       "strength": 1.0
      },
@@ -8556,12 +8566,112 @@
    "chain": {}
   },
   {
+   "source": "grid.song.wave_hallFurn",
+   "target": "sdf/hallFurn/surface/0/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallFurn",
+   "target": "sdf/hallFurn/surface/1/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallFurn",
+   "target": "sdf/hallFurn/surface/6/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallDisco",
+   "target": "sdf/hallDisco/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallDisco",
+   "target": "sdf/hallDisco/surface/0/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallDisco",
+   "target": "sdf/hallDisco/surface/1/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallDisco",
+   "target": "sdf/hallDisco/surface/6/edge",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.wave_hallStair",
    "target": "sdf/hallStair/look/edge/intensity",
    "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallStair",
+   "target": "sdf/hallStair/surface/0/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallStair",
+   "target": "sdf/hallStair/surface/1/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallStair",
+   "target": "sdf/hallStair/surface/6/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
    "enabled": true,
    "chain": {}
   },
@@ -8576,12 +8686,72 @@
    "chain": {}
   },
   {
-   "source": "grid.song.wave_hallDisco",
-   "target": "sdf/hallDisco/look/edge/intensity",
+   "source": "grid.song.wave_hallShell",
+   "target": "sdf/hallShell/surface/0/edge",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallShell",
+   "target": "sdf/hallShell/surface/1/edge",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_hallShell",
+   "target": "sdf/hallShell/surface/6/edge",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_livShell",
+   "target": "sdf/livShell/look/edge/intensity",
    "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_livShell",
+   "target": "sdf/livShell/surface/0/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_livShell",
+   "target": "sdf/livShell/surface/1/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.wave_livShell",
+   "target": "sdf/livShell/surface/6/edge",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "enabled": true,
    "chain": {}
   },
@@ -53452,8 +53622,8 @@
       "time": 90.27523,
       "value": [
        5.505302299376952,
-       3.320712272791127,
-       2.4790391977599535
+       3.320712272791126,
+       2.47903919775996
       ],
       "interp": "smooth"
      },
@@ -53461,8 +53631,8 @@
       "time": 91.37615,
       "value": [
        5.505302299376952,
-       0.12071227279112673,
-       3.0790391977599536
+       0.12071227279112584,
+       3.0790391977599603
       ],
       "interp": "step"
      }
@@ -53480,8 +53650,8 @@
       "time": 90.55046,
       "value": [
        4.120330355749098,
-       1.1521521589927217,
-       2.12669657056794
+       1.1521521589927213,
+       2.1266965705679395
       ],
       "interp": "smooth"
      },
@@ -53489,8 +53659,8 @@
       "time": 91.37615,
       "value": [
        4.120330355749098,
-       -2.0478478410072785,
-       2.72669657056794
+       -2.047847841007279,
+       2.7266965705679396
       ],
       "interp": "step"
      }
@@ -53508,8 +53678,8 @@
       "time": 90.82569,
       "value": [
        2.877571802802607,
-       0.7681743209802838,
-       3.1670124122709415
+       0.768174320980286,
+       3.167012412270939
       ],
       "interp": "smooth"
      },
@@ -53517,8 +53687,8 @@
       "time": 91.37615,
       "value": [
        2.877571802802607,
-       -2.4318256790197164,
-       3.7670124122709416
+       -2.431825679019714,
+       3.767012412270939
       ],
       "interp": "step"
      }

@@ -465,9 +465,16 @@ def colour_wave(b):
                                            (t1, [x, 1.4, zs[1]], "step")])
         f.track(f"lights/{name}/intensity", [(0.0, 0.0, "step"), (t0 - 0.05, 0.0, "smooth"), (t0 + 0.15, 40.0, "smooth"),
                                             (t1 - 0.1, 40.0, "smooth"), (t1, 0.0, "step")])
-    # the lines catch the colour as the front passes each object's middle (front at z(t) = 2.4 - 9 (t - t0)/(t1 - t0))
-    for o, zc in (("hallFurn", 0.0), ("hallStair", -2.5), ("hallShell", -2.0), ("hallDisco", -2.0)):
+    # the lines catch the colour as the front passes each object's middle (front at z(t) = 2.4 - 9 (t - t0)/(t1 - t0)):
+    # a flash of line light tinted by one channel of the surface's edge multiplier, a different hue per object, so the
+    # colour travels through the hall object by object
+    tints = [(0, 3.0), (2, 3.0), (1, 2.5), (0, 2.0), (2, 2.5)]
+    for j, (o, zc) in enumerate((("hallFurn", 0.6), ("hallDisco", 0.0), ("hallStair", -2.5), ("hallShell", -2.0),
+                                 ("livShell", -0.5))):
         tc = t0 + (zs[0] - zc) / (zs[0] - zs[1]) * (t1 - t0)
-        c = b.clap(f"wave_{o}", tc, attack=0.05, release=0.35)
+        c = b.clap(f"wave_{o}", tc, attack=0.06, release=0.45)
         f.route(c, f"sdf/{o}/look/edge/intensity", 10.0)
+        comp, amt = tints[j % len(tints)]
+        for k in (K.FILL, K.FLOOR, K.ACCENT):
+            f.route(c, f"sdf/{o}/surface/{k}/edge", amt, component=comp)
     b.palette_at(t0 + 0.1, "P11open", ramp=t1 - t0 - 0.1)
