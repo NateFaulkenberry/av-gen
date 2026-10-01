@@ -667,7 +667,7 @@ audio via BlackHole.
 - `sonic.live` projects;
 - a real CoreMIDI source (`[device]`).
 
-## Live art (art agent, 2026-09-30, `01-brief-live.md` PARTS 15-16) -- done; the last review media and the frame cost were finishing at 21:20
+## Live art (art agent, 2026-09-30, `01-brief-live.md` PARTS 15-16) -- done
 
 ### Resume here (live art)
 
@@ -733,7 +733,21 @@ sharpness 4; a world's forms appear from a weight of 0.375 and are full by 0.8; 
 
 ### Frame cost and tests
 
-(pending: being measured)
+- **Live, in the real app** (the probe's `patches` through every world, live MIDI and audio, no capture; this Mac's
+  window maximised: a 3304x1978 canvas, the adaptive scale at its 0.5 floor, a 1652x988 scene): default tier 29.7 ms
+  p50 (34 fps), GPU 29.0-31.5 ms per world; Preview 19.8 ms (50 fps), GPU 19.0-21.6 ms. The owner's canvas
+  (1640x1326) is a third of these pixels. The Live panel at Preview: 45 fps, MIDI to frame 11.7 ms, audio analysis to
+  frame 14.0 ms, 0 dropped.
+- **The art's own cost** (headless 1080p A/B on one recording, the engineer's live project against this one): -0.4 to
+  +1.9 ms GPU in the glass, heavy and strike worlds. The garden is dearer only because a soft pad now lands there and
+  marches its air; the live fog march runs 24 steps (garden at the default tier 43.8 -> 33.2 ms at 1080p), which
+  took every world in the live run about 8 ms cheaper (38.0 -> 29.7 ms p50).
+- **Tests:** `tools/gpu-lock.sh`-held run of `build/release/tests/avgen_tests "[sonic]"`: binary exit 0, "All tests
+  passed (206898 assertions in 27 test cases)". No engine code changed; `--audit-routes` on the live project: 452/452
+  routes and both tracks live, 0 warnings.
+- **Found for the engineer (not changed):** a MIDI input chosen by name does not connect a source that appears later
+  (`onSourceAdded` connects only under the wildcard); once in eight runs All MIDI inputs connected the probe's new
+  virtual source about 2.7 s late.
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
