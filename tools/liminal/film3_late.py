@@ -51,8 +51,8 @@ def gallery_room():
         px, pz = r * math.sin(a), r * math.cos(a)
         ped = ls.tag(X_(((-0.22, 0.22), (0.0, h), (-0.22, 0.22))), "shelf", id=f"{name}Plinth", room="gallery") if h > 0.05 else None
         item = R_([0, 0, 0], builder(), name=name + "Spin")
-        if name == "galClock":
-            ls.tag(item, "prop", id="GalleryClock", room="gallery")
+        if name in ("galClock", "galFrame"):
+            ls.tag(item, "prop", id={"galClock": "GalleryClock", "galFrame": "GalleryFrame"}[name], room="gallery")
         body = U_(*(c for c in (ped, T_([0, h, 0], item)) if c is not None))
         tree = place_(body, (px, 0.0, pz), ang + 180.0)
         objs.append((name, tree, role, (px - 1.2, -0.05, pz - 1.2), (px + 1.2, h + 1.9, pz + 1.2)))
@@ -202,14 +202,14 @@ def build(b):
         back = bar <= 78
         for j, (wd, wb, bt) in enumerate(seq):
             jj = j if seq[0][0] == "IS" else j + 1                 # the column a word sits in (IS, THAT, ALL, YOU)
-            along = -2.3 + 1.25 * jj + (0.25 if bar % 2 else 0.0)
-            yy = 2.65 - 0.42 * jj - (0.12 if bar % 2 else 0.0)
+            along = -2.2 + 1.2 * jj + (0.2 if bar % 2 else 0.0)
+            yy = 2.75 - 0.52 * jj - (0.06 if bar % 2 else 0.0)
             if wd == "GOT?":
-                along, yy = 0.6, 0.62
+                along, yy = 0.6, 0.5
             pos, nrm = ((along, yy, -3.49), (0, 0, 1)) if back else ((-3.49, yy, -along), (1, 0, 0))
             te = t(wb, bt)
             b.word(wd + ("..." if bar == 82 and wd == "YOU" else ""), te, te + G.BAR2 * 0.85, pos, nrm,
-                   0.36 if wd != "GOT?" else 0.9, style="flash" if wd != "GOT?" else "pop", role="word",
+                   0.36 if wd != "GOT?" else 0.7, style="flash" if wd != "GOT?" else "pop", role="word",
                    name=f"isth{wi:02d}", intensity=3.6 if wd != "GOT?" else 6.0, tin=0.1, tout=0.3, room="gallery")
             target = items[(wi * 4 + j) % len(items)]
             c = b.clap(f"lit{wi:02d}", te, release=0.45)

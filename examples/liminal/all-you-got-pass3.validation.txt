@@ -1,115 +1,25 @@
 ROOM VALIDATION
 
 Errors: 0
-Warnings: 23
+Warnings: 13
 Notes: 2
 
 WARNING
-Painting_01 has no valid support relationship: 1.53m from wall -x of gallery, facing 10 degrees off
-angle: 10.0
-wallDistance: 1.53
-
-Suggested correction:
-move Painting_01 onto wall -x (1.53m)
-(in: gallery)
-
-WARNING
-isth00 is jammed against isth01 (0.08m of a 0.15m margin)
-gap: 0.079
+isth14 is jammed against isth15 (0.11m of a 0.15m margin)
+gap: 0.114
 margin: 0.15
 
 Suggested correction:
-move isth00 along wall -z to [-0.803,2.12,-3.495]
-(in: gallery)
-
-WARNING
-isth04 is jammed against isth05 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth04 along wall -z to [-1.053,2.22,-3.495]
-(in: gallery)
-
-WARNING
-isth08 is jammed against isth09 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth08 along wall -z to [-0.803,2.12,-3.495]
-(in: gallery)
-
-WARNING
-isth12 is jammed against isth13 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth12 along wall -z to [-1.053,2.22,-3.495]
-(in: gallery)
-
-WARNING
-isth14 is jammed against isth15 (0.08m of a 0.15m margin)
-gap: 0.08
-margin: 0.15
-
-Suggested correction:
-move isth14 along wall -z to [1.427,1.377,-3.495]
+move isth14 along wall -z to [1.377,1.177,-3.495]
 (in: gallery)
 
 WARNING
 isth15 is jammed against the edge of wall -z (0.10m of a 0.15m margin)
-gap: 0.102
+gap: 0.097
 margin: 0.15
 
 Suggested correction:
-move isth15 along wall -z to [0.608,0.668,-3.495]
-(in: gallery)
-
-WARNING
-isth17 is jammed against isth18 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth17 along wall -x to [-3.495,2.12,0.798]
-(in: gallery)
-
-WARNING
-isth21 is jammed against isth22 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth21 along wall -x to [-3.495,2.22,1.048]
-(in: gallery)
-
-WARNING
-isth25 is jammed against isth26 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth25 along wall -x to [-3.495,2.12,0.798]
-(in: gallery)
-
-WARNING
-isth29 is jammed against isth30 (0.08m of a 0.15m margin)
-gap: 0.079
-margin: 0.15
-
-Suggested correction:
-move isth29 along wall -x to [-3.495,2.22,1.048]
-(in: gallery)
-
-WARNING
-isth30 is jammed against isth31 (0.08m of a 0.15m margin)
-gap: 0.075
-margin: 0.15
-
-Suggested correction:
-move isth30 along wall -x to [-3.495,1.82,-0.21]
+move isth15 along wall -z to [0.579,0.553,-3.495]
 (in: gallery)
 
 WARNING
@@ -189,9 +99,9 @@ Room_16 sits under a repeat/mirror/fold; its placement is not checked
 
 PASS
 87 architectural relationships
-297 entity placements
+299 entity placements
 5 furniture relationships
 13 character poses
 158 entities complete
-210 lyric placements
+227 lyric placements
 12 camera paths clear
