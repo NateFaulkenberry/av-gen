@@ -138,6 +138,7 @@ class Film:
         self.palette_states: list[dict] = []
         self.bindings: list[dict] = []
         self.report: list[str] = []
+        self._paths = {}
 
     # ---- SDF objects with the line look ---------------------------------------------------------------
     def sdf(self, name, tree, *, edge=(1.0, 1.0, 1.0), edge_intensity=4.0, edge_width=0.012, surfaces=None,
@@ -269,6 +270,178 @@ class Film:
                 fovk.append([t1 - 1e-4, float(f[-1][1]), "step"])
             sway += [[t0, float(s["sway"]), "step"], [t1 - 1e-4, float(s["sway"]), "step"]]
         return chapters, dist, lookat, fovk, sway
+
+    def camera_at(self, tt):
+        """(eye, target, vertical fov degrees, shot name) at time tt, as the journey will place it (no breathing)."""
+        for s in self.shots:
+            if s["t0"] - 1e-6 <= tt < s["t1"]:
+                break
+        else:
+            return None
+        eye = s["eye"] if len(s["eye"]) > 1 else [s["eye"][0], [s["eye"][0][0] + 0.001, s["eye"][0][1], s["eye"][0][2]]]
+        moves = s["moves"] or [(s["t0"], 0.0), (s["t1"], 1.0)]
+        f = moves[0][1]
+        for (ta, fa), (tb, fb) in zip(moves, moves[1:]):
+            if ta - 1e-9 <= tt <= tb + 1e-9:
+                f = fa + (fb - fa) * ease((tt - ta) / max(tb - ta, 1e-9), s["ease"])
+                break
+            if tt > tb:
+                f = fb
+        key = id(s)
+        if key not in self._paths:
+            d0 = [b - a for a, b in zip(eye[0], eye[1])]
+            L0 = math.sqrt(sum(v * v for v in d0)) or 1.0
+            d1 = [b - a for a, b in zip(eye[-2], eye[-1])]
+            L1 = math.sqrt(sum(v * v for v in d1)) or 1.0
+            pts = [[eye[0][j] - d0[j] / L0 * 2.0 for j in range(3)]] + eye + \
+                  [[eye[-1][j] + d1[j] / L1 * L for j in range(3)] for L in (6.0, 14.0)]
+            self._paths[key] = EnginePath(pts)
+        path = self._paths[key]
+        sa, sb = path.at_point[1], path.at_point[len(eye)]
+        pos = path.point(sa + (sb - sa) * f)
+        if s["look_keys"]:
+            lk = s["look_keys"]
+            tgt = lk[0][1]
+            for (ta, pa), (tb, pb) in zip(lk, lk[1:]):
+                if ta <= tt <= tb:
+                    u = (tt - ta) / max(tb - ta, 1e-9)
+                    u = u * u * (3 - 2 * u)
+                    tgt = [x + (y - x) * u for x, y in zip(pa, pb)]
+                    break
+                if tt > tb:
+                    tgt = pb
+        else:
+            tgt = s["look"]
+        fov = s["fov"] if s["fov"] is not None else 60.0
+        if not isinstance(fov, (int, float)):
+            fv = fov[0][1]
+            for (ta, va), (tb, vb) in zip(fov, fov[1:]):
+                if ta <= tt <= tb:
+                    fv = va + (vb - va) * (tt - ta) / max(tb - ta, 1e-9)
+                    break
+                if tt > tb:
+                    fv = vb
+            fov = fv
+        return pos, list(tgt), float(fov), s["name"]
+
+    def basis(self, tt):
+        eye, tgt, fov, shot = self.camera_at(tt)
+        fwd = [b - a for a, b in zip(eye, tgt)]
+        L = math.sqrt(sum(v * v for v in fwd)) or 1.0
+        fwd = [v / L for v in fwd]
+        right = [fwd[1] * 0.0 - fwd[2] * 1.0, fwd[2] * 0.0 - fwd[0] * 0.0, fwd[0] * 1.0 - fwd[1] * 0.0]
+        right = [-fwd[2], 0.0, fwd[0]]
+        Lr = math.sqrt(sum(v * v for v in right)) or 1.0
+        right = [v / Lr for v in right]
+        up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]]
+        return eye, fwd, right, up, fov
+
+    def ray(self, tt, sx, sy, aspect=16 / 9):
+        """The eye and the unit direction through screen point (sx, sy) in [-1, 1] (x right, y up) at time tt."""
+        eye, fwd, right, up, fov = self.basis(tt)
+        ty = math.tan(math.radians(fov / 2))
+        tx = ty * aspect
+        d = [f + r * sx * tx + u * sy * ty for f, r, u in zip(fwd, right, up)]
+        L = math.sqrt(sum(v * v for v in d))
+        return eye, [v / L for v in d], fwd
+
+    @staticmethod
+    def flat_tilt(normal, fwd):
+        """The in-plane turn that makes floor or ceiling text read the right way up for a camera facing fwd."""
+        fx, fz = fwd[0], fwd[2]
+        if normal[1] > 0.5:       # floor: the text's top away from the camera
+            return math.degrees(math.atan2(-fx, -fz))
+        if normal[1] < -0.5:      # ceiling: the text's top towards the camera's back
+            return math.degrees(math.atan2(fx, -fz))
+        return 0.0
+
+    def on_box(self, tt, sx, sy, ext, inset=0.004):
+        """Where the view ray through (sx, sy) at tt meets the inside of the room box `ext`: (point, inward
+        normal, tilt for flat surfaces, distance)."""
+        eye, d, fwd = self.ray(tt, sx, sy)
+        # the slab method: where the ray LEAVES the box is a wall, floor or ceiling seen from inside, whether the
+        # eye is inside the room or still in its doorway
+        t_exit, n_exit = None, None
+        for ax in range(3):
+            if abs(d[ax]) < 1e-9:
+                continue
+            lo, hi = ext[ax]
+            t_far = (hi - eye[ax]) / d[ax] if d[ax] > 0 else (lo - eye[ax]) / d[ax]
+            if t_exit is None or t_far < t_exit:
+                t_exit = t_far
+                n_exit = [0.0, 0.0, 0.0]
+                n_exit[ax] = -1.0 if d[ax] > 0 else 1.0
+        dist, n = t_exit, n_exit
+        p = [e + v * dist + nn * inset for e, v, nn in zip(eye, d, n)]
+        return p, n, self.flat_tilt(n, fwd), dist
+
+    def on_ground(self, tt, sx, sy, ground, inset=0.06, far=120.0):
+        """Where the view ray meets the terrain `ground(x, z)` (a march then a bisection): (point, up)."""
+        eye, d, fwd = self.ray(tt, sx, sy)
+        prev = 0.0
+        step = 0.25
+        s_ = 0.5
+        while s_ < far:
+            p = [e + v * s_ for e, v in zip(eye, d)]
+            if p[1] <= ground(p[0], p[2]):
+                lo, hi = prev, s_
+                for _ in range(30):
+                    m = (lo + hi) / 2
+                    q = [e + v * m for e, v in zip(eye, d)]
+                    if q[1] <= ground(q[0], q[2]):
+                        hi = m
+                    else:
+                        lo = m
+                q = [e + v * hi for e, v in zip(eye, d)]
+                q[1] += inset
+                return q, [0.0, 1.0, 0.0], self.flat_tilt([0, 1, 0], fwd), hi
+            prev = s_
+            s_ += step
+            step = min(step * 1.08, 3.0)
+        return None
+
+    def in_view(self, tt, sx, sy, dist):
+        """A point `dist` metres out along the view ray through (sx, sy), facing back at the camera."""
+        eye, d, fwd = self.ray(tt, sx, sy)
+        p = [e + v * dist for e, v in zip(eye, d)]
+        return p, [-v for v in d], 0.0, dist
+
+    def check_words(self, words, aspect=16 / 9):
+        """Words that are off screen, behind the camera or facing away at the moment they appear (+0.15 s)."""
+        bad = []
+        for w in words:
+            cam = self.camera_at(w["t0"] + 0.15)
+            if cam is None:
+                bad.append((w["t0"], w["text"], "no shot"))
+                continue
+            eye, tgt, fov, shot = cam
+            fwd = [b - a for a, b in zip(eye, tgt)]
+            L = math.sqrt(sum(v * v for v in fwd)) or 1.0
+            fwd = [v / L for v in fwd]
+            up0 = [0.0, 1.0, 0.0]
+            right = [fwd[1] * up0[2] - fwd[2] * up0[1], fwd[2] * up0[0] - fwd[0] * up0[2], fwd[0] * up0[1] - fwd[1] * up0[0]]
+            Lr = math.sqrt(sum(v * v for v in right)) or 1.0
+            right = [v / Lr for v in right]
+            up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]]
+            d = [b - a for a, b in zip(eye, w["position"])]
+            z = sum(a * b for a, b in zip(d, fwd))
+            if z <= 0.05:
+                bad.append((w["t0"], w["text"], f"behind the camera in {shot}"))
+                continue
+            x = sum(a * b for a, b in zip(d, right)) / z
+            y = sum(a * b for a, b in zip(d, up)) / z
+            ty = math.tan(math.radians(fov / 2))
+            tx = ty * aspect
+            n = w.get("normal", [0, 0, 1])
+            facing = -sum(a * b for a, b in zip(d, n))
+            why = []
+            if abs(x) > tx * 1.02 or abs(y) > ty * 1.02:
+                why.append(f"off screen ({x / tx:+.2f}, {y / ty:+.2f}) in {shot}")
+            if "rotation" not in w and facing <= 0:
+                why.append(f"faces away in {shot}")
+            if why:
+                bad.append((round(w["t0"], 2), w["text"], "; ".join(why)))
+        return bad
 
     # ---- palette --------------------------------------------------------------------------------------------
     def palette(self, name, **roles):

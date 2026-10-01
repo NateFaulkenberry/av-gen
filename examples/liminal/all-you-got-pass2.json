@@ -497,16 +497,6 @@
      },
      {
       "channel": "lit00",
-      "time": 164.86239,
-      "units": "seconds",
-      "attack": 0.0,
-      "hold": 0.0,
-      "release": 0.45,
-      "curve": "exp",
-      "strength": 1.0
-     },
-     {
-      "channel": "lit01",
       "time": 165.13761,
       "units": "seconds",
       "attack": 0.0,
@@ -516,7 +506,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit02",
+      "channel": "lit01",
       "time": 165.40788,
       "units": "seconds",
       "attack": 0.0,
@@ -526,7 +516,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit03",
+      "channel": "lit02",
       "time": 165.67816,
       "units": "seconds",
       "attack": 0.0,
@@ -536,7 +526,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit04",
+      "channel": "lit03",
       "time": 167.02951,
       "units": "seconds",
       "attack": 0.0,
@@ -546,7 +536,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit05",
+      "channel": "lit04",
       "time": 167.29978,
       "units": "seconds",
       "attack": 0.0,
@@ -556,7 +546,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit06",
+      "channel": "lit05",
       "time": 167.57005,
       "units": "seconds",
       "attack": 0.0,
@@ -566,7 +556,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit07",
+      "channel": "lit06",
       "time": 167.84032,
       "units": "seconds",
       "attack": 0.0,
@@ -576,7 +566,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit08",
+      "channel": "lit07",
       "time": 169.19167,
       "units": "seconds",
       "attack": 0.0,
@@ -586,7 +576,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit09",
+      "channel": "lit08",
       "time": 169.46194,
       "units": "seconds",
       "attack": 0.0,
@@ -596,7 +586,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit10",
+      "channel": "lit09",
       "time": 169.73221,
       "units": "seconds",
       "attack": 0.0,
@@ -606,7 +596,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit11",
+      "channel": "lit10",
       "time": 170.00248,
       "units": "seconds",
       "attack": 0.0,
@@ -616,7 +606,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit12",
+      "channel": "lit11",
       "time": 171.35383,
       "units": "seconds",
       "attack": 0.0,
@@ -626,7 +616,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit13",
+      "channel": "lit12",
       "time": 171.6241,
       "units": "seconds",
       "attack": 0.0,
@@ -636,7 +626,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit14",
+      "channel": "lit13",
       "time": 171.89437,
       "units": "seconds",
       "attack": 0.0,
@@ -646,7 +636,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit15",
+      "channel": "lit14",
       "time": 172.16464,
       "units": "seconds",
       "attack": 0.0,
@@ -656,7 +646,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit16",
+      "channel": "lit15",
       "time": 172.43491,
       "units": "seconds",
       "attack": 0.0,
@@ -666,7 +656,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit17",
+      "channel": "lit16",
       "time": 173.51599,
       "units": "seconds",
       "attack": 0.0,
@@ -676,7 +666,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit18",
+      "channel": "lit17",
       "time": 173.78626,
       "units": "seconds",
       "attack": 0.0,
@@ -686,7 +676,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit19",
+      "channel": "lit18",
       "time": 174.05653,
       "units": "seconds",
       "attack": 0.0,
@@ -696,7 +686,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit20",
+      "channel": "lit19",
       "time": 174.3268,
       "units": "seconds",
       "attack": 0.0,
@@ -706,7 +696,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit21",
+      "channel": "lit20",
       "time": 175.67816,
       "units": "seconds",
       "attack": 0.0,
@@ -716,7 +706,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit22",
+      "channel": "lit21",
       "time": 175.94843,
       "units": "seconds",
       "attack": 0.0,
@@ -726,7 +716,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit23",
+      "channel": "lit22",
       "time": 176.2187,
       "units": "seconds",
       "attack": 0.0,
@@ -736,7 +726,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit24",
+      "channel": "lit23",
       "time": 176.48897,
       "units": "seconds",
       "attack": 0.0,
@@ -746,7 +736,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit25",
+      "channel": "lit24",
       "time": 177.84032,
       "units": "seconds",
       "attack": 0.0,
@@ -756,7 +746,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit26",
+      "channel": "lit25",
       "time": 178.11059,
       "units": "seconds",
       "attack": 0.0,
@@ -766,7 +756,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit27",
+      "channel": "lit26",
       "time": 178.38086,
       "units": "seconds",
       "attack": 0.0,
@@ -776,7 +766,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit28",
+      "channel": "lit27",
       "time": 178.65113,
       "units": "seconds",
       "attack": 0.0,
@@ -786,7 +776,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit29",
+      "channel": "lit28",
       "time": 180.00248,
       "units": "seconds",
       "attack": 0.0,
@@ -796,7 +786,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit30",
+      "channel": "lit29",
       "time": 180.27275,
       "units": "seconds",
       "attack": 0.0,
@@ -806,7 +796,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit31",
+      "channel": "lit30",
       "time": 180.54302,
       "units": "seconds",
       "attack": 0.0,
@@ -816,7 +806,7 @@
       "strength": 1.0
      },
      {
-      "channel": "lit32",
+      "channel": "lit31",
       "time": 180.81329,
       "units": "seconds",
       "attack": 0.0,
@@ -1417,8 +1407,8 @@
       "attack": 0.0,
       "release": 0.2,
       "curve": "smooth",
-      "time": 81.1,
-      "hold": 3.670642201834866
+      "time": 81.6,
+      "hold": 3.170642201834866
      },
      {
       "channel": "w022_PEACE_OF_MIND",
@@ -2150,24 +2140,6 @@
       "hold": 0.550458715596335
      },
      {
-      "channel": "grow00",
-      "units": "seconds",
-      "attack": 0.0,
-      "release": 0.2,
-      "curve": "smooth",
-      "time": 145.3211009174312,
-      "hold": 3.550458715596335
-     },
-     {
-      "channel": "grow01",
-      "units": "seconds",
-      "attack": 0.0,
-      "release": 0.2,
-      "curve": "smooth",
-      "time": 146.42201834862385,
-      "hold": 3.550458715596335
-     },
-     {
       "channel": "grow02",
       "units": "seconds",
       "attack": 0.0,
@@ -2276,16 +2248,16 @@
       "hold": 1.10091743119267
      },
      {
-      "channel": "isth00",
+      "channel": "isFirst",
       "units": "seconds",
       "attack": 0.0,
-      "release": 0.3,
+      "release": 0.2,
       "curve": "smooth",
       "time": 164.86238532110093,
-      "hold": 1.8378378378378386
+      "hold": 0.2752293577981675
      },
      {
-      "channel": "isth01",
+      "channel": "isth00",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2294,7 +2266,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth02",
+      "channel": "isth01",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2303,7 +2275,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth03",
+      "channel": "isth02",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2312,7 +2284,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth04",
+      "channel": "isth03",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2321,7 +2293,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth05",
+      "channel": "isth04",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2330,7 +2302,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth06",
+      "channel": "isth05",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2339,7 +2311,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth07",
+      "channel": "isth06",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2348,7 +2320,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth08",
+      "channel": "isth07",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2357,7 +2329,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth09",
+      "channel": "isth08",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2366,7 +2338,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth10",
+      "channel": "isth09",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2375,7 +2347,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth11",
+      "channel": "isth10",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2384,7 +2356,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth12",
+      "channel": "isth11",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2393,7 +2365,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth13",
+      "channel": "isth12",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2402,7 +2374,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth14",
+      "channel": "isth13",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2411,7 +2383,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth15",
+      "channel": "isth14",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2420,7 +2392,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth16",
+      "channel": "isth15",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2429,7 +2401,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth17",
+      "channel": "isth16",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2438,7 +2410,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth18",
+      "channel": "isth17",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2447,7 +2419,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth19",
+      "channel": "isth18",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2456,7 +2428,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth20",
+      "channel": "isth19",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2465,7 +2437,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth21",
+      "channel": "isth20",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2474,7 +2446,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth22",
+      "channel": "isth21",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2483,7 +2455,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth23",
+      "channel": "isth22",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2492,7 +2464,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth24",
+      "channel": "isth23",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2501,7 +2473,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth25",
+      "channel": "isth24",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2510,7 +2482,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth26",
+      "channel": "isth25",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2519,7 +2491,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth27",
+      "channel": "isth26",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2528,7 +2500,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth28",
+      "channel": "isth27",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2537,7 +2509,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth29",
+      "channel": "isth28",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2546,7 +2518,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth30",
+      "channel": "isth29",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2555,7 +2527,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth31",
+      "channel": "isth30",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -2564,7 +2536,7 @@
       "hold": 1.8378378378378386
      },
      {
-      "channel": "isth32",
+      "channel": "isth31",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.3,
@@ -5431,7 +5403,7 @@
   },
   {
    "source": "grid.song.lit03",
-   "target": "sdf/galCup/look/edge/intensity",
+   "target": "sdf/galTV/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5441,7 +5413,7 @@
   },
   {
    "source": "grid.song.lit04",
-   "target": "sdf/galFrame/look/edge/intensity",
+   "target": "sdf/galBooks/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5451,7 +5423,7 @@
   },
   {
    "source": "grid.song.lit05",
-   "target": "sdf/galTV/look/edge/intensity",
+   "target": "sdf/galPlant/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5461,7 +5433,7 @@
   },
   {
    "source": "grid.song.lit06",
-   "target": "sdf/galBooks/look/edge/intensity",
+   "target": "sdf/galLamp/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5471,7 +5443,7 @@
   },
   {
    "source": "grid.song.lit07",
-   "target": "sdf/galPlant/look/edge/intensity",
+   "target": "sdf/galGlobe/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5481,7 +5453,7 @@
   },
   {
    "source": "grid.song.lit08",
-   "target": "sdf/galChair/look/edge/intensity",
+   "target": "sdf/galCup/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5491,7 +5463,7 @@
   },
   {
    "source": "grid.song.lit09",
-   "target": "sdf/galGlobe/look/edge/intensity",
+   "target": "sdf/galClock/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5501,186 +5473,6 @@
   },
   {
    "source": "grid.song.lit10",
-   "target": "sdf/galCup/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit11",
-   "target": "sdf/galClock/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit12",
-   "target": "sdf/galTV/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit13",
-   "target": "sdf/galBooks/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit14",
-   "target": "sdf/galPlant/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit15",
-   "target": "sdf/galLamp/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit16",
-   "target": "sdf/galChair/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit17",
-   "target": "sdf/galChair/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit18",
-   "target": "sdf/galGlobe/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit19",
-   "target": "sdf/galCup/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit20",
-   "target": "sdf/galClock/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit21",
-   "target": "sdf/galTV/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit22",
-   "target": "sdf/galBooks/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit23",
-   "target": "sdf/galPlant/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit24",
-   "target": "sdf/galLamp/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit25",
-   "target": "sdf/galGlobe/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit26",
-   "target": "sdf/galCup/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit27",
-   "target": "sdf/galClock/look/edge/intensity",
-   "amount": 12.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.lit28",
    "target": "sdf/galFrame/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
@@ -5690,7 +5482,7 @@
    "chain": {}
   },
   {
-   "source": "grid.song.lit29",
+   "source": "grid.song.lit11",
    "target": "sdf/galBooks/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
@@ -5700,7 +5492,7 @@
    "chain": {}
   },
   {
-   "source": "grid.song.lit30",
+   "source": "grid.song.lit12",
    "target": "sdf/galPlant/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
@@ -5710,7 +5502,7 @@
    "chain": {}
   },
   {
-   "source": "grid.song.lit31",
+   "source": "grid.song.lit13",
    "target": "sdf/galLamp/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
@@ -5720,8 +5512,178 @@
    "chain": {}
   },
   {
-   "source": "grid.song.lit32",
+   "source": "grid.song.lit14",
    "target": "sdf/galChair/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit15",
+   "target": "sdf/galGlobe/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit16",
+   "target": "sdf/galGlobe/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit17",
+   "target": "sdf/galCup/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit18",
+   "target": "sdf/galClock/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit19",
+   "target": "sdf/galFrame/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit20",
+   "target": "sdf/galBooks/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit21",
+   "target": "sdf/galPlant/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit22",
+   "target": "sdf/galLamp/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit23",
+   "target": "sdf/galChair/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit24",
+   "target": "sdf/galCup/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit25",
+   "target": "sdf/galClock/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit26",
+   "target": "sdf/galFrame/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit27",
+   "target": "sdf/galTV/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit28",
+   "target": "sdf/galPlant/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit29",
+   "target": "sdf/galLamp/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit30",
+   "target": "sdf/galChair/look/edge/intensity",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.lit31",
+   "target": "sdf/galGlobe/look/edge/intensity",
    "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9230,38 +9192,6 @@
    }
   },
   {
-   "source": "grid.song.grow00",
-   "target": "nodes/grow00/visible",
-   "op": "multiply",
-   "amount": 1000.0
-  },
-  {
-   "source": "grid.song.grow00",
-   "target": "nodes/grow00/scale",
-   "op": "multiply",
-   "amount": 1.0,
-   "chain": {
-    "springHz": 5.0,
-    "springDamping": 0.45
-   }
-  },
-  {
-   "source": "grid.song.grow01",
-   "target": "nodes/grow01/visible",
-   "op": "multiply",
-   "amount": 1000.0
-  },
-  {
-   "source": "grid.song.grow01",
-   "target": "nodes/grow01/scale",
-   "op": "multiply",
-   "amount": 1.0,
-   "chain": {
-    "springHz": 5.0,
-    "springDamping": 0.45
-   }
-  },
-  {
    "source": "grid.song.grow02",
    "target": "nodes/grow02/visible",
    "op": "multiply",
@@ -9451,6 +9381,28 @@
    "chain": {
     "springHz": 5.0,
     "springDamping": 0.45
+   }
+  },
+  {
+   "source": "grid.song.isFirst",
+   "target": "nodes/isFirst/visible",
+   "op": "multiply",
+   "amount": 1000.0
+  },
+  {
+   "source": "grid.song.isFirst",
+   "target": "nodes/isFirst/scale",
+   "op": "multiply",
+   "amount": 1.0
+  },
+  {
+   "source": "grid.song.isFirst",
+   "target": "nodes/isFirst/emissiveBoost",
+   "op": "add",
+   "amount": 6.0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 80.0
    }
   },
   {
@@ -9793,16 +9745,10 @@
    "source": "grid.song.isth15",
    "target": "nodes/isth15/scale",
    "op": "multiply",
-   "amount": 1.0
-  },
-  {
-   "source": "grid.song.isth15",
-   "target": "nodes/isth15/emissiveBoost",
-   "op": "add",
-   "amount": 6.0,
+   "amount": 1.0,
    "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
+    "springHz": 10.0,
+    "springDamping": 0.45
    }
   },
   {
@@ -9815,10 +9761,16 @@
    "source": "grid.song.isth16",
    "target": "nodes/isth16/scale",
    "op": "multiply",
-   "amount": 1.0,
+   "amount": 1.0
+  },
+  {
+   "source": "grid.song.isth16",
+   "target": "nodes/isth16/emissiveBoost",
+   "op": "add",
+   "amount": 6.0,
    "chain": {
-    "springHz": 10.0,
-    "springDamping": 0.45
+    "attackMs": 0,
+    "decayMs": 100.0
    }
   },
   {
@@ -10144,28 +10096,6 @@
   {
    "source": "grid.song.isth31",
    "target": "nodes/isth31/emissiveBoost",
-   "op": "add",
-   "amount": 6.0,
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 100.0
-   }
-  },
-  {
-   "source": "grid.song.isth32",
-   "target": "nodes/isth32/visible",
-   "op": "multiply",
-   "amount": 1000.0
-  },
-  {
-   "source": "grid.song.isth32",
-   "target": "nodes/isth32/scale",
-   "op": "multiply",
-   "amount": 1.0
-  },
-  {
-   "source": "grid.song.isth32",
-   "target": "nodes/isth32/emissiveBoost",
    "op": "add",
    "amount": 6.0,
    "chain": {
@@ -20482,315 +20412,315 @@
      {
       "time": 113.94495,
       "value": [
-       17002.09701
+       17002.05303
       ],
       "interp": "linear"
      },
      {
       "time": 114.04504,
       "value": [
-       17002.09979
+       17002.05546
       ],
       "interp": "linear"
      },
      {
       "time": 114.14512,
       "value": [
-       17002.10796
+       17002.06261
       ],
       "interp": "linear"
      },
      {
       "time": 114.2452,
       "value": [
-       17002.12125
+       17002.07424
       ],
       "interp": "linear"
      },
      {
       "time": 114.34529,
       "value": [
-       17002.13942
+       17002.09013
       ],
       "interp": "linear"
      },
      {
       "time": 114.44537,
       "value": [
-       17002.16221
+       17002.11006
       ],
       "interp": "linear"
      },
      {
       "time": 114.54545,
       "value": [
-       17002.18936
+       17002.1338
       ],
       "interp": "linear"
      },
      {
       "time": 114.64554,
       "value": [
-       17002.22061
+       17002.16114
       ],
       "interp": "linear"
      },
      {
       "time": 114.74562,
       "value": [
-       17002.25571
+       17002.19184
       ],
       "interp": "linear"
      },
      {
       "time": 114.8457,
       "value": [
-       17002.2944
+       17002.22568
       ],
       "interp": "linear"
      },
      {
       "time": 114.94579,
       "value": [
-       17002.33643
+       17002.26244
       ],
       "interp": "linear"
      },
      {
       "time": 115.04587,
       "value": [
-       17002.38154
+       17002.30189
       ],
       "interp": "linear"
      },
      {
       "time": 115.14595,
       "value": [
-       17002.42946
+       17002.34381
       ],
       "interp": "linear"
      },
      {
       "time": 115.24604,
       "value": [
-       17002.47996
+       17002.38797
       ],
       "interp": "linear"
      },
      {
       "time": 115.34612,
       "value": [
-       17002.53276
+       17002.43416
       ],
       "interp": "linear"
      },
      {
       "time": 115.44621,
       "value": [
-       17002.58761
+       17002.48213
       ],
       "interp": "linear"
      },
      {
       "time": 115.54629,
       "value": [
-       17002.64426
+       17002.53168
       ],
       "interp": "linear"
      },
      {
       "time": 115.64637,
       "value": [
-       17002.70245
+       17002.58257
       ],
       "interp": "linear"
      },
      {
       "time": 115.74646,
       "value": [
-       17002.76192
+       17002.63459
       ],
       "interp": "linear"
      },
      {
       "time": 115.84654,
       "value": [
-       17002.82241
+       17002.6875
       ],
       "interp": "linear"
      },
      {
       "time": 115.94662,
       "value": [
-       17002.88368
+       17002.74109
       ],
       "interp": "linear"
      },
      {
       "time": 116.04671,
       "value": [
-       17002.94546
+       17002.79512
       ],
       "interp": "linear"
      },
      {
       "time": 116.14679,
       "value": [
-       17003.00749
+       17002.84938
       ],
       "interp": "linear"
      },
      {
       "time": 116.24687,
       "value": [
-       17003.06953
+       17002.90364
       ],
       "interp": "linear"
      },
      {
       "time": 116.34696,
       "value": [
-       17003.13131
+       17002.95767
       ],
       "interp": "linear"
      },
      {
       "time": 116.44704,
       "value": [
-       17003.19257
+       17003.01126
       ],
       "interp": "linear"
      },
      {
       "time": 116.54712,
       "value": [
-       17003.25307
+       17003.06417
       ],
       "interp": "linear"
      },
      {
       "time": 116.64721,
       "value": [
-       17003.31254
+       17003.11619
       ],
       "interp": "linear"
      },
      {
       "time": 116.74729,
       "value": [
-       17003.37073
+       17003.16708
       ],
       "interp": "linear"
      },
      {
       "time": 116.84737,
       "value": [
-       17003.42738
+       17003.21663
       ],
       "interp": "linear"
      },
      {
       "time": 116.94746,
       "value": [
-       17003.48223
+       17003.26461
       ],
       "interp": "linear"
      },
      {
       "time": 117.04754,
       "value": [
-       17003.53503
+       17003.31079
       ],
       "interp": "linear"
      },
      {
       "time": 117.14762,
       "value": [
-       17003.58552
+       17003.35495
       ],
       "interp": "linear"
      },
      {
       "time": 117.24771,
       "value": [
-       17003.63345
+       17003.39687
       ],
       "interp": "linear"
      },
      {
       "time": 117.34779,
       "value": [
-       17003.67856
+       17003.43632
       ],
       "interp": "linear"
      },
      {
       "time": 117.44787,
       "value": [
-       17003.72058
+       17003.47308
       ],
       "interp": "linear"
      },
      {
       "time": 117.54796,
       "value": [
-       17003.75928
+       17003.50692
       ],
       "interp": "linear"
      },
      {
       "time": 117.64804,
       "value": [
-       17003.79438
+       17003.53762
       ],
       "interp": "linear"
      },
      {
       "time": 117.74812,
       "value": [
-       17003.82563
+       17003.56496
       ],
       "interp": "linear"
      },
      {
       "time": 117.84821,
       "value": [
-       17003.85278
+       17003.5887
       ],
       "interp": "linear"
      },
      {
       "time": 117.94829,
       "value": [
-       17003.87557
+       17003.60863
       ],
       "interp": "linear"
      },
      {
       "time": 118.04837,
       "value": [
-       17003.89374
+       17003.62452
       ],
       "interp": "linear"
      },
      {
       "time": 118.14846,
       "value": [
-       17003.90703
+       17003.63615
       ],
       "interp": "linear"
      },
      {
       "time": 118.24854,
       "value": [
-       17003.9152
+       17003.6433
       ],
       "interp": "linear"
      },
      {
       "time": 118.34862,
       "value": [
-       17003.91798
+       17003.64573
       ],
       "interp": "step"
      },
@@ -30840,7 +30770,7 @@
       "time": 81.46789,
       "value": [
        0.0,
-       0.9,
+       0.5,
        -4.3
       ],
       "interp": "step"
@@ -30849,7 +30779,7 @@
       "time": 90.27513,
       "value": [
        0.0,
-       0.9,
+       0.5,
        -4.3
       ],
       "interp": "step"
@@ -31019,18 +30949,18 @@
      {
       "time": 113.94495,
       "value": [
-       -1.9,
-       0.9,
-       -0.5
+       2.2,
+       0.95,
+       -0.3
       ],
       "interp": "step"
      },
      {
       "time": 118.34852,
       "value": [
-       -1.9,
-       0.9,
-       -0.5
+       2.2,
+       0.95,
+       -0.3
       ],
       "interp": "step"
      },
@@ -51325,6 +51255,61 @@
     ]
    },
    {
+    "target": "sdf/galMan/node/galManHead/rotation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 172.43291,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 172.55491,
+      "value": [
+       0.0,
+       78.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 175.94843,
+      "value": [
+       0.0,
+       78.0,
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 177.02951,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "sdf/galLamp/transform/scale",
     "component": -1,
     "timeBase": "seconds",
@@ -58106,19 +58091,19 @@
     "mode": "multiply"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w000_ALL_YOU_GOT/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w001_ALL_YOU_GOT/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w002_ALL_YOU_GOT/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w003_ALL_YOU_GOT/material/emissiveColor"
    },
    {
@@ -58130,11 +58115,11 @@
     "target": "procedural/w005_ALL_YOU_GOT/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w006_ALL_YOU_GOT/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w007_ALL_YOU_GOT/material/emissiveColor"
    },
    {
@@ -58154,11 +58139,11 @@
     "target": "procedural/w011_BREATHE_AND_GROW/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "word",
     "target": "procedural/w012_CAN_YOU_TELL_ME/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "accent",
     "target": "procedural/w013_IT_S_FINE_THOUGH/material/emissiveColor"
    },
    {
@@ -58486,7 +58471,7 @@
     "target": "procedural/v2w21/material/emissiveColor"
    },
    {
-    "role": "screen",
+    "role": "word",
     "target": "procedural/v2w22/material/emissiveColor"
    },
    {
@@ -58516,14 +58501,6 @@
    {
     "role": "word",
     "target": "procedural/fig66_5/material/emissiveColor"
-   },
-   {
-    "role": "word",
-    "target": "procedural/grow00/material/emissiveColor"
-   },
-   {
-    "role": "word",
-    "target": "procedural/grow01/material/emissiveColor"
    },
    {
     "role": "word",
@@ -58572,6 +58549,10 @@
    {
     "role": "word",
     "target": "procedural/grow13/material/emissiveColor"
+   },
+   {
+    "role": "word",
+    "target": "procedural/isFirst/material/emissiveColor"
    },
    {
     "role": "word",
@@ -58700,10 +58681,6 @@
    {
     "role": "word",
     "target": "procedural/isth31/material/emissiveColor"
-   },
-   {
-    "role": "word",
-    "target": "procedural/isth32/material/emissiveColor"
    },
    {
     "role": "accent",

@@ -126,7 +126,7 @@ def build_part2(b, end):
         "stu": [
             [((-1.0, 1.75, -1.69), (0, 0, 1), 0.3, -4), ((0.0, 0.762, -1.45), (0, 1, 0), 0.12, 15), ((0.3, 1.55, -1.66), (0, 0, 1), 0.36, 0)],
             [((-1.79, 2.15, 0.6), (1, 0, 0), 0.28, 0), ((-0.3, 0.01, 0.6), (0, 1, 0), 0.4, -20), ((1.79, 1.7, -0.9), (-1, 0, 0), 0.44, 6)],
-            [((0.4, 2.59, -0.3), (0, -1, 0), 0.34, 0), ((0.2, 0.95, -0.72), (0, 0, 1), 0.08, 0), ((1.79, 1.6, 0.2), (-1, 0, 0), 0.22, 0)],
+            [((0.4, 2.59, -0.3), (0, -1, 0), 0.34, 0), ((0.2, 0.475, -0.7), (0, 1, 0), 0.12, 0), ((1.79, 1.6, 0.9), (-1, 0, 0), 0.22, 0)],
             [((-0.9, 2.3, -1.69), (0, 0, 1), 0.2, 0), ((-0.9, 2.02, -1.69), (0, 0, 1), 0.2, 0), ((-0.9, 1.68, -1.69), (0, 0, 1), 0.3, 0)]],
         "bath": [
             [((0.75, 1.62, -1.37), (0, 0, 1), 0.16, 0), ((-1.02, 0.6, 0.25), (0, 1, 0), 0.24, 90), ((0.0, 0.01, 0.6), (0, 1, 0), 0.5, 0)],
@@ -134,10 +134,10 @@ def build_part2(b, end):
             [((1.49, 1.9, 0.2), (-1, 0, 0), 0.32, -10), ((1.49, 1.45, 0.2), (-1, 0, 0), 0.32, 0), ((1.49, 0.95, 0.2), (-1, 0, 0), 0.32, 10)],
             [((-0.3, 1.2, -1.39), (0, 0, 1), 0.5, 0), ((0.75, 1.42, -1.37), (0, 0, 1), 0.16, 0), ((0.4, 0.01, -0.4), (0, 1, 0), 0.6, 30)]],
         "bed": [
-            [((-0.3, 2.25, -1.79), (0, 0, 1), 0.28, 0), ((-0.3, 0.56, -0.2), (0, 1, 0), 0.3, 0), ((1.99, 1.6, 0.55), (-1, 0, 0), 0.4, 0)],
-            [((-1.99, 2.2, 0.3), (1, 0, 0), 0.24, 0), ((-1.35, 0.56, -1.55), (0, 1, 0), 0.07, 0), ((0.0, 2.59, 0.4), (0, -1, 0), 0.5, 0)],
+            [((-0.3, 2.25, -1.79), (0, 0, 1), 0.28, 0), ((-0.3, 0.56, -0.2), (0, 1, 0), 0.3, 0), ((1.405, 1.55, 0.55), (-1, 0, 0), 0.34, 0)],
+            [((-1.99, 2.47, 0.3), (1, 0, 0), 0.2, 0), ((-1.35, 0.56, -1.55), (0, 1, 0), 0.07, 0), ((0.0, 2.59, 0.4), (0, -1, 0), 0.5, 0)],
             [((1.0, 2.0, -1.79), (0, 0, 1), 0.2, 12), ((1.5, 1.7, -1.79), (0, 0, 1), 0.14, -12), ((0.6, 1.3, -1.79), (0, 0, 1), 0.3, 6)],
-            [((-1.2, 1.4, 1.79), (0, 0, -1), 0.34, 0), ((-0.3, 1.1, 1.79), (0, 0, -1), 0.34, 0), ((0.6, 0.8, 1.79), (0, 0, -1), 0.34, 0)]],
+            [((-1.2, 1.4, 1.79), (0, 0, -1), 0.34, 0), ((-0.3, 1.1, 1.79), (0, 0, -1), 0.34, 0), ((0.2, 0.8, 1.79), (0, 0, -1), 0.34, 0)]],
     }
     lig_shots = [("ligStu", "stu", t(42), t(44), [[-1.0, 1.55, 1.95], [-0.4, 1.52, 0.9], [0.45, 1.5, 0.25]],
                   [(t(42), (0.0, 1.4, -1.6)), (t(43), (0.6, 1.3, -1.2)), (t(44), (1.4, 1.5, -0.4))]),
@@ -147,17 +147,26 @@ def build_part2(b, end):
                   [(t(46), (-0.3, 1.5, -1.7)), (t(47), (0.5, 1.4, -1.5)), (t(48), (-0.4, 1.3, 1.2))])]
     for name, world, t0, t1, eye, lk in lig_shots:
         b.shot(name, t0, t1, eye, None, keys=(world,), look_keys=lk, fov=64.0)
+    # each half bar's LET, IT and GO land where the camera is looking, on the surfaces the view meets, in a
+    # different hand-set layout each time (screen positions, sizes, tilts)
+    layouts = [[(-0.55, 0.38, 0.09, -4), (0.05, -0.42, 0.05, 8), (0.58, 0.12, 0.11, 0)],
+               [(0.5, 0.45, 0.07, 6), (-0.5, -0.2, 0.06, 0), (0.1, 0.05, 0.13, -8)],
+               [(-0.3, 0.6, 0.08, 0), (-0.3, 0.3, 0.08, 0), (-0.3, -0.05, 0.11, 0)],
+               [(0.62, -0.35, 0.1, 12), (0.0, 0.45, 0.05, 0), (-0.6, -0.3, 0.12, -10)]]
+    rooms_ext = {"stu": stu["interior"], "bath": bath["interior"], "bed": bed["interior"]}
     k = 0
     for wi, world in enumerate(("stu", "bath", "bed")):
         for half in range(4):
             bar = 42 + wi * 2 + half // 2
             b0 = 1.0 if half % 2 == 0 else 3.0
+            lay = layouts[(half + wi) % 4]
             for j, wd in enumerate(("LET", "IT", "GO")):
-                pos, nrm, h, tilt = sides[world][half][j]
+                sx, sy, kk, tilt = lay[j]
                 tw = t(bar, b0 + 0.5 * j)
-                b.word(wd, tw, t(bar, b0 + 2.0) if half % 2 == 0 else t(bar + 1, 1.0), pos, nrm, h,
-                       style=["flash", "pop", "flash"][j], role="word" if j != 1 else "accent", tilt=tilt,
-                       name=f"lig{k:02d}", intensity=4.2, tin=0.08, tout=0.18)
+                t1 = t(bar, b0 + 2.0) if half % 2 == 0 else t(bar + 1, 1.0)
+                b.word_at(wd, tw, t1, ("box", rooms_ext[world]), sx, sy, k=kk, tilt=tilt,
+                          style=["flash", "pop", "flash"][j], role="word" if j != 1 else "accent",
+                          name=f"lig{k:02d}", intensity=4.2, tin=0.08, tout=0.18)
                 k += 1
     # C07 (45.4): every word in the bathroom flashes at once and flies off its wall
     c = b.clap("c07", t(45, 4), release=0.5)
@@ -189,7 +198,7 @@ def build_part2(b, end):
     # VERSE 2 (bars 50-65): the apartment breaks. Every two bars a BIG CLAP corrupts it differently and cuts
     # =========================================================================================================
     v2 = [("v2a", "stu", t(49, 4), t(51, 4), [[-1.3, 1.5, 1.5], [-0.6, 1.48, 0.9], [0.0, 1.45, 0.6]], (0.7, 1.0, -1.3)),
-          ("v2b", "liv", t(51, 4), t(53, 4), [[1.9, 1.5, 1.8], [1.3, 1.45, 1.1], [0.9, 1.4, 0.3]], (-1.9, 0.9, -0.5)),
+          ("v2b", "liv", t(51, 4), t(53, 4), [[-0.7, 1.5, 1.7], [-0.1, 1.47, 1.1], [0.4, 1.45, 0.55]], (2.2, 0.95, -0.3)),
           ("v2c", "bed", t(53, 4), t(55, 4), [[-1.6, 1.6, 1.55], [-1.0, 1.55, 1.0], [-0.6, 1.5, 0.6]], (1.3, 1.1, -1.3)),
           ("v2d", "kit", t(55, 4), t(57, 4), [[-1.7, 1.5, 1.4], [-1.0, 1.48, 1.2], [-0.3, 1.45, 1.25]], (1.2, 1.0, -1.0)),
           ("v2e", "liv", t(57, 4), t(59, 4), [[-1.2, 1.4, 1.9], [-0.4, 1.45, 1.6], [0.5, 1.5, 1.4]], (1.6, 1.2, -2.0)),
@@ -218,34 +227,41 @@ def build_part2(b, end):
                                                   (end, [0.0, 4400.0 + 260.0 * (end - t(54)), 0.0])])
     f.track("sdf/stuShell/node/stuFan/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, 300.0 * end, 0.0])])
     # the words of verse 2: more of them, smaller, scattered, arriving on the eighths
-    vw = [("DO YOU WANNA HAVE FUN?", 109.8, (0.3, 2.18, -1.69), (0, 0, 1), 0.11, "flicker", "word"),
-          ("AS THE FIRES KEEP BURNING", 111.4, (-1.79, 1.5, -0.2), (1, 0, 0), 0.09, "pop", "accent"),
-          ("THE WORLD STOPS TURNING", 113.1, (0.75, 0.62, -1.38), (0, 0, 1), 0.035, "cut", "word"),
-          ("AND EVERYONE", 114.5, (-0.2, 2.3, -2.19), (0, 0, 1), 0.12, "pop", "word"),
-          ("UNDER THE SUN", 115.1, (2.59, 1.75, -1.2), (-1, 0, 0), 0.12, "pop", "accent"),
-          ("TAKES STEPS IN THE PROCESS", 115.9, (2.075, 0.86, -0.17), (-1, 0, 0), 0.032, "flicker", "screen"),
-          ("TO HEAL AND GROW", 117.0, (2.075, 0.74, -0.17), (-1, 0, 0), 0.04, "flicker", "screen"),
-          ("TELL ME YOU'RE THE ONE", 118.7, (1.99, 1.4, 0.55), (-1, 0, 0), 0.09, "rise", "word"),
-          ("TO MAKE THE WORLD", 120.3, (-0.3, 2.3, -1.79), (0, 0, 1), 0.13, "pop", "word"),
-          ("STOP HURTING", 121.1, (-0.3, 2.05, -1.79), (0, 0, 1), 0.16, "flash", "accent"),
-          ("AND MY HEART KEEP PUMPING", 122.0, (-1.99, 2.05, 0.3), (1, 0, 0), 0.1, "pop", "word"),
-          ("WHILE EVERYONE UNDER THE SUN", 123.7, (1.0, 1.83, -1.46), (0, 0, 1), 0.045, "pop", "word"),
-          ("TAKE STEPS", 125.3, (-0.7, 1.62, -1.78), (0, 0, 1), 0.12, "rise", "accent"),
-          ("TO FEEL IT GROW", 126.2, (2.19, 1.5, -1.0), (-1, 0, 0), 0.1, "rise", "word"),
-          ("HOW LITTLE DO I KNOW?", 127.5, (0.0, 2.35, -2.19), (0, 0, 1), 0.14, "flash", "word"),
-          ("HOW LITTLE DO I KNOW?", 128.6, (2.59, 1.9, 0.9), (-1, 0, 0), 0.1, "flash", "accent"),
-          ("HOW LITTLE DO I KNOW?", 129.7, (-2.59, 2.3, -0.1), (1, 0, 0), 0.12, "flash", "word"),
-          ("HOW LITTLE DO I KNOW?", 130.8, (0.0, 0.03, 0.6), (0, 1, 0), 0.22, "flash", "accent"),
-          ("HOW LITTLE DO I KNOW?", 132.0, (-0.3, 2.25, -1.79), (0, 0, 1), 0.15, "flicker", "word"),
-          ("HOW LITTLE DO I KNOW?", 133.6, (1.99, 1.7, 0.2), (-1, 0, 0), 0.11, "flicker", "accent"),
-          ("BREATHE AND GROW", 136.0, (0.3, 2.2, -1.69), (0, 0, 1), 0.15, "rise", "word"),
-          ("HOW LITTLE DO I KNOW?", 138.2, (1.79, 1.9, -0.2), (-1, 0, 0), 0.1, "flash", "accent"),
-          ("TELL ME IT'LL BE FINE THOUGH?", 140.6, (2.075, 0.8, -0.17), (-1, 0, 0), 0.03, "flicker", "screen"),
-          ("FEEL IT GROW", 143.3, (-0.2, 2.25, -2.19), (0, 0, 1), 0.2, "rise", "word")]
-    for i, (text, t0, pos, nrm, h, style, role) in enumerate(vw):
+    # (text, time, screen x, screen y, size k, style, role); "TV" words sit on the television's screen
+    vw = [("DO YOU WANNA HAVE FUN?", 109.8, -0.1, 0.55, 0.05, "flicker", "word"),
+          ("AS THE FIRES KEEP BURNING", 111.4, -0.55, 0.2, 0.04, "pop", "accent"),
+          ("THE WORLD STOPS TURNING", 113.1, 0.35, -0.25, 0.03, "cut", "word"),
+          ("AND EVERYONE", 114.5, -0.45, 0.5, 0.06, "pop", "word"),
+          ("UNDER THE SUN", 115.1, 0.5, 0.55, 0.06, "pop", "accent"),
+          ("TAKES STEPS IN THE PROCESS", 115.9, "TV", 0.86, 0.032, "flicker", "screen"),
+          ("TO HEAL AND GROW", 117.0, "TV", 0.74, 0.04, "flicker", "screen"),
+          ("TELL ME YOU'RE THE ONE", 118.7, 0.45, 0.25, 0.045, "rise", "word"),
+          ("TO MAKE THE WORLD", 120.3, -0.35, 0.6, 0.05, "pop", "word"),
+          ("STOP HURTING", 121.1, -0.35, 0.38, 0.07, "flash", "accent"),
+          ("AND MY HEART KEEP PUMPING", 122.0, 0.2, -0.45, 0.04, "pop", "word"),
+          ("WHILE EVERYONE UNDER THE SUN", 123.7, -0.2, 0.55, 0.035, "pop", "word"),
+          ("TAKE STEPS", 125.3, -0.55, 0.0, 0.07, "rise", "accent"),
+          ("TO FEEL IT GROW", 126.2, 0.45, 0.35, 0.05, "rise", "word"),
+          ("HOW LITTLE DO I KNOW?", 127.5, 0.0, 0.6, 0.05, "flash", "word"),
+          ("HOW LITTLE DO I KNOW?", 128.6, 0.55, 0.15, 0.04, "flash", "accent"),
+          ("HOW LITTLE DO I KNOW?", 129.7, -0.5, -0.25, 0.045, "flash", "word"),
+          ("HOW LITTLE DO I KNOW?", 130.8, 0.1, -0.62, 0.05, "flash", "accent"),
+          ("HOW LITTLE DO I KNOW?", 132.0, -0.2, 0.55, 0.05, "flicker", "word"),
+          ("HOW LITTLE DO I KNOW?", 133.6, 0.5, -0.1, 0.04, "flicker", "accent"),
+          ("BREATHE AND GROW", 136.0, 0.0, 0.5, 0.06, "rise", "word"),
+          ("HOW LITTLE DO I KNOW?", 138.2, -0.45, 0.3, 0.04, "flash", "accent"),
+          ("TELL ME IT'LL BE FINE THOUGH?", 140.6, 0.35, 0.5, 0.035, "flicker", "word"),
+          ("FEEL IT GROW", 143.3, 0.0, 0.45, 0.07, "rise", "word")]
+    room_of = {"v2a": stu, "v2b": liv, "v2c": bed, "v2d": kit_, "v2e": liv, "v2f": bed, "v2g": stu, "v2h": liv}
+    for i, (text, t0, sx, sy, kk, style, role) in enumerate(vw):
         nxt = vw[i + 1][1] if i + 1 < len(vw) else t(66)
-        b.word(text, t0, max(min(t0 + 3.2, nxt + 1.2), t0 + 1.0), pos, nrm, h, style=style, role=role, name=f"v2w{i:02d}",
-               tin=0.1, tout=0.15)
+        t1 = max(min(t0 + 3.2, nxt + 1.2), t0 + 1.0)
+        if sx == "TV":
+            b.word(text, t0, t1, (2.075, sy, -0.17), (-1, 0, 0), kk, style=style, role=role, name=f"v2w{i:02d}", tin=0.1, tout=0.15)
+            continue
+        shot = f.camera_at(t0 + 0.12)[3]
+        b.word_at(text, t0, t1, ("box", room_of[shot]["interior"]), sx, sy, k=kk, style=style, role=role,
+                  name=f"v2w{i:02d}", tin=0.1, tout=0.15)
     # C09 (51.4) data-mosh: the frame smears (motion blur and a camera jolt) and splits, then snaps
     c = b.clap("c09", t(51, 4), release=0.9, hold=BEAT1 * 0.5)
     f.route(c, "temporal/mosh/amount", 0.75)
@@ -306,11 +322,11 @@ def build_part2(b, end):
         c = b.clap(f"fill{int(fill_t * 100)}", fill_t, release=0.35)
         f.route(c, "camera/exposure/compensation", 1.2)
         f.route(c, "post/bloom/intensity", 0.9)
-    for i, (wd, beat, pos) in enumerate((("FEEL", 1.0, (-0.9, 2.45, -1.0)), ("IT", 1.5, (0.0, 2.6, -0.5)), ("GROW", 2.0, (0.9, 2.45, -1.0)),
-                                         ("FEEL", 3.0, (-1.4, 2.0, 2.19)), ("IT", 3.5, (2.59, 2.2, 0.0)), ("GROW", 4.0, (0.0, 2.6, 0.6)))):
-        nrm = (0, 0, -1) if pos[2] > 2.0 else ((-1, 0, 0) if pos[0] > 2.5 else (0, -1, 0))
-        b.word(wd, t(66, beat), t(67), pos, nrm, 0.3, style="rise", role="word", tilt=0,
-               name=f"fig66_{i}", tin=0.15)
+    for i, (wd, beat, sx, sy, kk) in enumerate((("FEEL", 1.0, -0.5, 0.35, 0.09), ("IT", 1.5, 0.0, 0.5, 0.07),
+                                                ("GROW", 2.0, 0.5, 0.3, 0.11), ("FEEL", 3.0, -0.45, -0.1, 0.09),
+                                                ("IT", 3.5, 0.05, 0.25, 0.07), ("GROW", 4.0, 0.45, 0.55, 0.12))):
+        b.word_at(wd, t(66, beat), t(67), ("box", liv["interior"]), sx, sy, k=kk, style="rise", role="word",
+                  name=f"fig66_{i}", tin=0.15)
 
     # =========================================================================================================
     # BRIDGE 1 (67-74): the house grows into a tree of rooms; each GROW blooms one; the camera rises with them
@@ -347,10 +363,14 @@ def build_part2(b, end):
            None, keys=("tree", "land", "sky"), look_keys=[(t(73), (0.0, 22.0, 0.0)), (t(74), tuple(r12)), (t(75), tuple(r12))],
            fov=[(t(73), 60.0), (t(75), 70.0)], ease_kind="inout")
     for i, tb in enumerate(blooms):
+        if tb < t(67):
+            continue    # the first two rooms bloom while we are still in the living room
         (x, y, z), yaw = OD.tree_room_pose(i)
-        L = math.hypot(x, z)
-        nrm = (x / L, 0.0, z / L)
-        pos = (x + nrm[0] * 1.03, y + 0.9, z + nrm[2] * 1.03)
+        cam = f.camera_at(max(tb, t(66, 2)) + 0.2)
+        ex, ez = (cam[0][0], cam[0][2]) if cam and cam[3] in ("tree", "treeReveal", "treeLand") else (8.0, 8.0)
+        L = math.hypot(ex - x, ez - z) or 1.0
+        nrm = ((ex - x) / L, 0.0, (ez - z) / L)
+        pos = (x + nrm[0] * 1.05, y + 0.55, z + nrm[2] * 1.05)
         b.word("FEEL IT GROW", tb - BEAT1, min(tb + 3.0, t(73)), pos, nrm, 0.16, style="pop", role="word", name=f"grow{i:02d}",
                tin=0.2, intensity=4.0)
     g_b1 = b.gate("gB1", t(67), t(73))
@@ -383,8 +403,12 @@ def build_part2(b, end):
     # each bar's phrase on the wall the orbiting camera faces: the back wall (-z) for bars 75-78, then the left
     # wall (-x) as the orbit turns; the words step down the wall like a stammer, each one lighting an object
     wi = 0
+    b.word_at("IS", t(74, 4.5), t(75), ("view", 4.0), 0.0, 0.15, k=0.08, style="flash", role="word", name="isFirst",
+              intensity=4.0, tin=0.08)
     for bar in range(75, 83):
         seq = [("IS", bar - 1, 4.5), ("THAT", bar, 1.0), ("ALL", bar, 1.5), ("YOU", bar, 2.0)]
+        if bar == 75:
+            seq = seq[1:]
         if bar == 78:
             seq.append(("GOT?", bar, 2.5))
         back = bar <= 78
@@ -417,6 +441,10 @@ def build_part2(b, end):
     for name in items:
         f.route(c, f"sdf/{name}/look/edge/intensity", 18.0)
         f.route(c, f"sdf/{name}/look/edge/pixels", 3.0)
+    # on GOT? the seated mannequin turns its head a quarter turn, holds, and turns back (once in the film)
+    f.track("sdf/galMan/node/galManHead/rotation", [(0.0, [0.0, 0.0, 0.0], "step"), (t(78, 2.5) - 0.002, [0.0, 0.0, 0.0], "easeOut"),
+                                                   (t(78, 2.5) + 0.12, [0.0, 78.0, 0.0], "step"), (t(80), [0.0, 78.0, 0.0], "easeInOut"),
+                                                   (t(80, 3), [0.0, 0.0, 0.0], "step")])
     # C18 (82.4): everything falls into the mannequin's chair, then one beat of black
     c = b.clap("c18", t(82, 4), release=0.2, attack=BEAT2 * 0.5)
     for name in items:
@@ -463,8 +491,10 @@ def build_part2(b, end):
             b.word("IS THAT ALL YOU GOT?", t(bar - 1, 4.5), t(bar, 4.5), wall, (0, 0, 1), 0.22, style="pop", role="word",
                    name=f"b3w{bar}", tin=0.12)
         else:
-            b.word("IS THAT ALL?", t(bar - 1, 4.5), t(bar, 4.0), room_floor, (0, 1, 0), 0.3, style="pop", role="accent",
-                   name=f"b3w{bar}", tilt=(bar * 23) % 40 - 20, tin=0.12)
+            room = {83: liv, 85: kit_, 86: kit_, 87: bed, 89: liv, 90: liv}[bar]
+            b.word_at("IS THAT ALL?", t(bar - 1, 4.5), t(bar, 4.0), ("box", room["interior"]), 0.05 * ((bar % 3) - 1), -0.5,
+                      k=0.08, style="pop", role="accent", name=f"b3w{bar}", tilt=(bar * 23) % 30 - 15, tin=0.12,
+                      at=0.32 if bar == 83 else 0.12)
             f.route("grid.song.quarter", f"nodes/b3w{bar}/position", 0.25, component=1, depth=f"grid.song.b3w{bar}")
     # THE SWEEP (90.3-90.4 -> 91.1): a rainbow band washes across everything, rising to white; the bass fill kicks
     f.track("post/sweep/progress", [(0.0, 0.0, "step"), (t(90, 3) - 0.01, 0.0, "linear"), (t(91), 1.0, "step"), (end, 1.0, "step")])
@@ -497,15 +527,16 @@ def build_part2(b, end):
                       (t(99), (-14.0, 4.0, 0.0))], fov=[(t(91), 72.0), (t(93), 64.0), (t(99), 62.0)], ease_kind="linear")
     # LET IT GO, twice a bar, written across the hills: giant letters lying on the slopes
     k = 0
+    pats = [[(-0.5, -0.35), (0.0, -0.55), (0.5, -0.3)], [(0.45, -0.5), (-0.1, -0.3), (-0.55, -0.6)],
+            [(-0.6, -0.2), (-0.15, -0.45), (0.35, -0.65)], [(0.55, -0.25), (0.1, -0.6), (-0.4, -0.4)]]
     for bar in range(91, 99):
         for half, b0 in ((0, 1.0), (1, 3.0)):
+            pat = pats[(2 * (bar - 91) + half) % 4]
             for j, wd in enumerate(("LET", "IT", "GO")):
-                zc = 40.0 - (bar - 91) * 5.0 - half * 2.5
-                xc = (-6.0 + 6.0 * j) * (1 if (bar + half) % 2 == 0 else -1)
-                pos = (xc, gy(xc, zc - 6.0) + 0.06, zc - 6.0 - 1.5 * j)
-                b.word(wd, t(bar, b0 + 0.5 * j), t(bar, b0 + 0.5 * j) + G.BAR2 * 1.5, pos, (0, 1, 0.25), 1.6, style="flash",
-                       role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=5.0, tin=0.1, tout=0.35,
-                       tilt=-10 + 20 * ((k * 7) % 3) / 2.0)
+                tw = t(bar, b0 + 0.5 * j)
+                b.word_at(wd, tw, tw + G.BAR2 * 1.5, ("ground", gy), pat[j][0], pat[j][1], k=0.075, style="flash",
+                          role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=3.0, tin=0.1, tout=0.35,
+                          tilt=-8 + 16 * ((k * 7) % 3) / 2.0)
                 k += 1
     g_ch = b.gate("gChorus", t(91), t(113))
     b.pulse("sdf/landGround/look/edge/intensity", 2.0, "quarter", g_ch)
@@ -550,14 +581,15 @@ def build_part2(b, end):
            fov=[(t(107), 66.0), (t(112, 3), 66.0), (t(113), 50.0), (t(113) + 0.4, 84.0), (t(114), 76.0)], ease_kind="linear",
            moves=[(t(107), 0.0), (t(113), 0.92), (t(114), 1.0)])
     k = 0
+    arcs = [[(-0.6, 0.3), (0.0, 0.48), (0.6, 0.3)], [(-0.55, -0.1), (0.0, 0.1), (0.55, -0.1)],
+            [(-0.4, 0.55), (0.05, 0.35), (0.5, 0.55)]]
     for bar in range(107, 113):
         for half, b0 in ((0, 1.0), (1, 3.0)):
+            arc = arcs[(2 * (bar - 107) + half) % 3]
             for j, wd in enumerate(("LET", "IT", "GO")):
-                a = math.radians((bar - 107) * 60.0 + half * 30.0 + j * 10.0)
-                pos = (10.0 + 9.0 * math.cos(a), 18.6 + 1.0 * j, -9.0 * math.sin(a))
-                nrm = (-math.cos(a), 0.0, math.sin(a))
-                b.word(wd, t(bar, b0 + 0.5 * j), t(bar, b0 + 0.5 * j) + G.BAR2, pos, nrm, 0.9, style="flash", role="word",
-                       name=f"chC{k:02d}", intensity=6.0, tin=0.08, tout=0.3)
+                tw = t(bar, b0 + 0.5 * j)
+                b.word_at(wd, tw, tw + G.BAR2, ("view", 11.0 + 2.0 * j), arc[j][0], arc[j][1], k=0.07, style="flash",
+                          role="word", name=f"chC{k:02d}", intensity=4.5, tin=0.08, tout=0.3)
                 k += 1
     fw_pos = {"fwA": [], "fwB": [], "fwC": []}
     n_fw = 0

@@ -999,34 +999,34 @@
      "from": 0.0,
      "path": [
       [
-       3.19967,
-       1.60831,
-       3.31629
+       -2.11333,
+       1.57067,
+       3.11333
       ],
       [
-       1.9,
+       -0.7,
        1.5,
-       1.8
+       1.7
       ],
       [
-       1.3,
-       1.45,
+       -0.1,
+       1.47,
        1.1
       ],
       [
-       0.9,
-       1.4,
-       0.3
+       0.4,
+       1.45,
+       0.55
       ],
       [
-       -1.7791,
-       1.06511,
-       -5.0582
+       4.43458,
+       1.28862,
+       -3.88803
       ],
       [
-       -5.35123,
-       0.6186,
-       -12.20246
+       9.81401,
+       1.07344,
+       -9.80541
       ]
      ],
      "screw": {
@@ -29688,24 +29688,25 @@
    "kind": "procedural",
    "name": "w000_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    0.07121067050200203,
+    1.8327407345083215,
+    -2.1959999999999997
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.342983314144878,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29719,7 +29720,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -29728,24 +29729,25 @@
    "kind": "procedural",
    "name": "w001_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    -2.5960000000000005,
+    1.3379728866342324,
+    -0.22615106025731513
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.21568190485363953,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29759,7 +29761,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -29768,24 +29770,25 @@
    "kind": "procedural",
    "name": "w002_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    -0.5820440671602536,
+    0.6640946140465782,
+    -2.1960000000000006
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.3916415546080382,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29799,7 +29802,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -29808,24 +29811,25 @@
    "kind": "procedural",
    "name": "w003_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    -2.596,
+    1.9730214954993017,
+    0.9825864399497153
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.3535647348877716,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29839,7 +29843,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -29864,8 +29868,9 @@
      "textSize": 0.10416666666666667,
      "textDepth": 0.04,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Menlo",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -29904,8 +29909,9 @@
      "textSize": 0.10416666666666667,
      "textDepth": 0.04,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Menlo",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -29928,24 +29934,25 @@
    "kind": "procedural",
    "name": "w006_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    -2.146325450744672,
+    2.6063830224770728,
+    -2.1960000000000006
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.40079534309552617,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29959,7 +29966,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -29968,24 +29975,25 @@
    "kind": "procedural",
    "name": "w007_ALL_YOU_GOT",
    "position": [
-    2.075,
-    0.79,
-    -0.17
+    -2.596,
+    1.8163105617242543,
+    1.1133024742810995
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.10416666666666667,
-     "textDepth": 0.04,
+     "textSize": 0.25107850436120305,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -29999,7 +30007,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 4.0,
      "roughness": 0.7
     }
    }
@@ -30024,8 +30032,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30048,9 +30057,9 @@
    "kind": "procedural",
    "name": "w009_HOW_LITTLE",
    "position": [
-    -1.99,
-    2.05,
-    1.0
+    -1.9959999999999998,
+    1.9171003583690895,
+    -0.3915233075944393
    ],
    "rotation": [
     -89.99999999999997,
@@ -30061,11 +30070,12 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE",
-     "textSize": 0.18055555555555558,
+     "textSize": 0.23259174956973544,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30093,9 +30103,9 @@
     -0.4
    ],
    "rotation": [
-    -90.0,
-    -7.016709298534876e-15,
-    180.0
+    90.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
@@ -30104,8 +30114,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30128,24 +30139,25 @@
    "kind": "procedural",
    "name": "w011_BREATHE_AND_GROW",
    "position": [
-    1.99,
-    1.2,
-    0.55
+    1.0460432842389646,
+    1.088639521352501,
+    -1.7959999999999998
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.125,
+     "textSize": 0.15810986022202334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30168,24 +30180,25 @@
    "kind": "procedural",
    "name": "w012_CAN_YOU_TELL_ME",
    "position": [
-    2.075,
-    0.86,
-    -0.17
+    -2.596,
+    2.002706694421437,
+    0.37399006350604547
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "CAN YOU TELL ME",
-     "textSize": 0.0763888888888889,
-     "textDepth": 0.04,
+     "textSize": 0.2695267243505855,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30199,7 +30212,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.2,
      "roughness": 0.7
     }
    }
@@ -30208,24 +30221,25 @@
    "kind": "procedural",
    "name": "w013_IT_S_FINE_THOUGH",
    "position": [
-    2.075,
-    0.72,
-    -0.17
+    -1.7591079059817436,
+    1.7267834924166268,
+    -2.196
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT'S FINE THOUGH?",
-     "textSize": 0.0763888888888889,
-     "textDepth": 0.04,
+     "textSize": 0.29303155641784434,
+     "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30239,7 +30253,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.2,
      "roughness": 0.7
     }
    }
@@ -30264,8 +30278,9 @@
      "textSize": 0.19444444444444448,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30304,8 +30319,9 @@
      "textSize": 0.08333333333333333,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30344,8 +30360,9 @@
      "textSize": 0.08333333333333333,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30384,8 +30401,9 @@
      "textSize": 0.08333333333333333,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30424,8 +30442,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30464,8 +30483,9 @@
      "textSize": 0.04861111111111112,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": false
      }
     },
     "material": {
@@ -30504,8 +30524,9 @@
      "textSize": 0.18055555555555558,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30544,8 +30565,9 @@
      "textSize": 0.06944444444444445,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Menlo",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -30584,8 +30606,9 @@
      "textSize": 0.16666666666666666,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -30624,8 +30647,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30664,8 +30688,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30704,8 +30729,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30744,8 +30770,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30784,8 +30811,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30824,8 +30852,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30864,8 +30893,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30904,8 +30934,9 @@
      "textSize": 0.1388888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30944,8 +30975,9 @@
      "textSize": 0.5833333333333334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -30984,8 +31016,9 @@
      "textSize": 0.5833333333333334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31024,8 +31057,9 @@
      "textSize": 0.5833333333333334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31064,8 +31098,9 @@
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31104,8 +31139,9 @@
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31144,8 +31180,9 @@
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31168,24 +31205,25 @@
    "kind": "procedural",
    "name": "lig00",
    "position": [
-    -1.0,
-    1.75,
-    -1.69
+    -1.796,
+    2.0530916877619845,
+    -0.9688123807475859
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    -4.0
+    -89.99999999999994,
+    85.99999999999996,
+    -89.99999999999994
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.3830658435594021,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -31208,24 +31246,25 @@
    "kind": "procedural",
    "name": "lig01",
    "position": [
-    0.0,
-    0.762,
-    -1.45
+    0.31481226700607934,
+    0.36601390832509595,
+    -1.696
    ],
    "rotation": [
-    -90.0,
-    14.999999999999998,
-    9.400607950331846e-16
+    0.0,
+    -0.0,
+    8.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.16666666666666666,
+     "textSize": 0.2782588709720401,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31248,24 +31287,25 @@
    "kind": "procedural",
    "name": "lig02",
    "position": [
-    0.3,
-    1.55,
-    -1.66
+    1.7960000000000003,
+    1.626144866346597,
+    -0.43275475434742017
    ],
    "rotation": [
-    0.0,
     -0.0,
+    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5,
+     "textSize": 0.5415045472012882,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31288,24 +31328,25 @@
    "kind": "procedural",
    "name": "lig03",
    "position": [
-    -1.79,
-    2.15,
-    0.6
+    1.7959999999999998,
+    2.1787012345248726,
+    -0.6086281910517104
    ],
    "rotation": [
-    -0.0,
-    90.0,
-    0.0
+    -89.99999999999997,
+    -83.99999999999997,
+    89.99999999999997
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.38888888888888895,
+     "textSize": 0.3356588077009347,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31328,24 +31369,25 @@
    "kind": "procedural",
    "name": "lig04",
    "position": [
-    -0.3,
-    0.01,
-    0.6
+    -1.0375854423517277,
+    0.995375936600644,
+    -1.6959999999999997
    ],
    "rotation": [
-    -90.0,
-    -20.0,
-    -1.2769366635827897e-15
+    0.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.5555555555555556,
+     "textSize": 0.2639984563504328,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31368,24 +31410,25 @@
    "kind": "procedural",
    "name": "lig05",
    "position": [
-    1.79,
-    1.7,
-    -0.9
+    1.17812510158489,
+    1.361874939490613,
+    -1.6959999999999997
    ],
    "rotation": [
-    -89.99999999999997,
-    -83.99999999999997,
-    89.99999999999997
+    0.0,
+    -0.0,
+    -8.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6111111111111112,
+     "textSize": 0.6219694464910386,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31408,12 +31451,12 @@
    "kind": "procedural",
    "name": "lig06",
    "position": [
-    0.4,
-    2.59,
-    -0.3
+    -0.03916711419833152,
+    2.1903852732345506,
+    -1.6960000000000002
    ],
    "rotation": [
-    90.0,
+    0.0,
     -0.0,
     0.0
    ],
@@ -31421,11 +31464,12 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.47222222222222227,
+     "textSize": 0.2989232517214118,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31448,9 +31492,9 @@
    "kind": "procedural",
    "name": "lig07",
    "position": [
-    0.2,
-    0.95,
-    -0.72
+    0.09001023925193288,
+    1.7258513242403462,
+    -1.6960000000000002
    ],
    "rotation": [
     0.0,
@@ -31461,11 +31505,12 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.11111111111111112,
+     "textSize": 0.2739651806292625,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31488,24 +31533,25 @@
    "kind": "procedural",
    "name": "lig08",
    "position": [
-    1.79,
-    1.6,
-    0.2
+    0.2898300549298778,
+    1.2401428301596336,
+    -1.696
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.3055555555555556,
+     "textSize": 0.3601392487250334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31528,24 +31574,25 @@
    "kind": "procedural",
    "name": "lig09",
    "position": [
-    -0.9,
-    2.3,
-    -1.69
+    1.796,
+    1.1151298947995956,
+    -0.1156976270028206
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    -89.99999999999999,
+    -78.00000000000001,
+    89.99999999999999
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.2777777777777778,
+     "textSize": 0.23856174290689258,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31568,24 +31615,25 @@
    "kind": "procedural",
    "name": "lig10",
    "position": [
-    -0.9,
-    2.02,
-    -1.69
+    1.796,
+    2.0168776191912605,
+    -1.2247318314483366
    ],
    "rotation": [
-    0.0,
     -0.0,
+    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.2777777777777778,
+     "textSize": 0.15377803959298736,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31608,24 +31656,25 @@
    "kind": "procedural",
    "name": "lig11",
    "position": [
-    -0.9,
-    1.68,
-    -1.69
+    0.9855157838731706,
+    1.1469300412635937,
+    -1.6959999999999997
    ],
    "rotation": [
     0.0,
     -0.0,
-    0.0
+    -10.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.35019228291083676,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31648,24 +31697,25 @@
    "kind": "procedural",
    "name": "lig12",
    "position": [
-    0.75,
-    1.62,
-    -1.37
+    1.496,
+    1.9619872662349183,
+    -0.07884082128283332
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    -89.99999999999997,
+    -83.99999999999997,
+    89.99999999999997
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.22222222222222224,
+     "textSize": 0.19338508864906576,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31688,12 +31738,12 @@
    "kind": "procedural",
    "name": "lig13",
    "position": [
-    -1.02,
-    0.6,
-    0.25
+    -1.496,
+    0.9448817999369398,
+    -1.147621187205377
    ],
    "rotation": [
-    -90.0,
+    -0.0,
     90.0,
     0.0
    ],
@@ -31701,11 +31751,12 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.3333333333333333,
+     "textSize": 0.3103936843179215,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31728,24 +31779,25 @@
    "kind": "procedural",
    "name": "lig14",
    "position": [
-    0.0,
-    0.01,
-    0.6
+    0.4493479489251449,
+    1.389121910216432,
+    -1.3960000000000001
    ],
    "rotation": [
-    -90.0,
+    0.0,
     -0.0,
-    0.0
+    -8.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6944444444444444,
+     "textSize": 0.5573254588499907,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31768,24 +31820,25 @@
    "kind": "procedural",
    "name": "lig15",
    "position": [
-    -0.6,
-    2.25,
-    -1.39
+    -1.4960000000000002,
+    2.2477644444355205,
+    -1.2114415462821446
    ],
    "rotation": [
-    0.0,
     -0.0,
-    8.0
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.39389080867428256,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31808,9 +31861,9 @@
    "kind": "procedural",
    "name": "lig16",
    "position": [
-    -1.49,
-    1.8,
-    -0.5
+    -1.4960000000000002,
+    1.5439155328282785,
+    -0.7745629683052853
    ],
    "rotation": [
     -0.0,
@@ -31821,11 +31874,12 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.25,
+     "textSize": 0.33859253106167414,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31848,24 +31902,25 @@
    "kind": "procedural",
    "name": "lig17",
    "position": [
-    0.2,
-    2.59,
-    0.2
+    -1.4959999999999998,
+    0.8849293287190954,
+    -0.45470036916995693
    ],
    "rotation": [
-    90.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5555555555555556,
+     "textSize": 0.4280894415520667,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -31888,24 +31943,25 @@
    "kind": "procedural",
    "name": "lig18",
    "position": [
-    1.49,
-    1.9,
-    0.2
+    0.5284886461294792,
+    0.5468034196962317,
+    -1.3959999999999997
    ],
    "rotation": [
-    89.99999999999999,
-    -79.99999999999999,
-    -89.99999999999999
+    0.0,
+    -0.0,
+    12.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.4444444444444445,
+     "textSize": 0.36161938688917333,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -31928,24 +31984,25 @@
    "kind": "procedural",
    "name": "lig19",
    "position": [
-    1.49,
-    1.45,
-    0.2
+    -1.1284349486474121,
+    1.517198681950919,
+    -1.396
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.4444444444444445,
+     "textSize": 0.19210365911354987,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -31968,24 +32025,25 @@
    "kind": "procedural",
    "name": "lig20",
    "position": [
-    1.49,
-    0.95,
-    0.2
+    -1.496,
+    0.6634554426937808,
+    -0.10578760994972525
    ],
    "rotation": [
     -89.99999999999999,
-    -79.99999999999999,
-    89.99999999999999
+    79.99999999999999,
+    -89.99999999999999
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4444444444444445,
+     "textSize": 0.3737044019661483,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32008,24 +32066,25 @@
    "kind": "procedural",
    "name": "lig21",
    "position": [
-    -0.3,
-    1.2,
-    -1.39
+    -0.7859107402909886,
+    1.3886886342507705,
+    -1.3960000000000004
    ],
    "rotation": [
     0.0,
     -0.0,
-    0.0
+    -4.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.6944444444444444,
+     "textSize": 0.2801547997807563,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -32048,24 +32107,25 @@
    "kind": "procedural",
    "name": "lig22",
    "position": [
-    0.75,
-    1.42,
-    -1.37
+    1.3089666717676232,
+    0.2789325080770284,
+    -1.396
    ],
    "rotation": [
     0.0,
     -0.0,
-    0.0
+    8.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.22222222222222224,
+     "textSize": 0.17910608948984202,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -32088,24 +32148,25 @@
    "kind": "procedural",
    "name": "lig23",
    "position": [
-    0.4,
-    0.01,
-    -0.4
+    1.496,
+    1.4178593555651653,
+    0.17044916807426963
    ],
    "rotation": [
+    -0.0,
     -90.0,
-    29.999999999999996,
-    2.02554950116723e-15
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.8333333333333334,
+     "textSize": 0.2163640946645624,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32128,24 +32189,25 @@
    "kind": "procedural",
    "name": "lig24",
    "position": [
-    -0.3,
-    2.25,
-    -1.79
+    -0.8102511368776528,
+    2.596,
+    -0.5092534692579855
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    24.092702897677462,
+    -1.5688266803562708e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.38888888888888895,
+     "textSize": 0.35712824807909693,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -32168,12 +32230,12 @@
    "kind": "procedural",
    "name": "lig25",
    "position": [
-    -0.3,
-    0.56,
-    -0.2
+    -1.8952542071843188,
+    2.3039479229311537,
+    -1.7960000000000003
    ],
    "rotation": [
-    -90.0,
+    0.0,
     -0.0,
     0.0
    ],
@@ -32181,11 +32243,12 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.5293774486226983,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -32208,24 +32271,25 @@
    "kind": "procedural",
    "name": "lig26",
    "position": [
-    1.99,
-    1.6,
-    0.55
+    -1.7261129542952662,
+    1.3187053966907278,
+    -1.7960000000000003
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5555555555555556,
+     "textSize": 0.6960778577399949,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32248,24 +32312,25 @@
    "kind": "procedural",
    "name": "lig27",
    "position": [
-    -1.99,
-    2.2,
-    0.3
+    1.996,
+    0.9609638591430759,
+    -1.1616346708051855
    ],
    "rotation": [
-    -0.0,
-    90.0,
-    0.0
+    -89.99999999999999,
+    -78.00000000000001,
+    89.99999999999999
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.3333333333333333,
+     "textSize": 0.4095775362488279,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -32288,12 +32353,12 @@
    "kind": "procedural",
    "name": "lig28",
    "position": [
-    -1.35,
-    0.56,
-    -1.55
+    0.24875114848478186,
+    2.346527276851668,
+    -1.7959999999999998
    ],
    "rotation": [
-    -90.0,
+    0.0,
     -0.0,
     0.0
    ],
@@ -32301,11 +32366,12 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.09722222222222224,
+     "textSize": 0.23982204028250406,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -32328,24 +32394,25 @@
    "kind": "procedural",
    "name": "lig29",
    "position": [
-    0.0,
-    2.59,
-    0.4
+    -1.9960000000000004,
+    0.7115073480985374,
+    -1.6546166671415117
    ],
    "rotation": [
-    90.0,
-    -0.0,
-    0.0
+    -89.99999999999999,
+    79.99999999999999,
+    -89.99999999999999
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6944444444444444,
+     "textSize": 0.7188052752284746,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32368,24 +32435,25 @@
    "kind": "procedural",
    "name": "lig30",
    "position": [
-    1.0,
-    2.0,
-    -1.79
+    -1.4786273660232836,
+    2.1193255398059025,
+    -1.796
    ],
    "rotation": [
     0.0,
     -0.0,
-    12.0
+    -4.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.2777777777777778,
+     "textSize": 0.4732470656584807,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -32408,24 +32476,25 @@
    "kind": "procedural",
    "name": "lig31",
    "position": [
-    1.5,
-    1.7,
-    -1.79
+    0.5458105874587921,
+    0.5584974547214518,
+    -1.7960000000000003
    ],
    "rotation": [
     0.0,
     -0.0,
-    -12.0
+    8.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.19444444444444448,
+     "textSize": 0.21678671918773537,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -32448,24 +32517,25 @@
    "kind": "procedural",
    "name": "lig32",
    "position": [
-    0.6,
-    1.3,
-    -1.79
+    1.9454048387697402,
+    1.513204376780214,
+    -1.7959999999999998
    ],
    "rotation": [
     0.0,
     -0.0,
-    6.000000000000001
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.49106482451091843,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32488,24 +32558,25 @@
    "kind": "procedural",
    "name": "lig33",
    "position": [
-    -1.2,
-    1.4,
-    1.79
+    0.6441085462843607,
+    1.7022494787904987,
+    -1.7959999999999998
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    0.0,
+    -0.0,
+    6.000000000000001
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.47222222222222227,
+     "textSize": 0.27274284109943814,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -32528,24 +32599,25 @@
    "kind": "procedural",
    "name": "lig34",
    "position": [
-    -0.3,
-    1.1,
-    1.79
+    -1.996,
+    0.5233493292773683,
+    0.5842005463969671
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -0.0,
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.47222222222222227,
+     "textSize": 0.21078617803396088,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.5,
+      "italic": true
      }
     },
     "material": {
@@ -32568,24 +32640,25 @@
    "kind": "procedural",
    "name": "lig35",
    "position": [
-    0.6,
-    0.8,
-    1.79
+    -1.996,
+    0.6401572059241004,
+    0.7013683204367045
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -89.99999999999997,
+    82.00000000000003,
+    -89.99999999999997
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.47222222222222227,
+     "textSize": 0.4369832072321216,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32608,9 +32681,9 @@
    "kind": "procedural",
    "name": "v2w00",
    "position": [
-    0.3,
-    2.18,
-    -1.69
+    0.5252899970207969,
+    2.1369247529312294,
+    -1.696
    ],
    "rotation": [
     0.0,
@@ -32621,11 +32694,12 @@
     "source": {
      "kind": "text",
      "text": "DO YOU WANNA HAVE FUN?",
-     "textSize": 0.1527777777777778,
+     "textSize": 0.2574857187563029,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32648,24 +32722,25 @@
    "kind": "procedural",
    "name": "v2w01",
    "position": [
-    -1.79,
-    1.5,
-    -0.2
+    -0.6900746698313859,
+    1.3596715879379926,
+    -1.6959999999999997
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "AS THE FIRES KEEP BURNING",
-     "textSize": 0.125,
+     "textSize": 0.1529623394455651,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -32688,24 +32763,25 @@
    "kind": "procedural",
    "name": "v2w02",
    "position": [
-    0.75,
-    0.62,
-    -1.38
+    1.796,
+    0.4905145117742573,
+    -1.3234272724829137
    ],
    "rotation": [
-    0.0,
     -0.0,
+    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THE WORLD STOPS TURNING",
-     "textSize": 0.04861111111111112,
+     "textSize": 0.12112914864297968,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -32728,9 +32804,9 @@
    "kind": "procedural",
    "name": "v2w03",
    "position": [
-    -0.2,
-    2.3,
-    -2.19
+    1.6533348020703191,
+    2.039687767882491,
+    -2.196
    ],
    "rotation": [
     0.0,
@@ -32741,11 +32817,12 @@
     "source": {
      "kind": "text",
      "text": "AND EVERYONE",
-     "textSize": 0.16666666666666666,
+     "textSize": 0.37419344585603836,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -32768,9 +32845,9 @@
    "kind": "procedural",
    "name": "v2w04",
    "position": [
-    2.59,
-    1.75,
-    -1.2
+    2.596,
+    1.9116206255846364,
+    1.1275121799602204
    ],
    "rotation": [
     -0.0,
@@ -32781,11 +32858,12 @@
     "source": {
      "kind": "text",
      "text": "UNDER THE SUN",
-     "textSize": 0.16666666666666666,
+     "textSize": 0.25989144899405736,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -32824,8 +32902,9 @@
      "textSize": 0.044444444444444446,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Menlo",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32864,8 +32943,9 @@
      "textSize": 0.05555555555555556,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Menlo",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -32888,9 +32968,9 @@
    "kind": "procedural",
    "name": "v2w07",
    "position": [
-    1.99,
-    1.15,
-    0.55
+    1.996,
+    1.4362326240480856,
+    0.28542979941819313
    ],
    "rotation": [
     -0.0,
@@ -32901,11 +32981,12 @@
     "source": {
      "kind": "text",
      "text": "TELL ME YOU'RE THE ONE",
-     "textSize": 0.125,
+     "textSize": 0.23601177149225977,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -32928,9 +33009,9 @@
    "kind": "procedural",
    "name": "v2w08",
    "position": [
-    -0.3,
-    2.3,
-    -1.79
+    0.24922078428175531,
+    2.2189834494398037,
+    -1.7960000000000003
    ],
    "rotation": [
     0.0,
@@ -32941,11 +33022,12 @@
     "source": {
      "kind": "text",
      "text": "TO MAKE THE WORLD",
-     "textSize": 0.18055555555555558,
+     "textSize": 0.22937852920537657,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -32968,9 +33050,9 @@
    "kind": "procedural",
    "name": "v2w09",
    "position": [
-    -0.3,
-    2.05,
-    -1.79
+    0.3689011606885947,
+    1.7674020022280126,
+    -1.7959999999999998
    ],
    "rotation": [
     0.0,
@@ -32981,11 +33063,12 @@
     "source": {
      "kind": "text",
      "text": "STOP HURTING",
-     "textSize": 0.22222222222222224,
+     "textSize": 0.2873474245933426,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33008,24 +33091,25 @@
    "kind": "procedural",
    "name": "v2w10",
    "position": [
-    -1.99,
-    2.05,
-    0.3
+    1.996,
+    0.17401267050919067,
+    -1.0252789116192877
    ],
    "rotation": [
     -0.0,
-    90.0,
+    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "AND MY HEART KEEP PUMPING",
-     "textSize": 0.1388888888888889,
+     "textSize": 0.1895771457544697,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33048,9 +33132,9 @@
    "kind": "procedural",
    "name": "v2w11",
    "position": [
-    1.0,
-    1.83,
-    -1.46
+    0.9048320135210073,
+    2.204564963089846,
+    -1.796
    ],
    "rotation": [
     0.0,
@@ -33061,11 +33145,12 @@
     "source": {
      "kind": "text",
      "text": "WHILE EVERYONE UNDER THE SUN",
-     "textSize": 0.0625,
+     "textSize": 0.19512939051971814,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33088,9 +33173,9 @@
    "kind": "procedural",
    "name": "v2w12",
    "position": [
-    -0.7,
-    1.37,
-    -1.78
+    -0.18440735499478322,
+    0.80350224342203,
+    -1.7959999999999998
    ],
    "rotation": [
     0.0,
@@ -33101,11 +33186,12 @@
     "source": {
      "kind": "text",
      "text": "TAKE STEPS",
-     "textSize": 0.16666666666666666,
+     "textSize": 0.3000211536711493,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33128,9 +33214,9 @@
    "kind": "procedural",
    "name": "v2w13",
    "position": [
-    2.19,
-    1.25,
-    -1.0
+    2.196,
+    1.3261820772309558,
+    -0.2008144307171038
    ],
    "rotation": [
     -0.0,
@@ -33141,11 +33227,12 @@
     "source": {
      "kind": "text",
      "text": "TO FEEL IT GROW",
-     "textSize": 0.1388888888888889,
+     "textSize": 0.20864956207436275,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33168,24 +33255,25 @@
    "kind": "procedural",
    "name": "v2w14",
    "position": [
-    0.0,
-    2.35,
-    -2.19
+    1.2464450357183363,
+    2.696,
+    -1.5008333565539576
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    -35.30957710710014,
+    2.4849340776177895e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.19444444444444448,
+     "textSize": 0.3015128930974067,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33208,9 +33296,9 @@
    "kind": "procedural",
    "name": "v2w15",
    "position": [
-    2.59,
-    1.9,
-    0.9
+    2.596,
+    1.5511620934387849,
+    -0.02620650029947824
    ],
    "rotation": [
     -0.0,
@@ -33221,11 +33309,12 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.1388888888888889,
+     "textSize": 0.2084264127314885,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33248,24 +33337,25 @@
    "kind": "procedural",
    "name": "v2w16",
    "position": [
-    -2.59,
-    2.3,
-    -0.1
+    -0.2727165509008719,
+    0.7432774053931752,
+    -2.196
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.16666666666666666,
+     "textSize": 0.237345880873295,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33288,24 +33378,25 @@
    "kind": "procedural",
    "name": "v2w17",
    "position": [
-    0.0,
-    0.03,
-    0.6
+    1.790287423773076,
+    0.004,
+    -1.475744687206044
    ],
    "rotation": [
     -90.0,
-    -0.0,
-    0.0
+    -19.315010191137517,
+    -1.2296402452668643e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.3055555555555556,
+     "textSize": 0.24610596592854983,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33328,9 +33419,9 @@
    "kind": "procedural",
    "name": "v2w18",
    "position": [
-    -0.3,
-    2.25,
-    -1.79
+    -1.4955391539153633,
+    2.526468592566767,
+    -1.7959999999999998
    ],
    "rotation": [
     0.0,
@@ -33341,11 +33432,12 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.20833333333333334,
+     "textSize": 0.3137699013899739,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33368,24 +33460,25 @@
    "kind": "procedural",
    "name": "v2w19",
    "position": [
-    1.99,
-    1.7,
-    0.2
+    1.0825706746563901,
+    1.0793479152110952,
+    -1.7959999999999998
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.1527777777777778,
+     "textSize": 0.17114384057863885,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33408,9 +33501,9 @@
    "kind": "procedural",
    "name": "v2w20",
    "position": [
-    0.3,
-    1.9500000000000002,
-    -1.69
+    -0.3497475852034022,
+    1.7091819309055885,
+    -1.696
    ],
    "rotation": [
     0.0,
@@ -33421,11 +33514,12 @@
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.20833333333333334,
+     "textSize": 0.2904263762749802,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33448,24 +33542,25 @@
    "kind": "procedural",
    "name": "v2w21",
    "position": [
-    1.79,
-    1.9,
-    -0.2
+    -1.7960000000000003,
+    1.425075089920652,
+    -1.5426683529799916
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.1388888888888889,
+     "textSize": 0.19025446643515756,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -33488,24 +33583,25 @@
    "kind": "procedural",
    "name": "v2w22",
    "position": [
-    2.075,
-    0.8,
-    -0.17
+    -0.6504559119250028,
+    2.0111022474259244,
+    -2.196
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "TELL ME IT'LL BE FINE THOUGH?",
-     "textSize": 0.041666666666666664,
+     "textSize": 0.20153217271749463,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33528,9 +33624,9 @@
    "kind": "procedural",
    "name": "v2w23",
    "position": [
-    -0.2,
-    2.0,
-    -2.19
+    -1.3867473366504917,
+    2.0721433569672576,
+    -2.196
    ],
    "rotation": [
     0.0,
@@ -33541,11 +33637,12 @@
     "source": {
      "kind": "text",
      "text": "FEEL IT GROW",
-     "textSize": 0.2777777777777778,
+     "textSize": 0.3730098370438643,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "DIN Condensed",
+      "weight": 0.8,
+      "italic": false
      }
     },
     "material": {
@@ -33568,24 +33665,25 @@
    "kind": "procedural",
    "name": "fig66_0",
    "position": [
-    -0.9,
-    2.2,
-    -1.0
+    -1.1559966330625682,
+    2.446,
+    -1.0516788505753087
    ],
    "rotation": [
     90.0,
-    -0.0,
-    0.0
+    1.5550098837134305,
+    -9.524027907354497e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "FEEL",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.30745833605949635,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33608,24 +33706,25 @@
    "kind": "procedural",
    "name": "fig66_1",
    "position": [
-    0.0,
-    2.35,
-    -0.5
+    0.04253352346337171,
+    2.446,
+    -0.3613498223155339
    ],
    "rotation": [
     90.0,
-    -0.0,
-    0.0
+    1.2459573278566822,
+    -7.630491102012442e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.15557897400889642,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33648,24 +33747,25 @@
    "kind": "procedural",
    "name": "fig66_2",
    "position": [
-    0.9,
-    2.2,
-    -1.0
+    0.8511737091447972,
+    2.446,
+    -0.11968176850860257
    ],
    "rotation": [
     90.0,
-    -0.0,
-    0.0
+    0.30962511213943933,
+    -1.8959254681763098e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GROW",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.25038815622919597,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33688,24 +33788,25 @@
    "kind": "procedural",
    "name": "fig66_3",
    "position": [
-    -1.4,
-    1.75,
-    2.19
+    -0.6284558962221377,
+    2.446,
+    -0.1896361380252839
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    90.0,
+    -1.0828702750833146,
+    6.631457678727011e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "FEEL",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.2004253610730318,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33728,24 +33829,25 @@
    "kind": "procedural",
    "name": "fig66_4",
    "position": [
-    2.59,
-    1.9500000000000002,
-    0.0
+    0.17481826573230486,
+    2.446,
+    0.30028367740437073
    ],
    "rotation": [
-    -0.0,
-    -90.0,
-    0.0
+    90.0,
+    -3.045624268474684,
+    1.8666654738060308e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.1266350326622255,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33768,24 +33870,25 @@
    "kind": "procedural",
    "name": "fig66_5",
    "position": [
-    0.0,
-    2.35,
-    0.6
+    0.7481257369390548,
+    2.446,
+    0.7658613566947922
    ],
    "rotation": [
     90.0,
-    -0.0,
-    0.0
+    -7.781478048669345,
+    4.794294341051193e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GROW",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.2510937491624282,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33806,55 +33909,15 @@
   },
   {
    "kind": "procedural",
-   "name": "grow00",
+   "name": "grow02",
    "position": [
-    4.43,
-    2.1,
-    -0.0
-   ],
-   "rotation": [
-    -0.0,
-    90.0,
-    0.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "text",
-     "text": "FEEL IT GROW",
-     "textSize": 0.22222222222222224,
-     "textDepth": 0.08,
-     "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
-     }
-    },
-    "material": {
-     "baseColor": [
-      0.02,
-      0.02,
-      0.02
-     ],
-     "emissiveColor": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "emissiveIntensity": 4.0,
-     "roughness": 0.7
-    }
-   }
-  },
-  {
-   "kind": "procedural",
-   "name": "grow01",
-   "position": [
-    -3.266138602068849,
-    4.25,
-    -2.9928646197373756
+    0.903518485110831,
+    6.05,
+    2.530428115241734
    ],
    "rotation": [
     180.0,
-    -47.5,
+    35.32932060037367,
     180.0
    ],
    "procedural": {
@@ -33864,48 +33927,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
-     }
-    },
-    "material": {
-     "baseColor": [
-      0.02,
-      0.02,
-      0.02
-     ],
-     "emissiveColor": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "emissiveIntensity": 4.0,
-     "roughness": 0.7
-    }
-   }
-  },
-  {
-   "kind": "procedural",
-   "name": "grow02",
-   "position": [
-    0.3860999403721245,
-    6.4,
-    4.4131425125464325
-   ],
-   "rotation": [
-    0.0,
-    4.999999999999984,
-    0.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "text",
-     "text": "FEEL IT GROW",
-     "textSize": 0.22222222222222224,
-     "textDepth": 0.08,
-     "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33928,13 +33952,13 @@
    "kind": "procedural",
    "name": "grow03",
    "position": [
-    2.696813130508634,
-    8.549999999999999,
-    -3.514555297490171
+    2.565358909752711,
+    8.2,
+    -3.623095866226312
    ],
    "rotation": [
     180.0,
-    37.50000000000002,
+    28.16234567046026,
     180.0
    ],
    "procedural": {
@@ -33944,8 +33968,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -33968,14 +33993,14 @@
    "kind": "procedural",
    "name": "grow04",
    "position": [
-    -4.362698345844082,
-    10.7,
-    0.7692614270644988
+    -2.775253089816922,
+    10.35,
+    -0.2894053248882895
    ],
    "rotation": [
-    0.0,
-    -80.00000000000006,
-    0.0
+    180.0,
+    33.079562778508524,
+    180.0
    ],
    "procedural": {
     "source": {
@@ -33984,8 +34009,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34008,14 +34034,14 @@
    "kind": "procedural",
    "name": "grow05",
    "position": [
-    3.736224104951082,
-    12.85,
-    2.380237264976432
+    2.399978959153434,
+    12.5,
+    0.8866616773028144
    ],
    "rotation": [
-    0.0,
-    57.49999999999996,
-    0.0
+    180.0,
+    -26.44173937171272,
+    180.0
    ],
    "procedural": {
     "source": {
@@ -34024,8 +34050,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34048,13 +34075,13 @@
    "kind": "procedural",
    "name": "grow06",
    "position": [
-    -1.146568369804163,
-    14.999999999999998,
-    -4.279051410460574
+    -1.6886730990578773,
+    14.649999999999999,
+    -3.9538665260945134
    ],
    "rotation": [
     180.0,
-    -14.999999999999938,
+    -50.36999947142703,
     180.0
    ],
    "procedural": {
@@ -34064,8 +34091,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34088,14 +34116,14 @@
    "kind": "procedural",
    "name": "grow07",
    "position": [
-    -2.045546356631197,
-    17.15,
-    3.9294579909795235
+    -2.0857367574480348,
+    16.8,
+    2.10125542202342
    ],
    "rotation": [
-    0.0,
-    -27.499999999999954,
-    0.0
+    180.0,
+    -29.421456283118033,
+    180.0
    ],
    "procedural": {
     "source": {
@@ -34104,8 +34132,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34128,13 +34157,13 @@
    "kind": "procedural",
    "name": "grow08",
    "position": [
-    4.162838310081576,
-    19.299999999999997,
-    -1.5151492349327078
+    2.145541275952298,
+    18.95,
+    -1.1979544284261239
    ],
    "rotation": [
     180.0,
-    70.00000000000004,
+    -88.08509463019153,
     180.0
    ],
    "procedural": {
@@ -34144,8 +34173,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34168,14 +34198,14 @@
    "kind": "procedural",
    "name": "grow09",
    "position": [
-    -4.092786329025001,
-    21.449999999999996,
-    -1.6952876053773458
+    -4.000474448017413,
+    21.099999999999998,
+    -0.6976910367393543
    ],
    "rotation": [
-    180.0,
-    -67.50000000000004,
-    180.0
+    0.0,
+    -54.921532088748094,
+    0.0
    ],
    "procedural": {
     "source": {
@@ -34184,8 +34214,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34208,13 +34239,13 @@
    "kind": "procedural",
    "name": "grow10",
    "position": [
-    1.8721988995112928,
-    23.599999999999998,
-    4.0149434965723625
+    2.1657959381720064,
+    23.25,
+    3.837233322845098
    ],
    "rotation": [
     0.0,
-    24.999999999999922,
+    43.9622773168284,
     0.0
    ],
    "procedural": {
@@ -34224,8 +34255,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34248,14 +34280,14 @@
    "kind": "procedural",
    "name": "grow11",
    "position": [
-    1.332126691803929,
-    25.749999999999996,
-    -4.224966091814645
+    1.6216029029903343,
+    25.4,
+    -2.3803989512762085
    ],
    "rotation": [
-    180.0,
-    17.499999999999986,
-    180.0
+    0.0,
+    34.79693916260475,
+    0.0
    ],
    "procedural": {
     "source": {
@@ -34264,8 +34296,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34288,13 +34321,13 @@
    "kind": "procedural",
    "name": "grow12",
    "position": [
-    -3.836492538765067,
-    27.899999999999995,
-    2.2149999999999936
+    -2.1588768891326184,
+    27.549999999999997,
+    2.3966474998637715
    ],
    "rotation": [
     0.0,
-    -60.0000000000001,
+    48.434653526932614,
     0.0
    ],
    "procedural": {
@@ -34304,8 +34337,9 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34328,13 +34362,13 @@
    "kind": "procedural",
    "name": "grow13",
    "position": [
-    4.324991311541305,
-    30.049999999999997,
-    0.958827489745796
+    3.983600862358607,
+    29.7,
+    1.5491263569213618
    ],
    "rotation": [
     0.0,
-    77.5,
+    39.239701846196866,
     0.0
    ],
    "procedural": {
@@ -34344,8 +34378,50 @@
      "textSize": 0.22222222222222224,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 4.0,
+     "roughness": 0.7
+    }
+   }
+  },
+  {
+   "kind": "procedural",
+   "name": "isFirst",
+   "position": [
+    -1.1222719608585967,
+    25.774236739376796,
+    0.6519841679996743
+   ],
+   "rotation": [
+    -34.112673440470594,
+    -60.09536710088749,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "IS",
+     "textSize": 0.4444444444444445,
+     "textDepth": 0.08,
+     "font": {
+      "family": "Avenir Next",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -34380,12 +34456,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34420,12 +34497,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34460,12 +34538,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34488,8 +34567,8 @@
    "kind": "procedural",
    "name": "isth03",
    "position": [
-    1.6000000000000005,
-    1.5,
+    -1.9,
+    2.55,
     -3.49
    ],
    "rotation": [
@@ -34500,12 +34579,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34528,8 +34608,8 @@
    "kind": "procedural",
    "name": "isth04",
    "position": [
-    -1.9,
-    2.55,
+    -0.8499999999999999,
+    2.25,
     -3.49
    ],
    "rotation": [
@@ -34540,12 +34620,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34568,8 +34649,8 @@
    "kind": "procedural",
    "name": "isth05",
    "position": [
-    -0.8499999999999999,
-    2.25,
+    0.20000000000000018,
+    1.9499999999999997,
     -3.49
    ],
    "rotation": [
@@ -34580,12 +34661,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34608,8 +34690,8 @@
    "kind": "procedural",
    "name": "isth06",
    "position": [
-    0.20000000000000018,
-    1.9499999999999997,
+    1.2500000000000004,
+    1.65,
     -3.49
    ],
    "rotation": [
@@ -34620,12 +34702,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34648,8 +34731,8 @@
    "kind": "procedural",
    "name": "isth07",
    "position": [
-    1.2500000000000004,
-    1.65,
+    -1.5499999999999998,
+    2.4,
     -3.49
    ],
    "rotation": [
@@ -34660,12 +34743,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34688,8 +34772,8 @@
    "kind": "procedural",
    "name": "isth08",
    "position": [
-    -1.5499999999999998,
-    2.4,
+    -0.4999999999999999,
+    2.1,
     -3.49
    ],
    "rotation": [
@@ -34700,12 +34784,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34728,8 +34813,8 @@
    "kind": "procedural",
    "name": "isth09",
    "position": [
-    -0.4999999999999999,
-    2.1,
+    0.5500000000000002,
+    1.7999999999999998,
     -3.49
    ],
    "rotation": [
@@ -34740,12 +34825,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34768,8 +34854,8 @@
    "kind": "procedural",
    "name": "isth10",
    "position": [
-    0.5500000000000002,
-    1.7999999999999998,
+    1.6000000000000005,
+    1.5,
     -3.49
    ],
    "rotation": [
@@ -34780,12 +34866,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34808,8 +34895,8 @@
    "kind": "procedural",
    "name": "isth11",
    "position": [
-    1.6000000000000005,
-    1.5,
+    -1.9,
+    2.55,
     -3.49
    ],
    "rotation": [
@@ -34820,12 +34907,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34848,8 +34936,8 @@
    "kind": "procedural",
    "name": "isth12",
    "position": [
-    -1.9,
-    2.55,
+    -0.8499999999999999,
+    2.25,
     -3.49
    ],
    "rotation": [
@@ -34860,12 +34948,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34888,8 +34977,8 @@
    "kind": "procedural",
    "name": "isth13",
    "position": [
-    -0.8499999999999999,
-    2.25,
+    0.20000000000000018,
+    1.9499999999999997,
     -3.49
    ],
    "rotation": [
@@ -34900,12 +34989,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34928,8 +35018,8 @@
    "kind": "procedural",
    "name": "isth14",
    "position": [
-    0.20000000000000018,
-    1.9499999999999997,
+    1.2500000000000004,
+    1.65,
     -3.49
    ],
    "rotation": [
@@ -34940,12 +35030,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -34968,46 +35059,6 @@
    "kind": "procedural",
    "name": "isth15",
    "position": [
-    1.2500000000000004,
-    1.65,
-    -3.49
-   ],
-   "rotation": [
-    0.0,
-    -0.0,
-    0.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "text",
-     "text": "YOU",
-     "textSize": 0.5,
-     "textDepth": 0.08,
-     "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
-     }
-    },
-    "material": {
-     "baseColor": [
-      0.02,
-      0.02,
-      0.02
-     ],
-     "emissiveColor": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "emissiveIntensity": 3.6,
-     "roughness": 0.7
-    }
-   }
-  },
-  {
-   "kind": "procedural",
-   "name": "isth16",
-   "position": [
     0.2,
     1.4,
     -3.49
@@ -35024,8 +35075,9 @@
      "textSize": 1.25,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Impact",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35046,7 +35098,7 @@
   },
   {
    "kind": "procedural",
-   "name": "isth17",
+   "name": "isth16",
    "position": [
     -3.49,
     2.4,
@@ -35064,8 +35116,50 @@
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 3.6,
+     "roughness": 0.7
+    }
+   }
+  },
+  {
+   "kind": "procedural",
+   "name": "isth17",
+   "position": [
+    -3.49,
+    2.1,
+    0.4999999999999999
+   ],
+   "rotation": [
+    -0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "THAT",
+     "textSize": 0.5,
+     "textDepth": 0.08,
+     "font": {
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35089,8 +35183,8 @@
    "name": "isth18",
    "position": [
     -3.49,
-    2.1,
-    0.4999999999999999
+    1.7999999999999998,
+    -0.5500000000000002
    ],
    "rotation": [
     -0.0,
@@ -35100,12 +35194,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35129,8 +35224,8 @@
    "name": "isth19",
    "position": [
     -3.49,
-    1.7999999999999998,
-    -0.5500000000000002
+    1.5,
+    -1.6000000000000005
    ],
    "rotation": [
     -0.0,
@@ -35140,12 +35235,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35169,8 +35265,8 @@
    "name": "isth20",
    "position": [
     -3.49,
-    1.5,
-    -1.6000000000000005
+    2.55,
+    1.9
    ],
    "rotation": [
     -0.0,
@@ -35180,12 +35276,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35209,8 +35306,8 @@
    "name": "isth21",
    "position": [
     -3.49,
-    2.55,
-    1.9
+    2.25,
+    0.8499999999999999
    ],
    "rotation": [
     -0.0,
@@ -35220,12 +35317,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35249,8 +35347,8 @@
    "name": "isth22",
    "position": [
     -3.49,
-    2.25,
-    0.8499999999999999
+    1.9499999999999997,
+    -0.20000000000000018
    ],
    "rotation": [
     -0.0,
@@ -35260,12 +35358,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35289,8 +35388,8 @@
    "name": "isth23",
    "position": [
     -3.49,
-    1.9499999999999997,
-    -0.20000000000000018
+    1.65,
+    -1.2500000000000004
    ],
    "rotation": [
     -0.0,
@@ -35300,12 +35399,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35329,8 +35429,8 @@
    "name": "isth24",
    "position": [
     -3.49,
-    1.65,
-    -1.2500000000000004
+    2.4,
+    1.5499999999999998
    ],
    "rotation": [
     -0.0,
@@ -35340,12 +35440,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35369,8 +35470,8 @@
    "name": "isth25",
    "position": [
     -3.49,
-    2.4,
-    1.5499999999999998
+    2.1,
+    0.4999999999999999
    ],
    "rotation": [
     -0.0,
@@ -35380,12 +35481,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35409,8 +35511,8 @@
    "name": "isth26",
    "position": [
     -3.49,
-    2.1,
-    0.4999999999999999
+    1.7999999999999998,
+    -0.5500000000000002
    ],
    "rotation": [
     -0.0,
@@ -35420,12 +35522,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35449,8 +35552,8 @@
    "name": "isth27",
    "position": [
     -3.49,
-    1.7999999999999998,
-    -0.5500000000000002
+    1.5,
+    -1.6000000000000005
    ],
    "rotation": [
     -0.0,
@@ -35460,12 +35563,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "ALL",
+     "text": "YOU",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35489,8 +35593,8 @@
    "name": "isth28",
    "position": [
     -3.49,
-    1.5,
-    -1.6000000000000005
+    2.55,
+    1.9
    ],
    "rotation": [
     -0.0,
@@ -35500,12 +35604,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "YOU",
+     "text": "IS",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35529,8 +35634,8 @@
    "name": "isth29",
    "position": [
     -3.49,
-    2.55,
-    1.9
+    2.25,
+    0.8499999999999999
    ],
    "rotation": [
     -0.0,
@@ -35540,12 +35645,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "IS",
+     "text": "THAT",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35569,8 +35675,8 @@
    "name": "isth30",
    "position": [
     -3.49,
-    2.25,
-    0.8499999999999999
+    1.9499999999999997,
+    -0.20000000000000018
    ],
    "rotation": [
     -0.0,
@@ -35580,12 +35686,13 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "THAT",
+     "text": "ALL",
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35609,46 +35716,6 @@
    "name": "isth31",
    "position": [
     -3.49,
-    1.9499999999999997,
-    -0.20000000000000018
-   ],
-   "rotation": [
-    -0.0,
-    90.0,
-    0.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "text",
-     "text": "ALL",
-     "textSize": 0.5,
-     "textDepth": 0.08,
-     "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
-     }
-    },
-    "material": {
-     "baseColor": [
-      0.02,
-      0.02,
-      0.02
-     ],
-     "emissiveColor": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "emissiveIntensity": 3.6,
-     "roughness": 0.7
-    }
-   }
-  },
-  {
-   "kind": "procedural",
-   "name": "isth32",
-   "position": [
-    -3.49,
     1.65,
     -1.2500000000000004
    ],
@@ -35664,8 +35731,9 @@
      "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35688,24 +35756,25 @@
    "kind": "procedural",
    "name": "b3w83",
    "position": [
-    0.0,
-    0.03,
-    0.3
+    -1.2582255466781165,
+    0.004,
+    -0.12073179432094006
    ],
    "rotation": [
     -90.0,
-    9.0,
-    5.55668787584208e-16
+    -11.998841858106037,
+    -7.456496819538447e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.2628850176889338,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "American Typewriter",
+      "weight": 0.6,
+      "italic": false
      }
     },
     "material": {
@@ -35744,8 +35813,9 @@
      "textSize": 0.3055555555555556,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35768,24 +35838,25 @@
    "kind": "procedural",
    "name": "b3w85",
    "position": [
-    0.0,
-    0.03,
-    1.1
+    -0.8697529288501646,
+    0.004,
+    -0.07487042502322944
    ],
    "rotation": [
-    -90.0,
-    14.999999999999998,
-    9.400607950331846e-16
+    -89.99999999999999,
+    71.10399785685068,
+    1.0249399004766447e-14
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.3495357067922662,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35808,24 +35879,25 @@
    "kind": "procedural",
    "name": "b3w86",
    "position": [
-    0.6,
-    0.03,
-    1.2
+    -0.4173292546268601,
+    0.004,
+    -0.9696888095596563
    ],
    "rotation": [
     -90.0,
-    -2.0,
-    -1.2251444400236965e-16
+    20.32989651677495,
+    1.2998613208472468e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.3477094272172033,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35848,24 +35920,25 @@
    "kind": "procedural",
    "name": "b3w87",
    "position": [
-    0.2,
-    0.03,
-    0.9
+    0.6811931696435238,
+    0.004,
+    -0.7391482475529354
    ],
    "rotation": [
     -90.0,
-    -19.0,
-    -1.2080233829559575e-15
+    -63.43533185107034,
+    -7.016826568651762e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.3243749919465072,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35904,8 +35977,9 @@
      "textSize": 0.3055555555555556,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35928,24 +36002,25 @@
    "kind": "procedural",
    "name": "b3w89",
    "position": [
-    0.0,
-    0.03,
-    0.5
+    0.032209477078326554,
+    0.003999999999999778,
+    -0.817429901698176
    ],
    "rotation": [
     -90.0,
-    -13.0,
-    -8.099674917033327e-16
+    -67.94969800737206,
+    -8.661581031099275e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.27901020454937775,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -35968,24 +36043,25 @@
    "kind": "procedural",
    "name": "b3w90",
    "position": [
-    0.0,
-    0.03,
-    0.8
+    -1.3876196464841508,
+    0.004,
+    2.0724988088682657
    ],
    "rotation": [
-    -90.0,
-    10.0,
-    6.186175825598329e-16
+    89.99999999999997,
+    83.89091520055301,
+    179.99999999999997
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.4166666666666667,
+     "textSize": 0.37982095100933333,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Marker Felt",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -36008,24 +36084,25 @@
    "kind": "procedural",
    "name": "chA00",
    "position": [
-    6.0,
-    -1.2980028034238464,
-    34.0
+    -5.29344017429923,
+    0.8935349003719542,
+    37.385032443798465
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -7.919220232785568,
+    -4.880240539437328e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.051224980224788,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36039,7 +36116,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36048,24 +36125,25 @@
    "kind": "procedural",
    "name": "chA01",
    "position": [
-    -0.0,
-    -0.31701584026635243,
-    32.5
+    0.16309113882727055,
+    -0.003069806996151725,
+    37.505413436631464
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    0.35010568075102877,
+    2.1438056884700932e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 0.8347261123718978,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36079,7 +36157,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36088,24 +36166,25 @@
    "kind": "procedural",
    "name": "chA02",
    "position": [
-    -6.0,
-    0.6639711228911418,
-    31.0
+    16.921039265868234,
+    -2.661841430463156,
+    17.284403826679814
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    8.707578610360475,
+    5.373286332253043e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 3.346221063264235,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36119,7 +36198,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36128,24 +36207,25 @@
    "kind": "procedural",
    "name": "chA03",
    "position": [
-    -6.0,
-    0.4373596881780288,
-    31.5
+    8.211383060210109,
+    -2.0426480452700932,
+    28.422353923152933
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -6.4270080844151,
+    -3.9519969034695404e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.7634940924697655,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36159,7 +36239,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36168,24 +36248,25 @@
    "kind": "procedural",
    "name": "chA04",
    "position": [
-    0.0,
-    -0.5436272749794653,
-    30.0
+    -1.8832180211617207,
+    -0.6756911150814631,
+    24.70016301307349
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    2.0357877661465893,
+    1.2470853309495088e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.8714407177938603,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36199,7 +36280,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36208,24 +36289,25 @@
    "kind": "procedural",
    "name": "chA05",
    "position": [
-    6.0,
-    -1.5246142381369594,
-    28.5
+    -2.853984312530897,
+    0.3781780442867086,
+    36.07793275083512
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    10.495231029491439,
+    6.499330585247562e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 0.7253120347254218,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36239,7 +36321,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36248,24 +36330,25 @@
    "kind": "procedural",
    "name": "chA06",
    "position": [
-    -6.0,
-    0.23664506165799365,
-    29.0
+    -13.052120935534935,
+    0.48811313887646873,
+    22.148385490842955
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -4.643117762469597,
+    -2.849329670224892e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.3998883613971476,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36279,7 +36362,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36288,24 +36371,25 @@
    "kind": "procedural",
    "name": "chA07",
    "position": [
-    0.0,
-    -0.7443419014995005,
-    27.5
+    -1.1546249898236576,
+    -0.583323432409768,
+    28.4238490212868
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    3.743521906960516,
+    2.295513425845926e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.2047234905785484,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36319,7 +36403,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36328,24 +36412,25 @@
    "kind": "procedural",
    "name": "chA08",
    "position": [
-    6.0,
-    -1.7253288646569946,
-    26.0
+    4.964898397051758,
+    -1.6290628435202632,
+    28.2521118630804
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    12.094273638422653,
+    7.517593206867984e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.2003003745154945,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36359,7 +36444,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36368,24 +36453,25 @@
    "kind": "procedural",
    "name": "chA09",
    "position": [
-    6.0,
-    -1.8915356271221848,
-    26.5
+    19.642930968056838,
+    -1.556850521079951,
+    2.912620739579836
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -3.323163791380991,
+    -2.0371357825949147e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 4.0383528437607,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36399,7 +36485,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36408,24 +36494,25 @@
    "kind": "procedural",
    "name": "chA10",
    "position": [
-    -0.0,
-    -0.9105486639646907,
-    25.0
+    2.194931469915222,
+    -1.3130318452224372,
+    26.15304318490186
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    4.903738512824477,
+    3.010026939770102e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.1266614418723073,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36439,7 +36526,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36448,24 +36535,25 @@
    "kind": "procedural",
    "name": "chA11",
    "position": [
-    -6.0,
-    0.07043829919280337,
-    23.5
+    -4.17311546303456,
+    -0.29833978254954024,
+    24.645234648624886
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    13.083366102085845,
+    8.153460849707167e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.3407878509278055,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36479,7 +36567,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36488,24 +36576,25 @@
    "kind": "procedural",
    "name": "chA12",
    "position": [
-    6.0,
-    -2.016103925530899,
-    24.0
+    -6.1338402631324715,
+    -0.0965880345170172,
+    22.195093531215118
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -2.7455641243060063,
+    -1.6824611356063693e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.5308731638414728,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36519,7 +36608,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36528,24 +36617,25 @@
    "kind": "procedural",
    "name": "chA13",
    "position": [
-    -0.0,
-    -1.0351169623734044,
-    22.5
+    0.9492594180991958,
+    -1.2660980703290317,
+    22.070887572822112
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    5.0561249422501575,
+    3.104045240181638e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.2438790800760844,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36559,7 +36649,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36568,24 +36658,25 @@
    "kind": "procedural",
    "name": "chA14",
    "position": [
-    -6.0,
-    -0.054129999215910385,
-    21.0
+    15.682327318005697,
+    -1.7215265315435597,
+    2.0227994078729523
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    12.608308878137986,
+    7.847443852094832e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 3.535160153644646,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36599,7 +36690,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36608,24 +36699,25 @@
    "kind": "procedural",
    "name": "chA15",
    "position": [
-    -6.0,
-    -0.1317156063197376,
-    21.5
+    9.531053094794231,
+    -2.3658456987775422,
+    12.616857345126803
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -4.890816946099706,
+    -3.002056675053713e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.1698477508772798,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36639,7 +36731,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36648,24 +36740,25 @@
    "kind": "procedural",
    "name": "chA16",
    "position": [
-    0.0,
-    -1.1127025694772317,
-    20.0
+    -1.7871827824863389,
+    -0.4416123583494476,
+    8.983666655378023
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    2.137203020271109,
+    1.3092667052055348e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.297692525345383,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36679,7 +36772,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36688,24 +36781,25 @@
    "kind": "procedural",
    "name": "chA17",
    "position": [
-    6.0,
-    -2.0936895326347256,
-    18.5
+    -4.058549431756428,
+    -0.4227683201666466,
+    21.45810385430788
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    9.070757320204017,
+    5.601109819205294e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.074104930556316,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36719,7 +36813,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36728,24 +36822,25 @@
    "kind": "procedural",
    "name": "chA18",
    "position": [
-    -6.0,
-    -0.1589899455798212,
-    19.0
+    -14.341014376207134,
+    1.2166745654446935,
+    4.55869473173318
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -9.193214833468096,
+    -5.678030990091358e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.957240822302944,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36759,7 +36854,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36768,24 +36863,25 @@
    "kind": "procedural",
    "name": "chA19",
    "position": [
-    0.0,
-    -1.1399769087373153,
-    17.5
+    -1.3982242221663739,
+    -0.7088320861795587,
+    12.126361127149357
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    -2.3217608221860457,
+    -1.4224471472726205e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.6832347783963781,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36799,7 +36895,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36808,24 +36904,25 @@
    "kind": "procedural",
    "name": "chA20",
    "position": [
-    6.0,
-    -2.1209638718948094,
-    16.0
+    6.498368334468249,
+    -2.0524418250850776,
+    13.126422407475717
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    4.592411607781752,
+    2.8180785479331675e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.668372430029856,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36839,7 +36936,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36848,24 +36945,25 @@
    "kind": "procedural",
    "name": "chA21",
    "position": [
-    6.0,
-    -2.0967568200220126,
-    16.5
+    25.24521173534476,
+    0.2970031069438636,
+    -8.894029460397498
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -13.348644684130162,
+    -8.324856022028665e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 4.495456679121313,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36879,7 +36977,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36888,24 +36986,25 @@
    "kind": "procedural",
    "name": "chA22",
    "position": [
-    -0.0,
-    -1.1157698568645185,
-    15.0
+    2.6417161589161573,
+    -1.330769103277686,
+    10.720607836324145
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    -6.158350964247803,
+    -3.7854911896475764e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.593935866240887,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36919,7 +37018,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36928,24 +37027,25 @@
    "kind": "procedural",
    "name": "chA23",
    "position": [
-    -6.0,
-    -0.1347828937070244,
-    13.5
+    -5.7469888308963855,
+    0.3005239389890852,
+    7.564730413201971
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    1.1677444555971048,
+    7.151362764856222e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.8563130746411405,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36959,7 +37059,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -36968,24 +37068,25 @@
    "kind": "procedural",
    "name": "chA24",
    "position": [
-    6.0,
-    -2.0221069075885185,
-    14.0
+    -8.193447614089546,
+    0.8708256740679916,
+    4.563873662836372
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -15.665058377562646,
+    -9.838458083394927e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.0786295185332047,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -36999,7 +37100,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37008,24 +37109,25 @@
    "kind": "procedural",
    "name": "chA25",
    "position": [
-    -0.0,
-    -1.0411199444310246,
-    12.5
+    0.7403819056627126,
+    -0.698714889342678,
+    6.642140311075705
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    -7.652116204942366,
+    -4.71362859954503e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.7066814277636742,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37039,7 +37141,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37048,24 +37150,25 @@
    "kind": "procedural",
    "name": "chA26",
    "position": [
-    -6.0,
-    -0.06013298127353056,
-    11.0
+    22.387704620560225,
+    0.03985423450037112,
+    -11.593975130789914
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    0.6930301009684472,
+    4.2437924389088276e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 4.289693111183775,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37079,7 +37182,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37088,24 +37191,25 @@
    "kind": "procedural",
    "name": "chA27",
    "position": [
-    -6.0,
-    0.06175716231000988,
-    11.5
+    11.737716019092737,
+    -1.2807600313834424,
+    -1.9877646603746264
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -13.77658084642528,
+    -8.602141811571325e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.7772109836581427,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37119,7 +37223,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37128,24 +37232,25 @@
    "kind": "procedural",
    "name": "chA28",
    "position": [
-    0.0,
-    -0.9192298008474842,
-    10.0
+    -2.8591210897681654,
+    1.343342240928477,
+    -8.636423034920988
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    -4.6359870154655445,
+    -2.8449345912585256e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.9645526019965933,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37159,7 +37264,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37168,24 +37273,25 @@
    "kind": "procedural",
    "name": "chA29",
    "position": [
-    6.0,
-    -1.9002167640049783,
-    8.5
+    -8.734350365420022,
+    0.7671095263934027,
+    6.358458161157625
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    4.726691371995283,
+    2.9008474289336727e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.5184372432319135,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37199,7 +37305,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37208,24 +37314,25 @@
    "kind": "procedural",
    "name": "chA30",
    "position": [
-    -6.0,
-    0.22565820795286434,
-    9.0
+    -7.018761143072218,
+    4.209749981673442,
+    10.987122875971137
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -6.26797255617033,
+    32.455428654302715,
+    -9.491556683640454
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 0.8333333333333334,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37239,7 +37346,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37248,24 +37355,25 @@
    "kind": "procedural",
    "name": "chA31",
    "position": [
-    0.0,
-    -0.7553287552046297,
-    7.5
+    -6.5534806410047315,
+    1.3369510933414936,
+    -2.2303272542766237
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    1.8259058022423602,
+    1.1184234876168907e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.072379065680958,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37279,7 +37387,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37288,24 +37396,25 @@
    "kind": "procedural",
    "name": "chA32",
    "position": [
-    6.0,
-    -1.7363157183621238,
-    6.0
+    2.3326496455304495,
+    -0.17686591449838002,
+    -1.7043759663285911
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    11.701624672741943,
+    7.266490697442639e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.0332433907038148,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37319,7 +37428,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37328,24 +37437,25 @@
    "kind": "procedural",
    "name": "chA33",
    "position": [
-    6.0,
-    -1.5374354508334571,
-    6.5
+    34.687125735418526,
+    0.8149617209933928,
+    -73.23799062148002
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    -0.7219792431402254,
+    -4.421081845919684e-17
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 10.023593587372638,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37359,7 +37469,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37368,24 +37478,25 @@
    "kind": "procedural",
    "name": "chA34",
    "position": [
-    -0.0,
-    -0.556448487675963,
-    5.0
+    -4.334969442551186,
+    1.0967786262012145,
+    -3.069346148958097
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    8.779046288984759,
+    5.418082756113535e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.879812897659452,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37399,7 +37510,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37408,24 +37519,25 @@
    "kind": "procedural",
    "name": "chA35",
    "position": [
-    -6.0,
-    0.42453847548153106,
-    3.5
+    -17.91602356892943,
+    2.2966603036933066,
+    -8.301503392142692
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    17.933886201849063,
+    1.1354595091193547e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.758817367071252,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37439,7 +37551,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37448,24 +37560,25 @@
    "kind": "procedural",
    "name": "chA36",
    "position": [
-    6.0,
-    -1.3121083196391279,
-    4.0
+    -47.98379529073063,
+    -1.7303980587015535,
+    -42.37117023024516
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    2.7971455402023597,
+    1.7141196557753084e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 7.373247280463297,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37479,7 +37592,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37488,24 +37601,25 @@
    "kind": "procedural",
    "name": "chA37",
    "position": [
-    -0.0,
-    -0.33112135648163377,
-    2.5
+    -7.556934383117531,
+    1.875886448074072,
+    -6.704494977097244
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    11.171170304441645,
+    6.928385890834135e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.0163146542883585,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37519,7 +37633,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37528,24 +37642,25 @@
    "kind": "procedural",
    "name": "chA38",
    "position": [
-    -6.0,
-    0.6498656066758604,
-    1.0
+    19.189382084684755,
+    -1.9903592037104985,
+    -68.46622677764839
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    19.907321610045372,
+    1.2705137441860822e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 8.673060482812765,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37559,7 +37674,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37568,24 +37683,25 @@
    "kind": "procedural",
    "name": "chA39",
    "position": [
-    -6.0,
-    0.8919726203719631,
-    1.5
+    0.9549414038737707,
+    1.047500547654225,
+    -15.625009786806903
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    6.664086319721783,
+    4.0990768870701227e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.763800594131289,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37599,7 +37715,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37608,24 +37724,25 @@
    "kind": "procedural",
    "name": "chA40",
    "position": [
-    0.0,
-    -0.08901434278553094,
-    0.0
+    -14.503354918294843,
+    2.823110324375499,
+    -15.949888372439435
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    16.858195125908953,
+    1.06312415801605e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 2.864423348304382,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37639,7 +37756,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37648,24 +37765,25 @@
    "kind": "procedural",
    "name": "chA41",
    "position": [
-    6.0,
-    -1.0700013059430251,
-    -1.5
+    -17.690610831707794,
+    1.8518009332150513,
+    -3.0763815295570733
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    27.744966179175787,
+    1.845441138147241e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.9729186252570947,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37679,7 +37797,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37688,24 +37806,25 @@
    "kind": "procedural",
    "name": "chA42",
    "position": [
-    -6.0,
-    1.1404726451414402,
-    -1.0
+    -42.402051138362324,
+    -0.4325277606815808,
+    -14.114847409283005
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    20.180368479632907,
+    1.2894585337999571e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 4.6974769732125115,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37719,7 +37838,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37728,24 +37847,25 @@
    "kind": "procedural",
    "name": "chA43",
    "position": [
-    0.0,
-    0.15948568198394608,
-    -2.5
+    -13.377995126017307,
+    2.060795837922323,
+    -4.186817478187512
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    34.02511680917907,
+    2.368653427429501e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.6630492469630718,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37759,7 +37879,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37768,24 +37888,25 @@
    "kind": "procedural",
    "name": "chA44",
    "position": [
-    6.0,
-    -0.821501281173548,
-    -4.0
+    -6.6854086766710505,
+    1.6432627657421253,
+    -5.2870849279738374
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -90.0,
+    49.0400796209922,
+    4.0416068301127065e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.419976935440245,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37799,7 +37920,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37808,24 +37929,25 @@
    "kind": "procedural",
    "name": "chA45",
    "position": [
-    6.0,
-    -0.5772693896231729,
-    -3.5
+    -8.994517558527289,
+    2.2751380291022847,
+    -9.889105007839776
    ],
    "rotation": [
-    -75.7559742886662,
-    -9.698494383622078,
-    -2.4487947910309424
+    -90.0,
+    49.557215626879106,
+    4.116071527053971e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.7855474047945992,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37839,7 +37961,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37848,24 +37970,25 @@
    "kind": "procedural",
    "name": "chA46",
    "position": [
-    -0.0,
-    0.4037175735343213,
-    -5.0
+    -9.906450656473314,
+    1.574595881826292,
+    -0.9669794647298131
    ],
    "rotation": [
-    -75.96375653207352,
-    -0.0,
-    0.0
+    -90.0,
+    65.80238246278279,
+    7.80731137278187e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.2477011672884397,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37879,7 +38002,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37888,24 +38011,25 @@
    "kind": "procedural",
    "name": "chA47",
    "position": [
-    -6.0,
-    1.3847045366918156,
-    -6.5
+    -14.424737319414541,
+    1.1377870817131917,
+    5.422259904523767
    ],
    "rotation": [
-    -75.7559742886662,
-    9.698494383622078,
-    2.4487947910309424
+    -89.99999999999999,
+    80.96498772152461,
+    2.206360967122486e-14
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 2.2222222222222223,
+     "textSize": 1.5859554787691965,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -37919,7 +38043,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 5.0,
+     "emissiveIntensity": 3.0,
      "roughness": 0.7
     }
    }
@@ -37944,8 +38068,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -37984,8 +38109,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38024,8 +38150,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38064,8 +38191,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38104,8 +38232,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38144,8 +38273,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38184,8 +38314,9 @@
      "textSize": 1.9444444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38224,8 +38355,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38264,8 +38396,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38304,8 +38437,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38344,8 +38478,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38384,8 +38519,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38424,8 +38560,9 @@
      "textSize": 0.2777777777777778,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Rockwell",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38464,8 +38601,9 @@
      "textSize": 1.9444444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Didot",
+      "weight": 0.7,
+      "italic": false
      }
     },
     "material": {
@@ -38488,24 +38626,25 @@
    "kind": "procedural",
    "name": "chC00",
    "position": [
-    19.0,
-    18.6,
-    -0.0
+    4.779678019011972,
+    17.240343698819366,
+    -7.356265456706595
    ],
    "rotation": [
-    -0.0,
-    -90.0,
+    6.457398433709402,
+    4.285851168331697,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38519,7 +38658,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38528,24 +38667,25 @@
    "kind": "procedural",
    "name": "chC01",
    "position": [
-    18.86326977710987,
-    19.6,
-    -1.562833599002373
+    11.64176953345485,
+    19.350734735650025,
+    -7.479360779456958
    ],
    "rotation": [
-    0.0,
-    -79.99999999999999,
+    14.888608667693282,
+    -27.65579563201333,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38559,7 +38699,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38568,24 +38708,25 @@
    "kind": "procedural",
    "name": "chC02",
    "position": [
-    18.457233587073176,
-    20.6,
-    -3.0781812899310186
+    18.695944613879735,
+    18.228081895537382,
+    -3.948419472731431
    ],
    "rotation": [
-    0.0,
-    -70.00000000000001,
+    8.473687279563629,
+    -58.68993978688251,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38599,7 +38740,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38608,24 +38749,25 @@
    "kind": "procedural",
    "name": "chC03",
    "position": [
-    17.794228634059948,
-    18.6,
-    -4.499999999999999
+    2.797357489788486,
+    16.29394877885223,
+    -6.381164593353339
    ],
    "rotation": [
-    0.0,
-    -60.00000000000001,
+    1.3634577528854188,
+    19.31711834951437,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38639,7 +38781,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38648,24 +38790,25 @@
    "kind": "procedural",
    "name": "chC04",
    "position": [
-    16.894399988070802,
-    19.6,
-    -5.785088487178854
+    7.844692174497924,
+    19.05054301957707,
+    -8.474661609795453
    ],
    "rotation": [
-    0.0,
-    -50.0,
+    13.39268942424376,
+    -5.455925662973648,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38679,7 +38822,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38688,24 +38831,25 @@
    "kind": "procedural",
    "name": "chC05",
    "position": [
-    15.785088487178854,
-    20.6,
-    -6.894399988070802
+    14.115701673937231,
+    18.42381032287223,
+    -8.67609244642013
    ],
    "rotation": [
-    0.0,
-    -40.00000000000001,
+    9.118450432499108,
+    -29.375382948223127,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38719,7 +38863,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38728,24 +38872,25 @@
    "kind": "procedural",
    "name": "chC06",
    "position": [
-    14.5,
-    18.6,
-    -7.794228634059947
+    0.3407081544711765,
+    22.94997868292304,
+    -0.5985806968183294
    ],
    "rotation": [
-    0.0,
-    -30.00000000000001,
+    38.77422246653556,
+    53.96178858467882,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38759,7 +38904,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38768,24 +38913,25 @@
    "kind": "procedural",
    "name": "chC07",
    "position": [
-    13.07818128993102,
-    19.6,
-    -8.457233587073175
+    2.707750218429352,
+    24.289116276130635,
+    -4.317493467099637
    ],
    "rotation": [
-    0.0,
-    -20.00000000000001,
+    39.2241942691887,
+    28.370178114270736,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38799,7 +38945,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38808,24 +38954,25 @@
    "kind": "procedural",
    "name": "chC08",
    "position": [
-    11.562833599002374,
-    20.6,
-    -8.863269777109872
+    7.421831679234022,
+    25.898864585989273,
+    -6.702328902484883
    ],
    "rotation": [
-    0.0,
-    -10.000000000000005,
+    40.90999685667316,
+    1.4832963978798857,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38839,7 +38986,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38848,24 +38995,25 @@
    "kind": "procedural",
    "name": "chC09",
    "position": [
-    10.0,
-    18.6,
-    -9.0
+    -1.0026659224287453,
+    22.104370734831875,
+    5.54423881583517
    ],
    "rotation": [
-    0.0,
-    -3.508354649267438e-15,
-    0.0
+    -146.8565493787056,
+    85.10281479112234,
+    180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38879,7 +39027,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38888,24 +39036,25 @@
    "kind": "procedural",
    "name": "chC10",
    "position": [
-    8.437166400997627,
-    19.6,
-    -8.863269777109872
+    1.119721380763668,
+    25.740952179083102,
+    0.01207667086363351
    ],
    "rotation": [
-    0.0,
-    9.999999999999998,
+    47.88626378082777,
+    56.74318284223563,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38919,7 +39068,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38928,24 +39077,25 @@
    "kind": "procedural",
    "name": "chC11",
    "position": [
-    6.921818710068981,
-    20.6,
-    -8.457233587073176
+    4.899895570389518,
+    24.327753083407853,
+    -7.165637746983372
    ],
    "rotation": [
-    0.0,
-    20.0,
+    33.24611220164433,
+    17.382836674232266,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38959,7 +39109,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -38968,24 +39118,25 @@
    "kind": "procedural",
    "name": "chC12",
    "position": [
-    5.500000000000002,
-    18.6,
-    -7.794228634059948
+    -1.0147466617073153,
+    20.176234036833364,
+    6.1096895993209674
    ],
    "rotation": [
-    0.0,
-    29.999999999999993,
-    0.0
+    -158.34370942692823,
+    82.62793941829062,
+    180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -38999,7 +39150,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39008,24 +39159,25 @@
    "kind": "procedural",
    "name": "chC13",
    "position": [
-    4.214911512821145,
-    19.6,
-    -6.894399988070802
+    -0.4064715607726761,
+    23.01856949620909,
+    -0.3219920721912244
    ],
    "rotation": [
-    0.0,
-    40.00000000000001,
+    32.035868224208286,
+    62.42495077236864,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39039,7 +39191,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39048,24 +39200,25 @@
    "kind": "procedural",
    "name": "chC14",
    "position": [
-    3.105600011929199,
-    20.6,
-    -5.7850884871788555
+    2.9941228797182955,
+    21.022156637572685,
+    -7.794596424500056
    ],
    "rotation": [
-    0.0,
-    50.0,
+    19.04125278251609,
+    27.762230783628212,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39079,7 +39232,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39088,24 +39241,25 @@
    "kind": "procedural",
    "name": "chC15",
    "position": [
-    2.205771365940052,
-    18.6,
-    -4.499999999999999
+    1.3417025049120355,
+    22.831497101496456,
+    4.889381362989034
    ],
    "rotation": [
-    0.0,
-    60.00000000000001,
-    0.0
+    -142.528134319842,
+    88.59069070123024,
+    180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39119,7 +39273,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39128,24 +39282,25 @@
    "kind": "procedural",
    "name": "chC16",
    "position": [
-    1.5427664129268255,
-    19.6,
-    -3.07818128993102
+    1.1150105446774443,
+    23.107953301098085,
+    -1.384815601124017
    ],
    "rotation": [
-    0.0,
-    70.0,
+    32.38671433722474,
+    56.81280925725253,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39159,7 +39314,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39168,24 +39323,25 @@
    "kind": "procedural",
    "name": "chC17",
    "position": [
-    1.1367302228901277,
-    20.6,
-    -1.5628335990023725
+    5.016088010496325,
+    24.114798849394436,
+    -6.8847117616203715
    ],
    "rotation": [
-    0.0,
-    80.00000000000003,
+    32.07200199163964,
+    25.72635072165456,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39199,7 +39355,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39208,24 +39364,25 @@
    "kind": "procedural",
    "name": "chC18",
    "position": [
-    1.0,
-    18.6,
-    -1.102182119232618e-15
+    0.7370172696655235,
+    20.002873402881118,
+    5.488106167450221
    ],
    "rotation": [
-    -0.0,
-    90.0,
-    0.0
+    -159.55506788188734,
+    84.08689527239275,
+    180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39239,7 +39396,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39248,24 +39405,25 @@
    "kind": "procedural",
    "name": "chC19",
    "position": [
-    1.1367302228901277,
-    19.6,
-    1.5628335990023743
+    1.5807888028420525,
+    22.634806798896374,
+    -1.5186517718331851
    ],
    "rotation": [
-    180.0,
-    79.99999999999999,
-    180.0
+    29.842763060968668,
+    58.673281057238675,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39279,7 +39437,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39288,24 +39446,25 @@
    "kind": "procedural",
    "name": "chC20",
    "position": [
-    1.5427664129268237,
-    20.6,
-    3.0781812899310177
+    6.07961455787083,
+    20.887385375894326,
+    -8.941482548079744
    ],
    "rotation": [
-    180.0,
-    70.00000000000001,
-    180.0
+    18.326205551332155,
+    22.085323169732014,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39319,7 +39478,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39328,24 +39487,25 @@
    "kind": "procedural",
    "name": "chC21",
    "position": [
-    2.205771365940053,
-    18.6,
-    4.500000000000001
+    0.9019966666434929,
+    17.1234232580614,
+    4.17163966090502
    ],
    "rotation": [
-    180.0,
-    59.99999999999999,
+    -175.08866970083847,
+    89.322284543261,
     180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39359,7 +39519,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39368,24 +39528,25 @@
    "kind": "procedural",
    "name": "chC22",
    "position": [
-    3.105600011929198,
-    19.6,
-    5.785088487178854
+    1.2805323782547564,
+    19.032215768939906,
+    -2.7561634014568663
    ],
    "rotation": [
-    180.0,
-    50.0,
-    180.0
+    12.6416092244744,
+    58.24031041902869,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39399,7 +39560,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39408,24 +39569,25 @@
    "kind": "procedural",
    "name": "chC23",
    "position": [
-    4.2149115128211445,
-    20.6,
-    6.894399988070801
+    5.711244744351419,
+    17.250117530356256,
+    -9.664358505383218
    ],
    "rotation": [
-    180.0,
-    40.000000000000014,
-    180.0
+    4.042280003460969,
+    25.971024313584717,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39439,7 +39601,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39448,24 +39610,25 @@
    "kind": "procedural",
    "name": "chC24",
    "position": [
-    5.4999999999999964,
-    18.6,
-    7.794228634059945
+    2.7195087713581465,
+    20.915220975053252,
+    2.6812544190747762
    ],
    "rotation": [
-    180.0,
-    30.000000000000025,
-    180.0
+    25.357749214956577,
+    85.39080056919994,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39479,7 +39642,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39488,24 +39651,25 @@
    "kind": "procedural",
    "name": "chC25",
    "position": [
-    6.921818710068983,
-    19.6,
-    8.457233587073176
+    2.693746449177006,
+    20.823557615881107,
+    -3.4672949192070317
    ],
    "rotation": [
-    180.0,
-    19.999999999999986,
-    180.0
+    20.78686830968091,
+    56.1474862031208,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39519,7 +39683,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39528,24 +39692,25 @@
    "kind": "procedural",
    "name": "chC26",
    "position": [
-    8.437166400997627,
-    20.6,
-    8.863269777109872
+    6.3941813955442734,
+    22.271066036825278,
+    -8.952953064016334
    ],
    "rotation": [
-    180.0,
-    9.999999999999996,
-    180.0
+    23.81002168053706,
+    28.447832661074596,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39559,7 +39724,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39568,24 +39733,25 @@
    "kind": "procedural",
    "name": "chC27",
    "position": [
-    9.999999999999998,
-    18.6,
-    9.0
+    2.5844651297671604,
+    18.96581375049955,
+    3.8183420831411006
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
+    -165.5776270348105,
+    84.00928734511855,
     180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39599,7 +39765,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39608,24 +39774,25 @@
    "kind": "procedural",
    "name": "chC28",
    "position": [
-    11.56283359900237,
-    19.6,
-    8.863269777109874
+    2.8219080949041473,
+    21.269791560657374,
+    -3.345245495808926
    ],
    "rotation": [
-    180.0,
-    -9.99999999999997,
-    180.0
+    22.804601282730953,
+    60.84117675499469,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39639,7 +39806,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39648,24 +39815,25 @@
    "kind": "procedural",
    "name": "chC29",
    "position": [
-    13.07818128993102,
-    20.6,
-    8.457233587073175
+    6.929563211376182,
+    19.458578013007774,
+    -10.873901460829192
    ],
    "rotation": [
-    180.0,
-    -20.00000000000001,
-    180.0
+    12.405825591819351,
+    26.148200398019956,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39679,7 +39847,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39688,24 +39856,25 @@
    "kind": "procedural",
    "name": "chC30",
    "position": [
-    14.5,
-    18.6,
-    7.794228634059947
+    2.643751587973121,
+    15.443390473802234,
+    2.9011874914585407
    ],
    "rotation": [
-    180.0,
-    -29.999999999999996,
+    175.81777720012164,
+    84.41625427244978,
     180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39719,7 +39888,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39728,24 +39897,25 @@
    "kind": "procedural",
    "name": "chC31",
    "position": [
-    15.785088487178854,
-    19.6,
-    6.894399988070803
+    1.8607925965174719,
+    15.783823398266003,
+    -3.86360860936657
    ],
    "rotation": [
-    180.0,
-    -39.999999999999986,
-    180.0
+    -2.056205724603742,
+    65.08486275788475,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39759,7 +39929,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39768,24 +39938,25 @@
    "kind": "procedural",
    "name": "chC32",
    "position": [
-    16.894399988070802,
-    20.6,
-    5.785088487178856
+    5.3283251695519915,
+    12.91043089561511,
+    -10.590163802153214
    ],
    "rotation": [
-    180.0,
-    -49.99999999999998,
-    180.0
+    -12.883065608903292,
+    35.026234643059325,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39799,7 +39970,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39808,24 +39979,25 @@
    "kind": "procedural",
    "name": "chC33",
    "position": [
-    17.794228634059944,
-    18.6,
-    4.5000000000000036
+    3.0191911044353805,
+    16.516328549676764,
+    2.718195530240977
    ],
    "rotation": [
-    180.0,
-    -59.99999999999996,
+    -178.68538265758409,
+    80.6472888158937,
     180.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 1.25,
+     "textSize": 1.0694444444444444,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39839,7 +40011,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39848,24 +40020,25 @@
    "kind": "procedural",
    "name": "chC34",
    "position": [
-    18.457233587073176,
-    19.6,
-    3.0781812899310173
+    1.3500668151963868,
+    14.889845654251806,
+    -2.2109753627509536
    ],
    "rotation": [
-    180.0,
-    -70.00000000000001,
-    180.0
+    -6.087669238803086,
+    76.96654555103095,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 1.25,
+     "textSize": 1.263888888888889,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39879,7 +40052,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }
@@ -39888,24 +40061,25 @@
    "kind": "procedural",
    "name": "chC35",
    "position": [
-    18.86326977710987,
-    20.6,
-    1.5628335990023734
+    1.1999619025395738,
+    16.013186254953283,
+    -7.308938613656063
    ],
    "rotation": [
-    180.0,
-    -79.99999999999999,
-    180.0
+    -0.9926209245650545,
+    58.72245301125212,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 1.25,
+     "textSize": 1.4583333333333335,
      "textDepth": 0.08,
      "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
+      "family": "Futura",
+      "weight": 0.85,
+      "italic": false
      }
     },
     "material": {
@@ -39919,7 +40093,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 6.0,
+     "emissiveIntensity": 4.5,
      "roughness": 0.7
     }
    }

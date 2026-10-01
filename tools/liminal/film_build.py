@@ -92,6 +92,23 @@ class Builder:
         self.words.append(e)
         return e
 
+    def word_at(self, text, t0, t1, where, sx, sy, k=0.08, at=0.12, **kw):
+        """A word placed where the camera looks: the view ray through screen point (sx, sy) at t0 + `at` meets
+        `where` -- ("box", room extents) a wall, floor or ceiling; ("ground", fn) the terrain; ("view", metres)
+        open space -- and the word sits there, sized `k` x its distance (a constant size on screen)."""
+        kind, arg = where
+        if kind == "box":
+            hit = self.f.on_box(t0 + at, sx, sy, arg)
+        elif kind == "ground":
+            hit = self.f.on_ground(t0 + at, sx, sy, arg)
+        else:
+            hit = self.f.in_view(t0 + at, sx, sy, arg)
+        if hit is None:
+            hit = self.f.in_view(t0 + at, sx, sy, 8.0)
+        pos, n, tilt, dist = hit
+        tilt = kw.pop("tilt", 0.0) + tilt
+        return self.word(text, t0, t1, pos, n, kw.pop("height", None) or k * dist, tilt=tilt, **kw)
+
     # ---- palette ------------------------------------------------------------------------------------
     def palette_at(self, time, name, ramp=0.0):
         idx = float(self.PI[name])
@@ -338,9 +355,15 @@ def build(film: Film, add_world, palette_index, grid_settings):
     for node, obj, h in (("livTable", "livSofa", 0.035), ("livArm", "livMedia", 0.04), ("livPlant", "livShelf", 0.05)):
         f.route("grid.song.quarter", f"sdf/{obj}/node/{node}/translation", h, component=1, depth=g_rel)
     # ALL YOU GOT on the TV, once a bar with the chop (17-24), and the room's lines carry the downbeat
+    # (on the TV when the TV is in shot, bars 21-22; elsewhere stamped on the walls where the camera looks)
     for bar in range(17, 25):
-        b.word("ALL YOU GOT", t(bar) + 0.02, t(bar, 3.5), (2.075, 0.79, -0.17), (-1, 0, 0), 0.075, style="flash",
-               role="screen", intensity=5.0, tin=0.2, tout=0.15, depth=0.04)
+        if bar in (21, 22):
+            b.word("ALL YOU GOT", t(bar) + 0.02, t(bar, 3.5), (2.075, 0.79, -0.17), (-1, 0, 0), 0.075, style="flash",
+                   role="screen", intensity=5.0, tin=0.2, tout=0.15, depth=0.04)
+        else:
+            sx, sy = [(0.45, 0.5), (-0.5, 0.45), (0.55, -0.1), (-0.4, 0.55), None, None, (0.5, 0.45), (-0.45, 0.2)][bar - 17]
+            b.word_at("ALL YOU GOT", t(bar) + 0.02, t(bar, 3.5), ("box", liv["interior"]), sx, sy, k=0.06, style="flash",
+                      role="accent", intensity=4.0, tin=0.2, tout=0.15, at=0.3)
     # C01 (20.4): a colour explosion -- the whole wheel in 250 ms -- and the lamp bursts
     c = b.clap("c01", t(20, 4), release=0.9)
     f.route(c, "post/grade/hueShift", 3.1)
@@ -367,9 +390,9 @@ def build(film: Film, add_world, palette_index, grid_settings):
            keys=("bed",), fov=60.0)
     b.word("HOW LITTLE DO I KNOW?", 55.3, t(28, 4), (-0.3, 2.22, -1.79), (0, 0, 1), 0.2, style="rise", role="word",
            tin=0.5, tout=0.3)
-    b.word("HOW LITTLE", 57.4, t(28, 4), (-1.99, 2.05, 1.0), (1, 0, 0), 0.13, style="flicker", role="accent", tilt=-6)
-    b.word("DO I KNOW?", 59.5, t(28, 4), (0.2, 2.59, -0.4), (0, -1, 0), 0.16, style="pop", role="word", tilt=180)
-    b.word("BREATHE AND GROW", 61.5, t(28, 4), (1.99, 1.45, 0.55), (-1, 0, 0), 0.09, style="rise", role="accent")
+    b.word_at("HOW LITTLE", 57.4, t(28, 4), ("box", bed["interior"]), -0.62, 0.2, k=0.045, style="flicker", role="accent", tilt=-6)
+    b.word("DO I KNOW?", 59.5, t(28, 4), (0.2, 2.59, -0.4), (0, -1, 0), 0.16, style="pop", role="word", tilt=0)
+    b.word_at("BREATHE AND GROW", 61.5, t(28, 4), ("box", bed["interior"]), 0.55, -0.15, k=0.04, style="rise", role="accent")
     # C03 (28.4): the bedside lamp flares and floods the room white; inside the flash, the living room
     c = b.clap("c03", t(28, 4), release=1.1, attack=BEAT1 * 0.35)
     f.route(c, "camera/exposure/compensation", 2.6)
@@ -377,10 +400,8 @@ def build(film: Film, add_world, palette_index, grid_settings):
     f.route(c, "post/bloom/intensity", 1.8)
     b.shot("v1liv", t(28, 4), t(33), [[2.0, 1.5, 1.8], [1.6, 1.46, 1.35], [1.25, 1.42, 1.0]], (-1.6, 0.85, -0.6),
            keys=("liv",), fov=58.0)
-    b.word("CAN YOU TELL ME", 68.4, t(32, 3), (2.075, 0.86, -0.17), (-1, 0, 0), 0.055, style="flicker", role="screen",
-           intensity=5.0, depth=0.04)
-    b.word("IT'S FINE THOUGH?", 69.4, t(32, 3), (2.075, 0.72, -0.17), (-1, 0, 0), 0.055, style="flicker", role="screen",
-           intensity=5.0, depth=0.04)
+    b.word_at("CAN YOU TELL ME", 68.4, t(32, 3), ("box", liv["interior"]), -0.35, 0.55, k=0.045, style="flicker", role="word")
+    b.word_at("IT'S FINE THOUGH?", 69.4, t(32, 3), ("box", liv["interior"]), 0.3, 0.42, k=0.045, style="flicker", role="accent")
     b.word("FEEL AND GROW", 70.4, t(32, 4), (-0.2, 2.15, -2.19), (0, 0, 1), 0.14, style="rise", role="accent")
     # C04 (32.4): the palette turn -- the colour wipes from blue to crimson over one beat, and stays
     c = b.clap("c04", t(32, 4), release=0.8)
@@ -406,10 +427,10 @@ def build(film: Film, add_world, palette_index, grid_settings):
         f.track(f"sdf/{obj}/node/{node}/translation", [(0.0, base, "step"), (t(36, 4) - 0.001, base, "easeOut"),
                                                        (t(36, 4) + 0.12, upk, "smooth"), (t(37, 3), upk, "easeIn"),
                                                        (t(37, 4) + 0.3, base, "step")])
-    b.shot("v1hall", t(37), t(41), [[0.0, 1.6, 0.6], [0.05, 1.55, -0.8], [0.0, 1.45, -2.55]], (0.0, 0.9, -4.3), keys=("hall",),
+    b.shot("v1hall", t(37), t(41), [[0.0, 1.6, 0.6], [0.05, 1.55, -0.8], [0.0, 1.45, -2.55]], (0.0, 0.5, -4.3), keys=("hall",),
            fov=[(t(37), 62.0), (t(40, 4), 58.0), (t(41), 58.0)])
     HA = hall["anchors"]
-    b.word("CAN YOU TELL ME IT'S FINE?", 81.1, t(38, 3), (0.73, 1.5, -1.4), (-1, 0, 0), 0.05, style="flicker",
+    b.word("CAN YOU TELL ME IT'S FINE?", 81.6, t(38, 3), (0.73, 1.5, -1.4), (-1, 0, 0), 0.05, style="flicker",
            role="screen", intensity=4.0)
     b.word("PEACE OF MIND", 85.1, t(40, 4), (-0.74, 1.95, -2.2), (1, 0, 0), 0.12, style="rise", role="accent")
     words8 = ["IT'S", "STEPS", "IN", "A", "PROCESS,", "LET", "IT", "GO"]

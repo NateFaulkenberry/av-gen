@@ -241,7 +241,12 @@ def build_film(end=END, stem="all-you-got-pass2"):
             continue
         mb += [(tc - 0.002, 0.35, "step"), (tc - 0.001, 0.0, "step"), (tc + 0.045, 0.35, "step")]
     film.track("post/motionBlur/amount", mb)
-    # the words
+    # the words: each section's lettering has its own voice
+    style_fonts(b.words)
+    bad = film.check_words(b.words)
+    print(f"words not seen when they appear: {len(bad)} of {len(b.words)}")
+    for row in bad:
+        print("  ", row)
     out = place_words(b.words, grid="song")
     film.nodes += out["nodes"]
     film.events += out["events"]
@@ -251,6 +256,40 @@ def build_film(end=END, stem="all-you-got-pass2"):
     print(f"wrote {path}: {len(film.shots)} shots, {len(film.nodes)} nodes, {len(film.routes)} routes, "
           f"{len(film.events)} grid events, {len(b.words)} words")
     return path
+
+
+def style_fonts(words):
+    """A typeface per section (the brief's 'the text itself can have personality'): Menlo on screens, Didot on
+    the lonely verse 1 walls, LET / IT / GO hand-set in three faces, DIN Condensed for verse 2's tension,
+    American Typewriter for bridge 2's question, Marker Felt for the dance, Futura and Rockwell outside."""
+    def F(family, weight=0.6, italic=False):
+        return {"family": family, "weight": weight, "italic": italic}
+    for w in words:
+        t0, text, role = w["t0"], w["text"], w.get("role", "word")
+        if role == "screen":
+            w["font"] = F("Menlo", 0.7)
+        elif t0 < 37.4:
+            w["font"] = F("Futura", 0.7)
+        elif t0 < 87.4:
+            w["font"] = F("Didot", 0.5, role != "word") if role == "word" else F("Futura", 0.6)
+        elif t0 < 92.48:
+            w["font"] = F("Futura", 0.8)
+        elif t0 < 110.0:
+            w["font"] = {"LET": F("Futura", 0.85), "IT": F("Didot", 0.5, True), "GO": F("Impact", 0.7)}.get(text, F("Futura", 0.7))
+        elif t0 < 145.3:
+            w["font"] = F("DIN Condensed", 0.8) if role == "word" else F("American Typewriter", 0.6)
+        elif t0 < 165.1:
+            w["font"] = F("Avenir Next", 0.85)
+        elif t0 < 182.4:
+            w["font"] = F("Impact", 0.7) if text.startswith("GOT") else F("American Typewriter", 0.6)
+        elif t0 < 199.7:
+            w["font"] = F("Marker Felt", 0.7)
+        elif text in ("IT'S", "JUST", "STEPS", "IN", "A", "PROCESS"):
+            w["font"] = F("Rockwell", 0.7)
+        elif text == "FOR YOUR LIFE":
+            w["font"] = F("Didot", 0.7)
+        else:
+            w["font"] = F("Futura", 0.85)
 
 
 def main():
