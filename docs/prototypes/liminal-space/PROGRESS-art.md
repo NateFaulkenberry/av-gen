@@ -3,6 +3,70 @@
 *Kept current after every step so a cold successor can resume. The engineering agent's notes are `PROGRESS-eng.md`;
 these are the art side's. Newest state first.*
 
+## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
+
+**Status:** started 16:40. Nothing rendered yet. Pass 2 is untouched and still reproducible: its modules
+(`film_build.py`, `film_build2.py`, `make_all_you_got_pass2.py`) are left as they are. Pass 3 is a separate
+generator, `tools/liminal/make_all_you_got_pass3.py`, which writes `examples/liminal/all-you-got-pass3*.json`.
+
+**The rules of this pass:**
+- Refine, do not replace (§35).
+- No camera breathing anywhere (§20). The world breathes on the quarter: lines, light, colour, objects.
+- The mannequin never moves while seen (§16-19). It changes pose only off screen or inside a full-frame flash.
+- Nothing hops on the beat by translation (§28): no quarter-note bobs of furniture or words.
+- Commit after every step with `git commit -- <my paths>`. The engineer shares this worktree.
+- Never rebuild the engine. Render with the pinned copy: `S=<scratchpad>`, then `$S/liminal3/avgen.sh`. It is a
+  copy of `build/release/src/avgen` plus `git archive 373a34a7 shaders` in `$S/liminal2/bin-373a34a7`.
+  Re-pin only when the coordinator says the engineer's systems have landed and are built.
+
+**The engineer's systems this pass waits on (use them when they land; check `PROGRESS-eng.md`):**
+- the spatial validator (ADR-1051, `src/scene/space_validator.*`). It reads `entity` annotations on SDF
+  nodes: `{"id", "category", "room", "anchor", "pose", "interior", "hip", "normal", "t0", "t1"}`, plus
+  `"part": "head"`. The kit writes them;
+- static on screens;
+- the spatial colour wave (for 90.3-91.1, the owner's "~3:28": the only rainbow wipe in pass 2 is at
+  198.65 s = 3:18.6);
+- the corruption extensions;
+- the entity-jumping investigation;
+- (asked for) an SDF rim or silhouette term for the head.
+
+**The mannequin head (§31-33) is the kit's, not the engine's.** The head was a roundedBox. The line look draws
+only creases, and its width is about 2.2 px, roughly 7 mm at 3 m. So a rounded head drew nothing and its
+near-black fill read as a black blob (and as "missing" on the dark dawn hill). The coordinator has been told.
+The fix is a faceted head and sharp torso blocks in `kit.py`, plus a faint emissive head surface.
+
+### The pass 3 film (owner bars; `t()` from `pass2_grid.py`)
+
+| bars | seconds | place | what |
+|---|---|---|---|
+| 0 | 0-2.20 | black | the count-in: one road dash stamps down per beat (construction begins) |
+| 1-4 | 2.20-11.01 | the street | 1.1 the ground and the road burst out; houses slam down on the quarter notes |
+| 5-8 | 11.01-19.82 | the street | the bass: lamps, fences and trees pop in on the eighths; a skyline rises with the sustained note |
+| 9-16 | 19.82-37.43 | the street, then the hero house | the riser: the camera accelerates at the house; parts mutate and fly; 13-16 the windows flash with the chop; 16.4 the world freezes and dims, the camera keeps going |
+| 17.1 | 37.431 | the front window | the camera crosses the wall plane ON the downbeat: the first interior frame is frame 1123 (37.433 s at 30 fps). The audio's attack measures 37.41-37.45 s |
+| 17-32 | 37.43-72.66 | the living room | release and verse 1, a+b: tableaux Thinker (armchair), lying on the couch, head in hands, at the window; the camera sweeps the room |
+| 33-36 | 72.66-81.47 | the kitchen (through the living room's back door) | at the kitchen table |
+| 37-40 | 81.47-90.28 | the hall and the stair | the camera CLIMBS the stair with IT'S STEPS IN A PROCESS, LET IT GO on the risers; the top is a cliff edge into black |
+| 41 | 90.28-92.48 | the void | over the edge, falling; LET IT GO falls with us |
+| 42-49 | 92.48-110.09 | the basement | LET IT GO on its surfaces on the eighths; 49.4 a whip up |
+| 50-65 | 110.09-145.32 | upstairs | verse 2 tableaux: in bed, at the bathroom mirror, the toilet, at the desk, at the window; C09-C16 corruptions |
+| 66-end | 145.32- | as pass 2 | the roof rips off, the tree of rooms, the gallery (no head turn), the dance (ending at the front door), the colour wave through the house at 90.3, the open, the crash, the dawn (head fixed), the collapse back to the road dashes |
+
+### Pass 3 checklist
+- [ ] M1: the kit: a faceted mannequin with IK poses for the tableaux, new props (toilet, vanity, CRT monitor,
+  washing machine), entity annotations, a pose checker, and pose stills.
+- [ ] M2: the house plan `rooms3.py`: the ground floor (living room, kitchen, hall and stair to a cliff), the
+  basement and upstairs, each with tableau anchors.
+- [ ] M3: `make_all_you_got_pass3.py` with no camera breathing and no hops, reusing pass 2 from bar 66 on.
+  Validate, preview, commit.
+- [ ] M4: the intro (`intro3.py`): the neighbourhood assembling; the entry on 17.1.
+- [ ] M5: the living room and kitchen tableaux.
+- [ ] M6: the stair climb, the cliff, the void; let it go in the basement.
+- [ ] M7: verse 2's upstairs tableaux.
+- [ ] M8: corruption at transitions, claps, lyrics and peaks; static screens; the colour wave; the ending.
+- [ ] M9: the validator, fixes, a preview, `pass2_av.py`, the Critic on representative sections, refinement.
+- [ ] M10: the final 1080p render with the song, `[sdf],[liminal]` exit 0, the report in the hand-back.
+
 ## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
 
 **Where pass 2 stands (13:05): DONE.**
