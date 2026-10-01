@@ -630,3 +630,34 @@ questions with contact sheets.
 Two failures to kill on sight:
 - any room that reads empty in a still frame;
 - any pulse that is a generic scale multiplier on everything.
+
+---
+
+## 11. As built: where the film departs from the plan, and why
+
+- **Every word is placed where the camera looks.**
+  - The plan named surfaces ("LET on the left wall"). Built that way, a camera reproducer found 72 of 256 words
+    off screen, behind the camera or facing away at the moment they appear.
+  - Each word now has a hand-chosen screen position. A view ray at that instant lays the word on the wall,
+    floor, ceiling, terrain or open air it meets, sized by distance.
+  - The generator reports any word not seen: 0 of 254.
+- **The words have a typeface per section:**
+  - Menlo on screens;
+  - Didot on the lonely verse 1 walls;
+  - LET in Futura, IT in Didot italic, GO in Impact;
+  - DIN Condensed in verse 2;
+  - American Typewriter in bridge 2;
+  - Marker Felt in the dance;
+  - Futura and Rockwell outside.
+- **The engineer's systems carry the score:**
+  - the beat grid's pulses and per-clap channels (ADR-1045);
+  - text as extruded glyphs (1046);
+  - the line look in screen pixels (1047);
+  - camera breathing (1048);
+  - the data mosh (1049);
+  - the spectrum sweep (1050).
+- **Bridge 2's mannequin turns its head a quarter turn on GOT?** It happens once in the film, and it is the
+  only time a figure moves.
+- **Fireworks** (particle bursts) mark the summit's 2 and 4, the GOT? sparkle and the crash.
+- **The release ends on the downbeat of verse 1** (25.1, where the voice enters), not on C02. C02 blows the
+  walls out over its beat first.
