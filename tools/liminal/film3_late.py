@@ -458,12 +458,30 @@ def build(b):
 
 
 def colour_wave(b):
-    """Section 30, 90.3 -> 91.1: a wave of coloured light that travels through the hall and the house, not a screen
-    wipe. Until the engineer's spatial wave lands (ADR-1055?), it is built from what the scene has: a front of five
-    coloured point lights that enters through the front door and sweeps back through the hall past the camera,
-    lighting the surfaces it passes, with each object's lines catching the new palette as the front reaches it."""
+    """Section 30, 90.3 -> 91.1: a wave of coloured light that travels through the house, not a screen wipe. The world
+    wave (ADR-1055) enters by the front door and runs back through the hall past the camera: in its band every line
+    and every glow takes the rainbow's hue and the surfaces catch its light; behind it the lines are left in the
+    open's blue (the trail) as the palette turns to the final chorus's. The engine's travelling beam runs with it
+    (it also lights the meshes: the words), and so do a front of coloured point lights and a flare of each object's
+    lines as the front reaches it."""
     f = b.f
     t0, t1 = t(90, 3), t(91)
+    end = f.end
+    origin, direction = [3.85, 1.2, 2.6], [0.0, 0.0, -1.0]
+    f.track("post/wave/origin", [(0.0, origin, "step"), (end, origin, "step")])
+    f.track("post/wave/direction", [(0.0, direction, "step"), (end, direction, "step")])
+    f.track("post/wave/progress", [(0.0, -2.0, "step"), (t0 - 0.06, -2.0, "linear"), (t1 + 0.1, 10.8, "step")])
+    f.track("post/wave/width", [(0.0, 0.75, "step"), (end, 0.75, "step")])
+    f.track("post/wave/hue", [(0.0, 0.0, "step"), (end, 0.0, "step")])
+    f.track("post/wave/hueSpan", [(0.0, 1.0, "step"), (end, 1.0, "step")])
+    f.track("post/wave/intensity", [(0.0, 0.0, "step"), (t0 - 0.08, 0.0, "smooth"), (t0 + 0.06, 3.2, "smooth"),
+                                    (t1 - 0.05, 3.2, "smooth"), (t1 + 0.15, 0.0, "step")])
+    f.track("post/wave/edgeTint", [(0.0, 0.0, "step"), (t0 - 0.08, 0.0, "smooth"), (t0 + 0.04, 1.0, "smooth"),
+                                   (t1 + 0.05, 1.0, "smooth"), (t1 + 0.2, 0.0, "step")])
+    f.track("post/wave/trail", [(0.0, 0.0, "step"), (t0 - 0.05, 0.0, "smooth"), (t0 + 0.12, 1.0, "smooth"),
+                                (t1 - 0.01, 1.0, "step"), (t1, 0.0, "step")])
+    trail = [round(c, 5) for c in (0.1, 0.58, 1.0)]       # the open's night-sky blue lines (P11 'wall' #5CC8FF)
+    f.track("post/wave/trailColor", [(0.0, trail, "step"), (end, trail, "step")])
     zs = (2.4, -6.6)
     hues = [(1.0, 0.25, 0.6), (1.0, 0.6, 0.15), (0.3, 1.0, 0.5), (0.2, 0.7, 1.0), (0.75, 0.3, 1.0)]
     for i, (x, col) in enumerate(zip((2.95, 3.35, 3.75, 4.15, 4.55), hues)):

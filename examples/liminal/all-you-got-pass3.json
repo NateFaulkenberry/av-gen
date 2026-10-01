@@ -66816,6 +66816,328 @@
     ]
    },
    {
+    "target": "post/wave/origin",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       3.85,
+       1.2,
+       2.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       3.85,
+       1.2,
+       2.6
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/direction",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       -1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       0.0,
+       0.0,
+       -1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/progress",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -2.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 198.59113,
+      "value": [
+       -2.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 199.83221,
+      "value": [
+       10.8
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/width",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.75
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       0.75
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/hue",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/hueSpan",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 198.57113,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 198.71113,
+      "value": [
+       3.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.68221,
+      "value": [
+       3.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.88221,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/edgeTint",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 198.57113,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 198.69113,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.78221,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.93221,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/trail",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 198.60113,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 198.77113,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.72221,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 199.73221,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/wave/trailColor",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.1,
+       0.58,
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       0.1,
+       0.58,
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "lights/wave0/position",
     "component": -1,
     "timeBase": "seconds",
