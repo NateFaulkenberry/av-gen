@@ -1231,8 +1231,8 @@ def build(check_only=False, end=SONG_END):
                        ("sdf/grow/node/skyDoor/size", g_door), ("sdf/grow/node/skyDoorAt/translation", g_door_at)):
         T.append(track(target, ks, interp="linear"))
     T.append(track("lights/goldLight/position", [(t, wpt("grow", p)) for t, p in g_light], interp="linear"))
-    T.append(track("lights/goldLight/intensity", [(0, 8.0), (bt(67), 8.0), (bt(70), 40.0), (bt(73), 120.0),
-                                                  (bt(74), 120.0), (bt(75), 90.0), (end, 90.0)]))
+    T.append(track("lights/goldLight/intensity", [(0, 8.0), (bt(67), 8.0), (bt(70), 30.0), (bt(73), 70.0),
+                                                  (bt(74), 70.0), (bt(75), 55.0), (end, 55.0)]))
     T.append(track("lights/goldLight/range", [(0, 6.0), (bt(67), 6.0), (bt(73), 30.0), (end, 30.0)]))
     T.append(track("lights/daySunG/intensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 2.0), (end, 2.0)]))
     T.append(track("env/sky/sunIntensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 30.0), (bt(75, 4), 30.0),
@@ -1345,8 +1345,8 @@ def build(check_only=False, end=SONG_END):
                         "volumeJitter": 0.05, "volumeLocalLights": 1.0,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                                 "zenithColor": k0air, "horizonColor": k0air, "groundColor": k0air,
-                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.9967, 0.0785, 0.0209],
-                                "sunIntensity": 0.0, "sunSize": 0.012, "sunGlow": 0.02, "intensity": 0.9}},
+                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.9962, 0.0785, 0.0400],
+                                "sunIntensity": 0.0, "sunSize": 0.012, "sunGlow": 0.035, "intensity": 0.9}},
         "nodes": nodes,
         "lights": lights,
     }
