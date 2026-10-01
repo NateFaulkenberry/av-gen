@@ -889,8 +889,8 @@ def build(check_only=False, end=SONG_END):
     a_loop = P["corridor"].at_point[12]       # the opening frame, one storey up
 
     # Intro (bars 1-17): silence; the walk begins; a window; the stair; the opening frame again; the riser.
-    w.at(bt(2), 0.0).at(bt(2) + 2.2, 0.8, "a").at(bt(4), 0.8, "a").at(bt(4) + 0.9, 0.3)
-    w.at(bt(5) - 0.3, 0.3).at(bt(5) + 1.2, 1.0, "a").at(bt(8), 1.05, "a").at(bt(11, 3), 1.05, "a")
+    w.at(bt(2), 0.0).at(bt(2) + 2.2, 0.55).at(bt(4), 0.55).at(bt(4) + 0.9, 0.2)
+    w.at(bt(5) - 0.3, 0.2).at(bt(6), 0.5).at(bt(6) + 1.6, 1.2, "a").at(bt(8), 1.25, "a").at(bt(11, 3), 1.2, "a")
     w.at(bt(12) - 0.1, 0.0).at(bt(12, 3), 0.0)
     w.at(bt(13) + 0.4, 1.0, "b").at(bt(16), 1.1, "b").at(bt(17, 2), 0.9, "b").at(bt(17, 4), 0.0)
     # Hall (bars 18-25): out of the light on the downbeat, down the long stair, across, into the way on.
@@ -1009,7 +1009,7 @@ def build(check_only=False, end=SONG_END):
     # camera arrives; 1000 m from every other world, they are never in another chapter's view.)
     chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall"],
                      "enfilade": ["enfilade", "figWalk"],
-                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow"],
+                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow", "motesGrow"],
                      "loop": ["corridor"],
                      "penrose": ["penrose"], "open": ["open", "figTop"]}
     chapter_lights = {"corridor": L["corridor"], "hall": L["hall"], "enfilade": L["enfilade"], "void": L["void"],
@@ -1027,7 +1027,7 @@ def build(check_only=False, end=SONG_END):
     # THE TIMELINE
     # ======================================================================================================
     T = []
-    T.append(track("camera/journey/distance", walk.keys_dense(end, 0.1), interp="linear"))
+    T.append(track("camera/journey/distance", walk.keys_dense(end, 0.1), interp="smooth"))
 
     # The gaze. yaw + left, pitch + up; eased between poses.
     yaw = [(0, 0.0), (bt(4), 0.0), (bt(4) + 1.4, 36.0), (bt(5) - 0.2, 38.0), (bt(5) + 1.3, 0.0),
@@ -1109,28 +1109,30 @@ def build(check_only=False, end=SONG_END):
 
     fog_spikes = []
 
-    def threshold(t_in, t_peak0, t_peak1, t_out, v=1.45, ev=1.1, v_in=1.0):
+    def threshold(t_in, t_peak0, t_peak1, t_out, v=1.45, ev=1.1, v_in=1.0, v_out=1.0):
         """A threshold of light: the air thickens and brightens and the exposure opens, so the frame becomes a
         luminous haze (bright, never clipped flat) in which the world is swapped; then it clears."""
-        value.extend([(t_in, v_in), (t_peak0, v), (t_peak1, v), (t_out, 1.0)])
+        value.extend([(t_in, v_in), (t_peak0, v), (t_peak1, v), (t_out, v_out)])
         expo.extend([(t_in, 0.0), (t_peak0, ev), (t_peak1, ev), (t_out, 0.0)])
         fog_spikes.append((t_in, t_peak0, t_peak1, t_out))
-    threshold(bt(14, 3), bt(17, 3), bt(18) + 0.15, bt(19), 1.5, 1.2, 1.07)  # the riser into the hall
-    threshold(bt(25, 2), bt(25, 4), bt(26) + 0.2, bt(26) + 1.4)             # the way on, into the rooms
+    threshold(bt(14, 3), bt(17, 3), bt(18) + 0.15, bt(19), 1.5, 1.2, 1.07, 1.12)  # the riser into the hall
+    threshold(bt(25, 2), bt(25, 4), bt(26) + 0.2, bt(26) + 1.4, v_in=1.12)  # the way on, into the rooms
     threshold(bt(41, 1), bt(41, 3) - 0.3, bt(41, 3) + 0.25, bt(42) - 0.1, 1.4, 1.0)   # into the stairhead
     threshold(bt(58, 3), bt(58, 4), bt(59) + 0.2, bt(59) + 1.4)            # back into the rooms
     threshold(bt(66, 3), bt(66, 4) + 0.05, bt(67) + 0.15, bt(67) + 1.6, 1.5, 1.2)    # the tiny room's light
     threshold(bt(75, 3), bt(75, 4) + 0.2, bt(76) + 0.1, bt(76) + 0.9, 1.5, 1.2)      # into the light; the loop
     threshold(bt(83, 3), bt(83, 4) - 0.1, bt(84) + 0.1, bt(84) + 0.9, 1.4, 1.0)      # the pulse stops
     threshold(bt(91, 3), bt(91, 4), bt(92) + 0.3, bt(93), 1.7, 1.5)        # the fill: the brightest door
-    value.extend([(bt(42) + 0.6, 0.86), (bt(48), 0.86), (bt(50), 1.0)])
+    value.extend([(bt(42) + 0.6, 0.8), (bt(48), 0.8), (bt(50), 1.0)])
+
     value.extend([(bt(114), 1.0), (bt(116), 1.35), (end, 1.45)])
     value.sort()
     expo.sort()
     expo.extend([(bt(114), 0.0), (bt(116), 0.9), (end, 1.2)])
     T.append(track("palette/value", value))
     T.append(track("camera/exposure/compensation", expo))
-    T.append(track("palette/saturation", [(0, 1.0), (bt(42) - 0.4, 1.0), (bt(42) + 0.6, 0.55), (bt(43), 0.55),
+    T.append(track("palette/saturation", [(0, 1.0), (bt(18), 1.0), (bt(19) + 0.5, 1.3), (bt(25, 2), 1.3),
+                                          (bt(26) + 1.0, 1.0), (bt(42) - 0.4, 1.0), (bt(42) + 0.6, 0.55), (bt(43), 0.55),
                                           (bt(49), 0.85), (bt(51), 1.0), (bt(74), 1.0), (bt(74) + 0.6, 0.85),
                                           (bt(75, 4), 0.85), (bt(76), 1.0), (bt(114), 1.0), (end, 0.6)]))
 
@@ -1340,7 +1342,7 @@ def build(check_only=False, end=SONG_END):
         "environment": {"intensity": 0.0, "background": k0air, "fogColor": k0air,
                         "lightRig": "all-you-got.rig.json", "volumeDensity": 0.03, "volumeAbsorption": 1.0,
                         "volumeEmission": 1.0, "volumeScattering": 0.6, "volumeMaxDistance": 70.0,
-                        "volumeJitter": 0.2, "volumeLocalLights": 1.0,
+                        "volumeJitter": 0.05, "volumeLocalLights": 1.0,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                                 "zenithColor": k0air, "horizonColor": k0air, "groundColor": k0air,
                                 "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.9967, 0.0785, 0.0209],

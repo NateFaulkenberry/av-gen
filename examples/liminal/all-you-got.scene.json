@@ -615,7 +615,8 @@
      ],
      "yaw": 0.0,
      "nodes": [
-      "grow"
+      "grow",
+      "motesGrow"
      ],
      "lights": [
       "goldLight",
@@ -958,7 +959,7 @@
   "volumeEmission": 1.0,
   "volumeScattering": 0.6,
   "volumeMaxDistance": 70.0,
-  "volumeJitter": 0.2,
+  "volumeJitter": 0.05,
   "volumeLocalLights": 1.0,
   "sky": {
    "enabled": true,
