@@ -1,7 +1,40 @@
 # Liminal Euclidean World: the art agent's progress notes
 
-*Kept current after every step so a cold successor can resume. The engineering agent's notes are `PROGRESS.md`;
+*Kept current after every step so a cold successor can resume. The engineering agent's notes are `PROGRESS-eng.md`;
 these are the art side's. Newest state first.*
+
+## RESUME HERE (Phase B: building and rendering the video, 2026-09-30 night)
+
+The art agent owns the worktree alone in Phase B (the engineer handed back at `2083bab4`). Deadline: a full,
+art-directed render by the morning of 2026-10-01; safety net at 05:30 (render the best committed state as
+`all-you-got-WIP-<sha>.mp4` with a README).
+
+- **The generator:** `tools/liminal/make_all_you_got.py` writes `examples/liminal/all-you-got{,.scene,.rig}.json`
+  from the section map. `python3 tools/liminal/make_all_you_got.py` prints the chapter table (swap times, local
+  distance ranges against each path's length) and a check list of where the camera is at the plan's moments.
+- **Validate without the GPU** (catches scene load errors, unknown targets, dead tracks):
+  `./build/release/src/avgen --project examples/liminal/all-you-got.json --audit-routes /tmp/audit.json 2>&1 | grep -i "warn\|error\|loaded"`
+  must end with `0 warning(s)`. A scene that fails to load silently renders the default orb scene.
+- **SDF limits that bite:** 96 nodes per tree, at most 8 children per union (the generator's `union` nests),
+  8 nested point ops. `count_nodes()` asserts them per world.
+- **Stills:** `tools/gpu-lock.sh ./build/release/src/avgen --headless --project examples/liminal/all-you-got.json
+  --render <dir> --format png --range 1:253 --size 640x360 --fps 0.25` (64 frames, one every 4 s).
+- **The GPU is shared** with the Sonic agent, whose renders hold the lock for 5-15 minutes at a time. Queue GPU
+  work in the background and author meanwhile.
+- **Scratch:** `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/liminal/`
+  (the Sonic agent uses the same scratchpad root; keep to the `liminal/` folder).
+
+### Phase B status
+
+- [x] Generator v1: seven worlds (corridor with storeys repeating forever, hall, enfilade, void stairhead, grow
+  room, Penrose stairwell, the open), nine chapters, the walk integrated from a speed profile and fitted to the
+  plan's timing sheet, the K0-K12 palette, thresholds of light at every swap, sparse routes (bass breathing,
+  voice to beacon, treble tremble) scaled by a timeline `coupling` source.
+- [ ] Stills across the song; look calibration (luminous air, plaster, no edges).
+- [ ] Short test render (intro into bar 18; "let it go" into the build) + `liminal_critic.py temporal` + Critic.
+- [ ] Full render v1 -> `~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4`.
+- [ ] Analysis, final pass, `all-you-got-final.mp4`.
+- [ ] REPORT.md (the brief's 22 ten items) + copy in the review folder.
 
 ## Where things are
 
