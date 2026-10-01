@@ -52,8 +52,16 @@ HOUSE_PARTS = [
     # name, builder (in place), the offset it flies in from (metres)
     ("roofL", lambda: T([0, 2.85 + 0.75, -1.15], R([-33, 0, 0], box([2.95, 0.06, 1.42]))), (-9.0, 6.0, 0.0)),
     ("roofR", lambda: T([0, 2.85 + 0.75, 1.15], R([33, 0, 0], box([2.95, 0.06, 1.42]))), (9.0, 6.0, 0.0)),
-    ("gableF", lambda: T([0, 2.85, 2.3], R([0, 0, 45], K.D(box([1.7, 1.7, 0.05]), X(((-3, 3), (-3, -0.02), (-1, 1)))
-                                                         if False else box([0.0, 0.0, 0.0])))), (0.0, 0.0, 0.0)),
+    ("gables", lambda: gables(), (0.0, 7.0, 0.0)),
+    ("door", lambda: U(K.D(X(((1.05, 2.15), (0.0, 2.25), (2.33, 2.45))), X(((1.17, 2.03), (0.08, 2.15), (2.3, 2.6)))),
+                       X(((1.2, 2.0), (0.06, 2.12), (2.34, 2.4))), K.SP([1.88, 1.05, 2.43], 0.03),
+                       S(X(((2.3, 2.42), (1.95, 2.15), (2.36, 2.48))), GLOW)), (0.0, 0.0, 8.0)),
+    ("winR", lambda: U(K.D(X(((2.73, 2.82), (0.82, 2.28), (0.22, 1.58))), X(((2.6, 3.0), (0.9, 2.2), (0.3, 1.5)))),
+                       X(((2.73, 2.8), (1.53, 1.57), (0.3, 1.5))), X(((2.73, 2.8), (0.9, 2.2), (0.88, 0.92)))), (8.0, 0.0, 0.0)),
+    ("winF", lambda: U(K.D(X(((-1.38, 0.18), (0.72, 2.28), (2.35, 2.44))), X(((-1.3, 0.1), (0.8, 2.2), (2.2, 2.6)))),
+                       X(((-0.62, -0.58), (0.8, 2.2), (2.36, 2.42))), X(((-1.3, 0.1), (1.62, 1.66), (2.36, 2.42)))), (0.0, 0.0, 9.0)),
+    ("streetLamp", lambda: U(X(((-6.6, -6.48), (0.0, 3.4), (5.2, 5.32))), X(((-6.6, -5.9), (3.3, 3.4), (5.2, 5.32))),
+                             S(X(((-6.1, -5.8), (3.05, 3.3), (5.12, 5.4))), GLOW)), (0.0, -6.0, 0.0)),
     ("chimney", lambda: X(((1.5, 1.95), (2.9, 4.4), (-1.3, -0.85))), (0.0, 9.0, 0.0)),
     ("porch", lambda: U(X(((-1.25, 0.05), (0.0, 0.12), (2.35, 3.2))), X(((-1.2, 0.0), (2.32, 2.4), (3.05, 3.15)))), (0.0, -4.0, 6.0)),
     ("fenceL", lambda: U(X(((-6.0, -2.5), (0.55, 0.62), (4.5, 4.56))), X(((-6.0, -2.5), (0.25, 0.31), (4.5, 4.56))),
@@ -64,12 +72,25 @@ HOUSE_PARTS = [
 ]
 
 
-def house_parts():
-    """The parts that fly in (a roof, a chimney, a porch, fences, a path): each under a named translate
-    `<name>` that the generator keys from its offset to zero on its eighth note."""
+def gables():
+    """The two gable ends: the space under the roof's two 33-degree planes, above the wall top, cut to the end
+    walls (7 nodes)."""
+    import math as _m
+    a = _m.radians(33.0)
+    off = (2.85 + 2.35 * _m.tan(a)) * _m.cos(a)
+    under = K.I({"kind": "plane", "axis": [0.0, _m.cos(a), _m.sin(a)], "offset": off},
+                {"kind": "plane", "axis": [0.0, _m.cos(a), -_m.sin(a)], "offset": off},
+                X(((-2.75, 2.75), (2.85, 5.0), (-2.36, 2.36))))
+    return K.I(under, K.U(X(((-2.75, -2.6), (2.0, 5.0), (-3, 3))), X(((2.6, 2.75), (2.0, 5.0), (-3, 3)))))
+
+
+def house_parts(names=None):
+    """The parts that fly in (a roof, gables, a chimney, a porch, a door with a porch light, window frames, fences,
+    a path, a street lamp): each under a named translate `<name>` that the generator keys from its offset to zero
+    on its eighth note. `names` picks a subset (the parts are split over two SDF objects for the node limit)."""
     parts = []
     for name, builder, _off in HOUSE_PARTS:
-        if name == "gableF":
+        if names is not None and name not in names:
             continue
         parts.append(T([0.0, 0.0, 0.0], builder(), name=name))
     return S(U(*parts), FILL)

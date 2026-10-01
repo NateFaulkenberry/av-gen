@@ -65,29 +65,29 @@
      "from": 0.0,
      "path": [
       [
-       0.53274,
-       2.73274,
-       20.99117
+       1.99085,
+       2.66751,
+       15.45427
       ],
       [
-       0.4,
-       2.6,
-       19.0
+       1.6,
+       2.5,
+       13.5
       ],
       [
-       0.0,
+       0.9,
        2.2,
-       13.0
+       10.0
       ],
       [
-       -0.4,
-       1.75,
-       7.0
+       -0.2,
+       1.8,
+       6.4
       ],
       [
        -0.6,
-       1.55,
-       3.4
+       1.58,
+       3.6
       ],
       [
        -0.6,
@@ -96,13 +96,13 @@
       ],
       [
        -0.6,
-       1.2894,
-       -3.37557
+       1.15334,
+       -3.36879
       ],
       [
        -0.6,
-       0.98194,
-       -11.36966
+       0.66446,
+       -11.35383
       ]
      ],
      "screw": {
@@ -123,6 +123,7 @@
      "yaw": 0.0,
      "nodes": [
       "houseParts",
+      "houseParts2",
       "houseTree",
       "houseGround",
       "livShell",
@@ -7030,6 +7031,212 @@
         ],
         "children": [
          {
+          "kind": "intersection",
+          "children": [
+           {
+            "kind": "intersection",
+            "children": [
+             {
+              "kind": "plane",
+              "axis": [
+               0.0,
+               0.838670567945424,
+               0.5446390350150271
+              ],
+              "offset": 3.6701128509297725
+             },
+             {
+              "kind": "plane",
+              "axis": [
+               0.0,
+               0.838670567945424,
+               -0.5446390350150271
+              ],
+              "offset": 3.6701128509297725
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               3.925,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 2.75,
+                 1.075,
+                 2.36
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               -2.675,
+               3.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.07499999999999996,
+                 1.5,
+                 3.0
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               2.675,
+               3.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.07499999999999996,
+                 1.5,
+                 3.0
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "gables"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "difference",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               1.6,
+               1.125,
+               2.39
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.5499999999999999,
+                 1.125,
+                 0.06000000000000005
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               1.5999999999999999,
+               1.115,
+               2.45
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.42999999999999994,
+                 1.035,
+                 0.15000000000000013
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             1.6,
+             1.09,
+             2.37
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.4,
+               1.03,
+               0.030000000000000027
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             1.88,
+             1.05,
+             2.43
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 0.03
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             2.36,
+             2.05,
+             2.42
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.06000000000000005,
+               0.09999999999999998,
+               0.06000000000000005
+              ]
+             }
+            ],
+            "material": 2
+           }
+          ]
+         }
+        ],
+        "name": "door"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
           "kind": "translate",
           "translation": [
            1.725,
@@ -7101,6 +7308,419 @@
          }
         ],
         "name": "porch"
+       }
+      ],
+      "material": 0
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     -14.0,
+     -6.0,
+     -6.0
+    ],
+    "boundsMax": [
+     14.0,
+     12.0,
+     16.0
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 80.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "houseParts2",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "difference",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               2.775,
+               1.5499999999999998,
+               0.9
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.04499999999999993,
+                 0.73,
+                 0.68
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               2.8,
+               1.55,
+               0.9
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.19999999999999996,
+                 0.6500000000000001,
+                 0.6
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             2.7649999999999997,
+             1.55,
+             0.9
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.03499999999999992,
+               0.020000000000000018,
+               0.6
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             2.7649999999999997,
+             1.55,
+             0.9
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.03499999999999992,
+               0.6500000000000001,
+               0.020000000000000018
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "winR"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "difference",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               -0.6,
+               1.5,
+               2.395
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.7799999999999999,
+                 0.7799999999999999,
+                 0.04499999999999993
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               -0.6,
+               1.5,
+               2.4000000000000004
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.7000000000000001,
+                 0.7000000000000001,
+                 0.19999999999999996
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6,
+             1.5,
+             2.3899999999999997
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.020000000000000018,
+               0.7000000000000001,
+               0.030000000000000027
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6,
+             1.6400000000000001,
+             2.3899999999999997
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.7000000000000001,
+               0.019999999999999907,
+               0.030000000000000027
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "winF"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -6.54,
+             1.7,
+             5.26
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.05999999999999961,
+               1.7,
+               0.06000000000000005
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -6.25,
+             3.3499999999999996,
+             5.26
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.34999999999999964,
+               0.050000000000000044,
+               0.06000000000000005
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -5.949999999999999,
+             3.175,
+             5.26
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.1499999999999999,
+               0.125,
+               0.14000000000000012
+              ]
+             }
+            ],
+            "material": 2
+           }
+          ]
+         }
+        ],
+        "name": "streetLamp"
        },
        {
         "kind": "translate",
@@ -7458,7 +8078,7 @@
     ],
     "boundsMin": [
      -14.0,
-     -6.0,
+     -8.0,
      -6.0
     ],
     "boundsMax": [

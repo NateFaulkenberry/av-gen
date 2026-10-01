@@ -3717,6 +3717,19 @@
   },
   {
    "source": "grid.song.quarter",
+   "target": "sdf/houseParts2/look/edge/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gRiser",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
    "target": "sdf/houseGround/look/edge/intensity",
    "amount": 2.0,
    "op": "add",
@@ -13646,1239 +13659,1239 @@
      {
       "time": 19.81651,
       "value": [
-       2002.12317
+       2002.12377
       ],
       "interp": "linear"
      },
      {
       "time": 19.9166,
       "value": [
-       2002.12385
+       2002.12423
       ],
       "interp": "linear"
      },
      {
       "time": 20.01668,
       "value": [
-       2002.12589
+       2002.12562
       ],
       "interp": "linear"
      },
      {
       "time": 20.11676,
       "value": [
-       2002.12929
+       2002.12793
       ],
       "interp": "linear"
      },
      {
       "time": 20.21685,
       "value": [
-       2002.13405
+       2002.13117
       ],
       "interp": "linear"
      },
      {
       "time": 20.31693,
       "value": [
-       2002.14016
+       2002.13533
       ],
       "interp": "linear"
      },
      {
       "time": 20.41701,
       "value": [
-       2002.14764
+       2002.14041
       ],
       "interp": "linear"
      },
      {
       "time": 20.5171,
       "value": [
-       2002.15648
+       2002.14643
       ],
       "interp": "linear"
      },
      {
       "time": 20.61718,
       "value": [
-       2002.16667
+       2002.15336
       ],
       "interp": "linear"
      },
      {
       "time": 20.71726,
       "value": [
-       2002.17823
+       2002.16122
       ],
       "interp": "linear"
      },
      {
       "time": 20.81735,
       "value": [
-       2002.19114
+       2002.17001
       ],
       "interp": "linear"
      },
      {
       "time": 20.91743,
       "value": [
-       2002.20542
+       2002.17972
       ],
       "interp": "linear"
      },
      {
       "time": 21.01751,
       "value": [
-       2002.22105
+       2002.19036
       ],
       "interp": "linear"
      },
      {
       "time": 21.1176,
       "value": [
-       2002.23804
+       2002.20192
       ],
       "interp": "linear"
      },
      {
       "time": 21.21768,
       "value": [
-       2002.25639
+       2002.21441
       ],
       "interp": "linear"
      },
      {
       "time": 21.31776,
       "value": [
-       2002.2761
+       2002.22782
       ],
       "interp": "linear"
      },
      {
       "time": 21.41785,
       "value": [
-       2002.29717
+       2002.24215
       ],
       "interp": "linear"
      },
      {
       "time": 21.51793,
       "value": [
-       2002.3196
+       2002.25741
       ],
       "interp": "linear"
      },
      {
       "time": 21.61802,
       "value": [
-       2002.34339
+       2002.2736
       ],
       "interp": "linear"
      },
      {
       "time": 21.7181,
       "value": [
-       2002.36854
+       2002.29071
       ],
       "interp": "linear"
      },
      {
       "time": 21.81818,
       "value": [
-       2002.39505
+       2002.30874
       ],
       "interp": "linear"
      },
      {
       "time": 21.91827,
       "value": [
-       2002.42292
+       2002.3277
       ],
       "interp": "linear"
      },
      {
       "time": 22.01835,
       "value": [
-       2002.45215
+       2002.34759
       ],
       "interp": "linear"
      },
      {
       "time": 22.11843,
       "value": [
-       2002.48273
+       2002.3684
       ],
       "interp": "linear"
      },
      {
       "time": 22.21852,
       "value": [
-       2002.51468
+       2002.39013
       ],
       "interp": "linear"
      },
      {
       "time": 22.3186,
       "value": [
-       2002.54798
+       2002.41279
       ],
       "interp": "linear"
      },
      {
       "time": 22.41868,
       "value": [
-       2002.58265
+       2002.43638
       ],
       "interp": "linear"
      },
      {
       "time": 22.51877,
       "value": [
-       2002.61867
+       2002.46089
       ],
       "interp": "linear"
      },
      {
       "time": 22.61885,
       "value": [
-       2002.65606
+       2002.48632
       ],
       "interp": "linear"
      },
      {
       "time": 22.71893,
       "value": [
-       2002.6948
+       2002.51268
       ],
       "interp": "linear"
      },
      {
       "time": 22.81902,
       "value": [
-       2002.7349
+       2002.53997
       ],
       "interp": "linear"
      },
      {
       "time": 22.9191,
       "value": [
-       2002.77636
+       2002.56818
       ],
       "interp": "linear"
      },
      {
       "time": 23.01918,
       "value": [
-       2002.81918
+       2002.59731
       ],
       "interp": "linear"
      },
      {
       "time": 23.11927,
       "value": [
-       2002.86336
+       2002.62737
       ],
       "interp": "linear"
      },
      {
       "time": 23.21935,
       "value": [
-       2002.9089
+       2002.65835
       ],
       "interp": "linear"
      },
      {
       "time": 23.31943,
       "value": [
-       2002.9558
+       2002.69026
       ],
       "interp": "linear"
      },
      {
       "time": 23.41952,
       "value": [
-       2003.00406
+       2002.72309
       ],
       "interp": "linear"
      },
      {
       "time": 23.5196,
       "value": [
-       2003.05368
+       2002.75685
       ],
       "interp": "linear"
      },
      {
       "time": 23.61968,
       "value": [
-       2003.10466
+       2002.79154
       ],
       "interp": "linear"
      },
      {
       "time": 23.71977,
       "value": [
-       2003.15699
+       2002.82714
       ],
       "interp": "linear"
      },
      {
       "time": 23.81985,
       "value": [
-       2003.21069
+       2002.86368
       ],
       "interp": "linear"
      },
      {
       "time": 23.91993,
       "value": [
-       2003.26574
+       2002.90114
       ],
       "interp": "linear"
      },
      {
       "time": 24.02002,
       "value": [
-       2003.32216
+       2002.93952
       ],
       "interp": "linear"
      },
      {
       "time": 24.1201,
       "value": [
-       2003.37993
+       2002.97883
       ],
       "interp": "linear"
      },
      {
       "time": 24.22018,
       "value": [
-       2003.43907
+       2003.01906
       ],
       "interp": "linear"
      },
      {
       "time": 24.32027,
       "value": [
-       2003.49956
+       2003.06022
       ],
       "interp": "linear"
      },
      {
       "time": 24.42035,
       "value": [
-       2003.56141
+       2003.1023
       ],
       "interp": "linear"
      },
      {
       "time": 24.52043,
       "value": [
-       2003.62463
+       2003.14531
       ],
       "interp": "linear"
      },
      {
       "time": 24.62052,
       "value": [
-       2003.6892
+       2003.18924
       ],
       "interp": "linear"
      },
      {
       "time": 24.7206,
       "value": [
-       2003.75513
+       2003.2341
       ],
       "interp": "linear"
      },
      {
       "time": 24.82068,
       "value": [
-       2003.82242
+       2003.27988
       ],
       "interp": "linear"
      },
      {
       "time": 24.92077,
       "value": [
-       2003.89107
+       2003.32658
       ],
       "interp": "linear"
      },
      {
       "time": 25.02085,
       "value": [
-       2003.96108
+       2003.37422
       ],
       "interp": "linear"
      },
      {
       "time": 25.12093,
       "value": [
-       2004.03244
+       2003.42277
       ],
       "interp": "linear"
      },
      {
       "time": 25.22102,
       "value": [
-       2004.10517
+       2003.47225
       ],
       "interp": "linear"
      },
      {
       "time": 25.3211,
       "value": [
-       2004.17926
+       2003.52266
       ],
       "interp": "linear"
      },
      {
       "time": 25.42118,
       "value": [
-       2004.25471
+       2003.57399
       ],
       "interp": "linear"
      },
      {
       "time": 25.52127,
       "value": [
-       2004.33151
+       2003.62625
       ],
       "interp": "linear"
      },
      {
       "time": 25.62135,
       "value": [
-       2004.40968
+       2003.67943
       ],
       "interp": "linear"
      },
      {
       "time": 25.72143,
       "value": [
-       2004.4892
+       2003.73354
       ],
       "interp": "linear"
      },
      {
       "time": 25.82152,
       "value": [
-       2004.57009
+       2003.78857
       ],
       "interp": "linear"
      },
      {
       "time": 25.9216,
       "value": [
-       2004.65233
+       2003.84452
       ],
       "interp": "linear"
      },
      {
       "time": 26.02168,
       "value": [
-       2004.73593
+       2003.9014
       ],
       "interp": "linear"
      },
      {
       "time": 26.12177,
       "value": [
-       2004.82089
+       2003.95921
       ],
       "interp": "linear"
      },
      {
       "time": 26.22185,
       "value": [
-       2004.90722
+       2004.01794
       ],
       "interp": "linear"
      },
      {
       "time": 26.32193,
       "value": [
-       2004.9949
+       2004.07759
       ],
       "interp": "linear"
      },
      {
       "time": 26.42202,
       "value": [
-       2005.08394
+       2004.13817
       ],
       "interp": "linear"
      },
      {
       "time": 26.5221,
       "value": [
-       2005.17434
+       2004.19968
       ],
       "interp": "linear"
      },
      {
       "time": 26.62219,
       "value": [
-       2005.2661
+       2004.26211
       ],
       "interp": "linear"
      },
      {
       "time": 26.72227,
       "value": [
-       2005.35921
+       2004.32546
       ],
       "interp": "linear"
      },
      {
       "time": 26.82235,
       "value": [
-       2005.45369
+       2004.38974
       ],
       "interp": "linear"
      },
      {
       "time": 26.92244,
       "value": [
-       2005.54953
+       2004.45495
       ],
       "interp": "linear"
      },
      {
       "time": 27.02252,
       "value": [
-       2005.64673
+       2004.52108
       ],
       "interp": "linear"
      },
      {
       "time": 27.1226,
       "value": [
-       2005.74528
+       2004.58813
       ],
       "interp": "linear"
      },
      {
       "time": 27.22269,
       "value": [
-       2005.8452
+       2004.65611
       ],
       "interp": "linear"
      },
      {
       "time": 27.32277,
       "value": [
-       2005.94647
+       2004.72502
       ],
       "interp": "linear"
      },
      {
       "time": 27.42285,
       "value": [
-       2006.04911
+       2004.79485
       ],
       "interp": "linear"
      },
      {
       "time": 27.52294,
       "value": [
-       2006.1531
+       2004.8656
       ],
       "interp": "linear"
      },
      {
       "time": 27.62302,
       "value": [
-       2006.25845
+       2004.93728
       ],
       "interp": "linear"
      },
      {
       "time": 27.7231,
       "value": [
-       2006.36517
+       2005.00988
       ],
       "interp": "linear"
      },
      {
       "time": 27.82319,
       "value": [
-       2006.47324
+       2005.08341
       ],
       "interp": "linear"
      },
      {
       "time": 27.92327,
       "value": [
-       2006.58267
+       2005.15786
       ],
       "interp": "linear"
      },
      {
       "time": 28.02335,
       "value": [
-       2006.69346
+       2005.23324
       ],
       "interp": "linear"
      },
      {
       "time": 28.12344,
       "value": [
-       2006.80561
+       2005.30955
       ],
       "interp": "linear"
      },
      {
       "time": 28.22352,
       "value": [
-       2006.91912
+       2005.38677
       ],
       "interp": "linear"
      },
      {
       "time": 28.3236,
       "value": [
-       2007.03399
+       2005.46493
       ],
       "interp": "linear"
      },
      {
       "time": 28.42369,
       "value": [
-       2007.15022
+       2005.54401
       ],
       "interp": "linear"
      },
      {
       "time": 28.52377,
       "value": [
-       2007.26781
+       2005.62401
       ],
       "interp": "linear"
      },
      {
       "time": 28.62385,
       "value": [
-       2007.38675
+       2005.70494
       ],
       "interp": "linear"
      },
      {
       "time": 28.72394,
       "value": [
-       2007.3884
+       2005.70605
       ],
       "interp": "linear"
      },
      {
       "time": 28.82402,
       "value": [
-       2007.39333
+       2005.70941
       ],
       "interp": "linear"
      },
      {
       "time": 28.9241,
       "value": [
-       2007.40154
+       2005.715
       ],
       "interp": "linear"
      },
      {
       "time": 29.02419,
       "value": [
-       2007.41305
+       2005.72283
       ],
       "interp": "linear"
      },
      {
       "time": 29.12427,
       "value": [
-       2007.42784
+       2005.73289
       ],
       "interp": "linear"
      },
      {
       "time": 29.22435,
       "value": [
-       2007.44591
+       2005.74519
       ],
       "interp": "linear"
      },
      {
       "time": 29.32444,
       "value": [
-       2007.46728
+       2005.75972
       ],
       "interp": "linear"
      },
      {
       "time": 29.42452,
       "value": [
-       2007.49193
+       2005.77649
       ],
       "interp": "linear"
      },
      {
       "time": 29.5246,
       "value": [
-       2007.51987
+       2005.7955
       ],
       "interp": "linear"
      },
      {
       "time": 29.62469,
       "value": [
-       2007.55109
+       2005.81675
       ],
       "interp": "linear"
      },
      {
       "time": 29.72477,
       "value": [
-       2007.5856
+       2005.84022
       ],
       "interp": "linear"
      },
      {
       "time": 29.82485,
       "value": [
-       2007.6234
+       2005.86594
       ],
       "interp": "linear"
      },
      {
       "time": 29.92494,
       "value": [
-       2007.66448
+       2005.89389
       ],
       "interp": "linear"
      },
      {
       "time": 30.02502,
       "value": [
-       2007.70885
+       2005.92408
       ],
       "interp": "linear"
      },
      {
       "time": 30.1251,
       "value": [
-       2007.75651
+       2005.95651
       ],
       "interp": "linear"
      },
      {
       "time": 30.22519,
       "value": [
-       2007.80745
+       2005.99117
       ],
       "interp": "linear"
      },
      {
       "time": 30.32527,
       "value": [
-       2007.86168
+       2006.02806
       ],
       "interp": "linear"
      },
      {
       "time": 30.42535,
       "value": [
-       2007.9192
+       2006.0672
       ],
       "interp": "linear"
      },
      {
       "time": 30.52544,
       "value": [
-       2007.98001
+       2006.10857
       ],
       "interp": "linear"
      },
      {
       "time": 30.62552,
       "value": [
-       2008.0441
+       2006.15217
       ],
       "interp": "linear"
      },
      {
       "time": 30.7256,
       "value": [
-       2008.11147
+       2006.19801
       ],
       "interp": "linear"
      },
      {
       "time": 30.82569,
       "value": [
-       2008.18214
+       2006.24609
       ],
       "interp": "linear"
      },
      {
       "time": 30.92577,
       "value": [
-       2008.25609
+       2006.2964
       ],
       "interp": "linear"
      },
      {
       "time": 31.02585,
       "value": [
-       2008.33333
+       2006.34895
       ],
       "interp": "linear"
      },
      {
       "time": 31.12594,
       "value": [
-       2008.41385
+       2006.40374
       ],
       "interp": "linear"
      },
      {
       "time": 31.22602,
       "value": [
-       2008.49766
+       2006.46076
       ],
       "interp": "linear"
      },
      {
       "time": 31.32611,
       "value": [
-       2008.58476
+       2006.52002
       ],
       "interp": "linear"
      },
      {
       "time": 31.42619,
       "value": [
-       2008.67515
+       2006.58152
       ],
       "interp": "linear"
      },
      {
       "time": 31.52627,
       "value": [
-       2008.76882
+       2006.64525
       ],
       "interp": "linear"
      },
      {
       "time": 31.62636,
       "value": [
-       2008.86578
+       2006.71122
       ],
       "interp": "linear"
      },
      {
       "time": 31.72644,
       "value": [
-       2008.96602
+       2006.77942
       ],
       "interp": "linear"
      },
      {
       "time": 31.82652,
       "value": [
-       2009.06955
+       2006.84986
       ],
       "interp": "linear"
      },
      {
       "time": 31.92661,
       "value": [
-       2009.17637
+       2006.92253
       ],
       "interp": "linear"
      },
      {
       "time": 32.02669,
       "value": [
-       2009.28648
+       2006.99745
       ],
       "interp": "linear"
      },
      {
       "time": 32.12677,
       "value": [
-       2009.39987
+       2007.07459
       ],
       "interp": "linear"
      },
      {
       "time": 32.22686,
       "value": [
-       2009.51655
+       2007.15398
       ],
       "interp": "linear"
      },
      {
       "time": 32.32694,
       "value": [
-       2009.63651
+       2007.2356
       ],
       "interp": "linear"
      },
      {
       "time": 32.42702,
       "value": [
-       2009.75976
+       2007.31946
       ],
       "interp": "linear"
      },
      {
       "time": 32.52711,
       "value": [
-       2009.8863
+       2007.40555
       ],
       "interp": "linear"
      },
      {
       "time": 32.62719,
       "value": [
-       2010.01613
+       2007.49388
       ],
       "interp": "linear"
      },
      {
       "time": 32.72727,
       "value": [
-       2010.14924
+       2007.58444
       ],
       "interp": "linear"
      },
      {
       "time": 32.82736,
       "value": [
-       2010.28564
+       2007.67724
       ],
       "interp": "linear"
      },
      {
       "time": 32.92744,
       "value": [
-       2010.42532
+       2007.77228
       ],
       "interp": "linear"
      },
      {
       "time": 33.02752,
       "value": [
-       2010.5683
+       2007.86955
       ],
       "interp": "linear"
      },
      {
       "time": 33.12761,
       "value": [
-       2010.71456
+       2007.96906
       ],
       "interp": "linear"
      },
      {
       "time": 33.22769,
       "value": [
-       2010.8641
+       2008.07081
       ],
       "interp": "linear"
      },
      {
       "time": 33.32777,
       "value": [
-       2011.01693
+       2008.17479
       ],
       "interp": "linear"
      },
      {
       "time": 33.42786,
       "value": [
-       2011.17305
+       2008.28101
       ],
       "interp": "linear"
      },
      {
       "time": 33.52794,
       "value": [
-       2011.33246
+       2008.38947
       ],
       "interp": "linear"
      },
      {
       "time": 33.62802,
       "value": [
-       2011.49515
+       2008.50016
       ],
       "interp": "linear"
      },
      {
       "time": 33.72811,
       "value": [
-       2011.66113
+       2008.61308
       ],
       "interp": "linear"
      },
      {
       "time": 33.82819,
       "value": [
-       2011.8304
+       2008.72825
       ],
       "interp": "linear"
      },
      {
       "time": 33.92827,
       "value": [
-       2012.00295
+       2008.84565
       ],
       "interp": "linear"
      },
      {
       "time": 34.02836,
       "value": [
-       2012.17879
+       2008.96528
       ],
       "interp": "linear"
      },
      {
       "time": 34.12844,
       "value": [
-       2012.35791
+       2009.08715
       ],
       "interp": "linear"
      },
      {
       "time": 34.22852,
       "value": [
-       2012.54033
+       2009.21126
       ],
       "interp": "linear"
      },
      {
       "time": 34.32861,
       "value": [
-       2012.72603
+       2009.3376
       ],
       "interp": "linear"
      },
      {
       "time": 34.42869,
       "value": [
-       2012.91501
+       2009.46618
       ],
       "interp": "linear"
      },
      {
       "time": 34.52877,
       "value": [
-       2013.10729
+       2009.597
       ],
       "interp": "linear"
      },
      {
       "time": 34.62886,
       "value": [
-       2013.30285
+       2009.73005
       ],
       "interp": "linear"
      },
      {
       "time": 34.72894,
       "value": [
-       2013.50169
+       2009.86534
       ],
       "interp": "linear"
      },
      {
       "time": 34.82902,
       "value": [
-       2013.70382
+       2010.00287
       ],
       "interp": "linear"
      },
      {
       "time": 34.92911,
       "value": [
-       2013.90924
+       2010.14263
       ],
       "interp": "linear"
      },
      {
       "time": 35.02919,
       "value": [
-       2014.11795
+       2010.28462
       ],
       "interp": "linear"
      },
      {
       "time": 35.12927,
       "value": [
-       2014.32994
+       2010.42886
       ],
       "interp": "linear"
      },
      {
       "time": 35.22936,
       "value": [
-       2014.54522
+       2010.57533
       ],
       "interp": "linear"
      },
      {
       "time": 35.32944,
       "value": [
-       2014.76379
+       2010.72403
       ],
       "interp": "linear"
      },
      {
       "time": 35.42952,
       "value": [
-       2014.98564
+       2010.87497
       ],
       "interp": "linear"
      },
      {
       "time": 35.52961,
       "value": [
-       2015.21078
+       2011.02815
       ],
       "interp": "linear"
      },
      {
       "time": 35.62969,
       "value": [
-       2015.43921
+       2011.18357
       ],
       "interp": "linear"
      },
      {
       "time": 35.72977,
       "value": [
-       2015.67093
+       2011.34122
       ],
       "interp": "linear"
      },
      {
       "time": 35.82986,
       "value": [
-       2015.90593
+       2011.5011
       ],
       "interp": "linear"
      },
      {
       "time": 35.92994,
       "value": [
-       2016.14421
+       2011.66323
       ],
       "interp": "linear"
      },
      {
       "time": 36.03003,
       "value": [
-       2016.38579
+       2011.82759
       ],
       "interp": "linear"
      },
      {
       "time": 36.13011,
       "value": [
-       2016.63065
+       2011.99418
       ],
       "interp": "linear"
      },
      {
       "time": 36.23019,
       "value": [
-       2016.87879
+       2012.16301
       ],
       "interp": "linear"
      },
      {
       "time": 36.33028,
       "value": [
-       2017.13023
+       2012.33408
       ],
       "interp": "linear"
      },
      {
       "time": 36.43036,
       "value": [
-       2017.38495
+       2012.50738
       ],
       "interp": "linear"
      },
      {
       "time": 36.53044,
       "value": [
-       2017.64296
+       2012.68292
       ],
       "interp": "linear"
      },
      {
       "time": 36.63053,
       "value": [
-       2017.90425
+       2012.8607
       ],
       "interp": "linear"
      },
      {
       "time": 36.73061,
       "value": [
-       2018.16883
+       2013.04071
       ],
       "interp": "linear"
      },
      {
       "time": 36.83069,
       "value": [
-       2018.4367
+       2013.22296
       ],
       "interp": "linear"
      },
      {
       "time": 36.93078,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "linear"
      },
      {
       "time": 37.03086,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "linear"
      },
      {
       "time": 37.13094,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "linear"
      },
      {
       "time": 37.23103,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "linear"
      },
      {
       "time": 37.33111,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "linear"
      },
      {
       "time": 37.43119,
       "value": [
-       2018.57186
+       2013.31492
       ],
       "interp": "step"
      },
@@ -37702,7 +37715,7 @@
     ]
    },
    {
-    "target": "sdf/houseParts/node/path/translation",
+    "target": "sdf/houseParts2/node/path/translation",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -37728,7 +37741,44 @@
       "interp": "easeOut"
      },
      {
-      "time": 20.16651,
+      "time": 20.11651,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/houseParts2/node/streetLamp/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       -6.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 20.91643,
+      "value": [
+       0.0,
+       -6.0,
+       0.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 21.21743,
       "value": [
        0.0,
        0.0,
@@ -37765,7 +37815,7 @@
       "interp": "easeOut"
      },
      {
-      "time": 22.36835,
+      "time": 22.31835,
       "value": [
        0.0,
        0.0,
@@ -37776,7 +37826,7 @@
     ]
    },
    {
-    "target": "sdf/houseParts/node/fenceL/translation",
+    "target": "sdf/houseParts2/node/fenceL/translation",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -37787,6 +37837,43 @@
       "time": 0.0,
       "value": [
        -12.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 22.56781,
+      "value": [
+       -12.0,
+       0.0,
+       0.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 22.86881,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/houseParts2/node/fenceR/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       12.0,
        0.0,
        0.0
       ],
@@ -37795,14 +37882,14 @@
      {
       "time": 23.11827,
       "value": [
-       -12.0,
+       12.0,
        0.0,
        0.0
       ],
       "interp": "easeOut"
      },
      {
-      "time": 23.46927,
+      "time": 23.41927,
       "value": [
        0.0,
        0.0,
@@ -37813,7 +37900,7 @@
     ]
    },
    {
-    "target": "sdf/houseParts/node/fenceR/translation",
+    "target": "sdf/houseParts/node/door/translation",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -37823,23 +37910,97 @@
      {
       "time": 0.0,
       "value": [
-       12.0,
+       0.0,
+       0.0,
+       8.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 23.66872,
+      "value": [
+       0.0,
+       0.0,
+       8.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 23.96972,
+      "value": [
+       0.0,
        0.0,
        0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/houseParts2/node/winF/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       9.0
       ],
       "interp": "step"
      },
      {
       "time": 24.21918,
       "value": [
-       12.0,
+       0.0,
+       0.0,
+       9.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 24.52018,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/houseParts2/node/winR/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       8.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 24.49441,
+      "value": [
+       8.0,
        0.0,
        0.0
       ],
       "interp": "easeOut"
      },
      {
-      "time": 24.57018,
+      "time": 24.79541,
       "value": [
        0.0,
        0.0,
@@ -37867,7 +38028,7 @@
       "interp": "step"
      },
      {
-      "time": 25.3201,
+      "time": 24.76964,
       "value": [
        0.0,
        9.0,
@@ -37876,7 +38037,44 @@
       "interp": "easeOut"
      },
      {
-      "time": 25.6711,
+      "time": 25.07064,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/houseParts/node/gables/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       7.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 25.3201,
+      "value": [
+       0.0,
+       7.0,
+       0.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 25.6211,
       "value": [
        0.0,
        0.0,
@@ -37904,7 +38102,7 @@
       "interp": "step"
      },
      {
-      "time": 26.42102,
+      "time": 25.59533,
       "value": [
        -9.0,
        6.0,
@@ -37913,7 +38111,7 @@
       "interp": "easeOut"
      },
      {
-      "time": 26.77202,
+      "time": 25.89633,
       "value": [
        0.0,
        0.0,
@@ -37941,7 +38139,7 @@
       "interp": "step"
      },
      {
-      "time": 26.97148,
+      "time": 25.87056,
       "value": [
        9.0,
        6.0,
@@ -37950,7 +38148,7 @@
       "interp": "easeOut"
      },
      {
-      "time": 27.32248,
+      "time": 26.17156,
       "value": [
        0.0,
        0.0,
@@ -56614,6 +56812,47 @@
    {
     "role": "glass",
     "target": "sdf/houseParts/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/houseParts2/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/houseParts2/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/houseParts2/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/houseParts2/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/houseParts2/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/houseParts2/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/houseParts2/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/houseParts2/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/houseParts2/surface/7/emission",
     "mode": "multiply"
    },
    {

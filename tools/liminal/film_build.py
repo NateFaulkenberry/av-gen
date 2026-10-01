@@ -221,7 +221,10 @@ def build(film: Film, add_world, palette_index, grid_settings):
     b.world("seed", seed_room)
     liv = RM.living_room()
     b.world("liv", liv)
-    house = {"objects": [("houseParts", IN.house_parts(), "furn2", (-14, -6, -6), (14, 12, 16), {"max_distance": 80.0}),
+    house = {"objects": [("houseParts", IN.house_parts(["roofL", "roofR", "gables", "chimney", "porch", "door"]), "furn2",
+                          (-14, -6, -6), (14, 12, 16), {"max_distance": 80.0}),
+                         ("houseParts2", IN.house_parts(["winR", "winF", "streetLamp", "fenceL", "fenceR", "path"]), "furn",
+                          (-14, -8, -6), (14, 12, 16), {"max_distance": 80.0}),
                          ("houseTree", IN.house_tree(), "furn", (1.5, -0.1, 1.2), (5.8, 4.5, 5.6), {"max_distance": 80.0}),
                          ("houseGround", IN.ground_plane(), "wall", (-40, -1, -40), (40, 0.2, 40),
                           {"max_distance": 80.0, "edge_pixels": 1.6})],
@@ -281,26 +284,27 @@ def build(film: Film, add_world, palette_index, grid_settings):
     # =========================================================================================================
     # INTRO C (bars 9-16): the house assembles around the living room; the camera pushes in; the gap at 16.4
     # =========================================================================================================
-    b.shot("house", t(9), t(17), [[0.4, 2.6, 19.0], [0.0, 2.2, 13.0], [-0.4, 1.75, 7.0], [-0.6, 1.55, 3.4], [-0.6, 1.52, 2.62]],
+    b.shot("house", t(9), t(17), [[1.6, 2.5, 13.5], [0.9, 2.2, 10.0], [-0.2, 1.8, 6.4], [-0.6, 1.58, 3.6], [-0.6, 1.52, 2.62]],
            (-0.6, 1.4, 0.0), keys=("house", "liv"),
            moves=[(t(9), 0.0), (t(13), 0.32), (t(16, 4), 1.0), (t(17), 1.0)], ease_kind="in",
            fov=[(t(9), 50.0), (t(13), 54.0), (t(16, 3.5), 64.0), (t(17), 64.0)])
-    # the parts fly in, one per eighth note from bar 9, faster each bar
-    order = ["path", "porch", "fenceL", "fenceR", "chimney", "roofL", "roofR"]
-    slots = [t(9), t(10), t(10, 3), t(11), t(11, 3), t(12), t(12, 2)]
-    for (name, _b, off), tt in zip([p for p in IN.HOUSE_PARTS if p[0] in order], slots):
-        pass
+    # the parts fly in on the beat, faster each bar: two a bar, then four, then six
+    order = ["path", "streetLamp", "porch", "fenceL", "fenceR", "door", "winF", "winR", "chimney", "gables", "roofL", "roofR"]
+    slots = [t(9), t(9, 3), t(10), t(10, 2), t(10, 3), t(10, 4), t(11), t(11, 1.5), t(11, 2), t(11, 3), t(11, 3.5), t(11, 4)]
     by_name = {p[0]: p for p in IN.HOUSE_PARTS}
+    first = {"roofL", "roofR", "gables", "chimney", "porch", "door"}
     for name, tt in zip(order, slots):
         off = list(by_name[name][2])
-        f.track(f"sdf/houseParts/node/{name}/translation", [(0.0, off, "step"), (tt - 0.001, off, "easeOut"),
-                                                            (tt + 0.35, [0.0, 0.0, 0.0], "step")])
+        obj = "houseParts" if name in first else "houseParts2"
+        f.track(f"sdf/{obj}/node/{name}/translation", [(0.0, off, "step"), (tt - 0.001, off, "easeOut"),
+                                                       (tt + 0.3, [0.0, 0.0, 0.0], "step")])
     # the living room's walls draw themselves: their lines rise from nothing over bars 9-11
     f.track("sdf/livShell/look/edge/intensity", [(0.0, 0.0), (t(9), 0.0), (t(11), 4.0), (t(16, 4) - 0.01, 4.0),
                                                  (t(16, 4), 0.8, "step"), (t(17), 4.0)])
     f.track("sdf/houseTree/node/hTree/scale", [(0.0, 0.0, "step"), (t(13) - 0.001, 0.0, "easeOut"), (t(16), 1.0, "step")])
     g_riser = b.gate("gRiser", t(9), t(16, 4))
     b.pulse("sdf/houseParts/look/edge/intensity", 5.0, "eighth", g_riser)
+    b.pulse("sdf/houseParts2/look/edge/intensity", 4.0, "quarter", g_riser)
     b.pulse("sdf/houseGround/look/edge/intensity", 2.0, "quarter", g_riser)
     b.pulse("sdf/livShell/look/edge/pixels", 1.5, "quarter", g_riser)
     # the riser's anticipation (13-16): glow building, the ground's lines throbbing harder each bar on the eighths
