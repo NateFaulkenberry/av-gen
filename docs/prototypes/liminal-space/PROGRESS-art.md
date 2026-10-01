@@ -40,10 +40,22 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
   - Revised (`cc43f1b3`): sun patches in the hall (SDF soft shadow), finer motes, windows glow, the riser's
     light across four bars, the stairhead looks out at the figure and the void, thresholds as luminous haze
     (fog x3, +1.7 EV) instead of clipped white, contrast 1.12, less bob.
-- [ ] Full render v1 (running at 22:34): `~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4`, 1920x1080,
-  30 fps, h264 q90, the song muxed. Script: `scratchpad/liminal/full-v1.sh` via `scratchpad/liminal/gpu-when-free.sh`
-  (polls the lock every 0.3 s, then runs through `tools/gpu-lock.sh`).
-- [ ] Analysis of v1 (temporal + Critic + my own viewing against the addendum), the final pass, `all-you-got-final.mp4`.
+- [x] Full render v1 (`cc43f1b3`, 22:33-22:45, 12 min at 10.6 fps):
+  `~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4`, 1920x1080, 30 fps, h264 q90, the song muxed.
+  - temporal: 7 snaps (the chapter swaps; one major at the grow room), aggression-unanswered at bars 5-8 (the bass
+    pulse entry), "let it go" only 8 % below its neighbours, 21 colour moves (minor findings at thresholds).
+  - Critic (job `job_1a0f55a9841d09e0f`): camera wobble in 41 % of shots (the guard pushing at the enfilade's
+    screw seams, plus the bob), clipped highlights at the thresholds and the sun, flat low-contrast intro.
+  - My viewing: a giant half-disc sun (sunSize is radians), the mannequin seen close twice (stairhead, top), grain
+    on the hall's door jambs (the SDF soft shadow), a lavender hall, the look-down at bar 108 hitting the landing.
+  - **Lesson:** interior light is the procedural sky's IBL, so the palette's zenith/horizon/ground roles are the
+    ambient colour of each place; the rig's ambient does nothing without an ambient-role light.
+- [x] Final pass (`ed1dce5d`): thresholds as thick bright air (fog x7, +1.1 EV), guard radius 0.14, bob 3-7 mm, a
+  0.7-degree sun inside the final doorway, daylight from behind, the figure far down the stair and 4 m away at the
+  top, warm hall light, sun patches on the hall floor, a dimmer and emptier let-it-go, the first corridor visible
+  at bar 108, a look round at the release.
+- [ ] Full render v2 (running from about 22:57): `all-you-got-v2.mp4`; script `scratchpad/liminal/full-v2.sh`.
+- [ ] Analysis of v2; if it is better, it becomes `all-you-got-final.mp4`.
 - [ ] REPORT.md (the brief's 22 ten items) + copy in the review folder.
 
 ### How to analyse a render
