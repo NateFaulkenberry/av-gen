@@ -16,10 +16,10 @@ PROGRESS-art.md. The art agent renders with a pinned binary at `373a34a7`.*
 | 2 | SDF rim / fresnel emission (`look/rim/*`), replacing "fix the head" (coordinator) | **done** | 1052 | `[adr1052]` (CPU + GPU) |
 | 3 | random entity jumping (§28): cause found, `transform-step` hazard, `avgen --trace-jumps` | **done** (the data fix is the art agent's) | 1053 | `[adr1053]` |
 | 4 | screen static (`surface/<k>/static`, `look/static/*`) | **done** | 1054 | `[adr1054]` (CPU + GPU) |
-| 5 | spatial colour wave (§30): REUSE the `travelBeam` world effect (ADR-207/702); it lights raymarched SDF surfaces | **done** (recipe + demo render, no engine code) | - | - |
+| 5 | spatial colour wave (§30): `post/wave/*`, a world-space band shared by every SDF object, recolouring lines and emission (the `travelBeam` recipe remains as a light-only alternative) | **done** | 1055 | `[adr1055]` (CPU + GPU) |
 | 6 | geometry tearing on events (§21) | **not built** (budget); a recipe with existing ops is below | - | - |
 
-**Resume here:** items 1-5 are committed. What remains is the final hand-back: run both full suites under the lock, one
+**Resume here:** items 1-5 are committed (the last is `5dd835a4`). Since `225e70b0` and `6878d2c9` the validator is t0/t1-aware, and lyric obstacles are side-of-wall and SDF-exact. What remains is the final hand-back: run both full suites under the lock, one
 after the other, then restore `temporal-*.png`. Item 6 would be a new SDF domain op (`tear`: a band-wise offset
 `p.x += amount * (hash(floor(p.y * bands + seed)) - 0.5)`), which touches `src/spatial/sdf.*`, `shaders/sdf.wgsl` and the
 compiled path, in the pattern of ADR-1040's `warp`.
@@ -146,6 +146,15 @@ ls.apply_fixes(scene_dict, report, rules={"intersection", "orientation"})   # op
   - `trailLength` sets how long surfaces stay coloured after it passes.
 - **The palette:** the wave adds light; it does not change base colours. To make the room come out in a new palette, key
   `palette/position` across the same window so that it lands as the front leaves the room.
+
+#### 5b. The world wave (ADR-1055): the one for bar 90
+
+- **The front:** `post/wave/origin`, `direction`, `progress` (metres travelled; key it) and `width` (half-width, m).
+- **The band's light and colour:** `intensity`, plus `color`, or `hueSpan` > 0 for a rainbow from `hue`.
+- **Recolouring:** `edgeTint` recolours lines and emission toward the band's colour inside the band. `trail` and `trailColor`
+  recolour behind the front.
+- Shared by every SDF object. Off while intensity, edgeTint and trail are 0.
+- **Demo:** `~/Desktop/av-gen-review/24-liminal-space/pass3/eng/world-wave-post-wave-15.5-19s.png`.
 
 #### 6. More corruption, with what exists (no new engine code)
 
