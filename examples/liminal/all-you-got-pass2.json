@@ -7031,27 +7031,7 @@
   },
   {
    "source": "grid.song.crash",
-   "target": "sdf/treeA/look/edge/intensity",
-   "amount": 16.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.crash",
-   "target": "sdf/treeB/look/edge/intensity",
-   "amount": 16.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
-   "source": "grid.song.crash",
-   "target": "sdf/treeC/look/edge/intensity",
+   "target": "sdf/skyFurn/look/edge/intensity",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",

@@ -595,7 +595,7 @@ def build_part2(b, end):
     b.pulse("sdf/stair/look/edge/intensity", 3.0, "quarter", g_ch)
     # bars 107-112: the summit; LET IT GO chants in the ring; fireworks of geometry on 2 and 4
     sum_eye = [[5.5, 16.0, 3.5], [8.5, 16.1, 4.8], [12.5, 16.2, 3.6], [14.5, 16.3, -0.8]]
-    b.shot("summit", t(107), t(114), sum_eye, None, keys=("land", "sky", "tree"),
+    b.shot("summit", t(107), t(114), sum_eye, None, keys=("land", "sky"),
            look_keys=[(t(107), (10.0, 15.5, -4.0)), (t(109), (0.0, 22.0, 0.0)), (t(111), (-10.0, 20.0, -10.0)),
                       (t(112, 3), (10.0, 15.0, 0.0)), (t(113), (10.0, 15.0, 0.0)), (t(114), (10.0, 18.0, 0.0))],
            fov=[(t(107), 66.0), (t(112, 3), 66.0), (t(113), 50.0), (t(113) + 0.4, 84.0), (t(114), 76.0)], ease_kind="linear",
@@ -654,7 +654,7 @@ def build_part2(b, end):
     f.route(c, "palette/saturation", 1.0)
     f.route(c, "post/lens/chromaticAberration", 0.8)
     f.route(c, "post/grade/hueShift", 3.1)
-    for o in ("ringLow", "ringHigh", "landGround", "landTrees", "landMtn", "stair", "summit", "treeA", "treeB", "treeC"):
+    for o in ("ringLow", "ringHigh", "landGround", "landTrees", "landMtn", "stair", "summit", "skyFurn"):
         f.route(c, f"sdf/{o}/look/edge/intensity", 16.0)
 
     # =========================================================================================================
