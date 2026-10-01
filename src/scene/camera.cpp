@@ -267,6 +267,49 @@ glm::vec3 cameraShakeOffset(const CameraShake& shake, double seconds) {
            (shake.amplitude * envelope);
 }
 
+void applyCameraBreath(const CameraBreath& breath, glm::vec3& position, glm::vec3& target, float& fovDegrees) {
+    const float a = breath.amount;
+    if (a == 0.0f) {
+        return;
+    }
+    glm::vec3 forward = target - position;
+    const float distance = glm::length(forward);
+    if (distance < 1e-4f) {
+        return;
+    }
+    forward /= distance;
+    const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    glm::vec3 right = glm::cross(forward, worldUp);
+    if (glm::length(right) < 1e-4f) {
+        right = glm::vec3(1.0f, 0.0f, 0.0f);
+    }
+    right = glm::normalize(right);
+    const glm::vec3 up = glm::normalize(glm::cross(right, forward));
+    position += forward * (breath.forward * a) + worldUp * (breath.lift * a) + right * (breath.side * a);
+    // Yaw about world up, then pitch about the (yawed) horizontal right: no roll is ever introduced.
+    constexpr float kDegToRad = 0.01745329252f;
+    const float yaw = breath.yaw * a * kDegToRad;
+    const float pitch = breath.pitch * a * kDegToRad;
+    glm::vec3 dir = forward;
+    if (yaw != 0.0f) {
+        const float c = std::cos(yaw);
+        const float s = std::sin(yaw);
+        // Rotation about +Y by `yaw` (counter-clockwise seen from above = a turn to the left).
+        dir = glm::vec3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z);
+    }
+    if (pitch != 0.0f) {
+        glm::vec3 r = glm::cross(dir, worldUp);
+        if (glm::length(r) > 1e-4f) {
+            r = glm::normalize(r);
+            const glm::vec3 u = glm::cross(r, dir);
+            dir = glm::normalize(dir * std::cos(pitch) + u * std::sin(pitch));
+        }
+    }
+    static_cast<void>(up);
+    target = position + dir * distance;
+    fovDegrees = std::clamp(fovDegrees + breath.fov * a, 1.0f, 170.0f);
+}
+
 void applyCameraShake(const CameraShake& shake, double seconds, glm::vec3& position,
                       glm::vec3& target) {
     const float envelope = cameraShakeEnvelope(shake, seconds);

@@ -4436,6 +4436,18 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         &params.add(floatDesc(prefix_ + "camera/shake/rotation", 0.0f, 0.0f, 45.0f, 0.0f, 3.0f));
     cameraShakeStart_ =
         &params.add(floatDesc(prefix_ + "camera/shake/start", 0.0f, -1e6f, 1e6f, 0.0f, 600.0f));
+    // ADR-1048: camera breathing. Zero offsets by default (and an amount of 1), so a scene that never
+    // routes them renders exactly as before.
+    {
+        const std::string b = prefix_ + "camera/breath/";
+        cameraBreath_[0] = &params.add(floatDesc(b + "amount", 1.0f, -10.0f, 10.0f, 0.0f, 2.0f));
+        cameraBreath_[1] = &params.add(floatDesc(b + "forward", 0.0f, -100.0f, 100.0f, -0.5f, 0.5f));
+        cameraBreath_[2] = &params.add(floatDesc(b + "lift", 0.0f, -100.0f, 100.0f, -0.5f, 0.5f));
+        cameraBreath_[3] = &params.add(floatDesc(b + "side", 0.0f, -100.0f, 100.0f, -0.5f, 0.5f));
+        cameraBreath_[4] = &params.add(floatDesc(b + "yaw", 0.0f, -90.0f, 90.0f, -5.0f, 5.0f));
+        cameraBreath_[5] = &params.add(floatDesc(b + "pitch", 0.0f, -90.0f, 90.0f, -5.0f, 5.0f));
+        cameraBreath_[6] = &params.add(floatDesc(b + "fov", 0.0f, -90.0f, 90.0f, -10.0f, 10.0f));
+    }
     // ADR-1042: the journey's controls, only for a scene that has a journey (so no other scene gains
     // ten idle parameters). All ordinary parameters: the timeline keys them, routes add to them.
     if (journey_) {
@@ -5793,6 +5805,7 @@ void Composition::detach() {
     cameraShakeDecay_ = nullptr;
     cameraShakeRotation_ = nullptr;
     cameraShakeStart_ = nullptr;
+    cameraBreath_.fill(nullptr);
     cameraChannels_.clear();
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
@@ -8736,6 +8749,18 @@ void Composition::applyParameters() {
         shake.startSeconds =
             cameraShakeStart_ != nullptr ? static_cast<double>(cameraShakeStart_->value()) : 0.0;
         applyCameraShake(shake, currentTime_, scene_.camera.position, scene_.camera.target);
+    }
+    // ADR-1048: breathing, after the shake and in every mode, for the same reason as the shake.
+    if (cameraBreath_[0] != nullptr) {
+        CameraBreath breath;
+        breath.amount = cameraBreath_[0]->value();
+        breath.forward = cameraBreath_[1]->value();
+        breath.lift = cameraBreath_[2]->value();
+        breath.side = cameraBreath_[3]->value();
+        breath.yaw = cameraBreath_[4]->value();
+        breath.pitch = cameraBreath_[5]->value();
+        breath.fov = cameraBreath_[6]->value();
+        applyCameraBreath(breath, scene_.camera.position, scene_.camera.target, fov);
     }
     scene_.camera.fovYRadians = glm::radians(fov);
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);

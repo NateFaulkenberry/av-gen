@@ -1798,6 +1798,8 @@ private:
     params::Parameter<float>* cameraShakeDecay_ = nullptr;
     params::Parameter<float>* cameraShakeRotation_ = nullptr;
     params::Parameter<float>* cameraShakeStart_ = nullptr;
+    // ADR-1048: camera breathing (camera/breath/*): amount, forward, lift, side, yaw, pitch, fov.
+    std::array<params::Parameter<float>*, 7> cameraBreath_{};
 
     // ---- multiple cameras (ADR-245) -------------------------------------------------------------
     //

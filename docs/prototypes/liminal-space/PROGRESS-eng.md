@@ -4,7 +4,119 @@
 PROGRESS-art.md. Governing documents: `00-brief.md`, `01-addendum-emotion.md` (wins where they differ).
 Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 
-## Where things stand (2026-09-30, about 20:00)
+## ART PASS 2 (2026-10-01): Resume here
+
+*The governing brief is now `02-art-pass-2.md` (the owner's; it wins). My job is its section 19 Phase 4: the
+smallest reusable systems the art needs. The art agent works in the same worktree in parallel; I commit only my
+own paths with `git commit -- <paths>`. ADRs 1045-1059.*
+
+| # | system | status | ADR | tests |
+|---|---|---|---|---|
+| 1 | beat grid: owner-numbered bars, tempo map, pulses, authored event envelopes (BIG CLAPs, words) | **done** | 1045 | `[beatgrid]` (7 cases) |
+| 2 | spatial lyric typography | next | | |
+| 3 | luminous line-drawn edges | | | |
+| 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
+| 5 | object animation on beat sources | | | |
+| 6 | simulation-corruption effect | | | |
+| 7 | spectrum-sweep transition | | | |
+| - | tint on moving figures (pass 1 gap 2) | if cheap | | |
+
+**Resume here:** build the next undone row. Each system: code, a test, an ADR, the guide entry below, then
+`git commit -- <paths>`.
+
+### The owner's numbering (AUTHORITATIVE; the analysis numbers the count-in as bar 1)
+
+The owner's bar N = SONG-ANALYSIS bar N+1. The owner's bar 1 beat 1 is at **2.20183486 s** (= 4 x 60/109). 109 BPM
+to owner bar 74; **111 BPM from the downbeat of owner bar 75 (165.1376 s)**. Section starts in the owner's global
+bars (derived from the brief's bar counts and checked against the analysis's sections):
+
+| section | owner bars | name for `sections` |
+|---|---|---|
+| Intro | 1-16 | `intro: 1` |
+| First release ("all you got") | 17-24 | `release: 17` |
+| Verse 1 | 25-40 | `verse1: 25` |
+| The pause bar | 41 | `pause: 41` |
+| LET IT GO (8 bars) | 42-49 | `letgo: 42` |
+| Verse 2 | 50-65 | `verse2: 50` |
+| Bridge transition (FEEL IT GROW starts) | 66 | `bridgein: 66` |
+| Bridge 1 | 67-74 | `bridge1: 67` |
+| Bridge 2 ("is that all you", 111 BPM) | 75-82 | `bridge2: 75` |
+| Bridge 3 (dance) | 83-90 | `bridge3: 83` |
+| Final chorus | 91-114 | `chorus: 91` |
+| Ending | 115 | `ending: 115` |
+
+### Art agent's guide, pass 2
+
+#### 1. The beat grid (ADR-1045): pulses and BIG CLAPs as data
+
+Add one source to the project's `sources`:
+
+```json
+{"kind": "beatgrid", "name": "song", "settings": {
+  "origin": 2.20183486, "beatsPerBar": 4,
+  "tempo": [{"bar": 1, "bpm": 109}, {"bar": 75, "bpm": 111}],
+  "sections": {"intro": 1, "release": 17, "verse1": 25, "pause": 41, "letgo": 42, "verse2": 50,
+               "bridgein": 66, "bridge1": 67, "bridge2": 75, "bridge3": 83, "chorus": 91, "ending": 115},
+  "events": [
+    {"at": "release:4:4", "channel": "clap1", "release": 2},
+    {"at": "release:8:4", "channel": "clap2", "attack": 0, "hold": 1, "release": 0.25, "curve": "linear"},
+    {"at": "letgo:1:1", "channel": "let", "release": 0.5, "repeat": {"every": 4, "count": 8}},
+    {"at": "bridge2:0:4.5", "channel": "is", "attack": 0.25, "hold": 0.25, "release": 0.5},
+    {"at": "intro:5:1", "until": "release:1:1", "channel": "eighthGate", "attack": 1, "release": 1}
+  ]}}
+```
+
+Signals it publishes (all 0..1, pure in time, so seek equals play):
+
+- `grid.song.quarter` / `.eighth` / `.sixteenth` / `.half` / `.bar`: a pulse, 1 on the division and 0 just
+  before the next. Its sharpness is `sources/song/pulseDecay` (fraction of the division; 0.3 default; small =
+  a click, 1 = a long swell). Keyable and routable, so verse 2 can sharpen it.
+- `grid.song.quarter.wave` (and every division's `.wave`): a raised cosine, 1 on the beat, 0 half way. Smooth:
+  use it for camera breathing, bobbing and swells. `.phase` is the 0..1 saw (for spins that complete a turn per
+  bar: route `grid.song.bar.phase` to a rotation with amount 360).
+- `grid.song.<channel>`: each event channel. **A different treatment per clap = a different channel per clap**
+  (`clap1` drives `palette/saturation`, `clap2` drives `camera/exposure/compensation` down for a cut to black,
+  `clap3` drives an SDF node's scale...). A channel can carry many events (a word that repeats).
+
+Event fields: `at` ("section:bar:beat" or "bar:beat"; beat 1-based and fractional; bar 0 = the bar before the
+section) or `time` (seconds); `channel`; `strength` (default 1; may exceed 1); `attack` (rise *into* the
+instant, so the peak lands on the beat); `hold`; `until` (a position; replaces hold); `release`; `curve` (exp
+default, linear, smooth); `units` ("beats" default, or "seconds"); `repeat: {"every": beats, "count": n}`.
+
+Wiring, with existing routes (ADR-011/900/1041):
+
+```json
+{"source": "grid.song.clap1", "target": "palette/saturation", "amount": 1.5},
+{"source": "grid.song.clap2", "target": "camera/exposure/compensation", "amount": -8},
+{"source": "grid.song.quarter", "target": "sdf/world/look/edge/intensity", "amount": 3,
+ "depthSource": "grid.song.eighthGate"}
+```
+
+- Gate a pulse to a span of the song with an event that has `until`, used as the route's `depthSource`.
+- Do not put a depth on an integrating route (ADR-1041).
+- The pulses are exact on the grid; `audio.*` are the music's measured energy. Use the grid for the
+  beat-locked things the brief asks for, and audio where you want the music's actual dynamics.
+
+#### 4. Camera breathing (ADR-1048)
+
+Parameters `camera/breath/amount` (multiplies everything; default 1), `forward` (m, + towards the subject),
+`lift` (m), `side` (m), `yaw` (deg, + left), `pitch` (deg, + up), `fov` (deg added). Applied after the journey
+(or any camera), roll-free, without touching the journey's distance (so swaps do not move). Drive them from the
+smooth waves and key `amount` per section:
+
+```json
+{"source": "grid.song.quarter.wave", "target": "camera/breath/forward", "amount": 0.08},
+{"source": "grid.song.quarter.wave", "target": "camera/breath/fov", "amount": -1.5},
+{"source": "grid.song.half.wave", "target": "camera/breath/yaw", "amount": 0.6, "polarity": "bipolar"}
+```
+
+and a timeline track on `camera/breath/amount` (0 in bridge 3 and the chorus, where the brief says no camera
+pulse; 1 in the intro; 0.5 in the verses). For a breath that eases rather than ticks, add
+`"chain": {"springHz": 2, "springDamping": 0.7}`. Keep `forward` small near walls: the collision guard does not
+see the breath.
+
+
+## Where things stood after pass 1 (2026-09-30, about 20:00)
 
 - Branch `proto/liminal-space`, worktree `/Users/natefaulkenberry/Documents/GitHub/av-gen-liminal`. Never push or
   merge. Shared worktree: commit only engineering paths with `git commit -- <paths>`; the art agent owns
