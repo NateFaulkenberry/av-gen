@@ -167,7 +167,7 @@ def build(b):
           ("MAYBE CAUSE A LITTLE DRAMA", 76.3, t(36, 4), 0.0, 0.55, 0.035, "pop", "word"),
           ("IF YOU FEEL IT, SAY IT", 78.5, t(37), -0.4, 0.45, 0.04, "rise", "accent"),
           ("LET IT SHOW", 79.6, t(37), 0.35, 0.3, 0.06, "rise", "word"),
-          ("CAN YOU TELL ME IT'S FINE THOUGH?", 81.1, t(37) + 0.2, 0.1, 0.45, 0.03, "flicker", "word")]
+          ("CAN YOU TELL ME", 81.1, t(37) + 0.2, 0.1, 0.4, 0.035, "flicker", "word")]
     for i, (text, t0, t1, sx, sy, kk, style, role) in enumerate(kw):
         b.word_at(text, t0, t1, ("box", kit["interior"]), sx, sy, k=kk, style=style, role=role, name=f"v1k{i:02d}", room="kitchen")
         if i in (0, 3):
@@ -220,6 +220,8 @@ def build(b):
         pos, nrm, h = R3.riser(8 + i)
         b.word(wd, tw, t(41, 3), pos, nrm, min(0.11, h * 0.62), style="pop", role="word", room="hall", category="stairText",
                intensity=4.5, name=f"steps{i}")
+    b.word_at("IT'S FINE THOUGH?", 81.9, 84.6, ("box", hall["interior"]), -0.2, 0.4, k=0.04, style="flicker", role="accent",
+              room="hall")
     b.word_at("I KNOW, GET A LITTLE PEACE OF MIND THOUGH", 85.1, 87.8, ("box", hall["interior"]), 0.1, 0.45, k=0.028,
               style="rise", role="accent", room="hall")
     lyric_glitch(b, "lgh0", 85.1)

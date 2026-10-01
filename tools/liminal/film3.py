@@ -462,8 +462,8 @@ class Builder3(FB.Builder):
         for shrink in (1.0, 0.8, 0.64, 0.5):
             hit = self.f.on_box(tt, sx, sy, rdict["interior"])
             h = kw.get("height") or k * shrink * hit[3]
-            margin = max(0.35 * h, 0.15)
-            half_w = 0.42 * h * len(text) * 0.9
+            margin = max(0.35 * h, 0.18)
+            half_w = 0.47 * h * len(text) * 0.9
             cands = []
             for key, m in masks.items():
                 n = m["n"]

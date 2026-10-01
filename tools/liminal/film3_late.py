@@ -35,14 +35,34 @@ def hold_keys(t0, t1, v):
 
 
 def gallery_room():
-    """Pass 2's gallery with its seated mannequin replaced by the pass 3 figure (the gallery tableau, on a chair)."""
-    gal = RM.gallery()
-    gal["objects"] = [o for o in gal["objects"] if o[0] != "galMan"]
+    """Bridge 2's room of objects (pass 2's gallery) with the pass 3 figure: a named, sealed room (no door: a room of
+    the mind), each object on a pedestal tagged as a surface it rests on, the clock lying face up on its stand, and
+    the mannequin in the middle on a chair (the gallery tableau). 7 x 3.2 x 7 m."""
+    import liminal_space as ls
+    from kit import R as R_, T as T_, U as U_, X as X_, place as place_
+    ext = ((-3.5, 3.5), (0.0, 3.2), (-3.5, 3.5))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    shell = U_(K.D(K.shell(ext, 0.15, entity={"id": "gallery", "sealed": True})), K.tiles(ext, 0.7), K.skirting(ext),
+               K.wall_band(ext, 2.4, 2.45, 0.02))
+    objs = [("galShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5))]
+    anchors = {}
+    for name, builder, r, ang, h, role in RM.GALLERY_ITEMS:
+        a = math.radians(ang)
+        px, pz = r * math.sin(a), r * math.cos(a)
+        ped = ls.tag(X_(((-0.22, 0.22), (0.0, h), (-0.22, 0.22))), "shelf", id=f"{name}Plinth", room="gallery") if h > 0.05 else None
+        item = R_([0, 0, 0], builder(), name=name + "Spin")
+        if name == "galClock":
+            ls.tag(item, "prop", id="GalleryClock", room="gallery")
+        body = U_(*(c for c in (ped, T_([0, h, 0], item)) if c is not None))
+        tree = place_(body, (px, 0.0, pz), ang + 180.0)
+        objs.append((name, tree, role, (px - 1.2, -0.05, pz - 1.2), (px + 1.2, h + 1.9, pz + 1.2)))
+        anchors[name] = (px, h + 0.4, pz)
     chair = K.place(K.chair(entity={"id": "GalleryChair", "room": "gallery"}), (0.0, 0.0, 0.0), 180.0)
     tree, lo, hi = TB.placed("gallery", "galMan", (0.0, 0.0, 0.0), 180.0, room="gallery", anchor_id="GalleryChair")
-    gal["objects"].append(("galSeat", chair, "furn", (-0.5, -0.05, -0.5), (0.5, 1.0, 0.5)))
-    gal["objects"].append(("galMan", tree, "figure", lo, hi, {"figure": True}))
-    return gal
+    objs.append(("galSeat", chair, "furn", (-0.5, -0.05, -0.5), (0.5, 1.0, 0.5)))
+    objs.append(("galMan", tree, "figure", lo, hi, {"figure": True}))
+    return {"id": "gallery", "interior": ext, "objects": objs, "lights": [("galKey", (0.0, 2.9, 0.0), "lamp")],
+            "anchors": dict(anchors, man=(0.0, 1.0, 0.0), centre=(0.0, 1.2, 0.0))}
 
 
 def build(b):
@@ -181,10 +201,11 @@ def build(b):
             seq.append(("GOT?", bar, 2.5))
         back = bar <= 78
         for j, (wd, wb, bt) in enumerate(seq):
-            along = -1.9 + 1.05 * j + (0.35 if bar % 2 else 0.0)
-            yy = 2.55 - 0.3 * j - (0.15 if bar % 2 else 0.0)
+            jj = j if seq[0][0] == "IS" else j + 1                 # the column a word sits in (IS, THAT, ALL, YOU)
+            along = -2.3 + 1.25 * jj + (0.25 if bar % 2 else 0.0)
+            yy = 2.65 - 0.42 * jj - (0.12 if bar % 2 else 0.0)
             if wd == "GOT?":
-                along, yy = 0.2, 1.4
+                along, yy = 0.6, 0.62
             pos, nrm = ((along, yy, -3.49), (0, 0, 1)) if back else ((-3.49, yy, -along), (1, 0, 0))
             te = t(wb, bt)
             b.word(wd + ("..." if bar == 82 and wd == "YOU" else ""), te, te + G.BAR2 * 0.85, pos, nrm,

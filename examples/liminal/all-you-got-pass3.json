@@ -2129,7 +2129,16 @@
       "hold": 1.776146788990843
      },
      {
-      "channel": "w029_I_KNOW__GET_A_LI",
+      "channel": "w029_IT_S_FINE_THOUGH",
+      "units": "seconds",
+      "attack": 0.0,
+      "release": 0.2,
+      "curve": "smooth",
+      "time": 81.9,
+      "hold": 2.6999999999999886
+     },
+     {
+      "channel": "w030_I_KNOW__GET_A_LI",
       "units": "seconds",
       "attack": 0.0,
       "release": 0.2,
@@ -10197,14 +10206,33 @@
    }
   },
   {
-   "source": "grid.song.w029_I_KNOW__GET_A_LI",
-   "target": "nodes/w029_I_KNOW__GET_A_LI/visible",
+   "source": "grid.song.w029_IT_S_FINE_THOUGH",
+   "target": "nodes/w029_IT_S_FINE_THOUGH/visible",
    "op": "multiply",
    "amount": 1000.0
   },
   {
-   "source": "grid.song.w029_I_KNOW__GET_A_LI",
-   "target": "nodes/w029_I_KNOW__GET_A_LI/scale",
+   "source": "grid.song.w029_IT_S_FINE_THOUGH",
+   "target": "nodes/w029_IT_S_FINE_THOUGH/scale",
+   "op": "multiply",
+   "amount": 1.0
+  },
+  {
+   "source": "grid.song.sixteenth",
+   "target": "nodes/w029_IT_S_FINE_THOUGH/emissiveBoost",
+   "op": "add",
+   "amount": 3.0,
+   "depthSource": "grid.song.w029_IT_S_FINE_THOUGH"
+  },
+  {
+   "source": "grid.song.w030_I_KNOW__GET_A_LI",
+   "target": "nodes/w030_I_KNOW__GET_A_LI/visible",
+   "op": "multiply",
+   "amount": 1000.0
+  },
+  {
+   "source": "grid.song.w030_I_KNOW__GET_A_LI",
+   "target": "nodes/w030_I_KNOW__GET_A_LI/scale",
    "op": "multiply",
    "amount": 1.0,
    "chain": {
@@ -10213,8 +10241,8 @@
    }
   },
   {
-   "source": "grid.song.w029_I_KNOW__GET_A_LI",
-   "target": "nodes/w029_I_KNOW__GET_A_LI/position",
+   "source": "grid.song.w030_I_KNOW__GET_A_LI",
+   "target": "nodes/w030_I_KNOW__GET_A_LI/position",
    "component": 1,
    "op": "add",
    "amount": 0.25,
@@ -74332,7 +74360,11 @@
    },
    {
     "role": "accent",
-    "target": "procedural/w029_I_KNOW__GET_A_LI/material/emissiveColor"
+    "target": "procedural/w029_IT_S_FINE_THOUGH/material/emissiveColor"
+   },
+   {
+    "role": "accent",
+    "target": "procedural/w030_I_KNOW__GET_A_LI/material/emissiveColor"
    },
    {
     "role": "word",
