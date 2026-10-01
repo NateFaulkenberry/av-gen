@@ -33,7 +33,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from liminal_sdf import (box, breathing, corridor, doorway, landing, opening, room, screw, screw_apply,  # noqa: E402
-                         sdf_node, slab, stairway, surface, translate, union)
+                         sdf_node, slab, stairway, surface, translate, tremble, union)
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples", "liminal")
 
@@ -71,6 +71,8 @@ cell_a = union(
 )
 tree_a = screw(breathing(cell_a, amount=0.08, frequency=0.07, axes=(1.0, 0.0, 1.0), cell=T, name="breath"), T,
                name="climb")
+# A near-field tremble round the whole world (above the screw): only walls within 4 m of the camera shiver.
+tree_a = tremble(tree_a, amount=0.0, frequency=3.0, radius=4.0, fade=2.0)
 
 PATH_A = [
     [-15.0, 0.0, 0.0],
@@ -230,6 +232,10 @@ routes = [
     # route that adds pace moves the swap in time, out of the white-out keyed to hide it. To let the music
     # nudge the walk, integrate it into the distance -- route("audio.rms", "camera/journey/distance", 0.12,
     # integrate=True, ...) -- only in a chapter with no swap ahead, and never with a depth.)
+    # The bright, noisy top end as a nearby shiver: the tremble's amount on a spring, its phase integrated.
+    route("audio.treble", "sdf/world/node/tremble/amount", 0.05, attackMs=30, decayMs=500, springHz=2.0,
+          springDamping=0.6),
+    route("audio.treble", "sdf/world/node/tremble/translation", 3.0, 1, attackMs=30, decayMs=500, integrate=True),
     # High detail as fine edge light, springy.
     route("audio.highMid", "sdf/world/look/edge/intensity", 0.6, attackMs=40, decayMs=400, springHz=1.5,
           springDamping=0.8),

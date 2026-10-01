@@ -517,7 +517,12 @@ glm::vec3 warpPoint(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
         // The window (offset > 0): the warp fades to zero over `rounding` metres before the planes
         // dot(p, axis) = +-offset -- a screw's seams, where two cells' warps would otherwise disagree.
         float fade = 1.0f;
-        if (n.offset > 0.0f) {
+        if (n.count == 1) {
+            // ADR-1044's near-field mode: a sphere of radius `offset` about the point `axis` (the composition
+            // keeps it on the camera), fading over `rounding` -- a tremble only nearby surfaces feel.
+            const float f = glm::clamp((n.offset - glm::length(p - n.axis)) / std::max(n.rounding, 1e-4f), 0.0f, 1.0f);
+            fade = f * f * (3.0f - 2.0f * f);
+        } else if (n.offset > 0.0f) {
             const float along = std::fabs(glm::dot(p, safeNormalize(n.axis)));
             const float f = glm::clamp((n.offset - along) / std::max(n.rounding, 1e-4f), 0.0f, 1.0f);
             fade = f * f * (3.0f - 2.0f * f);

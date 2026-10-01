@@ -607,7 +607,10 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         warped.axis = glm::vec3(1.0f, 0.2f, 0.0f);
         warped.offset = 0.9f;
         warped.rounding = 0.4f;
-        cases.push_back({"warp windowed", treeOf(std::move(warped)), 1e-3f});
+        cases.push_back({"warp windowed", treeOf(warped), 1e-3f});
+        warped.count = 1; // the near-field sphere about `axis`
+        warped.axis = glm::vec3(0.2f, 0.1f, 0.0f);
+        cases.push_back({"warp near-field", treeOf(std::move(warped)), 1e-3f});
         SdfNode shell = unary(SdfNodeKind::Shell, box(glm::vec3(0.8f, 0.6f, 0.7f)));
         shell.offset = 0.15f;
         cases.push_back({"shell", treeOf(std::move(shell)), 1e-4f});

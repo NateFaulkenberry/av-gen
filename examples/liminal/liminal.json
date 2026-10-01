@@ -73,6 +73,35 @@
    }
   },
   {
+   "source": "audio.treble",
+   "target": "sdf/world/node/tremble/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 500,
+    "springHz": 2.0,
+    "springDamping": 0.6
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/world/node/tremble/translation",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 500,
+    "integrate": true
+   }
+  },
+  {
    "source": "audio.highMid",
    "target": "sdf/world/look/edge/intensity",
    "amount": 0.6,

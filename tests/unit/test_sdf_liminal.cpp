@@ -244,6 +244,20 @@ TEST_CASE("Warp: zero amount is the identity, a masked axis is untouched, the ph
     for (const glm::vec3& p : points({-0.2f, -2.0f, 2.0f}, {0.2f, 2.0f, 3.0f}, 5)) {
         CHECK_THAT(static_cast<double>(treeOf(windowed).evaluate(p, 0.0)), WithinAbs(static_cast<double>(p.x), 1e-6));
     }
+    // The near-field mode (count 1): only within `offset` of the point `axis`.
+    SdfNode near = w2;
+    near.count = 1;
+    near.axis = glm::vec3(0.0f, 0.0f, 0.0f);
+    near.offset = 1.0f;
+    near.rounding = 0.5f;
+    for (const glm::vec3& p : points({-0.2f, 1.2f, 1.2f}, {0.2f, 3.0f, 3.0f}, 4)) { // all beyond 1 m of the point
+        CHECK_THAT(static_cast<double>(treeOf(near).evaluate(p, 0.0)), WithinAbs(static_cast<double>(p.x), 1e-6));
+    }
+    float moved = 0.0f;
+    for (const glm::vec3& p : points({-0.2f, -0.3f, -0.3f}, {0.2f, 0.3f, 0.3f}, 4)) {
+        moved = std::max(moved, std::fabs(treeOf(near).evaluate(p, 0.0) - p.x));
+    }
+    CHECK(moved > 0.01f);
 }
 
 TEST_CASE("Shell: a box becomes a room with walls of the given thickness", "[sdf][liminal]") {

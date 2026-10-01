@@ -1774,6 +1774,7 @@ private:
     std::optional<Journey> journey_; // one or more chapters
     // The camera's global journey distance this frame (0 without a journey).
     [[nodiscard]] double journeyCameraDistance() const;
+    void followCameraWarps(const glm::vec3& eye); // ADR-1044: near-field warps follow the eye
     params::Parameter<float>* journeyDistance_ = nullptr;
     params::Parameter<float>* journeyLookAhead_ = nullptr;
     params::Parameter<float>* journeyHeight_ = nullptr;

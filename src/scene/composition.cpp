@@ -7716,6 +7716,23 @@ void Composition::registerCameraChannels(params::ParameterSet& params, float rea
     }
 }
 
+void Composition::followCameraWarps(const glm::vec3& eye) {
+    // ADR-1044: a `warp` with count 1 is a near-field tremble centred on the camera: its `axis` is kept on
+    // the eye, in the object's local frame (so it must sit above any screw, in object coordinates).
+    for (SdfObject& so : scene_.sdfs) {
+        const glm::vec3 local = glm::vec3(glm::inverse(so.transform.matrix()) * glm::vec4(eye, 1.0f));
+        const auto visit = [&](spatial::SdfNode& n, const auto& self) -> void {
+            if (n.kind == spatial::SdfNodeKind::Warp && n.count == 1) {
+                n.axis = local;
+            }
+            for (spatial::SdfNode& c : n.children) {
+                self(c, self);
+            }
+        };
+        visit(so.tree.root, visit);
+    }
+}
+
 double Composition::journeyCameraDistance() const {
     return journeyDistance_ != nullptr ? static_cast<double>(journeyDistance_->value()) : 0.0;
 }
@@ -8670,6 +8687,7 @@ void Composition::applyParameters() {
         const CameraPose pose = evaluateMainCamera();
         scene_.camera.position = pose.position;
         scene_.camera.target = pose.target;
+        followCameraWarps(pose.position);
     } else {
         const auto poseOf = [&](CameraId id) -> CameraPose {
             if (id == kMainCamera) {

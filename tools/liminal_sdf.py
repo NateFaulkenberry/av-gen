@@ -225,6 +225,17 @@ def breathing(child: dict, amount: float = 0.1, frequency: float = 0.08, axes: V
     return _named(node, name)
 
 
+def tremble(child: dict, amount: float = 0.02, frequency: float = 3.0, radius: float = 4.0, fade: float = 2.0,
+            seed: int = 7, name: Optional[str] = "tremble") -> dict:
+    """A near-field tremble (ADR-1044): a fine warp only within `radius` metres of the camera, fading over
+    `fade`. The composition keeps its centre on the eye every frame, in the object's own coordinates, so wrap
+    it round the WHOLE tree (above the screw). Drive `amount` from the distorted synth through a spring and
+    `translation` (the phase) through an integrating route: nearby walls shiver, far ones stay still."""
+    return _named({"kind": "warp", "amount": float(amount), "frequency": float(frequency), "count": 1,
+                   "offset": float(radius), "rounding": float(fade), "axis": [0.0, 0.0, 0.0],
+                   "size": [1.0, 1.0, 1.0], "seed": int(seed), "children": [child]}, name)
+
+
 def screw_apply(point: Vec3, translation: Vec3, count: int, k: int) -> list:
     """S^k(point): where cell k puts a cell-0 point (for placing props and lights in every cell)."""
     x, y, z = point

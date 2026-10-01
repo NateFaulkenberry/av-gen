@@ -933,6 +933,7 @@ public:
 
     // ---- accessors for UI / renderer / tests ----
     [[nodiscard]] const scene::Scene& scene() const { return controller_->scene(); }
+    [[nodiscard]] const params::Palette& palette() const { return palette_; } // ADR-1043
 
     // ---- distance detail policy (ADR-186) ------------------------------------------------------
     //

@@ -275,7 +275,7 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
         out = {F::Offset};
         break;
     case SdfNodeKind::Warp: // ADR-1040: size = per-axis gain, translation = the phase
-        out = {F::Amount, F::Frequency, F::Size, F::Translation, F::Axis, F::Offset, F::Rounding};
+        out = {F::Amount, F::Frequency, F::Size, F::Translation, F::Axis, F::Offset, F::Rounding, F::Count};
         break;
     }
     out.push_back(F::Enabled);

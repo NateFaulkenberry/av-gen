@@ -157,6 +157,12 @@ TEST_CASE("Journey: every chapter of the example is clear of its architecture at
             }
         }
         REQUIRE(!treeJson.is_null());
+        // A near-field tremble may wrap the world (above the screw); its amplitude is centimetres.
+        float trembleAllowance = 0.0f;
+        if (treeJson["root"]["kind"] == "warp" && treeJson["root"].value("count", 0) == 1) {
+            trembleAllowance = 0.06f;
+            treeJson["root"] = treeJson["root"]["children"][0];
+        }
         REQUIRE(treeJson["root"]["kind"] == "screw");
         float worst = 1e9f;
         double worstAt = 0.0;
@@ -198,7 +204,7 @@ TEST_CASE("Journey: every chapter of the example is clear of its architecture at
         INFO("chapter '" << chapter.name << "': closest approach " << worst << " m at distance " << worstAt << " m, eye ("
                          << worstEye.x << ", " << worstEye.y << ", " << worstEye.z << ") (radius "
                          << chapter.world.radius << ")");
-        CHECK(worst > chapter.world.radius);
+        CHECK(worst > chapter.world.radius + trembleAllowance);
     }
 }
 

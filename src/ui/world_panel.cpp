@@ -158,6 +158,17 @@ std::vector<Influence> directInfluencesOf(app::Engine& engine, const std::string
         i.detail = std::to_string(t.keys.size()) + " keys";
         out.push_back(std::move(i));
     }
+    // ADR-1043: the project palette writes its bound targets after the routes.
+    for (const params::PaletteBinding& b : engine.palette().bindings) {
+        if (b.target != path || engine.palette().empty()) {
+            continue;
+        }
+        Influence i;
+        i.kind = Influence::Kind::Palette;
+        i.source = "palette role '" + b.role + "'";
+        i.detail = b.mode == params::PaletteMode::Multiply ? "multiply" : "replace";
+        out.push_back(std::move(i));
+    }
     for (const params::Cue& c : engine.timeline().cues()) {
         const params::Preset* preset = c.preset.empty() ? nullptr : engine.presets().find(c.preset);
         if (preset != nullptr && preset->values.count(path) != 0) {
@@ -624,6 +635,7 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
                 case Influence::Kind::Macro: kind = "macro"; break;
                 case Influence::Kind::Entity: kind = "entity"; break;
                 case Influence::Kind::Staging: kind = "staging"; break;
+                case Influence::Kind::Palette: kind = "palette"; break;
                 }
                 // Build the trailing value first: a temporary std::string's c_str() must not
                 // outlive the full expression it was created in.
