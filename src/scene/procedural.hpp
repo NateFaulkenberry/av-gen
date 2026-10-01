@@ -18,6 +18,7 @@
 // `structureVersion` so the renderer rebuilds meshes/instances only then; everything else is a
 // per-frame uniform.
 
+#include "comp/font.hpp"
 #include "core/error.hpp"
 #include "core/wind.hpp"
 #include "params/parameter_set.hpp"
@@ -57,7 +58,7 @@ namespace avgen::scene {
 // (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
 // Appended only, never reordered: the enum's integer value is written into `structuralHash` and its
 // name into every scene file.
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated };
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated, Text };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -174,6 +175,15 @@ struct SourceSpec {
     // every part is separately selectable and separately materialled in the editor.
     GeneratedSource generated;
     int generatedPart = 0;
+    // Text (ADR-1046): a word or a block of lines as extruded glyph geometry (scene/text_mesh.hpp),
+    // facing +Z with its back at z = 0. One em is `textSize` metres; depth and tracking are in em.
+    std::string text;
+    comp::FontDesc font;
+    float textSize = 1.0f;
+    float textDepth = 0.08f;
+    float textTracking = 0.0f;
+    int textAlign = 1;  // 0 left, 1 centre, 2 right (about x = 0)
+    int textVAlign = 0; // 0 middle (the block centred on y = 0), 1 baseline (first baseline at y = 0)
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change

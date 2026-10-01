@@ -13,7 +13,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | # | system | status | ADR | tests |
 |---|---|---|---|---|
 | 1 | beat grid: owner-numbered bars, tempo map, pulses, authored event envelopes (BIG CLAPs, words) | **done** | 1045 | `[beatgrid]` (7 cases) |
-| 2 | spatial lyric typography | next | | |
+| 2 | spatial lyric typography (mesh text + `tools/liminal_text.py`) | **done** | 1046 | `[text]` (3 cases) |
 | 3 | luminous line-drawn edges | | | |
 | 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
 | 5 | object animation on beat sources | | | |
@@ -96,6 +96,44 @@ Wiring, with existing routes (ADR-011/900/1041):
 - Do not put a depth on an integrating route (ADR-1041).
 - The pulses are exact on the grid; `audio.*` are the music's measured energy. Use the grid for the
   beat-locked things the brief asks for, and audio where you want the music's actual dynamics.
+
+#### 2. Lyrics in the world (ADR-1046)
+
+A word is a procedural node with a `text` source: extruded glyph geometry, lit, fogged, depth-tested against
+the SDF, perspective-correct. Use the helper; it handles ~300 entries in one call:
+
+```python
+import sys; sys.path.insert(0, "tools")
+from liminal_text import place_words
+out = place_words([
+  {"text": "LET", "t0": 93.52, "t1": 94.6, "position": [x, y, z], "normal": [0, 0, 1], "height": 0.5,
+   "style": "pop", "role": "accent", "chapter": "rooms"},
+  {"text": "IS", "at": "bridge2:0:4.5", "hold": 0.4, "position": [...], "normal": [1, 0, 0], "tilt": -8,
+   "style": "flash", "color": [1, 0.4, 0.8], "intensity": 4},
+], grid="song")
+scene["nodes"] += out["nodes"]; grid_settings["events"] += out["events"]
+project["routes"] += out["routes"]; palette["bindings"] += out["bindings"]
+# out["chapters"]: {"rooms": [names]}: add them to that journey chapter's "nodes" so they show only there
+```
+
+- Entry fields: `text`; `t0`/`t1` (seconds) or `at`/`until`/`hold` (grid positions); `position` (the text's
+  centre, world metres in the chapter's frame); `normal` (the wall's outward normal; the text faces it,
+  upright) or `rotation` (Euler degrees); `tilt` (degrees in the wall's plane, + = anticlockwise as you face it);
+  `height` (cap height, m); `depth` (extrusion, em, 0.08); `font` (`{"family", "weight" -1..1, "italic"}`,
+  any installed family); `role` (palette role bound to the emission colour) or `color`; `intensity`
+  (emission, 3); `fill` (lit base colour, dark by default); `style` (pop, rise, flash, flicker, cut); `in`/`out`
+  (seconds); `rise` (m, for rise); `flash` (emission spike); `chapter`; `name` (default `w<i>_<TEXT>`).
+- Each word is addressable: `nodes/<name>/scale|position|rotation|visible|emissiveBoost`,
+  `procedural/<name>/material/emissive|emissiveColor|baseColor`, and its envelope `grid.song.<name>`
+  (1 while shown). Key or route anything on top (a slide: a route from `grid.song.<name>` to
+  `nodes/<name>/position` component 0).
+- **At most 256 procedural objects draw at once.** The helper's `visible` route hides a word whose envelope is
+  0, so only the words currently shown count.
+- Without the helper: `{"kind": "procedural", "name": "w", "procedural": {"source": {"kind": "text", "text":
+  "GO", "textSize": 0.7 (m per em), "textDepth": 0.08, "font": {...}, "textAlign": 0|1|2, "textVAlign":
+  0 middle|1 baseline}, "material": {...}}}`. A text node faces +Z with its back at z = 0, and is a single
+  instance.
+- Mesh text has no SDF edge lines; make it read with emission and bloom (dark `fill`, bright emission).
 
 #### 4. Camera breathing (ADR-1048)
 
