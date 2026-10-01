@@ -13,11 +13,21 @@ these are the art side's. Newest state first.*
     and C14 not read); entry boundaries 2x to 41x, except the pause and the ending (by design).
 - **Gate:** `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0 (41,918 assertions in
   102 test cases). The coordinator was told at 19:39, so the engineer has the GPU back.
-- **Take 2** (`2f4ad1ef`) is queued: `$S/liminal3/final.sh` renders to a temp file and replaces the final only on
-  success. It has the wave band at half the light (lines stay visible in the band), and C12 and C14 readable.
-  When it lands, look at 198.3-199.9 (`fps=15` tile) and compare `$S/liminal3/av-final` with
-  `$S/liminal3/av-take1`.
-- **The Critic on take 1** is running: `$S/liminal3/critic-take1/`.
+- **Take 2** (`8f2c5e77`) is queued. `$S/liminal3/final.sh` renders to a temp file and replaces the final only on
+  success. Take 2 has:
+  - the wave band at half the light, so lines stay visible in the band;
+  - C12 and C14 readable;
+  - glides keyed with the engine's Catmull-Rom instead of straight lines. Piecewise-linear distance keys every
+    0.1 s stepped the camera's speed ten times a second: that is the Critic's "wobble".
+
+  When it lands:
+  1. Look at 198.3-199.9 (an `fps=15` tile).
+  2. Compare `$S/liminal3/av-final` with `$S/liminal3/av-take1`.
+  3. Run `python3 tools/liminal/critic_pass3.py --project $S/liminal3/p3-final/all-you-got-pass3.json --video
+     ~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4 --out $S/liminal3/critic-take2 --submit
+     --label pass3-final-take2 --track film`. The shots sidecar is now beside the snapshot, so it uses the 18 shots.
+- **The Critic on take 1** (job `job_1a0f9d8ab4daf52ba`, 64 timing-sheet shots): 0.93 overall; composition,
+  colour, pacing and creative intent 1.0; musical sync 0.99; technical 0.79; motion 0.68 (wobble: fixed in take 2).
 
 **Generate, then check (CPU, about 80 s):**
 ```sh
