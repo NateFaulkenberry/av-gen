@@ -136,7 +136,7 @@ def bedroom():
     shell = U(*_shell_bits(ext, door=("+z", 1.2, 0.9), windows=[("-x", 0.3, 1.1, 1.3, 0.9)]),
               _window("-x", ext, 0.3, 1.1, 1.3, 0.9, curtains="bedCurtain"),
               on_wall(K.painting(1.0, 0.55, motif="horizon"), "-z", ext, -0.3, 1.62),
-              place(K.hanging_lamp(0.7, name="bedPendant"), (0.0, y1, 0.2)))
+              place(K.hanging_lamp(0.5, name="bedPendant"), (0.0, y1, 0.2)))
     furn = U(place(K.bed(1.5, 2.05), (-0.3, 0.0, z0 + 1.05)),
              place(K.nightstand(), (-1.35, 0.0, z0 + 0.25)), place(K.nightstand(), (0.75, 0.0, z0 + 0.25)),
              place(K.table_lamp(0.45), (-1.35, 0.55, z0 + 0.25)),
@@ -148,7 +148,7 @@ def bedroom():
             "objects": [("bedShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("bedFurn", furn, "furn", (x0 - 0.05, -0.05, z0 - 0.1), (x1 + 0.05, 2.1, 1.5)),
                         ("bedMan", man, "figure", (x1 - 0.9, -0.05, z0 - 0.05), (x1 + 0.05, 1.95, z0 + 0.9))],
-            "lights": [("bedLamp", (-1.35, 0.95, z0 + 0.25), "lamp"), ("bedPend", (0.0, 1.75, 0.2), "lamp")],
+            "lights": [("bedLamp", (-1.35, 0.95, z0 + 0.25), "lamp"), ("bedPend", (0.0, 1.95, 0.2), "lamp")],
             "anchors": {"bed": (-0.3, 0.6, z0 + 1.0), "wall": (-0.3, 1.85, z0), "window": (x0, 1.5, 0.3),
                         "man": (x1 - 0.42, 1.2, z0 + 0.38), "door": (1.2, 1.0, z1), "lamp": (-1.35, 0.8, z0 + 0.25),
                         "ceiling": (0.0, y1, 0.0), "wardrobe": (x1 - 0.3, 1.0, 0.55)}}
