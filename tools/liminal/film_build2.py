@@ -677,6 +677,12 @@ def build_part2(b, end):
     f.track("temporal/mosh/amount", [(0.0, 0.0), (251.6, 0.0, "smooth"), (253.8, 0.55, "smooth"), (254.95, 0.95, "step"),
                                      (255.0, 0.0, "step")], mode="add")
     f.track("temporal/mosh/shift", [(0.0, 0.0), (252.5, 0.0, "smooth"), (254.95, 30.0, "step"), (255.0, 0.0, "step")], mode="add")
+    # the geometry dissolves into the light: far things first (the mountains, the rings), then the ground, the
+    # trees and the stones, and last the figure on the hill
+    for o, t_out in (("landMtn", 252.2), ("ringLow", 252.6), ("ringHigh", 252.4), ("sun", 254.6), ("landGround", 253.4),
+                     ("landTrees", 253.8), ("landStones", 254.1), ("hillMan", 254.7)):
+        f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 1.0, "step"), (t(114), 1.0, "smooth"), (t_out - 1.4, 1.0, "smooth"),
+                                                 (t_out, 0.0, "step")], mode="multiply")
     # the collapse: the seed again, the cursor blinking twice, then out
     b.shot("cursor", 255.0, end, [[0.0, 0.25, 6.2], [0.0, 0.25, 6.15]], (0.0, 0.0, 0.0), keys=("seed",), fov=46.0)
     zero = [0.0, 0.0, 0.0]

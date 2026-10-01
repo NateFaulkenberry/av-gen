@@ -53452,6 +53452,310 @@
     ]
    },
    {
+    "target": "sdf/landMtn/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 250.8,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.2,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/ringLow/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 251.2,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.6,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/ringHigh/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 251.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.4,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/sun/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 253.2,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 254.6,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/landGround/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 253.4,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/landTrees/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.4,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 253.8,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/landStones/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 252.7,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 254.1,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/hillMan/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "multiply",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 249.46194,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 253.3,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 254.7,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "palette/position",
     "component": -1,
     "timeBase": "seconds",
