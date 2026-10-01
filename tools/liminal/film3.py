@@ -83,8 +83,10 @@ class Builder3(FB.Builder):
             moves.append((tt, (f(tt) - s0) / (s1 - s0) if s1 > s0 else 0.0))
             tt += 0.05
         moves.append((times[-1], 1.0))
+        # the distance keys (every 0.1 s) are joined by the engine's Catmull-Rom ("smooth"), not straight lines: a
+        # piecewise-linear distance steps the speed ten times a second through every acceleration (a wobble)
         self.shot(name, times[0], times[-1], eye, None, keys=nodes_keys, extra=extra, look_keys=look_keys, moves=moves,
-                  fov=fov, ease_kind="linear", sway=sway)
+                  fov=fov, ease_kind="linear", sway=sway, dist_interp="smooth")
         self._angular_gaze(self.f.shots[-1])
 
     def _angular_gaze(self, shot, dt=0.1):

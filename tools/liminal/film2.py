@@ -206,14 +206,14 @@ class Film:
 
     # ---- shots ---------------------------------------------------------------------------------------------
     def shot(self, name, t0, t1, eye, look, *, nodes=(), lights=(), moves=None, look_keys=None, fov=None,
-             sway=0.0, ease_kind="inout"):
+             sway=0.0, ease_kind="inout", dist_interp="linear"):
         """A shot from t0 to t1 (seconds). `eye`: the eye's path points (world). `look`: the look-at point, or
         `look_keys` [(t, point), ...]. `moves`: [(t, fraction 0..1 of the eye path), ...] (default: the whole
         path, eased over the shot). `fov`: a number or [(t, fov)]."""
         self.shots.append({"name": name, "t0": float(t0), "t1": float(t1), "eye": [list(map(float, p)) for p in eye],
                            "look": list(map(float, look)) if look is not None else None, "look_keys": look_keys,
                            "nodes": list(nodes), "lights": list(lights), "moves": moves, "fov": fov, "sway": sway,
-                           "ease": ease_kind})
+                           "ease": ease_kind, "dist_interp": dist_interp})
 
     def _build_journey(self):
         chapters, dist, lookat, fovk, sway = [], [], [], [], []
@@ -252,9 +252,14 @@ class Film:
                         break
                     if t > tb:
                         f = fb
-                dist.append([t, base + s_a + (s_b - s_a) * f, "linear"])
+                dist.append([t, base + s_a + (s_b - s_a) * f, s.get("dist_interp", "linear")])
             # hold the last value as a step until the cut
             dist[-1][2] = "step"
+            if s.get("dist_interp", "linear") == "smooth":
+                # the spline's slope at a shot's first and last keys would see the 1000 m jump to the neighbouring
+                # chapter: keep those two segments straight
+                dist[-(n_dense + 1)][2] = "linear"
+                dist[-2][2] = "linear"
             if s["look_keys"]:
                 for t, p in s["look_keys"]:
                     lookat.append([t, list(map(float, p)), "smooth"])
