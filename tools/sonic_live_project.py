@@ -198,7 +198,7 @@ LIVE_WORLD = [
 ]
 ACCENT = {"visual.organic": "visual.organicAccent", "visual.crystalline": "visual.crystalAccent",
           "visual.tectonic": "visual.tectonicAccent"}
-FAMILY_SHARPNESS = 3.0
+FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more clearly in a three-way blend
 
 
 # ------------------------------------------------------------------------------------------------ routes
@@ -267,11 +267,12 @@ def retime(route):
     if not ch:
         return route
     if ch.get("gain") == 1.25 and ch.get("offset") == -0.25 and ch.get("clampEnabled"):
-        # GROW: a world's forms appear from a weight of 0.375 (the master's 0.2). Live, the world often sits between
-        # two families (warm keys: 0.33 garden, 0.67 glass), and at 0.2 the minority world's forms scattered through
-        # the majority's as small debris (mushroom caps as red discs among the crystals). The palettes still blend
-        # continuously; only the forms wait.
-        ch["gain"], ch["offset"] = 1.6, -0.6
+        # GROW: a world's forms appear from a weight of 0.375 (the master's 0.2) and are full by 0.8 (the master's
+        # 1.0). Live, the world often sits between two families (warm keys: 0.33 garden, 0.67 glass), and at 0.2 the
+        # minority world's forms scattered through the majority's as small debris (mushroom caps as red discs among
+        # the crystals); full only at 1.0, a world led at 0.6 (the top of a filter sweep, a held driven note) stood
+        # half-grown in a dark, sparse in-between. The palettes still blend continuously; only the forms wait.
+        ch["gain"], ch["offset"] = 2.35, -0.88
     if ch.get("attackMs") == 800 and ch.get("decayMs") == 1600:  # SLOW and GROW: the family blends
         ch["attackMs"], ch["decayMs"] = SLOW["attackMs"], SLOW["decayMs"]
     if s == "visual.glow" and ch.get("attackMs") == 150:

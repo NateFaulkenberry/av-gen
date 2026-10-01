@@ -509,7 +509,7 @@
     ],
     "groups": {
      "family": {
-      "sharpness": 3.0
+      "sharpness": 4.0
      }
     }
    }
@@ -986,8 +986,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -1002,8 +1002,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -1018,8 +1018,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -1264,8 +1264,8 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
@@ -1280,8 +1280,8 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
@@ -2425,8 +2425,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -2441,8 +2441,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -2468,8 +2468,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3017,8 +3017,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3088,8 +3088,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3104,8 +3104,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3120,8 +3120,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3136,8 +3136,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3152,8 +3152,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3168,8 +3168,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3184,8 +3184,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3200,8 +3200,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3413,8 +3413,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3429,8 +3429,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3445,8 +3445,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3461,8 +3461,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
@@ -3477,8 +3477,8 @@
    "chain": {
     "attackMs": 500,
     "decayMs": 1000,
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.35,
+    "offset": -0.88,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0
