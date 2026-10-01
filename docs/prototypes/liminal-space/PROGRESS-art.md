@@ -5,15 +5,35 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status (18:10):** the whole pass 3 film generates and validates (commit `8c82d5b6`). Nothing rendered yet except
-tableau stills (`~/Desktop/av-gen-review/24-liminal-space/pass3/tableaux-{1,2}.png`). The GPU has been held by
-other agents' full suites since about 17:30. The house stills (`examples/liminal/all-you-got-pass3-rooms.json`) are
-queued.
+**Status (18:42):**
+- **v1 preview:** `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3-preview-v1.mp4` (960x540). It
+  was rendered at `976152d1` with the old pin. Contact sheets are in `$S/liminal3/sheets/v1-*.png`, and
+  `pass2_av` is in `$S/liminal3/av-v1/`.
+  - **What works:** the intro's neighbourhood; the cut inside on the downbeat (frame 1123); the living-room sweep
+    with four tableaux; the kitchen; the climb with one word a riser, the dissolve and the void; the basement;
+    the upstairs tableaux; the dawn figure with its head.
+  - **Quarter lock:** +12 to +27 dB in most sections, with no camera breathing.
+  - **BIG CLAPs:** 11 unmistakable, 6 visible, 2 not read (C04, C09).
+- **v1 fixes, at `8c675031`:** see that commit's message. They include rim and static on, re-pinned to
+  `dd5c0fe1`, and the travelBeam stand-in for the wave.
+- **v2 preview:** rendering at 18:40 (`$S/liminal3/preview.sh v2`).
+- **Next:**
+  1. Sheets for v2 and `pass2_av`.
+  2. The Critic: `python3 tools/liminal/critic_pass3.py --project examples/liminal/all-you-got-pass3.json
+     --video <v2.mp4> --out $S/liminal3/critic-v2 --submit --label pass3-v2 --track film`.
+  3. Fix, then v3.
+  4. The engineer's wave (`post/wave/*`, about 19:45): re-pin, replace the travelBeam, and key `progress`
+     0 to 10 over 90.3-91.1 from the front door, with the trail as P11's palette.
+  5. The final 1080p: `tools/gpu-lock.sh $S/liminal3/avgen.sh --headless --project ... --render
+     ~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4 --range 0:258 --size 1920x1080 --fps 30
+     --codec h264 --quality 90 --particle-warmup 30`.
+  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` must exit 0.
+  7. The report.
 
 **Generate, then check (CPU, about 80 s):**
 ```sh
 S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad
-export AVGEN=$S/liminal3/bin-validate/avgen        # a copy of build/release/src/avgen at 225e70b0 (time-aware validator)
+export AVGEN=$S/liminal3/bin-validate/avgen        # a copy of the pinned binary (dd5c0fe1: the time-aware validator, rim, static)
 python3 tools/liminal/make_all_you_got_pass3.py    # writes examples/liminal/all-you-got-pass3{,.scene,.rig,.shots}.json
                                                    # and all-you-got-pass3.validation.txt
 ./build/release/src/avgen --project examples/liminal/all-you-got-pass3.json --audit-routes /tmp/a.json 2>&1 | grep -i "warn\|error"
