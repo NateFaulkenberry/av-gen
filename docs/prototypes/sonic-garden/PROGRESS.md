@@ -702,8 +702,8 @@ the before/after curves and the limits); LIVE-QUICKSTART.md has a "What to try" 
 1. **Distortion (PART 18).** Before, nothing the garden showed read roughness (`grain` acted on the core and the blades,
    which the garden hides) and the family never left the garden (chaotic 0.00-0.01). Now `grit` (roughness x
    energy^0.4 x (1 - inharmonicity)^2) roughens, buzzes and fragments every world within 40-300 ms: 0 to 0.48 at drive
-   40 on the held note (peaks 0.77), fragments 0 to 0.42; the world goes garden -> buzzing glass 0.58, the rough
-   heavy world rising to 0.25 over a 6 s hold. A driven chord reaches the heavy world (0.90) in about 2 s; a drive
+   40 on the held note (peaks 0.77), fragments 0 to 0.42; the world goes garden -> buzzing glass 0.66, the rough
+   heavy world rising to 0.22 over a 6 s hold. A driven chord reaches the heavy world (0.90) in about 2 s; a drive
    after the filter on a riff 1.00. Honest limit: on one held note, distortion and an open filter are nearly the
    same spectrum to the character, so the two tests' tops look alike; the chaotic threshold (-0.44) is set so the
    top of a filter sweep stays bright glass rather than a dim in-between world (at -0.38 a held driven note went
@@ -718,8 +718,9 @@ the before/after curves and the limits); LIVE-QUICKSTART.md has a "What to try" 
 
 ### Families on synth patches (probe `patches`, the same phrase through six patches)
 
-pad 0.89 garden; pluck 0.92, lead 0.98, FM bell 0.99 glass; distorted bass 0.98 rough and heavy; noise perc 1.00
-rough and light. (The master's mappings read the pad as 0.57 glass and the distorted bass as 0.89 glass.)
+pad 0.94 garden; pluck 0.96, lead 1.00, FM bell 1.00 glass; distorted bass 0.99 rough and heavy; noise perc 1.00
+rough and light. (The master's mappings read the pad as 0.57 glass and the distorted bass as 0.89 glass.) Family
+sharpness 4; a world's forms appear from a weight of 0.375 and are full by 0.8; the fog march runs 24 steps live.
 
 ### Tools
 
