@@ -30,7 +30,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | second brief PARTS 2-7 (live AA) | done (2026-09-30) | `AA-RESEARCH.md`, ADR-1024; see "Live anti-aliasing" below |
 | second brief PART 8 (merge prep) | see "Live anti-aliasing" below | |
 | second brief PARTS 9-14 (integration, live MIDI, live audio, sync, UI, demo plumbing) | done (2026-09-30), ADR-1025 | see "Live input" below; the owner's hands-on test is `LIVE-QUICKSTART.md` |
-| second brief PARTS 15-16 (live demo art, live art direction) | in progress (art agent, 2026-09-30) | see "Live art (PARTS 15-16)" below; `tools/sonic_live_project.py` writes the live tuning |
+| second brief PARTS 15-16 (live demo art, live art direction) | done (art agent, 2026-09-30) | see "Live art (PARTS 15-16)" below; `tools/sonic_live_project.py` writes the live tuning; review media in `23-sonic-garden/live-art/` |
 | second brief PART 22 (the hardware test) | the owner's | `LIVE-QUICKSTART.md` |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
@@ -667,29 +667,70 @@ audio via BlackHole.
 - `sonic.live` projects;
 - a real CoreMIDI source (`[device]`).
 
-## Live art (art agent, 2026-09-30, `01-brief-live.md` PARTS 15-16) -- IN PROGRESS
+## Live art (art agent, 2026-09-30, `01-brief-live.md` PARTS 15-16) -- done; the last review media and the frame cost were finishing at 21:20
 
 ### Resume here (live art)
 
-- Commits on `proto/sonic-garden`: `4dcb65c5` (first pass: timing, families, glow/grit, live scene, probe patches,
-  replay tool), `cbb5bd3d` (the filter seen in the garden, waiting world, matte observatory floor, seed, hold),
-  `7a35999e` (chaotic reads rasp so a bell is not rough; forms from 0.375; the glass keeps its blacks; composition;
-  the quickstart's "What to try"), `626c64d2` (the heavy core stays dark between worlds; the replay clip tool).
-- The look is final unless the owner's hardware test says otherwise; the design and the measurements are in the notes
-  (`~/Desktop/av-gen-review/23-sonic-garden/live-art/LIVE-ART-NOTES.md`, drafted in the art agent's scratchpad).
-- **Everything is data written by `tools/sonic_live_project.py`** (the live project AND its own scene,
-  `examples/sonic-garden/sonic-live.scene.json`). The master and its variants are untouched. Run it after any change
-  to the master.
-- **Tuning loop without a GPU:** record a probe scenario once
-  (`build/release/tools/avgen_sonic_probe <scenario> --out e.csv --wav a.wav`, into BlackHole, no app needed), then
-  `python3 tools/sonic_live_replay.py e.csv a.wav <dir> --trace` makes a file project of it and traces every signal
-  (the live and file paths compute the same character, ADR-1025). The replay project also renders headless under
-  `tools/gpu-lock.sh` for stills and full-quality clips.
-- Probe scenarios for PART 15: `low`, `high`, `chords`, `arp`, `distorted`, `sweep`, `drive`, plus `patches` (one
-  phrase through pad, pluck, lead, FM bell, distorted bass, noise perc), `drivechord` and `play` (~2 min).
-- Next (in progress at 19:50): the final media run (live captures of every test and the play-through, full-quality
-  replays of the same performances, the frame cost at the default and preview tiers, a Live panel photograph),
-  then the notes into the review folder, this section's summary, and `avgen_tests "[sonic]"` under the lock.
+- Commits on `proto/sonic-garden`: `4dcb65c5` (first pass), `cbb5bd3d` (the filter in the garden, waiting world,
+  matte floor, seed, hold), `7a35999e` (rasp, forms from 0.375, the glass's blacks, composition, the quickstart's
+  "What to try"), `626c64d2` (the heavy core stays dark), `9cb362a9` (note gestures as accents), `7087e3fd`
+  (`--no-lock`), and this section.
+- To change the live look: edit `tools/sonic_live_project.py`, run it, reopen Sonic Live. To check a change without a
+  GPU: `avgen_sonic_probe <scenario> --out e.csv --wav a.wav` (into BlackHole, no app needed), then
+  `python3 tools/sonic_live_replay.py e.csv a.wav <dir> --trace`. To see it: `--render clip.mp4`.
+- The GPU lock is shared with the liminal worktree's agents, whose full suites hold it for 35-40 min; the art
+  agent's media runs queued behind them for most of an hour on 2026-09-30.
+
+The live demo's art direction. **Everything is data written by `tools/sonic_live_project.py`**: the live project
+(`examples/sonic-garden/sonic-live.json`) and, new, its own scene (`examples/sonic-garden/sonic-live.scene.json`,
+the master's scene plus what live play needs). The garden master, its variants and their review material are
+untouched. No engine code changed, so no ADR. The notes, the curves and the clips are in
+`~/Desktop/av-gen-review/23-sonic-garden/live-art/` (LIVE-ART-NOTES.md there has the design, the per-gesture table,
+the before/after curves and the limits); LIVE-QUICKSTART.md has a "What to try" section for the owner's test.
+
+### The design: three timescales, and the note is only the first
+
+| layer | speed | reads | moves |
+|---|---|---|---|
+| the note | immediate | `notes.noteOn`, velocity, pitch | a gesture whose form is the world's, place the register, strength an accent (1 - note density) |
+| the sound now | 50-300 ms | medium tier | `glow` (the filter: light, colour, focus, air, detail), `grit` (distortion: buzz, cracks, matte, fragments), light held by `energy` (release = trail) |
+| the playing | 0.3-1.5 s | `notes.*` | `figure` (pattern), `stack` (density), `sustain` (trails), `lift` (height) |
+| the identity | about 2 s | slow tier | the four worlds, blended |
+
+### The engineer's three problems
+
+1. **Distortion (PART 18).** Before, nothing the garden showed read roughness (`grain` acted on the core and the blades,
+   which the garden hides) and the family never left the garden (chaotic 0.00-0.01). Now `grit` (roughness x
+   energy^0.4 x (1 - inharmonicity)^2) roughens, buzzes and fragments every world within 40-300 ms: 0 to 0.48 at drive
+   40 on the held note (peaks 0.77), fragments 0 to 0.55; the world goes garden -> glass 0.46 -> rough/heavy 0.55 over
+   a 6 s hold. A driven chord reaches the heavy world (0.94) in about 2 s; a drive after the filter on a riff 0.98.
+   Honest limit: on one held note, distortion and an open filter are nearly the same spectrum to the character, so
+   the two tests' tops look alike.
+2. **The filter lag (PART 17).** The fast channel is now quick (up/down hysteresis 17-170 ms, routes 60/250 ms: about a
+   third of a second from knob to picture, was about a second) and reaches down to a bass note's closed filter
+   (`glow` 0.13 at 350 Hz, 0.27 at 1 kHz; was 0.00, 0.03). The world's identity stays about 2 s on purpose: the light
+   follows the knob, the world follows where it comes to rest. The live project carries its own time constants, so
+   the Live panel's Smoothing stays 1x by default.
+3. **The camera.** A slow 64 s drift loop round the master's mid-move framing (about 1.6 m of travel), raised 0.6 m
+   to look into the lotus's cup; it does not follow the music. Weight lowers it only in the heavy world.
+
+### Families on synth patches (probe `patches`, the same phrase through six patches)
+
+pad 0.89 garden; pluck 0.92, lead 0.98, FM bell 0.99 glass; distorted bass 0.98 rough and heavy; noise perc 1.00
+rough and light. (The master's mappings read the pad as 0.57 glass and the distorted bass as 0.89 glass.)
+
+### Tools
+
+- `tools/avgen_sonic_probe` (extended): patches (pad, keys, pluck, lead, FM bell, bass, distorted bass, noise perc),
+  the PART 15 scenarios `low`, `high`, `chords`, `arp`, `distorted` (plus `sweep`, `drive` with a 6 s hold,
+  `patches`, `drivechord`, `play`), and a repeated key now retriggers.
+- `tools/sonic_live_replay.py`: a probe recording as a file project; `--trace` (no GPU) and `--render clip.mp4`
+  (full quality, with the probe's audio and a readout strip).
+- `tools/sonic_live_clip.py`: the readout shows the patch, glow, grit and the four worlds.
+
+### Frame cost and tests
+
+(pending: being measured)
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 
