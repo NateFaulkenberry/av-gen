@@ -661,3 +661,52 @@ Two failures to kill on sight:
 - **Fireworks** (particle bursts) mark the summit's 2 and 4, the GOT? sparkle and the crash.
 - **The release ends on the downbeat of verse 1** (25.1, where the voice enters), not on C02. C02 blows the
   walls out over its beat first.
+
+## 12. Results (the final film, commit `82f8edba`)
+
+**The film:** `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
+- 1920x1080, 30 fps, h264 quality 90, with the song, 258 s (the ending runs 4.2 s past the song).
+- Rendered in 5.3 minutes, with 0 GPU errors.
+- A contact sheet sits beside it.
+
+**"Does the visual response read?"** (`pass2_av.py`: best of brightness, lines and change):
+
+| section | pass 1 quarter lock | pass 2 quarter lock | pass 2 eighth lock |
+|---|---|---|---|
+| Intro 1-4 | +6.5 dB (0.10) | +14.6 dB (0.37) | +12.1 dB (0.18) |
+| Intro 5-8 | +5.3 dB (0.10) | +21.4 dB (0.79) | +21.0 dB (0.61) |
+| Intro 9-16 | +6.3 dB (0.04) | +18.9 dB (0.46) | +21.7 dB (0.49) |
+| Release 17-24 | +5.6 dB (0.03) | +16.4 dB (0.27) | +15.6 dB (0.19) |
+| Verse 1, 1-8 | +0.3 dB (0.01) | +17.0 dB (0.33) | +18.5 dB (0.30) |
+| Verse 1, 9-16 | +6.4 dB (0.03) | +16.9 dB (0.30) | +17.0 dB (0.22) |
+| Let it go | +4.0 dB (0.04) | +18.7 dB (0.45) | +14.9 dB (0.14) |
+| Verse 2 | +7.8 dB (0.02) | +23.6 dB (0.51) | +22.5 dB (0.35) |
+| Bridge 1, 1-6 (growth, not pulse) | +4.9 dB (0.05) | +10.7 dB (0.16) | +8.0 dB (0.05) |
+| Bridge 2 (the eighth thump) | +7.3 dB (0.06) | +12.7 dB (0.20) | +17.5 dB (0.26) |
+| Bridge 3 (dance) | +0.7 dB (0.02) | +20.2 dB (0.48) | +18.2 dB (0.29) |
+| Chorus 1-8 | +4.1 dB (0.03) | +18.7 dB (0.52) | +11.6 dB (0.07) |
+| Chorus 9-16 | +6.5 dB (0.06) | +20.3 dB (0.48) | +14.6 dB (0.15) |
+| Chorus 17-22 | +6.2 dB (0.06) | +18.8 dB (0.47) | +18.1 dB (0.34) |
+
+- **BIG CLAPs:**
+  - Pass 1 had 6 unmistakable (all accidents of its chapter swaps) and 9 not read.
+  - Pass 2 has **17 unmistakable** and 1 visible: C07, z 2.2, the words flying off in "let it go".
+- **Section boundaries:** 2.4x to 500x the surrounding change, except the ending (0.8x): the crash's ring-out
+  flows into the dawn on purpose.
+
+**The Creative Critic:**
+- **The pass 2 runs:**
+  - pass 1, job `job_1a0f80d8694ad5bee`;
+  - v1, `job_1a0f853be95f3a158`;
+  - v2, `job_1a0f85ef8d76d5547`;
+  - the final, `job_1a0f868d8a7af001d`.
+- **Audio reactivity:**
+  - pass 1: "no measurable response" (z 0.2);
+  - the final: an onset-locked **z 7.8** over 299 events, 81 % of screen regions responding, in 3 distinct
+    (feature, lag) groups.
+- **Issues:** pass 1 had 59 (7 high, 30 medium); the final has 25 (2 high, 10 medium).
+  - The two high findings are intended flashes: the dawn's white-out, and C02's burst of light.
+  - Most medium findings are intended motion: the seed's per-beat evolution, the mosh strain, the falling words,
+    the cursor's blink.
+- **Technical quality:** 0.65, then 0.88.
+- **The `[sdf],[liminal]` gate:** exit 0, 41,767 assertions in 85 test cases.

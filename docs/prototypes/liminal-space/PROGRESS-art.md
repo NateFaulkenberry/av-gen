@@ -5,28 +5,19 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
 
-**Where pass 2 stands (12:55):**
-- The final 1920x1080 render is running from `82f8edba` into
-  `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
-- When it finishes:
-  1. tell the coordinator, who releases the engineer's render suite;
-  2. run `python3 tools/liminal/pass2_av.py` and `critic_pass2.py` on it;
-  3. run the test gate `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"`, which must exit 0;
-  4. hand back.
-- **v2 preview** (`$S/liminal2/v2-full.mp4`):
-  - 17 of 18 BIG CLAPs unmistakable;
-  - quarter lock +14 to +24 dB in every pulse section;
-  - the Critic: 25 issues (1 high: the dawn's intended white-out), an onset-locked z of 8.4, technical
-    quality 0.94.
-- **Since v2 (all in the final):**
-  - every word is checked on the CPU to lie on solid wall, with a clear line of sight, fully on screen;
-  - the house parts arrive from above and below;
-  - verse 2's lamps are amber (no green cast);
-  - the chorus's LET IT GO stands on the hills;
-  - the sun clears the mountains;
-  - dawn breathes before the breakdown;
-  - C02 has a light burst;
-  - the gallery's sparkle is fine glitter.
+**Where pass 2 stands (13:05): DONE.**
+- **The final film** is `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
+  - 1920x1080, 30 fps, h264 quality 90, with the song, 258 s.
+  - Rendered from `82f8edba`, with a contact sheet beside it.
+  - The results are in `PASS2-PLAN.md` §12: 17 of 18 BIG CLAPs unmistakable, quarter lock +10.7 to +23.6 dB,
+    a Critic reactivity z of 7.8.
+- **The `[sdf],[liminal]` gate** exits 0.
+- **The coordinator was told** the final render finished at 12:59, so the engineer's render suite could run.
+- **Next, if anyone continues** (small, not yet done):
+  1. The sun rises a little late. Only its halo shows before the white wash, so raise its rise a second
+     earlier: `sdf/sun/node/sunAt` in `film_build2.py`.
+  2. Make C07 unmistakable (it measures z 2.2) with a light burst, as C02 got.
+  3. If wanted, re-render with `tools/liminal/render_pass2.sh final`, using `AVGEN=` the pinned engine.
 
 - **Owner numbering everywhere:** owner bar N = analysis bar N+1. `tools/liminal/pass2_grid.py` is the one grid.
   It writes `tools/liminal/all-you-got.pass2.json` (sections, 18 BIG CLAPs in seconds, events, 274 lyric
@@ -127,9 +118,10 @@ these are the art side's. Newest state first.*
     motion blur off, and sheets in `$S/liminal2/fb-<tag>/`.
   - Then a preview, `tools/liminal/render_pass2.sh preview` with `AVGEN=$S/liminal2/avgen.sh`.
   - Then `pass2_av.py` and the Critic, then iterate.
-- [ ] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4` at 1920x1080 with
-  `--particle-warmup 120`.
-- [ ] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0; the REPORT-pass2 text.
+- [x] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`, 1920x1080 at 30
+  fps, with the song.
+- [x] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0 (41,767 assertions in 85
+  cases). The report's text goes to the coordinator in the hand-back.
 
 ## RESUME HERE (Phase B: building and rendering the video, 2026-09-30 night)
 
