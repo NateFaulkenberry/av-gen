@@ -74,9 +74,18 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
 - [x] Also on the way: every chapter path carried straight on past its end (the gaze no longer reaches the closing
   segment), "let it go" darker (value 0.74) with a slower look back, the sun centred in the final doorway, the grow
   room's gold no longer clipping. The clearance test walks each chapter only as far as the walk goes; it passes.
-- [ ] **Final render** (`95d23ae0`, from about 00:04): `~/Desktop/av-gen-review/24-liminal-space/all-you-got-final.mp4`;
-  script `scratchpad/liminal/full-final.sh`. Then temporal + Critic on it, `[sdf],[liminal]` under the lock, and the
-  report text in the hand-back (the harness refuses report files from this agent).
+- [x] Final render v5 (`95d23ae0`, kept as `all-you-got-v5.mp4`): the Critic's wobble 38 -> 23 (the rest at the chapter
+  swaps; jerk elsewhere 28-125 against 200-550 before), motion 0.52 -> 0.67, lighting 0.83, technical quality 0.69;
+  "let it go" 15.1 % below its neighbours (passes). One new major snap at 198.8 s: the fill's light ramped in one beat.
+- [x] **FINAL** (`60594dfa`): the fill's light over two beats. `~/Desktop/av-gen-review/24-liminal-space/all-you-got-final.mp4`,
+  1920x1080, 30 fps, h264 q90 + AAC, 253.8 s (12.5 min to render at 10.1 fps).
+  - temporal: 4 snaps, all minor (the chapter swaps); 0 flicker; colour 3 minor; "let it go" 15.1 %, the break 25.8 %;
+    one major left, `breakdown-contrast` on Verse 1, a false positive: the rule matches "let it go" in the section's
+    name (a lyric), and verse 1 is not a breakdown.
+  - `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"`: exit 0, 41,725 assertions in 82 cases.
+    No engine code changed, so the full suites were not required.
+  - Analyzer outputs and contact sheets: `~/Desktop/av-gen-review/24-liminal-space/analysis/renders/`.
+- [ ] The report: its full text goes to the coordinator in the hand-back (the harness refuses report files here).
 
 ### How to analyse a render
 
