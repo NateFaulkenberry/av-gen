@@ -27,3 +27,17 @@ the beat grid's smooth `.wave` outputs (ADR-1045), so breathing is as seek-exact
 - The breath does not move the journey's distance, so swaps stay where they are, and the journey's collision
   guard does not see it: keep `forward` to a few centimetres to a few decimetres near walls.
 - Every scene gains seven idle parameters under `camera/`.
+
+## Amendment (2026-10-01): at rest it touches nothing
+
+The first version rebuilt the aim as `position + normalize(target - position) * distance` whenever `amount` was
+non-zero, which is its default. That round trip is not exact in floating point. Every frame with the default
+breath therefore moved `camera.target` by an ulp, and the render suite's exact camera check failed
+(`test_resource_lifetime_gpu.cpp:242`). Now:
+- nothing at all is applied when every offset is 0 or the amount is 0;
+- a translation moves the aim by the same delta;
+- the aim is rebuilt only when yaw or pitch turn it.
+
+Frames of the art agent's film are byte-identical where breathing is off (1, 60, 200 s). At 5 s, where it is
+active, 4,112 pixels of 518,400 changed: all but 10 by under 8 of 255, plus two star-dot pixels. That is the
+removed drift. Test: `Camera breath at rest leaves the camera bit-identical`.

@@ -85,6 +85,28 @@ TEST_CASE("Camera breath moves along the view, turns the aim without roll, and w
     }
 }
 
+TEST_CASE("Camera breath at rest leaves the camera bit-identical", "[camera][breath][adr1048]") {
+    // The default parameters (amount 1, every offset 0) must not touch the camera at all: a
+    // renormalised aim drifts by an ulp, which broke an exact camera check in the render suite.
+    const glm::vec3 eye(0.37f, 1.613f, 2.91f);
+    const glm::vec3 aim(-0.731f, 1.29f, -4.117f);
+    glm::vec3 p = eye;
+    glm::vec3 t = aim;
+    float fov = 47.3f;
+    scene::applyCameraBreath(scene::CameraBreath{}, p, t, fov);
+    CHECK(p == eye);
+    CHECK(t == aim);
+    CHECK(fov == 47.3f);
+    // Amount 0 with offsets set is also untouched.
+    scene::CameraBreath b;
+    b.amount = 0.0f;
+    b.forward = 0.1f;
+    b.yaw = 3.0f;
+    scene::applyCameraBreath(b, p, t, fov);
+    CHECK(p == eye);
+    CHECK(t == aim);
+}
+
 TEST_CASE("Camera breath is a set of parameters a beat-grid route drives, in the engine's frame",
           "[camera][breath][adr1048][beatgrid]") {
     app::Engine engine(app::EngineMode::Offline);

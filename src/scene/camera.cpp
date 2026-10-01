@@ -269,7 +269,12 @@ glm::vec3 cameraShakeOffset(const CameraShake& shake, double seconds) {
 
 void applyCameraBreath(const CameraBreath& breath, glm::vec3& position, glm::vec3& target, float& fovDegrees) {
     const float a = breath.amount;
-    if (a == 0.0f) {
+    // Nothing to apply means nothing touched: the camera must be bit-identical to a scene without
+    // breathing (ADR-1048). Rebuilding the target as `position + normalize(target - position) * distance`
+    // is not exact in floating point, so it is done only when the aim actually turns.
+    const bool moves = breath.forward != 0.0f || breath.lift != 0.0f || breath.side != 0.0f;
+    const bool turns = breath.yaw != 0.0f || breath.pitch != 0.0f;
+    if (a == 0.0f || (!moves && !turns && breath.fov == 0.0f)) {
         return;
     }
     glm::vec3 forward = target - position;
@@ -284,30 +289,38 @@ void applyCameraBreath(const CameraBreath& breath, glm::vec3& position, glm::vec
         right = glm::vec3(1.0f, 0.0f, 0.0f);
     }
     right = glm::normalize(right);
-    const glm::vec3 up = glm::normalize(glm::cross(right, forward));
-    position += forward * (breath.forward * a) + worldUp * (breath.lift * a) + right * (breath.side * a);
-    // Yaw about world up, then pitch about the (yawed) horizontal right: no roll is ever introduced.
-    constexpr float kDegToRad = 0.01745329252f;
-    const float yaw = breath.yaw * a * kDegToRad;
-    const float pitch = breath.pitch * a * kDegToRad;
-    glm::vec3 dir = forward;
-    if (yaw != 0.0f) {
-        const float c = std::cos(yaw);
-        const float s = std::sin(yaw);
-        // Rotation about +Y by `yaw` (counter-clockwise seen from above = a turn to the left).
-        dir = glm::vec3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z);
+    if (moves) {
+        // The aim travels with the body by the same delta, so a pure translation leaves the view
+        // direction exactly as it was.
+        const glm::vec3 delta = forward * (breath.forward * a) + worldUp * (breath.lift * a) + right * (breath.side * a);
+        position += delta;
+        target += delta;
     }
-    if (pitch != 0.0f) {
-        glm::vec3 r = glm::cross(dir, worldUp);
-        if (glm::length(r) > 1e-4f) {
-            r = glm::normalize(r);
-            const glm::vec3 u = glm::cross(r, dir);
-            dir = glm::normalize(dir * std::cos(pitch) + u * std::sin(pitch));
+    if (turns) {
+        // Yaw about world up, then pitch about the (yawed) horizontal right: no roll is ever introduced.
+        constexpr float kDegToRad = 0.01745329252f;
+        const float yaw = breath.yaw * a * kDegToRad;
+        const float pitch = breath.pitch * a * kDegToRad;
+        glm::vec3 dir = forward;
+        if (yaw != 0.0f) {
+            const float c = std::cos(yaw);
+            const float s = std::sin(yaw);
+            // Rotation about +Y by `yaw` (counter-clockwise seen from above = a turn to the left).
+            dir = glm::vec3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z);
         }
+        if (pitch != 0.0f) {
+            glm::vec3 r = glm::cross(dir, worldUp);
+            if (glm::length(r) > 1e-4f) {
+                r = glm::normalize(r);
+                const glm::vec3 u = glm::cross(r, dir);
+                dir = glm::normalize(dir * std::cos(pitch) + u * std::sin(pitch));
+            }
+        }
+        target = position + dir * distance;
     }
-    static_cast<void>(up);
-    target = position + dir * distance;
-    fovDegrees = std::clamp(fovDegrees + breath.fov * a, 1.0f, 170.0f);
+    if (breath.fov != 0.0f) {
+        fovDegrees = std::clamp(fovDegrees + breath.fov * a, 1.0f, 170.0f);
+    }
 }
 
 void applyCameraShake(const CameraShake& shake, double seconds, glm::vec3& position,
