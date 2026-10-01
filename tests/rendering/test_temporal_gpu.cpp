@@ -466,3 +466,40 @@ TEST_CASE("the ring costs what ADR-410 says it costs", "[gpu][temporal][memory]"
     CHECK_FALSE(history.active());
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- ADR-1049: the data mosh and channel shift ---------------------------------------------------
+
+namespace {
+scene::Scene withMosh(scene::Scene s, float amount, float shift) {
+    s.temporal.mosh.enabled = true;
+    s.temporal.mosh.frames = 6;
+    s.temporal.mosh.amount = amount;
+    s.temporal.mosh.shift = shift;
+    s.temporal.mosh.block = 160.0f; // 24 px blocks at 160 lines
+    s.temporal.mosh.smear = 60.0f;
+    return s;
+}
+} // namespace
+
+TEST_CASE("the mosh at zero is the frame without it, and turned up corrupts it deterministically",
+          "[gpu][temporal][adr1049]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const scene::Scene plain = movingLight();
+    const Shot off = play(*ctx, shaders, plain, 10);
+    // Enabled with nothing to do: the ring is kept warm and the picture is untouched.
+    const Shot idle = play(*ctx, shaders, withMosh(plain, 0.0f, 0.0f), 10);
+    CHECK_IDENTICAL(off.image, idle.image);
+    CHECK(idle.stats.framesNeeded == 6u);
+    // Every block corrupted: the frame comes from the past, so the mover is somewhere else.
+    const Shot full = play(*ctx, shaders, withMosh(plain, 1.0f, 0.0f), 10);
+    CHECK_DIFFERS(off.image, full.image);
+    // A channel shift alone also changes the picture.
+    const Shot shifted = play(*ctx, shaders, withMosh(plain, 0.0f, 6.0f), 10);
+    CHECK_DIFFERS(off.image, shifted.image);
+    // And the same frames from a fresh renderer are the same corruption (a function of ring and clock).
+    const Shot again = play(*ctx, shaders, withMosh(plain, 0.5f, 3.0f), 10);
+    const Shot twice = play(*ctx, shaders, withMosh(plain, 0.5f, 3.0f), 10);
+    CHECK_IDENTICAL(again.image, twice.image);
+    CHECK(ctx->errorCount() == 0);
+}

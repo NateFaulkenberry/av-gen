@@ -17,7 +17,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 3 | luminous line-drawn edges (pixel width, shape, per-surface colour) | **done** | 1047 | `[adr1047]` (1 CPU, 1 GPU) |
 | 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
 | 5 | object animation on beat sources | | | |
-| 6 | simulation-corruption effect | | | |
+| 6 | simulation corruption: data mosh + channel shift (temporal `mosh`) | **done** | 1049 | `[adr1049]` (GPU) |
 | 7 | spectrum-sweep transition | | | |
 | - | tint on moving figures (pass 1 gap 2) | if cheap | | |
 
@@ -152,6 +152,21 @@ On every SDF object (`sdf/<object>/...`, also in the scene file's `look` and `su
   pulse on the beat.
 - In JSON: `"look": {"edgeIntensity": 5, "edgePixels": 2, "edgeSoftness": 0.1}` and
   `"surfaces": [{"color": [...], "emission": [...], "edge": [1, 0.2, 0.8]}]`.
+
+#### 6. Corruption: data mosh and channel shift (ADR-1049)
+
+Project parameters (keyable, routable):
+
+- `temporal/mosh/enabled`: true for the whole film (cheap while idle; it keeps the history ring warm).
+- `temporal/mosh/amount` 0..1: the share of blocks replaced by the same block from up to `frames` frames ago,
+  dragged `smear` px. **Drive it from an event channel**: `{"source": "grid.song.glitch1", "target":
+  "temporal/mosh/amount", "amount": 0.6}`.
+- `temporal/mosh/shift`: px the red and blue channels split (twice that inside corrupted blocks). Route a
+  channel into it for a colour-corruption hit.
+- `temporal/mosh/block` (px at 1080 lines, 32), `smear` (px, 24), `frames` (1-32, 8), `rate` (re-picks per
+  second, 12; 0 = frozen pattern), `seed` (key a new value for a different pattern).
+- Byte-identical to no effect while amount and shift are 0. Scrub-safe once `frames` frames have played
+  after a seek (the history ring's warm-up).
 
 #### 4. Camera breathing (ADR-1048)
 

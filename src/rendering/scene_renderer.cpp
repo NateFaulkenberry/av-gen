@@ -4385,6 +4385,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // The frame index, not the render time: `beginFrame` distinguishes a repeat from a jump by
         // comparing indices, and a float second cannot be compared for equality to do that.
         temporalIn.frameIndex = time.frameIndex;
+        temporalIn.renderTime = time.renderTime;
         temporalIn.settings = &scene.temporal;
         temporalIn.resolutionScale = qualitySettings_.temporalHistoryScale;
         temporalIn.hdrFormat = kHdrFormat;

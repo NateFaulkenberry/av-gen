@@ -111,6 +111,7 @@ Report checkTemporal(const TemporalSettings& settings) {
     {
         TemporalSettings all = settings;
         all.echo.enabled = true;
+        all.mosh.enabled = true;
         const auto bounds = declaredBounds(all);
         for (auto& f : checkBounds(bounds).findings) {
             r.findings.push_back(std::move(f));

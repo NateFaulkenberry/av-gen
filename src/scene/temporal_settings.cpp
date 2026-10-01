@@ -54,6 +54,8 @@ std::uint32_t temporalEffectHistoryFrames(TemporalEffectKind kind, const Tempora
     switch (kind) {
     case TemporalEffectKind::FrameEcho:
         return s.echo.enabled ? static_cast<std::uint32_t>(clampFrames(s.echo.frames)) : 0u;
+    case TemporalEffectKind::Mosh:
+        return s.mosh.enabled ? static_cast<std::uint32_t>(clampFrames(s.mosh.frames)) : 0u;
     case TemporalEffectKind::Count: break;
     }
     return 0u;
@@ -62,6 +64,7 @@ std::uint32_t temporalEffectHistoryFrames(TemporalEffectKind kind, const Tempora
 bool temporalEffectEnabled(TemporalEffectKind kind, const TemporalSettings& s) {
     switch (kind) {
     case TemporalEffectKind::FrameEcho: return s.echo.enabled;
+    case TemporalEffectKind::Mosh: return s.mosh.enabled;
     case TemporalEffectKind::Count: break;
     }
     return false;
@@ -95,6 +98,18 @@ TemporalParameters registerTemporalParameters(params::ParameterSet& params, cons
                                  1.0f, static_cast<float>(kMaxFrames), 1.0f, 16.0f));
     p.echoStrength = &params.add(f((echo + "strength").c_str(), defaults.echo.strength, 0.0f, 1.0f, 0.0f, 1.0f));
     p.echoDecay = &params.add(f((echo + "decay").c_str(), defaults.echo.decay, 0.0f, 0.99f, 0.0f, 0.95f));
+    // ADR-1049
+    const std::string mosh = temporalParameterPrefix(TemporalEffectKind::Mosh);
+    const MoshSettings& m = defaults.mosh;
+    p.moshEnabled = &params.add(b((mosh + "enabled").c_str(), m.enabled));
+    p.moshFrames = &params.add(f((mosh + "frames").c_str(), static_cast<float>(clampFrames(m.frames)), 1.0f,
+                                 static_cast<float>(kMaxFrames), 1.0f, 16.0f));
+    p.moshAmount = &params.add(f((mosh + "amount").c_str(), m.amount, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.moshBlock = &params.add(f((mosh + "block").c_str(), m.block, 2.0f, 512.0f, 8.0f, 128.0f));
+    p.moshSmear = &params.add(f((mosh + "smear").c_str(), m.smear, 0.0f, 1000.0f, 0.0f, 200.0f));
+    p.moshShift = &params.add(f((mosh + "shift").c_str(), m.shift, 0.0f, 200.0f, 0.0f, 40.0f));
+    p.moshRate = &params.add(f((mosh + "rate").c_str(), m.rate, 0.0f, 120.0f, 0.0f, 30.0f));
+    p.moshSeed = &params.add(f((mosh + "seed").c_str(), m.seed, -1.0e6f, 1.0e6f, 0.0f, 100.0f));
     return p;
 }
 
@@ -105,6 +120,15 @@ void applyTemporalParameters(const TemporalParameters& p, TemporalSettings& sett
     }
     if (p.echoStrength != nullptr) settings.echo.strength = p.echoStrength->value();
     if (p.echoDecay != nullptr) settings.echo.decay = p.echoDecay->value();
+    MoshSettings& m = settings.mosh;
+    if (p.moshEnabled != nullptr) m.enabled = p.moshEnabled->value();
+    if (p.moshFrames != nullptr) m.frames = clampFrames(static_cast<int>(std::lround(p.moshFrames->value())));
+    if (p.moshAmount != nullptr) m.amount = p.moshAmount->value();
+    if (p.moshBlock != nullptr) m.block = p.moshBlock->value();
+    if (p.moshSmear != nullptr) m.smear = p.moshSmear->value();
+    if (p.moshShift != nullptr) m.shift = p.moshShift->value();
+    if (p.moshRate != nullptr) m.rate = p.moshRate->value();
+    if (p.moshSeed != nullptr) m.seed = p.moshSeed->value();
 }
 
 nlohmann::json temporalToJson(const TemporalSettings& s) {
@@ -118,6 +142,10 @@ nlohmann::json temporalToJson(const TemporalSettings& s) {
     echo["strength"] = s.echo.strength;
     echo["decay"] = s.echo.decay;
     j["echo"] = std::move(echo);
+    const MoshSettings& m = s.mosh;
+    j["mosh"] = nlohmann::json{{"enabled", m.enabled}, {"frames", clampFrames(m.frames)}, {"amount", m.amount},
+                               {"block", m.block},     {"smear", m.smear},                {"shift", m.shift},
+                               {"rate", m.rate},       {"seed", m.seed}};
     return j;
 }
 
@@ -141,6 +169,26 @@ Result<TemporalSettings> temporalFromJson(const nlohmann::json& j) {
         if (const auto v = e.find("decay"); v != e.end() && v->is_number()) {
             s.echo.decay = std::clamp(v->get<float>(), 0.0f, 0.99f);
         }
+    }
+    if (const auto it = j.find("mosh"); it != j.end()) { // ADR-1049
+        if (!it->is_object()) {
+            return fail("temporal.mosh: expected an object");
+        }
+        const auto& e = *it;
+        MoshSettings& m = s.mosh;
+        if (const auto v = e.find("enabled"); v != e.end() && v->is_boolean()) m.enabled = v->get<bool>();
+        if (const auto v = e.find("frames"); v != e.end() && v->is_number()) m.frames = clampFrames(v->get<int>());
+        const auto num = [&](const char* key, float& out, float lo, float hi) {
+            if (const auto v = e.find(key); v != e.end() && v->is_number()) {
+                out = std::clamp(v->get<float>(), lo, hi);
+            }
+        };
+        num("amount", m.amount, 0.0f, 1.0f);
+        num("block", m.block, 2.0f, 512.0f);
+        num("smear", m.smear, 0.0f, 1000.0f);
+        num("shift", m.shift, 0.0f, 200.0f);
+        num("rate", m.rate, 0.0f, 120.0f);
+        num("seed", m.seed, -1.0e6f, 1.0e6f);
     }
     return s;
 }
