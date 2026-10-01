@@ -139,7 +139,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             }
             ImGui::SameLine();
             {
-                static const char* sizes[] = {"Automatic size", "1920 x 1080", "1280 x 720", "960 x 540"};
+                static const char* sizes[] = {"Auto size", "1920 x 1080", "1280 x 720", "960 x 540"};
                 static const std::uint32_t widths[] = {0, 1920, 1280, 960};
                 static const std::uint32_t heights[] = {0, 1080, 720, 540};
                 int size = 0;

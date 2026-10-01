@@ -136,8 +136,8 @@ Things to know:
   runs, the canvas shows the film's camera, not a free editor view, so the two always match.
 - The picture is the canvas's size. For a picture that exactly fills a 16:9 projector, switch the canvas to
   **Output Frame** mode in the canvas toolbar: it then renders at the project's 16:9 output shape.
-- The projection costs about **FRAME_COST** a frame (measured on this Mac, see ADR-1026), because it copies the
-  frame that is already rendered.
+- The projection costs almost nothing: it copies the frame that is already rendered. On this Mac it measured
+  0.07 ms of CPU a frame, and no measurable change in frame rate (ADR-1026).
 - Changing a choice while the projection runs reopens the window with the new choice.
 - From the command line, `--start-projection` presses the button once the editor is up. The older
   `--output <display>[:fullscreen|:WxH]` flag still opens a plain output window, which is saved in the project.

@@ -32,7 +32,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | second brief PARTS 9-14 (integration, live MIDI, live audio, sync, UI, demo plumbing) | done (2026-09-30), ADR-1025 | see "Live input" below; the owner's hands-on test is `LIVE-QUICKSTART.md` |
 | second brief PARTS 15-16 (live demo art, live art direction) | done (art agent, 2026-09-30) | see "Live art (PARTS 15-16)" below; `tools/sonic_live_project.py` writes the live tuning; review media in `23-sonic-garden/live-art/` |
 | second brief PART 22 (the hardware test) | the owner's | `LIVE-QUICKSTART.md` |
-| projection (owner's request, 2026-10-01) | IN PROGRESS (engineering agent), ADR-1026 | see "Projection" below; Start projection at the top of the Live panel |
+| projection (owner's request, 2026-10-01) | done (engineering agent), ADR-1026 | see "Projection" below; Start projection at the top of the Live panel |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
 
@@ -762,13 +762,19 @@ workspace there ... a clean window to send to a projector".
 
 ### Resume here (projection)
 
-- Committed on `proto/sonic-garden`: `cc74ccb3` (the implementation and `tests/unit/test_projection.cpp`).
-- Uncommitted when this was written: the Automatic window size (half the display on the primary), ADR-1026,
-  the quickstart's "Projecting to a second screen", this section.
-- Next: the manual check in the real app (screenshots into `~/Desktop/av-gen-review/23-sonic-garden/projection/`),
-  the frame cost (A/B of `--example "Sonic Live" --frames 1200 --profile-cpu` with and without
-  `--start-projection`), then both full suites under the lock.
-- This Mac has one display (the built-in Retina), so the window is tested windowed on it.
+- Committed on `proto/sonic-garden`: the implementation, `tests/unit/test_projection.cpp` (`[projection]`, 8 cases),
+  ADR-1026 (indexed), the quickstart's "Projecting to a second screen", and this section.
+- The manual check is done (one display on this Mac, so windowed on it). The media are in
+  `~/Desktop/av-gen-review/23-sonic-garden/projection/`:
+  - 01 is the editor window;
+  - 02 is the projection window (Fit letterbox, no UI);
+  - 03 and 04 are the Live panel before and during projection.
+  - The window captures use `screencapture -l<window id>`, with the ids found by the app's pid. A full-screen
+    capture photographs the owner's desktop: don't take one.
+- Frame cost: within noise (see ADR-1026, "Measured").
+- Remaining: both full suites under the lock (the results are recorded below once run).
+- Not tested on hardware: a real second display, fullscreen on it, unplugging. The unplug path is covered by the
+  unit test only.
 
 ### What was built
 

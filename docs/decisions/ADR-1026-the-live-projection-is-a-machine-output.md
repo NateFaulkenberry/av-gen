@@ -71,7 +71,24 @@ What was missing was a one-press path from the Live panel, and per-machine choic
 
 ## Measured
 
-FRAME_COST_SECTION
+The real app on this Mac (M2 Max, one display), the Sonic Live demo with no input (the waiting world), 1200 frames
+per arm, interleaved off/on/off/on in one GPU-lock hold. The canvas is 1684x1326 px. The projection is windowed at
+1728x1116 px with Fit (letterbox).
+
+| arm | 1200 frames, wall | gpu.frame p50 | gpu.acquire WAIT mean | outputs+share p50 / p99 |
+|---|---|---|---|---|
+| off 1 | 30.7 s | 23.8 ms | 24.8 ms | 0.001 / 0.005 ms |
+| on 1 | 28.1 s | 22.6 ms | 22.2 ms | 0.071 / 4.6 ms |
+| off 2 | 29.5 s | 22.7 ms | 23.7 ms | 0.001 / 0.004 ms |
+| on 2 | 28.3 s | 22.5 ms | 22.3 ms | 0.071 / 4.4 ms |
+
+- The frame is GPU-bound (about 23 ms, about 40 fps). The second window's cost is below this run's noise: the "on"
+  arms were not slower.
+- The CPU cost is 0.07 ms a frame at the median. The 4.5 ms p99 is the second swapchain's acquire occasionally
+  waiting.
+- The mapper's draw is one full-screen triangle sampling an already-rendered texture. `gpu.frame` times only the
+  scene renderer's timeline, so that draw is not in that column. The wall times are what include it.
+- A fullscreen 4K projector would make that draw about 4x larger in pixels. It is still a copy, not a render.
 
 ## Consequences
 
