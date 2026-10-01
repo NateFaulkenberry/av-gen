@@ -82,7 +82,7 @@ def row():
     x size grows a lot at a time)."""
     lots = T([HERO_X, 0, NEAR_C], K.repeat([LOT, 0, 0], LOTS, house_module()))
     sides = T([0, 0, ROAD_Z], K.mirror([0, 0, 1], lots))
-    clip = T([HERO_X, 4.0, ROAD_Z], box([0.0, 8.0, 30.0], name="rowClip"))
+    clip = T([HERO_X, 4.0, ROAD_Z], box([0.0, 0.0, 0.0], name="rowClip"))
     hero_lot = X(((HERO_X - 6.4, HERO_X + 6.4), (-1.0, 12.0), (-9.0, 4.0)))
     return K.D(K.I(sides, clip), hero_lot)
 
@@ -101,7 +101,7 @@ def lamps():
     pole = U(S(X(((-0.07, 0.07), (0.0, 4.6), (-0.07, 0.07))), FILL), S(X(((-0.05, 0.05), (4.5, 4.6), (-1.2, 0.0))), FILL),
              S(X(((-0.22, 0.22), (4.3, 4.5), (-1.45, -0.95))), GLOW))
     lamp_row = T([HERO_X + LOT / 2, 0, ROAD_Z], K.mirror([0, 0, 1], T([0, 0, 3.9], K.repeat([LOT, 0, 0], LOTS, pole))))
-    lamp_row = K.I(lamp_row, T([HERO_X, 3.0, ROAD_Z], box([0.0, 6.0, 30.0], name="lampClip")))
+    lamp_row = K.I(lamp_row, T([HERO_X, 3.0, ROAD_Z], box([0.0, 0.0, 0.0], name="lampClip")))
     tree = {"kind": "scale", "scale": 1.0, "name": "treeGrow", "children": [K.round_tree(4.2)]}
     tree_row = T([HERO_X + LOT / 2 - 3.6, 0, ROAD_Z], K.mirror([0, 0, 1], T([0, 0, 6.4], K.repeat([LOT, 0, 0], LOTS, tree))))
     return U(lamp_row, tree_row)

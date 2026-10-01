@@ -70,7 +70,7 @@ def build(b):
 
     # ---- 1.1-2.3: the neighbours land, a pair of lots a beat -----------------------------------------------------
     lands = [t(1, 1), t(1, 2), t(1, 3), t(1, 4), t(2, 1), t(2, 2), t(2, 3)]
-    clip = [(0.0, [0.0, 8.0, 30.0], "step")]
+    clip = [(0.0, [0.0, 0.0, 0.0], "step")]      # closed: a point in the road (a zero-width box still cuts a plane)
     fall = [(0.0, [IN.LOT, 60.0, 0.0], "step")]
     for k, tl in enumerate(lands, start=1):
         x = IN.LOT * k
@@ -116,7 +116,7 @@ def build(b):
             (t(4, 4) - 0.001, [0.0, 0.0, 180.0], "easeOut"), (t(4, 4) + 0.12, [0.0, 0.0, 360.0], "step")]
 
     # ---- 5-8: the lamps on the eighths, alternating sides ---------------------------------------------------------
-    lamp = [(0.0, [0.0, 6.0, 30.0], "step")]
+    lamp = [(0.0, [0.0, 0.0, 0.0], "step")]
     for i in range(14):
         lamp.append((t(5, 1 + i * 0.5), [IN.LOT * (i // 2 + 1) - 2.0 + (i % 2) * 6.5, 6.0, 30.0], "step"))
     lamp.append((t(9), [IN.LOT * IN.LOTS + 8.0, 6.0, 30.0], "step"))
@@ -132,7 +132,7 @@ def build(b):
     b.pulse("sdf/street/look/edge/intensity", 2.0, "quarter", b.gate("iQuarter", t(1), t(16, 4)))
 
     # ---- 9-12: the hero house rises, then its parts fly in, faster each bar; the neighbours mutate --------------
-    rise = [(0.0, [6.0, 0.0, 6.0], "step")]
+    rise = [(0.0, [0.0, 0.0, 0.0], "step")]
     for i in range(4):
         tb = t(9, 1 + i)
         rise += [(tb - 0.001, [6.0, 1.45 * i, 6.0], "easeOut"), (tb + 0.14, [6.0, 1.45 * (i + 1), 6.0], "step")]
