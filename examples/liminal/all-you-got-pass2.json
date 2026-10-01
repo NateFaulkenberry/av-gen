@@ -4970,6 +4970,58 @@
    "depthMax": 1.0
   },
   {
+   "source": "grid.song.eighth",
+   "target": "sdf/livClutter/look/edge/intensity",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV2",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/kitClutter/look/edge/intensity",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV2",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/bedClutter/look/edge/intensity",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV2",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/stuClutter/look/edge/intensity",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gV2",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
    "source": "grid.song.c09",
    "target": "temporal/mosh/amount",
    "amount": 0.75,
@@ -40208,6 +40260,102 @@
     ]
    },
    {
+    "target": "sdf/livClutter/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/kitClutter/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/bedClutter/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/stuClutter/look/edge/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 258.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "sdf/stuFurn/node/stuGlobe/rotation",
     "component": -1,
     "timeBase": "seconds",
@@ -41220,6 +41368,315 @@
      },
      {
       "time": 160.60349,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/treeTrunk/node/trunkTop/size",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       3.0,
+       3.0,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 145.87056,
+      "value": [
+       3.0,
+       3.0,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 146.27156,
+      "value": [
+       3.0,
+       6.4,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 146.97148,
+      "value": [
+       3.0,
+       6.4,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 147.37248,
+      "value": [
+       3.0,
+       8.55,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 148.07239,
+      "value": [
+       3.0,
+       8.55,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 148.47339,
+      "value": [
+       3.0,
+       10.7,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 149.17331,
+      "value": [
+       3.0,
+       10.7,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 149.57431,
+      "value": [
+       3.0,
+       12.85,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 150.27423,
+      "value": [
+       3.0,
+       12.85,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 150.67523,
+      "value": [
+       3.0,
+       15.0,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 151.37515,
+      "value": [
+       3.0,
+       15.0,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 151.77615,
+      "value": [
+       3.0,
+       17.15,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 152.47606,
+      "value": [
+       3.0,
+       17.15,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 152.87706,
+      "value": [
+       3.0,
+       19.299999999999997,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 153.57698,
+      "value": [
+       3.0,
+       19.299999999999997,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 153.97798,
+      "value": [
+       3.0,
+       21.45,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 154.6779,
+      "value": [
+       3.0,
+       21.45,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 155.0789,
+      "value": [
+       3.0,
+       23.599999999999998,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 155.77882,
+      "value": [
+       3.0,
+       23.599999999999998,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 156.17982,
+      "value": [
+       3.0,
+       25.749999999999996,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 156.87973,
+      "value": [
+       3.0,
+       25.749999999999996,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 157.28073,
+      "value": [
+       3.0,
+       27.9,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 157.98065,
+      "value": [
+       3.0,
+       27.9,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 158.38165,
+      "value": [
+       3.0,
+       30.049999999999997,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 159.08157,
+      "value": [
+       3.0,
+       30.049999999999997,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 159.48257,
+      "value": [
+       3.0,
+       32.199999999999996,
+       3.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 160.18249,
+      "value": [
+       3.0,
+       32.199999999999996,
+       3.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 160.58349,
+      "value": [
+       3.0,
+       34.35,
+       3.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "sdf/treeTrunk/node/canopy/scale",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 156.32928,
+      "value": [
+       0.0
+      ],
+      "interp": "easeOut"
+     },
+     {
+      "time": 158.53211,
+      "value": [
+       1.15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 159.63303,
       "value": [
        1.0
       ],
@@ -58047,6 +58504,170 @@
    {
     "role": "glass",
     "target": "sdf/bedDisco/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/livClutter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livClutter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livClutter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livClutter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livClutter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livClutter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livClutter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livClutter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livClutter/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/bedClutter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedClutter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedClutter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedClutter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bedClutter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bedClutter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bedClutter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bedClutter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bedClutter/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/kitClutter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitClutter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitClutter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitClutter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitClutter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitClutter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitClutter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitClutter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitClutter/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/stuClutter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuClutter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuClutter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuClutter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/stuClutter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/stuClutter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/stuClutter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/stuClutter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/stuClutter/surface/7/emission",
     "mode": "multiply"
    },
    {

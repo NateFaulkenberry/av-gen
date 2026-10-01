@@ -294,3 +294,24 @@ def gallery():
     return {"interior": ext, "objects": objs,
             "lights": [("galKey", (0.0, 2.9, 0.0), "lamp")],
             "anchors": dict(anchors, man=(0.0, 1.0, 0.0), centre=(0.0, 1.2, 0.0))}
+
+
+
+def clutter():
+    """Verse 2's density: the same home, stranger. Per room, an object shown only in verse 2 (each about 40-70
+    nodes): chairs stacked on the coffee table and boxes by the door (living room); boxes and a chair on the bed
+    (bedroom); chairs upturned on the table and a tower of plates (kitchen); a tower of books on the desk (study)."""
+    def stacked_chairs(n=3):
+        return U(*[place(K.chair(), (0.02 * i, 0.47 * i, 0.0), 180.0 * (i % 2) + 9 * i) for i in range(n)])
+    liv = U(place(stacked_chairs(3), (-0.95, 0.42, -0.1), 15.0),
+            place(K.boxes(), (1.1, 0.0, -1.75), 20.0),
+            place(K.boxes(), (2.0, 0.0, 1.6), -35.0))
+    bed = U(place(K.boxes(), (-0.6, 0.55, -0.6), 12.0),
+            place(R([180, 0, 0], K.chair()), (0.3, 1.47, -0.2), 30.0))
+    kit = U(place(R([180, 0, 0], K.chair()), (-0.25, 1.68, 0.45), 8.0),
+            place(R([180, 0, 0], K.chair()), (0.3, 1.68, 0.45), -14.0),
+            T([0.35, 0.75, 0.75], K.repeat([0, 0.05, 0], 6, K.cyl(0.13, 0.016))),
+            place(K.boxes(), (1.6, 0.0, 1.2), 25.0))
+    stu = U(*[place(K.stack_of_books(), (0.6 - 0.02 * i, 0.75 + 0.11 * i, -1.4), 23.0 * i) for i in range(6)])
+    return {"livClutter": (liv, (-2.7, -0.05, -2.3), (2.7, 2.6, 2.3)), "bedClutter": (bed, (-2.0, -0.05, -1.8), (2.0, 2.6, 1.8)),
+            "kitClutter": (kit, (-2.2, -0.05, -1.8), (2.2, 2.6, 1.8)), "stuClutter": (stu, (-1.8, -0.05, -1.7), (1.8, 2.6, 1.7))}

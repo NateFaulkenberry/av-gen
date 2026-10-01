@@ -88,6 +88,8 @@ def build_part2(b, end):
                          "lights": []})
     b.world("discoBed", {"objects": [("bedDisco", disco_floor(bed["interior"], 0.6), "furn", (-2.1, -0.05, -1.9), (2.1, 0.1, 1.9))],
                          "lights": []})
+    for cname, (tree_c, lo, hi) in RM.clutter().items():
+        b.world(cname, {"objects": [(cname, tree_c, "furn2", lo, hi)], "lights": []})
     hill_man = {"objects": [("hillMan", K.place(K.mannequin("stand", name="hillMan"), (0.0, OD.ground(0.0, -18.0), -18.0), 180.0),
                              "figure", (-1, -5, -19.5), (1, 2.5, -16.5), far)], "lights": []}
     b.world("hillman", hill_man)
@@ -207,12 +209,13 @@ def build_part2(b, end):
           ("v2h", "liv", t(63, 4), t(67), [[-0.2, 1.5, 1.9], [0.0, 1.45, 1.0], [0.1, 1.4, 0.35]], None)]
     for name, world, t0, t1, eye, look in v2:
         if name == "v2h":
-            b.shot(name, t0, t1, eye, None, keys=(world,), extra=["stars"],
+            b.shot(name, t0, t1, eye, None, keys=(world, "livClutter"), extra=["stars"],
                    look_keys=[(t0, (-1.6, 1.0, -1.0)), (t(65, 3), (-1.0, 1.4, -1.4)), (t(66), (0.0, 2.2, -1.2)),
                               (t(66, 3), (0.1, 3.4, -0.4)), (t(67), (0.2, 6.0, 0.0))],
                    fov=[(t0, 60.0), (t(66, 3), 64.0), (t(67), 74.0)])
         else:
-            b.shot(name, t0, t1, eye, look, keys=(world,), fov=62.0, sway=1.6)
+            b.shot(name, t0, t1, eye, look, keys=(world, {"stu": "stuClutter", "liv": "livClutter", "bed": "bedClutter",
+                                                          "kit": "kitClutter"}[world]), fov=62.0, sway=1.6)
     g_v2 = b.gate("gV2", t(49, 4), t(66))
     for o in ("stuShell", "stuFurn", "livShell", "livSofa", "livMedia", "livShelf", "bedShell", "bedFurn", "kitShell",
               "kitCounter", "kitTable"):
@@ -221,6 +224,10 @@ def build_part2(b, end):
     f.track("temporal/mosh/seed", [(t(50) + 0.27 * i, float(i), "step") for i in range(0, 130)])
     g_strain = b.gate("gStrain", t(58), t(66))
     f.route("grid.song.sixteenth", "temporal/mosh/shift", 4.0, depth=g_strain)
+    # the furniture turns by itself, a little faster each phrase: the armchair, the kitchen chairs, the clutter
+    for obj, rate in (("livClutter", 6.0), ("kitClutter", -5.0), ("bedClutter", 4.0), ("stuClutter", -7.0)):
+        f.track(f"sdf/{obj}/look/edge/intensity", hold_keys(0.0, end, 4.0))
+        b.pulse(f"sdf/{obj}/look/edge/intensity", 3.0, "eighth", g_v2)
     # the globe has been spinning; it stops on "and the world stops turning" (113.1 s); C09 restarts it
     f.track("sdf/stuFurn/node/stuGlobe/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (113.1, [0.0, 2600.0, 0.0], "step"),
                                                   (t(51, 4), [0.0, 2600.0, 0.0], "linear"), (t(54), [0.0, 4400.0, 0.0], "linear"),
@@ -341,6 +348,14 @@ def build_part2(b, end):
         obj = next(v for r, v in groups.items() if i in r)
         f.track(f"sdf/{obj}/node/gr{i}/scale", [(0.0, 0.0, "step"), (tb - 0.001, 0.0, "easeOut"), (tb + 0.18, 1.12, "smooth"),
                                                 (tb + 0.42, 1.0, "step")])
+    trunk = [(0.0, [3.0, 3.0, 3.0], "step")]
+    for i, tb in enumerate(blooms):
+        h = 1.2 + OD.TREE_STEP * i + 3.2 + 2.0   # half the box height: the trunk's top 3 m above the newest room
+        trunk.append((tb - 0.001, trunk[-1][1], "easeOut"))
+        trunk.append((tb + 0.4, [3.0, min(h, OD.TRUNK_H + 2.0), 3.0], "step"))
+    f.track("sdf/treeTrunk/node/trunkTop/size", trunk)
+    f.track("sdf/treeTrunk/node/canopy/scale", [(0.0, 0.0, "step"), (t(71) - 0.001, 0.0, "easeOut"), (t(72), 1.15, "smooth"),
+                                               (t(72, 3), 1.0, "step")])
     # the camera spirals up the trunk with the blooms, then pulls out to see the whole tree; then it lands
     spiral = []
     for k in range(0, 9):

@@ -108,11 +108,16 @@ def tree_room_pose(i):
     return (TREE_R * math.cos(a), 1.2 + TREE_STEP * i, -TREE_R * math.sin(a)), TREE_TURN * i
 
 
+TRUNK_H = 1.2 + TREE_STEP * TREE_ROOMS + 2.0
+
+
 def tree_trunk(k=FILL):
-    """The trunk: a tall square column with a band at every storey (8 nodes)."""
-    H = 1.2 + TREE_STEP * TREE_ROOMS + 2.0
-    return U(S(X(((-0.6, 0.6), (-2.0, H), (-0.6, 0.6))), k),
+    """The trunk: a tall square column with a band at every storey, cut off at a named height (`trunkTop`, a box
+    whose size y the generator keys so the trunk grows ahead of the blooms) (10 nodes)."""
+    H = TRUNK_H
+    body = U(S(X(((-0.6, 0.6), (-2.0, H), (-0.6, 0.6))), k),
              S(T([0, 1.2, 0], K.I(K.repeat([0, TREE_STEP, 0], 0, box([0.66, 0.03, 0.66])), box([1, H, 1]))), ACCENT))
+    return K.I(body, T([0, -2.0, 0], box([3.0, H + 2.0, 3.0], name="trunkTop")))
 
 
 def tree_branch_group(indices, k=FILL):
@@ -140,9 +145,10 @@ def sky_furniture(k=K.FILL):
 
 
 def tree_canopy(k=K.GLOW):
-    """Leaves of light at the top of the tree of rooms: a dome of small glowing cubes (about 10 nodes)."""
+    """Leaves of light at the top of the tree of rooms: a dome of small glowing cubes under a named uniform scale
+    (`canopy`, 0 -> 1 as the growth completes) (about 11 nodes)."""
     top = 1.2 + TREE_STEP * TREE_ROOMS + 1.5
-    ring1 = K.T([0, top, 0], K.polar(9, K.T([2.4, 0, 0], K.R([30, 0, 30], K.box([0.28, 0.28, 0.28])))))
-    ring2 = K.T([0, top + 1.6, 0], K.R([0, 20, 0], K.polar(6, K.T([1.4, 0, 0], K.R([10, 0, 45], K.box([0.24, 0.24, 0.24]))))))
-    crown = K.T([0, top + 2.8, 0], K.R([45, 0, 45], K.box([0.35, 0.35, 0.35])))
-    return K.S(K.U(ring1, ring2, crown), k)
+    ring1 = K.T([0, 0, 0], K.polar(9, K.T([2.4, 0, 0], K.R([30, 0, 30], K.box([0.28, 0.28, 0.28])))))
+    ring2 = K.T([0, 1.6, 0], K.R([0, 20, 0], K.polar(6, K.T([1.4, 0, 0], K.R([10, 0, 45], K.box([0.24, 0.24, 0.24]))))))
+    crown = K.T([0, 2.8, 0], K.R([45, 0, 45], K.box([0.35, 0.35, 0.35])))
+    return K.S(K.T([0, top, 0], {"kind": "scale", "scale": 1.0, "name": "canopy", "children": [K.U(ring1, ring2, crown)]}), k)

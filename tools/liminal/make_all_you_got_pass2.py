@@ -217,9 +217,11 @@ def U_(*parts):
     return K.U(*parts)
 
 
-def check_clearance(film, step=0.1, warn=0.18):
+def check_clearance(film, step=0.1, warn=0.08):
     """The eye's distance to every SDF object of its shot (rest geometry, CPU), sampled through each shot: the
-    closest approach per shot, and every shot that comes within `warn` metres of a surface."""
+    closest approach per shot, and every shot that comes within `warn` metres of a surface. A CSG difference is
+    only a bound near its cuts, so passing through a doorway reads about 0.09 m here although the jambs are
+    0.4 m away; below 0.08 m is real."""
     import sdf_eval
     trees = {n["name"]: n["sdf"]["tree"]["root"] for n in film.nodes if n.get("kind") == "sdf"}
     print("clearance (closest approach of the eye to a surface, per shot):")
