@@ -157,7 +157,9 @@ std::size_t OutputManager::openCount() const {
 nlohmann::json OutputManager::toJson() const {
     nlohmann::json arr = nlohmann::json::array();
     for (const auto& o : outputs_) {
-        arr.push_back(o->desc.toJson());
+        if (!o->projection) {
+            arr.push_back(o->desc.toJson());
+        }
     }
     return arr;
 }
@@ -177,9 +179,15 @@ Result<void> OutputManager::fromJson(const nlohmann::json& outputs) {
                 return fail("outputs: duplicate name '{}'", d->name);
             }
         }
+        for (const auto& kept : outputs_) {
+            if (kept->projection && kept->desc.name == d->name) {
+                return fail("outputs: '{}' is the name of this machine's projection", d->name);
+            }
+        }
         descs.push_back(std::move(*d));
     }
-    outputs_.clear(); // closes open windows
+    // The project's outputs are replaced (their windows close); a projection is this machine's and stays.
+    std::erase_if(outputs_, [](const auto& o) { return !o->projection; });
     for (auto& d : descs) {
         auto output = std::make_unique<Output>();
         output->desc = std::move(d);

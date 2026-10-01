@@ -105,6 +105,43 @@ makes all of this faster (below 1x) or calmer (above 1x); 1x is the demo's own l
   - "audio analysis -> frame" is the same for the sound.
   - The timbre cost, and whether any analysis was dropped (it should stay 0).
 
+## Projecting to a second screen
+
+The **Start projection** button at the top of the Live panel puts the picture, with no panels, in a window of
+its own. Send that window to a projector or any second screen (HDMI, USB-C, AirPlay).
+
+1. **Connect the projector** before you press the button. In System Settings > Displays, use it as an extended
+   display, not a mirror: when the screens are mirrored, the projector shows the editor too.
+2. **Check the choices under the button.** AV Gen remembers them on this Mac, as it does your devices.
+   - **Display:** Automatic picks the first screen that is not this Mac's own. You can also choose a screen by
+     name. If the remembered screen is not connected, AV Gen says so and uses the automatic choice.
+   - **Fullscreen:** on by default for another screen and off for this one. A fullscreen window on this Mac's own
+     screen would cover the editor.
+   - **Size** (when not fullscreen): Automatic is the other screen's full size, or half of this one.
+   - **Fit / Fill / Stretch:** what happens when the screen's shape is not the picture's. Fit shows the whole
+     picture with black bars. Fill fills the screen and crops the picture's edges. Stretch distorts the picture.
+3. **Press Start projection.**
+   - If the open project is not a live one, AV Gen opens the Sonic Live demo first. If the current project has
+     unsaved changes, it asks about them first, and Cancel there leaves the projection off.
+   - It turns live input on, then opens the projection window.
+   - The button turns red and reads **Stop projection**. The line under the choices says where the projection
+     is and at what size.
+4. **To end it,** press **Stop projection**, press **Esc** with the projection window in front, or close the
+   window. If the projector is unplugged, the projection stops and the line under the button says so. The editor
+   is never affected.
+
+Things to know:
+
+- The projection is the picture the canvas renders, after post-processing and the live anti-aliasing. While it
+  runs, the canvas shows the film's camera, not a free editor view, so the two always match.
+- The picture is the canvas's size. For a picture that exactly fills a 16:9 projector, switch the canvas to
+  **Output Frame** mode in the canvas toolbar: it then renders at the project's 16:9 output shape.
+- The projection costs almost nothing: it copies the frame that is already rendered. On this Mac it measured
+  0.07 ms of CPU a frame, and no measurable change in frame rate (ADR-1026).
+- Changing a choice while the projection runs reopens the window with the new choice.
+- From the command line, `--start-projection` presses the button once the editor is up. The older
+  `--output <display>[:fullscreen|:WxH]` flag still opens a plain output window, which is saved in the project.
+
 ## What to expect from the timing
 
 Measured on this Mac with a virtual keyboard and a synth routed through BlackHole:

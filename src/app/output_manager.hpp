@@ -59,6 +59,9 @@ struct Output {
     std::shared_ptr<OutputRuntime> runtime; // null while closed
     std::uint64_t framesPresented = 0;
     std::string lastError;
+    // ADR-1026: the Live panel's projection. This machine's rather than the project's: toJson leaves it out,
+    // fromJson (a project load) keeps it and its open window, and Esc in its window closes it like the close button.
+    bool projection = false;
 
     [[nodiscard]] bool open() const { return runtime != nullptr; }
     // Pixel size of the open window's swapchain (0 while closed). Defined in output_manager_gpu.cpp.
@@ -86,7 +89,9 @@ public:
     [[nodiscard]] std::size_t openCount() const;
 
     // The project's "outputs" block: an array of OutputDesc. fromJson validates the whole array
-    // first (names unique) and then replaces the set, closing any open windows.
+    // first (names unique) and then replaces the set, closing any open windows. Projection outputs
+    // (ADR-1026) are not the project's: toJson skips them and fromJson keeps them open; a project
+    // output named like one is refused.
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] Result<void> fromJson(const nlohmann::json& outputs);
 
@@ -96,6 +101,8 @@ public:
     // returned after every output was tried.
     [[nodiscard]] Result<void> open(gpu::Context& context, gpu::ShaderLibrary& shaders);
     void closeAll();
+    // Closes the project's windows and leaves a projection (ADR-1026) open.
+    void closeProjectOutputs();
     // Consumes the events routed to the output windows: resizes their swapchains and closes
     // windows the user closed (those outputs are disabled so they are not reopened). Call after
     // the primary window's pollEvents each frame. `pumpQueue` must be false when another window

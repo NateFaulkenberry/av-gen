@@ -59,6 +59,7 @@ struct FrameEvents {
     bool resized = false;
     bool closeRequested = false; // this window's close button / Cmd-W
     bool focusChanged = false;
+    bool escape = false;         // Esc pressed while this window had the keyboard (ADR-1026: ends a projection)
     std::vector<std::string> droppedFiles;
 };
 

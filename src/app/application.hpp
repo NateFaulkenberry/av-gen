@@ -20,6 +20,7 @@
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
+#include "app/projection.hpp"
 #include "app/render_settings.hpp"
 #include "app/render_state.hpp"
 #include "app/settings.hpp"
@@ -284,6 +285,8 @@ struct AppOptions {
     // ADR-1025: live Sonic input. --live turns it on in the editor; --midi sets the MIDI source filter for this
     // run; --sonic-live-log writes one row per frame (host times and the sonic/notes/timbre/visual signals).
     bool live = false;
+    // ADR-1026: --start-projection presses the Live panel's Start projection on the first frame.
+    bool startProjection = false;
     std::optional<std::string> midi;
     std::optional<std::string> sonicLiveLog;
     // --live-capture <dir>: every Nth live frame re-rendered at a small size into <dir> as PPM, with frames.csv
@@ -465,6 +468,18 @@ private:
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();
+    // ADR-1026: the Live panel's projection. Start/stop from the panel; serviceProjection once per frame before the
+    // outputs present (it opens the window once the demo has loaded, keeps the picture's scaling, and stops when the
+    // window is closed or its display is unplugged).
+    void startProjection();
+    void stopProjection();
+    void openProjectionWindow();
+    void serviceProjection();
+    [[nodiscard]] bool projectIsLive() const;
+    Projection projection_;
+    std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
+    std::vector<ProjectionDisplay> projectionDisplays_;
+    std::chrono::steady_clock::time_point projectionLastScan_{};
     void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
     // Set once `--capture-ui` has written its file, so the loop leaves after the frame it captured
