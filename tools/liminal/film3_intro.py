@@ -87,6 +87,21 @@ def build(b):
         f.route(c, "post/lens/chromaticAberration", 0.35)
         f.route(c, "temporal/mosh/amount", 0.22)
     clip.append((t(2, 3) + 0.6, [IN.LOT * IN.LOTS + 4.0, 8.0, 30.0], "step"))
+    # each landing throws up debris of light at the two lots nearest the camera (the -x copies, both sides)
+    for side, z in (("N", IN.ROAD_Z - IN.NEAR_C), ("F", IN.ROAD_Z + IN.NEAR_C)):
+        nm_ = f"debris{side}"
+        f.nodes.append({"name": nm_, "kind": "particles", "particles": {
+            "capacity": 4000, "spawnRate": 0.0, "burst": 0.0, "shape": "box", "position": [IN.HERO_X - IN.LOT, 0.3, z],
+            "extent": [3.5, 0.2, 3.5], "lifetimeMin": 0.5, "lifetimeMax": 1.3, "direction": [0.0, 1.0, 0.0], "spread": 0.9,
+            "speedMin": 3.0, "speedMax": 9.0, "gravity": [0.0, -9.0, 0.0], "drag": 0.6, "sizeStart": 0.09, "sizeEnd": 0.0,
+            "blend": "additive", "colorStart": [0.6, 0.95, 1.0, 1.0], "colorEnd": [1.0, 0.3, 0.9, 0.0], "emissive": 3.0,
+            "velocityStretch": 0.05, "stretchMax": 5.0}})
+        b.worlds["street"]["names"].append(nm_)
+        f.track(f"particles/{nm_}/position", [(0.0, [IN.HERO_X - IN.LOT, 0.3, z], "step")] +
+                [(tl - 0.03, [IN.HERO_X - IN.LOT * k, 0.3, z], "step") for k, tl in enumerate(lands, start=1)])
+        for k, tl in enumerate(lands, start=1):
+            cb = b.clap(f"debris{side}{k}", tl, release=0.06)
+            f.route(cb, f"particles/{nm_}/burst", 700.0)
     f.track("sdf/row/node/rowClip/size", clip)
     f.track("sdf/faller/node/fall/translation", sorted(fall, key=lambda k: k[0]))
     b.key("nodes/faller/visible", 0.0, 0.0)
@@ -104,6 +119,9 @@ def build(b):
         f.track(f"sdf/skyline/node/{nm_}t/translation", [(k[0], [0.0, k[1] / 2, 0.0], k[2] if len(k) > 2 else "smooth") for k in ks])
     f.track("sdf/skyline/node/towerAw/size", [(k[0], [3.1, k[1] / 2 - 0.4 if k[1] > 1 else 0.0, 3.1], k[2] if len(k) > 2 else "smooth") for k in tower])
     f.track("sdf/skyline/node/towerAwt/translation", [(k[0], [0.0, k[1] / 2, 0.0], k[2] if len(k) > 2 else "smooth") for k in tower])
+    # the riser: the towers stutter on the sixteenths, harder each bar (a city that cannot hold its shape)
+    for nm_ in ("towerA", "towerB"):
+        f.route("grid.song.sixteenth", f"sdf/skyline/node/{nm_}/size", 4.0, component=1, depth="grid.song.riserBar")
     c = b.clap("city", t(3), release=0.8)
     f.route(c, "post/bloom/intensity", 1.2)
     f.route(c, "temporal/mosh/amount", 0.35)

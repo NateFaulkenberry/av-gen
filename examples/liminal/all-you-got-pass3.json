@@ -188,6 +188,146 @@
       "strength": 1.0
      },
      {
+      "channel": "debrisN1",
+      "time": 2.20183,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN2",
+      "time": 2.75229,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN3",
+      "time": 3.30275,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN4",
+      "time": 3.85321,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN5",
+      "time": 4.40367,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN6",
+      "time": 4.95413,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisN7",
+      "time": 5.50459,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF1",
+      "time": 2.20183,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF2",
+      "time": 2.75229,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF3",
+      "time": 3.30275,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF4",
+      "time": 3.85321,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF5",
+      "time": 4.40367,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF6",
+      "time": 4.95413,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "debrisF7",
+      "time": 5.50459,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "city",
       "time": 6.6055,
       "units": "seconds",
@@ -4617,6 +4757,172 @@
    "component": -1,
    "enabled": true,
    "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN1",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN2",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN3",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN4",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN5",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN6",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisN7",
+   "target": "particles/debrisN/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF1",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF2",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF3",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF4",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF5",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF6",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.debrisF7",
+   "target": "particles/debrisF/burst",
+   "amount": 700.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.sixteenth",
+   "target": "sdf/skyline/node/towerA/size",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.riserBar",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.sixteenth",
+   "target": "sdf/skyline/node/towerB/size",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.riserBar",
+   "depthMin": 0.0,
+   "depthMax": 1.0
   },
   {
    "source": "grid.song.city",
@@ -50066,6 +50372,170 @@
        3.5
       ],
       "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/debrisN/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -11.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.17183,
+      "value": [
+       -11.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.72229,
+      "value": [
+       -24.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.27275,
+      "value": [
+       -37.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.82321,
+      "value": [
+       -50.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.37367,
+      "value": [
+       -63.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.92413,
+      "value": [
+       -76.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.47459,
+      "value": [
+       -89.825,
+       0.3,
+       -1.1500000000000004
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "particles/debrisF/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -11.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.17183,
+      "value": [
+       -11.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.72229,
+      "value": [
+       -24.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.27275,
+      "value": [
+       -37.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.82321,
+      "value": [
+       -50.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.37367,
+      "value": [
+       -63.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.92413,
+      "value": [
+       -76.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.47459,
+      "value": [
+       -89.825,
+       0.3,
+       25.15
+      ],
+      "interp": "step"
      }
     ]
    },
