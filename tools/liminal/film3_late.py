@@ -293,6 +293,14 @@ def build(b):
                       at=0.32 if bar == 83 else 0.12, room=room["id"])
             f.route("grid.song.quarter.wave", f"nodes/b3w{bar}/scale", 0.15, depth=f"grid.song.b3w{bar}")
     colour_wave(b)
+    # the open's light waits behind the front door: when it swings open (90.4) the doorway is a slab of white light
+    # that floods the frame on the way out (91.1)
+    door_light = {"objects": [("doorLight", K.S(K.X(((2.9, 4.0), (-0.1, 2.2), (2.75, 2.85))), K.GLOW), "furn",
+                                (2.8, -0.2, 2.6), (4.1, 2.3, 3.0))], "lights": []}
+    b.world("doorLight", door_light)
+    f.shots[-1]["nodes"] += b.worlds["doorLight"]["names"]
+    f.track("sdf/doorLight/surface/2/emission", [(0.0, [0.0, 0.0, 0.0], "step"), (t(90, 4) - 0.01, [0.0, 0.0, 0.0], "step"),
+                                                 (t(90, 4) + 0.2, [8.0, 8.0, 8.0], "smooth"), (t(91) - 0.02, [40.0, 40.0, 40.0], "step")])
     # the bass fill (90.4) throws the front door open; the open's light floods in
     f.track("sdf/hallShell/node/frontDoorSwing/rotation", [(0.0, [0.0, 0.0, 0.0], "step"), (t(90, 4) - 0.001, [0.0, 0.0, 0.0], "easeOut"),
                                                          (t(90, 4) + 0.25, [0.0, -105.0, 0.0], "smooth"), (t(91), [0.0, -100.0, 0.0], "step")])
@@ -439,7 +447,7 @@ def build(b):
     # the coda: the road's four dashes in the black, as at the count-in, going out one by one
     b.shot("coda", 255.0, end, [[-46.0, 2.0, 12.6], [-45.99, 2.0, 12.6]], (-20.0, 0.8, 12.0), keys=("street",), fov=54.0)
     for o in ("row", "faller", "lamps", "skyline", "heroShell", "heroParts", "heroTree"):
-        f.track(f"nodes/{o}/visible", [(0.0, 1.0, "step"), (254.99, 0.0, "step"), (end, 0.0, "step")])
+        b.key(f"nodes/{o}/visible", 254.99, 0.0)
     f.track("sdf/street/node/gridClip/size", [(254.99, [0.0, 0.5, 0.0], "step"), (end, [0.0, 0.5, 0.0], "step")], mode="replace")
     f.track("sdf/street/look/edge/intensity", [(0.0, 1.0, "step"), (254.99, 0.0, "step"), (end, 0.0, "step")], mode="multiply")
     blink = [(254.99, [260.0, 0.5, 0.5])]
@@ -478,3 +486,17 @@ def colour_wave(b):
         for k in (K.FILL, K.FLOOR, K.ACCENT):
             f.route(c, f"sdf/{o}/surface/{k}/edge", amt, component=comp)
     b.palette_at(t0 + 0.1, "P11open", ramp=t1 - t0 - 0.1)
+    # the engine's travelling beam (ADR-207/702): a rainbow front of light that adds colour to every surface it crosses,
+    # entering by the front door and running back through the hall past the camera (until ADR-1055's wave lands)
+    f.effects = getattr(f, "effects", []) + [{
+        "id": "colourWave", "type": "travelBeam", "name": "Colour wave", "owner": {"kind": "world"}, "enabled": True, "order": 0,
+        "activation": "window", "timing": {"delay": 0, "lifetime": 0, "fadeIn": 0.12, "fadeOut": 0.6, "windowStart": round(t0 - 0.05, 3),
+                                           "windowSeconds": round(t1 - t0 + 0.4, 3), "repeatSeconds": 0},
+        "parameters": {"propagation": {"kind": "directional", "direction": "explicit", "explicitDirection": [0, 0, -1], "speed": 9.0,
+                                       "range": 14.0, "frontWidth": 1.4, "trailLength": 5.0, "falloff": 1.2, "startOffset": 0.0,
+                                       "verticalExtent": 6.0, "verticalGrowth": 0.0, "ringCount": 0, "beamRadius": 0},
+                       "appearance": {"color": [1, 0.3, 0.8], "intensity": 2.6, "edgeColor": [1, 1, 1], "edgeIntensity": 5.0, "width": 1.0,
+                                      "rainbow": True, "rainbowSpeed": 0.6, "rainbowScale": 0.22, "rainbowSaturation": 0.95,
+                                      "rainbowBrightness": 1.4},
+                       "sparkle": {"enabled": False}, "response": {"ground": 1, "foliage": 1, "surface": 1, "emissive": 1},
+                       "source": {"kind": "world", "position": [3.85, 1.2, 2.6]}}}]

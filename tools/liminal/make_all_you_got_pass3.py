@@ -112,6 +112,7 @@ def build(end=END, validate=True):
         film.route(cl, "temporal/mosh/shift", 9.0)
         film.route(cl, "post/lens/chromaticAberration", 0.35)
     b.breath_forbidden()
+    b.write_keys()
     b.write_figures(end)
     b.stamp_figure_spans()
     film.track("palette/position", sorted(b.pal, key=lambda k: k[0]) + [(end, b.pal[-1][1], "step")])

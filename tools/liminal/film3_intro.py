@@ -40,7 +40,7 @@ def build(b):
     # ---- the camera: one continuous glide, accelerating into the window --------------------------------------
     keys = [(0.0, (-46.0, 2.0, 12.6)), (t(1), (-45.6, 2.2, 12.8)), (t(5), (-36.0, 6.8, 18.0)), (t(9), (-22.0, 8.6, 18.4)),
             (t(13), (-9.5, 6.4, 15.0)), (t(15), (-3.2, 3.6, 9.8)), (t(16, 2.5), (-1.3, 2.3, 6.0)),
-            (t(16, 4), (-0.75, 1.7, 3.85)), (ENTRY, (-0.6, 1.53, 2.42))]
+            (t(16, 4), (-0.75, 1.72, 4.0)), (ENTRY, (-0.6, 1.53, 2.65))]
     look = [(0.0, (-20.0, 0.8, 12.0)), (t(1), (-20.0, 1.0, 12.0)), (t(2), (-12.0, 2.5, 9.0)), (t(5), (-2.0, 3.5, 6.0)),
             (t(9), (0.8, 3.4, 1.5)), (t(13), (0.2, 2.6, 2.0)), (t(15), (-0.5, 1.9, 2.0)), (t(16, 3), (-0.6, 1.6, 2.0)),
             (ENTRY, (-0.6, 1.53, 0.0))]
@@ -89,6 +89,8 @@ def build(b):
     clip.append((t(2, 3) + 0.6, [IN.LOT * IN.LOTS + 4.0, 8.0, 30.0], "step"))
     f.track("sdf/row/node/rowClip/size", clip)
     f.track("sdf/faller/node/fall/translation", sorted(fall, key=lambda k: k[0]))
+    b.key("nodes/faller/visible", 0.0, 0.0)
+    b.key("nodes/faller/visible", t(1) - 0.25, 1.0)
 
     # ---- 3.1-3.4: the far city shoots up; it keeps rising through the bass's sustained note (bars 5-8) ----------
     tower = [(0.0, 0.0), (t(3) - 0.001, 0.0, "easeOut"), (t(3) + 0.22, 19.0, "smooth"), (t(3, 2), 17.0, "easeOut"),
@@ -119,6 +121,10 @@ def build(b):
         lamp.append((t(5, 1 + i * 0.5), [IN.LOT * (i // 2 + 1) - 2.0 + (i % 2) * 6.5, 6.0, 30.0], "step"))
     lamp.append((t(9), [IN.LOT * IN.LOTS + 8.0, 6.0, 30.0], "step"))
     f.track("sdf/lamps/node/lampClip/size", lamp)
+    c = b.clap("bassIn", t(5), release=0.7)          # the bass enters: a stab of light and the lamps' first pop
+    f.route(c, "camera/exposure/compensation", 1.0)
+    f.route(c, "post/bloom/intensity", 0.8)
+    f.route(c, "sdf/street/look/edge/intensity", 5.0)
     g_bass = b.gate("iBass", t(5), t(16, 4))
     b.pulse("sdf/lamps/surface/2/emission", 2.5, "eighth", g_bass)
     b.pulse("sdf/row/surface/4/emission", 1.5, "eighth", g_bass)
@@ -136,6 +142,8 @@ def build(b):
     order = ["path", "fence", "mailbox", "porch", "frontDoor", "livWin", "bedWin", "roofL", "roofR", "chimney"]
     slots = [t(10, 1), t(10, 3), t(11, 1), t(11, 2), t(11, 3), t(11, 4), t(12, 1), t(12, 1.5), t(12, 2), t(12, 3)]
     by = {p[0]: p for p in IN.HERO_PARTS}
+    b.key("nodes/heroParts/visible", 0.0, 0.0)
+    b.key("nodes/heroParts/visible", t(10) - 0.35, 1.0)
     for nm_, tt in zip(order, slots):
         off = list(by[nm_][2])
         f.track(f"sdf/heroParts/node/hp_{nm_}/translation", [(0.0, off, "step"), (tt - 0.001, off, "easeOut"),

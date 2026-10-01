@@ -54,23 +54,23 @@
       ],
       [
        -0.75,
-       1.7,
-       3.85
+       1.72,
+       4.0
       ],
       [
        -0.6,
        1.53,
-       2.42
+       2.65
       ],
       [
-       0.02161,
-       0.82551,
-       -3.50599
+       0.0562,
+       0.69881,
+       -3.2558
       ],
       [
-       0.85042,
-       -0.1138,
-       -11.4073
+       0.93113,
+       -0.40944,
+       -11.13021
       ]
      ],
      "screw": {
@@ -1250,7 +1250,8 @@
       "hallMan",
       "livDisco",
       "kitDisco",
-      "hallDisco"
+      "hallDisco",
+      "doorLight"
      ],
      "lights": [
       "livLamp",
@@ -1964,7 +1965,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -2032,7 +2034,10 @@
      ],
      "edgePixels": 1.6,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -2443,7 +2448,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -2511,7 +2517,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -2885,7 +2894,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -2953,7 +2963,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -3266,7 +3279,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -3334,7 +3348,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -3555,7 +3572,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -3623,7 +3641,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -4000,7 +4021,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -4068,7 +4090,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -4802,7 +4827,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -4870,7 +4896,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -4900,9 +4929,9 @@
      "root": {
       "kind": "translate",
       "translation": [
-       -2.3,
+       -3.1,
        0.0,
-       5.9
+       6.3
       ],
       "children": [
        {
@@ -5038,7 +5067,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -5085,14 +5115,14 @@
      }
     ],
     "boundsMin": [
-     -5.0,
+     -5.8,
      -0.1,
-     3.2
+     3.6
     ],
     "boundsMax": [
-     0.4,
+     -0.4,
      6.5,
-     8.6
+     9.0
     ],
     "look": {
      "aoStrength": 0.25,
@@ -5106,7 +5136,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -5758,7 +5791,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -5826,7 +5860,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -6508,7 +6545,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -6576,7 +6614,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -7312,7 +7353,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -7380,7 +7422,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -7874,7 +7919,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -7942,7 +7988,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -8463,7 +8512,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -8531,7 +8581,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -9358,14 +9411,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9377,7 +9432,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9389,7 +9445,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9401,7 +9458,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9413,7 +9471,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9425,7 +9484,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -9442,7 +9502,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -9467,7 +9528,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -10314,14 +10382,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10333,7 +10403,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10345,7 +10416,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10357,7 +10429,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10369,7 +10442,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10381,7 +10455,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -10398,7 +10473,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -10423,7 +10499,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -11250,14 +11333,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11269,7 +11354,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11281,7 +11367,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11293,7 +11380,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11305,7 +11393,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11317,7 +11406,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -11334,7 +11424,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -11359,7 +11450,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -12176,14 +12274,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12195,7 +12295,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12207,7 +12308,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12219,7 +12321,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12231,7 +12334,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12243,7 +12347,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -12260,7 +12365,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -12285,7 +12391,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -13206,7 +13319,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -13274,7 +13388,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -13828,7 +13945,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -13896,7 +14014,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -14588,7 +14709,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -14656,7 +14778,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -15473,14 +15598,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15492,7 +15619,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15504,7 +15632,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15516,7 +15645,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15528,7 +15658,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15540,7 +15671,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -15557,7 +15689,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -15582,7 +15715,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -16374,7 +16514,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -16442,7 +16583,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -16614,7 +16758,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -16682,7 +16827,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -17208,7 +17356,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -17276,7 +17425,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -18102,14 +18254,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18121,7 +18275,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18133,7 +18288,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18145,7 +18301,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18157,7 +18314,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18169,7 +18327,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -18186,7 +18345,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -18211,7 +18371,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -18839,7 +19006,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -18907,7 +19075,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -19775,7 +19946,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -19843,7 +20015,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -20301,7 +20476,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -20369,7 +20545,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -21263,7 +21442,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -21331,7 +21511,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -21821,7 +22004,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -21889,7 +22073,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -22496,7 +22683,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -22564,7 +22752,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -23334,7 +23525,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -23402,7 +23594,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -24332,7 +24527,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -24400,7 +24596,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -25247,14 +25446,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25266,7 +25467,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25278,7 +25480,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25290,7 +25493,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25302,7 +25506,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25314,7 +25519,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -25331,7 +25537,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -25356,7 +25563,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -26173,14 +26387,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26192,7 +26408,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26204,7 +26421,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26216,7 +26434,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26228,7 +26447,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26240,7 +26460,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -26257,7 +26478,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -26282,7 +26504,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -26912,7 +27141,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -26980,7 +27210,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -27632,7 +27865,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -27700,7 +27934,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -28527,14 +28764,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28546,7 +28785,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28558,7 +28798,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28570,7 +28811,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28582,7 +28824,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28594,7 +28837,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -28611,7 +28855,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -28636,7 +28881,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -29463,14 +29715,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29482,7 +29736,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29494,7 +29749,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29506,7 +29762,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29518,7 +29775,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29530,7 +29788,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -29547,7 +29806,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -29572,7 +29832,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -30060,132 +30327,6 @@
        {
         "kind": "translate",
         "translation": [
-         -0.8,
-         5.550000000000001,
-         -4.3
-        ],
-        "children": [
-         {
-          "kind": "union",
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               -0.15,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.012,
-                "height": 0.3
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               -0.32,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.07,
-                "height": 0.08
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               -0.34,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 0.0,
-                 0.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "polarRepeat",
-                  "count": 4,
-                  "children": [
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     0.42,
-                     0.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "rotate",
-                      "rotation": [
-                       8.0,
-                       0.0,
-                       0.0
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.36,
-                         0.008,
-                         0.07
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ],
-                "name": "stuFan"
-               }
-              ]
-             }
-            ],
-            "material": 0
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             -0.02,
-             0.0
-            ],
-            "children": [
-             {
-              "kind": "cylinder",
-              "radius": 0.08,
-              "height": 0.04
-             }
-            ]
-           }
-          ],
-          "entity": {
-           "category": "ceilingFan",
-           "id": "CeilingFan",
-           "room": "study"
-          }
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
          1.2,
          4.45,
          -5.0
@@ -30408,7 +30549,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -30476,7 +30618,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -31238,7 +31383,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -31306,7 +31452,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -31646,7 +31795,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -31714,7 +31864,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -31753,19 +31906,150 @@
         ],
         "children": [
          {
-          "kind": "translate",
-          "translation": [
-           -1.725,
-           5.625000000000001,
-           -4.375
-          ],
+          "kind": "union",
           "children": [
            {
-            "kind": "box",
-            "size": [
-             1.025,
-             0.07500000000000018,
-             2.1750000000000003
+            "kind": "translate",
+            "translation": [
+             -1.725,
+             5.625000000000001,
+             -4.375
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               1.025,
+               0.07500000000000018,
+               2.1750000000000003
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.8,
+             5.550000000000001,
+             -4.3
+            ],
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -0.15,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "cylinder",
+                    "radius": 0.012,
+                    "height": 0.3
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -0.32,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "cylinder",
+                    "radius": 0.07,
+                    "height": 0.08
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -0.34,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "polarRepeat",
+                      "count": 4,
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.42,
+                         0.0,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "rotate",
+                          "rotation": [
+                           8.0,
+                           0.0,
+                           0.0
+                          ],
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             0.36,
+                             0.008,
+                             0.07
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ],
+                    "name": "stuFan"
+                   }
+                  ]
+                 }
+                ],
+                "material": 0
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 -0.02,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "cylinder",
+                  "radius": 0.08,
+                  "height": 0.04
+                 }
+                ]
+               }
+              ],
+              "entity": {
+               "category": "ceilingFan",
+               "id": "CeilingFan",
+               "room": "study"
+              }
+             }
             ]
            }
           ]
@@ -31860,7 +32144,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -31908,7 +32193,7 @@
     ],
     "boundsMin": [
      -14.6,
-     5.250000000000001,
+     4.750000000000001,
      -18.4
     ],
     "boundsMax": [
@@ -31928,7 +32213,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -32755,14 +33043,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32774,7 +33064,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32786,7 +33077,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32798,7 +33090,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32810,7 +33103,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32822,7 +33116,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -32839,7 +33134,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -32864,7 +33160,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -33690,14 +33993,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33709,7 +34014,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33721,7 +34027,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33733,7 +34040,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33745,7 +34053,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33757,7 +34066,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -33774,7 +34084,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -33799,7 +34110,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -33987,7 +34305,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -34055,7 +34374,10 @@
      ],
      "edgePixels": 1.8,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -34420,7 +34742,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -34488,7 +34811,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -35237,7 +35563,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -35305,7 +35632,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -36040,7 +36370,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -36108,7 +36439,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -36425,7 +36759,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -36493,7 +36828,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -37410,7 +37748,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -37478,7 +37817,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -38395,7 +38737,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -38463,7 +38806,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -39206,7 +39552,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -39274,7 +39621,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -39511,7 +39861,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -39579,7 +39930,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -39816,7 +40170,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -39884,7 +40239,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -40028,7 +40386,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -40096,7 +40455,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -40257,7 +40619,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -40325,7 +40688,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -40481,7 +40847,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -40549,7 +40916,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -41356,7 +41726,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -41424,7 +41795,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -41905,7 +42279,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -41973,7 +42348,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -42182,7 +42560,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -42250,7 +42629,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -42557,7 +42939,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -42625,7 +43008,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -42886,7 +43272,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -42954,7 +43341,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -43275,7 +43665,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -43343,7 +43734,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -43693,7 +44087,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -43761,7 +44156,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -44033,7 +44431,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -44101,7 +44500,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -44336,7 +44738,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -44404,7 +44807,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -44679,7 +45085,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -44747,7 +45154,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -44983,7 +45393,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -45051,7 +45462,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -45264,7 +45678,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -45332,7 +45747,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -46149,14 +46567,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46168,7 +46588,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46180,7 +46601,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46192,7 +46614,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46204,7 +46627,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46216,7 +46640,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -46233,7 +46658,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -46258,7 +46684,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -47083,14 +47516,16 @@
        0.02,
        0.02,
        0.025
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
        0.015,
        0.015,
        0.02
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47102,7 +47537,8 @@
        2.0,
        1.4,
        0.7
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47114,7 +47550,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47126,7 +47563,8 @@
        0.22,
        0.22,
        0.22
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47138,7 +47576,8 @@
        0.45,
        0.45,
        0.45
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47150,7 +47589,8 @@
        1.25,
        1.25,
        1.25
-      ]
+      ],
+      "rim": 0.28
      },
      {
       "color": [
@@ -47167,7 +47607,8 @@
        1.9,
        1.9,
        1.9
-      ]
+      ],
+      "rim": 1.0
      }
     ],
     "boundsMin": [
@@ -47192,7 +47633,14 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "rimIntensity": 1.15,
+     "rimPower": 2.6,
+     "rimColor": [
+      1.0,
+      1.0,
+      1.0
+     ]
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -47485,7 +47933,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -47553,7 +48002,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -47794,7 +48246,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -47862,7 +48315,10 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -48103,7 +48559,8 @@
        0.4,
        0.7,
        1.0
-      ]
+      ],
+      "static": 1.0
      },
      {
       "color": [
@@ -48171,7 +48628,183 @@
      ],
      "edgePixels": 2.2,
      "edgeSoftness": 0.14,
-     "edgeThreshold": 0.02
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 30.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "doorLight",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "translate",
+      "translation": [
+       3.45,
+       1.05,
+       2.8
+      ],
+      "children": [
+       {
+        "kind": "box",
+        "size": [
+         0.55,
+         1.1500000000000001,
+         0.050000000000000044
+        ]
+       }
+      ],
+      "material": 2
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ],
+      "static": 1.0
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     2.8,
+     -0.2,
+     2.6
+    ],
+    "boundsMax": [
+     4.1,
+     2.3,
+     3.0
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
     },
     "castShadows": false,
     "depthPrepass": false,
@@ -49704,13 +50337,13 @@
    "name": "pauseA0",
    "position": [
     5.505302299376952,
-    3.320712272791126,
-    2.47903919775996
+    2.26575883602409,
+    1.827769662278181
    ],
    "rotation": [
-    159.53154393602816,
-    -19.688574364111627,
-    -171.89856689872053
+    136.32835676796762,
+    -23.1627871053853,
+    -173.41963146989588
    ],
    "procedural": {
     "source": {
@@ -49751,13 +50384,13 @@
    "name": "pauseA1",
    "position": [
     4.120330355749098,
-    1.1521521589927213,
-    2.1266965705679395
+    0.9436761231194231,
+    1.6971148273708305
    ],
    "rotation": [
-    120.02041392824295,
-    6.597793015505014,
-    177.96876503797742
+    112.0857444301964,
+    9.67356724228499,
+    178.45515585276948
    ],
    "procedural": {
     "source": {
@@ -49798,13 +50431,13 @@
    "name": "pauseA2",
    "position": [
     2.877571802802607,
-    0.768174320980286,
-    3.167012412270939
+    0.5841302903264451,
+    2.8524474636438972
    ],
    "rotation": [
-    125.89587542318533,
-    31.055781505934572,
-    172.4782842369801
+    121.10024443780996,
+    35.695519413836514,
+    172.83017550550227
    ],
    "procedural": {
     "source": {
@@ -49845,12 +50478,12 @@
    "name": "pauseB0",
    "position": [
     5.719416218327055,
-    0.5412362740026717,
-    3.64196255506974
+    0.46536582253777947,
+    3.462210295606342
    ],
    "rotation": [
-    123.94273884531961,
-    -46.65593871677903,
+    121.42696187034673,
+    -51.14952169850637,
     180.0
    ],
    "procedural": {
@@ -49892,11 +50525,11 @@
    "name": "pauseB1",
    "position": [
     4.42,
-    -0.27977840931302245,
-    3.9836495247378205
+    -0.3227526602528572,
+    3.862058450907193
    ],
    "rotation": [
-    110.61967449169671,
+    108.31046400438845,
     -7.016709298534876e-15,
     180.0
    ],
@@ -49938,13 +50571,13 @@
    "kind": "procedural",
    "name": "pauseB2",
    "position": [
-    3.120583781672945,
-    -0.7384619794372318,
-    4.0015621694100165
+    3.120583781672946,
+    -0.7518294291317127,
+    3.955813771777808
    ],
    "rotation": [
-    118.94947510015446,
-    57.02587249093397,
+    118.45107818533252,
+    58.46843247899597,
     180.0
    ],
    "procedural": {
@@ -60936,6 +61569,86 @@
    "range": 2.8,
    "castsShadow": false,
    "volumetric": 1.5
+  }
+ ],
+ "effects": [
+  {
+   "id": "colourWave",
+   "type": "travelBeam",
+   "name": "Colour wave",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "window",
+   "timing": {
+    "delay": 0,
+    "lifetime": 0,
+    "fadeIn": 0.12,
+    "fadeOut": 0.6,
+    "windowStart": 198.601,
+    "windowSeconds": 1.481,
+    "repeatSeconds": 0
+   },
+   "parameters": {
+    "propagation": {
+     "kind": "directional",
+     "direction": "explicit",
+     "explicitDirection": [
+      0,
+      0,
+      -1
+     ],
+     "speed": 9.0,
+     "range": 14.0,
+     "frontWidth": 1.4,
+     "trailLength": 5.0,
+     "falloff": 1.2,
+     "startOffset": 0.0,
+     "verticalExtent": 6.0,
+     "verticalGrowth": 0.0,
+     "ringCount": 0,
+     "beamRadius": 0
+    },
+    "appearance": {
+     "color": [
+      1,
+      0.3,
+      0.8
+     ],
+     "intensity": 2.6,
+     "edgeColor": [
+      1,
+      1,
+      1
+     ],
+     "edgeIntensity": 5.0,
+     "width": 1.0,
+     "rainbow": true,
+     "rainbowSpeed": 0.6,
+     "rainbowScale": 0.22,
+     "rainbowSaturation": 0.95,
+     "rainbowBrightness": 1.4
+    },
+    "sparkle": {
+     "enabled": false
+    },
+    "response": {
+     "ground": 1,
+     "foliage": 1,
+     "surface": 1,
+     "emissive": 1
+    },
+    "source": {
+     "kind": "world",
+     "position": [
+      3.85,
+      1.2,
+      2.6
+     ]
+    }
+   }
   }
  ]
 }

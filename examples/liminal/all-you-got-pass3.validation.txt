@@ -1,7 +1,7 @@
 ROOM VALIDATION
 
 Errors: 0
-Warnings: 13
+Warnings: 12
 Notes: 2
 
 WARNING
@@ -52,11 +52,6 @@ move steps13x along wall +x to [-2.195,10.001,0.008]
 (in: tree)
 
 WARNING
-camera path of chapter 'street' grazes 'heroParts' (0.11m away at path metres 58.6-58.7)
-distance: 0.111
-(in: street)
-
-WARNING
 camera path of chapter 'liv' grazes 'livShell' (0.05m away at path metres 2.1-14.0)
 distance: 0.05
 (in: liv)
@@ -104,4 +99,4 @@ PASS
 13 character poses
 158 entities complete
 227 lyric placements
-12 camera paths clear
+13 camera paths clear

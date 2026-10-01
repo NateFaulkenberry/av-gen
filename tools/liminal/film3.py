@@ -140,6 +140,19 @@ class Builder3(FB.Builder):
         return [[eye[0][j] - d0[j] / L0 * 2.0 for j in range(3)]] + eye + \
                [[eye[-1][j] + d1[j] / L1 * L for j in range(3)] for L in (6.0, 14.0)]
 
+    # ---- keys shared between sections (one replace track per target) --------------------------------------
+    def key(self, target, tt, v, interp="step"):
+        if not hasattr(self, "_keys"):
+            self._keys = {}
+        self._keys.setdefault(target, []).append((tt, v, interp))
+
+    def write_keys(self, defaults=None):
+        for target, ks in sorted(getattr(self, "_keys", {}).items()):
+            ks = sorted(ks, key=lambda k: k[0])
+            if ks[0][0] > 0.0 and defaults and target in defaults:
+                ks = [(0.0, defaults[target], "step")] + ks
+            self.f.track(target, ks)
+
     # ---- figures -----------------------------------------------------------------------------------------
     def show(self, fig, t0, t1):
         self.fig_spans.setdefault(fig, []).append((t0, t1))

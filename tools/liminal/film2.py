@@ -481,6 +481,8 @@ class Film:
         scene = {"format": "avgen-scene", "version": 1, "name": "All You Got (pass 2)",
                  "camera": {"mode": 3, "fov": 60.0, "journey": {"chapters": chapters}},
                  "environment": env, "nodes": self.nodes, "lights": self.lights}
+        if getattr(self, "effects", None):
+            scene["effects"] = self.effects
         rig = {"format": "avgen-lightrig", "version": 1, "name": "AllYouGot2",
                "description": "Dark: a faint ambient so the fill reads as planes; the lines and lamps carry the image.",
                "keyIntensity": 0.0, "ambientIntensity": 1.0, "ambientColor": list(rig_ambient), "ambientTemperature": 6500,

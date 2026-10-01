@@ -198,6 +198,16 @@
       "strength": 1.0
      },
      {
+      "channel": "bassIn",
+      "time": 11.00917,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.7,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "iBass",
       "time": 11.00917,
       "units": "seconds",
@@ -496,6 +506,16 @@
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.55,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "v1in",
+      "time": 55.04587,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.6,
       "curve": "exp",
       "strength": 1.0
      },
@@ -4639,6 +4659,36 @@
    "chain": {}
   },
   {
+   "source": "grid.song.bassIn",
+   "target": "camera/exposure/compensation",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.bassIn",
+   "target": "post/bloom/intensity",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.bassIn",
+   "target": "sdf/street/look/edge/intensity",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.eighth",
    "target": "sdf/lamps/surface/2/emission",
    "amount": 2.5,
@@ -5421,6 +5471,26 @@
   },
   {
    "source": "grid.song.c01",
+   "target": "palette/value",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c01",
+   "target": "camera/exposure/compensation",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c01",
    "target": "lights/livLamp/intensity",
    "amount": 25.0,
    "op": "add",
@@ -5500,6 +5570,26 @@
    "chain": {}
   },
   {
+   "source": "grid.song.v1in",
+   "target": "camera/exposure/compensation",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.v1in",
+   "target": "post/bloom/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.c03",
    "target": "camera/exposure/compensation",
    "amount": 2.4,
@@ -5543,6 +5633,106 @@
    "source": "grid.song.c04",
    "target": "post/bloom/intensity",
    "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "camera/exposure/compensation",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "palette/value",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/livShell/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/livSofa/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/livMedia/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/livShelf/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/livDecor/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/kitShell/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/kitCounter/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c04",
+   "target": "sdf/kitTable/look/edge/intensity",
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6800,6 +6990,46 @@
   },
   {
    "source": "grid.song.c09",
+   "target": "palette/value",
+   "amount": 1.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c09",
+   "target": "post/bloom/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c09",
+   "target": "sdf/bedShell/look/edge/intensity",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c09",
+   "target": "sdf/bedFurn/look/edge/intensity",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c09",
    "target": "temporal/mosh/shift",
    "amount": 14.0,
    "op": "add",
@@ -6856,6 +7086,16 @@
    "source": "grid.song.c10",
    "target": "temporal/mosh/amount",
    "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c10",
+   "target": "camera/exposure/compensation",
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6943,6 +7183,26 @@
    "chain": {}
   },
   {
+   "source": "grid.song.c12",
+   "target": "post/bloom/intensity",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c12",
+   "target": "palette/value",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.c13",
    "target": "sdf/stuShell/node/stuWarp/amount",
    "amount": 0.16,
@@ -6975,7 +7235,37 @@
   {
    "source": "grid.song.c13",
    "target": "camera/exposure/compensation",
-   "amount": 0.8,
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c13",
+   "target": "sdf/stuShell/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c13",
+   "target": "sdf/stuFurn/look/edge/intensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c13",
+   "target": "sdf/stuShelf/look/edge/intensity",
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -7053,6 +7343,16 @@
    "chain": {
     "attackMs": 5.0
    }
+  },
+  {
+   "source": "grid.song.c14",
+   "target": "camera/exposure/compensation",
+   "amount": -6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
   },
   {
    "source": "grid.song.c14b",
@@ -7150,6 +7450,46 @@
    "source": "grid.song.c15",
    "target": "post/bloom/intensity",
    "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c15",
+   "target": "camera/exposure/compensation",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c15",
+   "target": "sdf/stuShell/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c15",
+   "target": "sdf/stuFurn/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c15",
+   "target": "sdf/stuShelf/look/edge/intensity",
+   "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -15373,7 +15713,7 @@
      {
       "time": 1.70142,
       "value": [
-       1002.38002
+       1002.38001
       ],
       "interp": "linear"
      },
@@ -15436,7 +15776,7 @@
      {
       "time": 2.60217,
       "value": [
-       1002.69259
+       1002.69258
       ],
       "interp": "linear"
      },
@@ -15849,7 +16189,7 @@
      {
       "time": 8.50709,
       "value": [
-       1010.37132
+       1010.37131
       ],
       "interp": "linear"
      },
@@ -15877,7 +16217,7 @@
      {
       "time": 8.90742,
       "value": [
-       1011.04912
+       1011.04911
       ],
       "interp": "linear"
      },
@@ -17018,7 +17358,7 @@
      {
       "time": 25.22102,
       "value": [
-       1036.52839
+       1036.52838
       ],
       "interp": "linear"
      },
@@ -17067,7 +17407,7 @@
      {
       "time": 25.9216,
       "value": [
-       1037.56384
+       1037.56383
       ],
       "interp": "linear"
      },
@@ -17116,7 +17456,7 @@
      {
       "time": 26.62219,
       "value": [
-       1038.62748
+       1038.62747
       ],
       "interp": "linear"
      },
@@ -17270,609 +17610,609 @@
      {
       "time": 28.82402,
       "value": [
-       1042.2432
+       1042.24321
       ],
       "interp": "linear"
      },
      {
       "time": 28.9241,
       "value": [
-       1042.42495
+       1042.42496
       ],
       "interp": "linear"
      },
      {
       "time": 29.02419,
       "value": [
-       1042.60977
+       1042.60978
       ],
       "interp": "linear"
      },
      {
       "time": 29.12427,
       "value": [
-       1042.79749
+       1042.7975
       ],
       "interp": "linear"
      },
      {
       "time": 29.22435,
       "value": [
-       1042.98794
+       1042.98795
       ],
       "interp": "linear"
      },
      {
       "time": 29.32444,
       "value": [
-       1043.18095
+       1043.18096
       ],
       "interp": "linear"
      },
      {
       "time": 29.42452,
       "value": [
-       1043.37635
+       1043.37637
       ],
       "interp": "linear"
      },
      {
       "time": 29.5246,
       "value": [
-       1043.57398
+       1043.574
       ],
       "interp": "linear"
      },
      {
       "time": 29.62469,
       "value": [
-       1043.77366
+       1043.7737
       ],
       "interp": "linear"
      },
      {
       "time": 29.72477,
       "value": [
-       1043.97524
+       1043.97527
       ],
       "interp": "linear"
      },
      {
       "time": 29.82485,
       "value": [
-       1044.17853
+       1044.17857
       ],
       "interp": "linear"
      },
      {
       "time": 29.92494,
       "value": [
-       1044.38337
+       1044.38342
       ],
       "interp": "linear"
      },
      {
       "time": 30.02502,
       "value": [
-       1044.5896
+       1044.58965
       ],
       "interp": "linear"
      },
      {
       "time": 30.1251,
       "value": [
-       1044.79704
+       1044.7971
       ],
       "interp": "linear"
      },
      {
       "time": 30.22519,
       "value": [
-       1045.00552
+       1045.00559
       ],
       "interp": "linear"
      },
      {
       "time": 30.32527,
       "value": [
-       1045.21489
+       1045.21496
       ],
       "interp": "linear"
      },
      {
       "time": 30.42535,
       "value": [
-       1045.42496
+       1045.42503
       ],
       "interp": "linear"
      },
      {
       "time": 30.52544,
       "value": [
-       1045.63556
+       1045.63565
       ],
       "interp": "linear"
      },
      {
       "time": 30.62552,
       "value": [
-       1045.84654
+       1045.84663
       ],
       "interp": "linear"
      },
      {
       "time": 30.7256,
       "value": [
-       1046.05773
+       1046.05782
       ],
       "interp": "linear"
      },
      {
       "time": 30.82569,
       "value": [
-       1046.26894
+       1046.26904
       ],
       "interp": "linear"
      },
      {
       "time": 30.92577,
       "value": [
-       1046.48002
+       1046.48012
       ],
       "interp": "linear"
      },
      {
       "time": 31.02585,
       "value": [
-       1046.6908
+       1046.6909
       ],
       "interp": "linear"
      },
      {
       "time": 31.12594,
       "value": [
-       1046.90111
+       1046.90121
       ],
       "interp": "linear"
      },
      {
       "time": 31.22602,
       "value": [
-       1047.11077
+       1047.11088
       ],
       "interp": "linear"
      },
      {
       "time": 31.32611,
       "value": [
-       1047.31963
+       1047.31974
       ],
       "interp": "linear"
      },
      {
       "time": 31.42619,
       "value": [
-       1047.52751
+       1047.52762
       ],
       "interp": "linear"
      },
      {
       "time": 31.52627,
       "value": [
-       1047.73424
+       1047.73435
       ],
       "interp": "linear"
      },
      {
       "time": 31.62636,
       "value": [
-       1047.93965
+       1047.93977
       ],
       "interp": "linear"
      },
      {
       "time": 31.72644,
       "value": [
-       1048.14359
+       1048.1437
       ],
       "interp": "linear"
      },
      {
       "time": 31.82652,
       "value": [
-       1048.34587
+       1048.34598
       ],
       "interp": "linear"
      },
      {
       "time": 31.92661,
       "value": [
-       1048.54633
+       1048.54644
       ],
       "interp": "linear"
      },
      {
       "time": 32.02669,
       "value": [
-       1048.7448
+       1048.74491
       ],
       "interp": "linear"
      },
      {
       "time": 32.12677,
       "value": [
-       1048.94112
+       1048.94122
       ],
       "interp": "linear"
      },
      {
       "time": 32.22686,
       "value": [
-       1049.13511
+       1049.1352
       ],
       "interp": "linear"
      },
      {
       "time": 32.32694,
       "value": [
-       1049.3266
+       1049.32669
       ],
       "interp": "linear"
      },
      {
       "time": 32.42702,
       "value": [
-       1049.51543
+       1049.51551
       ],
       "interp": "linear"
      },
      {
       "time": 32.52711,
       "value": [
-       1049.70143
+       1049.7015
       ],
       "interp": "linear"
      },
      {
       "time": 32.62719,
       "value": [
-       1049.88443
+       1049.88449
       ],
       "interp": "linear"
      },
      {
       "time": 32.72727,
       "value": [
-       1050.06426
+       1050.0643
       ],
       "interp": "linear"
      },
      {
       "time": 32.82736,
       "value": [
-       1050.24075
+       1050.24078
       ],
       "interp": "linear"
      },
      {
       "time": 32.92744,
       "value": [
-       1050.41374
+       1050.41375
       ],
       "interp": "linear"
      },
      {
       "time": 33.02752,
       "value": [
-       1050.58301
+       1050.58302
       ],
       "interp": "linear"
      },
      {
       "time": 33.12761,
       "value": [
-       1050.74727
+       1050.74745
       ],
       "interp": "linear"
      },
      {
       "time": 33.22769,
       "value": [
-       1050.90565
+       1050.90634
       ],
       "interp": "linear"
      },
      {
       "time": 33.32777,
       "value": [
-       1051.0586
+       1051.06013
       ],
       "interp": "linear"
      },
      {
       "time": 33.42786,
       "value": [
-       1051.20664
+       1051.20927
       ],
       "interp": "linear"
      },
      {
       "time": 33.52794,
       "value": [
-       1051.35027
+       1051.35423
       ],
       "interp": "linear"
      },
      {
       "time": 33.62802,
       "value": [
-       1051.49001
+       1051.4955
       ],
       "interp": "linear"
      },
      {
       "time": 33.72811,
       "value": [
-       1051.62636
+       1051.63353
       ],
       "interp": "linear"
      },
      {
       "time": 33.82819,
       "value": [
-       1051.75982
+       1051.7688
       ],
       "interp": "linear"
      },
      {
       "time": 33.92827,
       "value": [
-       1051.89091
+       1051.90177
       ],
       "interp": "linear"
      },
      {
       "time": 34.02836,
       "value": [
-       1052.02014
+       1052.03292
       ],
       "interp": "linear"
      },
      {
       "time": 34.12844,
       "value": [
-       1052.148
+       1052.16271
       ],
       "interp": "linear"
      },
      {
       "time": 34.22852,
       "value": [
-       1052.27502
+       1052.29162
       ],
       "interp": "linear"
      },
      {
       "time": 34.32861,
       "value": [
-       1052.4017
+       1052.42011
       ],
       "interp": "linear"
      },
      {
       "time": 34.42869,
       "value": [
-       1052.52854
+       1052.54866
       ],
       "interp": "linear"
      },
      {
       "time": 34.52877,
       "value": [
-       1052.65605
+       1052.67772
       ],
       "interp": "linear"
      },
      {
       "time": 34.62886,
       "value": [
-       1052.78474
+       1052.80778
       ],
       "interp": "linear"
      },
      {
       "time": 34.72894,
       "value": [
-       1052.91513
+       1052.9393
       ],
       "interp": "linear"
      },
      {
       "time": 34.82902,
       "value": [
-       1053.04771
+       1053.07275
       ],
       "interp": "linear"
      },
      {
       "time": 34.92911,
       "value": [
-       1053.183
+       1053.2086
       ],
       "interp": "linear"
      },
      {
       "time": 35.02919,
       "value": [
-       1053.3215
+       1053.34732
       ],
       "interp": "linear"
      },
      {
       "time": 35.12927,
       "value": [
-       1053.46372
+       1053.48938
       ],
       "interp": "linear"
      },
      {
       "time": 35.22936,
       "value": [
-       1053.61017
+       1053.63525
       ],
       "interp": "linear"
      },
      {
       "time": 35.32944,
       "value": [
-       1053.76135
+       1053.78539
       ],
       "interp": "linear"
      },
      {
       "time": 35.42952,
       "value": [
-       1053.91779
+       1053.94028
       ],
       "interp": "linear"
      },
      {
       "time": 35.52961,
       "value": [
-       1054.07997
+       1054.10039
       ],
       "interp": "linear"
      },
      {
       "time": 35.62969,
       "value": [
-       1054.24842
+       1054.26619
       ],
       "interp": "linear"
      },
      {
       "time": 35.72977,
       "value": [
-       1054.42363
+       1054.43814
       ],
       "interp": "linear"
      },
      {
       "time": 35.82986,
       "value": [
-       1054.60612
+       1054.61671
       ],
       "interp": "linear"
      },
      {
       "time": 35.92994,
       "value": [
-       1054.79639
+       1054.80238
       ],
       "interp": "linear"
      },
      {
       "time": 36.03003,
       "value": [
-       1054.99496
+       1054.99562
       ],
       "interp": "linear"
      },
      {
       "time": 36.13011,
       "value": [
-       1055.21066
+       1055.20364
       ],
       "interp": "linear"
      },
      {
       "time": 36.23019,
       "value": [
-       1055.45702
+       1055.43738
       ],
       "interp": "linear"
      },
      {
       "time": 36.33028,
       "value": [
-       1055.72862
+       1055.69229
       ],
       "interp": "linear"
      },
      {
       "time": 36.43036,
       "value": [
-       1056.01818
+       1055.96231
       ],
       "interp": "linear"
      },
      {
       "time": 36.53044,
       "value": [
-       1056.31841
+       1056.24136
       ],
       "interp": "linear"
      },
      {
       "time": 36.63053,
       "value": [
-       1056.62202
+       1056.5234
       ],
       "interp": "linear"
      },
      {
       "time": 36.73061,
       "value": [
-       1056.92173
+       1056.80234
       ],
       "interp": "linear"
      },
      {
       "time": 36.83069,
       "value": [
-       1057.21025
+       1057.07213
       ],
       "interp": "linear"
      },
      {
       "time": 36.93078,
       "value": [
-       1057.48321
+       1057.32916
       ],
       "interp": "linear"
      },
      {
       "time": 37.03086,
       "value": [
-       1057.74942
+       1057.58083
       ],
       "interp": "linear"
      },
      {
       "time": 37.13094,
       "value": [
-       1058.01258
+       1057.83017
       ],
       "interp": "linear"
      },
      {
       "time": 37.23103,
       "value": [
-       1058.2741
+       1058.07825
       ],
       "interp": "linear"
      },
      {
       "time": 37.33111,
       "value": [
-       1058.53538
+       1058.32616
       ],
       "interp": "linear"
      },
      {
       "time": 37.43119,
       "value": [
-       1058.79776
+       1058.57491
       ],
       "interp": "step"
      },
@@ -36011,7 +36351,7 @@
      {
       "time": 29.0,
       "value": [
-       0.59333,
+       0.59334,
        2.46706,
        1.76216
       ],
@@ -36020,16 +36360,16 @@
      {
       "time": 29.1,
       "value": [
-       0.64595,
+       0.64596,
        2.4412,
-       1.71473
+       1.71472
       ],
       "interp": "smooth"
      },
      {
       "time": 29.2,
       "value": [
-       0.67919,
+       0.6792,
        2.41883,
        1.6737
       ],
@@ -36038,333 +36378,333 @@
      {
       "time": 29.3,
       "value": [
-       0.6944,
+       0.69442,
        2.3997,
-       1.63906
+       1.63905
       ],
       "interp": "smooth"
      },
      {
       "time": 29.4,
       "value": [
-       0.69297,
-       2.38357,
-       1.6108
+       0.69299,
+       2.38356,
+       1.61079
       ],
       "interp": "smooth"
      },
      {
       "time": 29.5,
       "value": [
-       0.67631,
-       2.37019,
-       1.58893
+       0.67633,
+       2.37018,
+       1.58892
       ],
       "interp": "smooth"
      },
      {
       "time": 29.6,
       "value": [
-       0.64583,
-       2.35932,
-       1.57348
+       0.64585,
+       2.35931,
+       1.57347
       ],
       "interp": "smooth"
      },
      {
       "time": 29.7,
       "value": [
-       0.60297,
-       2.35073,
-       1.56445
+       0.603,
+       2.35072,
+       1.56443
       ],
       "interp": "smooth"
      },
      {
       "time": 29.8,
       "value": [
-       0.54917,
-       2.34417,
-       1.56182
+       0.5492,
+       2.34416,
+       1.5618
       ],
       "interp": "smooth"
      },
      {
       "time": 29.9,
       "value": [
-       0.48583,
-       2.33942,
-       1.56555
+       0.48586,
+       2.3394,
+       1.56552
       ],
       "interp": "smooth"
      },
      {
       "time": 30.0,
       "value": [
-       0.41437,
-       2.33623,
-       1.57555
+       0.41441,
+       2.33621,
+       1.57552
       ],
       "interp": "smooth"
      },
      {
       "time": 30.1,
       "value": [
-       0.33617,
-       2.33437,
-       1.59168
+       0.33621,
+       2.33435,
+       1.59165
       ],
       "interp": "smooth"
      },
      {
       "time": 30.2,
       "value": [
-       0.25258,
-       2.3336,
-       1.61376
+       0.25263,
+       2.33358,
+       1.61372
       ],
       "interp": "smooth"
      },
      {
       "time": 30.3,
       "value": [
-       0.16493,
-       2.33369,
-       1.64153
+       0.16498,
+       2.33367,
+       1.6415
       ],
       "interp": "smooth"
      },
      {
       "time": 30.4,
       "value": [
-       0.07449,
-       2.33441,
-       1.67469
+       0.07454,
+       2.33439,
+       1.67465
       ],
       "interp": "smooth"
      },
      {
       "time": 30.5,
       "value": [
-       -0.01751,
-       2.33553,
-       1.71286
+       -0.01746,
+       2.3355,
+       1.71281
       ],
       "interp": "smooth"
      },
      {
       "time": 30.6,
       "value": [
-       -0.10991,
-       2.33681,
-       1.75559
+       -0.10985,
+       2.33679,
+       1.75554
       ],
       "interp": "smooth"
      },
      {
       "time": 30.7,
       "value": [
-       -0.20158,
-       2.33804,
-       1.80237
+       -0.20152,
+       2.33801,
+       1.80232
       ],
       "interp": "smooth"
      },
      {
       "time": 30.8,
       "value": [
-       -0.29147,
-       2.33899,
-       1.85262
+       -0.29141,
+       2.33895,
+       1.85256
       ],
       "interp": "smooth"
      },
      {
       "time": 30.9,
       "value": [
-       -0.37861,
-       2.33943,
-       1.90569
+       -0.37854,
+       2.3394,
+       1.90563
       ],
       "interp": "smooth"
      },
      {
       "time": 31.0,
       "value": [
-       -0.46208,
-       2.33917,
-       1.96087
+       -0.462,
+       2.33914,
+       1.96081
       ],
       "interp": "smooth"
      },
      {
       "time": 31.1,
       "value": [
-       -0.54102,
-       2.33799,
-       2.01739
+       -0.54095,
+       2.33795,
+       2.01733
       ],
       "interp": "smooth"
      },
      {
       "time": 31.2,
       "value": [
-       -0.61469,
-       2.33569,
-       2.07443
+       -0.61462,
+       2.33565,
+       2.07436
       ],
       "interp": "smooth"
      },
      {
       "time": 31.3,
       "value": [
-       -0.68237,
-       2.33207,
-       2.13108
+       -0.6823,
+       2.33204,
+       2.13102
       ],
       "interp": "smooth"
      },
      {
       "time": 31.4,
       "value": [
-       -0.74346,
-       2.32696,
-       2.18644
+       -0.74338,
+       2.32692,
+       2.18637
       ],
       "interp": "smooth"
      },
      {
       "time": 31.5,
       "value": [
-       -0.79738,
-       2.32016,
-       2.23951
+       -0.7973,
+       2.32012,
+       2.23943
       ],
       "interp": "smooth"
      },
      {
       "time": 31.6,
       "value": [
-       -0.84366,
-       2.31151,
-       2.28928
+       -0.84358,
+       2.31147,
+       2.28921
       ],
       "interp": "smooth"
      },
      {
       "time": 31.7,
       "value": [
-       -0.88188,
-       2.30084,
-       2.33471
+       -0.88181,
+       2.3008,
+       2.33464
       ],
       "interp": "smooth"
      },
      {
       "time": 31.8,
       "value": [
-       -0.91169,
-       2.288,
-       2.37474
+       -0.91162,
+       2.28796,
+       2.37467
       ],
       "interp": "smooth"
      },
      {
       "time": 31.9,
       "value": [
-       -0.93277,
-       2.27284,
-       2.40826
+       -0.9327,
+       2.2728,
+       2.40819
       ],
       "interp": "smooth"
      },
      {
       "time": 32.0,
       "value": [
-       -0.94486,
-       2.25521,
-       2.43417
+       -0.9448,
+       2.25518,
+       2.4341
       ],
       "interp": "smooth"
      },
      {
       "time": 32.1,
       "value": [
-       -0.94775,
-       2.23498,
-       2.45136
+       -0.94768,
+       2.23495,
+       2.45129
       ],
       "interp": "smooth"
      },
      {
       "time": 32.2,
       "value": [
-       -0.94122,
-       2.21202,
-       2.4587
+       -0.94117,
+       2.21199,
+       2.45864
       ],
       "interp": "smooth"
      },
      {
       "time": 32.3,
       "value": [
-       -0.92511,
-       2.18619,
-       2.4551
+       -0.92506,
+       2.18616,
+       2.45504
       ],
       "interp": "smooth"
      },
      {
       "time": 32.4,
       "value": [
-       -0.89925,
-       2.15737,
-       2.43943
+       -0.8992,
+       2.15734,
+       2.43938
       ],
       "interp": "smooth"
      },
      {
       "time": 32.5,
       "value": [
-       -0.86344,
-       2.12543,
-       2.41063
+       -0.8634,
+       2.12541,
+       2.41058
       ],
       "interp": "smooth"
      },
      {
       "time": 32.6,
       "value": [
-       -0.81749,
-       2.09024,
-       2.36761
+       -0.81746,
+       2.09022,
+       2.36757
       ],
       "interp": "smooth"
      },
      {
       "time": 32.7,
       "value": [
-       -0.76116,
-       2.05168,
-       2.30936
+       -0.76113,
+       2.05166,
+       2.30932
       ],
       "interp": "smooth"
      },
      {
       "time": 32.8,
       "value": [
-       -0.69415,
-       2.00959,
-       2.23485
+       -0.69413,
+       2.00958,
+       2.23483
       ],
       "interp": "smooth"
      },
      {
       "time": 32.9,
       "value": [
-       -0.61612,
+       -0.61611,
        1.96384,
-       2.14316
+       2.14315
       ],
       "interp": "smooth"
      },
@@ -36380,396 +36720,396 @@
      {
       "time": 33.1,
       "value": [
-       -0.43431,
-       1.86444,
-       1.91615
+       -0.43428,
+       1.86441,
+       1.91602
       ],
       "interp": "smooth"
      },
      {
       "time": 33.2,
       "value": [
-       -0.36256,
-       1.82377,
-       1.82095
+       -0.36234,
+       1.82356,
+       1.82019
       ],
       "interp": "smooth"
      },
      {
       "time": 33.3,
       "value": [
-       -0.31099,
-       1.7921,
-       1.7481
+       -0.31043,
+       1.79159,
+       1.74623
       ],
       "interp": "smooth"
      },
      {
       "time": 33.4,
       "value": [
-       -0.2778,
-       1.76873,
-       1.69628
+       -0.2768,
+       1.76779,
+       1.69287
       ],
       "interp": "smooth"
      },
      {
       "time": 33.5,
       "value": [
-       -0.26117,
-       1.7529,
-       1.66416
+       -0.25963,
+       1.75143,
+       1.65883
       ],
       "interp": "smooth"
      },
      {
       "time": 33.6,
       "value": [
-       -0.25923,
-       1.74385,
-       1.65041
+       -0.25709,
+       1.74178,
+       1.64282
       ],
       "interp": "smooth"
      },
      {
       "time": 33.7,
       "value": [
-       -0.27015,
-       1.74083,
-       1.65368
+       -0.26735,
+       1.73808,
+       1.64353
       ],
       "interp": "smooth"
      },
      {
       "time": 33.8,
       "value": [
-       -0.29208,
-       1.74307,
-       1.67256
+       -0.2886,
+       1.73959,
+       1.65962
       ],
       "interp": "smooth"
      },
      {
       "time": 33.9,
       "value": [
-       -0.32324,
-       1.74981,
-       1.70566
+       -0.31905,
+       1.74556,
+       1.68971
       ],
       "interp": "smooth"
      },
      {
       "time": 34.0,
       "value": [
-       -0.36185,
-       1.76029,
-       1.75148
+       -0.35698,
+       1.75525,
+       1.73238
       ],
       "interp": "smooth"
      },
      {
       "time": 34.1,
       "value": [
-       -0.40626,
-       1.77378,
-       1.80852
+       -0.40071,
+       1.76794,
+       1.78614
       ],
       "interp": "smooth"
      },
      {
       "time": 34.2,
       "value": [
-       -0.45482,
-       1.78954,
-       1.87517
+       -0.44866,
+       1.78293,
+       1.84947
       ],
       "interp": "smooth"
      },
      {
       "time": 34.3,
       "value": [
-       -0.50604,
-       1.80689,
-       1.94981
+       -0.49931,
+       1.79952,
+       1.92077
       ],
       "interp": "smooth"
      },
      {
       "time": 34.4,
       "value": [
-       -0.55846,
-       1.82513,
-       2.03073
+       -0.55124,
+       1.81704,
+       1.99838
       ],
       "interp": "smooth"
      },
      {
       "time": 34.5,
       "value": [
-       -0.61078,
-       1.84363,
-       2.11616
+       -0.60314,
+       1.83486,
+       2.08058
       ],
       "interp": "smooth"
      },
      {
       "time": 34.6,
       "value": [
-       -0.66177,
-       1.86174,
-       2.20427
+       -0.65381,
+       1.85237,
+       2.16561
       ],
       "interp": "smooth"
      },
      {
       "time": 34.7,
       "value": [
-       -0.71032,
-       1.87888,
-       2.29319
+       -0.70213,
+       1.86898,
+       2.25161
       ],
       "interp": "smooth"
      },
      {
       "time": 34.8,
       "value": [
-       -0.75546,
-       1.89449,
-       2.38096
+       -0.74714,
+       1.88415,
+       2.3367
       ],
       "interp": "smooth"
      },
      {
       "time": 34.9,
       "value": [
-       -0.79629,
-       1.90803,
-       2.4656
+       -0.78797,
+       1.89734,
+       2.41895
       ],
       "interp": "smooth"
      },
      {
       "time": 35.0,
       "value": [
-       -0.83207,
-       1.91901,
-       2.54507
+       -0.82384,
+       1.90807,
+       2.49636
       ],
       "interp": "smooth"
      },
      {
       "time": 35.1,
       "value": [
-       -0.86213,
-       1.92696,
-       2.61729
+       -0.85412,
+       1.91588,
+       2.56692
       ],
       "interp": "smooth"
      },
      {
       "time": 35.2,
       "value": [
-       -0.88594,
-       1.93145,
-       2.68016
+       -0.87823,
+       1.92034,
+       2.62856
       ],
       "interp": "smooth"
      },
      {
       "time": 35.3,
       "value": [
-       -0.90302,
-       1.93205,
-       2.73154
+       -0.89573,
+       1.92105,
+       2.67924
       ],
       "interp": "smooth"
      },
      {
       "time": 35.4,
       "value": [
-       -0.913,
-       1.9284,
-       2.76929
+       -0.9062,
+       1.9176,
+       2.71681
       ],
       "interp": "smooth"
      },
      {
       "time": 35.5,
       "value": [
-       -0.91555,
-       1.92013,
-       2.79124
+       -0.90932,
+       1.90965,
+       2.73922
       ],
       "interp": "smooth"
      },
      {
       "time": 35.6,
       "value": [
-       -0.91037,
-       1.90687,
-       2.79523
+       -0.90477,
+       1.89684,
+       2.74434
       ],
       "interp": "smooth"
      },
      {
       "time": 35.7,
       "value": [
-       -0.89719,
-       1.88828,
-       2.77912
+       -0.89226,
+       1.87881,
+       2.73012
       ],
       "interp": "smooth"
      },
      {
       "time": 35.8,
       "value": [
-       -0.87571,
-       1.86402,
-       2.74079
+       -0.87145,
+       1.85519,
+       2.69446
       ],
       "interp": "smooth"
      },
      {
       "time": 35.9,
       "value": [
-       -0.84556,
-       1.83371,
-       2.67815
+       -0.84195,
+       1.82562,
+       2.63538
       ],
       "interp": "smooth"
      },
      {
       "time": 36.0,
       "value": [
-       -0.80624,
-       1.79698,
-       2.58917
+       -0.8032,
+       1.78967,
+       2.55092
       ],
       "interp": "smooth"
      },
      {
       "time": 36.1,
       "value": [
-       -0.75663,
-       1.75253,
-       2.46919
+       -0.75415,
+       1.74621,
+       2.43701
       ],
       "interp": "smooth"
      },
      {
       "time": 36.2,
       "value": [
-       -0.69452,
-       1.69458,
-       2.29845
+       -0.69314,
+       1.69037,
+       2.27723
       ],
       "interp": "smooth"
      },
      {
       "time": 36.3,
       "value": [
-       -0.62308,
-       1.62377,
-       2.07691
+       -0.62282,
+       1.62267,
+       2.07134
       ],
       "interp": "smooth"
      },
      {
       "time": 36.4,
       "value": [
-       -0.55476,
-       1.55131,
-       1.82549
+       -0.55481,
+       1.55365,
+       1.83689
       ],
       "interp": "smooth"
      },
      {
       "time": 36.5,
       "value": [
-       -0.51554,
-       1.50262,
-       1.5943
+       -0.51425,
+       1.50768,
+       1.61706
       ],
       "interp": "smooth"
      },
      {
       "time": 36.6,
       "value": [
-       -0.5018,
-       1.47565,
-       1.3865
+       -0.49808,
+       1.4827,
+       1.41493
       ],
       "interp": "smooth"
      },
      {
       "time": 36.7,
       "value": [
-       -0.50667,
-       1.46645,
-       1.20238
+       -0.50037,
+       1.47484,
+       1.23118
       ],
       "interp": "smooth"
      },
      {
       "time": 36.8,
       "value": [
-       -0.52279,
-       1.47124,
-       1.04204
+       -0.51469,
+       1.48044,
+       1.06631
       ],
       "interp": "smooth"
      },
      {
       "time": 36.9,
       "value": [
-       -0.54331,
-       1.48644,
-       0.90466
+       -0.5349,
+       1.49593,
+       0.92001
       ],
       "interp": "smooth"
      },
      {
       "time": 37.0,
       "value": [
-       -0.56674,
-       1.50739,
-       0.77485
+       -0.55928,
+       1.51654,
+       0.77967
       ],
       "interp": "smooth"
      },
      {
       "time": 37.1,
       "value": [
-       -0.59149,
-       1.53004,
-       0.63732
+       -0.58594,
+       1.53809,
+       0.63281
       ],
       "interp": "smooth"
      },
      {
       "time": 37.2,
       "value": [
-       -0.61123,
-       1.54774,
-       0.4823
+       -0.60803,
+       1.55401,
+       0.47178
       ],
       "interp": "smooth"
      },
      {
       "time": 37.3,
       "value": [
-       -0.61822,
-       1.55234,
-       0.29957
+       -0.61706,
+       1.55632,
+       0.28851
       ],
       "interp": "smooth"
      },
      {
       "time": 37.4,
       "value": [
-       -0.60745,
-       1.53854,
-       0.07835
+       -0.60738,
+       1.53962,
+       0.07431
       ],
       "interp": "smooth"
      },
@@ -41565,8 +41905,8 @@
       "time": 89.8679,
       "value": [
        4.42,
-       2.56927,
-       1.63857
+       2.57844,
+       1.6416
       ],
       "interp": "smooth"
      },
@@ -41574,8 +41914,8 @@
       "time": 89.9679,
       "value": [
        4.42,
-       2.93287,
-       1.74539
+       3.1407,
+       1.84156
       ],
       "interp": "smooth"
      },
@@ -41583,8 +41923,8 @@
       "time": 90.0679,
       "value": [
        4.42,
-       3.39855,
-       1.72564
+       3.49271,
+       2.05359
       ],
       "interp": "smooth"
      },
@@ -41592,8 +41932,8 @@
       "time": 90.1679,
       "value": [
        4.42,
-       3.76348,
-       1.70411
+       2.53505,
+       2.30839
       ],
       "interp": "smooth"
      },
@@ -41601,8 +41941,8 @@
       "time": 90.2679,
       "value": [
        4.42,
-       3.51596,
-       2.28171
+       1.60356,
+       2.18842
       ],
       "interp": "smooth"
      },
@@ -41610,8 +41950,8 @@
       "time": 90.3679,
       "value": [
        4.42,
-       3.194,
-       2.58704
+       1.51382,
+       2.31768
       ],
       "interp": "smooth"
      },
@@ -41619,8 +41959,8 @@
       "time": 90.4679,
       "value": [
        4.42,
-       2.5699,
-       2.68859
+       1.22899,
+       2.30623
       ],
       "interp": "smooth"
      },
@@ -41628,8 +41968,8 @@
       "time": 90.5679,
       "value": [
        4.42,
-       1.80051,
-       2.6117
+       0.88207,
+       2.23504
       ],
       "interp": "smooth"
      },
@@ -41637,8 +41977,8 @@
       "time": 90.6679,
       "value": [
        4.42,
-       1.17428,
-       2.49833
+       0.57871,
+       2.23982
       ],
       "interp": "smooth"
      },
@@ -41646,8 +41986,8 @@
       "time": 90.7679,
       "value": [
        4.42,
-       0.87216,
-       2.65403
+       0.37233,
+       2.45404
       ],
       "interp": "smooth"
      },
@@ -41655,8 +41995,8 @@
       "time": 90.8679,
       "value": [
        4.42,
-       0.69473,
-       2.95209
+       0.20185,
+       2.75265
       ],
       "interp": "smooth"
      },
@@ -41664,8 +42004,8 @@
       "time": 90.9679,
       "value": [
        4.42,
-       0.51506,
-       3.21431
+       0.03838,
+       3.01636
       ],
       "interp": "smooth"
      },
@@ -41673,8 +42013,8 @@
       "time": 91.0679,
       "value": [
        4.42,
-       0.364,
-       3.42062
+       -0.0885,
+       3.22545
       ],
       "interp": "smooth"
      },
@@ -41682,8 +42022,8 @@
       "time": 91.1679,
       "value": [
        4.42,
-       0.23085,
-       3.59582
+       -0.19079,
+       3.4052
       ],
       "interp": "smooth"
      },
@@ -41691,8 +42031,8 @@
       "time": 91.2679,
       "value": [
        4.42,
-       0.09649,
-       3.7455
+       -0.28895,
+       3.56164
       ],
       "interp": "smooth"
      },
@@ -41700,8 +42040,8 @@
       "time": 91.3679,
       "value": [
        4.42,
-       -0.05108,
-       3.87612
+       -0.39636,
+       3.70162
       ],
       "interp": "smooth"
      },
@@ -41709,8 +42049,8 @@
       "time": 91.4679,
       "value": [
        4.42,
-       -0.22265,
-       3.99321
+       -0.52517,
+       3.83087
       ],
       "interp": "smooth"
      },
@@ -41718,8 +42058,8 @@
       "time": 91.5679,
       "value": [
        4.42,
-       -0.43084,
-       4.09786
+       -0.68936,
+       3.9505
       ],
       "interp": "smooth"
      },
@@ -41727,8 +42067,8 @@
       "time": 91.6679,
       "value": [
        4.42,
-       -0.68393,
-       4.18324
+       -0.89856,
+       4.05343
       ],
       "interp": "smooth"
      },
@@ -41736,8 +42076,8 @@
       "time": 91.7679,
       "value": [
        4.42,
-       -0.96678,
-       4.24241
+       -1.1389,
+       4.13223
       ],
       "interp": "smooth"
      },
@@ -41745,8 +42085,8 @@
       "time": 91.8679,
       "value": [
        4.42,
-       -1.26608,
-       4.28131
+       -1.39825,
+       4.19209
       ],
       "interp": "smooth"
      },
@@ -41754,8 +42094,8 @@
       "time": 91.9679,
       "value": [
        4.42,
-       -1.57172,
-       4.30948
+       -1.66759,
+       4.24157
       ],
       "interp": "smooth"
      },
@@ -41763,8 +42103,8 @@
       "time": 92.0679,
       "value": [
        4.42,
-       -1.87628,
-       4.33658
+       -1.94044,
+       4.28916
       ],
       "interp": "smooth"
      },
@@ -41772,8 +42112,8 @@
       "time": 92.1679,
       "value": [
        4.42,
-       -2.17395,
-       4.37129
+       -2.21188,
+       4.34225
       ],
       "interp": "smooth"
      },
@@ -41781,8 +42121,8 @@
       "time": 92.2679,
       "value": [
        4.42,
-       -2.45983,
-       4.42112
+       -2.47781,
+       4.40697
       ],
       "interp": "smooth"
      },
@@ -41790,8 +42130,8 @@
       "time": 92.3679,
       "value": [
        4.42,
-       -2.72948,
-       4.49227
+       -2.73455,
+       4.48821
       ],
       "interp": "smooth"
      },
@@ -41799,8 +42139,8 @@
       "time": 92.4679,
       "value": [
        4.42,
-       -2.97856,
-       4.58972
+       -2.9786,
+       4.58969
       ],
       "interp": "smooth"
      },
@@ -53400,35 +53740,11 @@
        0.0
       ],
       "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "nodes/hallShell/visible",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
+     },
      {
-      "time": 0.0,
+      "time": 92.47706,
       "value": [
        1.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 90.25523,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 91.92661,
-      "value": [
-       0.0
       ],
       "interp": "step"
      }
@@ -53469,35 +53785,11 @@
        0.0
       ],
       "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "nodes/hallFurn/visible",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
+     },
      {
-      "time": 0.0,
+      "time": 92.47706,
       "value": [
        1.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 90.25523,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 91.92661,
-      "value": [
-       0.0
       ],
       "interp": "step"
      }
@@ -53535,7 +53827,7 @@
      {
       "time": 92.47706,
       "value": [
-       0.0
+       2.5
       ],
       "interp": "step"
      }
@@ -53573,7 +53865,7 @@
      {
       "time": 92.47706,
       "value": [
-       0.0
+       2.5
       ],
       "interp": "step"
      }
@@ -53595,16 +53887,23 @@
       "interp": "step"
      },
      {
-      "time": 90.27523,
+      "time": 90.82569,
       "value": [
        1.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 91.37615,
+      "time": 91.65138,
       "value": [
        0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 92.47706,
+      "value": [
+       1.0
       ],
       "interp": "step"
      }
@@ -53622,8 +53921,8 @@
       "time": 90.27523,
       "value": [
        5.505302299376952,
-       3.320712272791126,
-       2.47903919775996
+       2.26575883602409,
+       1.827769662278181
       ],
       "interp": "smooth"
      },
@@ -53631,8 +53930,8 @@
       "time": 91.37615,
       "value": [
        5.505302299376952,
-       0.12071227279112584,
-       3.0790391977599603
+       -0.9342411639759103,
+       2.427769662278181
       ],
       "interp": "step"
      }
@@ -53650,8 +53949,8 @@
       "time": 90.55046,
       "value": [
        4.120330355749098,
-       1.1521521589927213,
-       2.1266965705679395
+       0.9436761231194231,
+       1.6971148273708305
       ],
       "interp": "smooth"
      },
@@ -53659,8 +53958,8 @@
       "time": 91.37615,
       "value": [
        4.120330355749098,
-       -2.047847841007279,
-       2.7266965705679396
+       -2.256323876880577,
+       2.2971148273708306
       ],
       "interp": "step"
      }
@@ -53678,8 +53977,8 @@
       "time": 90.82569,
       "value": [
        2.877571802802607,
-       0.768174320980286,
-       3.167012412270939
+       0.5841302903264451,
+       2.8524474636438972
       ],
       "interp": "smooth"
      },
@@ -53687,8 +53986,8 @@
       "time": 91.37615,
       "value": [
        2.877571802802607,
-       -2.431825679019714,
-       3.767012412270939
+       -2.615869709673555,
+       3.4524474636438973
       ],
       "interp": "step"
      }
@@ -53733,7 +54032,7 @@
     ]
    },
    {
-    "target": "sdf/stuShell/node/stuFan/rotation",
+    "target": "sdf/stuCeil/node/stuFan/rotation",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -66927,6 +67226,52 @@
     ]
    },
    {
+    "target": "sdf/doorLight/surface/2/emission",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 199.18167,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 199.39167,
+      "value": [
+       8.0,
+       8.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 199.71221,
+      "value": [
+       40.0,
+       40.0,
+       40.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "sdf/hallShell/node/frontDoorSwing/rotation",
     "component": -1,
     "timeBase": "seconds",
@@ -67996,10 +68341,10 @@
     ]
    },
    {
-    "target": "nodes/row/visible",
+    "target": "sdf/street/look/edge/intensity",
     "component": -1,
     "timeBase": "seconds",
-    "mode": "replace",
+    "mode": "multiply",
     "loopLength": 0.0,
     "enabled": true,
     "keys": [
@@ -68037,6 +68382,13 @@
      {
       "time": 0.0,
       "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.95183,
+      "value": [
        1.0
       ],
       "interp": "step"
@@ -68047,18 +68399,11 @@
        0.0
       ],
       "interp": "step"
-     },
-     {
-      "time": 258.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
      }
     ]
    },
    {
-    "target": "nodes/lamps/visible",
+    "target": "nodes/hallFurn/visible",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -68073,23 +68418,23 @@
       "interp": "step"
      },
      {
-      "time": 254.99,
+      "time": 90.25523,
       "value": [
        0.0
       ],
       "interp": "step"
      },
      {
-      "time": 258.0,
+      "time": 92.47706,
       "value": [
-       0.0
+       1.0
       ],
       "interp": "step"
      }
     ]
    },
    {
-    "target": "nodes/skyline/visible",
+    "target": "nodes/hallShell/visible",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -68104,47 +68449,16 @@
       "interp": "step"
      },
      {
-      "time": 254.99,
+      "time": 90.25523,
       "value": [
        0.0
       ],
       "interp": "step"
      },
      {
-      "time": 258.0,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     }
-    ]
-   },
-   {
-    "target": "nodes/heroShell/visible",
-    "component": -1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 0.0,
-    "enabled": true,
-    "keys": [
-     {
-      "time": 0.0,
+      "time": 92.47706,
       "value": [
        1.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 254.99,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 258.0,
-      "value": [
-       0.0
       ],
       "interp": "step"
      }
@@ -68161,6 +68475,13 @@
      {
       "time": 0.0,
       "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 21.66835,
+      "value": [
        1.0
       ],
       "interp": "step"
@@ -68171,9 +68492,19 @@
        0.0
       ],
       "interp": "step"
-     },
+     }
+    ]
+   },
+   {
+    "target": "nodes/heroShell/visible",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
      {
-      "time": 258.0,
+      "time": 254.99,
       "value": [
        0.0
       ],
@@ -68190,21 +68521,7 @@
     "enabled": true,
     "keys": [
      {
-      "time": 0.0,
-      "value": [
-       1.0
-      ],
-      "interp": "step"
-     },
-     {
       "time": 254.99,
-      "value": [
-       0.0
-      ],
-      "interp": "step"
-     },
-     {
-      "time": 258.0,
       "value": [
        0.0
       ],
@@ -68213,29 +68530,49 @@
     ]
    },
    {
-    "target": "sdf/street/look/edge/intensity",
+    "target": "nodes/lamps/visible",
     "component": -1,
     "timeBase": "seconds",
-    "mode": "multiply",
+    "mode": "replace",
     "loopLength": 0.0,
     "enabled": true,
     "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       1.0
-      ],
-      "interp": "step"
-     },
      {
       "time": 254.99,
       "value": [
        0.0
       ],
       "interp": "step"
-     },
+     }
+    ]
+   },
+   {
+    "target": "nodes/row/visible",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
      {
-      "time": 258.0,
+      "time": 254.99,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "nodes/skyline/visible",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 254.99,
       "value": [
        0.0
       ],
@@ -71871,6 +72208,10 @@
     "target": "sdf/livThinker/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/livThinker/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/livThinker/surface/0/color"
    },
@@ -71906,6 +72247,10 @@
    {
     "role": "figure",
     "target": "sdf/livLie/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/livLie/look/rim/color"
    },
    {
     "role": "fill",
@@ -71945,6 +72290,10 @@
     "target": "sdf/livHands/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/livHands/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/livHands/surface/0/color"
    },
@@ -71980,6 +72329,10 @@
    {
     "role": "figure",
     "target": "sdf/livWindow/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/livWindow/look/rim/color"
    },
    {
     "role": "fill",
@@ -72154,6 +72507,10 @@
     "target": "sdf/kitMan/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/kitMan/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/kitMan/surface/0/color"
    },
@@ -72316,6 +72673,10 @@
    {
     "role": "figure",
     "target": "sdf/hallMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/hallMan/look/rim/color"
    },
    {
     "role": "fill",
@@ -72703,6 +73064,10 @@
     "target": "sdf/bedLie/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/bedLie/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/bedLie/surface/0/color"
    },
@@ -72738,6 +73103,10 @@
    {
     "role": "figure",
     "target": "sdf/bedEdge/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/bedEdge/look/rim/color"
    },
    {
     "role": "fill",
@@ -72867,6 +73236,10 @@
     "target": "sdf/bathMirror/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/bathMirror/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/bathMirror/surface/0/color"
    },
@@ -72902,6 +73275,10 @@
    {
     "role": "figure",
     "target": "sdf/bathToilet/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/bathToilet/look/rim/color"
    },
    {
     "role": "fill",
@@ -73109,6 +73486,10 @@
     "target": "sdf/stuDesk/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/stuDesk/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/stuDesk/surface/0/color"
    },
@@ -73144,6 +73525,10 @@
    {
     "role": "figure",
     "target": "sdf/stuFloor/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/stuFloor/look/rim/color"
    },
    {
     "role": "fill",
@@ -74216,6 +74601,10 @@
     "target": "sdf/galMan/look/edge/color"
    },
    {
+    "role": "figure",
+    "target": "sdf/galMan/look/rim/color"
+   },
+   {
     "role": "fill",
     "target": "sdf/galMan/surface/0/color"
    },
@@ -74255,6 +74644,10 @@
    {
     "role": "figure",
     "target": "sdf/hillMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/hillMan/look/rim/color"
    },
    {
     "role": "fill",
@@ -74410,6 +74803,47 @@
    {
     "role": "glass",
     "target": "sdf/hallDisco/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/doorLight/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/doorLight/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/doorLight/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/doorLight/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/doorLight/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/doorLight/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/doorLight/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/doorLight/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/doorLight/surface/7/emission",
     "mode": "multiply"
    },
    {

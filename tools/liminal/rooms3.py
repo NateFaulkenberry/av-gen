@@ -405,7 +405,7 @@ def study():
     walls = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.9, 1.2, 1.1, 1.05)], ceiling=False))
     shell = U(K.wave(walls, 0.0, 7.0, [1.0, 0.0, 0.0], name="stuWarp"),
               window_on("-z", ext, -0.9, 1.2, 1.1, 1.05, eid="StudyWindow", room=rid),
-              place(tag(U(K.ceiling_fan(name="stuFan"), K.CY([0, -0.02, 0], 0.08, 0.04)), "ceilingFan", "CeilingFan", rid), (-0.8, y1, -4.3)),
+
               on_wall(K.painting(0.8, 0.55, motif="horizon", entity={"id": "StudyPainting", "room": rid}), "+x", ext, -5.0, y0 + 1.6))
     # the desk against the back wall under the window, its front (+Z) to the room; the chair in front of it
     desk_at = (-0.9, y0, z0 + 0.46)
@@ -419,18 +419,20 @@ def study():
             "objects": [("stuShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("stuFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05)),
                         ("stuShelf", shelf, "furn2", (x1 - 0.5, y0 - 0.05, -4.2), (x1 + 0.05, y0 + 2.0, -3.0)),
-                        ("stuCeil", ceiling_halves(ext, "stu"), "wall", (x0 - 12, y1 - 0.3, z0 - 12), (x1 + 12, y1 + 40.0, z1 + 12))] + figs,
+                        ("stuCeil", ceiling_halves(ext, "stu", attach_left=[place(tag(U(K.ceiling_fan(name="stuFan"), K.CY([0, -0.02, 0], 0.08, 0.04)),
+                                                                                       "ceilingFan", "CeilingFan", rid), (-0.8, y1, -4.3))]),
+                         "wall", (x0 - 12, y1 - 0.8, z0 - 12), (x1 + 12, y1 + 40.0, z1 + 12))] + figs,
             "lights": [("stuLamp", (-0.2, y0 + 1.6, z0 + 0.5), "lamp"), ("stuScreen", (-1.1, y0 + 1.0, z0 + 0.9), "screen")],
             "anchors": {"desk": (desk_at[0], y0 + 0.9, desk_at[2]), "monitor": (-1.1, y0 + 1.0, z0 + 0.31), "window": (-0.9, y0 + 1.6, z0),
                         "wall": (x0, y0 + 1.0, -4.2), "door": (x1, y0 + 1.0, -3.0), "fan": (-0.8, y1 - 0.3, -4.3)}}
 
 
-def ceiling_halves(ext, prefix):
-    """A room's ceiling as its own object in two halves (`<prefix>CeilL`, `<prefix>CeilR`: named translates) and a
-    rose (`<prefix>CeilRose`), so the roof can split and fly off (bars 65.4-66.4)."""
+def ceiling_halves(ext, prefix, attach_left=()):
+    """A room's ceiling as its own object in two halves (`<prefix>CeilL`, `<prefix>CeilR`: named translates), so the
+    roof can split and fly off (bars 65.4-66.4); anything hanging from the left half (`attach_left`) goes with it."""
     (x0, x1), (y0, y1), (z0, z1) = ext
     xm = (x0 + x1) / 2
-    ceil = U(T([0, 0, 0], X(((x0 - 0.15, xm), (y1, y1 + 0.15), (z0 - 0.15, z1 + 0.15))), name=f"{prefix}CeilL"),
+    ceil = U(T([0, 0, 0], U(X(((x0 - 0.15, xm), (y1, y1 + 0.15), (z0 - 0.15, z1 + 0.15))), *attach_left), name=f"{prefix}CeilL"),
              T([0, 0, 0], X(((xm, x1 + 0.15), (y1, y1 + 0.15), (z0 - 0.15, z1 + 0.15))), name=f"{prefix}CeilR"))
     return S(ceil, FILL)
 

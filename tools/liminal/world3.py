@@ -24,7 +24,7 @@ HEAD_GLOW = 0.16      # the head surface's emission before the figure colour mul
 HEAD_EDGE = 1.9       # the head's line brightness against the body's
 # The engine's rim (ADR-1052) and screen static (ADR-1054) change the SDF uniform block: switch them on only when
 # rendering with a binary that has them (re-pinned after their commit).
-ENGINE_RIM_STATIC = os.environ.get("LIMINAL_RIM_STATIC", "0") == "1"
+ENGINE_RIM_STATIC = os.environ.get("LIMINAL_RIM_STATIC", "1") == "1"     # pinned at dd5c0fe1, which has both
 FIGURE_RIM = {"rimIntensity": 1.15, "rimPower": 2.6, "rimColor": [1.0, 1.0, 1.0]}
 
 

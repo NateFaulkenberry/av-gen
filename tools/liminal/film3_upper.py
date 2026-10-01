@@ -153,7 +153,7 @@ def build(b):
     for o in ("bedShell", "bathShell", "stuShell"):
         f.route("grid.song.quarter.wave", f"sdf/{o}/transform/scale", 0.012, depth=g_v2)
     f.route("grid.song.bar.wave", "sdf/bedShell/node/bedCurtain/amount", 0.04, depth=g_v2)
-    f.track("sdf/stuShell/node/stuFan/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, 300.0 * end, 0.0])])
+    f.track("sdf/stuCeil/node/stuFan/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (end, [0.0, 300.0 * end, 0.0])])
     f.track("sdf/stuFurn/node/stuGlobe/rotation", [(0.0, [0.0, 0.0, 0.0], "linear"), (113.1, [0.0, 2600.0, 0.0], "step"),
                                                   (t(51, 4), [0.0, 2600.0, 0.0], "linear"), (t(54), [0.0, 4400.0, 0.0], "linear"),
                                                   (end, [0.0, 4400.0 + 260.0 * (end - t(54)), 0.0])])
@@ -204,6 +204,10 @@ def build(b):
     # C09 (51.4) data-mosh: three quarters of the frame freezes and smears, the channels split, then it snaps back
     c = b.clap("c09", t(51, 4), release=0.9, hold=BEAT1 * 0.5)
     f.route(c, "temporal/mosh/amount", 0.75)
+    f.route(c, "palette/value", 1.7)
+    f.route(c, "post/bloom/intensity", 1.2)
+    for o in ("bedShell", "bedFurn"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 9.0)
     f.route(c, "temporal/mosh/shift", 14.0)
     f.route(c, "post/lens/chromaticAberration", 0.6)
     # C10 (53.4) positional corruption: the bedroom's parts jump sideways by their own amounts (the cut lands
@@ -213,6 +217,7 @@ def build(b):
         f.route(c, f"sdf/{o}/transform/position", off, component=0, attackMs=5.0)
     f.route(c, "post/lens/chromaticAberration", 0.7)
     f.route(c, "temporal/mosh/amount", 0.5)
+    f.route(c, "camera/exposure/compensation", 1.8)
     # C11 (55.4) colour corruption: a 180-degree hue jump, the channels split, the lamp pumps like a heart
     c = b.clap("c11", t(55, 4), release=0.55)
     f.route(c, "post/grade/hueShift", 3.1)
@@ -225,16 +230,21 @@ def build(b):
     for o in ("bathShell", "bathFurn"):
         f.route(c, f"sdf/{o}/transform/scale", 1.0, component=1)
     f.route(c, "temporal/mosh/amount", 0.45)
+    f.route(c, "post/bloom/intensity", 1.6)
+    f.route(c, "palette/value", 1.6)
     # C13 (59.4) the walls tear: the study's walls ripple (a displacement), the frame splits
     c = b.clap("c13", t(59, 4), release=0.7)
     f.route(c, "sdf/stuShell/node/stuWarp/amount", 0.16)
     f.route(c, "post/lens/chromaticAberration", 0.8)
     f.route(c, "temporal/mosh/amount", 0.35)
-    f.route(c, "camera/exposure/compensation", 0.8)
+    f.route(c, "camera/exposure/compensation", 1.6)
+    for o in ("stuShell", "stuFurn", "stuShelf"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 8.0)
     # C14 (61.4) a lurch: the whole room jumps a hand's width sideways for two frames, twice
     c = b.clap("c14", t(61, 4), release=0.08, attack=0.0)
     for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil", "stuDesk", "stuFloor"):
         f.route(c, f"sdf/{o}/transform/position", 0.22, component=0, attackMs=5.0)
+    f.route(c, "camera/exposure/compensation", -6.0)      # the frame drops out for an instant
     c = b.clap("c14b", t(61, 4) + 0.14, release=0.06)
     for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil", "stuDesk", "stuFloor"):
         f.route(c, f"sdf/{o}/transform/position", -0.16, component=0, attackMs=5.0)
@@ -243,6 +253,9 @@ def build(b):
     c = b.clap("c15", t(63, 4), release=0.6)
     f.route(c, "palette/saturation", -0.9)
     f.route(c, "post/bloom/intensity", 1.6)
+    f.route(c, "camera/exposure/compensation", 1.4)
+    for o in ("stuShell", "stuFurn", "stuShelf"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 10.0)
     for o in ("stuShell", "stuFurn", "stuShelf", "stuFloor", "stuCeil"):
         f.track(f"sdf/{o}/transform/position", [(t(63, 4) - 0.002, [0.0, 0.0, 0.0], "easeIn"), (t(64) - 0.05, [0.0, -1.0, 0.0], "easeOut"),
                                                 (t(64, 3), [0.0, 0.0, 0.0], "step")], mode="add")

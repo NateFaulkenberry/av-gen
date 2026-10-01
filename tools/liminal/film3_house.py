@@ -125,6 +125,8 @@ def build(b):
     c = b.clap("c01", t(20, 4), release=0.9)
     f.route(c, "post/grade/hueShift", 3.1)
     f.route(c, "palette/saturation", 0.8)
+    f.route(c, "palette/value", 1.6)
+    f.route(c, "camera/exposure/compensation", 1.2)
     f.route(c, "lights/livLamp/intensity", 25.0)
     f.route(c, "post/bloom/intensity", 1.2)
     f.route(c, "temporal/mosh/shift", 18.0)
@@ -135,6 +137,9 @@ def build(b):
     f.route(c, "camera/exposure/compensation", 1.6)
     f.route(c, "post/lens/chromaticAberration", 0.7)
     f.route(c, "temporal/mosh/amount", 0.5)
+    c = b.clap("v1in", t(25), release=0.6)           # the walls slam back for the verse: a white flash on the downbeat
+    f.route(c, "camera/exposure/compensation", 1.6)
+    f.route(c, "post/bloom/intensity", 1.2)
     for o in ("livShell", "livDecor"):
         f.track(f"sdf/{o}/transform/scale", [(0.0, [1.0, 1.0, 1.0], "step"), (t(24, 4) - 0.002, [1.0, 1.0, 1.0], "easeOut"),
                                              (t(24, 4) + 0.14, [2.4, 1.5, 2.4], "easeIn"), (t(25) - 0.002, [3.4, 1.9, 3.4], "step"),
@@ -148,6 +153,10 @@ def build(b):
     # ---- C04 (32.4): the palette turn, and the camera goes through to the kitchen ------------------------------
     c = b.clap("c04", t(32, 4), release=0.8)
     f.route(c, "post/bloom/intensity", 0.9)
+    f.route(c, "camera/exposure/compensation", 2.0)
+    f.route(c, "palette/value", 1.8)
+    for o in ("livShell", "livSofa", "livMedia", "livShelf", "livDecor", "kitShell", "kitCounter", "kitTable"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 8.0)
     f.route(c, "lights/livLamp/intensity", 12.0)
     f.route(c, "temporal/mosh/amount", 0.4)
     f.route(c, "temporal/mosh/shift", 12.0)
@@ -207,8 +216,8 @@ def build(b):
     def ahead(tt, z):    # looking 15 degrees down, as a climber watches the next steps (they fill the lower frame)
         return (tt, (4.42, climb_y(z) - 3.0 * 0.268, z + 3.0))
     look = [(t(37), (3.6, 1.4, -4.6)), (82.3, (4.3, 1.1, -3.2)), (83.6, (4.4, 1.3, -3.0)), (85.0, (4.42, 1.7, -2.6)),
-            ahead(86.0, -4.95), ahead(87.5, -3.64), ahead(89.6, -1.95), (89.85, (4.42, climb_y(-1.4) - 1.1, 1.6)), (90.25, (4.42, 3.9, 1.8)),
-            (t(41), (4.42, 3.4, 2.4)), (90.75, (4.42, 0.9, 2.6)), (t(42), (4.42, -3.0, 4.6))]
+            ahead(86.0, -4.95), ahead(87.5, -3.64), ahead(89.6, -1.95), (89.85, (4.42, climb_y(-1.4) - 1.1, 1.6)), (90.05, (4.42, 3.5, 2.0)),
+            (t(41), (4.42, 1.6, 2.2)), (90.75, (4.42, 0.4, 2.4)), (t(42), (4.42, -3.0, 4.6))]
     b.glide("hall", eye, look, nodes_keys=("hall",), fov=64.0)
     s5 = b.swap("kitMan", "hallMan", t(37) - 0.3)
     b.show("kitMan", s4, s5)
@@ -234,13 +243,17 @@ def build(b):
     f.route(c, "post/bloom/intensity", 2.0)
     f.route(c, "camera/exposure/compensation", 1.4)
     f.route(c, "temporal/mosh/amount", 0.45)
+    # (every one of these comes back at 42.1: the hall is used again for the dance)
     for o in ("hallShell", "hallFurn"):
         f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 1.0, "step"), (t(40, 4) - 0.001, 1.0, "step"), (t(40, 4) + 0.05, 4.0, "smooth"),
-                                                 (t(41) - 0.05, 0.0, "step")], mode="multiply")
-        f.track(f"nodes/{o}/visible", [(0.0, 1.0, "step"), (t(41) - 0.02, 0.0, "step"), (t(41, 4), 0.0, "step")])
-    f.track("lights/hallLamp/intensity", [(0.0, 2.5), (t(40, 4), 2.5, "smooth"), (t(41) - 0.05, 0.0, "step"), (t(42), 0.0, "step")])
-    f.track("lights/hallLamp2/intensity", [(0.0, 2.5), (t(40, 4), 2.5, "smooth"), (t(41) - 0.05, 0.0, "step"), (t(42), 0.0, "step")])
-    f.track("sdf/hallStair/look/edge/intensity", [(0.0, 1.0, "step"), (t(41), 1.0, "smooth"), (t(41, 3), 0.0, "step")], mode="multiply")
+                                                 (t(41) - 0.05, 0.0, "step"), (t(42), 1.0, "step")], mode="multiply")
+        b.key(f"nodes/{o}/visible", 0.0, 1.0)
+        b.key(f"nodes/{o}/visible", t(41) - 0.02, 0.0)
+        b.key(f"nodes/{o}/visible", t(42), 1.0)
+    for lamp in ("hallLamp", "hallLamp2"):
+        f.track(f"lights/{lamp}/intensity", [(0.0, 2.5), (t(40, 4), 2.5, "smooth"), (t(41) - 0.05, 0.0, "step"), (t(42), 2.5, "step")])
+    f.track("sdf/hallStair/look/edge/intensity", [(0.0, 1.0, "step"), (t(41, 2), 1.0, "smooth"), (t(41, 3.5), 0.0, "step"),
+                                                  (t(42), 1.0, "step")], mode="multiply")
 
     # ---- 41: over the edge. LET IT GO falls with us; the second, hot pink, stops dead on 41.4 --------------
     for i, (wd, beat, sx, sy, dist) in enumerate((("LET", 1.0, -0.35, 0.1, 3.0), ("IT", 1.5, 0.08, -0.15, 3.4), ("GO", 2.0, 0.4, 0.05, 3.8))):
