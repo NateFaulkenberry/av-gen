@@ -446,9 +446,10 @@ LIVE_DEFORMERS = {
 
 # The inner petals, turned half a petal (a gap nearer the held camera), and the seed raised 0.3 m in their cup.
 PETAL_START = 0.449
-SEED_RAISE = 0.4
+SEED_RAISE = 0.5
 SEED_BODY = 0.4
-PETAL_CURL = 0.22
+PETAL_CURL = 0.12
+OUTER_PETAL_CURL = 0.15
 
 
 def live_scene():
@@ -467,9 +468,13 @@ def live_scene():
     for node in s["nodes"]:
         if node["name"] == "petals":
             node["procedural"]["distribution"]["startAngle"] = PETAL_START
-            # and curled less (0.41 -> 0.22): their tips no longer rise across the seed, where two of them read as
+            # and curled less (0.41 -> 0.12): their tips no longer rise across the seed, where two of them read as
             # a pair of eyes
             node["procedural"]["deformers"][0]["amount"] = PETAL_CURL
+        if node["name"] == "outerpetals":
+            # the outer ring too (0.27 -> 0.15): on a single held note (no chord to open it) one of them curled up
+            # in front of the seed from the drifting camera, its dark underside a teardrop-shaped hole in the light
+            node["procedural"]["deformers"][0]["amount"] = OUTER_PETAL_CURL
         if node["name"] == "seed":  # and the seed sits a little higher in the cup, clear of the petal tips
             pos = node["procedural"]["distributionTransform"]["position"]
             pos[1] = round(pos[1] + SEED_RAISE, 3)

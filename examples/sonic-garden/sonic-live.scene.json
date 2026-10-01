@@ -1960,7 +1960,7 @@
     "distributionTransform": {
      "position": [
       0,
-      2.2,
+      2.3,
       0
      ],
      "rotation": [
@@ -2177,7 +2177,7 @@
     "deformers": [
      {
       "kind": "bend",
-      "amount": 0.22,
+      "amount": 0.12,
       "axis": [
        0,
        0,
@@ -2322,7 +2322,7 @@
     "deformers": [
      {
       "kind": "bend",
-      "amount": 0.27,
+      "amount": 0.15,
       "axis": [
        0,
        0,
