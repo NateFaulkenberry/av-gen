@@ -154,6 +154,46 @@
       "curve": "linear"
      },
      {
+      "channel": "riserBar",
+      "time": 28.62385,
+      "units": "seconds",
+      "hold": 2.141834862385321,
+      "attack": 0.03,
+      "release": 0.03,
+      "curve": "linear",
+      "strength": 0.4
+     },
+     {
+      "channel": "riserBar",
+      "time": 30.82569,
+      "units": "seconds",
+      "hold": 2.141834862385321,
+      "attack": 0.03,
+      "release": 0.03,
+      "curve": "linear",
+      "strength": 0.7
+     },
+     {
+      "channel": "riserBar",
+      "time": 33.02752,
+      "units": "seconds",
+      "hold": 2.141834862385321,
+      "attack": 0.03,
+      "release": 0.03,
+      "curve": "linear",
+      "strength": 1.0
+     },
+     {
+      "channel": "riserBar",
+      "time": 35.22936,
+      "units": "seconds",
+      "hold": 2.141834862385321,
+      "attack": 0.03,
+      "release": 0.03,
+      "curve": "linear",
+      "strength": 1.2999999999999998
+     },
+     {
       "channel": "chop13",
       "time": 28.62385,
       "units": "seconds",
@@ -883,12 +923,32 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1072",
+      "time": 234.86734,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1074",
       "time": 235.94843,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1074",
+      "time": 235.94843,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
       "curve": "exp",
       "strength": 1.0
      },
@@ -903,12 +963,32 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1082",
+      "time": 237.02951,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1084",
       "time": 238.11059,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1084",
+      "time": 238.11059,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
       "curve": "exp",
       "strength": 1.0
      },
@@ -923,12 +1003,32 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1092",
+      "time": 239.19167,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1094",
       "time": 240.27275,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1094",
+      "time": 240.27275,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
       "curve": "exp",
       "strength": 1.0
      },
@@ -943,12 +1043,32 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1102",
+      "time": 241.35383,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1104",
       "time": 242.43491,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1104",
+      "time": 242.43491,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
       "curve": "exp",
       "strength": 1.0
      },
@@ -963,12 +1083,32 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1112",
+      "time": 243.51599,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1114",
       "time": 244.59707,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1114",
+      "time": 244.59707,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
       "curve": "exp",
       "strength": 1.0
      },
@@ -983,12 +1123,72 @@
       "strength": 1.0
      },
      {
+      "channel": "fwb1122",
+      "time": 245.67816,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "fw1124",
       "time": 246.75924,
       "units": "seconds",
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.5,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "fwb1124",
+      "time": 246.75924,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "crashfwA",
+      "time": 247.29978,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.1,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "crashfwB",
+      "time": 247.29978,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.1,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "crashfwC",
+      "time": 247.29978,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.1,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "gotSpark",
+      "time": 172.43491,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.08,
       "curve": "exp",
       "strength": 1.0
      },
@@ -2082,7 +2282,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 164.86238532110093,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth01",
@@ -2091,7 +2291,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 165.1376146788991,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth02",
@@ -2100,7 +2300,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 165.40788494916936,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth03",
@@ -2109,7 +2309,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 165.67815521943965,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth04",
@@ -2118,7 +2318,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 167.029506570791,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth05",
@@ -2127,7 +2327,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 167.29977684106126,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth06",
@@ -2136,7 +2336,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 167.57004711133152,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth07",
@@ -2145,7 +2345,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 167.8403173816018,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth08",
@@ -2154,7 +2354,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 169.19166873295316,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth09",
@@ -2163,7 +2363,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 169.46193900322342,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth10",
@@ -2172,7 +2372,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 169.73220927349368,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth11",
@@ -2181,7 +2381,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 170.00247954376397,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth12",
@@ -2190,7 +2390,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 171.35383089511532,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth13",
@@ -2199,7 +2399,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 171.62410116538558,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth14",
@@ -2208,7 +2408,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 171.89437143565584,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth15",
@@ -2217,7 +2417,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 172.16464170592613,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth16",
@@ -2226,7 +2426,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 172.4349119761964,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth17",
@@ -2235,7 +2435,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 173.51599305727748,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth18",
@@ -2244,7 +2444,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 173.78626332754774,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth19",
@@ -2253,7 +2453,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 174.05653359781803,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth20",
@@ -2262,7 +2462,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 174.3268038680883,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth21",
@@ -2271,7 +2471,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 175.67815521943965,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth22",
@@ -2280,7 +2480,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 175.9484254897099,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth23",
@@ -2289,7 +2489,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 176.2186957599802,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth24",
@@ -2298,7 +2498,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 176.48896603025045,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth25",
@@ -2307,7 +2507,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 177.8403173816018,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth26",
@@ -2316,7 +2516,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 178.11058765187207,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth27",
@@ -2325,7 +2525,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 178.38085792214235,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth28",
@@ -2334,7 +2534,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 178.6511281924126,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth29",
@@ -2343,7 +2543,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 180.00247954376397,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth30",
@@ -2352,7 +2552,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 180.27274981403423,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth31",
@@ -2361,7 +2561,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 180.54302008430452,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "isth32",
@@ -2370,7 +2570,7 @@
       "release": 0.3,
       "curve": "smooth",
       "time": 180.81329035457478,
-      "hold": 1.9459459459459367
+      "hold": 1.8378378378378386
      },
      {
       "channel": "b3w83",
@@ -3576,6 +3776,32 @@
    "enabled": true,
    "chain": {},
    "depthSource": "grid.song.gRiser",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/houseGround/look/edge/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.riserBar",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/houseParts/look/edge/pixels",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.riserBar",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
@@ -6377,6 +6603,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1072",
+   "target": "particles/fwA/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1074",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6390,6 +6626,16 @@
    "source": "grid.song.fw1074",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1074",
+   "target": "particles/fwB/burst",
+   "amount": 900.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6417,6 +6663,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1082",
+   "target": "particles/fwC/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1084",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6430,6 +6686,16 @@
    "source": "grid.song.fw1084",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1084",
+   "target": "particles/fwA/burst",
+   "amount": 900.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6457,6 +6723,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1092",
+   "target": "particles/fwB/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1094",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6470,6 +6746,16 @@
    "source": "grid.song.fw1094",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1094",
+   "target": "particles/fwC/burst",
+   "amount": 900.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6497,6 +6783,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1102",
+   "target": "particles/fwA/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1104",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6510,6 +6806,16 @@
    "source": "grid.song.fw1104",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1104",
+   "target": "particles/fwB/burst",
+   "amount": 900.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6537,6 +6843,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1112",
+   "target": "particles/fwC/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1114",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6550,6 +6866,16 @@
    "source": "grid.song.fw1114",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1114",
+   "target": "particles/fwA/burst",
+   "amount": 900.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6577,6 +6903,16 @@
    "chain": {}
   },
   {
+   "source": "grid.song.fwb1122",
+   "target": "particles/fwB/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.fw1124",
    "target": "sdf/ringLow/look/edge/intensity",
    "amount": 10.0,
@@ -6590,6 +6926,56 @@
    "source": "grid.song.fw1124",
    "target": "post/bloom/intensity",
    "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.fwb1124",
+   "target": "particles/fwC/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.crashfwA",
+   "target": "particles/fwA/burst",
+   "amount": 2600.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.crashfwB",
+   "target": "particles/fwB/burst",
+   "amount": 2600.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.crashfwC",
+   "target": "particles/fwC/burst",
+   "amount": 2600.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.gotSpark",
+   "target": "particles/fwB/burst",
+   "amount": 1400.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -31281,7 +31667,7 @@
      {
       "time": 249.46194,
       "value": [
-       0.0,
+       2.0,
        1.0,
        -40.0
       ],
@@ -31290,7 +31676,7 @@
      {
       "time": 252.0,
       "value": [
-       0.0,
+       3.0,
        3.0,
        -60.0
       ],
@@ -31299,8 +31685,8 @@
      {
       "time": 255.0,
       "value": [
-       0.0,
        4.0,
+       5.0,
        -80.0
       ],
       "interp": "smooth"
@@ -31308,8 +31694,8 @@
      {
       "time": 254.9999,
       "value": [
-       0.0,
        4.0,
+       5.0,
        -80.0
       ],
       "interp": "step"
@@ -37810,6 +38196,44 @@
       "time": 35.22936,
       "value": [
        1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "post/bloom/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.62385,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.6055,
+      "value": [
+       0.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 36.88073,
+      "value": [
+       0.0
       ],
       "interp": "step"
      }
@@ -51948,6 +52372,207 @@
     ]
    },
    {
+    "target": "particles/fwA/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       21.490666646784668,
+       25.0,
+       -9.641814145298088
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 234.81734,
+      "value": [
+       21.490666646784668,
+       25.0,
+       -9.641814145298088
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 238.06059,
+      "value": [
+       10.261786096559247,
+       25.0,
+       14.997715427345868
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 241.30383,
+      "value": [
+       -1.8201613041008304,
+       25.0,
+       -9.234922129884874
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 244.54707,
+      "value": [
+       24.615550971778532,
+       25.0,
+       -3.3742658151579694
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 247.24978,
+      "value": [
+       10.0,
+       19.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "particles/fwB/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.5,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 172.38491,
+      "value": [
+       0.0,
+       1.5,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 235.89843,
+      "value": [
+       3.1901425039067988,
+       33.0,
+       -13.365097862825518
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 239.14167,
+      "value": [
+       24.672214011007085,
+       33.0,
+       3.118675362266398
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 242.38491,
+      "value": [
+       -1.6571894218545644,
+       33.0,
+       9.43980586574756
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 245.62816,
+      "value": [
+       10.000000000000009,
+       33.0,
+       -15.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 247.24978,
+      "value": [
+       10.0,
+       19.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "particles/fwC/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.554435894139948,
+       29.0,
+       3.6288284339950128
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 236.97951,
+      "value": [
+       -4.554435894139948,
+       29.0,
+       3.6288284339950128
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 240.22275,
+      "value": [
+       16.33927392611049,
+       29.0,
+       -13.594616805549752
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 243.46599,
+      "value": [
+       16.575567201836158,
+       29.0,
+       13.481910694487507
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 246.70924,
+      "value": [
+       -4.615550971778525,
+       29.0,
+       -3.374265815157985
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 247.24978,
+      "value": [
+       10.0,
+       19.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
     "target": "sdf/ringLow/transform/scale",
     "component": -1,
     "timeBase": "seconds",
@@ -52123,7 +52748,7 @@
       "time": 0.0,
       "value": [
        0.0,
-       -30.0,
+       -40.0,
        0.0
       ],
       "interp": "step"
@@ -52132,7 +52757,7 @@
       "time": 249.46194,
       "value": [
        0.0,
-       -18.0,
+       -14.0,
        0.0
       ],
       "interp": "smooth"
@@ -52141,7 +52766,7 @@
       "time": 253.5,
       "value": [
        0.0,
-       4.0,
+       14.0,
        0.0
       ],
       "interp": "smooth"
@@ -52150,7 +52775,7 @@
       "time": 258.0,
       "value": [
        0.0,
-       10.0,
+       20.0,
        0.0
       ],
       "interp": "smooth"

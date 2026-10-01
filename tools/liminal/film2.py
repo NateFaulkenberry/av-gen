@@ -324,6 +324,11 @@ class Film:
                    "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "startSeconds": 0.0,
                               "endSeconds": self.end}}
         os.makedirs(out_dir, exist_ok=True)
+        shots = [{"id": f"s{i + 1:02d}", "name": sh["name"], "start": round(sh["t0"], 3), "end": round(sh["t1"], 3)}
+                 for i, sh in enumerate(self.shots)]
+        with open(os.path.join(out_dir, f"{stem}.shots.json"), "w") as fh:
+            json.dump(shots, fh, indent=1)
+            fh.write("\n")
         for fname, doc in ((f"{stem}.scene.json", scene), (f"{stem}.rig.json", rig), (f"{stem}.json", project)):
             with open(os.path.join(out_dir, fname), "w") as f:
                 json.dump(doc, f, indent=1)

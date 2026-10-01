@@ -287,6 +287,13 @@ def build(film: Film, add_world, palette_index, grid_settings):
     b.pulse("sdf/houseParts/look/edge/intensity", 5.0, "eighth", g_riser)
     b.pulse("sdf/houseGround/look/edge/intensity", 2.0, "quarter", g_riser)
     b.pulse("sdf/livShell/look/edge/pixels", 1.5, "quarter", g_riser)
+    # the riser's anticipation (13-16): glow building, the ground's lines throbbing harder each bar on the eighths
+    f.track("post/bloom/intensity", [(0.0, 0.0), (t(13), 0.0, "smooth"), (t(16, 3.5), 0.6, "step"), (t(16, 4), 0.0, "step")],
+            mode="add")
+    for k_, bar in enumerate(range(13, 17)):
+        f.event("riserBar", time=t(bar), hold=G.BAR1 - 0.06, attack=0.03, release=0.03, curve="linear", strength=0.4 + 0.3 * k_)
+    b.pulse("sdf/houseGround/look/edge/intensity", 6.0, "eighth", "grid.song.riserBar")
+    b.pulse("sdf/houseParts/look/edge/pixels", 2.0, "eighth", "grid.song.riserBar")
     # the 'all you got' chop, once a bar from bar 13: the windows flash
     for bar in range(13, 17):
         c = b.clap(f"chop{bar}", t(bar), release=0.9)

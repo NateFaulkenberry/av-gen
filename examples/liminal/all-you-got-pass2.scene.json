@@ -1426,7 +1426,8 @@
       "livMedia",
       "livShelf",
       "livMan",
-      "livCeil"
+      "livCeil",
+      "stars"
      ],
      "lights": [
       "livLamp",
@@ -1530,7 +1531,10 @@
       "summit",
       "sun",
       "skyFurn",
-      "stars"
+      "stars",
+      "fwA",
+      "fwB",
+      "fwC"
      ],
      "lights": []
     },
@@ -1601,7 +1605,10 @@
       "summit",
       "sun",
       "skyFurn",
-      "stars"
+      "stars",
+      "fwA",
+      "fwB",
+      "fwC"
      ],
      "lights": []
     },
@@ -1677,7 +1684,10 @@
       "summit",
       "sun",
       "skyFurn",
-      "stars"
+      "stars",
+      "fwA",
+      "fwB",
+      "fwC"
      ],
      "lights": []
     },
@@ -1764,7 +1774,8 @@
       "galCup",
       "galFrame",
       "galBooks",
-      "galMan"
+      "galMan",
+      "fwB"
      ],
      "lights": [
       "galKey"
@@ -2120,7 +2131,10 @@
       "summit",
       "sun",
       "skyFurn",
-      "stars"
+      "stars",
+      "fwA",
+      "fwB",
+      "fwC"
      ],
      "lights": []
     },
@@ -2207,7 +2221,10 @@
       "summit",
       "sun",
       "skyFurn",
-      "stars"
+      "stars",
+      "fwA",
+      "fwB",
+      "fwC"
      ],
      "lights": []
     },
@@ -2280,6 +2297,9 @@
       "sun",
       "skyFurn",
       "stars",
+      "fwA",
+      "fwB",
+      "fwC",
       "treeTrunk",
       "treeA",
       "treeB",
@@ -2351,6 +2371,9 @@
       "sun",
       "skyFurn",
       "stars",
+      "fwA",
+      "fwB",
+      "fwC",
       "hillMan"
      ],
      "lights": []
@@ -26742,9 +26765,9 @@
      "root": {
       "kind": "translate",
       "translation": [
-       0.0,
+       8.0,
        -8.0,
-       -150.0
+       -170.0
       ],
       "children": [
        {
@@ -26768,7 +26791,7 @@
             "children": [
              {
               "kind": "cylinder",
-              "radius": 9.0,
+              "radius": 8.0,
               "height": 0.3
              }
             ],
@@ -26784,7 +26807,7 @@
             "children": [
              {
               "kind": "torus",
-              "radius": 12.15,
+              "radius": 10.8,
               "rounding": 0.12
              }
             ],
@@ -26800,7 +26823,7 @@
             "children": [
              {
               "kind": "torus",
-              "radius": 15.75,
+              "radius": 14.0,
               "rounding": 0.08
              }
             ],
@@ -26915,14 +26938,14 @@
      }
     ],
     "boundsMin": [
-     -30.0,
-     -40.0,
-     -160.0
+     -22.0,
+     -50.0,
+     -180.0
     ],
     "boundsMax": [
-     30.0,
+     38.0,
      60.0,
-     -140.0
+     -160.0
     ],
     "look": {
      "aoStrength": 0.25,
@@ -27849,6 +27872,168 @@
      1.0,
      0.9
     ]
+   }
+  },
+  {
+   "name": "fwA",
+   "kind": "particles",
+   "particles": {
+    "capacity": 9000,
+    "spawnRate": 0.0,
+    "burst": 0.0,
+    "shape": "sphere",
+    "position": [
+     10.0,
+     26.0,
+     0.0
+    ],
+    "extent": [
+     0.25,
+     0.25,
+     0.25
+    ],
+    "lifetimeMin": 0.9,
+    "lifetimeMax": 1.7,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 5.0,
+    "speedMax": 11.0,
+    "gravity": [
+     0.0,
+     -4.0,
+     0.0
+    ],
+    "drag": 0.9,
+    "sizeStart": 0.2,
+    "sizeEnd": 0.0,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.3,
+     0.85,
+     1.0
+    ],
+    "colorEnd": [
+     0.55,
+     0.2,
+     1.0,
+     0.0
+    ],
+    "emissive": 3.0,
+    "velocityStretch": 0.06,
+    "stretchMax": 6.0
+   }
+  },
+  {
+   "name": "fwB",
+   "kind": "particles",
+   "particles": {
+    "capacity": 9000,
+    "spawnRate": 0.0,
+    "burst": 0.0,
+    "shape": "sphere",
+    "position": [
+     10.0,
+     26.0,
+     0.0
+    ],
+    "extent": [
+     0.25,
+     0.25,
+     0.25
+    ],
+    "lifetimeMin": 0.9,
+    "lifetimeMax": 1.7,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 5.0,
+    "speedMax": 11.0,
+    "gravity": [
+     0.0,
+     -4.0,
+     0.0
+    ],
+    "drag": 0.9,
+    "sizeStart": 0.2,
+    "sizeEnd": 0.0,
+    "blend": "additive",
+    "colorStart": [
+     0.4,
+     0.95,
+     1.0,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     1.0,
+     1.0,
+     0.0
+    ],
+    "emissive": 3.0,
+    "velocityStretch": 0.06,
+    "stretchMax": 6.0
+   }
+  },
+  {
+   "name": "fwC",
+   "kind": "particles",
+   "particles": {
+    "capacity": 9000,
+    "spawnRate": 0.0,
+    "burst": 0.0,
+    "shape": "sphere",
+    "position": [
+     10.0,
+     26.0,
+     0.0
+    ],
+    "extent": [
+     0.25,
+     0.25,
+     0.25
+    ],
+    "lifetimeMin": 0.9,
+    "lifetimeMax": 1.7,
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spread": 1.0,
+    "speedMin": 5.0,
+    "speedMax": 11.0,
+    "gravity": [
+     0.0,
+     -4.0,
+     0.0
+    ],
+    "drag": 0.9,
+    "sizeStart": 0.2,
+    "sizeEnd": 0.0,
+    "blend": "additive",
+    "colorStart": [
+     1.0,
+     0.82,
+     0.3,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.35,
+     0.1,
+     0.0
+    ],
+    "emissive": 3.0,
+    "velocityStretch": 0.06,
+    "stretchMax": 6.0
    }
   },
   {
@@ -34183,8 +34368,8 @@
    "kind": "procedural",
    "name": "isth00",
    "position": [
-    -1.35,
-    2.0,
+    -1.5499999999999998,
+    2.4,
     -3.49
    ],
    "rotation": [
@@ -34196,7 +34381,7 @@
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34214,7 +34399,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34223,20 +34408,20 @@
    "kind": "procedural",
    "name": "isth01",
    "position": [
-    3.49,
-    1.75,
-    -0.45
+    -0.4999999999999999,
+    2.1,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34254,7 +34439,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34263,20 +34448,20 @@
    "kind": "procedural",
    "name": "isth02",
    "position": [
-    0.45,
-    2.0,
-    3.49
+    0.5500000000000002,
+    1.7999999999999998,
+    -3.49
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    0.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34294,7 +34479,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34303,20 +34488,20 @@
    "kind": "procedural",
    "name": "isth03",
    "position": [
-    -3.49,
-    1.75,
-    1.35
+    1.6000000000000005,
+    1.5,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34334,7 +34519,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34343,20 +34528,20 @@
    "kind": "procedural",
    "name": "isth04",
    "position": [
-    3.49,
-    2.0,
-    -1.35
+    -1.9,
+    2.55,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34374,7 +34559,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34383,20 +34568,20 @@
    "kind": "procedural",
    "name": "isth05",
    "position": [
-    -0.45,
-    1.75,
-    3.49
+    -0.8499999999999999,
+    2.25,
+    -3.49
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    0.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34414,7 +34599,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34423,20 +34608,20 @@
    "kind": "procedural",
    "name": "isth06",
    "position": [
-    -3.49,
-    2.0,
-    0.45
+    0.20000000000000018,
+    1.9499999999999997,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34454,7 +34639,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34463,8 +34648,8 @@
    "kind": "procedural",
    "name": "isth07",
    "position": [
-    1.35,
-    1.75,
+    1.2500000000000004,
+    1.65,
     -3.49
    ],
    "rotation": [
@@ -34476,7 +34661,7 @@
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34494,7 +34679,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34503,20 +34688,20 @@
    "kind": "procedural",
    "name": "isth08",
    "position": [
-    -1.35,
-    2.0,
-    3.49
+    -1.5499999999999998,
+    2.4,
+    -3.49
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    0.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34534,7 +34719,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34543,20 +34728,20 @@
    "kind": "procedural",
    "name": "isth09",
    "position": [
-    -3.49,
-    1.75,
-    -0.45
+    -0.4999999999999999,
+    2.1,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34574,7 +34759,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34583,8 +34768,8 @@
    "kind": "procedural",
    "name": "isth10",
    "position": [
-    0.45,
-    2.0,
+    0.5500000000000002,
+    1.7999999999999998,
     -3.49
    ],
    "rotation": [
@@ -34596,7 +34781,7 @@
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34614,7 +34799,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34623,20 +34808,20 @@
    "kind": "procedural",
    "name": "isth11",
    "position": [
-    3.49,
-    1.75,
-    1.35
+    1.6000000000000005,
+    1.5,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34654,7 +34839,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34663,20 +34848,20 @@
    "kind": "procedural",
    "name": "isth12",
    "position": [
-    -3.49,
-    2.0,
-    -1.35
+    -1.9,
+    2.55,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34694,7 +34879,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34703,8 +34888,8 @@
    "kind": "procedural",
    "name": "isth13",
    "position": [
-    -0.45,
-    1.75,
+    -0.8499999999999999,
+    2.25,
     -3.49
    ],
    "rotation": [
@@ -34716,7 +34901,7 @@
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34734,7 +34919,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34743,20 +34928,20 @@
    "kind": "procedural",
    "name": "isth14",
    "position": [
-    3.49,
-    2.0,
-    0.45
+    0.20000000000000018,
+    1.9499999999999997,
+    -3.49
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34774,7 +34959,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34783,20 +34968,20 @@
    "kind": "procedural",
    "name": "isth15",
    "position": [
-    1.35,
-    1.75,
-    3.49
+    1.2500000000000004,
+    1.65,
+    -3.49
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    0.0,
+    -0.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34814,7 +34999,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34823,9 +35008,49 @@
    "kind": "procedural",
    "name": "isth16",
    "position": [
+    0.2,
+    1.4,
+    -3.49
+   ],
+   "rotation": [
+    0.0,
+    -0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "GOT?",
+     "textSize": 1.25,
+     "textDepth": 0.08,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.7
+     }
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 6.0,
+     "roughness": 0.7
+    }
+   }
+  },
+  {
+   "kind": "procedural",
+   "name": "isth17",
+   "position": [
     -3.49,
-    2.0,
-    2.25
+    2.4,
+    1.5499999999999998
    ],
    "rotation": [
     -0.0,
@@ -34835,48 +35060,8 @@
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "GOT?",
-     "textSize": 0.9722222222222222,
-     "textDepth": 0.08,
-     "font": {
-      "family": "Helvetica Neue",
-      "weight": 0.7
-     }
-    },
-    "material": {
-     "baseColor": [
-      0.02,
-      0.02,
-      0.02
-     ],
-     "emissiveColor": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "emissiveIntensity": 7.0,
-     "roughness": 0.7
-    }
-   }
-  },
-  {
-   "kind": "procedural",
-   "name": "isth17",
-   "position": [
-    -1.35,
-    2.0,
-    -3.49
-   ],
-   "rotation": [
-    0.0,
-    -0.0,
-    0.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34894,7 +35079,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34903,20 +35088,20 @@
    "kind": "procedural",
    "name": "isth18",
    "position": [
-    3.49,
-    1.75,
-    -0.45
+    -3.49,
+    2.1,
+    0.4999999999999999
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34934,7 +35119,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34943,20 +35128,20 @@
    "kind": "procedural",
    "name": "isth19",
    "position": [
-    0.45,
-    2.0,
-    3.49
+    -3.49,
+    1.7999999999999998,
+    -0.5500000000000002
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -0.0,
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -34974,7 +35159,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -34984,8 +35169,8 @@
    "name": "isth20",
    "position": [
     -3.49,
-    1.75,
-    1.35
+    1.5,
+    -1.6000000000000005
    ],
    "rotation": [
     -0.0,
@@ -34996,7 +35181,7 @@
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35014,7 +35199,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35023,20 +35208,20 @@
    "kind": "procedural",
    "name": "isth21",
    "position": [
-    3.49,
-    2.0,
-    -1.35
+    -3.49,
+    2.55,
+    1.9
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35054,7 +35239,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35063,20 +35248,20 @@
    "kind": "procedural",
    "name": "isth22",
    "position": [
-    -0.45,
-    1.75,
-    3.49
+    -3.49,
+    2.25,
+    0.8499999999999999
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -0.0,
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35094,7 +35279,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35104,8 +35289,8 @@
    "name": "isth23",
    "position": [
     -3.49,
-    2.0,
-    0.45
+    1.9499999999999997,
+    -0.20000000000000018
    ],
    "rotation": [
     -0.0,
@@ -35116,7 +35301,7 @@
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35134,7 +35319,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35143,20 +35328,20 @@
    "kind": "procedural",
    "name": "isth24",
    "position": [
-    1.35,
-    1.75,
-    -3.49
+    -3.49,
+    1.65,
+    -1.2500000000000004
    ],
    "rotation": [
-    0.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35174,7 +35359,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35183,20 +35368,20 @@
    "kind": "procedural",
    "name": "isth25",
    "position": [
-    -1.35,
-    2.0,
-    3.49
+    -3.49,
+    2.4,
+    1.5499999999999998
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -0.0,
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35214,7 +35399,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35224,8 +35409,8 @@
    "name": "isth26",
    "position": [
     -3.49,
-    1.75,
-    -0.45
+    2.1,
+    0.4999999999999999
    ],
    "rotation": [
     -0.0,
@@ -35236,7 +35421,7 @@
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35254,7 +35439,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35263,20 +35448,20 @@
    "kind": "procedural",
    "name": "isth27",
    "position": [
-    0.45,
-    2.0,
-    -3.49
+    -3.49,
+    1.7999999999999998,
+    -0.5500000000000002
    ],
    "rotation": [
-    0.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35294,7 +35479,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35303,20 +35488,20 @@
    "kind": "procedural",
    "name": "isth28",
    "position": [
-    3.49,
-    1.75,
-    1.35
+    -3.49,
+    1.5,
+    -1.6000000000000005
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35334,7 +35519,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35344,8 +35529,8 @@
    "name": "isth29",
    "position": [
     -3.49,
-    2.0,
-    -1.35
+    2.55,
+    1.9
    ],
    "rotation": [
     -0.0,
@@ -35356,7 +35541,7 @@
     "source": {
      "kind": "text",
      "text": "IS",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35374,7 +35559,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35383,20 +35568,20 @@
    "kind": "procedural",
    "name": "isth30",
    "position": [
-    -0.45,
-    1.75,
-    -3.49
+    -3.49,
+    2.25,
+    0.8499999999999999
    ],
    "rotation": [
-    0.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "THAT",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35414,7 +35599,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35423,20 +35608,20 @@
    "kind": "procedural",
    "name": "isth31",
    "position": [
-    3.49,
-    2.0,
-    0.45
+    -3.49,
+    1.9499999999999997,
+    -0.20000000000000018
    ],
    "rotation": [
     -0.0,
-    -90.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35454,7 +35639,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }
@@ -35463,20 +35648,20 @@
    "kind": "procedural",
    "name": "isth32",
    "position": [
-    1.35,
-    1.75,
-    3.49
+    -3.49,
+    1.65,
+    -1.2500000000000004
    ],
    "rotation": [
-    180.0,
-    7.016709298534876e-15,
-    180.0
+    -0.0,
+    90.0,
+    0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "YOU...",
-     "textSize": 0.5833333333333334,
+     "textSize": 0.5,
      "textDepth": 0.08,
      "font": {
       "family": "Helvetica Neue",
@@ -35494,7 +35679,7 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 3.6,
      "roughness": 0.7
     }
    }

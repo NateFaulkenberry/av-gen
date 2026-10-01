@@ -165,6 +165,17 @@ def main():
     ]
     scene["modulation"] = routes
     scene["events"] = [{"type": "bigclap", "t": c["t"], "entity": c["id"]} for c in grid["bigClaps"] if lo <= c["t"] < hi]
+    # pass 2's own shots, when the generator wrote them beside the project (pass 1 used the timing sheet)
+    sidecar = os.path.splitext(os.path.abspath(a.project))[0] + ".shots.json"
+    if os.path.exists(sidecar):
+        own = []
+        for sh in json.load(open(sidecar)):
+            s0, s1 = max(sh["start"], lo), min(sh["end"], hi)
+            if s1 - s0 > 0.05:
+                sec = next((x["id"] for x in grid["sections"] if x["t0"] - 1e-6 <= s0 < x["t1"]), "")
+                own.append({"id": sh["id"], "start": round(s0, 3), "end": round(s1, 3), "segment": sec, "label": sh["name"]})
+        json.dump(own, open(os.path.join(a.out, "shots.json"), "w"), indent=1)
+        scene["shots"] = own
     scene.setdefault("timeline", {})["sections"] = [{"id": s["id"], "name": s["name"], "start": s["start"], "end": s["end"]}
                                                   for s in segments]
     json.dump(scene, open(scene_path, "w"), indent=1)

@@ -62,8 +62,8 @@ def build_part2(b, end):
                        ("stair", K.T([-14.0, OD.ground(-14, 0) - 0.2, 0.0], OD.sky_stair(40, 0.45, 0.32, 2.4)), "furn2",
                         (-15, -3, -3), (5, 15, 3), far),
                        ("summit", K.T([10.0, 14.2, 0.0], OD.summit()), "wall", (3, 12.5, -7), (17, 16.0, 7), far),
-                       ("sun", K.T([0.0, -8.0, -150.0], K.T([0, 0, 0], OD.sun_disc(9.0), name="sunAt")), "furn2",
-                        (-30, -40, -160), (30, 60, -140), far),
+                       ("sun", K.T([8.0, -8.0, -170.0], K.T([0, 0, 0], OD.sun_disc(8.0), name="sunAt")), "furn2",
+                        (-22, -50, -180), (38, 60, -160), far),
                        ("skyFurn", OD.sky_furniture(), "furn", (-17, 5, -21), (15, 18, -1), far)],
            "lights": []}
     b.world("sky", sky)
@@ -73,6 +73,15 @@ def build_part2(b, end):
         "sizeStart": 0.22, "sizeEnd": 0.22, "blend": "additive", "colorStart": [0.85, 0.9, 1.0, 0.9],
         "colorEnd": [0.85, 0.9, 1.0, 0.9]}})
     b.worlds["sky"]["names"].append("stars")
+    fw_cols = {"fwA": ([1.0, 0.3, 0.85, 1.0], [0.55, 0.2, 1.0, 0.0]), "fwB": ([0.4, 0.95, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0]),
+               "fwC": ([1.0, 0.82, 0.3, 1.0], [1.0, 0.35, 0.1, 0.0])}
+    for nm_, (c0, c1) in fw_cols.items():
+        f.nodes.append({"name": nm_, "kind": "particles", "particles": {
+            "capacity": 9000, "spawnRate": 0.0, "burst": 0.0, "shape": "sphere", "position": [10.0, 26.0, 0.0],
+            "extent": [0.25, 0.25, 0.25], "lifetimeMin": 0.9, "lifetimeMax": 1.7, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
+            "speedMin": 5.0, "speedMax": 11.0, "gravity": [0.0, -4.0, 0.0], "drag": 0.9, "sizeStart": 0.2, "sizeEnd": 0.0,
+            "blend": "additive", "colorStart": c0, "colorEnd": c1, "emissive": 3.0, "velocityStretch": 0.06, "stretchMax": 6.0}})
+        b.worlds["sky"]["names"].append(nm_)
     b.world("discoLiv", {"objects": [("livDisco", disco_floor(liv["interior"], 0.6), "furn", (-2.7, -0.05, -2.3), (2.7, 0.1, 2.3))],
                          "lights": []})
     b.world("discoKit", {"objects": [("kitDisco", disco_floor(kit_["interior"], 0.6), "furn", (-2.3, -0.05, -1.9), (2.3, 0.1, 1.9))],
@@ -189,7 +198,7 @@ def build_part2(b, end):
           ("v2h", "liv", t(63, 4), t(67), [[-0.2, 1.5, 1.9], [0.0, 1.45, 1.0], [0.1, 1.4, 0.35]], None)]
     for name, world, t0, t1, eye, look in v2:
         if name == "v2h":
-            b.shot(name, t0, t1, eye, None, keys=(world,), extra=b.worlds["liv"]["names"][:0],
+            b.shot(name, t0, t1, eye, None, keys=(world,), extra=["stars"],
                    look_keys=[(t0, (-1.6, 1.0, -1.0)), (t(65, 3), (-1.0, 1.4, -1.4)), (t(66), (0.0, 2.2, -1.2)),
                               (t(66, 3), (0.1, 3.4, -0.4)), (t(67), (0.2, 6.0, 0.0))],
                    fov=[(t0, 60.0), (t(66, 3), 64.0), (t(67), 74.0)])
@@ -357,7 +366,7 @@ def build_part2(b, end):
     for k in range(7):
         a = math.radians(15.0 + 15.0 * k)
         orbit.append([3.6 * math.sin(a), 1.55 + 0.05 * k, 3.6 * math.cos(a)])
-    b.shot("gallery", t(75), t(83), orbit, (0.0, 0.95, 0.0), keys=("gal",), fov=60.0, ease_kind="linear",
+    b.shot("gallery", t(75), t(83), orbit, (0.0, 0.95, 0.0), keys=("gal",), extra=["fwB"], fov=60.0, ease_kind="linear",
            moves=[(t(75), 0.0), (t(82, 3), 1.0), (t(83), 1.0)])
     items = [it[0] for it in RM.GALLERY_ITEMS]
     for n_i, name in enumerate(items):
@@ -371,21 +380,24 @@ def build_part2(b, end):
             keys_ += [(te - 0.001, keys_[-1][1], "easeOut"), (te + 0.09, [0.0, ang, 0.0], "step")]
         f.track(f"sdf/{name}/node/{name}Spin/rotation", keys_)
     # IS THAT ALL YOU: IS on 4.5, THAT 1, ALL 1.5, YOU 2 (GOT? on 78.2.5); four walls; each word lights an object
-    walls = [((0.0, 2.0, -3.49), (0, 0, 1)), ((3.49, 2.0, 0.0), (-1, 0, 0)), ((0.0, 2.0, 3.49), (0, 0, -1)), ((-3.49, 2.0, 0.0), (1, 0, 0))]
+    # each bar's phrase on the wall the orbiting camera faces: the back wall (-z) for bars 75-78, then the left
+    # wall (-x) as the orbit turns; the words step down the wall like a stammer, each one lighting an object
     wi = 0
     for bar in range(75, 83):
         seq = [("IS", bar - 1, 4.5), ("THAT", bar, 1.0), ("ALL", bar, 1.5), ("YOU", bar, 2.0)]
         if bar == 78:
             seq.append(("GOT?", bar, 2.5))
+        back = bar <= 78
         for j, (wd, wb, bt) in enumerate(seq):
-            wall_pos, nrm = walls[(bar - 75 + j) % 4]
-            off = (j - 1.5) * 0.9
-            pos = (wall_pos[0] + (off if nrm[0] == 0 else 0.0), wall_pos[1] - 0.25 * (j % 2),
-                   wall_pos[2] + (off if nrm[2] == 0 else 0.0))
+            along = -1.9 + 1.05 * j + (0.35 if bar % 2 else 0.0)
+            yy = 2.55 - 0.3 * j - (0.15 if bar % 2 else 0.0)
+            if wd == "GOT?":
+                along, yy = 0.2, 1.4
+            pos, nrm = ((along, yy, -3.49), (0, 0, 1)) if back else ((-3.49, yy, -along), (1, 0, 0))
             te = t(wb, bt)
-            b.word(wd + ("..." if bar == 82 and wd == "YOU" else ""), te, te + G.BAR2 * 0.9, pos, nrm,
-                   0.42 if wd != "GOT?" else 0.7, style="flash" if wd != "GOT?" else "pop", role="word",
-                   name=f"isth{wi:02d}", intensity=4.0 if wd != "GOT?" else 7.0, tin=0.1, tout=0.3)
+            b.word(wd + ("..." if bar == 82 and wd == "YOU" else ""), te, te + G.BAR2 * 0.85, pos, nrm,
+                   0.36 if wd != "GOT?" else 0.9, style="flash" if wd != "GOT?" else "pop", role="word",
+                   name=f"isth{wi:02d}", intensity=3.6 if wd != "GOT?" else 6.0, tin=0.1, tout=0.3)
             target = items[(wi * 4 + j) % len(items)]
             c = b.clap(f"lit{wi:02d}", te, release=0.45)
             f.route(c, f"sdf/{target}/look/edge/intensity", 12.0)
@@ -547,11 +559,32 @@ def build_part2(b, end):
                 b.word(wd, t(bar, b0 + 0.5 * j), t(bar, b0 + 0.5 * j) + G.BAR2, pos, nrm, 0.9, style="flash", role="word",
                        name=f"chC{k:02d}", intensity=6.0, tin=0.08, tout=0.3)
                 k += 1
+    fw_pos = {"fwA": [], "fwB": [], "fwC": []}
+    n_fw = 0
     for bar in range(107, 113):
         for bt in (2.0, 4.0):
-            c = b.clap(f"fw{bar}{int(bt)}", t(bar, bt), release=0.5)
+            tb = t(bar, bt)
+            c = b.clap(f"fw{bar}{int(bt)}", tb, release=0.5)
             f.route(c, "sdf/ringLow/look/edge/intensity", 10.0)
             f.route(c, "post/bloom/intensity", 0.6)
+            em = ["fwA", "fwB", "fwC"][n_fw % 3]
+            a = math.radians(40.0 + 77.0 * n_fw)
+            fw_pos[em].append((tb - 0.05, [10.0 + 15.0 * math.cos(a), 25.0 + 4.0 * ((n_fw * 5) % 3), -15.0 * math.sin(a)]))
+            cb = b.clap(f"fwb{bar}{int(bt)}", tb, release=0.06)
+            f.route(cb, f"particles/{em}/burst", 900.0)
+            n_fw += 1
+    # the crash: every emitter at once from the summit's heart
+    for em in ("fwA", "fwB", "fwC"):
+        fw_pos[em].append((t(113) - 0.05, [10.0, 19.0, 0.0]))
+        cb = b.clap(f"crash{em}", t(113), release=0.1)
+        f.route(cb, f"particles/{em}/burst", 2600.0)
+    # GOT? in the gallery: one sparkle from the room's heart
+    fw_pos["fwB"].insert(0, (t(78, 2.5) - 0.05, [0.0, 1.5, 0.0]))
+    cb = b.clap("gotSpark", t(78, 2.5), release=0.08)
+    f.route(cb, "particles/fwB/burst", 1400.0)
+    for em, ks in fw_pos.items():
+        ks.sort()
+        f.track(f"particles/{em}/position", [(0.0, ks[0][1], "step")] + [(tt, p, "step") for tt, p in ks])
     # the build (112.3, 112.4): everything is pulled toward the centre in two jolts
     for o in ("ringLow", "ringHigh"):
         f.track(f"sdf/{o}/transform/scale", [(0.0, [1.0, 1.0, 1.0], "step"), (t(112, 3), [1.0, 1.0, 1.0], "easeOut"),
@@ -578,10 +611,10 @@ def build_part2(b, end):
     # =========================================================================================================
     dawn_eye = [[3.0, gy(3, -8) + 1.9, -8.0], [2.0, gy(2, -10) + 1.85, -10.5], [1.2, gy(1.2, -12) + 1.8, -12.6]]
     b.shot("dawn", t(114), 255.0, dawn_eye, None, keys=("land", "sky", "hillman"),
-           look_keys=[(t(114), (0.0, 1.0, -40.0)), (252.0, (0.0, 3.0, -60.0)), (255.0, (0.0, 4.0, -80.0))],
+           look_keys=[(t(114), (2.0, 1.0, -40.0)), (252.0, (3.0, 3.0, -60.0)), (255.0, (4.0, 5.0, -80.0))],
            fov=[(t(114), 60.0), (255.0, 54.0)])
-    f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -30.0, 0.0], "step"), (t(114), [0.0, -18.0, 0.0], "smooth"),
-                                              (253.5, [0.0, 4.0, 0.0], "smooth"), (end, [0.0, 10.0, 0.0])])
+    f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -40.0, 0.0], "step"), (t(114), [0.0, -14.0, 0.0], "smooth"),
+                                              (253.5, [0.0, 14.0, 0.0], "smooth"), (end, [0.0, 20.0, 0.0])])
     b.val += [(t(114), 1.0, "smooth"), (253.0, 1.6, "smooth"), (254.8, 4.5, "smooth"), (255.0, 5.0, "step"),
               (255.01, 1.0, "step")]
     f.track("camera/exposure/compensation", [(0.0, 0.0), (252.0, 0.0, "smooth"), (254.9, 2.6, "step"), (255.0, 0.0, "step")], mode="add")
