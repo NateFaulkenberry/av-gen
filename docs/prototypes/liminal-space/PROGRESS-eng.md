@@ -16,7 +16,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 2 | spatial lyric typography (mesh text + `tools/liminal_text.py`) | **done** | 1046 | `[text]` (3 cases) |
 | 3 | luminous line-drawn edges (pixel width, shape, per-surface colour) | **done** | 1047 | `[adr1047]` (1 CPU, 1 GPU) |
 | 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
-| 5 | object animation on beat sources | | | |
+| 5 | object animation on beat sources (routes from the grid; no new engine code) | **done** | 1045 | `[beatgrid]` "spin, bob and pulse an SDF prop" |
 | 6 | simulation corruption: data mosh + channel shift (temporal `mosh`) | **done** | 1049 | `[adr1049]` (GPU) |
 | 7 | spectrum-sweep transition (`post/sweep/*`) | **done** | 1050 | `[adr1050]` (CPU and GPU) |
 | - | tint on moving figures (pass 1 gap 2) | if cheap | | |
@@ -152,6 +152,28 @@ On every SDF object (`sdf/<object>/...`, also in the scene file's `look` and `su
   pulse on the beat.
 - In JSON: `"look": {"edgeIntensity": 5, "edgePixels": 2, "edgeSoftness": 0.1}` and
   `"surfaces": [{"color": [...], "emission": [...], "edge": [1, 0.2, 0.8]}]`.
+
+#### 5. Object animation on the beat (routes; ADR-1045)
+
+Wrap an SDF prop in named `translate` / `rotate` / `scale` nodes (`sdf_node` helpers name them), and route the
+grid into them. Tested recipe (seek-exact):
+
+```json
+{"source": "grid.song.bar.phase",     "target": "sdf/props/node/lampSpin/rotation",  "component": 1, "amount": 360},
+{"source": "grid.song.quarter.wave",  "target": "sdf/props/node/lampAt/translation", "component": 1, "amount": 0.1},
+{"source": "grid.song.quarter",       "target": "sdf/props/node/lampPulse/scale",    "amount": 0.25},
+{"source": "grid.song.clap",          "target": "sdf/props/surface/0/emission",      "amount": 4}
+```
+
+- **Spin**: a division's `.phase` x 360 (one turn per bar with `bar.phase`, per beat with `quarter.phase`); the
+  wrap from 360 to 0 is invisible. A continuous spin at a varying speed: a rate route with
+  `"chain": {"integrate": true}` (no depth on it).
+- **Bob**: a `.wave` into a translation component; `"polarity": "bipolar"` swings both ways.
+- **Scale-pulse**: a pulse into a `scale` node (op add, small amount) or `nodes/<n>/scale` for a mesh node.
+- **Glow**: a pulse or an event channel into `surface/<k>/emission` (or `look/edge/intensity` for the lines,
+  `surface/<k>/edge` for one surface's lines). Mesh nodes: `nodes/<n>/emissiveBoost`.
+- Gate any of these to a section with `"depthSource": "grid.song.<gate>"` (an event with `until`).
+- An SDF node changes with the whole world's march (no rebuild): animate as many as you like.
 
 #### 6. Corruption: data mosh and channel shift (ADR-1049)
 

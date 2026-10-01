@@ -234,3 +234,67 @@ TEST_CASE("Routes from the beat grid land a seek exactly where a play does", "[b
     // And the clap is visibly up there (the route is live, not a pair of zeros agreeing).
     CHECK(playedValues[0] > 1.05f);
 }
+
+// Art pass 2 section 19's "environmental object animation": spin, bob, scale-pulse and glow on beat
+// sources are routes from the grid into an SDF prop's transform nodes and surfaces -- no new engine
+// code, but the recipe the guide gives must actually reach the tree, and land a seek where a play does.
+TEST_CASE("Beat-grid routes spin, bob and pulse an SDF prop, seek-exact", "[beatgrid][adr1045][liminal]") {
+    const auto build = [](app::Engine& engine) {
+        REQUIRE(engine
+                    .setCompositionJson(json::parse(R"({"format": "avgen-scene", "version": 1, "name": "props",
+          "nodes": [{"kind": "sdf", "name": "props", "sdf": {"compile": true,
+            "surfaces": [{"color": [0.02, 0.02, 0.02], "emission": [0, 0, 0]}],
+            "tree": {"root": {"kind": "translate", "name": "lampAt", "translation": [0, 1, -3],
+              "children": [{"kind": "rotate", "name": "lampSpin", "rotation": [0, 0, 0],
+                "children": [{"kind": "scale", "name": "lampPulse", "scale": 1.0,
+                  "children": [{"kind": "box", "size": [0.3, 0.6, 0.3]}]}]}]}}}}]})"))
+                    .has_value());
+        json doc = json::array();
+        doc.push_back(json{{"kind", "beatgrid"}, {"name", "song"}, {"settings", songSettings()}});
+        REQUIRE(engine.sources().fromJson(doc).has_value());
+        engine.sources().attach(engine.signals(), engine.params());
+        const auto add = [&](const char* source, const char* target, int component, float amount,
+                             params::ModOp op = params::ModOp::Add) {
+            params::ModRoute r;
+            r.source = source;
+            r.target = target;
+            r.component = component;
+            r.amount = amount;
+            r.op = op;
+            engine.modulator().addRoute(std::move(r));
+        };
+        add("grid.song.bar.phase", "sdf/props/node/lampSpin/rotation", 1, 360.0f);         // a turn a bar
+        add("grid.song.quarter.wave", "sdf/props/node/lampAt/translation", 1, 0.1f);       // bob
+        add("grid.song.quarter", "sdf/props/node/lampPulse/scale", -1, 0.25f);             // scale pulse
+        add("grid.song.clap", "sdf/props/surface/0/emission", -1, 4.0f);                   // glow on a clap
+        engine.rebind();
+    };
+    const auto values = [](app::Engine& e) {
+        return std::array<float, 4>{e.params().find("sdf/props/node/lampSpin/rotation")->finalComponent(1),
+                                    e.params().find("sdf/props/node/lampAt/translation")->finalComponent(1),
+                                    e.params().find("sdf/props/node/lampPulse/scale")->finalComponent(0),
+                                    e.params().find("sdf/props/surface/0/emission")->finalComponent(0)};
+    };
+    const long long target = 2745; // 45.75 s: just after release bar 4 beat 4's clap
+    app::Engine played{app::EngineMode::Offline};
+    build(played);
+    for (long long k = 0; k <= target; ++k) {
+        played.update(FrameTime{static_cast<double>(k) / 60.0, k == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(k)});
+    }
+    const auto p = values(played);
+    // The clap is up, the prop is part-way round its turn, lifted and swollen by the beat it is on.
+    CHECK(p[3] > 1.0f);
+    CHECK(p[0] > 200.0f); // beat 4 of the bar: three quarters of a turn
+    CHECK(p[0] < 360.0f);
+    CHECK(p[1] > 1.05f);
+    CHECK(p[2] > 1.1f);
+    app::Engine seeked{app::EngineMode::Offline};
+    build(seeked);
+    seeked.seekSeconds(static_cast<double>(target) / 60.0);
+    seeked.update(FrameTime{static_cast<double>(target) / 60.0, 0.0, 0});
+    const auto s = values(seeked);
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        INFO("value " << i);
+        CHECK(s[i] == p[i]);
+    }
+}
