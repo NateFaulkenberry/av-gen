@@ -139,6 +139,7 @@ def main():
         "project": "All You Got -- art pass 2 (a primitive simulated universe of luminous line-drawn geometry)",
         "mood": ["winding up", "loneliness", "tension", "growth", "reflection", "celebration", "release", "resolution"],
         "visual_language": ["luminous line-drawn geometry on dark", "early primitive 3D / wireframe / simulated space",
+                            "BIG CLAP flashes: deliberate bursts of light and colour that flood the frame for a beat",
                             "small dense furnished rooms", "simple line-drawn outdoor spaces", "spatial lyric typography",
                             "a slightly broken simulation", "mannequins, sparingly"],
         "camera_language": ["authored", "varies by section", "breathing only where it is asked for"],

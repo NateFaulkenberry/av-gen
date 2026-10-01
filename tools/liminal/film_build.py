@@ -349,7 +349,9 @@ def build(film: Film, add_world, palette_index, grid_settings):
     g_rel = b.gate("gRel", t(17), t(24, 4))
     f.track("sources/song/pulseDecay", [(0.0, 0.3), (t(17), 0.42), (t(25), 0.3), (t(49, 4), 0.3), (t(50), 0.22), (t(58), 0.16),
                                         (t(66), 0.3)])
-    for o, amt in (("livShell", 3.0), ("livSofa", 4.0), ("livMedia", 4.0), ("livShelf", 4.0)):
+    # a hierarchy, not a whole-frame pulse: the room's bones on the bar, the furniture on the quarter
+    b.pulse("sdf/livShell/look/edge/intensity", 4.0, "bar", g_rel)
+    for o, amt in (("livSofa", 4.0), ("livMedia", 4.0), ("livShelf", 3.0)):
         b.pulse(f"sdf/{o}/look/edge/intensity", amt, "quarter", g_rel)
     f.route("grid.song.quarter", "lights/livLamp/intensity", 3.0, depth=g_rel)
     for node, obj, h in (("livTable", "livSofa", 0.035), ("livArm", "livMedia", 0.04), ("livPlant", "livShelf", 0.05)):
@@ -445,11 +447,15 @@ def build(film: Film, add_world, palette_index, grid_settings):
     f.route(c, "post/lens/distortion", -0.6)
     f.route("grid.song.quarter", "lights/kitPend/intensity", 3.0, depth=b.gate("gV1k", t(33), t(37)))
     g_v1 = b.gate("gV1", t(25), t(40, 4))
-    for o in ("bedShell", "bedFurn", "livShell", "livSofa", "livMedia", "livShelf", "kitShell", "kitCounter", "kitTable",
-              "hallShell", "hallFurn"):
+    # verse 1: the walls hold still; the furniture breathes lightly on the quarter; the lamps, the clock and the
+    # pendant carry the beat (the light is the pulse)
+    for o in ("bedFurn", "livSofa", "livMedia", "livShelf", "kitCounter", "kitTable", "hallFurn"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 1.6, "quarter", g_v1)
-    f.route("grid.song.quarter", "lights/bedLamp/intensity", 1.5, depth=g_v1)
-    f.route("grid.song.quarter", "lights/livLamp/intensity", 1.5, depth=g_v1)
+    f.route("grid.song.quarter", "lights/bedLamp/intensity", 2.5, depth=g_v1)
+    f.route("grid.song.quarter", "lights/livLamp/intensity", 2.5, depth=g_v1)
+    f.route("grid.song.quarter", "lights/hallLamp/intensity", 2.5, depth=g_v1)
+    for o in ("bedFurn", "livSofa", "kitTable"):
+        f.route("grid.song.quarter", f"sdf/{o}/surface/{K.GLOW}/emission", 2.0, depth=g_v1)
     # the clock hands tick on the quarter (a sixth of a turn each beat, a hand that keeps time)
     for clock_obj, clock in (("livMedia", "livClock"), ("kitShell", "kitClock")):
         f.route("grid.song.bar.phase", f"sdf/{clock_obj}/node/{clock}M/rotation", -360.0, component=2)

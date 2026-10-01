@@ -185,7 +185,9 @@ def build_part2(b, end):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.0, "sixteenth", g_rb)
     b.val += [(t(48), 1.0, "smooth"), (t(48, 2), 0.55, "smooth"), (t(49, 3.9), 0.55, "step"), (t(49, 4), 1.0, "step")]
     g_lig = b.gate("gLig", t(42), t(48))
-    for o in ("stuShell", "stuFurn", "bathShell", "bathFurn", "bedShell", "bedFurn"):
+    # let it go: the exposed kick is the strongest quarter pulse in the song, so the room's bones take it; the
+    # words take the eighths
+    for o in ("stuShell", "bathShell", "bedShell"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.5, "quarter", g_lig)
     # C08 (49.4): a whip-zoom, a one-frame negative, a cut into verse 2
     c = b.clap("c08", t(49, 4), release=0.35, attack=0.12)
@@ -217,10 +219,12 @@ def build_part2(b, end):
             b.shot(name, t0, t1, eye, look, keys=(world, {"stu": "stuClutter", "liv": "livClutter", "bed": "bedClutter",
                                                           "kit": "kitClutter"}[world]), fov=62.0, sway=1.6)
     g_v2 = b.gate("gV2", t(49, 4), t(66))
-    for o in ("stuShell", "stuFurn", "livShell", "livSofa", "livMedia", "livShelf", "bedShell", "bedFurn", "kitShell",
-              "kitCounter", "kitTable"):
+    # verse 2's hierarchy: the walls on the half bar, the furniture on the quarter, the clutter on the eighth
+    for o in ("stuShell", "livShell", "bedShell", "kitShell"):
+        b.pulse(f"sdf/{o}/look/edge/intensity", 3.0, "half", g_v2)
+    for o in ("stuFurn", "livSofa", "livMedia", "livShelf", "bedFurn", "kitCounter", "kitTable"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.5, "quarter", g_v2)
-        b.pulse(f"sdf/{o}/look/edge/pixels", 1.2, "eighth", g_v2)
+        b.pulse(f"sdf/{o}/look/edge/pixels", 1.0, "quarter", g_v2)
     f.track("temporal/mosh/seed", [(t(50) + 0.27 * i, float(i), "step") for i in range(0, 130)])
     g_strain = b.gate("gStrain", t(58), t(66))
     f.route("grid.song.sixteenth", "temporal/mosh/shift", 4.0, depth=g_strain)
@@ -495,8 +499,8 @@ def build_part2(b, end):
         f.route("grid.song.quarter", f"sdf/{obj}/node/{node}/translation", h, component=1, depth=g_b3)
     f.route("grid.song.half", "sdf/kitTable/node/kitPendant/rotation", 18.0, component=2, depth=g_b3, polarity="bipolar")
     f.route("grid.song.half", "sdf/bedShell/node/bedPendant/rotation", 18.0, component=0, depth=g_b3, polarity="bipolar")
-    for o in ("livShell", "kitShell", "bedShell", "livSofa", "livMedia", "livShelf", "kitCounter", "kitTable", "bedFurn"):
-        b.pulse(f"sdf/{o}/look/edge/intensity", 2.5, "quarter", g_b3)
+    for o in ("livSofa", "livMedia", "livShelf", "kitCounter", "kitTable", "bedFurn"):
+        b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "quarter", g_b3)
     # IS THAT ALL? bouncing across the floors; IS THAT ALL YOU GOT? across a wall on bars 84 and 88
     for bar in range(83, 91):
         room_floor = {83: (0.0, 0.03, 0.3), 84: (0.0, 0.03, 0.3), 85: (0.0, 0.03, 1.1), 86: (0.6, 0.03, 1.2),
