@@ -5,35 +5,56 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status:** started 16:40. Nothing rendered yet. Pass 2 is untouched and still reproducible: its modules
-(`film_build.py`, `film_build2.py`, `make_all_you_got_pass2.py`) are left as they are. Pass 3 is a separate
-generator, `tools/liminal/make_all_you_got_pass3.py`, which writes `examples/liminal/all-you-got-pass3*.json`.
+**Status (18:10):** the whole pass 3 film generates and validates (commit `8c82d5b6`). Nothing rendered yet except
+tableau stills (`~/Desktop/av-gen-review/24-liminal-space/pass3/tableaux-{1,2}.png`). The GPU has been held by
+other agents' full suites since about 17:30. The house stills (`examples/liminal/all-you-got-pass3-rooms.json`) are
+queued.
 
-**The rules of this pass:**
-- Refine, do not replace (§35).
-- No camera breathing anywhere (§20). The world breathes on the quarter: lines, light, colour, objects.
-- The mannequin never moves while seen (§16-19). It changes pose only off screen or inside a full-frame flash.
-- Nothing hops on the beat by translation (§28): no quarter-note bobs of furniture or words.
-- Commit after every step with `git commit -- <my paths>`. The engineer shares this worktree.
-- Never rebuild the engine. Render with the pinned copy: `S=<scratchpad>`, then `$S/liminal3/avgen.sh`. It is a
-  copy of `build/release/src/avgen` plus `git archive 373a34a7 shaders` in `$S/liminal2/bin-373a34a7`.
-  Re-pin only when the coordinator says the engineer's systems have landed and are built.
+**Generate, then check (CPU, about 80 s):**
+```sh
+S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad
+export AVGEN=$S/liminal3/bin-validate/avgen        # a copy of build/release/src/avgen at 225e70b0 (time-aware validator)
+python3 tools/liminal/make_all_you_got_pass3.py    # writes examples/liminal/all-you-got-pass3{,.scene,.rig,.shots}.json
+                                                   # and all-you-got-pass3.validation.txt
+./build/release/src/avgen --project examples/liminal/all-you-got-pass3.json --audit-routes /tmp/a.json 2>&1 | grep -i "warn\|error"
+$AVGEN --trace-jumps examples/liminal/all-you-got-pass3.json --json $S/liminal3/jumps3.json   # positional jumps
+```
+- **Must print:** "words not seen when they appear: 0", an empty "words placed without a clear wall" list, and 8
+  "swap ... (both off screen)" lines.
+- **Validator:** 5 errors. 4 are false positives, sent to the coordinator: lyric obstacles seen through walls, and
+  a stair read as its bounding box. The fifth, `v1w03`, overlaps a door opening by 1%.
+- **Route audit:** 0 warnings.
+- **Jump trace:** only authored moves remain (the riser's sideways tremor, the falling houses, the split ceiling).
 
-**The engineer's systems this pass waits on (use them when they land; check `PROGRESS-eng.md`):**
-- the spatial validator (ADR-1051, `src/scene/space_validator.*`). It reads `entity` annotations on SDF
-  nodes: `{"id", "category", "room", "anchor", "pose", "interior", "hip", "normal", "t0", "t1"}`, plus
-  `"part": "head"`. The kit writes them;
-- static on screens;
-- the spatial colour wave (for 90.3-91.1, the owner's "~3:28": the only rainbow wipe in pass 2 is at
-  198.65 s = 3:18.6);
-- the corruption extensions;
-- the entity-jumping investigation;
-- (asked for) an SDF rim or silhouette term for the head.
+**Render (GPU, through the lock, with the pinned engine):**
+```sh
+tools/gpu-lock.sh $S/liminal3/avgen.sh --headless --project examples/liminal/all-you-got-pass3.json \
+    --render ~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3-preview.mp4 --range 0:258 --size 960x540 \
+    --fps 30 --codec h264 --quality 80 --particle-warmup 30
+```
 
-**The mannequin head (§31-33) is the kit's, not the engine's.** The head was a roundedBox. The line look draws
-only creases, and its width is about 2.2 px, roughly 7 mm at 3 m. So a rounded head drew nothing and its
-near-black fill read as a black blob (and as "missing" on the dark dawn hill). The coordinator has been told.
-The fix is a faceted head and sharp torso blocks in `kit.py`, plus a faint emissive head surface.
+**The pass 3 modules** (`tools/liminal/`; pass 2's modules are untouched):
+- `figure3.py`: the posed mannequin (faceted head, sharp blocks, IK). Its parts give its march bounds.
+- `tableaux3.py`: 14 poses, each checked against its anchor: `python3 tools/liminal/tableaux3.py` exits 0.
+- `props3.py`: new props. `rooms3.py`: the house (ground floor, basement, upstairs), every prop tagged.
+- `intro3.py`: the neighbourhood.
+- `film3.py`: Builder3, which handles:
+  - glides at a smooth speed;
+  - gazes interpolated by angle;
+  - figure swaps only off screen (walls occlude);
+  - clear-wall masks for words.
+- `film3_intro.py` (bars 0-16), `film3_house.py` (17-41), `film3_upper.py` (42-66), `film3_late.py` (67-end).
+- `make_all_you_got_pass3.py`: the entry point. `space-rules3.json` holds the pass 3 validator rules.
+- `preview3.py tableaux|rooms`: stills projects.
+
+**Waiting on the engineer:**
+- the rim (ADR-1052, built): `sdf/<o>/look/rim/intensity|color|power`, and `surface/<k>/rim`;
+- the screen static (ADR-1054, in test);
+- the spatial colour wave (not started; `film3_late.colour_wave()` is a stand-in with moving coloured lights).
+
+The rim and the static change the SDF uniform block. Re-pin when the coordinator sends the sha:
+`B=$S/liminal2/bin-<sha>`, copy `build/release/src/avgen` into it, run `git archive <sha> shaders | tar -x -C $B`,
+then point `$S/liminal3/avgen.sh` at it.
 
 ### The pass 3 film (owner bars; `t()` from `pass2_grid.py`)
 
@@ -53,16 +74,13 @@ The fix is a faceted head and sharp torso blocks in `kit.py`, plus a faint emiss
 | 66-end | 145.32- | as pass 2 | the roof rips off, the tree of rooms, the gallery (no head turn), the dance (ending at the front door), the colour wave through the house at 90.3, the open, the crash, the dawn (head fixed), the collapse back to the road dashes |
 
 ### Pass 3 checklist
-- [ ] M1: the kit: a faceted mannequin with IK poses for the tableaux, new props (toilet, vanity, CRT monitor,
-  washing machine), entity annotations, a pose checker, and pose stills.
-- [ ] M2: the house plan `rooms3.py`: the ground floor (living room, kitchen, hall and stair to a cliff), the
-  basement and upstairs, each with tableau anchors.
-- [ ] M3: `make_all_you_got_pass3.py` with no camera breathing and no hops, reusing pass 2 from bar 66 on.
-  Validate, preview, commit.
-- [ ] M4: the intro (`intro3.py`): the neighbourhood assembling; the entry on 17.1.
-- [ ] M5: the living room and kitchen tableaux.
-- [ ] M6: the stair climb, the cliff, the void; let it go in the basement.
-- [ ] M7: verse 2's upstairs tableaux.
+- [x] M1: the kit: the faceted IK mannequin, the new props, entity tags, the pose checker, and stills (`324d1144`).
+- [x] M2: the house `rooms3.py`, which validates with 0 errors (`817b282c`, `7cb584db`).
+- [x] M3: `make_all_you_got_pass3.py`, with no breathing and no hops, and pass 2 adapted from bar 67 (`8c82d5b6`).
+- [x] M4: the intro written (`3e1adc00`); it has not been seen rendered yet.
+- [x] M5: the living room sweep with 4 tableaux, and the kitchen (written, not yet seen).
+- [x] M6: the climb (one word a riser), the fall, and the basement (written, not yet seen).
+- [x] M7: verse 2 upstairs, with 6 tableaux and 8 corruptions (written, not yet seen).
 - [ ] M8: corruption at transitions, claps, lyrics and peaks; static screens; the colour wave; the ending.
 - [ ] M9: the validator, fixes, a preview, `pass2_av.py`, the Critic on representative sections, refinement.
 - [ ] M10: the final 1080p render with the song, `[sdf],[liminal]` exit 0, the report in the hand-back.
