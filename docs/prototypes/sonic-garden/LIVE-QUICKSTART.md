@@ -68,12 +68,13 @@ seconds. In this order:
    filter closed the garden is dusk: dim, soft focus, thick air. As you open it the light rises, the air clears,
    the focus sharpens and the ground's veins light up, within about a third of a second of the knob. Leave it open
    and the world itself turns: the garden gives way to glass, and at the very top (a fully open saw is a raspy
-   sound) it cracks and throws off fragments. Close it and the garden grows back.
+   sound) the glass buzzes and throws off fragments. Close it and the garden grows back.
 4. **Same note, now turn up the distortion or drive** (a drive AFTER the filter, like a pedal, shows best: a drive
    into a closed filter is filtered away before anyone hears it). First the light opens (more harmonics), then the
-   forms start to buzz and crack and fragments fly (roughness), and held there for a few seconds the heavy world
-   rises: violet air, basalt, a fissured mass. On a single note distortion and an open filter sound alike, so they
-   look alike at the top; on a chord or a riff, distortion goes all the way to the heavy world.
+   forms start to buzz and crack and fragments fly (roughness); held, the world turns to bright, buzzing glass and
+   the heavy world begins to rise behind it. On a single note distortion and an open filter sound alike, so they
+   look alike at the top; play a chord or a riff through the distortion and it goes all the way to the heavy world
+   (violet air, basalt, a fissured mass) within about two seconds.
 5. **A bright pluck, an FM bell or a bright lead, played high:** the **glass observatory** (dark crystals, a gem in
    rings of light). Notes ring the rings: high notes swing the ecliptic ring, low notes the meridians. The gem and
    the rings rise with your register. A ringing sound keeps the rings lit; a dry pluck lets them go at once.

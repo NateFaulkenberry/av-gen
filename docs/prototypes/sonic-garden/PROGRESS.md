@@ -702,10 +702,12 @@ the before/after curves and the limits); LIVE-QUICKSTART.md has a "What to try" 
 1. **Distortion (PART 18).** Before, nothing the garden showed read roughness (`grain` acted on the core and the blades,
    which the garden hides) and the family never left the garden (chaotic 0.00-0.01). Now `grit` (roughness x
    energy^0.4 x (1 - inharmonicity)^2) roughens, buzzes and fragments every world within 40-300 ms: 0 to 0.48 at drive
-   40 on the held note (peaks 0.77), fragments 0 to 0.55; the world goes garden -> glass 0.46 -> rough/heavy 0.55 over
-   a 6 s hold. A driven chord reaches the heavy world (0.94) in about 2 s; a drive after the filter on a riff 0.98.
-   Honest limit: on one held note, distortion and an open filter are nearly the same spectrum to the character, so
-   the two tests' tops look alike.
+   40 on the held note (peaks 0.77), fragments 0 to 0.42; the world goes garden -> buzzing glass 0.58, the rough
+   heavy world rising to 0.25 over a 6 s hold. A driven chord reaches the heavy world (0.90) in about 2 s; a drive
+   after the filter on a riff 1.00. Honest limit: on one held note, distortion and an open filter are nearly the
+   same spectrum to the character, so the two tests' tops look alike; the chaotic threshold (-0.44) is set so the
+   top of a filter sweep stays bright glass rather than a dim in-between world (at -0.38 a held driven note went
+   rough sooner, but every sweep's top went dark for two seconds).
 2. **The filter lag (PART 17).** The fast channel is now quick (up/down hysteresis 17-170 ms, routes 60/250 ms: about a
    third of a second from knob to picture, was about a second) and reaches down to a bass note's closed filter
    (`glow` 0.13 at 350 Hz, 0.27 at 1 kHz; was 0.00, 0.03). The world's identity stays about 2 s on purpose: the light
