@@ -18,7 +18,7 @@ import kit as K
 import outdoor2 as OD
 import pass2_grid as G
 import rooms2 as RM
-from film2 import Film, mix, mul, srgb
+from film2 import Film, mix, mul, srgb  # noqa: F401
 
 t = G.t
 BEAT1 = G.BAR1 / 4.0
@@ -92,13 +92,73 @@ class Builder:
         self.words.append(e)
         return e
 
+    def _sdf_fields(self, tt):
+        """The shot's SDF trees at time tt (rest geometry), for occlusion and solidity checks."""
+        cam = self.f.camera_at(tt)
+        if cam is None:
+            return []
+        shot = next(s for s in self.f.shots if s["name"] == cam[3])
+        if not hasattr(self, "_trees"):
+            self._trees = {}
+        out = []
+        for n in self.f.nodes:
+            if n.get("kind") == "sdf" and n["name"] in shot["nodes"]:
+                out.append(n["sdf"]["tree"]["root"])
+        return out
+
+    def _placement_ok(self, tt, pos, normal, height, text):
+        """True when the word lies on solid wall (no window or doorway behind it) and nothing stands between the
+        eye and it (its centre and both ends)."""
+        import sdf_eval
+        trees = self._sdf_fields(tt)
+        if not trees:
+            return True
+
+        def field(p):
+            return min(sdf_eval.evaluate(tr, p) for tr in trees)
+        eye = self.f.camera_at(tt)[0]
+        pts = [list(pos)]
+        if abs(normal[1]) < 0.5:   # a wall: check both ends of the line of text too
+            right = [normal[2], 0.0, -normal[0]]
+            half = 0.42 * height * len(text) * 0.9
+            pts += [[p + r * half for p, r in zip(pos, right)], [p - r * half for p, r in zip(pos, right)]]
+        for p in pts:
+            behind = [v - n * 0.03 for v, n in zip(p, normal)]
+            if field(behind) > 0.0:
+                return False          # no wall behind this part of the word: a window, a door, the room's corner
+            d = [b - a for a, b in zip(eye, p)]
+            L = math.sqrt(sum(v * v for v in d))
+            u = [v / L for v in d]
+            s_ = 0.05
+            while s_ < L - 0.12:
+                q = [e + v * s_ for e, v in zip(eye, u)]
+                f_ = field(q)
+                if f_ < 0.01:
+                    return False      # something stands in front of the word
+                s_ += max(f_ * 0.9, 0.02)
+        return True
+
     def word_at(self, text, t0, t1, where, sx, sy, k=0.08, at=0.12, **kw):
         """A word placed where the camera looks: the view ray through screen point (sx, sy) at t0 + `at` meets
         `where` -- ("box", room extents) a wall, floor or ceiling; ("ground", fn) the terrain; ("view", metres)
-        open space -- and the word sits there, sized `k` x its distance (a constant size on screen)."""
+        open space -- and the word sits there, sized `k` x its distance (a constant size on screen). In a room the
+        placement must lie on solid wall with a clear line of sight; if not, nearby screen points are tried."""
         kind, arg = where
         if kind == "box":
-            hit = self.f.on_box(t0 + at, sx, sy, arg)
+            hit = None
+            for dx, dy in ((0, 0), (0, 0.12), (0, -0.12), (0.15, 0), (-0.15, 0), (0, 0.24), (0, -0.24), (0.15, 0.12),
+                           (-0.15, 0.12), (0.3, 0), (-0.3, 0), (0.15, -0.12), (-0.15, -0.12), (0, 0.36), (0.3, 0.24),
+                           (-0.3, 0.24), (0.45, 0), (-0.45, 0), (0, 0.48), (0.45, 0.24), (-0.45, 0.24), (0.45, -0.24),
+                           (-0.45, -0.24), (0.6, 0.1), (-0.6, 0.1), (0, -0.4)):
+                cx, cy = max(-0.9, min(0.9, sx + dx)), max(-0.9, min(0.9, sy + dy))
+                cand = self.f.on_box(t0 + at, cx, cy, arg)
+                h = kw.get("height") or k * cand[3]
+                if self._placement_ok(t0 + at, cand[0], cand[1], h, text):
+                    hit = cand
+                    break
+            if hit is None:
+                hit = self.f.on_box(t0 + at, sx, sy, arg)
+                self.unplaced = getattr(self, "unplaced", []) + [(round(t0, 2), text)]
         elif kind == "ground":
             hit = self.f.on_ground(t0 + at, sx, sy, arg)
         else:
@@ -225,7 +285,7 @@ def build(film: Film, add_world, palette_index, grid_settings):
                           (-14, -6, -6), (14, 12, 16), {"max_distance": 80.0}),
                          ("houseParts2", IN.house_parts(["winR", "winF", "streetLamp", "fenceL", "fenceR", "path"]), "furn",
                           (-14, -8, -6), (14, 12, 16), {"max_distance": 80.0}),
-                         ("houseTree", IN.house_tree(), "furn", (1.5, -0.1, 1.2), (5.8, 4.5, 5.6), {"max_distance": 80.0}),
+                         ("houseTree", IN.house_tree(), "furn", (2.8, -0.1, -0.5), (5.6, 4.2, 2.5), {"max_distance": 80.0}),
                          ("houseGround", IN.ground_plane(), "wall", (-40, -1, -40), (40, 0.2, 40),
                           {"max_distance": 80.0, "edge_pixels": 1.6})],
              "lights": []}
@@ -377,6 +437,7 @@ def build(film: Film, add_world, palette_index, grid_settings):
     f.route(c, "post/bloom/intensity", 1.2)
     # C02 (24.4): the walls blow outward into the black, the furniture lifts; the cut lands in the bedroom
     c = b.clap("c02", t(24, 4), release=0.55)
+    f.route(c, "palette/value", 2.2)
     f.route(c, "post/bloom/intensity", 2.2)
     f.route(c, "camera/exposure/compensation", 2.0)
     f.route(c, "post/lens/chromaticAberration", 0.7)
@@ -395,7 +456,7 @@ def build(film: Film, add_world, palette_index, grid_settings):
     BA = bed["anchors"]
     b.shot("v1bed", t(25), t(28, 4), [[1.25, 1.6, 1.75], [1.0, 1.58, 1.25], [0.65, 1.56, 0.95]], (-0.45, 1.55, -1.75),
            keys=("bed",), fov=60.0)
-    b.word("HOW LITTLE DO I KNOW?", 55.3, t(28, 4), (-0.3, 2.22, -1.79), (0, 0, 1), 0.2, style="rise", role="word",
+    b.word("HOW LITTLE DO I KNOW?", 55.3, t(28, 4), (-0.15, 2.24, -1.79), (0, 0, 1), 0.165, style="rise", role="word",
            tin=0.5, tout=0.3)
     b.word_at("HOW LITTLE", 57.4, t(28, 4), ("box", bed["interior"]), -0.62, 0.2, k=0.045, style="flicker", role="accent", tilt=-6)
     b.word("DO I KNOW?", 59.5, t(28, 4), (0.2, 2.59, -0.4), (0, -1, 0), 0.16, style="pop", role="word", tilt=0)
@@ -414,7 +475,7 @@ def build(film: Film, add_world, palette_index, grid_settings):
     c = b.clap("c04", t(32, 4), release=0.8)
     f.route(c, "post/bloom/intensity", 0.9)
     f.route(c, "lights/livLamp/intensity", 12.0)
-    b.shot("v1kit", t(33), t(37), [[1.75, 1.5, 1.6], [1.4, 1.48, 1.3], [1.0, 1.45, 1.15]], (-0.4, 1.0, -0.7), keys=("kit",),
+    b.shot("v1kit", t(33), t(38), [[1.75, 1.5, 1.6], [1.4, 1.48, 1.3], [1.0, 1.45, 1.15]], (-0.4, 1.0, -0.7), keys=("kit",),
            fov=60.0)
     KA = kit_["anchors"]
     for i, (wd, x) in enumerate((("COME ON,", -0.05), ("TELL ME", 0.35), ("WHAT YOU", 0.75))):
@@ -434,11 +495,11 @@ def build(film: Film, add_world, palette_index, grid_settings):
         f.track(f"sdf/{obj}/node/{node}/translation", [(0.0, base, "step"), (t(36, 4) - 0.001, base, "easeOut"),
                                                        (t(36, 4) + 0.12, upk, "smooth"), (t(37, 3), upk, "easeIn"),
                                                        (t(37, 4) + 0.3, base, "step")])
-    b.shot("v1hall", t(37), t(41), [[0.0, 1.6, 0.6], [0.05, 1.55, -0.8], [0.0, 1.45, -2.55]], (0.0, 0.5, -4.3), keys=("hall",),
+    b.shot("v1hall", t(38), t(41), [[0.0, 1.6, 0.6], [0.05, 1.55, -0.8], [0.0, 1.45, -2.55]], (0.0, 0.5, -4.3), keys=("hall",),
            fov=[(t(37), 62.0), (t(40, 4), 58.0), (t(41), 58.0)])
     HA = hall["anchors"]
-    b.word("CAN YOU TELL ME IT'S FINE?", 81.6, t(38, 3), (0.73, 1.5, -1.4), (-1, 0, 0), 0.05, style="flicker",
-           role="screen", intensity=4.0)
+    b.word_at("CAN YOU TELL ME IT'S FINE THOUGH?", 81.1, t(37, 4), ("box", kit_["interior"]), 0.3, 0.55, k=0.035,
+              style="flicker", role="screen", intensity=4.0)
     b.word("PEACE OF MIND", 85.1, t(40, 4), (-0.74, 1.95, -2.2), (1, 0, 0), 0.12, style="rise", role="accent")
     words8 = ["IT'S", "STEPS", "IN", "A", "PROCESS,", "LET", "IT", "GO"]
     for i, wd in enumerate(words8):

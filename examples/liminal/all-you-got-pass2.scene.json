@@ -8103,9 +8103,9 @@
      "root": {
       "kind": "translate",
       "translation": [
-       3.6,
+       4.2,
        0.0,
-       3.4
+       1.0
       ],
       "children": [
        {
@@ -8120,14 +8120,14 @@
             "kind": "translate",
             "translation": [
              0.0,
-             0.85,
+             0.45599999999999996,
              0.0
             ],
             "children": [
              {
               "kind": "cylinder",
-              "radius": 0.153,
-              "height": 1.7
+              "radius": 0.133,
+              "height": 0.9119999999999999
              }
             ],
             "material": 0
@@ -8136,28 +8136,46 @@
             "kind": "translate",
             "translation": [
              0.0,
-             2.3120000000000003,
+             1.5959999999999999,
              0.0
             ],
             "children": [
              {
-              "kind": "rotate",
-              "rotation": [
-               35.0,
-               45.0,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "roundedBox",
-                "size": [
-                 0.748,
-                 0.748,
-                 0.748
-                ],
-                "rounding": 0.0408
-               }
-              ]
+              "kind": "cone",
+              "radius": 0.9119999999999999,
+              "height": 1.5959999999999999
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             2.356,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "cone",
+              "radius": 0.722,
+              "height": 1.3679999999999999
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.1159999999999997,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "cone",
+              "radius": 0.494,
+              "height": 1.14
              }
             ],
             "material": 6
@@ -8270,14 +8288,14 @@
      }
     ],
     "boundsMin": [
-     1.5,
+     2.8,
      -0.1,
-     1.2
+     -0.5
     ],
     "boundsMax": [
-     5.8,
-     4.5,
-     5.6
+     5.6,
+     4.2,
+     2.5
     ],
     "look": {
      "aoStrength": 0.25,
@@ -33055,20 +33073,20 @@
    "kind": "procedural",
    "name": "w006_ALL_YOU_GOT",
    "position": [
-    -2.146325450744672,
-    2.6063830224770728,
-    -2.1960000000000006
+    -1.7938232811717376,
+    2.696,
+    -1.7772705110773153
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    64.8473777438234,
+    -7.47166375118671e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.40079534309552617,
+     "textSize": 0.35909589442418904,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33137,8 +33155,8 @@
    "kind": "procedural",
    "name": "w008_HOW_LITTLE_DO_I_",
    "position": [
-    -0.3,
-    1.9700000000000002,
+    -0.15,
+    1.9900000000000002,
     -1.79
    ],
    "rotation": [
@@ -33150,7 +33168,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.2777777777777778,
+     "textSize": 0.22916666666666669,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -33179,8 +33197,8 @@
    "name": "w009_HOW_LITTLE",
    "position": [
     -1.9959999999999998,
-    1.9171003583690895,
-    -0.3915233075944393
+    2.56553581540267,
+    -0.39623373112182936
    ],
    "rotation": [
     -89.99999999999997,
@@ -33191,7 +33209,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE",
-     "textSize": 0.23259174956973544,
+     "textSize": 0.23970427245612388,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33260,8 +33278,8 @@
    "kind": "procedural",
    "name": "w011_BREATHE_AND_GROW",
    "position": [
-    1.0460432842389646,
-    1.088639521352501,
+    0.694052841548071,
+    1.0759633464003828,
     -1.7959999999999998
    ],
    "rotation": [
@@ -33273,7 +33291,7 @@
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.15810986022202334,
+     "textSize": 0.15723749841535387,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33342,8 +33360,8 @@
    "kind": "procedural",
    "name": "w013_IT_S_FINE_THOUGH",
    "position": [
-    -1.7591079059817436,
-    1.7267834924166268,
+    -0.509573711293436,
+    2.083274615236121,
     -2.196
    ],
    "rotation": [
@@ -33355,7 +33373,7 @@
     "source": {
      "kind": "text",
      "text": "IT'S FINE THOUGH?",
-     "textSize": 0.29303155641784434,
+     "textSize": 0.24875233787968615,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33670,20 +33688,20 @@
    "kind": "procedural",
    "name": "w021_CAN_YOU_TELL_ME_",
    "position": [
-    0.73,
-    1.5,
-    -1.4
+    -0.13121762232904088,
+    2.2198456462620424,
+    -1.7959999999999998
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
-     "text": "CAN YOU TELL ME IT'S FINE?",
-     "textSize": 0.06944444444444445,
+     "text": "CAN YOU TELL ME IT'S FINE THOUGH?",
+     "textSize": 0.16148841535757055,
      "textDepth": 0.08,
      "font": {
       "family": "Menlo",
@@ -34327,8 +34345,8 @@
    "name": "lig00",
    "position": [
     -1.796,
-    2.0530916877619845,
-    -0.9688123807475859
+    2.2469735372819315,
+    -0.9841957076894869
    ],
    "rotation": [
     -89.99999999999994,
@@ -34339,7 +34357,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.3830658435594021,
+     "textSize": 0.38959009442164577,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34367,20 +34385,20 @@
    "kind": "procedural",
    "name": "lig01",
    "position": [
-    0.31481226700607934,
-    0.36601390832509595,
-    -1.696
+    0.15211748238701883,
+    0.004,
+    -1.2414424859792195
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    8.0
+    -90.0,
+    -8.462089406540347,
+    -5.219541465360152e-16
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.2782588709720401,
+     "textSize": 0.25578216281152716,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34531,20 +34549,20 @@
    "kind": "procedural",
    "name": "lig05",
    "position": [
-    1.17812510158489,
-    1.361874939490613,
-    -1.6959999999999997
+    1.7959999999999998,
+    1.3860630826077915,
+    -0.860337103145532
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    -8.0
+    89.99999999999997,
+    -82.00000000000003,
+    -89.99999999999997
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6219694464910386,
+     "textSize": 0.5788060358138909,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34572,8 +34590,8 @@
    "kind": "procedural",
    "name": "lig06",
    "position": [
-    -0.03916711419833152,
-    2.1903852732345506,
+    0.3730647891052855,
+    2.2384651707192624,
     -1.6960000000000002
    ],
    "rotation": [
@@ -34585,7 +34603,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.2989232517214118,
+     "textSize": 0.30950199417562846,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34654,8 +34672,8 @@
    "kind": "procedural",
    "name": "lig08",
    "position": [
-    0.2898300549298778,
-    1.2401428301596336,
+    0.2799784941107385,
+    0.8991739368341972,
     -1.696
    ],
    "rotation": [
@@ -34667,7 +34685,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.3601392487250334,
+     "textSize": 0.369548010868723,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34777,9 +34795,9 @@
    "kind": "procedural",
    "name": "lig11",
    "position": [
-    0.9855157838731706,
-    1.1469300412635937,
-    -1.6959999999999997
+    1.6270667510103083,
+    1.045566272710421,
+    -1.696
    ],
    "rotation": [
     0.0,
@@ -34790,7 +34808,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.35019228291083676,
+     "textSize": 0.39645471314418795,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34941,20 +34959,20 @@
    "kind": "procedural",
    "name": "lig15",
    "position": [
-    -1.4960000000000002,
-    2.2477644444355205,
-    -1.2114415462821446
+    -1.005809426544147,
+    2.246625808078517,
+    -1.396
    ],
    "rotation": [
+    0.0,
     -0.0,
-    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.39389080867428256,
+     "textSize": 0.37990559229606063,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35064,8 +35082,8 @@
    "kind": "procedural",
    "name": "lig18",
    "position": [
-    0.5284886461294792,
-    0.5468034196962317,
+    0.22175595891255961,
+    0.4502748844363804,
     -1.3959999999999997
    ],
    "rotation": [
@@ -35077,7 +35095,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.36161938688917333,
+     "textSize": 0.36908096790295497,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35351,20 +35369,20 @@
    "kind": "procedural",
    "name": "lig25",
    "position": [
-    -1.8952542071843188,
-    2.3039479229311537,
-    -1.7960000000000003
+    -1.9959999999999998,
+    2.197090369807042,
+    -1.0174886956308762
    ],
    "rotation": [
-    0.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.5293774486226983,
+     "textSize": 0.4755302332607828,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35392,8 +35410,8 @@
    "kind": "procedural",
    "name": "lig26",
    "position": [
-    -1.7261129542952662,
-    1.3187053966907278,
+    -0.898489578512293,
+    1.3382756520121684,
     -1.7960000000000003
    ],
    "rotation": [
@@ -35405,7 +35423,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6960778577399949,
+     "textSize": 0.6225685069622648,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35433,20 +35451,20 @@
    "kind": "procedural",
    "name": "lig27",
    "position": [
-    1.996,
-    0.9609638591430759,
-    -1.1616346708051855
+    0.7625964869622888,
+    0.7048895629130778,
+    -1.7960000000000003
    ],
    "rotation": [
-    -89.99999999999999,
-    -78.00000000000001,
-    89.99999999999999
+    0.0,
+    -0.0,
+    12.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.4095775362488279,
+     "textSize": 0.48533739763896633,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35515,20 +35533,20 @@
    "kind": "procedural",
    "name": "lig29",
    "position": [
-    -1.9960000000000004,
-    0.7115073480985374,
-    -1.6546166671415117
+    -1.4518156628353593,
+    0.6986116327486726,
+    -1.7960000000000003
    ],
    "rotation": [
-    -89.99999999999999,
-    79.99999999999999,
-    -89.99999999999999
+    0.0,
+    -0.0,
+    -10.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.7188052752284746,
+     "textSize": 0.6797713236364427,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35638,20 +35656,20 @@
    "kind": "procedural",
    "name": "lig32",
    "position": [
-    1.9454048387697402,
-    1.513204376780214,
-    -1.7959999999999998
+    1.996,
+    1.5252884363047639,
+    -1.233375247098361
    ],
    "rotation": [
-    0.0,
     -0.0,
+    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.49106482451091843,
+     "textSize": 0.4194705145471312,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35762,8 +35780,8 @@
    "name": "lig35",
    "position": [
     -1.996,
-    0.6401572059241004,
-    0.7013683204367045
+    0.6437991417495402,
+    0.30331006740429867
    ],
    "rotation": [
     -89.99999999999997,
@@ -35774,7 +35792,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4369832072321216,
+     "textSize": 0.44893585242038964,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35802,20 +35820,20 @@
    "kind": "procedural",
    "name": "v2w00",
    "position": [
-    0.5252899970207969,
-    2.1369247529312294,
-    -1.696
+    0.5082783389461598,
+    2.596,
+    -1.6552379774290051
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    -35.40486150212074,
+    2.4937059226511363e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "DO YOU WANNA HAVE FUN?",
-     "textSize": 0.2574857187563029,
+     "textSize": 0.26177194459756803,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35843,8 +35861,8 @@
    "kind": "procedural",
    "name": "v2w01",
    "position": [
-    -0.6900746698313859,
-    1.3596715879379926,
+    -0.7202173295338729,
+    1.0157686563701651,
     -1.6959999999999997
    ],
    "rotation": [
@@ -35856,7 +35874,7 @@
     "source": {
      "kind": "text",
      "text": "AS THE FIRES KEEP BURNING",
-     "textSize": 0.1529623394455651,
+     "textSize": 0.15496912696333195,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -35885,8 +35903,8 @@
    "name": "v2w02",
    "position": [
     1.796,
-    0.4905145117742573,
-    -1.3234272724829137
+    0.6578439553257603,
+    -0.8450111012043989
    ],
    "rotation": [
     -0.0,
@@ -35897,7 +35915,7 @@
     "source": {
      "kind": "text",
      "text": "THE WORLD STOPS TURNING",
-     "textSize": 0.12112914864297968,
+     "textSize": 0.10620116293888056,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -35925,8 +35943,8 @@
    "kind": "procedural",
    "name": "v2w03",
    "position": [
-    1.6533348020703191,
-    2.039687767882491,
+    1.0711303098288059,
+    1.9750436719022955,
     -2.196
    ],
    "rotation": [
@@ -35938,7 +35956,7 @@
     "source": {
      "kind": "text",
      "text": "AND EVERYONE",
-     "textSize": 0.37419344585603836,
+     "textSize": 0.3513736491384171,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -35967,8 +35985,8 @@
    "name": "v2w04",
    "position": [
     2.596,
-    1.9116206255846364,
-    1.1275121799602204
+    2.435707663873087,
+    1.0862827888039832
    ],
    "rotation": [
     -0.0,
@@ -35979,7 +35997,7 @@
     "source": {
      "kind": "text",
      "text": "UNDER THE SUN",
-     "textSize": 0.25989144899405736,
+     "textSize": 0.2697067175984267,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36090,8 +36108,8 @@
    "name": "v2w07",
    "position": [
     1.996,
-    1.4362326240480856,
-    0.28542979941819313
+    1.9121757149710334,
+    0.2586275147042787
    ],
    "rotation": [
     -0.0,
@@ -36102,7 +36120,7 @@
     "source": {
      "kind": "text",
      "text": "TELL ME YOU'RE THE ONE",
-     "textSize": 0.23601177149225977,
+     "textSize": 0.23912007289479467,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36212,20 +36230,20 @@
    "kind": "procedural",
    "name": "v2w10",
    "position": [
-    1.996,
-    0.17401267050919067,
-    -1.0252789116192877
+    0.961726803341835,
+    2.0099444267035755,
+    -1.7959999999999998
    ],
    "rotation": [
+    0.0,
     -0.0,
-    -90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "AND MY HEART KEEP PUMPING",
-     "textSize": 0.1895771457544697,
+     "textSize": 0.14493897069666442,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36253,20 +36271,20 @@
    "kind": "procedural",
    "name": "v2w11",
    "position": [
-    0.9048320135210073,
-    2.204564963089846,
-    -1.796
+    0.6876527057585355,
+    2.596,
+    -1.4947187356002576
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    -49.111833233450504,
+    4.051846017169561e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "WHILE EVERYONE UNDER THE SUN",
-     "textSize": 0.19512939051971814,
+     "textSize": 0.18196904804663488,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36418,8 +36436,8 @@
    "name": "v2w15",
    "position": [
     2.596,
-    1.5511620934387849,
-    -0.02620650029947824
+    2.243045518512021,
+    -0.04697526479075531
    ],
    "rotation": [
     -0.0,
@@ -36430,7 +36448,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.2084264127314885,
+     "textSize": 0.21368102212366788,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36458,8 +36476,8 @@
    "kind": "procedural",
    "name": "v2w16",
    "position": [
-    -0.2727165509008719,
-    0.7432774053931752,
+    0.8051592717815641,
+    1.1886506259906433,
     -2.196
    ],
    "rotation": [
@@ -36471,7 +36489,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.237345880873295,
+     "textSize": 0.24015697658430163,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36540,20 +36558,20 @@
    "kind": "procedural",
    "name": "v2w18",
    "position": [
-    -1.4955391539153633,
-    2.526468592566767,
-    -1.7959999999999998
+    -0.5139012044840092,
+    2.596,
+    -1.4155523979660258
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    25.891517315489782,
+    -1.7029236490376652e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.3137699013899739,
+     "textSize": 0.25682694252762384,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36581,8 +36599,8 @@
    "kind": "procedural",
    "name": "v2w19",
    "position": [
-    1.0825706746563901,
-    1.0793479152110952,
+    1.05047965934054,
+    1.660153835025308,
     -1.7959999999999998
    ],
    "rotation": [
@@ -36594,7 +36612,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.17114384057863885,
+     "textSize": 0.1689781140124188,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36622,8 +36640,8 @@
    "kind": "procedural",
    "name": "v2w20",
    "position": [
-    -0.3497475852034022,
-    1.7091819309055885,
+    0.21145307888663123,
+    1.4616156957507287,
     -1.696
    ],
    "rotation": [
@@ -36635,7 +36653,7 @@
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.2904263762749802,
+     "textSize": 0.2711165221775208,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36664,8 +36682,8 @@
    "name": "v2w21",
    "position": [
     -1.7960000000000003,
-    1.425075089920652,
-    -1.5426683529799916
+    1.4458627481073547,
+    -0.6330364239783113
    ],
    "rotation": [
     -0.0,
@@ -36676,7 +36694,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.19025446643515756,
+     "textSize": 0.15820410061909113,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36704,8 +36722,8 @@
    "kind": "procedural",
    "name": "v2w22",
    "position": [
-    -0.6504559119250028,
-    2.0111022474259244,
+    -0.6762176573808967,
+    2.5112491821859937,
     -2.196
    ],
    "rotation": [
@@ -36717,7 +36735,7 @@
     "source": {
      "kind": "text",
      "text": "TELL ME IT'LL BE FINE THOUGH?",
-     "textSize": 0.20153217271749463,
+     "textSize": 0.20608874402505903,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36745,8 +36763,8 @@
    "kind": "procedural",
    "name": "v2w23",
    "position": [
-    -1.3867473366504917,
-    2.0721433569672576,
+    -1.3867473366504919,
+    2.33590150655634,
     -2.196
    ],
    "rotation": [
@@ -36758,7 +36776,7 @@
     "source": {
      "kind": "text",
      "text": "FEEL IT GROW",
-     "textSize": 0.3730098370438643,
+     "textSize": 0.3795437938331215,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -39000,9 +39018,9 @@
    "kind": "procedural",
    "name": "b3w86",
    "position": [
-    -0.4173292546268601,
+    -0.9277892740914103,
     0.004,
-    -0.9696888095596563
+    -0.9040266295549642
    ],
    "rotation": [
     -90.0,
@@ -39013,7 +39031,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.3477094272172033,
+     "textSize": 0.34927337552589005,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39041,9 +39059,9 @@
    "kind": "procedural",
    "name": "b3w87",
    "position": [
-    0.6811931696435238,
+    0.5125416168451997,
     0.004,
-    -0.7391482475529354
+    -1.1886799296129609
    ],
    "rotation": [
     -90.0,
@@ -39054,7 +39072,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.3243749919465072,
+     "textSize": 0.33160577206015185,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39123,9 +39141,9 @@
    "kind": "procedural",
    "name": "b3w89",
    "position": [
-    0.032209477078326554,
-    0.003999999999999778,
-    -0.817429901698176
+    1.4770546359699923,
+    0.004,
+    -1.556615708455446
    ],
    "rotation": [
     -90.0,
@@ -39136,7 +39154,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.27901020454937775,
+     "textSize": 0.426810128150571,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",

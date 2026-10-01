@@ -76,8 +76,8 @@ PALETTES = [
       "#000000", "#FFFFFF", "#FF4FD8", fill="#000000"),
     P("P6violet", "#B07CFF", "#D9C2FF", "#8A5CFF", "#F0E6FF", "#07020F", "#FF8FE6", "#C9A8FF", "#FF4FD8", "#8A5CFF",
       "#1E0E3A", "#FF4FD8", "#FF4FD8", fill="#06030B"),
-    P("P7tension", "#22F0D0", "#FF2E9A", "#22F0D0", "#FFFFFF", "#010406", "#E8FF3A", "#22F0D0", "#FF2E9A", "#E8FF3A",
-      "#05302A", "#FFFFFF", "#E8FF3A", fill="#020405"),
+    P("P7tension", "#22F0D0", "#FF2E9A", "#22F0D0", "#FFFFFF", "#010406", "#FFB347", "#22F0D0", "#FF2E9A", "#FFB347",
+      "#05302A", "#FFFFFF", "#E8FF3A", fill="#030305"),
     P("P8growth", "#FFD27A", "#FFFFFF", "#FFB08A", "#FFF0D8", "#0A0830", "#FFD27A", "#FFE6B0", "#FFB08A", "#FFD27A",
       "#2A1C50", "#FFF2D0", "#FFB08A", fill="#060418"),
     P("P9jewels", "#BFB8D8", "#FF3355", "#3D7BFF", "#FFFFFF", "#05020A", "#FFB33D", "#5CF0FF", "#FF3355", "#3D7BFF",
@@ -269,6 +269,7 @@ def build_film(end=END, stem="all-you-got-pass2", clearance=False):
     # the words: each section's lettering has its own voice
     style_fonts(b.words)
     bad = film.check_words(b.words)
+    print(f"words placed without a clear wall and line of sight: {getattr(b, 'unplaced', [])}")
     print(f"words not seen when they appear: {len(bad)} of {len(b.words)}")
     for row in bad:
         print("  ", row)

@@ -251,7 +251,7 @@ def build_part2(b, end):
           ("TELL ME YOU'RE THE ONE", 118.7, 0.45, 0.25, 0.045, "rise", "word"),
           ("TO MAKE THE WORLD", 120.3, -0.35, 0.6, 0.05, "pop", "word"),
           ("STOP HURTING", 121.1, -0.35, 0.38, 0.07, "flash", "accent"),
-          ("AND MY HEART KEEP PUMPING", 122.0, 0.2, -0.45, 0.04, "pop", "word"),
+          ("AND MY HEART KEEP PUMPING", 122.0, -0.2, 0.55, 0.035, "pop", "word"),
           ("WHILE EVERYONE UNDER THE SUN", 123.7, -0.2, 0.55, 0.035, "pop", "word"),
           ("TAKE STEPS", 125.3, -0.55, 0.0, 0.07, "rise", "accent"),
           ("TO FEEL IT GROW", 126.2, 0.45, 0.35, 0.05, "rise", "word"),
@@ -369,12 +369,7 @@ def build_part2(b, end):
         r = 6.6
         y = 1.8 + 2.15 * k * 1.25
         spiral.append([r * math.cos(a), y, -r * math.sin(a)])
-    look_tree = []
-    for i, tb in enumerate(blooms):
-        if t(67) - 0.01 <= tb <= t(71) + 0.01:
-            (x, y, z), _yaw = OD.tree_room_pose(i)
-            look_tree.append((tb, (x * 0.45, y + 0.4, z * 0.45)))
-    look_tree = [(t(67), (0.0, 7.0, 0.0))] + look_tree + [(t(71), (0.0, 22.0, 0.0))]
+    look_tree = [(t(bar), (0.0, 5.8 + (bar - 67) * 4.6, 0.0)) for bar in range(67, 72)]
     b.shot("tree", t(67), t(71), spiral, None, keys=("tree", "land", "rings"), look_keys=look_tree, fov=68.0, ease_kind="linear")
     b.shot("treeReveal", t(71), t(73), [[10.0, 18.0, 12.0], [17.0, 20.0, 19.0], [24.0, 21.0, 26.0]], None, keys=("tree", "land", "rings"),
            look_keys=[(t(71), (0.0, 17.0, 0.0)), (t(73), (0.0, 14.0, 0.0))], fov=62.0)
@@ -669,14 +664,14 @@ def build_part2(b, end):
     b.shot("dawn", t(114), 255.0, dawn_eye, None, keys=("land", "rings", "sky", "hillman"),
            look_keys=[(t(114), (2.0, 1.0, -40.0)), (252.0, (3.0, 3.0, -60.0)), (255.0, (4.0, 5.0, -80.0))],
            fov=[(t(114), 60.0), (255.0, 54.0)])
-    f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -40.0, 0.0], "step"), (t(114), [0.0, -14.0, 0.0], "smooth"),
-                                              (253.5, [0.0, 14.0, 0.0], "smooth"), (end, [0.0, 20.0, 0.0])])
+    f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -40.0, 0.0], "step"), (t(114), [0.0, -6.0, 0.0], "smooth"),
+                                              (253.5, [0.0, 26.0, 0.0], "smooth"), (end, [0.0, 34.0, 0.0])])
     b.val += [(t(114), 1.0, "smooth"), (253.0, 1.6, "smooth"), (254.8, 4.5, "smooth"), (255.0, 5.0, "step"),
               (255.01, 1.0, "step")]
     f.track("camera/exposure/compensation", [(0.0, 0.0), (252.0, 0.0, "smooth"), (254.9, 2.6, "step"), (255.0, 0.0, "step")], mode="add")
-    f.track("temporal/mosh/amount", [(0.0, 0.0), (251.6, 0.0, "smooth"), (253.8, 0.55, "smooth"), (254.95, 0.95, "step"),
+    f.track("temporal/mosh/amount", [(0.0, 0.0), (253.0, 0.0, "smooth"), (254.3, 0.5, "smooth"), (254.95, 0.95, "step"),
                                      (255.0, 0.0, "step")], mode="add")
-    f.track("temporal/mosh/shift", [(0.0, 0.0), (252.5, 0.0, "smooth"), (254.95, 30.0, "step"), (255.0, 0.0, "step")], mode="add")
+    f.track("temporal/mosh/shift", [(0.0, 0.0), (253.4, 0.0, "smooth"), (254.95, 30.0, "step"), (255.0, 0.0, "step")], mode="add")
     # the geometry dissolves into the light: far things first (the mountains, the rings), then the ground, the
     # trees and the stones, and last the figure on the hill
     for o, t_out in (("landMtn", 252.2), ("ringLow", 252.6), ("ringHigh", 252.4), ("sun", 254.6), ("landGround", 253.4),
