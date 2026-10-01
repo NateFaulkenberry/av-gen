@@ -772,7 +772,11 @@ workspace there ... a clean window to send to a projector".
   - The window captures use `screencapture -l<window id>`, with the ids found by the app's pid. A full-screen
     capture photographs the owner's desktop: don't take one.
 - Frame cost: within noise (see ADR-1026, "Measured").
-- Remaining: both full suites under the lock (the results are recorded below once run).
+- Suites at `de626773`, run under the lock one after the other:
+  - `avgen_tests`: exit 0; 3,939 cases, 3,919 passed, 19 skipped, 1 failed as expected (the slope lean);
+  - `avgen_render_tests`: exit 0; 559 cases, 558 passed, 1 skipped.
+- Next: the coordinator merges. The owner tries it with the projector (LIVE-QUICKSTART, "Projecting to a second
+  screen").
 - Not tested on hardware: a real second display, fullscreen on it, unplugging. The unplug path is covered by the
   unit test only.
 
