@@ -122,6 +122,17 @@ class Builder:
             right = [normal[2], 0.0, -normal[0]]
             half = 0.42 * height * len(text) * 0.9
             pts += [[p + r * half for p, r in zip(pos, right)], [p - r * half for p, r in zip(pos, right)]]
+        # the whole line of text on screen (its ends inside the frame, with a small margin)
+        cam_eye, fwd, right_c, up_c, fov = self.f.basis(tt)
+        ty = math.tan(math.radians(fov / 2))
+        tx = ty * 16 / 9
+        for p in pts:
+            d = [b - a for a, b in zip(cam_eye, p)]
+            z = sum(a * b for a, b in zip(d, fwd))
+            if z <= 0.1:
+                return False
+            if abs(sum(a * b for a, b in zip(d, right_c)) / z) > tx * 0.94 or abs(sum(a * b for a, b in zip(d, up_c)) / z) > ty * 0.94:
+                return False
         for p in pts:
             behind = [v - n * 0.03 for v, n in zip(p, normal)]
             if field(behind) > 0.0:
@@ -146,17 +157,23 @@ class Builder:
         kind, arg = where
         if kind == "box":
             hit = None
-            for dx, dy in ((0, 0), (0, 0.12), (0, -0.12), (0.15, 0), (-0.15, 0), (0, 0.24), (0, -0.24), (0.15, 0.12),
+            base_k = k
+            for shrink in (1.0, 0.78, 0.6, 0.45):
+                k = base_k * shrink
+                if hit is not None:
+                    break
+                for dx, dy in ((0, 0), (0, 0.12), (0, -0.12), (0.15, 0), (-0.15, 0), (0, 0.24), (0, -0.24), (0.15, 0.12),
                            (-0.15, 0.12), (0.3, 0), (-0.3, 0), (0.15, -0.12), (-0.15, -0.12), (0, 0.36), (0.3, 0.24),
                            (-0.3, 0.24), (0.45, 0), (-0.45, 0), (0, 0.48), (0.45, 0.24), (-0.45, 0.24), (0.45, -0.24),
                            (-0.45, -0.24), (0.6, 0.1), (-0.6, 0.1), (0, -0.4)):
-                cx, cy = max(-0.9, min(0.9, sx + dx)), max(-0.9, min(0.9, sy + dy))
-                cand = self.f.on_box(t0 + at, cx, cy, arg)
-                h = kw.get("height") or k * cand[3]
-                if self._placement_ok(t0 + at, cand[0], cand[1], h, text):
-                    hit = cand
-                    break
+                    cx, cy = max(-0.9, min(0.9, sx + dx)), max(-0.9, min(0.9, sy + dy))
+                    cand = self.f.on_box(t0 + at, cx, cy, arg)
+                    h = kw.get("height") or k * cand[3]
+                    if self._placement_ok(t0 + at, cand[0], cand[1], h, text):
+                        hit = cand
+                        break
             if hit is None:
+                k = base_k
                 hit = self.f.on_box(t0 + at, sx, sy, arg)
                 self.unplaced = getattr(self, "unplaced", []) + [(round(t0, 2), text)]
         elif kind == "ground":

@@ -32892,7 +32892,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.342983314144878,
+     "textSize": 0.26752698503300487,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -32933,7 +32933,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.21568190485363953,
+     "textSize": 0.16823188578583886,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -32974,7 +32974,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.3916415546080382,
+     "textSize": 0.30548041259426983,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33015,7 +33015,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.3535647348877716,
+     "textSize": 0.27578049321246184,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33138,7 +33138,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.35909589442418904,
+     "textSize": 0.28009479765086753,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33179,7 +33179,7 @@
     "source": {
      "kind": "text",
      "text": "ALL YOU GOT",
-     "textSize": 0.25107850436120305,
+     "textSize": 0.1958412334017384,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33261,7 +33261,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE",
-     "textSize": 0.23970427245612388,
+     "textSize": 0.18696933251577663,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33343,7 +33343,7 @@
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.15723749841535387,
+     "textSize": 0.12264524876397602,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33384,7 +33384,7 @@
     "source": {
      "kind": "text",
      "text": "CAN YOU TELL ME",
-     "textSize": 0.2695267243505855,
+     "textSize": 0.21023084499345668,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -33412,20 +33412,20 @@
    "kind": "procedural",
    "name": "w013_IT_S_FINE_THOUGH",
    "position": [
-    -0.509573711293436,
-    2.083274615236121,
-    -2.196
+    -2.5959999999999996,
+    1.7168306219940315,
+    -0.46328740513528177
    ],
    "rotation": [
-    0.0,
     -0.0,
+    90.0,
     0.0
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "IT'S FINE THOUGH?",
-     "textSize": 0.24875233787968615,
+     "textSize": 0.21410326682814487,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -33753,7 +33753,7 @@
     "source": {
      "kind": "text",
      "text": "CAN YOU TELL ME IT'S FINE THOUGH?",
-     "textSize": 0.16148841535757055,
+     "textSize": 0.09689304921454232,
      "textDepth": 0.08,
      "font": {
       "family": "Menlo",
@@ -34409,7 +34409,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.38959009442164577,
+     "textSize": 0.3038802736488837,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34450,7 +34450,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.25578216281152716,
+     "textSize": 0.19951008699299122,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34491,7 +34491,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5415045472012882,
+     "textSize": 0.4223735468170048,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34532,7 +34532,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.3356588077009347,
+     "textSize": 0.26181387000672907,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34573,7 +34573,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.2639984563504328,
+     "textSize": 0.20591879595333762,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34614,7 +34614,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5788060358138909,
+     "textSize": 0.45146870793483496,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34655,7 +34655,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.30950199417562846,
+     "textSize": 0.24141155545699022,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34696,7 +34696,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.2739651806292625,
+     "textSize": 0.21369284089082477,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34737,7 +34737,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.369548010868723,
+     "textSize": 0.288247448477604,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34778,7 +34778,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.23856174290689258,
+     "textSize": 0.18607815946737624,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34819,7 +34819,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.15377803959298736,
+     "textSize": 0.11994687088253016,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34860,7 +34860,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.39645471314418795,
+     "textSize": 0.30923467625246664,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -34901,7 +34901,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.19338508864906576,
+     "textSize": 0.1508403691462713,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -34942,7 +34942,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.3103936843179215,
+     "textSize": 0.24210707376797877,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -34983,7 +34983,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.5573254588499907,
+     "textSize": 0.4347138579029928,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35024,7 +35024,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.37990559229606063,
+     "textSize": 0.2963263619909273,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35065,7 +35065,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.33859253106167414,
+     "textSize": 0.26410217422810583,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35106,7 +35106,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4280894415520667,
+     "textSize": 0.333909764410612,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35147,7 +35147,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.36908096790295497,
+     "textSize": 0.2878831549643049,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35188,7 +35188,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.19210365911354987,
+     "textSize": 0.14984085410856893,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35229,7 +35229,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.3737044019661483,
+     "textSize": 0.2914894335335957,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35270,7 +35270,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.2801547997807563,
+     "textSize": 0.2185207438289899,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35311,7 +35311,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.17910608948984202,
+     "textSize": 0.1397027498020768,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35352,7 +35352,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.2163640946645624,
+     "textSize": 0.1687639938383587,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35393,7 +35393,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.35712824807909693,
+     "textSize": 0.2785600335016956,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35434,7 +35434,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.4755302332607828,
+     "textSize": 0.37091358194341056,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35475,7 +35475,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6225685069622648,
+     "textSize": 0.48560343543056655,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35516,7 +35516,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.48533739763896633,
+     "textSize": 0.37856317015839375,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35557,7 +35557,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.23982204028250406,
+     "textSize": 0.1870611914203532,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35598,7 +35598,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.6797713236364427,
+     "textSize": 0.5302216324364253,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35639,7 +35639,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.4732470656584807,
+     "textSize": 0.36913271121361496,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35680,7 +35680,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.21678671918773537,
+     "textSize": 0.1690936409664336,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35721,7 +35721,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.4194705145471312,
+     "textSize": 0.3271870013467623,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35762,7 +35762,7 @@
     "source": {
      "kind": "text",
      "text": "LET",
-     "textSize": 0.27274284109943814,
+     "textSize": 0.21273941605756178,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35803,7 +35803,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.21078617803396088,
+     "textSize": 0.1644132188664895,
      "textDepth": 0.08,
      "font": {
       "family": "Didot",
@@ -35844,7 +35844,7 @@
     "source": {
      "kind": "text",
      "text": "GO",
-     "textSize": 0.44893585242038964,
+     "textSize": 0.350169964887904,
      "textDepth": 0.08,
      "font": {
       "family": "Impact",
@@ -35885,7 +35885,7 @@
     "source": {
      "kind": "text",
      "text": "DO YOU WANNA HAVE FUN?",
-     "textSize": 0.26177194459756803,
+     "textSize": 0.20418211678610307,
      "textDepth": 0.08,
      "font": {
       "family": "Futura",
@@ -35913,8 +35913,8 @@
    "kind": "procedural",
    "name": "v2w01",
    "position": [
-    -0.7202173295338729,
-    1.0157686563701651,
+    0.5613743770972668,
+    0.8782477506512872,
     -1.6959999999999997
    ],
    "rotation": [
@@ -35926,7 +35926,7 @@
     "source": {
      "kind": "text",
      "text": "AS THE FIRES KEEP BURNING",
-     "textSize": 0.15496912696333195,
+     "textSize": 0.1354239435618109,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -35967,7 +35967,7 @@
     "source": {
      "kind": "text",
      "text": "THE WORLD STOPS TURNING",
-     "textSize": 0.10620116293888056,
+     "textSize": 0.08283690709232684,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -35995,20 +35995,20 @@
    "kind": "procedural",
    "name": "v2w03",
    "position": [
-    1.0711303098288059,
-    1.9750436719022955,
-    -2.196
+    1.4610584334186831,
+    2.696,
+    -1.7816504862129474
    ],
    "rotation": [
-    0.0,
-    -0.0,
-    0.0
+    90.0,
+    -55.70931272312799,
+    5.144851693661301e-15
    ],
    "procedural": {
     "source": {
      "kind": "text",
      "text": "AND EVERYONE",
-     "textSize": 0.3513736491384171,
+     "textSize": 0.2715046511460409,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36037,8 +36037,8 @@
    "name": "v2w04",
    "position": [
     2.596,
-    2.435707663873087,
-    1.0862827888039832
+    2.4122375977435104,
+    0.21767711924840527
    ],
    "rotation": [
     -0.0,
@@ -36049,7 +36049,7 @@
     "source": {
      "kind": "text",
      "text": "UNDER THE SUN",
-     "textSize": 0.2697067175984267,
+     "textSize": 0.22381709954386036,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36160,8 +36160,8 @@
    "name": "v2w07",
    "position": [
     1.996,
-    1.9121757149710334,
-    0.2586275147042787
+    1.7143722164968116,
+    -0.30362316950394264
    ],
    "rotation": [
     -0.0,
@@ -36172,7 +36172,7 @@
     "source": {
      "kind": "text",
      "text": "TELL ME YOU'RE THE ONE",
-     "textSize": 0.23912007289479467,
+     "textSize": 0.19614313383380363,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36213,7 +36213,7 @@
     "source": {
      "kind": "text",
      "text": "TO MAKE THE WORLD",
-     "textSize": 0.22937852920537657,
+     "textSize": 0.17891525278019374,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36254,7 +36254,7 @@
     "source": {
      "kind": "text",
      "text": "STOP HURTING",
-     "textSize": 0.2873474245933426,
+     "textSize": 0.22413099118280727,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36295,7 +36295,7 @@
     "source": {
      "kind": "text",
      "text": "AND MY HEART KEEP PUMPING",
-     "textSize": 0.14493897069666442,
+     "textSize": 0.11305239714339826,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36336,7 +36336,7 @@
     "source": {
      "kind": "text",
      "text": "WHILE EVERYONE UNDER THE SUN",
-     "textSize": 0.18196904804663488,
+     "textSize": 0.14193585747637522,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36377,7 +36377,7 @@
     "source": {
      "kind": "text",
      "text": "TAKE STEPS",
-     "textSize": 0.3000211536711493,
+     "textSize": 0.1800126922026896,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36418,7 +36418,7 @@
     "source": {
      "kind": "text",
      "text": "TO FEEL IT GROW",
-     "textSize": 0.20864956207436275,
+     "textSize": 0.16274665841800295,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36459,7 +36459,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.3015128930974067,
+     "textSize": 0.23518005661597724,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36488,8 +36488,8 @@
    "name": "v2w15",
    "position": [
     2.596,
-    2.243045518512021,
-    -0.04697526479075531
+    1.5511620934387849,
+    -0.02620650029947824
    ],
    "rotation": [
     -0.0,
@@ -36500,7 +36500,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.21368102212366788,
+     "textSize": 0.12505584763889308,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36541,7 +36541,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.24015697658430163,
+     "textSize": 0.18732244173575527,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36582,7 +36582,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.24610596592854983,
+     "textSize": 0.19196265342426885,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36623,7 +36623,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.25682694252762384,
+     "textSize": 0.20032501517154658,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36651,8 +36651,8 @@
    "kind": "procedural",
    "name": "v2w19",
    "position": [
-    1.05047965934054,
-    1.660153835025308,
+    0.20927973834176938,
+    1.4587233919529776,
     -1.7959999999999998
    ],
    "rotation": [
@@ -36664,7 +36664,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.1689781140124188,
+     "textSize": 0.13315103559510924,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36705,7 +36705,7 @@
     "source": {
      "kind": "text",
      "text": "BREATHE AND GROW",
-     "textSize": 0.2711165221775208,
+     "textSize": 0.21147088729846622,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36734,8 +36734,8 @@
    "name": "v2w21",
    "position": [
     -1.7960000000000003,
-    1.4458627481073547,
-    -0.6330364239783113
+    1.4371443123098795,
+    -1.0145400787482195
    ],
    "rotation": [
     -0.0,
@@ -36746,7 +36746,7 @@
     "source": {
      "kind": "text",
      "text": "HOW LITTLE DO I KNOW?",
-     "textSize": 0.15820410061909113,
+     "textSize": 0.07675152662523278,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -36787,7 +36787,7 @@
     "source": {
      "kind": "text",
      "text": "TELL ME IT'LL BE FINE THOUGH?",
-     "textSize": 0.20608874402505903,
+     "textSize": 0.16074922033954606,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36828,7 +36828,7 @@
     "source": {
      "kind": "text",
      "text": "FEEL IT GROW",
-     "textSize": 0.3795437938331215,
+     "textSize": 0.2960441591898348,
      "textDepth": 0.08,
      "font": {
       "family": "DIN Condensed",
@@ -36869,7 +36869,7 @@
     "source": {
      "kind": "text",
      "text": "FEEL",
-     "textSize": 0.30745833605949635,
+     "textSize": 0.23981750212640718,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -36910,7 +36910,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.15557897400889642,
+     "textSize": 0.12135159972693922,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -36951,7 +36951,7 @@
     "source": {
      "kind": "text",
      "text": "GROW",
-     "textSize": 0.25038815622919597,
+     "textSize": 0.19530276185877288,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -36992,7 +36992,7 @@
     "source": {
      "kind": "text",
      "text": "FEEL",
-     "textSize": 0.2004253610730318,
+     "textSize": 0.15633178163696482,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -37033,7 +37033,7 @@
     "source": {
      "kind": "text",
      "text": "IT",
-     "textSize": 0.1266350326622255,
+     "textSize": 0.0987753254765359,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -37074,7 +37074,7 @@
     "source": {
      "kind": "text",
      "text": "GROW",
-     "textSize": 0.2510937491624282,
+     "textSize": 0.19585312434669405,
      "textDepth": 0.08,
      "font": {
       "family": "Avenir Next",
@@ -38960,7 +38960,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.2628850176889338,
+     "textSize": 0.20505031379736838,
      "textDepth": 0.08,
      "font": {
       "family": "American Typewriter",
@@ -39042,7 +39042,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.3495357067922662,
+     "textSize": 0.27263785129796764,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39083,7 +39083,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.34927337552589005,
+     "textSize": 0.2724332329101943,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39124,7 +39124,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.33160577206015185,
+     "textSize": 0.2586525022069185,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39206,7 +39206,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.426810128150571,
+     "textSize": 0.3329118999574454,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
@@ -39247,7 +39247,7 @@
     "source": {
      "kind": "text",
      "text": "IS THAT ALL?",
-     "textSize": 0.37982095100933333,
+     "textSize": 0.29626034178728,
      "textDepth": 0.08,
      "font": {
       "family": "Marker Felt",
