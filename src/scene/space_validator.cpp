@@ -1718,6 +1718,7 @@ struct SpObstacle {
     SpRect r;
     std::string id;
     std::string kind; // window, door, furniture, mounted, text
+    const SpEntity* ent = nullptr; // its geometry, when it has an SDF (measured exactly, not by its box)
 };
 
 std::vector<SpObstacle> obstaclesOn(const SpCtx& ctx, const SpGroup& g, const SpWall& w, const SpEntity& self, float depthLimit) {
@@ -1728,12 +1729,15 @@ std::vector<SpObstacle> obstaclesOn(const SpCtx& ctx, const SpGroup& g, const Sp
         if (!coexist(self, o)) continue;
         if (o.text) continue;
         const SpBox& b = o.geom.worldBox;
+        // Only what stands on the room's side of this wall, within reach of it: not the next room's
+        // furniture seen through the wall.
         const float d0 = std::min(w.depth(b.lo), w.depth(b.hi));
-        if (d0 > depthLimit) continue;
+        const float d1 = std::max(w.depth(b.lo), w.depth(b.hi));
+        if (d0 > depthLimit || d1 < -0.05f) continue;
         const std::string opening = ctx.cat(o.category).value("opening", std::string());
         const std::string kind = !opening.empty() ? opening
                                  : (supportsOf(ctx.cat(o.category), "mounts").empty() ? "furniture" : "mounted");
-        out.push_back({{b.lo[w.uAxis], b.hi[w.uAxis], b.lo.y, b.hi.y}, o.id, kind});
+        out.push_back({{b.lo[w.uAxis], b.hi[w.uAxis], b.lo.y, b.hi.y}, o.id, kind, o.geom.ok ? &o : nullptr});
     }
     return out;
 }
@@ -1866,7 +1870,34 @@ void checkLyrics(SpCtx& ctx) {
             }
             bool clean = inside >= 0.999f;
             for (const SpObstacle& ob : obstacles) {
-                const float share = overlapArea(tr, ob.r) / std::max(1e-6f, tr.area());
+                float share = overlapArea(tr, ob.r) / std::max(1e-6f, tr.area());
+                std::optional<float> exactGap;
+                if (ob.ent != nullptr && ob.kind != "window" && ob.kind != "door" && (share > 0.0f || rectGap(tr, ob.r) < margin)) {
+                    // Its real shape, not its box (a stair's box covers the wall above the treads): the share
+                    // of the text's columns, in front of the wall within reach, that the shape occupies, and the
+                    // nearest the shape comes to them.
+                    const int nu = 16, nv = 8;
+                    int hits = 0;
+                    float nearest = kInf;
+                    for (int iu = 0; iu < nu; ++iu) {
+                        for (int iv = 0; iv < nv; ++iv) {
+                            const float u = tr.u0 + (tr.u1 - tr.u0) * (iu + 0.5f) / nu;
+                            const float v = tr.v0 + (tr.v1 - tr.v0) * (iv + 0.5f) / nv;
+                            bool hit = false;
+                            for (float d = 0.02f; d <= depthLimit + 1e-4f; d += 0.08f) {
+                                const float dist = ob.ent->geom.dist(w.point(u, v, d));
+                                nearest = std::min(nearest, dist);
+                                if (dist < 0.0f) {
+                                    hit = true;
+                                    break;
+                                }
+                            }
+                            hits += hit ? 1 : 0;
+                        }
+                    }
+                    share = static_cast<float>(hits) / static_cast<float>(nu * nv);
+                    exactGap = std::max(0.0f, nearest);
+                }
                 if (share > 0.0f) {
                     const bool hard = ob.kind == "window" || ob.kind == "door";
                     out.v.push_back({hard || share > 0.25f ? "ERROR" : "WARNING", "lyricPlacement", {t.id, ob.id},
@@ -1875,7 +1906,7 @@ void checkLyrics(SpCtx& ctx) {
                                      "", "on a clear wall section", "", json{{"overlap", r3(share)}, {"wall", w.side}}});
                     clean = false;
                 } else {
-                    const float gap = rectGap(tr, ob.r);
+                    const float gap = exactGap ? *exactGap : rectGap(tr, ob.r);
                     if (gap < margin) {
                         out.v.push_back({"WARNING", "lyricClearance", {t.id, ob.id},
                                          fmt::format("{} is jammed against {} ({} of a {} margin)", t.id, ob.id, fmtM(gap), fmtM(margin)),

@@ -336,3 +336,32 @@ TEST_CASE("Space validator: a camera path is checked only against what is presen
     CHECK(find(runAt(35.0, 40.0), "cameraPath", "walk") == nullptr); // he is not there yet
     CHECK(find(runAt(62.0, 66.0), "cameraPath", "walk") != nullptr); // the camera walks through him
 }
+
+TEST_CASE("Space validator: lyric obstacles are on the text's side of the wall, and measured by their shape",
+          "[space][liminal][adr1051]") {
+    auto word = [](const std::string& name, double x, double y) {
+        return json{{"kind", "procedural"}, {"name", name}, {"position", {x, y, -2.49}}, {"rotation", {0.0, 0.0, 0.0}},
+                    {"entity", {{"category", "wallText"}, {"room", "room"}}},
+                    {"procedural", {{"source", {{"kind", "text"}, {"text", "GO"}, {"textSize", 0.3}}}}}};
+    };
+    // A cabinet in the NEXT room, right behind the -z wall: not an obstacle.
+    json s = scene(unionOf({place(boxAt(0, 1.0, 0, 0.6, 1.0, 0.3), -1.6, -3.0, 0, {{"category", "cabinet"}, {"id", "NextRoomCabinet"}})}));
+    s["nodes"].push_back(word("Behind", -1.6, 1.4));
+    const json r = run(s);
+    CHECK(find(r, "lyricPlacement", "NextRoomCabinet") == nullptr);
+    CHECK(find(r, "lyricClearance", "NextRoomCabinet") == nullptr);
+
+    // A ramp (a rotated slab) against the wall: its box reaches above the word, its shape does not.
+    // It rises away from the wall: low (y ~0.7) at the wall, high (y ~2.4) 1.7 m out, so its box covers the word.
+    json ramp = {{"kind", "rotate"}, {"rotation", {-45.0, 0.0, 0.0}},
+                 {"children", json::array({boxAt(0, 0, 0, 0.6, 0.04, 1.2)})}};
+    json s2 = scene(unionOf({place(ramp, -1.6, -1.4, 0, {{"category", "stairs"}, {"id", "Ramp"}, {"tilted", true}}, 1.55)}));
+    s2["nodes"].push_back(word("Above", -1.6, 2.3));
+    const json r2 = run(s2);
+    CHECK(find(r2, "lyricPlacement", "Ramp") == nullptr);
+    CHECK(find(r2, "lyricClearance", "Ramp") == nullptr);
+    // The same word low on the wall, where the ramp really is: flagged.
+    json s3 = s2;
+    s3["nodes"].back()["position"] = {-1.6, 0.75, -2.49};
+    CHECK(find(run(s3), "lyricPlacement", "Ramp") != nullptr);
+}
