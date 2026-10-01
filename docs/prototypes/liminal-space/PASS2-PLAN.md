@@ -280,12 +280,12 @@ No two are the same effect. Each is chosen for where it falls in the story. "z" 
 | pause | 41.1-41.4 | 90.275 | **Black.** LET IT GO falls through the void, twice. The second LET IT GO is hot pink: the quick shift of tone. | The song loses momentum. |
 | C07 | 45.4 | 100.734 | **Typographic explosion.** Every LET / IT / GO in the room flashes at once and flies off its wall, spinning outward. | The words become the event. |
 | C08 | 49.4 | 109.541 | **Camera transition.** A whip-zoom (FOV 40 → 100 in 3 frames), a one-frame negative, and a cut into verse 2's apartment. | The rebuild ends: a hard re-entry. |
-| C09 | 51.4 | 113.945 | **Data-mosh.** The frame freezes and smears for an eighth, then snaps. The globe, stopped on "the world stops turning", restarts violently. | The first break of the simulation. |
+| C09 | 51.4 | 113.945 | **Data-mosh** (the engineer's ADR-1049): 75 % of the blocks freeze from earlier frames and smear, the channels split, then snap. The globe, stopped on "the world stops turning", restarts violently. | The first break of the simulation. |
 | C10 | 53.4 | 118.349 | **Positional corruption.** Every object jumps sideways by a different amount and snaps back over a beat. | Broken positions. |
 | C11 | 55.4 | 122.752 | **Colour corruption.** A full channel split, a hue jump of 180°, and the lamp pumps like a heart. | "...and my heart keep pumping". |
 | C12 | 57.4 | 127.156 | **Stretch.** The room stretches vertically 2x (the ceiling flies up) and snaps back. | Impossible motion. |
 | C13 | 59.4 | 131.560 | **The mannequin.** A flash, and the mannequin is suddenly standing in the room, close, facing away. Gone at the next clap. | Unexpected, so strange. |
-| C14 | 61.4 | 135.963 | **Duplication.** The room tiles sideways forever for one beat: the simulation repeating itself. | "How little do I know?" |
+| C14 | 61.4 | 135.963 | **A wrong scale.** The study's furniture shrinks to half its size for a beat and snaps back. As built, this replaced the planned tiling, which would have hidden behind the walls. | "How little do I know?" |
 | C15 | 63.4 | 140.367 | **Floor drop.** The floor falls 1 m and every line goes white for a beat. | Losing the ground before the lift. |
 | C16 | 65.4 | 144.771 | **Lift-off.** The roof rips upward and the walls stretch toward the sky. | It hands over to the bridge. |
 | fills | 66.3 / 66.4 | 146.422 / 146.973 | The ceiling splits (66.3), then flies off into the sky (66.4). Two hits. | The snare fills. |
