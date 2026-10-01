@@ -22,12 +22,27 @@ LINE_ROLE = {"wall": "wall", "furn": "furn", "furn2": "furn2", "figure": "figure
 SURFACE_ROLE = {K.GLOW: "glow", K.SCREEN: "screen", K.CANVAS: "canvas", K.CANVAS2: "canvas2", K.GLASS: "glass"}
 HEAD_GLOW = 0.16      # the head surface's emission before the figure colour multiplies it
 HEAD_EDGE = 1.9       # the head's line brightness against the body's
+# The engine's rim (ADR-1052) and screen static (ADR-1054) change the SDF uniform block: switch them on only when
+# rendering with a binary that has them (re-pinned after their commit).
+ENGINE_RIM_STATIC = os.environ.get("LIMINAL_RIM_STATIC", "0") == "1"
+FIGURE_RIM = {"rimIntensity": 1.15, "rimPower": 2.6, "rimColor": [1.0, 1.0, 1.0]}
 
 
 def figure_surfaces():
     s = default_surfaces()
     s[K.GLASS] = {"color": [0.03, 0.03, 0.035], "emission": [HEAD_GLOW] * 3, "edge": [HEAD_EDGE] * 3}
     s[K.ACCENT] = {"color": [0.03, 0.028, 0.032], "edge": [1.25] * 3}
+    if ENGINE_RIM_STATIC:   # a glowing contour round the head, a faint one round the body (section 32)
+        for k in range(8):
+            s[k] = dict(s[k], rim=1.0 if k == K.GLASS else 0.28)
+    return s
+
+
+def screen_surfaces():
+    """Every object's SCREEN surface shows static (section 22); the others are untouched."""
+    s = default_surfaces()
+    if ENGINE_RIM_STATIC:
+        s[K.SCREEN] = dict(s[K.SCREEN], static=1.0)
     return s
 
 
@@ -56,9 +71,17 @@ def add_world(film, room: dict, edge_width=0.011, edge_intensity=4.0, max_distan
         is_figure = opts.pop("figure", False) or role == "figure"
         if is_figure:
             opts.setdefault("surfaces", figure_surfaces())
+            if ENGINE_RIM_STATIC:
+                opts.setdefault("look_extra", dict(FIGURE_RIM))
+        else:
+            opts.setdefault("surfaces", screen_surfaces())
+            if ENGINE_RIM_STATIC:
+                opts.setdefault("look_extra", {"staticCell": 0.011, "staticRate": 24.0, "staticRoll": 0.35})
         film.sdf(name, tree, bmin=bmin, bmax=bmax, **opts)
         if not own_line:
             film.bind(LINE_ROLE[role], f"sdf/{name}/look/edge/color")
+        if is_figure and ENGINE_RIM_STATIC:
+            film.bind("figure", f"sdf/{name}/look/rim/color")
         film.bind("fill", f"sdf/{name}/surface/{K.FILL}/color")
         film.bind("fill", f"sdf/{name}/surface/{K.FLOOR}/color")
         if not is_figure:
