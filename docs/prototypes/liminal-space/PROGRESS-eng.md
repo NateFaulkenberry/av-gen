@@ -24,6 +24,10 @@ after the other, then restore `temporal-*.png`. Item 6 would be a new SDF domain
 `p.x += amount * (hash(floor(p.y * bands + seed)) - 0.5)`), which touches `src/spatial/sdf.*`, `shaders/sdf.wgsl` and the
 compiled path, in the pattern of ADR-1040's `warp`.
 
+**Suites (pass 3, head `868ebbab`):** `avgen_tests` exit 0 (3,991 cases: 3,971 passed, 19 skipped, 1 failed as expected,
+the slope lean). `avgen_render_tests` was held for the art agent's final render (the binary was moved to
+`build/release/tests/avgen_render_tests.held`). Restore it with `mv` and run it alone under the lock.
+
 **The missing head (§33), found by the validator:** in `all-you-got-pass2.scene.json`, `hillMan` has boundsMax y = 2.5 and its
 head is at y = 2.896, so the head is never marched. This is a data fix in the art agent's generator (grow the bounds). The
 validator now reports it (`integrity`/`clipped`). The other mannequins' "black blob" is the crease-only line look on a rounded
