@@ -372,7 +372,7 @@ def path_intro():
 
 
 def path_loop():
-    return [[-10.0, 0.0, 0.0], [-4.0, 0.0, 0.0], [10.0, 0.0, 0.0], [40.0, 0.0, 0.0], [80.0, 0.0, 0.0]]
+    return [[-10.0, 0.0, 0.0], [-4.0, 0.0, 0.0], [10.0, 0.0, 0.0], [28.0, 0.0, 0.0], [36.0, 0.0, 0.0]]
 
 
 # ======================================================================================================
@@ -573,7 +573,7 @@ def g_room(L, W, Hh):
 def world_grow():
     size, at = g_room(G_L0, G_W0, G_H0)
     body = translate(at, {"kind": "shell", "offset": G_WALL, "children": [box(size, name="grow")]}, name="growAt")
-    entry = slab(((-1.0, 1.0), (0.0, 2.6), (-0.65, 0.65)))
+    entry = slab(((-1.0, 1.0), (0.0, 2.7), (-0.8, 0.8)))
     sky_door = translate([G_L0, 1.7, 0.0], box([0.0, 0.0, 0.0], name="skyDoor"), name="skyDoorAt")
     room = difference(body, entry, sky_door)
     floor_skin = surface(translate([at[0], 0.0, 0.0], box([size[0] - G_WALL, 0.012, size[2] - G_WALL], name="growFloor"),
@@ -581,7 +581,7 @@ def world_grow():
     vest = shellbox(((-4.3, 0.0), (-0.3, 2.9), (-1.0, 1.0)), 0.3)
     out = union(slab(((G_L1 + 0.15, G_L1 + 4.0), (-0.4, 0.0), (-2.0, 2.0))),
                 surface(slab(((G_L1 + 0.15, G_L1 + 4.0), (-0.02, 0.004), (-2.0, 2.0))), FLOOR))
-    tree = difference(union(room, floor_skin, vest, out), slab(((-1.0, 0.3), (0.0, 2.6), (-0.65, 0.65))))
+    tree = difference(union(room, floor_skin, vest, out), slab(((-1.0, 0.3), (0.0, 2.7), (-0.8, 0.8))))
     tree = breathing(tree, amount=0.0, frequency=0.06, axes=(1.0, 0.0, 1.0), name="breath")
     return tremble(tree, amount=0.0, frequency=3.0, radius=3.5, fade=2.0)
 
@@ -613,13 +613,13 @@ def world_penrose():
     land1 = landing([P_R, P_RISE, (P_R + P_HALF) / 2 + 0.25], 2.0, P_R - P_HALF + 1.5, thickness=0.3)
     ywall = (P_RISE / 2 - P_TURN / 2, P_RISE / 2 + P_TURN / 2)
     wall_a = moved(difference(slab(((P_R + 1.0, P_R + 1.3), ywall, (0.0, P_R + 1.3))),
-                              slab(((P_R + 0.5, P_R + 1.8), (P_RISE, P_RISE + 2.7), (P_DOOR_Z - 0.65, P_DOOR_Z + 0.65)))),
+                              slab(((P_R + 0.5, P_R + 1.8), (P_RISE, P_RISE + 2.7), (P_DOOR_Z - 0.8, P_DOOR_Z + 0.8)))),
                    "crackA")
     wall_b = moved(slab(((P_R + 1.0, P_R + 1.3), ywall, (-P_R - 1.3, 0.0))), "crackB")
     sky = surface(slab(((P_R + 2.2, P_R + 2.4), ywall, (-1.5, 1.5))), SKY)
-    beacon = surface(shellbox(((P_R + 1.2, P_R + 2.9), (P_RISE - 0.3, P_RISE + 3.0), (P_DOOR_Z - 1.0, P_DOOR_Z + 1.0)),
+    beacon = surface(shellbox(((P_R + 1.2, P_R + 3.6), (P_RISE - 0.3, P_RISE + 3.0), (P_DOOR_Z - 1.2, P_DOOR_Z + 1.2)),
                               0.3), BEACON)
-    beacon = difference(beacon, slab(((P_R + 0.8, P_R + 1.8), (P_RISE, P_RISE + 2.7), (P_DOOR_Z - 0.65, P_DOOR_Z + 0.65))))
+    beacon = difference(beacon, slab(((P_R + 0.8, P_R + 1.8), (P_RISE, P_RISE + 2.7), (P_DOOR_Z - 0.8, P_DOOR_Z + 0.8))))
     cell = union(flight, land0, land1, wall_a, wall_b, sky, beacon)
     tree = screw(cell, [0.0, P_RISE, 0.0], count=4, seam=0.16, name="penrose")
     tree = breathing(tree, amount=0.0, frequency=0.07, axes=(1.0, 0.0, 1.0), name="breath")
@@ -671,7 +671,8 @@ def world_open():
     base = union(slab(((-2.4, 2.4), (-0.4, 0.0), (-2.4, 2.4))),
                  surface(slab(((-2.4, 2.4), (-0.02, 0.004), (-2.4, 2.4))), FLOOR),
                  slab(((-0.5, 0.5), (-30.0, -0.4), (-0.5, 0.5))),
-                 shellbox(((-6.8, -2.6), (-0.3, 3.5), (-1.1, 1.1)), 0.3, LAMP))
+                 difference(shellbox(((-6.8, -2.6), (-0.3, 3.5), (-1.1, 1.1)), 0.3, LAMP),
+                            slab(((-3.2, -2.0), (0.0, 3.2), (-0.75, 0.75)))))
     walls = [moved(difference(slab(((-2.8, -2.4), (-0.4, 6.0), (-2.8, 2.8))),
                               slab(((-3.6, -1.8), (0.0, 3.2), (-0.75, 0.75)))), "wallW"),
              moved(slab(((-2.8, 2.8), (-0.4, 6.0), (2.4, 2.8))), "wallN"),
@@ -775,6 +776,10 @@ def build(check_only=False, end=SONG_END):
         k = keys[name]
         walls = hexlin(k["walls"])
         air = hexlin(k["air"])
+        if name == "K4":   # the restless teal, quieter as an air colour (the whole frame is air)
+            air = mix(air, hexlin(keys["K3"]["air"]), 0.55)
+        if name == "K1":   # luminous cobalt: the depth of the hall, not a lavender wash over everything
+            air = mix(air, hexlin("#8C9FD8"), 0.45)
         light = hexlin(k["light"])
         accent = hexlin(k["accent"])
         zen = hexlin(sky_zen[name]) if name in sky_zen else air
@@ -800,6 +805,8 @@ def build(check_only=False, end=SONG_END):
         seam = 0.0012 * maxd[w]
         node = sdf_node(w, tree, surfaces=surfaces_default(), step_scale=0.8, max_distance=maxd[w],
                         look={"aoStrength": looks[w], "aoDistance": 1.4}, position=OFFSET[w])
+        if w == "hall":
+            node["sdf"]["castShadows"] = True   # the high windows cast the shafts (the sun's shadow map)
         nodes.append(node)
         print(f"world {w}: {n} nodes, depth {depth}, seam floor {seam:.3f}")
 
@@ -815,6 +822,16 @@ def build(check_only=False, end=SONG_END):
     nodes.append(figure("figWalk", [0.0, 0.0, 0.0], 0.0, state="Walk_Loop", journey=0.0))
     nodes.append(figure("figVoid", wpt("void", list(D_FIG)), 90.0))
     nodes.append(figure("figTop", wpt("open", [E_HX0 + 2.3, E_HIGH_Y, 0.9]), 90.0))
+
+    # ---- motes: dust hanging in the light (the hall's shafts, the growing room's gold) -------------------
+    def motes(name, world, centre, extent, rate, color):
+        return {"name": name, "kind": "particles", "particles": {
+            "capacity": 20000, "spawnRate": rate, "shape": "box", "position": wpt(world, centre), "extent": extent,
+            "lifetimeMin": 9.0, "lifetimeMax": 16.0, "speedMin": 0.01, "speedMax": 0.06, "spread": 1.0,
+            "gravity": [0.0, 0.004, 0.0], "sizeStart": 0.028, "sizeEnd": 0.0, "blend": "additive",
+            "colorStart": color + [0.55], "colorEnd": color + [0.0]}}
+    nodes.append(motes("motesHall", "hall", [B_L / 2, 8.0, 0.0], [B_L / 2, 7.5, B_W - 0.5], 900.0, [1.0, 0.85, 0.6]))
+    nodes.append(motes("motesGrow", "grow", [9.0, 4.0, 0.0], [8.0, 4.0, 5.5], 700.0, [1.0, 0.8, 0.45]))
 
     # ---- lights ---------------------------------------------------------------------------------------
     lights = []
@@ -973,8 +990,10 @@ def build(check_only=False, end=SONG_END):
     paths = {"corridor": path_intro(), "hall": path_hall(), "enfilade": path_enfilade(), "void": path_void(),
              "enfilade2": path_enfilade(turn=False), "grow": path_grow(), "loop": path_loop(),
              "penrose": path_penrose(), "open": path_open()}
-    chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall"], "enfilade": ["enfilade", "figWalk"],
-                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow"], "loop": ["corridor"],
+    chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall", "motesHall"],
+                     "enfilade": ["enfilade", "figWalk"],
+                     "void": ["void", "figVoid"], "enfilade2": ["enfilade"], "grow": ["grow", "motesGrow"],
+                     "loop": ["corridor"],
                      "penrose": ["penrose"], "open": ["open", "figTop"]}
     chapter_lights = {"corridor": L["corridor"], "hall": L["hall"], "enfilade": L["enfilade"], "void": L["void"],
                       "enfilade2": L["enfilade2"], "grow": L["grow"], "loop": [], "penrose": L["penrose"],
@@ -1088,11 +1107,13 @@ def build(check_only=False, end=SONG_END):
                                           (bt(75, 4), 0.85), (bt(76), 1.0), (bt(114), 1.0), (end, 0.6)]))
 
     # World air: how thick the luminous fog is, per place (pure functions of time; chapters swap in light).
-    dens = [(0, 0.03), (bt(17, 3), 0.03), (bt(18), 0.022), (bt(25, 4), 0.022), (bt(26), 0.03), (bt(41, 3), 0.03),
-            (bt(42) - 0.2, 0.026), (bt(58, 4), 0.026), (bt(59), 0.03), (bt(66, 4), 0.03), (bt(67), 0.024),
+    dens = [(0, 0.03), (bt(17, 3), 0.03), (bt(18), 0.016), (bt(25, 4), 0.016), (bt(26), 0.03), (bt(41, 3), 0.03),
+            (bt(42) - 0.2, 0.04), (bt(58, 4), 0.04), (bt(59), 0.03), (bt(66, 4), 0.03), (bt(67), 0.024),
             (bt(72), 0.012), (bt(75, 4), 0.012), (bt(76), 0.034), (bt(83, 4), 0.034), (bt(84), 0.028),
             (bt(91, 4), 0.028), (bt(92), 0.007), (bt(100), 0.005), (bt(113), 0.005), (bt(116), 0.03), (end, 0.04)]
     T.append(track("scene/volumeDensity", dens))
+    T.append(track("scene/volumeEmission", [(0, 1.0), (bt(17, 4), 1.0), (bt(18), 0.55), (bt(25, 4), 0.55),
+                                            (bt(26), 1.0), (end, 1.0)]))
     T.append(track("lightrig/AllYouGot/ambientIntensity", [
         (0, 1.0), (bt(18), 0.75), (bt(26), 0.7), (bt(42), 0.85), (bt(51), 0.7), (bt(67), 0.8), (bt(76), 0.8),
         (bt(84), 0.8), (bt(92), 0.7), (end, 0.9)]))
@@ -1169,8 +1190,8 @@ def build(check_only=False, end=SONG_END):
                                                   (bt(74), 120.0), (bt(75), 90.0), (end, 90.0)]))
     T.append(track("lights/goldLight/range", [(0, 6.0), (bt(67), 6.0), (bt(73), 30.0), (end, 30.0)]))
     T.append(track("lights/daySunG/intensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 2.0), (end, 2.0)]))
-    T.append(track("env/sky/sunIntensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 14.0), (bt(75, 4), 14.0),
-                                            (bt(76), 0.0), (bt(91, 4), 0.0), (bt(92), 18.0), (end, 18.0)]))
+    T.append(track("env/sky/sunIntensity", [(0, 0.0), (bt(70), 0.0), (bt(72), 6.0), (bt(75, 4), 6.0),
+                                            (bt(76), 0.0), (bt(91, 4), 0.0), (bt(92), 7.0), (end, 7.0)]))
 
     # The Penrose stairwell's seams: they open onto sky a little wider each time round, then close.
     crack = [(0, 0.0), (bt(84), 0.0), (bt(85, 3), 0.18), (bt(86, 3), 0.04), (bt(87), 0.3), (bt(88), 0.08),
@@ -1256,6 +1277,7 @@ def build(check_only=False, end=SONG_END):
     bindings = []
     for n_ in WORLDS:
         bindings += [{"role": "walls", "target": f"sdf/{n_}/surface/{PLASTER}/color"},
+                     {"role": "walls", "target": f"sdf/{n_}/surface/{LAMP}/color"},
                      {"role": "floor", "target": f"sdf/{n_}/surface/{FLOOR}/color"},
                      {"role": "accent", "target": f"sdf/{n_}/surface/{ACCENT}/color"},
                      {"role": "dark", "target": f"sdf/{n_}/surface/{DARK}/color"},
@@ -1286,8 +1308,8 @@ def build(check_only=False, end=SONG_END):
                         "volumeJitter": 0.5, "volumeLocalLights": 1.0,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                                 "zenithColor": k0air, "horizonColor": k0air, "groundColor": k0air,
-                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.97, 0.17, 0.0],
-                                "sunIntensity": 0.0, "sunSize": 0.6, "sunGlow": 0.25, "intensity": 1.0}},
+                                "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.995, 0.06, 0.03],
+                                "sunIntensity": 0.0, "sunSize": 0.25, "sunGlow": 0.06, "intensity": 0.75}},
         "nodes": nodes,
         "lights": lights,
     }

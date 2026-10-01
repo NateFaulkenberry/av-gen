@@ -20830,14 +20830,14 @@
      {
       "time": 37.4312,
       "value": [
-       0.022
+       0.016
       ],
       "interp": "smooth"
      },
      {
       "time": 54.4954,
       "value": [
-       0.022
+       0.016
       ],
       "interp": "smooth"
      },
@@ -20858,14 +20858,14 @@
      {
       "time": 90.0752,
       "value": [
-       0.026
+       0.04
       ],
       "interp": "smooth"
      },
      {
       "time": 127.156,
       "value": [
-       0.026
+       0.04
       ],
       "interp": "smooth"
      },
@@ -20964,6 +20964,58 @@
       "time": 253.79,
       "value": [
        0.04
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/volumeEmission",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.8807,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.4312,
+      "value": [
+       0.55
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 54.4954,
+      "value": [
+       0.55
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0459,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 253.79,
+      "value": [
+       1.0
       ],
       "interp": "smooth"
      }
@@ -23268,7 +23320,7 @@
      {
       "time": 180.6872,
       "value": [
-       3.170936045239415,
+       3.170936045239401,
        0.0,
        0.0
       ],
@@ -23277,7 +23329,7 @@
      {
       "time": 180.7872,
       "value": [
-       3.34215703572454,
+       3.342157035724526,
        0.0,
        0.0
       ],
@@ -23286,7 +23338,7 @@
      {
       "time": 180.8872,
       "value": [
-       3.4942026662821775,
+       3.4942026662821632,
        0.0,
        0.0
       ],
@@ -23295,7 +23347,7 @@
      {
       "time": 180.9872,
       "value": [
-       3.6274588373015035,
+       3.6274588373014893,
        0.0,
        0.0
       ],
@@ -23304,7 +23356,7 @@
      {
       "time": 181.0872,
       "value": [
-       3.74388702429016,
+       3.743887024290146,
        0.0,
        0.0
       ],
@@ -27741,14 +27793,14 @@
      {
       "time": 156.3303,
       "value": [
-       14.0
+       6.0
       ],
       "interp": "smooth"
      },
      {
       "time": 164.5872,
       "value": [
-       14.0
+       6.0
       ],
       "interp": "smooth"
      },
@@ -27769,14 +27821,14 @@
      {
       "time": 199.7322,
       "value": [
-       18.0
+       7.0
       ],
       "interp": "smooth"
      },
      {
       "time": 253.79,
       "value": [
-       18.0
+       7.0
       ],
       "interp": "smooth"
      }
@@ -30707,9 +30759,9 @@
       0.18115
      ],
      "air": [
-      0.04231,
-      0.08438,
-      0.47932
+      0.14128,
+      0.20242,
+      0.57264
      ],
      "light": [
       0.9131,
@@ -30732,24 +30784,24 @@
       0.39157
      ],
      "skyglow": [
-      0.23385,
-      0.2675,
-      0.58346
+      0.31302,
+      0.36194,
+      0.65811
      ],
      "zenith": [
-      0.04231,
-      0.08438,
-      0.47932
+      0.14128,
+      0.20242,
+      0.57264
      ],
      "horizon": [
-      0.04231,
-      0.08438,
-      0.47932
+      0.14128,
+      0.20242,
+      0.57264
      ],
      "ambient": [
-      0.4777,
-      0.38912,
-      0.43544
+      0.52719,
+      0.44815,
+      0.48211
      ],
      "figure": [
       0.0824,
@@ -30917,9 +30969,9 @@
       0.1563
      ],
      "air": [
-      0.07819,
-      0.25415,
-      0.25818
+      0.25627,
+      0.32973,
+      0.35496
      ],
      "light": [
       0.84687,
@@ -30942,24 +30994,24 @@
       0.12214
      ],
      "skyglow": [
-      0.26255,
-      0.40332,
-      0.40654
+      0.40502,
+      0.46378,
+      0.48397
      ],
      "zenith": [
-      0.07819,
-      0.25415,
-      0.25818
+      0.25627,
+      0.32973,
+      0.35496
      ],
      "horizon": [
-      0.07819,
-      0.25415,
-      0.25818
+      0.25627,
+      0.32973,
+      0.35496
      ],
      "ambient": [
-      0.46253,
-      0.33871,
-      0.19016
+      0.55157,
+      0.3765,
+      0.23855
      ],
      "figure": [
       0.06931,
@@ -31535,6 +31587,10 @@
     "target": "sdf/corridor/surface/0/color"
    },
    {
+    "role": "walls",
+    "target": "sdf/corridor/surface/3/color"
+   },
+   {
     "role": "floor",
     "target": "sdf/corridor/surface/1/color"
    },
@@ -31564,6 +31620,10 @@
    {
     "role": "walls",
     "target": "sdf/hall/surface/0/color"
+   },
+   {
+    "role": "walls",
+    "target": "sdf/hall/surface/3/color"
    },
    {
     "role": "floor",
@@ -31597,6 +31657,10 @@
     "target": "sdf/enfilade/surface/0/color"
    },
    {
+    "role": "walls",
+    "target": "sdf/enfilade/surface/3/color"
+   },
+   {
     "role": "floor",
     "target": "sdf/enfilade/surface/1/color"
    },
@@ -31626,6 +31690,10 @@
    {
     "role": "walls",
     "target": "sdf/void/surface/0/color"
+   },
+   {
+    "role": "walls",
+    "target": "sdf/void/surface/3/color"
    },
    {
     "role": "floor",
@@ -31659,6 +31727,10 @@
     "target": "sdf/grow/surface/0/color"
    },
    {
+    "role": "walls",
+    "target": "sdf/grow/surface/3/color"
+   },
+   {
     "role": "floor",
     "target": "sdf/grow/surface/1/color"
    },
@@ -31690,6 +31762,10 @@
     "target": "sdf/penrose/surface/0/color"
    },
    {
+    "role": "walls",
+    "target": "sdf/penrose/surface/3/color"
+   },
+   {
     "role": "floor",
     "target": "sdf/penrose/surface/1/color"
    },
@@ -31719,6 +31795,10 @@
    {
     "role": "walls",
     "target": "sdf/open/surface/0/color"
+   },
+   {
+    "role": "walls",
+    "target": "sdf/open/surface/3/color"
    },
    {
     "role": "floor",

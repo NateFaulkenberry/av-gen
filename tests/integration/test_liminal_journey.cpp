@@ -442,3 +442,89 @@ TEST_CASE("Node tint: an opt-in colour multiplier a palette can bind", "[liminal
         }
     }
 }
+
+// The music video (tools/liminal/make_all_you_got.py): every chapter's walk clears its architecture, with the
+// world at the state the camera meets it in (the grown room, the narrowed loop corridor, the open's walls gone)
+// and the breathing at its largest. The collision guard is a safety net; this is the guarantee by construction.
+TEST_CASE("All You Got: every chapter's walk is clear of its world", "[liminal][journey][allyougot]") {
+    const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "liminal";
+    const std::filesystem::path file = dir / "all-you-got.scene.json";
+    if (!std::filesystem::exists(file)) {
+        SKIP("examples/liminal/all-you-got.scene.json not generated");
+    }
+    const nlohmann::json doc = readJson(file);
+    auto journey = scene::Journey::fromJson(doc.at("camera").at("journey"));
+    REQUIRE(journey.has_value());
+    REQUIRE(journey->size() >= 9);
+    const auto set = [](nlohmann::json& node, const std::string& name, const char* field, const nlohmann::json& value,
+                        const auto& self) -> void {
+        if (node.value("name", "") == name) {
+            node[field] = value;
+        }
+        if (node.contains("children")) {
+            for (auto& c : node["children"]) {
+                self(c, name, field, value, self);
+            }
+        }
+    };
+    const auto vec = [](float x, float y, float z) { return nlohmann::json::array({x, y, z}); };
+    for (std::size_t c = 0; c < journey->size(); ++c) {
+        const scene::JourneyChapter& chapter = journey->chapter(c);
+        const scene::JourneyPath& path = journey->path(c);
+        nlohmann::json root;
+        for (const auto& n : doc.at("nodes")) {
+            if (n.value("name", "") == chapter.world.collide) {
+                root = n.at("sdf").at("tree").at("root");
+            }
+        }
+        REQUIRE(!root.is_null());
+        // The near-field tremble wraps the world; its amplitude is centimetres.
+        if (root["kind"] == "warp" && root.value("count", 0) == 1) {
+            root = root["children"][0];
+        }
+        // The world as the camera meets it.
+        set(root, "breath", "amount", 0.36f, set);
+        if (chapter.name == "loop") {
+            set(root, "wallL", "translation", vec(0.0f, 0.0f, 0.32f), set);
+            set(root, "wallR", "translation", vec(0.0f, 0.0f, -0.32f), set);
+            set(root, "ceiling", "translation", vec(0.0f, -0.75f, 0.0f), set);
+            set(root, "lampsAt", "translation", vec(0.0f, -0.75f, 0.0f), set);
+        }
+        if (chapter.name == "grow") { // grown (the camera walks in as it grows; grown is the tightest for the far door)
+            set(root, "grow", "size", vec(9.15f, 5.15f, 6.65f), set);
+            set(root, "growAt", "translation", vec(9.0f, 5.0f, 0.0f), set);
+            set(root, "skyDoor", "size", vec(0.7f, 1.7f, 1.0f), set);
+            set(root, "skyDoorAt", "translation", vec(18.0f, 1.7f, 0.0f), set);
+        }
+        if (chapter.name == "open") {
+            set(root, "wallW", "translation", vec(-14.0f, 0.0f, 0.0f), set);
+            set(root, "wallN", "translation", vec(0.0f, 0.0f, 14.0f), set);
+            set(root, "wallS", "translation", vec(0.0f, 0.0f, -14.0f), set);
+            set(root, "wallE", "translation", vec(0.0f, -40.0f, 0.0f), set);
+            set(root, "lid", "translation", vec(0.0f, 24.0f, 0.0f), set);
+        }
+        auto tree = spatial::SdfTree::fromJson(nlohmann::json{{"root", root}});
+        REQUIRE(tree.has_value());
+        const glm::vec3 last = chapter.world.path.back();
+        float worst = 1e9f;
+        double worstAt = 0.0;
+        glm::vec3 worstEye(0.0f);
+        for (double d = chapter.from; d < path.cellLength(); d += 0.05) {
+            scene::JourneyView v;
+            v.distance = d;
+            const auto pose = scene::journeyPose(path, v);
+            if (glm::length(path.sample(d).position - last) < 0.4f) {
+                break; // the walk ends at the path's last point (the closing segment is never walked)
+            }
+            const float clearance = tree->evaluate(pose.eye, 0.0);
+            if (clearance < worst) {
+                worst = clearance;
+                worstAt = d;
+                worstEye = pose.eye;
+            }
+        }
+        INFO("chapter '" << chapter.name << "': closest approach " << worst << " m at local distance " << worstAt
+                         << " m, eye (" << worstEye.x << ", " << worstEye.y << ", " << worstEye.z << ")");
+        CHECK(worst > 0.22f);
+    }
+}
