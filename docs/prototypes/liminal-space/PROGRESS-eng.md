@@ -21,6 +21,11 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 7 | spectrum-sweep transition (`post/sweep/*`) | **done** | 1050 | `[adr1050]` (CPU and GPU) |
 | - | tint on moving figures (pass 1 gap 2) | **not reproducible at this head**: still, walking, keyed, journey-anchored and palette-bound figures all take the tint (renders checked); regression test added | 1044 | `[tint]` |
 
+**Suites after the breath fix (`373a34a7`, 2026-10-01):** `avgen_tests` exit 0 (3,963 cases: 3,943 passed,
+19 skipped, 1 failed as expected, the slope lean); `avgen_render_tests` exit 0 (564 cases: 563 passed, 1 skipped).
+The render suite had failed at `test_resource_lifetime_gpu.cpp:242`: camera breathing at its defaults drifted
+`camera.target` by an ulp. It now touches nothing at rest (ADR-1048 amendment).
+
 **Resume here:** all seven Phase 4 systems are built, tested, documented below and committed (ADRs 1045-1050;
 the commits `bcf2516b`..`b25b5e3d` on `proto/liminal-space`). The art agent's needs list (relayed by the
 coordinator) is covered: text from a data block, beat envelopes with gain and a section mask, breathing on the
