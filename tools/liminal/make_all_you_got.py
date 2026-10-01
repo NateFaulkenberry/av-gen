@@ -1002,9 +1002,17 @@ def build(check_only=False, end=SONG_END):
               f"speed {walk.speed(t):.2f}")
 
     # ---- the journey ------------------------------------------------------------------------------------
+    def extended(pts, lengths=(12.0, 24.0)):
+        """The path carried straight on past its last point, so the gaze (taken a few metres ahead) never runs
+        onto the closing segment towards the screw's far image, where the look direction jittered."""
+        (x0, y0, z0), (x1, y1, z1) = pts[-2], pts[-1]
+        d = math.dist((x0, z0), (x1, z1)) or 1.0
+        ux, uz = (x1 - x0) / d, (z1 - z0) / d
+        return pts + [[x1 + ux * L, y1, z1 + uz * L] for L in lengths]
     paths = {"corridor": path_intro(), "hall": path_hall(), "enfilade": path_enfilade(), "void": path_void(),
              "enfilade2": path_enfilade(turn=False), "grow": path_grow(), "loop": path_loop(),
              "penrose": path_penrose(), "open": path_open()}
+    paths = {k: extended(v) for k, v in paths.items()}
     # (The dust nodes belong to no chapter: they simulate from the first frame, so a beam is full when the
     # camera arrives; 1000 m from every other world, they are never in another chapter's view.)
     chapter_nodes = {"corridor": ["corridor"], "hall": ["hall", "figHall"],
