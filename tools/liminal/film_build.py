@@ -376,12 +376,14 @@ def build(film: Film, add_world, palette_index, grid_settings):
     f.route(c, "lights/livLamp/intensity", 25.0)
     f.route(c, "post/bloom/intensity", 1.2)
     # C02 (24.4): the walls blow outward into the black, the furniture lifts; the cut lands in the bedroom
-    c = b.clap("c02", t(24, 4), release=0.5, attack=BEAT1 * 0.25)
-    f.route(c, "post/bloom/intensity", 1.5)
-    f.route(c, "camera/exposure/compensation", 1.0)
+    c = b.clap("c02", t(24, 4), release=0.55)
+    f.route(c, "post/bloom/intensity", 2.2)
+    f.route(c, "camera/exposure/compensation", 2.0)
+    f.route(c, "post/lens/chromaticAberration", 0.7)
+    f.route(c, "post/grade/hueShift", -1.4)
     for o in ("livShell", "livCeil"):
         f.track(f"sdf/{o}/transform/scale", [(0.0, [1.0, 1.0, 1.0], "step"), (t(24, 4) - 0.002, [1.0, 1.0, 1.0], "easeOut"),
-                                             (t(24, 4) + 0.35, [2.2, 1.5, 2.2], "easeIn"), (t(25) - 0.002, [3.4, 1.9, 3.4], "step"),
+                                             (t(24, 4) + 0.14, [2.4, 1.6, 2.4], "easeIn"), (t(25) - 0.002, [3.6, 2.0, 3.6], "step"),
                                              (t(25), [1.0, 1.0, 1.0], "step")])
     for o in ("livSofa", "livMedia", "livShelf", "livMan"):
         f.track(f"sdf/{o}/transform/position", [(0.0, [0.0, 0.0, 0.0], "step"), (t(24, 4) - 0.002, [0.0, 0.0, 0.0], "easeOut"),

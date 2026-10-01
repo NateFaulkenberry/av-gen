@@ -266,9 +266,9 @@
       "channel": "c02",
       "time": 54.49541,
       "units": "seconds",
-      "attack": 0.13761467889908258,
+      "attack": 0.0,
       "hold": 0.0,
-      "release": 0.5,
+      "release": 0.55,
       "curve": "exp",
       "strength": 1.0
      },
@@ -4047,7 +4047,7 @@
   {
    "source": "grid.song.c02",
    "target": "post/bloom/intensity",
-   "amount": 1.5,
+   "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4057,7 +4057,27 @@
   {
    "source": "grid.song.c02",
    "target": "camera/exposure/compensation",
-   "amount": 1.0,
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c02",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c02",
+   "target": "post/grade/hueShift",
+   "amount": -1.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -38713,20 +38733,20 @@
       "interp": "easeOut"
      },
      {
-      "time": 54.84541,
+      "time": 54.63541,
       "value": [
-       2.2,
-       1.5,
-       2.2
+       2.4,
+       1.6,
+       2.4
       ],
       "interp": "easeIn"
      },
      {
       "time": 55.04387,
       "value": [
-       3.4,
-       1.9,
-       3.4
+       3.6,
+       2.0,
+       3.6
       ],
       "interp": "step"
      },
@@ -38768,20 +38788,20 @@
       "interp": "easeOut"
      },
      {
-      "time": 54.84541,
+      "time": 54.63541,
       "value": [
-       2.2,
-       1.5,
-       2.2
+       2.4,
+       1.6,
+       2.4
       ],
       "interp": "easeIn"
      },
      {
       "time": 55.04387,
       "value": [
-       3.4,
-       1.9,
-       3.4
+       3.6,
+       2.0,
+       3.6
       ],
       "interp": "step"
      },
