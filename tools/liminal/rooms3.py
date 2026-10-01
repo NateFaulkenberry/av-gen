@@ -206,35 +206,36 @@ def kitchen():
                         "livingDoor": (-1.75, 1.0, z1), "hallDoor": (x1, 1.0, -4.6), "man": (0.0, 1.0, -5.1)}}
 
 
-STAIR = {"x0": 3.9, "x1": 4.95, "foot_z": -0.35, "steps": 14, "run": 0.27, "rise": CEIL / 14}
+STAIR = {"x0": 3.9, "x1": 4.95, "foot_z": -4.7, "steps": 16, "run": 0.27, "rise": CEIL / 16}
 
 
-def stair_point(i, frac_x=0.5):
-    """The centre of tread i (0 = the first step up) of the hall stair: (x, y of its top, z)."""
+def riser(i):
+    """The face of riser i (0 = the first, at the foot) of the hall stair, which climbs towards +Z: (centre, the
+    face's normal (towards the foot), its height)."""
     s = STAIR
-    x = s["x0"] + (s["x1"] - s["x0"]) * frac_x
-    return (x, (i + 1) * s["rise"], s["foot_z"] - (i + 0.5) * s["run"])
+    return ((s["x0"] + s["x1"]) / 2, (i + 0.5) * s["rise"], s["foot_z"] + i * s["run"] - 0.003), (0.0, 0.0, -1.0), s["rise"]
 
 
-def hall(void_top=False):
+def hall():
     """Bars 37-40 (and the dance's way out): a long hall down the right side of the house. The front door at +Z,
-    doors to the living room and the kitchen on its left wall, a coat rail, a mirror, a phone table, a runner, and
-    the stair along its right wall climbing towards the back to the upstairs. With `void_top`, the stairwell opens
-    into nothing: no ceiling over the stair, and the flight carries on up out of the house to an edge (the
-    1:28 climb)."""
+    doors to the living room and the kitchen on its left wall, a coat rail, a mirror, a phone table, a runner. The
+    stair (its own object, `hallStair`, so it can stay lit while the house dissolves) climbs along the right wall from
+    behind the kitchen door towards the front, up through an open stairwell: in verse 1 there is nothing above, so the
+    flight carries on up out of the house to an edge (the 1:28 climb)."""
     rid = "hall"
     ext = ((2.75, 4.95), (0.0, CEIL), (-6.4, 2.2))
     (x0, x1), (y0, y1), (z0, z1) = ext
     s = STAIR
+    top_z = s["foot_z"] + s["steps"] * s["run"]
     doors = [("-x", -1.2, 0.9, "HallLivingDoor"), ("-x", -4.6, 0.9, "HallKitchenDoor"), ("+z", 3.45, 1.0, "FrontDoor")]
-    well = X(((s["x0"] - 0.05, x1 + 0.3), (y1 - 0.05, y1 + 0.6), (s["foot_z"] - s["steps"] * s["run"] - 0.1, s["foot_z"] - 0.9)))
+    well = X(((s["x0"] - 0.05, x1 + 0.3), (y1 - 0.05, y1 + 0.6), (s["foot_z"] + 1.1, top_z + 0.1)))
     flight = {"kind": "stairs", "size": [s["run"], s["rise"], (s["x1"] - s["x0"]) / 2], "count": s["steps"], "height": 0.0}
-    stair = T([(s["x0"] + s["x1"]) / 2, 0.0, s["foot_z"]], R([0, 90, 0], flight))
+    stair = T([(s["x0"] + s["x1"]) / 2, 0.0, s["foot_z"]], R([0, -90, 0], flight))
     ls.tag(stair, "stairs", id="HallStair", room=rid)
-    rail = K.SEG([s["x0"] - 0.03, 0.95, s["foot_z"]], [s["x0"] - 0.03, CEIL + 0.95, s["foot_z"] - s["steps"] * s["run"]], 0.022)
-    posts = U(K.SEG([s["x0"] - 0.03, 0.0, s["foot_z"]], [s["x0"] - 0.03, 0.97, s["foot_z"]], 0.03, box_section=(0.03, 0.03)))
+    rail = K.SEG([s["x0"] - 0.03, 0.95, s["foot_z"]], [s["x0"] - 0.03, CEIL + 0.95, top_z], 0.022)
+    post = K.SEG([s["x0"] - 0.03, 0.0, s["foot_z"]], [s["x0"] - 0.03, 0.97, s["foot_z"]], 0.03, box_section=(0.03, 0.03))
+    stair_obj = U(S(stair, FILL), S(U(rail, post), ACCENT))
     shell = U(*shell_with(ext, rid, doors=doors, windows=[], boards="z", extra_cuts=[well]),
-              S(stair, FILL), S(U(rail, posts), ACCENT),
               on_wall(K.painting(0.45, 0.6, motif="portrait", entity={"id": "HallPortrait", "room": rid}), "-x", ext, 0.5, 1.6),
               place(tag(PR.front_door(1.0, 2.05, name="frontDoorSwing"), "door", "FrontDoorLeaf", rid, normal=[0, 0, -1]),
                     (3.45, 0.0, z1), 180.0))
@@ -242,13 +243,14 @@ def hall(void_top=False):
              on_wall(K.mirror_frame(0.55, 0.85, entity={"id": "HallMirror", "room": rid}), "-x", ext, -2.6, 1.5),
              place(K.phone_table(entity={"id": "PhoneTable", "room": rid}), (x0 + 0.24, 0.0, -2.0), 90.0),
              place(K.rug(0.8, 2.4, entity={"id": "Runner", "room": rid}), (3.35, 0.0, 0.6)))
-    foot = (stair_point(-1)[0] - 0.05, 0.0, s["foot_z"] + 0.75)
-    figs = figure_objects(rid, [("hallMan", "stair", (3.35, 0.0, s["foot_z"] + 0.55), 180.0 + 12.0, None)])
+    figs = figure_objects(rid, [("hallMan", "stair", (3.32, 0.0, -3.55), 10.0, None)])
     return {"id": rid, "interior": ext,
-            "objects": [("hallShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, (y1 + 0.3) if not void_top else 3.4, z1 + 0.5)),
+            "objects": [("hallShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("hallStair", stair_obj, "furn2", (s["x0"] - 0.2, -0.4, s["foot_z"] - 0.1), (x1 + 0.05, CEIL + 1.1, top_z + 0.1)),
                         ("hallFurn", furn, "furn", (x0 - 0.05, -0.05, -3.0), (4.0, 2.1, 2.2))] + figs,
-            "lights": [("hallLamp", (3.5, 2.35, 0.4), "lamp"), ("hallLamp2", (3.4, 2.35, -3.6), "lamp")],
-            "anchors": {"frontDoor": (3.45, 1.0, z1), "stairFoot": foot, "mirror": (x0, 1.5, -2.6)}}
+            "lights": [("hallLamp", (3.4, 2.35, 0.6), "lamp"), ("hallLamp2", (3.4, 2.35, -5.4), "lamp")],
+            "anchors": {"frontDoor": (3.45, 1.0, z1), "stairFoot": (4.42, 0.0, s["foot_z"]), "stairTop": (4.42, CEIL, top_z),
+                        "mirror": (x0, 1.5, -2.6)}}
 
 
 def ground_floor():

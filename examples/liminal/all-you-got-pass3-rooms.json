@@ -4628,6 +4628,47 @@
     "mode": "multiply"
    },
    {
+    "role": "furn2",
+    "target": "sdf/hallStair/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallStair/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallStair/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallStair/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/hallStair/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/hallStair/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/hallStair/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/hallStair/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/hallStair/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
     "role": "furn",
     "target": "sdf/hallFurn/look/edge/color"
    },

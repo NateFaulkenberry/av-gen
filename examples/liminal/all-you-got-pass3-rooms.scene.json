@@ -422,6 +422,7 @@
      "yaw": 0.0,
      "nodes": [
       "hallShell",
+      "hallStair",
       "hallFurn",
       "hallMan"
      ],
@@ -479,6 +480,7 @@
      "yaw": 0.0,
      "nodes": [
       "hallShell",
+      "hallStair",
       "hallFurn",
       "hallMan"
      ],
@@ -11609,7 +11611,7 @@
             "translation": [
              4.55,
              2.9750000000000005,
-             -2.7399999999999998
+             -1.94
             ],
             "children": [
              {
@@ -11617,7 +11619,7 @@
               "size": [
                0.7,
                0.32499999999999996,
-               1.4899999999999998
+               1.6600000000000001
               ]
              }
             ]
@@ -11922,96 +11924,6 @@
          {
           "kind": "translate",
           "translation": [
-           4.425,
-           0.0,
-           -0.35
-          ],
-          "children": [
-           {
-            "kind": "rotate",
-            "rotation": [
-             0.0,
-             90.0,
-             0.0
-            ],
-            "children": [
-             {
-              "kind": "stairs",
-              "size": [
-               0.27,
-               0.19285714285714287,
-               0.5250000000000001
-              ],
-              "count": 14,
-              "height": 0.0
-             }
-            ]
-           }
-          ],
-          "entity": {
-           "category": "stairs",
-           "id": "HallStair",
-           "room": "hall"
-          },
-          "material": 0
-         }
-        ]
-       },
-       {
-        "kind": "union",
-        "children": [
-         {
-          "kind": "union",
-          "children": [
-           {
-            "kind": "translate",
-            "translation": [
-             3.87,
-             2.3000000000000003,
-             -2.2399999999999998
-            ],
-            "children": [
-             {
-              "kind": "rotate",
-              "rotation": [
-               -54.46232220802562,
-               0.0,
-               -0.0
-              ],
-              "children": [
-               {
-                "kind": "capsule",
-                "radius": 0.022,
-                "height": 4.645255644203019
-               }
-              ]
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             3.87,
-             0.485,
-             -0.35
-            ],
-            "children": [
-             {
-              "kind": "box",
-              "size": [
-               0.03,
-               0.485,
-               0.03
-              ]
-             }
-            ]
-           }
-          ],
-          "material": 6
-         },
-         {
-          "kind": "translate",
-          "translation": [
            2.75,
            1.6,
            0.5
@@ -12142,97 +12054,61 @@
             ]
            }
           ]
-         },
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         3.45,
+         0.0,
+         2.2
+        ],
+        "children": [
          {
-          "kind": "translate",
-          "translation": [
-           3.45,
+          "kind": "rotate",
+          "rotation": [
            0.0,
-           2.2
+           180.0,
+           0.0
           ],
           "children": [
            {
-            "kind": "rotate",
-            "rotation": [
+            "kind": "translate",
+            "translation": [
+             -0.5,
              0.0,
-             180.0,
              0.0
             ],
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               -0.5,
+              "kind": "rotate",
+              "rotation": [
+               0.0,
                0.0,
                0.0
               ],
               "children": [
                {
-                "kind": "rotate",
-                "rotation": [
-                 0.0,
-                 0.0,
-                 0.0
-                ],
+                "kind": "union",
                 "children": [
                  {
-                  "kind": "union",
+                  "kind": "difference",
                   "children": [
                    {
-                    "kind": "difference",
+                    "kind": "translate",
+                    "translation": [
+                     0.5,
+                     1.025,
+                     0.0
+                    ],
                     "children": [
                      {
-                      "kind": "translate",
-                      "translation": [
+                      "kind": "box",
+                      "size": [
                        0.5,
                        1.025,
-                       0.0
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.5,
-                         1.025,
-                         0.025
-                        ]
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.5,
-                       1.6,
-                       0.05
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.38,
-                         0.29999999999999993,
-                         0.05
-                        ]
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.5,
-                       0.6749999999999999,
-                       0.05
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.38,
-                         0.475,
-                         0.05
-                        ]
-                       }
+                       0.025
                       ]
                      }
                     ]
@@ -12242,54 +12118,90 @@
                     "translation": [
                      0.5,
                      1.6,
-                     0.0
+                     0.05
                     ],
                     "children": [
                      {
                       "kind": "box",
                       "size": [
-                       0.36,
-                       0.2799999999999999,
-                       0.01
+                       0.38,
+                       0.29999999999999993,
+                       0.05
                       ]
                      }
-                    ],
-                    "material": 7
+                    ]
                    },
                    {
                     "kind": "translate",
                     "translation": [
-                     0.9,
-                     1.0,
-                     0.04
+                     0.5,
+                     0.6749999999999999,
+                     0.05
                     ],
                     "children": [
                      {
-                      "kind": "sphere",
-                      "radius": 0.025
+                      "kind": "box",
+                      "size": [
+                       0.38,
+                       0.475,
+                       0.05
+                      ]
                      }
-                    ],
-                    "material": 6
+                    ]
                    }
                   ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.5,
+                   1.6,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.36,
+                     0.2799999999999999,
+                     0.01
+                    ]
+                   }
+                  ],
+                  "material": 7
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.9,
+                   1.0,
+                   0.04
+                  ],
+                  "children": [
+                   {
+                    "kind": "sphere",
+                    "radius": 0.025
+                   }
+                  ],
+                  "material": 6
                  }
-                ],
-                "name": "frontDoorSwing"
+                ]
                }
               ],
-              "material": 0,
-              "entity": {
-               "category": "door",
-               "id": "FrontDoorLeaf",
-               "room": "hall",
-               "normal": [
-                0,
-                0,
-                -1
-               ]
-              }
+              "name": "frontDoorSwing"
              }
-            ]
+            ],
+            "material": 0,
+            "entity": {
+             "category": "door",
+             "id": "FrontDoorLeaf",
+             "room": "hall",
+             "normal": [
+              0,
+              0,
+              -1
+             ]
+            }
            }
           ]
          }
@@ -12407,6 +12319,246 @@
      5.45,
      3.0,
      2.7
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 30.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "hallStair",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "translate",
+        "translation": [
+         4.425,
+         0.0,
+         -4.7
+        ],
+        "children": [
+         {
+          "kind": "rotate",
+          "rotation": [
+           0.0,
+           -90.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "stairs",
+            "size": [
+             0.27,
+             0.16875,
+             0.5250000000000001
+            ],
+            "count": 16,
+            "height": 0.0
+           }
+          ]
+         }
+        ],
+        "entity": {
+         "category": "stairs",
+         "id": "HallStair",
+         "room": "hall"
+        },
+        "material": 0
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           3.87,
+           2.3000000000000003,
+           -2.54
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             57.9946167919165,
+             0.0,
+             -0.0
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.022,
+              "height": 5.0943498113105665
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           3.87,
+           0.485,
+           -4.7
+          ],
+          "children": [
+           {
+            "kind": "box",
+            "size": [
+             0.03,
+             0.485,
+             0.03
+            ]
+           }
+          ]
+         }
+        ],
+        "material": 6
+       }
+      ]
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     3.6999999999999997,
+     -0.4,
+     -4.8
+    ],
+    "boundsMax": [
+     5.0,
+     3.8000000000000003,
+     -0.2799999999999999
     ],
     "look": {
      "aoStrength": 0.25,
@@ -13044,16 +13196,16 @@
      "root": {
       "kind": "translate",
       "translation": [
-       3.35,
+       3.32,
        0.0,
-       0.20000000000000007
+       -3.55
       ],
       "children": [
        {
         "kind": "rotate",
         "rotation": [
          0.0,
-         192.0,
+         10.0,
          0.0
         ],
         "children": [
@@ -13926,14 +14078,14 @@
      }
     ],
     "boundsMin": [
-     2.956747331583475,
+     2.9303308274889357,
      -0.06000000000000007,
-     -0.13108640581586206
+     -3.8891193033808014
     ],
     "boundsMax": [
-     3.747076714375692,
+     3.7064753231920955,
      1.8635206286201025,
-     0.5490771275753863
+     -3.228993916196462
     ],
     "look": {
      "aoStrength": 0.25,
@@ -29371,9 +29523,9 @@
    "name": "hallLamp",
    "type": "point",
    "position": [
-    3.5,
+    3.4,
     2.35,
-    0.4
+    0.6
    ],
    "color": [
     1.0,
@@ -29391,7 +29543,7 @@
    "position": [
     3.4,
     2.35,
-    -3.6
+    -5.4
    ],
    "color": [
     1.0,
