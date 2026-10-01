@@ -5,8 +5,18 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
 
-**Where pass 2 stands:** Phase 1-2 done, the plan written (`PASS2-PLAN.md`), the world kit next. The engineer
-(space-engineer) is building the reusable systems in the same worktree in parallel. Commit only art paths:
+**Where pass 2 stands (12:45):**
+- The whole film is built as data and committed: 36 shots, 18 BIG CLAPs each with its own treatment, 254
+  words all seen when they appear, a clean CPU clearance.
+- All seven of the engineer's systems are in.
+- The v1 preview measured:
+  - 17 of 18 BIG CLAPs unmistakable;
+  - +11 to +26 dB of quarter lock in most sections (pass 1: +0 to +8);
+  - an onset-locked z of 5.6 in the Critic (pass 1: 0.2).
+- The many fixes since v1 are committed but not yet rendered. The GPU was held by the engineer's full CPU suite
+  from 12:08.
+- The coordinator has the engineer's render suite waiting until the art's final 1080p render is done. **Tell
+  the coordinator the moment the final render is finished.** Commit only art paths:
 `git commit -- tools/liminal/ examples/liminal/all-you-got* docs/prototypes/liminal-space/PASS2-PLAN.md
 docs/prototypes/liminal-space/PROGRESS-art.md`.
 
