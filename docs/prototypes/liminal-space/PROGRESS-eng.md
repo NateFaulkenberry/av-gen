@@ -14,7 +14,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 |---|---|---|---|---|
 | 1 | beat grid: owner-numbered bars, tempo map, pulses, authored event envelopes (BIG CLAPs, words) | **done** | 1045 | `[beatgrid]` (7 cases) |
 | 2 | spatial lyric typography (mesh text + `tools/liminal_text.py`) | **done** | 1046 | `[text]` (3 cases) |
-| 3 | luminous line-drawn edges | | | |
+| 3 | luminous line-drawn edges (pixel width, shape, per-surface colour) | **done** | 1047 | `[adr1047]` (1 CPU, 1 GPU) |
 | 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
 | 5 | object animation on beat sources | | | |
 | 6 | simulation-corruption effect | | | |
@@ -134,6 +134,24 @@ project["routes"] += out["routes"]; palette["bindings"] += out["bindings"]
   0 middle|1 baseline}, "material": {...}}}`. A text node faces +Z with its back at z = 0, and is a single
   instance.
 - Mesh text has no SDF edge lines; make it read with emission and bloom (dark `fill`, bright emission).
+
+#### 3. The line look (ADR-1047)
+
+On every SDF object (`sdf/<object>/...`, also in the scene file's `look` and `surfaces`):
+
+- `look/edge/intensity` (0 = off; 3-8 for luminous lines on a dark fill), `look/edge/color` (palette-bindable).
+- **`look/edge/pixels`**: the line's width in screen pixels at every distance (1.5-3 reads as drawn lines;
+  0 = the old world width `look/edge/width`). Use this in small rooms.
+- `look/edge/softness` (default 0.28): small (0.05-0.12) = a hard, thin line; large (0.4-1) = a soft glow
+  across the crease. `look/edge/threshold` (0.02): raise it to drop shallow creases (only hard corners draw).
+- **`surface/<k>/edge`**: RGB multiplier of the edge colour on surface k (1 = the object's colour; 0 = no
+  lines on that surface). For several line colours in one world, set `look/edge/color` to white and colour
+  each surface's `edge`, and bind them in the palette. Needs `compile: true` (the helper sets it).
+- The dark fill is the surface colour (`surface/<k>/color`) or `material/baseColor`. Bloom
+  (`post/bloom/*`) makes the lines glow. Route `grid.song.quarter` into `look/edge/intensity` for lines that
+  pulse on the beat.
+- In JSON: `"look": {"edgeIntensity": 5, "edgePixels": 2, "edgeSoftness": 0.1}` and
+  `"surfaces": [{"color": [...], "emission": [...], "edge": [1, 0.2, 0.8]}]`.
 
 #### 4. Camera breathing (ADR-1048)
 

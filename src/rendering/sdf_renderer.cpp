@@ -655,6 +655,7 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                     rec.fieldSlot = -1;
                     rec.p0 = glm::vec4(s.color, 0.0f);
                     rec.p1 = glm::vec4(s.emission, 0.0f);
+                    rec.p2 = glm::vec4(s.edge, 0.0f); // ADR-1047: the surface's edge colour multiplier
                     im.packScratch.push_back(rec);
                 }
             }
@@ -676,6 +677,7 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             u.look2 = glm::vec4(look.shadowStrength, look.shadowSoftness,
                                 static_cast<float>(std::clamp(look.shadowSteps, 1, 256)), 1.0f);
             u.look3 = glm::vec4(look.shadowDirection, 0.0f);
+            u.look4 = glm::vec4(look.edgePixels, look.edgeThreshold, std::max(look.edgeSoftness, 1e-3f), 0.0f);
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));

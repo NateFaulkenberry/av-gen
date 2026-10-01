@@ -1036,6 +1036,73 @@ TEST_CASE("SDF surfaces: a compiled tree picks each hit's surface by node materi
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1047: the line look -- per-surface edge colour, and an edge width in pixels.
+TEST_CASE("SDF line look: edges take each surface's colour and a pixel width holds across resolutions",
+          "[gpu][sdf][liminal][adr1047]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "lines";
+    SdfNode left = translate(glm::vec3(-0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    SdfNode right = translate(glm::vec3(0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    right.material = 1;
+    o.tree = treeOf(combo(SdfNodeKind::Union, {std::move(left), std::move(right)}));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.0f);
+    o.boundsMax = glm::vec3(3.0f);
+    o.compile = true;
+    o.material.baseColor = glm::vec3(0.02f);
+    o.look.edgeIntensity = 6.0f;
+    o.look.edgeColor = glm::vec3(1.0f);
+    o.look.edgeWidth = 0.05f;
+    o.surfaces = {{glm::vec3(0.02f), glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f)},
+                  {glm::vec3(0.02f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f)}};
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](float pixels, std::uint32_t size) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.look.edgePixels = pixels;
+        c.look.edgeSoftness = 0.1f;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, 0.5, size, size);
+    };
+    struct Count {
+        long red = 0;
+        long blue = 0;
+    };
+    const auto count = [](const gpu::Image8& img) {
+        Count c;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const auto* px = img.pixel(x, y);
+                c.red += (px[0] > 120 && px[0] > px[2] + 60) ? 1 : 0;
+                c.blue += (px[2] > 120 && px[2] > px[0] + 60) ? 1 : 0;
+            }
+        }
+        return c;
+    };
+    // Per-surface colour: the left box's lines are red, the right box's blue.
+    const auto world = count(render(0.0f, 192));
+    INFO("world width at 192: red " << world.red << ", blue " << world.blue);
+    CHECK(world.red > 40);
+    CHECK(world.blue > 40);
+    // A width in pixels: doubling the resolution doubles a line's length in pixels but not its width,
+    // so the line pixels roughly double; a width in world units scales both, so they quadruple.
+    const auto px192 = count(render(1.5f, 192));
+    const auto px384 = count(render(1.5f, 384));
+    const auto world384 = count(render(0.0f, 384));
+    const double pixelRatio = static_cast<double>(px384.red + px384.blue) / static_cast<double>(px192.red + px192.blue);
+    const double worldRatio =
+        static_cast<double>(world384.red + world384.blue) / static_cast<double>(world.red + world.blue);
+    INFO("pixel-width ratio " << pixelRatio << ", world-width ratio " << worldRatio);
+    CHECK(pixelRatio > 1.4);
+    CHECK(pixelRatio < 2.8);
+    CHECK(worldRatio > 3.0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF compiled trees deeper than the interpreter's stacks render (ADR-1005)", "[gpu][sdf]") {
     auto ctx = makeContext();
     scene::Scene s = baseScene();

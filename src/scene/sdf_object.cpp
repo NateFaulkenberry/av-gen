@@ -532,7 +532,11 @@ json SdfObject::toJson() const {
     if (!surfaces.empty()) { // ADR-1044
         json arr = json::array();
         for (const Surface& s : surfaces) {
-            arr.push_back(json{{"color", vecToJson(s.color)}, {"emission", vecToJson(s.emission)}});
+            json sj{{"color", vecToJson(s.color)}, {"emission", vecToJson(s.emission)}};
+            if (s.edge != glm::vec3(1.0f)) { // ADR-1047; written only when used
+                sj["edge"] = vecToJson(s.edge);
+            }
+            arr.push_back(std::move(sj));
         }
         j["surfaces"] = std::move(arr);
     }
@@ -541,6 +545,11 @@ json SdfObject::toJson() const {
                      {"edgeColor", vecToJson(look.edgeColor)}, {"shadowStrength", look.shadowStrength},
                      {"shadowSoftness", look.shadowSoftness}, {"shadowDirection", vecToJson(look.shadowDirection)},
                      {"shadowSteps", look.shadowSteps}};
+    if (look.edgePixels != 0.0f || look.edgeThreshold != 0.02f || look.edgeSoftness != 0.28f) { // ADR-1047
+        j["look"]["edgePixels"] = look.edgePixels;
+        j["look"]["edgeThreshold"] = look.edgeThreshold;
+        j["look"]["edgeSoftness"] = look.edgeSoftness;
+    }
     return j;
 }
 
@@ -625,6 +634,9 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
             if (!e) return std::unexpected(e.error());
             s.color = *c;
             s.emission = *e;
+            auto edge = readVec3(sj, "edge", s.edge);
+            if (!edge) return std::unexpected(edge.error());
+            s.edge = *edge;
             o.surfaces.push_back(s);
         }
     }
@@ -648,7 +660,9 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         for (auto r : {rf(o.look.aoStrength, "aoStrength"), rf(o.look.aoDistance, "aoDistance"),
                        rf(o.look.edgeIntensity, "edgeIntensity"), rf(o.look.edgeWidth, "edgeWidth"),
                        rv(o.look.edgeColor, "edgeColor"), rf(o.look.shadowStrength, "shadowStrength"),
-                       rf(o.look.shadowSoftness, "shadowSoftness"), rv(o.look.shadowDirection, "shadowDirection")}) {
+                       rf(o.look.shadowSoftness, "shadowSoftness"), rv(o.look.shadowDirection, "shadowDirection"),
+                       rf(o.look.edgePixels, "edgePixels"), rf(o.look.edgeThreshold, "edgeThreshold"),
+                       rf(o.look.edgeSoftness, "edgeSoftness")}) {
             if (!r) return std::unexpected(r.error());
         }
         auto steps = readInt(lj, "shadowSteps", o.look.shadowSteps);
@@ -692,6 +706,7 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
         const std::string base = "surface/" + std::to_string(k) + "/";
         r.v3(base + "color", base + "color", rest.surfaces[k].color, 0.0f, 100.0f, 0.0f, 1.0f, true);
         r.v3(base + "emission", base + "emission", rest.surfaces[k].emission, 0.0f, 1000.0f, 0.0f, 10.0f, true);
+        r.v3(base + "edge", base + "edge", rest.surfaces[k].edge, 0.0f, 100.0f, 0.0f, 4.0f, true); // ADR-1047
     }
     r.i("march/maxSteps", rest.maxSteps, 1, 1024, 16, 512);
     r.f("march/epsilon", "march/epsilon", rest.epsilon, 1e-6f, 0.1f, 1e-4f, 0.01f);
@@ -702,6 +717,10 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("look/edge/intensity", "look/edge/intensity", rest.look.edgeIntensity, 0.0f, 1000.0f, 0.0f, 20.0f);
     r.f("look/edge/width", "look/edge/width", rest.look.edgeWidth, 1e-4f, 10.0f, 0.005f, 0.5f);
     r.v3("look/edge/color", "look/edge/color", rest.look.edgeColor, 0.0f, 100.0f, 0.0f, 1.0f, true);
+    // ADR-1047: the line look.
+    r.f("look/edge/pixels", "look/edge/pixels", rest.look.edgePixels, 0.0f, 64.0f, 0.0f, 8.0f);
+    r.f("look/edge/threshold", "look/edge/threshold", rest.look.edgeThreshold, 0.0f, 1.0f, 0.0f, 0.2f);
+    r.f("look/edge/softness", "look/edge/softness", rest.look.edgeSoftness, 1e-3f, 2.0f, 0.01f, 0.6f);
     r.f("look/shadow/strength", "look/shadow/strength", rest.look.shadowStrength, 0.0f, 1.0f, 0.0f, 1.0f);
     r.f("look/shadow/softness", "look/shadow/softness", rest.look.shadowSoftness, 0.1f, 256.0f, 1.0f, 64.0f);
     r.v3("look/shadow/direction", "look/shadow/direction", rest.look.shadowDirection, -1.0f, 1.0f, -1.0f, 1.0f);
@@ -803,6 +822,7 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     for (std::size_t k = 0; k < live.surfaces.size(); ++k) { // ADR-1044
         index.copy("surface/" + std::to_string(k) + "/color", live.surfaces[k].color);
         index.copy("surface/" + std::to_string(k) + "/emission", live.surfaces[k].emission);
+        index.copy("surface/" + std::to_string(k) + "/edge", live.surfaces[k].edge);
     }
     index.copy("march/maxSteps", live.maxSteps);
     index.copy("march/epsilon", live.epsilon);
@@ -813,6 +833,9 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("look/edge/intensity", live.look.edgeIntensity);
     index.copy("look/edge/width", live.look.edgeWidth);
     index.copy("look/edge/color", live.look.edgeColor);
+    index.copy("look/edge/pixels", live.look.edgePixels);
+    index.copy("look/edge/threshold", live.look.edgeThreshold);
+    index.copy("look/edge/softness", live.look.edgeSoftness);
     index.copy("look/shadow/strength", live.look.shadowStrength);
     index.copy("look/shadow/softness", live.look.shadowSoftness);
     index.copy("look/shadow/direction", live.look.shadowDirection);
