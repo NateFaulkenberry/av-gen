@@ -63,11 +63,20 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
   test passes. The Critic's wobble rose to 36 findings: the swaps, plus 10 Hz velocity steps from the linear 0.1 s
   distance keys during accelerations. The grow room's motes were drawing in the hall (they belonged to no chapter);
   now gated.
-- [ ] v4 (`80491f03`, rendering from 23:34): C1 (`smooth`) walk keys, the walk carried by the bass pulse from bar 6,
-  a brighter and richer hall, a quieter let-it-go, almost no volumetric jitter.
-- [ ] Final: v4 plus the sun centred in the final doorway (azimuth 2.3 degrees) and the grow light's peak lowered
-  (it clipped), rendered as `all-you-got-final.mp4`; then `[sdf],[liminal]` under the lock; then the report (the
-  harness refuses report files from this agent, so its text goes to the coordinator in the hand-back).
+- [x] v4 (`80491f03`, `all-you-got-v4.mp4`): the aggression-unanswered finding at bars 5-8 is gone (the walk is
+  carried by the bass pulse); snaps 4, all minor; the Critic's wobble unchanged (38).
+- [x] **The wobble was real, and it was the world offsets.** With every timeline track frozen and no routes, the
+  image still jumped horizontally by up to 20 px at 1080p at the end of the open chapter (the sun disc tracked
+  frame by frame). Moving that world from z = 6000 m to the origin made it rock steady. The jitter grew with the
+  offset (the corridor at 0 m had little, the open at 6000 m the most). All seven worlds now sit at the origin
+  (`95d23ae0`); inactive chapters' nodes and lights are hidden, so overlapping is free. **Engine finding for the
+  coordinator:** something in the camera or reprojection path loses precision with a camera thousands of metres out.
+- [x] Also on the way: every chapter path carried straight on past its end (the gaze no longer reaches the closing
+  segment), "let it go" darker (value 0.74) with a slower look back, the sun centred in the final doorway, the grow
+  room's gold no longer clipping. The clearance test walks each chapter only as far as the walk goes; it passes.
+- [ ] **Final render** (`95d23ae0`, from about 00:04): `~/Desktop/av-gen-review/24-liminal-space/all-you-got-final.mp4`;
+  script `scratchpad/liminal/full-final.sh`. Then temporal + Critic on it, `[sdf],[liminal]` under the lock, and the
+  report text in the hand-back (the harness refuses report files from this agent).
 
 ### How to analyse a render
 
