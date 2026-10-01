@@ -3,6 +3,49 @@
 *Kept current after every step so a cold successor can resume. The engineering agent's notes are `PROGRESS-eng.md`;
 these are the art side's. Newest state first.*
 
+## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
+
+**Where pass 2 stands:** Phase 1-2 done, the plan written (`PASS2-PLAN.md`), the world kit next. The engineer
+(space-engineer) is building the reusable systems in the same worktree in parallel. Commit only art paths:
+`git commit -- tools/liminal/ examples/liminal/all-you-got* docs/prototypes/liminal-space/PASS2-PLAN.md
+docs/prototypes/liminal-space/PROGRESS-art.md`.
+
+- **Owner numbering everywhere:** owner bar N = analysis bar N+1. `tools/liminal/pass2_grid.py` is the one grid.
+  It writes `tools/liminal/all-you-got.pass2.json` (sections, 18 BIG CLAPs in seconds, events, 274 lyric
+  entries); `python3 tools/liminal/pass2_grid.py --md` prints the tables.
+- **Measure a render** ("does the visual response read?"):
+  `python3 tools/liminal/pass2_av.py --video <mp4> [--video-start s] --out <dir>`: the quarter and eighth beat
+  lock per section (pure noise reads about +4 dB with a share under 0.1; the target is above +12 dB with a
+  share above 0.3), the BIG CLAP z-scores (the target is z >= 3), and the boundary changes. Pass 1:
+  `$S/liminal2/av-pass1/`.
+- **The Critic with the pass 2 criteria:**
+  `python3 tools/liminal/critic_pass2.py --project <p.json> --video <mp4> --out <dir> --submit --label <l>
+  --track film`. It fixes the modulation shape, which un-breaks the reactivity analyzer. The pass 1 run is job
+  `job_1a0f80d8694ad5bee`: complete, "no measurable response" (z 0.2 over 268 events).
+- **Scratch:** `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`,
+  then `$S/liminal2/`.
+  - The Python venv with numpy, scipy, matplotlib and faster-whisper is `$S/venv/bin/python`; the system
+    python3 has numpy only.
+  - The clap check (`claps2.py`) and the hook-word timing (`words.py`, `vocenv.py`) are there.
+- **Review media:** `~/Desktop/av-gen-review/24-liminal-space/pass2/`.
+
+### Pass 2 checklist
+
+- [x] Phase 1 analysis and Phase 2 critique of pass 1 (`PASS2-PLAN.md` §1-2).
+- [x] The timeline re-mapped to owner numbering, with every BIG CLAP in seconds and the lyric times
+  (`pass2_grid.py`, `PASS2-PLAN.md` §4-6).
+- [x] The art needs sent to the coordinator for the engineer (`PASS2-PLAN.md` §9).
+- [ ] The world kit as data: props, rooms, outdoors, mannequin, palettes (`tools/liminal/props.py`,
+  `rooms.py`), and the generator `tools/liminal/make_all_you_got_pass2.py`, which writes
+  `examples/liminal/all-you-got-pass2{,.scene,.rig}.json`.
+- [ ] Stills of each room through `tools/gpu-lock.sh` (the existing binary; do not rebuild while the engineer
+  is mid-change).
+- [ ] Pulses and claps as timeline keys; switch to the engineer's systems as they land (text, beat envelopes,
+  breathing, corruption, sweep, line width).
+- [ ] Section renders, then `pass2_av.py`, the Critic and viewing; iterate.
+- [ ] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
+- [ ] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0; REPORT-pass2 text.
+
 ## RESUME HERE (Phase B: building and rendering the video, 2026-09-30 night)
 
 The art agent owns the worktree alone in Phase B (the engineer handed back at `2083bab4`). Deadline: a full,
