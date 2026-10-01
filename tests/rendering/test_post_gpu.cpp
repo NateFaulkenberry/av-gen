@@ -471,3 +471,52 @@ TEST_CASE("the live antialiasing floor raises FXAA and changes nothing else", "[
         CHECK(d.identical());
     }
 }
+
+// ADR-1050: the spectrum sweep -- off at its defaults, and a band of hue that travels with progress.
+TEST_CASE("The spectrum sweep is off at its defaults and moves a band of hue across the frame",
+          "[gpu][post][adr1050]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto s = brightCubeScene();
+    FrameTime time{};
+    auto plain = renderer.renderToImage(s, time, 128, 128);
+    REQUIRE(plain.has_value());
+    // Progress alone, with no intensity and no wash, changes nothing.
+    s.post.sweepProgress = 0.5f;
+    auto idle = renderer.renderToImage(s, time, 128, 128);
+    REQUIRE(idle.has_value());
+    {
+        const auto d = testing::byteDiff(plain->rgba, idle->rgba);
+        INFO(d.describe());
+        CHECK(d.identical());
+    }
+    // A band of light: where is it brightest along x?
+    s.post.sweepIntensity = 1.0f;
+    s.post.sweepWidth = 0.2f;
+    const auto brightestColumn = [&](float progress) {
+        s.post.sweepProgress = progress;
+        auto img = renderer.renderToImage(s, time, 128, 128);
+        REQUIRE(img.has_value());
+        long best = -1;
+        std::uint32_t at = 0;
+        for (std::uint32_t x = 0; x < img->width; ++x) {
+            long column = 0;
+            for (std::uint32_t y = 0; y < 16; ++y) { // the top rows: background only, no cube
+                column += sum3(img->pixel(x, y));
+            }
+            if (column > best) {
+                best = column;
+                at = x;
+            }
+        }
+        return at;
+    };
+    const std::uint32_t early = brightestColumn(0.3f);
+    const std::uint32_t late = brightestColumn(0.7f);
+    INFO("brightest column at progress 0.3: " << early << ", at 0.7: " << late);
+    CHECK(early < 64u);
+    CHECK(late > 64u);
+    CHECK(ctx->errorCount() == 0);
+}

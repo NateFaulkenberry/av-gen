@@ -18,7 +18,7 @@ own paths with `git commit -- <paths>`. ADRs 1045-1059.*
 | 4 | camera breathing | **done** | 1048 | `[breath]` (2 cases) |
 | 5 | object animation on beat sources | | | |
 | 6 | simulation corruption: data mosh + channel shift (temporal `mosh`) | **done** | 1049 | `[adr1049]` (GPU) |
-| 7 | spectrum-sweep transition | | | |
+| 7 | spectrum-sweep transition (`post/sweep/*`) | **done** | 1050 | `[adr1050]` (CPU and GPU) |
 | - | tint on moving figures (pass 1 gap 2) | if cheap | | |
 
 **Resume here:** build the next undone row. Each system: code, a test, an ADR, the guide entry below, then
@@ -167,6 +167,18 @@ Project parameters (keyable, routable):
   second, 12; 0 = frozen pattern), `seed` (key a new value for a different pattern).
 - Byte-identical to no effect while amount and shift are 0. Scrub-safe once `frames` frames have played
   after a seek (the history ring's warm-up).
+
+#### 7. The spectrum sweep (ADR-1050)
+
+Project parameters `post/sweep/*`: `progress` (0 = the band waits off the leading edge, 1 = it has left the
+far edge), `width` (half-width as a fraction of the frame, 0.35), `intensity` (added light, HDR), `wash` (0..1,
+how far the band tints the image under it), `angle` (degrees: 0 left to right, 90 top to bottom, -15 a
+slight rise), `span` (rainbows across the band, 1), `hue` (offset in turns), `trail` (0..1 wash left behind).
+Off while intensity and wash are both 0.
+
+For owner bar 90, beats 3-4 (198.651-199.732 s), key `progress` 0 -> 1 across the two beats (or route a
+grid event with `"attack": 2` in beats into it with op replace), and key `wash`/`intensity` up just before and
+down after. Add a bloom key if you want the band itself to glow: the sweep is applied after bloom.
 
 #### 4. Camera breathing (ADR-1048)
 

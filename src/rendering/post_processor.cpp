@@ -929,6 +929,13 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             }
         }
         u.params2 = glm::vec4(s.hueShift, static_cast<float>(layerCount), 0.0f, 0.0f);
+        // ADR-1050: the spectrum sweep rides the composite (HDR, before the tone map, so it blooms
+        // through nothing but still clips like light). params3 and params4 are the depth-of-field
+        // passes' in their own uniforms; here they are free.
+        const bool sweep = s.sweepIntensity > 0.0f || s.sweepWash > 0.0f;
+        u.params3 = glm::vec4(s.sweepProgress, std::max(s.sweepWidth, 1e-3f), s.sweepIntensity, s.sweepWash);
+        u.params4 = glm::vec4(glm::radians(s.sweepAngle), s.sweepSpan, sweep ? 1.0f : 0.0f, s.sweepHue);
+        u.tintA = glm::vec4(s.sweepTrail, 0.0f, 0.0f, 0.0f);
         PassTextures textures;
         textures.source = current;
         textures.second = bloom;
