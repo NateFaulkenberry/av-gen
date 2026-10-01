@@ -232,6 +232,10 @@ def build(b):
     f.route(c, "temporal/mosh/amount", 0.45)
     f.route(c, "post/bloom/intensity", 1.6)
     f.route(c, "palette/value", 1.6)
+    c = b.clap("c12in", t(57, 4), release=0.3)      # and the study comes in white-hot
+    f.route(c, "camera/exposure/compensation", 2.2)
+    for o in ("stuShell", "stuFurn", "stuShelf"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 10.0)
     # C13 (59.4) the walls tear: the study's walls ripple (a displacement), the frame splits
     c = b.clap("c13", t(59, 4), release=0.7)
     f.route(c, "sdf/stuShell/node/stuWarp/amount", 0.16)
@@ -249,6 +253,10 @@ def build(b):
     for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil", "stuDesk", "stuFloor"):
         f.route(c, f"sdf/{o}/transform/position", -0.16, component=0, attackMs=5.0)
     f.route(c, "temporal/mosh/amount", 0.5)
+    c = b.clap("c14c", t(61, 4) + 0.07, release=0.25)   # between the two jumps, the lines flare
+    f.route(c, "camera/exposure/compensation", 1.8)
+    for o in ("stuShell", "stuFurn", "stuShelf"):
+        f.route(c, f"sdf/{o}/look/edge/intensity", 9.0)
     # C15 (63.4) the floor drops: the room falls a metre under the camera and every line flares white
     c = b.clap("c15", t(63, 4), release=0.6)
     f.route(c, "palette/saturation", -0.9)

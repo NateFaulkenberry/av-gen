@@ -473,11 +473,11 @@ def colour_wave(b):
     # door as the door opens
     f.track("post/wave/progress", [(0.0, 0.0, "step"), (t0 - 0.2, 0.0, "linear"), (t0 + 0.13, 7.1, "linear"),
                                    (t(90, 4) + 0.13, 9.0, "linear"), (t1 + 0.02, 11.2, "step")])
-    f.track("post/wave/width", [(0.0, 0.6, "step"), (end, 0.6, "step")])
+    f.track("post/wave/width", [(0.0, 0.5, "step"), (end, 0.5, "step")])
     f.track("post/wave/hue", [(0.0, 0.0, "step"), (end, 0.0, "step")])
     f.track("post/wave/hueSpan", [(0.0, 1.0, "step"), (end, 1.0, "step")])
-    f.track("post/wave/intensity", [(0.0, 0.0, "step"), (t0 - 0.22, 0.0, "smooth"), (t0 - 0.1, 2.2, "smooth"),
-                                    (t1 - 0.05, 2.2, "smooth"), (t1 + 0.1, 0.0, "step")])
+    f.track("post/wave/intensity", [(0.0, 0.0, "step"), (t0 - 0.22, 0.0, "smooth"), (t0 - 0.1, 1.2, "smooth"),
+                                    (t1 - 0.05, 1.2, "smooth"), (t1 + 0.1, 0.0, "step")])
     f.track("post/wave/edgeTint", [(0.0, 0.0, "step"), (t0 - 0.22, 0.0, "smooth"), (t0 - 0.12, 1.0, "smooth"),
                                    (t1 + 0.05, 1.0, "smooth"), (t1 + 0.2, 0.0, "step")])
     f.track("post/wave/trail", [(0.0, 0.0, "step"), (t0 - 0.2, 0.0, "smooth"), (t0 - 0.05, 1.0, "smooth"),

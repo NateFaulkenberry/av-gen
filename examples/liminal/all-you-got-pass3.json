@@ -952,6 +952,16 @@
       "strength": 1.0
      },
      {
+      "channel": "c12in",
+      "time": 127.15596,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.3,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "c13",
       "time": 131.55963,
       "units": "seconds",
@@ -978,6 +988,16 @@
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.06,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "c14c",
+      "time": 136.0333,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.25,
       "curve": "exp",
       "strength": 1.0
      },
@@ -7499,6 +7519,46 @@
    "chain": {}
   },
   {
+   "source": "grid.song.c12in",
+   "target": "camera/exposure/compensation",
+   "amount": 2.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c12in",
+   "target": "sdf/stuShell/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c12in",
+   "target": "sdf/stuFurn/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c12in",
+   "target": "sdf/stuShelf/look/edge/intensity",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.c13",
    "target": "sdf/stuShell/node/stuWarp/amount",
    "amount": 0.16,
@@ -7726,6 +7786,46 @@
    "source": "grid.song.c14b",
    "target": "temporal/mosh/amount",
    "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14c",
+   "target": "camera/exposure/compensation",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14c",
+   "target": "sdf/stuShell/look/edge/intensity",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14c",
+   "target": "sdf/stuFurn/look/edge/intensity",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14c",
+   "target": "sdf/stuShelf/look/edge/intensity",
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -67227,14 +67327,14 @@
      {
       "time": 0.0,
       "value": [
-       0.6
+       0.5
       ],
       "interp": "step"
      },
      {
       "time": 258.0,
       "value": [
-       0.6
+       0.5
       ],
       "interp": "step"
      }
@@ -67313,14 +67413,14 @@
      {
       "time": 198.55113,
       "value": [
-       2.2
+       1.2
       ],
       "interp": "smooth"
      },
      {
       "time": 199.68221,
       "value": [
-       2.2
+       1.2
       ],
       "interp": "smooth"
      },
