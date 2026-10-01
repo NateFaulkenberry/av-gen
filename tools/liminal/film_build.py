@@ -244,7 +244,6 @@ def build(film: Film, add_world, palette_index, grid_settings):
     # ---- camera breathing: routed from the quarter's smooth wave, amount keyed per section ----------
     f.route("grid.song.quarter.wave", "camera/breath/forward", 0.07)
     f.route("grid.song.quarter.wave", "camera/breath/fov", -2.4)
-    f.route("grid.song.eighth.wave", "camera/breath/lift", 0.012)
     b.breath += [(t(1) - 0.01, 0.0), (t(1), 1.0), (t(5), 1.0), (t(9), 0.7), (t(16, 4), 0.0), (t(17), 0.6), (t(19), 0.25),
                  (t(24, 4), 0.12)]
 

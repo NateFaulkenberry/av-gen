@@ -3524,16 +3524,6 @@
    "chain": {}
   },
   {
-   "source": "grid.song.eighth.wave",
-   "target": "camera/breath/lift",
-   "amount": 0.012,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
    "source": "grid.song.quarter",
    "target": "sdf/seed/look/edge/intensity",
    "amount": 6.0,
@@ -31166,11 +31156,11 @@
       "interp": "smooth"
      },
      {
-      "time": 162.93578,
+      "time": 161.83486,
       "value": [
-       -2.94449,
-       27.0,
-       1.7
+       -1.47224,
+       28.0,
+       0.85
       ],
       "interp": "smooth"
      },
@@ -53467,14 +53457,14 @@
      {
       "time": 92.48706,
       "value": [
-       0.75
+       0.5
       ],
       "interp": "smooth"
      },
      {
       "time": 105.68807,
       "value": [
-       0.75
+       0.5
       ],
       "interp": "smooth"
      },
