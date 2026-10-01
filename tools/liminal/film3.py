@@ -147,10 +147,15 @@ class Builder3(FB.Builder):
         self._keys.setdefault(target, []).append((tt, v, interp))
 
     def write_keys(self, defaults=None):
+        """One replace track per target. A replace track holds its first value before its first key, so a target
+        whose first key is later than 0 starts from its default (`defaults`, or 1 for a node's `visible`)."""
         for target, ks in sorted(getattr(self, "_keys", {}).items()):
             ks = sorted(ks, key=lambda k: k[0])
-            if ks[0][0] > 0.0 and defaults and target in defaults:
-                ks = [(0.0, defaults[target], "step")] + ks
+            if ks[0][0] > 0.0:
+                d = (defaults or {}).get(target, 1.0 if target.endswith("/visible") else None)
+                if d is None:
+                    raise RuntimeError(f"{target}: first key at {ks[0][0]} s and no default before it")
+                ks = [(0.0, d, "step")] + ks
             self.f.track(target, ks)
 
     # ---- figures -----------------------------------------------------------------------------------------

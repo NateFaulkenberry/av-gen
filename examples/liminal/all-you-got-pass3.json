@@ -68504,6 +68504,13 @@
     "enabled": true,
     "keys": [
      {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
       "time": 254.99,
       "value": [
        0.0
@@ -68520,6 +68527,13 @@
     "loopLength": 0.0,
     "enabled": true,
     "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
      {
       "time": 254.99,
       "value": [
@@ -68538,6 +68552,13 @@
     "enabled": true,
     "keys": [
      {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
       "time": 254.99,
       "value": [
        0.0
@@ -68555,6 +68576,13 @@
     "enabled": true,
     "keys": [
      {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
       "time": 254.99,
       "value": [
        0.0
@@ -68571,6 +68599,13 @@
     "loopLength": 0.0,
     "enabled": true,
     "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
      {
       "time": 254.99,
       "value": [
