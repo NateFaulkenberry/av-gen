@@ -362,6 +362,32 @@ fn hueRotate(c: vec3<f32>, angle: f32) -> vec3<f32> {
     return mat3x3<f32>(vec3<f32>(1.0, 1.0, 1.0), vec3<f32>(0.956, -0.272, -1.106), vec3<f32>(0.621, -0.647, 1.703)) * rot;
 }
 
+// ADR-1050: the spectrum sweep. A band of hues crossing the frame along `angle` as progress goes 0 -> 1:
+// params3 = (progress, half-width, intensity, wash), params4 = (angle rad, hue span, on, hue offset),
+// tintA.x = the trail it leaves behind. Pure in the frame's parameters, so it is as seekable as they are.
+fn sweepHueRgb(h: f32) -> vec3<f32> {
+    let k = vec3<f32>(0.0, 2.0 / 3.0, 1.0 / 3.0);
+    return clamp(abs(fract(vec3<f32>(h) + k) * 6.0 - 3.0) - 1.0, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn applySweep(color: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
+    let aspect = post.outputSize.x / max(post.outputSize.y, 1.0);
+    let angle = post.params4.x;
+    let dir = vec2<f32>(cos(angle), sin(angle));
+    let p = (uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0);
+    let half = 0.5 * (abs(dir.x) * aspect + abs(dir.y));
+    let s = dot(p, dir) / max(2.0 * half, 1e-4) + 0.5;          // 0 at the leading edge, 1 at the far one
+    let w = post.params3.y;
+    let centre = mix(-w, 1.0 + w, post.params3.x);
+    let u = (s - centre) / w;                                     // -1..1 across the band
+    let band = select(0.0, pow(cos(1.5707963 * u), 2.0), abs(u) < 1.0);
+    let trail = select(0.0, post.tintA.x, u <= -1.0);             // what the band leaves behind it
+    let rgb = sweepHueRgb(post.params4.w + post.params4.y * (0.5 - 0.5 * clamp(u, -1.0, 1.0)));
+    let tintAmount = post.params3.w * max(band, trail);
+    let tinted = color * mix(vec3<f32>(1.0), rgb * 1.6, tintAmount);
+    return tinted + rgb * (post.params3.z * band);
+}
+
 @fragment
 fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     let bloomIntensity = post.params0.x;
@@ -396,6 +422,9 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     color = mix(vec3<f32>(lum), color, saturation * grade.y);
     // Lift / gamma / gain.
     color = pow(max(color * post.gain.rgb + post.lift.rgb, vec3<f32>(0.0)), vec3<f32>(1.0) / max(post.gamma.rgb, vec3<f32>(1e-3)));
+    if (post.params4.z > 0.5) {
+        color = applySweep(color, in.uv);
+    }
     return vec4<f32>(color, 1.0);
 }
 

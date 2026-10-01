@@ -260,6 +260,31 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
         break;
     }
 
+    // spring (ADR-1041): semi-implicit Euler in equal sub-steps of at most kSpringStepSeconds, so
+    // the result depends only on the sequence of (input, dt), never on wall time.
+    if (springHz > 0.0f) {
+        if (!state.springInitialised) {
+            state.springPosition = y;
+            state.springVelocity = 0.0f;
+            state.springInitialised = true;
+        } else if (dt > 0.0) {
+            const double omega = 2.0 * 3.14159265358979323846 * static_cast<double>(std::min(springHz, kMaxSpringHz));
+            const double zeta = static_cast<double>(std::max(springDamping, 0.0f));
+            const int steps = std::max(1, static_cast<int>(std::ceil(dt / kSpringStepSeconds - 1e-9)));
+            const double h = dt / static_cast<double>(steps);
+            double x = static_cast<double>(state.springPosition);
+            double v = static_cast<double>(state.springVelocity);
+            const double target = static_cast<double>(y);
+            for (int i = 0; i < steps; ++i) {
+                v += h * (omega * omega * (target - x) - 2.0 * zeta * omega * v);
+                x += h * v;
+            }
+            state.springPosition = static_cast<float>(x);
+            state.springVelocity = static_cast<float>(v);
+        }
+        y = state.springPosition;
+    }
+
     // remap (no clamping)
     if (remapEnabled) {
         const float inSpan = remapInMax - remapInMin;
@@ -269,6 +294,13 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
             const float t = (y - remapInMin) / inSpan;
             y = remapOutMin + t * (remapOutMax - remapOutMin);
         }
+    }
+
+    // integrate (ADR-1041): the running total of the rate over the frame's dt. The first frame after a
+    // reset has dt = 0 (ADR-521) and adds nothing.
+    if (integrate) {
+        state.integral += static_cast<double>(y) * dt;
+        y = static_cast<float>(state.integral);
     }
     return y;
 }

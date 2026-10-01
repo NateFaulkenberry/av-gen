@@ -143,6 +143,23 @@ struct CameraShake {
 void applyCameraShake(const CameraShake& shake, double seconds, glm::vec3& position,
                       glm::vec3& target);
 
+// ADR-1048: camera breathing. A small, authored offset in the camera's own frame -- forward/back,
+// lift, side, a roll-free yaw and pitch of the aim, and a FOV change -- applied after whatever placed
+// the camera (journey, spline, cinematic), like the shake. It has no clock of its own: the values are
+// parameters (`camera/breath/*`) that routes drive from a beat source (ADR-1045's `.wave` outputs),
+// and `amount` scales all of it, so a section's breathing is one keyed number. Roll-free by
+// construction: yaw turns about world up and pitch about the camera's horizontal right.
+struct CameraBreath {
+    float amount = 1.0f;  // multiplies everything below; key it per section (0 = still)
+    float forward = 0.0f; // metres along the view (+ = towards the subject)
+    float lift = 0.0f;    // metres up
+    float side = 0.0f;    // metres right
+    float yaw = 0.0f;     // degrees, + = left (as the journey's yaw)
+    float pitch = 0.0f;   // degrees, + = up
+    float fov = 0.0f;     // degrees added to the field of view
+};
+void applyCameraBreath(const CameraBreath& breath, glm::vec3& position, glm::vec3& target, float& fovDegrees);
+
 // ---- parameters (camera/lens/*, camera/exposure/*, camera/focus/*) ------------------------------
 
 struct CameraParameters {

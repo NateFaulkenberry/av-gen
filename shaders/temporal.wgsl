@@ -22,8 +22,11 @@ struct TemporalUniforms {
     outputSize: vec4<f32>,
     // x = ring depth, y = layer the NEXT capture writes, z = frames valid, w = taps to read
     ring: vec4<f32>,
-    // x = strength, y = per-tap decay, z = unused, w = unused
+    // echo: x = strength, y = per-tap decay. mosh (ADR-1049): x = amount, y = block px, z = smear px,
+    // w = channel shift px
     params: vec4<f32>,
+    // mosh (ADR-1049): x = the epoch (floor(time * rate) + seed), yzw = 0
+    extra: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> temporal: TemporalUniforms;
@@ -110,6 +113,69 @@ fn fs_echo(in: FsIn) -> @location(0) vec4<f32> {
     let echo = accum / weightSum;
     let strength = clamp(temporal.params.x, 0.0, 1.0);
     return vec4<f32>(current.rgb + echo * strength, current.a);
+}
+
+// ---- ADR-1049 data mosh and channel shift ------------------------------------------------------
+//
+// A block is replaced by the same block from `lag` frames ago (1..taps), dragged along one axis: the
+// smear of a codec that lost its keyframe. Which blocks, how far back and which way are integer hashes
+// of the block and the epoch, so the result is a function of the ring and the clock alone (FIR). The
+// colour channels are pulled apart by `shift` pixels everywhere, and twice as far inside a corrupted
+// block. The ring is half resolution, so a corrupted block is also softer: that reads as damage.
+
+fn moshPcg(v: u32) -> u32 {
+    let s = v * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+fn moshRandom(a: u32, b: u32, c: u32) -> f32 {
+    return f32(moshPcg(a ^ moshPcg(b ^ moshPcg(c))) >> 8u) / 16777216.0;
+}
+
+fn moshShifted(uv: vec2<f32>, shiftUv: f32) -> vec3<f32> {
+    let r = textureSampleLevel(source, linearSampler, uv + vec2<f32>(shiftUv, 0.0), 0.0).r;
+    let g = textureSampleLevel(source, linearSampler, uv, 0.0).g;
+    let b = textureSampleLevel(source, linearSampler, uv - vec2<f32>(shiftUv, 0.0), 0.0).b;
+    return vec3<f32>(r, g, b);
+}
+
+@fragment
+fn fs_mosh(in: FsIn) -> @location(0) vec4<f32> {
+    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let amount = clamp(temporal.params.x, 0.0, 1.0);
+    let shiftUv = temporal.params.w * temporal.outputSize.z;
+    var colour = current.rgb;
+    if (shiftUv > 0.0) {
+        colour = moshShifted(in.uv, shiftUv);
+    }
+    let taps = i32(temporal.ring.w + 0.5);
+    if (amount <= 0.0 || taps <= 0) {
+        return vec4<f32>(colour, current.a);
+    }
+    let block = max(temporal.params.y, 1.0);
+    let cell = vec2<u32>(max(floor(in.uv * temporal.outputSize.xy / block), vec2<f32>(0.0)));
+    let epoch = bitcast<u32>(i32(floor(temporal.extra.x)));
+    if (moshRandom(cell.x, cell.y, epoch) >= amount) {
+        return vec4<f32>(colour, current.a);
+    }
+    let depth = i32(temporal.ring.x + 0.5);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let lag = clamp(1 + i32(floor(moshRandom(cell.x + 7919u, cell.y, epoch) * f32(taps))), 1, taps);
+    let layer = ((writeLayer - lag) % depth + depth) % depth;
+    let pick = moshRandom(cell.x, cell.y + 104729u, epoch);
+    let sign = select(-1.0, 1.0, moshRandom(cell.y, cell.x, epoch + 31u) < 0.5);
+    let dir = select(vec2<f32>(sign, 0.0), vec2<f32>(0.0, sign), pick < 0.3);
+    let drag = temporal.params.z * (0.25 + 0.75 * moshRandom(cell.x + 3u, cell.y + 5u, epoch)) * temporal.outputSize.zw;
+    let uv = clamp(in.uv - dir * drag, vec2<f32>(0.0), vec2<f32>(1.0));
+    var moshed = textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
+    if (shiftUv > 0.0) {
+        let s = 2.0 * shiftUv;
+        moshed = vec3<f32>(textureSampleLevel(colourHistory, linearSampler, uv + vec2<f32>(s, 0.0), layer, 0.0).r,
+                           moshed.g,
+                           textureSampleLevel(colourHistory, linearSampler, uv - vec2<f32>(s, 0.0), layer, 0.0).b);
+    }
+    return vec4<f32>(moshed, current.a);
 }
 
 // ---- §53 debug view: history state ------------------------------------------------------------

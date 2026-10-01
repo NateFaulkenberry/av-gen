@@ -1,0 +1,5544 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "~/Desktop/All You Got.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "all-you-got-pass2-kit.scene.json"
+  }
+ },
+ "parameters": {
+  "temporal/mosh/enabled": true,
+  "temporal/mosh/amount": 0.0,
+  "temporal/mosh/shift": 0.0,
+  "temporal/mosh/block": 40.0,
+  "temporal/mosh/smear": 30.0,
+  "temporal/mosh/frames": 10.0,
+  "temporal/mosh/rate": 12.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.35,
+  "post/bloom/threshold": 0.9,
+  "post/grade/contrast": 1.08,
+  "post/grade/saturation": 1.1,
+  "post/output/vignette": 0.25,
+  "post/output/grain": 0.0,
+  "post/motionBlur/amount": 0.0
+ },
+ "sources": [
+  {
+   "kind": "beatgrid",
+   "name": "song",
+   "settings": {
+    "origin": 2.2018348623853212,
+    "beatsPerBar": 4,
+    "tempo": [
+     {
+      "bar": 1,
+      "bpm": 109
+     },
+     {
+      "bar": 75,
+      "bpm": 111
+     }
+    ],
+    "sections": {
+     "intro": 1,
+     "release": 17,
+     "verse1": 25,
+     "pause": 41,
+     "letgo": 42,
+     "verse2": 50,
+     "bridgein": 66,
+     "bridge1": 67,
+     "bridge2": 75,
+     "bridge3": 83,
+     "chorus": 91,
+     "ending": 115
+    },
+    "events": []
+   }
+  }
+ ],
+ "routes": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/journey/distance",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.1,
+      "value": [
+       1002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.2,
+      "value": [
+       1002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.3,
+      "value": [
+       1002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.4,
+      "value": [
+       1002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.5,
+      "value": [
+       1002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.6,
+      "value": [
+       1002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.7,
+      "value": [
+       1002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.8,
+      "value": [
+       1002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.9,
+      "value": [
+       1002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       1002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       2002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.1,
+      "value": [
+       2002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.2,
+      "value": [
+       2002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.3,
+      "value": [
+       2002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.4,
+      "value": [
+       2002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.5,
+      "value": [
+       2002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.6,
+      "value": [
+       2002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.7,
+      "value": [
+       2002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.8,
+      "value": [
+       2002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.9,
+      "value": [
+       2002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       3002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.1,
+      "value": [
+       3002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.2,
+      "value": [
+       3002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.3,
+      "value": [
+       3002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.4,
+      "value": [
+       3002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.5,
+      "value": [
+       3002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.6,
+      "value": [
+       3002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.7,
+      "value": [
+       3002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.8,
+      "value": [
+       3002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.9,
+      "value": [
+       3002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       3002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       4002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.1,
+      "value": [
+       4002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.2,
+      "value": [
+       4002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.3,
+      "value": [
+       4002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.4,
+      "value": [
+       4002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.5,
+      "value": [
+       4002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.6,
+      "value": [
+       4002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.7,
+      "value": [
+       4002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.8,
+      "value": [
+       4002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.9,
+      "value": [
+       4002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       4002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       5002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.1,
+      "value": [
+       5002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.2,
+      "value": [
+       5002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.3,
+      "value": [
+       5002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.4,
+      "value": [
+       5002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.5,
+      "value": [
+       5002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.6,
+      "value": [
+       5002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.7,
+      "value": [
+       5002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.8,
+      "value": [
+       5002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.9,
+      "value": [
+       5002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       5002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       6002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.1,
+      "value": [
+       6002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.2,
+      "value": [
+       6002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.3,
+      "value": [
+       6002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.4,
+      "value": [
+       6002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.5,
+      "value": [
+       6002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.6,
+      "value": [
+       6002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.7,
+      "value": [
+       6002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.8,
+      "value": [
+       6002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.9,
+      "value": [
+       6002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       6002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       7002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.1,
+      "value": [
+       7002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.2,
+      "value": [
+       7002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.3,
+      "value": [
+       7002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.4,
+      "value": [
+       7002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.5,
+      "value": [
+       7002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.6,
+      "value": [
+       7002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.7,
+      "value": [
+       7002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.8,
+      "value": [
+       7002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.9,
+      "value": [
+       7002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       7002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       8002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.1,
+      "value": [
+       8002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.2,
+      "value": [
+       8002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.3,
+      "value": [
+       8002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.4,
+      "value": [
+       8002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       8002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.6,
+      "value": [
+       8002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.7,
+      "value": [
+       8002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.8,
+      "value": [
+       8002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.9,
+      "value": [
+       8002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       8002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       9002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.1,
+      "value": [
+       9002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.2,
+      "value": [
+       9002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.3,
+      "value": [
+       9002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.4,
+      "value": [
+       9002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.5,
+      "value": [
+       9002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.6,
+      "value": [
+       9002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.7,
+      "value": [
+       9002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.8,
+      "value": [
+       9002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.9,
+      "value": [
+       9002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       9002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       10002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.1,
+      "value": [
+       10002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.2,
+      "value": [
+       10002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.3,
+      "value": [
+       10002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.4,
+      "value": [
+       10002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.5,
+      "value": [
+       10002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.6,
+      "value": [
+       10002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.7,
+      "value": [
+       10002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.8,
+      "value": [
+       10002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.9,
+      "value": [
+       10002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       10002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       11002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.1,
+      "value": [
+       11002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.2,
+      "value": [
+       11002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.3,
+      "value": [
+       11002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.4,
+      "value": [
+       11002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.5,
+      "value": [
+       11002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.6,
+      "value": [
+       11002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.7,
+      "value": [
+       11002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.8,
+      "value": [
+       11002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.9,
+      "value": [
+       11002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       11002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       12002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.1,
+      "value": [
+       12002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.2,
+      "value": [
+       12002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.3,
+      "value": [
+       12002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.4,
+      "value": [
+       12002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.5,
+      "value": [
+       12002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.6,
+      "value": [
+       12002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.7,
+      "value": [
+       12002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.8,
+      "value": [
+       12002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.9,
+      "value": [
+       12002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       12002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       13002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.1,
+      "value": [
+       13002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.2,
+      "value": [
+       13002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.3,
+      "value": [
+       13002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.4,
+      "value": [
+       13002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.5,
+      "value": [
+       13002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.6,
+      "value": [
+       13002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.7,
+      "value": [
+       13002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.8,
+      "value": [
+       13002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 12.9,
+      "value": [
+       13002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.0,
+      "value": [
+       13002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.0,
+      "value": [
+       14002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.1,
+      "value": [
+       14002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.2,
+      "value": [
+       14002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.3,
+      "value": [
+       14002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.4,
+      "value": [
+       14002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.5,
+      "value": [
+       14002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.6,
+      "value": [
+       14002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.7,
+      "value": [
+       14002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.8,
+      "value": [
+       14002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 13.9,
+      "value": [
+       14002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       14002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       15002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.1,
+      "value": [
+       15002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.2,
+      "value": [
+       15002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.3,
+      "value": [
+       15002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.4,
+      "value": [
+       15002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.5,
+      "value": [
+       15002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.6,
+      "value": [
+       15002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.7,
+      "value": [
+       15002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.8,
+      "value": [
+       15002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 14.9,
+      "value": [
+       15002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       15002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       16002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.1,
+      "value": [
+       16002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.2,
+      "value": [
+       16002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.3,
+      "value": [
+       16002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.4,
+      "value": [
+       16002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.5,
+      "value": [
+       16002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.6,
+      "value": [
+       16002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.7,
+      "value": [
+       16002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.8,
+      "value": [
+       16002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 15.9,
+      "value": [
+       16002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       16002.06872
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAt",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.6,
+       0.95,
+       -1.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       -0.6,
+       0.95,
+       -1.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       -1.9,
+       0.75,
+       -0.35
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       -1.9,
+       0.75,
+       -0.35
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2.2,
+       0.85,
+       -0.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       2.2,
+       0.85,
+       -0.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       -0.6,
+       0.9,
+       -1.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       -0.6,
+       0.9,
+       -1.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       1.4,
+       1.1,
+       -1.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       1.4,
+       1.1,
+       -1.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       -0.6,
+       0.9,
+       -1.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       -0.6,
+       0.9,
+       -1.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       1.2,
+       1.0,
+       -1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       1.2,
+       1.0,
+       -1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       0.0,
+       1.2,
+       -4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       0.0,
+       1.2,
+       -4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.6,
+       0.95,
+       -1.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       0.6,
+       0.95,
+       -1.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       -0.8,
+       0.8,
+       -0.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       -0.8,
+       0.8,
+       -0.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.0,
+       0.9,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       0.0,
+       0.9,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.9999,
+      "value": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0,
+       3.0,
+       -30.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.9999,
+      "value": [
+       0.0,
+       3.0,
+       -30.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.0,
+      "value": [
+       0.0,
+       6.0,
+       -10.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.9999,
+      "value": [
+       0.0,
+       6.0,
+       -10.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       0.0,
+       12.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.9999,
+      "value": [
+       0.0,
+       12.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       0.0,
+       15.0,
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.9999,
+      "value": [
+       0.0,
+       15.0,
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/fov",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/sway",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 13.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 14.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 15.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "palette/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAtWeight",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/height",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/bob",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/pitch",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/yaw",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/radius",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAhead",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/swayRate",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     }
+    ]
+   }
+  ]
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "P0boot",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "furn2": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.00518,
+      0.00518,
+      0.02956
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "jewel1": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel2": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "jewel5": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel6": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "zenith": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "horizon": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P1compile",
+    "colors": {
+     "wall": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "furn": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "fill": [
+      0.00152,
+      0.00152,
+      0.00212
+     ],
+     "glow": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00518,
+      0.05127
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel1": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "jewel3": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel5": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel6": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "zenith": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "horizon": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "sun": [
+      1.0,
+      0.53948,
+      0.04667
+     ]
+    }
+   },
+   {
+    "name": "P2allyougot",
+    "colors": {
+     "wall": [
+      0.21223,
+      0.89627,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "furn2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "figure": [
+      0.80695,
+      0.80695,
+      1.0
+     ],
+     "fog": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "fill": [
+      0.00121,
+      0.00152,
+      0.00368
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "screen": [
+      0.3467,
+      0.80695,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "canvas2": [
+      0.21223,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.01033,
+      0.02315,
+      0.14413
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel1": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "jewel3": [
+      0.21223,
+      0.89627,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel5": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel6": [
+      0.3467,
+      0.80695,
+      1.0
+     ],
+     "zenith": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "horizon": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "sun": [
+      1.0,
+      0.45079,
+      0.06301
+     ]
+    }
+   },
+   {
+    "name": "P3night",
+    "colors": {
+     "wall": [
+      0.33245,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      0.57758,
+      0.76052,
+      1.0
+     ],
+     "furn2": [
+      0.21223,
+      0.43415,
+      1.0
+     ],
+     "figure": [
+      0.80695,
+      0.85499,
+      1.0
+     ],
+     "fog": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "fill": [
+      0.00091,
+      0.00121,
+      0.00304
+     ],
+     "glow": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "screen": [
+      0.27468,
+      0.63076,
+      1.0
+     ],
+     "canvas": [
+      0.04231,
+      0.10462,
+      0.52712
+     ],
+     "canvas2": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "glass": [
+      0.00605,
+      0.01938,
+      0.07619
+     ],
+     "word": [
+      0.72306,
+      0.83077,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "jewel1": [
+      0.57758,
+      0.76052,
+      1.0
+     ],
+     "jewel2": [
+      0.21223,
+      0.43415,
+      1.0
+     ],
+     "jewel3": [
+      0.33245,
+      0.57758,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "jewel5": [
+      0.04231,
+      0.10462,
+      0.52712
+     ],
+     "jewel6": [
+      0.27468,
+      0.63076,
+      1.0
+     ],
+     "zenith": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "horizon": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "sun": [
+      1.0,
+      0.43966,
+      0.10702
+     ]
+    }
+   },
+   {
+    "name": "P4ember",
+    "colors": {
+     "wall": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "furn": [
+      1.0,
+      0.25415,
+      0.04667
+     ],
+     "furn2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.7913,
+      0.63076
+     ],
+     "fog": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "fill": [
+      0.00273,
+      0.00061,
+      0.00091
+     ],
+     "glow": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "screen": [
+      1.0,
+      0.14413,
+      0.04667
+     ],
+     "canvas": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "canvas2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "glass": [
+      0.04231,
+      0.00304,
+      0.00304
+     ],
+     "word": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "accent": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel1": [
+      1.0,
+      0.25415,
+      0.04667
+     ],
+     "jewel2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel3": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "jewel4": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel5": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "jewel6": [
+      1.0,
+      0.14413,
+      0.04667
+     ],
+     "zenith": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "horizon": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "sun": [
+      1.0,
+      0.7454,
+      0.25415
+     ]
+    }
+   },
+   {
+    "name": "P5void",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "glass": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel1": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel6": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "zenith": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "horizon": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P6violet",
+    "colors": {
+     "wall": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "furn": [
+      0.69387,
+      0.53948,
+      1.0
+     ],
+     "furn2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "figure": [
+      0.87137,
+      0.7913,
+      1.0
+     ],
+     "fog": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "fill": [
+      0.00182,
+      0.00091,
+      0.00335
+     ],
+     "glow": [
+      1.0,
+      0.27468,
+      0.7913
+     ],
+     "screen": [
+      0.58408,
+      0.39157,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.01298,
+      0.00439,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel1": [
+      0.69387,
+      0.53948,
+      1.0
+     ],
+     "jewel2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "jewel3": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel6": [
+      0.58408,
+      0.39157,
+      1.0
+     ],
+     "zenith": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "horizon": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "sun": [
+      1.0,
+      0.27468,
+      0.7913
+     ]
+    }
+   },
+   {
+    "name": "P7tension",
+    "colors": {
+     "wall": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "furn": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "furn2": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00061,
+      0.00121,
+      0.00152
+     ],
+     "glow": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "screen": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "canvas": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "canvas2": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "glass": [
+      0.00152,
+      0.02956,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "jewel1": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "jewel2": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "jewel3": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "jewel4": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "jewel5": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "jewel6": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "zenith": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "horizon": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "sun": [
+      0.80695,
+      1.0,
+      0.04231
+     ]
+    }
+   },
+   {
+    "name": "P8growth",
+    "colors": {
+     "wall": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "fog": [
+      0.00304,
+      0.00243,
+      0.02956
+     ],
+     "fill": [
+      0.00182,
+      0.00121,
+      0.00913
+     ],
+     "glow": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "screen": [
+      1.0,
+      0.7913,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "canvas2": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "glass": [
+      0.02315,
+      0.01161,
+      0.08022
+     ],
+     "word": [
+      1.0,
+      0.88792,
+      0.63076
+     ],
+     "accent": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel1": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel3": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "jewel4": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel5": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel6": [
+      1.0,
+      0.7913,
+      0.43415
+     ],
+     "zenith": [
+      0.00182,
+      0.00152,
+      0.01161
+     ],
+     "horizon": [
+      0.04231,
+      0.01033,
+      0.06848
+     ],
+     "sun": [
+      1.0,
+      0.64448,
+      0.19462
+     ]
+    }
+   },
+   {
+    "name": "P9jewels",
+    "colors": {
+     "wall": [
+      0.521,
+      0.47932,
+      0.68669
+     ],
+     "furn": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "furn2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "fill": [
+      0.00121,
+      0.00061,
+      0.00273
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.04667
+     ],
+     "screen": [
+      0.10702,
+      0.87137,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "canvas2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00243,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.19462,
+      0.47932
+     ],
+     "jewel1": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "jewel2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "jewel3": [
+      1.0,
+      0.45079,
+      0.04667
+     ],
+     "jewel4": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel5": [
+      1.0,
+      0.19462,
+      0.47932
+     ],
+     "jewel6": [
+      0.10702,
+      0.87137,
+      1.0
+     ],
+     "zenith": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "horizon": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "sun": [
+      1.0,
+      0.45079,
+      0.04667
+     ]
+    }
+   },
+   {
+    "name": "P10dance",
+    "colors": {
+     "wall": [
+      1.0,
+      0.19462,
+      0.02732
+     ],
+     "furn": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "furn2": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "figure": [
+      1.0,
+      0.80695,
+      0.63076
+     ],
+     "fog": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00368,
+      0.00091,
+      0.00121
+     ],
+     "glow": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "screen": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "canvas2": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "glass": [
+      0.04231,
+      0.00439,
+      0.00518
+     ],
+     "word": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "accent": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "jewel1": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "jewel2": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "jewel3": [
+      1.0,
+      0.19462,
+      0.02732
+     ],
+     "jewel4": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "jewel6": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "zenith": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "horizon": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "sun": [
+      1.0,
+      0.58408,
+      0.06848
+     ]
+    }
+   },
+   {
+    "name": "P11open",
+    "colors": {
+     "wall": [
+      0.10702,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "furn2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00091,
+      0.00243,
+      0.01444
+     ],
+     "fill": [
+      0.00061,
+      0.00121,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "screen": [
+      0.21223,
+      0.7991,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "canvas2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "glass": [
+      0.00304,
+      0.01033,
+      0.06848
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel1": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "jewel2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel3": [
+      0.10702,
+      0.57758,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel5": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "jewel6": [
+      0.21223,
+      0.7991,
+      1.0
+     ],
+     "zenith": [
+      0.00061,
+      0.00121,
+      0.00439
+     ],
+     "horizon": [
+      0.02956,
+      0.01444,
+      0.15593
+     ],
+     "sun": [
+      1.0,
+      0.57758,
+      0.14703
+     ]
+    }
+   },
+   {
+    "name": "P12summit",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "furn2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00243,
+      0.00121,
+      0.01033
+     ],
+     "fill": [
+      0.00152,
+      0.00091,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "canvas2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "glass": [
+      0.01033,
+      0.00304,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.10702
+     ],
+     "jewel1": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "jewel2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.76815,
+      0.10702
+     ],
+     "jewel5": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "jewel6": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "zenith": [
+      0.00121,
+      0.00061,
+      0.00368
+     ],
+     "horizon": [
+      0.14413,
+      0.01033,
+      0.14413
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P13dawn",
+    "colors": {
+     "wall": [
+      1.0,
+      0.76815,
+      0.52712
+     ],
+     "furn": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "furn2": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "figure": [
+      1.0,
+      0.90466,
+      0.80695
+     ],
+     "fog": [
+      0.10224,
+      0.016,
+      0.03689
+     ],
+     "fill": [
+      0.00439,
+      0.00243,
+      0.00518
+     ],
+     "glow": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "screen": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "canvas2": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "glass": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "jewel1": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "jewel2": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "jewel3": [
+      1.0,
+      0.76815,
+      0.52712
+     ],
+     "jewel4": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "jewel5": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "jewel6": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "zenith": [
+      0.00304,
+      0.00518,
+      0.03955
+     ],
+     "horizon": [
+      1.0,
+      0.25415,
+      0.10702
+     ],
+     "sun": [
+      1.0,
+      0.80695,
+      0.52712
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "fog",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "zenith",
+    "target": "env/sky/zenithColor"
+   },
+   {
+    "role": "horizon",
+    "target": "env/sky/horizonColor"
+   },
+   {
+    "role": "fog",
+    "target": "env/sky/groundColor"
+   },
+   {
+    "role": "sun",
+    "target": "env/sky/sunColor"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/livShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/livSofa/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livSofa/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livSofa/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livSofa/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livSofa/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livSofa/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/livMedia/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livMedia/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livMedia/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livMedia/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livMedia/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livMedia/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/livShelf/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livShelf/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livShelf/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livShelf/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livShelf/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livShelf/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/livMan/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/livCeil/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livCeil/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livCeil/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livCeil/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livCeil/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livCeil/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livCeil/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livCeil/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livCeil/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/livLamp/color"
+   },
+   {
+    "role": "screen",
+    "target": "lights/livTV/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/bedShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bedShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bedShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bedShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bedShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bedShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/bedFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bedFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bedFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bedFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bedFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bedFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/bedMan/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedMan/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bedMan/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bedMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bedMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bedMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bedMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bedMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/bedLamp/color"
+   },
+   {
+    "role": "glow",
+    "target": "lights/bedPend/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/kitShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/kitCounter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitCounter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitCounter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitCounter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitCounter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitCounter/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/kitTable/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitTable/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitTable/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitTable/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitTable/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitTable/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/kitPend/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/hallShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/hallShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/hallShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/hallShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/hallShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/hallShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/hallFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/hallFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/hallFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/hallFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/hallFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/hallFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/hallFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/hallLamp/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/stuShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/stuShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/stuShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/stuShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/stuShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/stuShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/stuFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/stuFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/stuFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/stuFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/stuFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/stuFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/stuFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/stuLamp/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/bathShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bathShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bathShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bathShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bathShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bathShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/bathFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/bathFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/bathFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/bathFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/bathFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/bathFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/bathFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/bathLamp/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/galShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel1",
+    "target": "sdf/galLamp/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galLamp/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galLamp/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galLamp/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galLamp/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galLamp/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galLamp/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galLamp/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galLamp/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel2",
+    "target": "sdf/galGlobe/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galGlobe/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galGlobe/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galGlobe/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galGlobe/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galGlobe/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galGlobe/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galGlobe/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galGlobe/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel3",
+    "target": "sdf/galClock/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galClock/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galClock/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galClock/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galClock/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galClock/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galClock/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galClock/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galClock/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel4",
+    "target": "sdf/galTV/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galTV/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galTV/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galTV/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galTV/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galTV/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galTV/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galTV/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galTV/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel5",
+    "target": "sdf/galPlant/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galPlant/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galPlant/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galPlant/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galPlant/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galPlant/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galPlant/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galPlant/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galPlant/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel6",
+    "target": "sdf/galChair/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galChair/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galChair/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galChair/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galChair/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galChair/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galChair/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galChair/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galChair/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel1",
+    "target": "sdf/galCup/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galCup/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galCup/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galCup/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galCup/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galCup/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galCup/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galCup/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galCup/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel2",
+    "target": "sdf/galFrame/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galFrame/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galFrame/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galFrame/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galFrame/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galFrame/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galFrame/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galFrame/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galFrame/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "jewel3",
+    "target": "sdf/galBooks/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galBooks/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galBooks/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galBooks/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galBooks/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galBooks/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galBooks/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galBooks/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galBooks/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/galMan/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galMan/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/galMan/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/galMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/galMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/galMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/galMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/galMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/galKey/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/landGround/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landGround/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landGround/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landGround/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/landGround/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/landGround/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/landGround/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/landGround/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/landGround/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/landMtn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landMtn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landMtn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landMtn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/landMtn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/landMtn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/landMtn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/landMtn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/landMtn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/landTrees/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landTrees/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landTrees/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landTrees/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/landTrees/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/landTrees/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/landTrees/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/landTrees/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/landTrees/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/landStones/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landStones/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landStones/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landStones/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/landStones/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/landStones/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/landStones/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/landStones/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/landStones/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/landRing/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landRing/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landRing/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/landRing/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/landRing/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/landRing/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/landRing/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/landRing/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/landRing/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/treeTrunk/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeTrunk/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeTrunk/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeTrunk/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/treeTrunk/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/treeTrunk/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/treeTrunk/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/treeTrunk/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/treeTrunk/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/treeA/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeA/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeA/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeA/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/treeA/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/treeA/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/treeA/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/treeA/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/treeA/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/treeB/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeB/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeB/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeB/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/treeB/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/treeB/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/treeB/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/treeB/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/treeB/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/treeC/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeC/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeC/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/treeC/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/treeC/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/treeC/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/treeC/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/treeC/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/treeC/surface/7/emission",
+    "mode": "multiply"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 16.0
+ }
+}

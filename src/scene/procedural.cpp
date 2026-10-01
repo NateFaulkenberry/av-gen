@@ -99,6 +99,8 @@
 
 #include "scene/procedural.hpp"
 
+#include "scene/text_mesh.hpp"
+
 #include "assets/mesh_lod.hpp"
 
 #include "core/log.hpp"
@@ -155,6 +157,12 @@ public:
     void i32(int v) { u32(std::bit_cast<std::uint32_t>(v)); }
     void f32(float v) { u32(std::bit_cast<std::uint32_t>(v == 0.0f ? 0.0f : v)); } // -0 == +0
     void boolean(bool v) { u32(v ? 1u : 0u); }
+    void str(std::string_view s) {
+        u64(s.size());
+        for (const char c : s) {
+            u32(static_cast<unsigned char>(c));
+        }
+    }
     void v3(const glm::vec3& v) {
         f32(v.x);
         f32(v.y);
@@ -516,6 +524,19 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s);
 // A cache rather than a rebuild per call because `Composition::nodeBounds` runs every frame the
 // editor draws a selection. It is only ever added to, and the entries are small; a scene has tens of
 // distinct generated sources, not thousands.
+// ADR-1046: a text source's mesh description.
+TextMeshSpec textMeshSpecOf(const SourceSpec& s) {
+    TextMeshSpec t;
+    t.text = s.text;
+    t.font = s.font;
+    t.size = s.textSize;
+    t.depth = s.textDepth;
+    t.tracking = s.textTracking;
+    t.align = static_cast<TextAlign3d>(std::clamp(s.textAlign, 0, 2));
+    t.valign = static_cast<TextVAlign3d>(std::clamp(s.textVAlign, 0, 1));
+    return t;
+}
+
 const MeshData* generatedMeshForBounds(const SourceSpec& s) {
     if (s.kind != PrimitiveKind::Generated) {
         return nullptr;
@@ -574,6 +595,15 @@ void primitiveBoxImpl(const SourceSpec& s, glm::vec3& centre, glm::vec3& half) {
             ps.push_back(sample.position);
         }
         fromPoints(ps);
+    } else if (s.kind == PrimitiveKind::Text) {
+        if (auto mesh = cachedTextMesh(textMeshSpecOf(s)); mesh) {
+            std::vector<glm::vec3> ps;
+            ps.reserve((*mesh)->vertices.size());
+            for (const Vertex& v : (*mesh)->vertices) {
+                ps.push_back(v.position);
+            }
+            fromPoints(ps);
+        }
     } else if (s.kind == PrimitiveKind::Generated) {
         // ADR-209. The kind ADR-199 missed, and the one every hero mushroom in Glowmere actually
         // uses -- which is why the box was reported wrong a second time, with a second screenshot,
@@ -635,6 +665,17 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
             extent = glm::max(extent, glm::abs(sample.position));
         }
         return extent + glm::vec3(s.tubeRadius * std::max(1.0f, s.tubeTaper));
+    }
+    case PrimitiveKind::Text: {
+        // ADR-1046: the glyphs' own extent (cached: the culler asks every frame).
+        glm::vec3 extent(0.5f);
+        if (auto mesh = cachedTextMesh(textMeshSpecOf(s)); mesh && !(*mesh)->vertices.empty()) {
+            extent = glm::vec3(0.0f);
+            for (const Vertex& v : (*mesh)->vertices) {
+                extent = glm::max(extent, glm::abs(v.position));
+            }
+        }
+        return extent;
     }
     case PrimitiveKind::Torus:
     default:
@@ -746,6 +787,8 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "mesh";
     case PrimitiveKind::Generated:
         return "generated";
+    case PrimitiveKind::Text:
+        return "text";
     }
     return "cylinder";
 }
@@ -753,7 +796,7 @@ const char* primitiveKindName(PrimitiveKind kind) {
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
     for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
                             PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube,
-                            PrimitiveKind::Mesh, PrimitiveKind::Generated}) {
+                            PrimitiveKind::Mesh, PrimitiveKind::Generated, PrimitiveKind::Text}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -889,6 +932,17 @@ std::optional<DeformSpace> deformSpaceFromName(std::string_view name) {
 Result<void> SourceSpec::validate() const {
     const auto inRange = [](int v, int lo, int hi) { return v >= lo && v <= hi; };
     switch (kind) {
+    case PrimitiveKind::Text:
+        if (text.empty()) {
+            return fail("a text source needs some text");
+        }
+        if (!(textSize > 0.0f) || !(textDepth >= 0.0f)) {
+            return fail("text size must be positive and depth >= 0 (got {}, {})", textSize, textDepth);
+        }
+        if (!inRange(textAlign, 0, 2) || !inRange(textVAlign, 0, 1)) {
+            return fail("text align must be 0..2 and valign 0..1");
+        }
+        break;
     case PrimitiveKind::Generated:
         if (auto ok = generated.validate(); !ok) {
             return ok;
@@ -985,6 +1039,15 @@ std::uint64_t SourceSpec::structuralHash() const {
     StructHash h;
     h.u32(static_cast<std::uint32_t>(kind));
     switch (kind) {
+    case PrimitiveKind::Text:
+        h.str(text);
+        h.str(font.key());
+        h.f32(textSize);
+        h.f32(textDepth);
+        h.f32(textTracking);
+        h.i32(textAlign);
+        h.i32(textVAlign);
+        break;
     case PrimitiveKind::Generated:
         h.u64(generated.structuralHash());
         // The part is hashed for the same reason `assetPart` is: two objects naming one parameter
@@ -1619,6 +1682,13 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return makePointQuad(spec.pointSize);
     case PrimitiveKind::Procedural:
         return fail("procedural source '{}' resolves through ProceduralGeometry::resolveSourceMesh", spec.reference);
+    case PrimitiveKind::Text: {
+        auto mesh = cachedTextMesh(textMeshSpecOf(spec));
+        if (!mesh) {
+            return std::unexpected(mesh.error());
+        }
+        return **mesh;
+    }
     }
     return fail("unknown primitive kind");
 }
@@ -1717,7 +1787,11 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
     if (level < 2 || level > 3) {
         return false;
     }
-    // A mesh source's levels 1-3 are simplifications of the asset, in the asset's own space.
+    // A mesh source's levels 1-3 are simplifications of the asset, in the asset's own space. Text
+    // (ADR-1046) is never an impostor: a word at a distance is still that word.
+    if (spec.kind == PrimitiveKind::Text) {
+        return false;
+    }
     return !(spec.kind == PrimitiveKind::Mesh && spec.assetMesh);
 }
 
@@ -1767,7 +1841,7 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
         return decimateMesh(*base,
                             std::max(static_cast<int>(static_cast<float>(full) * kLevelShare[level]), 24));
     }
-    if (level <= 0) {
+    if (level <= 0 || spec.kind == PrimitiveKind::Text) {
         return makeSourceMesh(spec);
     }
     if (level == 1) {
@@ -2665,6 +2739,15 @@ json ProceduralGeometry::toJson() const {
         s["minorSegments"] = source.minorSegments;
         s["pointSize"] = source.pointSize;
         s["reference"] = source.reference;
+        if (source.kind == PrimitiveKind::Text) { // ADR-1046; only for the kind that uses it
+            s["text"] = source.text;
+            s["font"] = source.font.toJson();
+            s["textSize"] = source.textSize;
+            s["textDepth"] = source.textDepth;
+            s["textTracking"] = source.textTracking;
+            s["textAlign"] = source.textAlign;
+            s["textVAlign"] = source.textVAlign;
+        }
         j["source"] = std::move(s);
     }
     j["sourceTransform"] = transformToJson(sourceTransform);
@@ -2910,6 +2993,26 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.minorSegments, "minorSegments", readInt);
         AVGEN_PROC_READ(s.pointSize, "pointSize", readFloat);
         AVGEN_PROC_READ(s.reference, "reference", readString);
+        // ADR-1046: text.
+        AVGEN_PROC_READ(s.text, "text", readString);
+        AVGEN_PROC_READ(s.textSize, "textSize", readFloat);
+        AVGEN_PROC_READ(s.textDepth, "textDepth", readFloat);
+        AVGEN_PROC_READ(s.textTracking, "textTracking", readFloat);
+        AVGEN_PROC_READ(s.textAlign, "textAlign", readInt);
+        AVGEN_PROC_READ(s.textVAlign, "textVAlign", readInt);
+        if (j.contains("font")) {
+            auto font = comp::FontDesc::fromJson(j.at("font"));
+            if (!font) {
+                return fail("text font: {}", font.error().message);
+            }
+            s.font = std::move(*font);
+        }
+    }
+    // ADR-1046: a word is one object. A text source with no distribution is a single instance, not the
+    // radial ring of 32 every other primitive defaults to.
+    if (g.source.kind == PrimitiveKind::Text && !root.contains("distribution")) {
+        g.distribution.kind = DistributionKind::Single;
+        g.distribution.count = 1;
     }
     if (root.contains("distribution")) {
         const json& j = root.at("distribution");
@@ -3285,7 +3388,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 8, 0, 8);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 9, 0, 9); // 9 = text (ADR-1046)
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
@@ -3530,7 +3633,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 8);
+    copyEnum(p, "source/kind", s.kind, 9);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/bevel", s.bevel);

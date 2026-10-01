@@ -33,6 +33,7 @@
 #include "scene/rebuild_deferral.hpp"
 #include "stage/staging.hpp"
 #include "scene/sdf_object.hpp"
+#include "scene/journey.hpp"
 #include "scene/spline_params.hpp"
 #include "scene/floaters.hpp"
 #include "scene/particles.hpp"
@@ -393,6 +394,15 @@ struct CompositionNode {
     std::optional<bool> animationLoop;
 
     std::unique_ptr<class Composition> child;              // Scene (nested)
+    // ADR-1042: the node rides the scene's journey at this distance (metres along the path), wrapped with
+    // the camera; its position is then an offset in the path frame (x right, y up, z forward) and its
+    // rotation turns it after it faces along the path. Unset: an ordinary node.
+    std::optional<float> journeyAnchor;
+    params::Parameter<float>* journeyDistanceParam = nullptr;
+    // ADR-1044: an opt-in colour multiplier on every surface the node draws (`"tint": [r, g, b]` in the
+    // node), a parameter `nodes/<name>/tint` a palette can bind (a figure's wooden tone made a silhouette).
+    std::optional<glm::vec3> tint;
+    params::Parameter<glm::vec3>* tintParam = nullptr;
     params::Parameter<glm::vec3>* positionParam = nullptr;
     params::Parameter<glm::vec3>* rotationParam = nullptr; // Euler degrees
     params::Parameter<glm::vec3>* scaleParam = nullptr;
@@ -1759,6 +1769,27 @@ private:
     params::Parameter<float>* cameraSplineT_ = nullptr;
     params::Parameter<float>* cameraLookAhead_ = nullptr;
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
+    // Camera mode 3 (the journey, ADR-1042): walks the periodic path of `journeySetting_` through a
+    // world repeated by the same screw, at camera/journey/distance metres, wrapping invisibly.
+    std::optional<Journey> journey_; // one or more chapters
+    // The camera's global journey distance this frame (0 without a journey).
+    [[nodiscard]] double journeyCameraDistance() const;
+    void followCameraWarps(const glm::vec3& eye); // ADR-1044: near-field warps follow the eye
+    params::Parameter<float>* journeyDistance_ = nullptr;
+    params::Parameter<float>* journeyLookAhead_ = nullptr;
+    params::Parameter<float>* journeyHeight_ = nullptr;
+    params::Parameter<float>* journeyYaw_ = nullptr;
+    params::Parameter<float>* journeyPitch_ = nullptr;
+    params::Parameter<float>* journeyBob_ = nullptr;
+    params::Parameter<float>* journeyStride_ = nullptr;
+    params::Parameter<float>* journeySway_ = nullptr;
+    params::Parameter<float>* journeySwayRate_ = nullptr;
+    params::Parameter<float>* journeyRadius_ = nullptr;
+    params::Parameter<glm::vec3>* journeyLookAt_ = nullptr;
+    params::Parameter<float>* journeyLookAtWeight_ = nullptr;
+    // The eye pushed out of the named SDF by the collision guard (ADR-1042); a pure function of the
+    // frame's live tree, so seek-exact.
+    [[nodiscard]] JourneyPose guardJourneyPose(JourneyPose pose, std::size_t chapter) const;
     // Camera shake (ADR-098): a camera-space offset, in every camera mode. `start` is the second
     // the impulse began -- a parameter and not a timer, which is what keeps a decaying shake a pure
     // function of the playhead. See scene::CameraShake.
@@ -1767,6 +1798,8 @@ private:
     params::Parameter<float>* cameraShakeDecay_ = nullptr;
     params::Parameter<float>* cameraShakeRotation_ = nullptr;
     params::Parameter<float>* cameraShakeStart_ = nullptr;
+    // ADR-1048: camera breathing (camera/breath/*): amount, forward, lift, side, yaw, pitch, fov.
+    std::array<params::Parameter<float>*, 7> cameraBreath_{};
 
     // ---- multiple cameras (ADR-245) -------------------------------------------------------------
     //
@@ -2284,6 +2317,7 @@ private:
         bool visible = true;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restRoughness;
+        std::vector<glm::vec3> restBaseColor; // ADR-1044: captured before the node's tint first writes
         // The opacity the asset was built with, captured the first time a node's `opacity`
         // parameter is read rather than pushed alongside `restRoughness` at every one of the six
         // sites that build a range. Lazy because a vector that is silently shorter than

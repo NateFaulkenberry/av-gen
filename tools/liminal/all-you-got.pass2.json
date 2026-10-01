@@ -1,0 +1,2731 @@
+{
+ "format": "avgen-liminal-pass2-grid",
+ "version": 1,
+ "song": {
+  "path": "~/Desktop/All You Got.wav",
+  "duration": 253.786
+ },
+ "numbering": "owner bar N = analysis bar N + 1; owner bar 0 is the count-in; beats 1-based, 4.5 = the and of 4",
+ "tempo": [
+  {
+   "bar": 0,
+   "bpm": 109.0,
+   "t": 0.0,
+   "barSeconds": 2.2018348623853212
+  },
+  {
+   "bar": 75,
+   "bpm": 111.0,
+   "t": 165.1376,
+   "barSeconds": 2.1621621621621623
+  }
+ ],
+ "sections": [
+  {
+   "id": "countin",
+   "name": "Count-in (skipped)",
+   "bars": [
+    0,
+    0
+   ],
+   "analysisBars": [
+    1,
+    1
+   ],
+   "t0": 0.0,
+   "t1": 2.2018,
+   "bpm": 109.0,
+   "music": "one bar of four beats before the song",
+   "ask": "black"
+  },
+  {
+   "id": "intro-a",
+   "name": "Intro, bars 1-4",
+   "bars": [
+    1,
+    4
+   ],
+   "analysisBars": [
+    2,
+    5
+   ],
+   "t0": 2.2018,
+   "t1": 11.0092,
+   "bpm": 109.0,
+   "music": "the downbeat; quarter-note pulse; sparse call and response",
+   "ask": "SUDDEN SPLASH OF COLOUR + GEOMETRY out of black; every quarter note a meaningful response"
+  },
+  {
+   "id": "intro-b",
+   "name": "Intro, bars 5-8",
+   "bars": [
+    5,
+    8
+   ],
+   "analysisBars": [
+    6,
+    9
+   ],
+   "t0": 11.0092,
+   "t1": 19.8165,
+   "bpm": 109.0,
+   "music": "bass enters: quarter pulse + eighth pulse + bass eighths + a sustained bass note building tension; sound design enters",
+   "ask": "add the eighth-note subdivision: more tension, movement, light, colour, growth"
+  },
+  {
+   "id": "intro-c",
+   "name": "Intro, bars 9-16",
+   "bars": [
+    9,
+    16
+   ],
+   "analysisBars": [
+    10,
+    17
+   ],
+   "t0": 19.8165,
+   "t1": 37.4312,
+   "bpm": 109.0,
+   "music": "the riser builds; the 'all you got' chop from bar 13",
+   "ask": "keep ramping: pulsing, tension, density, growth, anticipation; progressively more elaborate"
+  },
+  {
+   "id": "release",
+   "name": "First major release, bars 17-24",
+   "bars": [
+    17,
+    24
+   ],
+   "analysisBars": [
+    18,
+    25
+   ],
+   "t0": 37.4312,
+   "t1": 55.0459,
+   "bpm": 109.0,
+   "music": "crash into 'All you got'; the full groove; settles",
+   "ask": "MAJOR VISUAL IMPACT on the downbeat, then small dense Euclidean rooms; quarter pulse drives geometry, light, colour, objects; settle after the impact"
+  },
+  {
+   "id": "verse1-a",
+   "name": "Verse 1, bars 1-8",
+   "bars": [
+    25,
+    32
+   ],
+   "analysisBars": [
+    26,
+    33
+   ],
+   "t0": 55.0459,
+   "t1": 72.6606,
+   "bpm": 109.0,
+   "music": "the voice; a quarter-note pulse in the low end",
+   "ask": "slow down; ~4 bars per space; rooms breathe, objects animate, lyrics appear; one related palette"
+  },
+  {
+   "id": "verse1-b",
+   "name": "Verse 1, bars 9-16",
+   "bars": [
+    33,
+    40
+   ],
+   "analysisBars": [
+    34,
+    41
+   ],
+   "t0": 72.6606,
+   "t1": 90.2752,
+   "bpm": 109.0,
+   "music": "pre-chorus, restless; ends 'it's steps in a process, let it go'",
+   "ask": "a different, deliberate palette"
+  },
+  {
+   "id": "pause",
+   "name": "The pause bar",
+   "bars": [
+    41,
+    41
+   ],
+   "analysisBars": [
+    42,
+    42
+   ],
+   "t0": 90.2752,
+   "t1": 92.4771,
+   "bpm": 109.0,
+   "music": "bass and kick out for exactly one bar under 'let it go'",
+   "ask": "cut to black or a dramatic pause; LET IT GO animates; falling off, abrupt stop, quick shift of tone"
+  },
+  {
+   "id": "letgo",
+   "name": "LET IT GO, 8 bars",
+   "bars": [
+    42,
+    49
+   ],
+   "analysisBars": [
+    43,
+    50
+   ],
+   "t0": 92.4771,
+   "t1": 110.0917,
+   "bpm": 109.0,
+   "music": "kick and bass return; 'let it go' twice a bar; rebuild at 48-49",
+   "ask": "first serious environmental lyrics: LET on one wall, IT elsewhere, GO on another surface; quicker rooms"
+  },
+  {
+   "id": "verse2",
+   "name": "Verse 2, 16 bars",
+   "bars": [
+    50,
+    65
+   ],
+   "analysisBars": [
+    51,
+    66
+   ],
+   "t0": 110.0917,
+   "t1": 145.3211,
+   "bpm": 109.0,
+   "music": "full groove; the densest lyric; noise sweeps at phrase ends",
+   "ask": "verse pacing with more tension: faster objects, denser rooms, more aggressive effects, stronger colour"
+  },
+  {
+   "id": "bridge-t",
+   "name": "Bridge transition",
+   "bars": [
+    66,
+    66
+   ],
+   "analysisBars": [
+    67,
+    67
+   ],
+   "t0": 145.3211,
+   "t1": 147.5229,
+   "bpm": 109.0,
+   "music": "an impact on the downbeat; the key lifts to F; 'feel it grow' begins; snare fills on beats 3 and 4",
+   "ask": "lifting, growth, elevation; leave the rooms"
+  },
+  {
+   "id": "bridge1-a",
+   "name": "Bridge 1, bars 1-6",
+   "bars": [
+    67,
+    72
+   ],
+   "analysisBars": [
+    68,
+    73
+   ],
+   "t0": 147.5229,
+   "t1": 160.7339,
+   "bpm": 109.0,
+   "music": "'feel it grow' twice a bar, a chorus joins; sub drops, air rises",
+   "ask": "growth and elevation, not the quarter pulse: lift, soar, grow, expand, rise"
+  },
+  {
+   "id": "bridge1-b",
+   "name": "Bridge 1, bars 7-8",
+   "bars": [
+    73,
+    74
+   ],
+   "analysisBars": [
+    74,
+    75
+   ],
+   "t0": 160.7339,
+   "t1": 165.1376,
+   "bpm": 109.0,
+   "music": "the chorus drops out, the drums pause, synths ring out",
+   "ask": "growth completes; landing; a controlled descent"
+  },
+  {
+   "id": "bridge2",
+   "name": "Bridge 2, 8 bars",
+   "bars": [
+    75,
+    82
+   ],
+   "analysisBars": [
+    76,
+    83
+   ],
+   "t0": 165.1376,
+   "t1": 182.4349,
+   "bpm": 111.0,
+   "music": "111 BPM; a driving eighth-note thump, no sub, dark top; 'is that all you' once a bar; the pulse stops on 82.3",
+   "ask": "one room, the objects themselves: spin, glow, transform; reflection"
+  },
+  {
+   "id": "bridge3",
+   "name": "Bridge 3, dance, 8 bars",
+   "bars": [
+    83,
+    90
+   ],
+   "analysisBars": [
+    84,
+    91
+   ],
+   "t0": 182.4349,
+   "t1": 199.7322,
+   "bpm": 111.0,
+   "music": "the beat returns, strongest offbeat hats; 90.3 drums pause, a bright synth sweep over beats 3-4, bass fill on 4",
+   "ask": "warm, celebratory, euphoric, playful; the camera soars and glides; the quarter note through effects, never the camera"
+  },
+  {
+   "id": "chorus-a",
+   "name": "Final chorus, bars 1-8",
+   "bars": [
+    91,
+    98
+   ],
+   "analysisBars": [
+    92,
+    99
+   ],
+   "t0": 199.7322,
+   "t1": 217.0295,
+   "bpm": 111.0,
+   "music": "the release: the F world, sustained; LET IT GO chanted",
+   "ask": "celebration; open beyond the rooms; quarter-note FEEL, not PULSE"
+  },
+  {
+   "id": "chorus-b",
+   "name": "Final chorus, bars 9-16",
+   "bars": [
+    99,
+    106
+   ],
+   "analysisBars": [
+    100,
+    107
+   ],
+   "t0": 217.0295,
+   "t1": 234.3268,
+   "bpm": 111.0,
+   "music": "'it's just steps in a process, for your life'",
+   "ask": "support the lyric change"
+  },
+  {
+   "id": "chorus-c",
+   "name": "Final chorus, bars 17-22",
+   "bars": [
+    107,
+    112
+   ],
+   "analysisBars": [
+    108,
+    113
+   ],
+   "t0": 234.3268,
+   "t1": 247.2998,
+   "bpm": 111.0,
+   "music": "the loudest bars; LET IT GO chants join; 112.3-4 snare fills",
+   "ask": "keep building; the fill prepares the crash"
+  },
+  {
+   "id": "crash",
+   "name": "Final chorus, bars 23-24",
+   "bars": [
+    113,
+    114
+   ],
+   "analysisBars": [
+    114,
+    115
+   ],
+   "t0": 247.2998,
+   "t1": 251.6241,
+   "bpm": 111.0,
+   "music": "113.1 the final crash; it rings out",
+   "ask": "HUGE FINAL CRASH: colour, light, geometry, transformation, release; ring out"
+  },
+  {
+   "id": "ending",
+   "name": "Ending",
+   "bars": [
+    115,
+    115
+   ],
+   "analysisBars": [
+    116,
+    116
+   ],
+   "t0": 251.6241,
+   "t1": 253.786,
+   "bpm": 111.0,
+   "music": "the tail: near silence",
+   "ask": "wrap up, close out, dawn, fade, wash out; connect back to the beginning"
+  }
+ ],
+ "bigClaps": [
+  {
+   "id": "C01",
+   "bar": 20,
+   "beat": 4.0,
+   "t": 45.6881,
+   "analysisBar": 21,
+   "section": "release"
+  },
+  {
+   "id": "C02",
+   "bar": 24,
+   "beat": 4.0,
+   "t": 54.4954,
+   "analysisBar": 25,
+   "section": "release"
+  },
+  {
+   "id": "C03",
+   "bar": 28,
+   "beat": 4.0,
+   "t": 63.3028,
+   "analysisBar": 29,
+   "section": "verse1-a"
+  },
+  {
+   "id": "C04",
+   "bar": 32,
+   "beat": 4.0,
+   "t": 72.1101,
+   "analysisBar": 33,
+   "section": "verse1-a"
+  },
+  {
+   "id": "C05",
+   "bar": 36,
+   "beat": 4.0,
+   "t": 80.9174,
+   "analysisBar": 37,
+   "section": "verse1-b"
+  },
+  {
+   "id": "C06",
+   "bar": 40,
+   "beat": 4.0,
+   "t": 89.7248,
+   "analysisBar": 41,
+   "section": "verse1-b"
+  },
+  {
+   "id": "C07",
+   "bar": 45,
+   "beat": 4.0,
+   "t": 100.7339,
+   "analysisBar": 46,
+   "section": "letgo"
+  },
+  {
+   "id": "C08",
+   "bar": 49,
+   "beat": 4.0,
+   "t": 109.5413,
+   "analysisBar": 50,
+   "section": "letgo"
+  },
+  {
+   "id": "C09",
+   "bar": 51,
+   "beat": 4.0,
+   "t": 113.945,
+   "analysisBar": 52,
+   "section": "verse2"
+  },
+  {
+   "id": "C10",
+   "bar": 53,
+   "beat": 4.0,
+   "t": 118.3486,
+   "analysisBar": 54,
+   "section": "verse2"
+  },
+  {
+   "id": "C11",
+   "bar": 55,
+   "beat": 4.0,
+   "t": 122.7523,
+   "analysisBar": 56,
+   "section": "verse2"
+  },
+  {
+   "id": "C12",
+   "bar": 57,
+   "beat": 4.0,
+   "t": 127.156,
+   "analysisBar": 58,
+   "section": "verse2"
+  },
+  {
+   "id": "C13",
+   "bar": 59,
+   "beat": 4.0,
+   "t": 131.5596,
+   "analysisBar": 60,
+   "section": "verse2"
+  },
+  {
+   "id": "C14",
+   "bar": 61,
+   "beat": 4.0,
+   "t": 135.9633,
+   "analysisBar": 62,
+   "section": "verse2"
+  },
+  {
+   "id": "C15",
+   "bar": 63,
+   "beat": 4.0,
+   "t": 140.367,
+   "analysisBar": 64,
+   "section": "verse2"
+  },
+  {
+   "id": "C16",
+   "bar": 65,
+   "beat": 4.0,
+   "t": 144.7706,
+   "analysisBar": 66,
+   "section": "verse2"
+  },
+  {
+   "id": "C17",
+   "bar": 78,
+   "beat": 2.5,
+   "t": 172.4349,
+   "analysisBar": 79,
+   "section": "bridge2"
+  },
+  {
+   "id": "C18",
+   "bar": 82,
+   "beat": 4.0,
+   "t": 181.8944,
+   "analysisBar": 83,
+   "section": "bridge2"
+  }
+ ],
+ "events": [
+  {
+   "id": "splash",
+   "bar": 1,
+   "beat": 1.0,
+   "t": 2.2018,
+   "note": "out of black: the first splash of colour and geometry",
+   "section": "intro-a"
+  },
+  {
+   "id": "bass-in",
+   "bar": 5,
+   "beat": 1.0,
+   "t": 11.0092,
+   "note": "bass enters: the eighth-note subdivision begins",
+   "section": "intro-a"
+  },
+  {
+   "id": "riser",
+   "bar": 9,
+   "beat": 1.0,
+   "t": 19.8165,
+   "note": "the riser begins",
+   "section": "intro-c"
+  },
+  {
+   "id": "hook-chop",
+   "bar": 13,
+   "beat": 1.0,
+   "t": 28.6239,
+   "note": "the 'all you got' vocal chop begins (about once a bar)",
+   "section": "intro-c"
+  },
+  {
+   "id": "gap",
+   "bar": 16,
+   "beat": 4.0,
+   "t": 36.8807,
+   "note": "a one-beat gap before the release",
+   "section": "intro-c"
+  },
+  {
+   "id": "impact",
+   "bar": 17,
+   "beat": 1.0,
+   "t": 37.4312,
+   "note": "MAJOR VISUAL IMPACT: 'All you got'",
+   "section": "intro-c"
+  },
+  {
+   "id": "voice",
+   "bar": 25,
+   "beat": 1.0,
+   "t": 55.0459,
+   "note": "the voice enters: 'How little do I know?'",
+   "section": "release"
+  },
+  {
+   "id": "palette-turn",
+   "bar": 33,
+   "beat": 1.0,
+   "t": 72.6606,
+   "note": "verse 1 bars 9-16: a different palette",
+   "section": "verse1-a"
+  },
+  {
+   "id": "pause",
+   "bar": 41,
+   "beat": 1.0,
+   "t": 90.2752,
+   "note": "the pause bar: bass and kick out for one bar",
+   "section": "pause"
+  },
+  {
+   "id": "return",
+   "bar": 42,
+   "beat": 1.0,
+   "t": 92.4771,
+   "note": "kick and bass return",
+   "section": "pause"
+  },
+  {
+   "id": "rebuild",
+   "bar": 48,
+   "beat": 1.0,
+   "t": 105.6881,
+   "note": "the synth rebuild (mids gated, hats building)",
+   "section": "letgo"
+  },
+  {
+   "id": "verse2",
+   "bar": 50,
+   "beat": 1.0,
+   "t": 110.0917,
+   "note": "verse 2",
+   "section": "verse2"
+  },
+  {
+   "id": "pivot",
+   "bar": 66,
+   "beat": 1.0,
+   "t": 145.3211,
+   "note": "impact; the key lifts to F; 'feel it grow' begins",
+   "section": "bridge-t"
+  },
+  {
+   "id": "fill-a",
+   "bar": 66,
+   "beat": 3.0,
+   "t": 146.422,
+   "note": "snare fill, beat 3",
+   "section": "bridge-t"
+  },
+  {
+   "id": "fill-b",
+   "bar": 66,
+   "beat": 4.0,
+   "t": 146.9725,
+   "note": "snare fill, beat 4",
+   "section": "bridge-t"
+  },
+  {
+   "id": "lift",
+   "bar": 67,
+   "beat": 1.0,
+   "t": 147.5229,
+   "note": "bridge 1: growth",
+   "section": "bridge1-a"
+  },
+  {
+   "id": "landing",
+   "bar": 73,
+   "beat": 1.0,
+   "t": 160.7339,
+   "note": "chorus out, drums pause, synths ring out",
+   "section": "bridge1-b"
+  },
+  {
+   "id": "tempo",
+   "bar": 75,
+   "beat": 1.0,
+   "t": 165.1376,
+   "note": "111 BPM; 'is that all you'",
+   "section": "bridge2"
+  },
+  {
+   "id": "pulse-stop",
+   "bar": 82,
+   "beat": 3.0,
+   "t": 181.3538,
+   "note": "the eighth-note pulse stops",
+   "section": "bridge2"
+  },
+  {
+   "id": "dance",
+   "bar": 83,
+   "beat": 1.0,
+   "t": 182.4349,
+   "note": "the beat returns: the dance",
+   "section": "bridge3"
+  },
+  {
+   "id": "sweep",
+   "bar": 90,
+   "beat": 3.0,
+   "t": 198.6511,
+   "note": "drums pause; bright synth sweep over beats 3-4",
+   "section": "bridge3"
+  },
+  {
+   "id": "bass-fill",
+   "bar": 90,
+   "beat": 4.0,
+   "t": 199.1917,
+   "note": "bass fill",
+   "section": "bridge3"
+  },
+  {
+   "id": "chorus",
+   "bar": 91,
+   "beat": 1.0,
+   "t": 199.7322,
+   "note": "the final chorus",
+   "section": "chorus-a"
+  },
+  {
+   "id": "lyric-change",
+   "bar": 99,
+   "beat": 1.0,
+   "t": 217.0295,
+   "note": "'it's just steps in a process, for your life'",
+   "section": "chorus-b"
+  },
+  {
+   "id": "chants",
+   "bar": 107,
+   "beat": 1.0,
+   "t": 234.3268,
+   "note": "LET IT GO chants join; the loudest bars",
+   "section": "chorus-c"
+  },
+  {
+   "id": "final-fill-a",
+   "bar": 112,
+   "beat": 3.0,
+   "t": 246.2187,
+   "note": "snare fill, beat 3",
+   "section": "chorus-c"
+  },
+  {
+   "id": "final-fill-b",
+   "bar": 112,
+   "beat": 4.0,
+   "t": 246.7592,
+   "note": "snare fill, beat 4",
+   "section": "chorus-c"
+  },
+  {
+   "id": "crash",
+   "bar": 113,
+   "beat": 1.0,
+   "t": 247.2998,
+   "note": "HUGE FINAL CRASH",
+   "section": "chorus-c"
+  },
+  {
+   "id": "bass-out",
+   "bar": 114,
+   "beat": 1.0,
+   "t": 249.4619,
+   "note": "the bass leaves; the ring-out",
+   "section": "crash"
+  },
+  {
+   "id": "tail",
+   "bar": 115,
+   "beat": 1.0,
+   "t": 251.6241,
+   "note": "the near-silent tail",
+   "section": "ending"
+  }
+ ],
+ "lyrics": [
+  {
+   "text": "HOW LITTLE DO I KNOW?",
+   "bar": 25,
+   "beat": 1.462,
+   "t": 55.3,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TAKE STEPS IN THE PROCESS, BREATHE AND GROW",
+   "bar": 27,
+   "beat": 4.725,
+   "t": 61.5,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "HOW LITTLE DO I KNOW",
+   "bar": 28,
+   "beat": 4.722,
+   "t": 63.7,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "CAN YOU TELL ME IT'S FINE THOUGH?",
+   "bar": 31,
+   "beat": 1.26,
+   "t": 68.4,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "IT'S STEPS IN THE PROCESS, FEEL AND GROW",
+   "bar": 31,
+   "beat": 4.53,
+   "t": 70.2,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "COME ON, TELL ME WHAT YOU WANNA",
+   "bar": 32,
+   "beat": 4.527,
+   "t": 72.4,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "MAYBE CAUSE A LITTLE DRAMA",
+   "bar": 34,
+   "beat": 3.612,
+   "t": 76.3,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "IF YOU FEEL IT, SAY IT, LET IT SHOW",
+   "bar": 35,
+   "beat": 3.608,
+   "t": 78.5,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "CAN YOU TELL ME IT'S FINE THOUGH?",
+   "bar": 36,
+   "beat": 4.332,
+   "t": 81.1,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "I KNOW, GET A LITTLE PEACE OF MIND THOUGH",
+   "bar": 38,
+   "beat": 3.598,
+   "t": 85.1,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "IT'S STEPS IN A PROCESS, LET IT GO",
+   "bar": 39,
+   "beat": 3.958,
+   "t": 87.5,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "LET",
+   "bar": 41,
+   "beat": 1.0,
+   "t": 90.2752,
+   "phrase": "letgo-41-0"
+  },
+  {
+   "text": "IT",
+   "bar": 41,
+   "beat": 1.5,
+   "t": 90.5505,
+   "phrase": "letgo-41-0"
+  },
+  {
+   "text": "GO",
+   "bar": 41,
+   "beat": 2.0,
+   "t": 90.8257,
+   "phrase": "letgo-41-0"
+  },
+  {
+   "text": "LET",
+   "bar": 41,
+   "beat": 3.0,
+   "t": 91.3761,
+   "phrase": "letgo-41-1"
+  },
+  {
+   "text": "IT",
+   "bar": 41,
+   "beat": 3.5,
+   "t": 91.6514,
+   "phrase": "letgo-41-1"
+  },
+  {
+   "text": "GO",
+   "bar": 41,
+   "beat": 4.0,
+   "t": 91.9266,
+   "phrase": "letgo-41-1"
+  },
+  {
+   "text": "LET",
+   "bar": 42,
+   "beat": 1.0,
+   "t": 92.4771,
+   "phrase": "letgo-42-0"
+  },
+  {
+   "text": "IT",
+   "bar": 42,
+   "beat": 1.5,
+   "t": 92.7523,
+   "phrase": "letgo-42-0"
+  },
+  {
+   "text": "GO",
+   "bar": 42,
+   "beat": 2.0,
+   "t": 93.0275,
+   "phrase": "letgo-42-0"
+  },
+  {
+   "text": "LET",
+   "bar": 42,
+   "beat": 3.0,
+   "t": 93.578,
+   "phrase": "letgo-42-1"
+  },
+  {
+   "text": "IT",
+   "bar": 42,
+   "beat": 3.5,
+   "t": 93.8532,
+   "phrase": "letgo-42-1"
+  },
+  {
+   "text": "GO",
+   "bar": 42,
+   "beat": 4.0,
+   "t": 94.1284,
+   "phrase": "letgo-42-1"
+  },
+  {
+   "text": "LET",
+   "bar": 43,
+   "beat": 1.0,
+   "t": 94.6789,
+   "phrase": "letgo-43-0"
+  },
+  {
+   "text": "IT",
+   "bar": 43,
+   "beat": 1.5,
+   "t": 94.9541,
+   "phrase": "letgo-43-0"
+  },
+  {
+   "text": "GO",
+   "bar": 43,
+   "beat": 2.0,
+   "t": 95.2294,
+   "phrase": "letgo-43-0"
+  },
+  {
+   "text": "LET",
+   "bar": 43,
+   "beat": 3.0,
+   "t": 95.7798,
+   "phrase": "letgo-43-1"
+  },
+  {
+   "text": "IT",
+   "bar": 43,
+   "beat": 3.5,
+   "t": 96.055,
+   "phrase": "letgo-43-1"
+  },
+  {
+   "text": "GO",
+   "bar": 43,
+   "beat": 4.0,
+   "t": 96.3303,
+   "phrase": "letgo-43-1"
+  },
+  {
+   "text": "LET",
+   "bar": 44,
+   "beat": 1.0,
+   "t": 96.8807,
+   "phrase": "letgo-44-0"
+  },
+  {
+   "text": "IT",
+   "bar": 44,
+   "beat": 1.5,
+   "t": 97.156,
+   "phrase": "letgo-44-0"
+  },
+  {
+   "text": "GO",
+   "bar": 44,
+   "beat": 2.0,
+   "t": 97.4312,
+   "phrase": "letgo-44-0"
+  },
+  {
+   "text": "LET",
+   "bar": 44,
+   "beat": 3.0,
+   "t": 97.9817,
+   "phrase": "letgo-44-1"
+  },
+  {
+   "text": "IT",
+   "bar": 44,
+   "beat": 3.5,
+   "t": 98.2569,
+   "phrase": "letgo-44-1"
+  },
+  {
+   "text": "GO",
+   "bar": 44,
+   "beat": 4.0,
+   "t": 98.5321,
+   "phrase": "letgo-44-1"
+  },
+  {
+   "text": "LET",
+   "bar": 45,
+   "beat": 1.0,
+   "t": 99.0826,
+   "phrase": "letgo-45-0"
+  },
+  {
+   "text": "IT",
+   "bar": 45,
+   "beat": 1.5,
+   "t": 99.3578,
+   "phrase": "letgo-45-0"
+  },
+  {
+   "text": "GO",
+   "bar": 45,
+   "beat": 2.0,
+   "t": 99.633,
+   "phrase": "letgo-45-0"
+  },
+  {
+   "text": "LET",
+   "bar": 45,
+   "beat": 3.0,
+   "t": 100.1835,
+   "phrase": "letgo-45-1"
+  },
+  {
+   "text": "IT",
+   "bar": 45,
+   "beat": 3.5,
+   "t": 100.4587,
+   "phrase": "letgo-45-1"
+  },
+  {
+   "text": "GO",
+   "bar": 45,
+   "beat": 4.0,
+   "t": 100.7339,
+   "phrase": "letgo-45-1"
+  },
+  {
+   "text": "LET",
+   "bar": 46,
+   "beat": 1.0,
+   "t": 101.2844,
+   "phrase": "letgo-46-0"
+  },
+  {
+   "text": "IT",
+   "bar": 46,
+   "beat": 1.5,
+   "t": 101.5596,
+   "phrase": "letgo-46-0"
+  },
+  {
+   "text": "GO",
+   "bar": 46,
+   "beat": 2.0,
+   "t": 101.8349,
+   "phrase": "letgo-46-0"
+  },
+  {
+   "text": "LET",
+   "bar": 46,
+   "beat": 3.0,
+   "t": 102.3853,
+   "phrase": "letgo-46-1"
+  },
+  {
+   "text": "IT",
+   "bar": 46,
+   "beat": 3.5,
+   "t": 102.6606,
+   "phrase": "letgo-46-1"
+  },
+  {
+   "text": "GO",
+   "bar": 46,
+   "beat": 4.0,
+   "t": 102.9358,
+   "phrase": "letgo-46-1"
+  },
+  {
+   "text": "LET",
+   "bar": 47,
+   "beat": 1.0,
+   "t": 103.4862,
+   "phrase": "letgo-47-0"
+  },
+  {
+   "text": "IT",
+   "bar": 47,
+   "beat": 1.5,
+   "t": 103.7615,
+   "phrase": "letgo-47-0"
+  },
+  {
+   "text": "GO",
+   "bar": 47,
+   "beat": 2.0,
+   "t": 104.0367,
+   "phrase": "letgo-47-0"
+  },
+  {
+   "text": "LET",
+   "bar": 47,
+   "beat": 3.0,
+   "t": 104.5872,
+   "phrase": "letgo-47-1"
+  },
+  {
+   "text": "IT",
+   "bar": 47,
+   "beat": 3.5,
+   "t": 104.8624,
+   "phrase": "letgo-47-1"
+  },
+  {
+   "text": "GO",
+   "bar": 47,
+   "beat": 4.0,
+   "t": 105.1376,
+   "phrase": "letgo-47-1"
+  },
+  {
+   "text": "LET",
+   "bar": 48,
+   "beat": 1.0,
+   "t": 105.6881,
+   "phrase": "letgo-48-0"
+  },
+  {
+   "text": "IT",
+   "bar": 48,
+   "beat": 1.5,
+   "t": 105.9633,
+   "phrase": "letgo-48-0"
+  },
+  {
+   "text": "GO",
+   "bar": 48,
+   "beat": 2.0,
+   "t": 106.2385,
+   "phrase": "letgo-48-0"
+  },
+  {
+   "text": "LET",
+   "bar": 48,
+   "beat": 3.0,
+   "t": 106.789,
+   "phrase": "letgo-48-1"
+  },
+  {
+   "text": "IT",
+   "bar": 48,
+   "beat": 3.5,
+   "t": 107.0642,
+   "phrase": "letgo-48-1"
+  },
+  {
+   "text": "GO",
+   "bar": 48,
+   "beat": 4.0,
+   "t": 107.3394,
+   "phrase": "letgo-48-1"
+  },
+  {
+   "text": "LET",
+   "bar": 49,
+   "beat": 1.0,
+   "t": 107.8899,
+   "phrase": "letgo-49-0"
+  },
+  {
+   "text": "IT",
+   "bar": 49,
+   "beat": 1.5,
+   "t": 108.1651,
+   "phrase": "letgo-49-0"
+  },
+  {
+   "text": "GO",
+   "bar": 49,
+   "beat": 2.0,
+   "t": 108.4404,
+   "phrase": "letgo-49-0"
+  },
+  {
+   "text": "LET",
+   "bar": 49,
+   "beat": 3.0,
+   "t": 108.9908,
+   "phrase": "letgo-49-1"
+  },
+  {
+   "text": "IT",
+   "bar": 49,
+   "beat": 3.5,
+   "t": 109.2661,
+   "phrase": "letgo-49-1"
+  },
+  {
+   "text": "GO",
+   "bar": 49,
+   "beat": 4.0,
+   "t": 109.5413,
+   "phrase": "letgo-49-1"
+  },
+  {
+   "text": "DO YOU WANNA HAVE FUN?",
+   "bar": 49,
+   "beat": 4.47,
+   "t": 109.8,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "AS THE FIRES KEEP BURNING",
+   "bar": 50,
+   "beat": 3.377,
+   "t": 111.4,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "AND THE WORLD STOPS TURNING",
+   "bar": 51,
+   "beat": 2.465,
+   "t": 113.1,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "AND EVERYONE UNDER THE SUN",
+   "bar": 52,
+   "beat": 1.008,
+   "t": 114.5,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TAKES STEPS IN THE PROCESS TO HEAL AND GROW",
+   "bar": 52,
+   "beat": 3.552,
+   "t": 115.9,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TELL ME YOU'RE THE ONE",
+   "bar": 53,
+   "beat": 4.638,
+   "t": 118.7,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TO MAKE THE WORLD STOP HURTING",
+   "bar": 54,
+   "beat": 3.545,
+   "t": 120.3,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "AND MY HEART KEEP PUMPING",
+   "bar": 55,
+   "beat": 2.633,
+   "t": 122.0,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "WHILE EVERYONE UNDER THE SUN",
+   "bar": 56,
+   "beat": 1.722,
+   "t": 123.7,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TAKE STEPS IN THE PROCESS TO FEEL IT GROW",
+   "bar": 56,
+   "beat": 4.628,
+   "t": 125.3,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "HOW LITTLE DO I KNOW?",
+   "bar": 57,
+   "beat": 4.625,
+   "t": 127.5,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "STEPS IN THE PROCESS, BREATHE AND GROW",
+   "bar": 61,
+   "beat": 4.067,
+   "t": 136.0,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "TELL ME IT'LL BE FINE THOUGH?",
+   "bar": 63,
+   "beat": 3.333,
+   "t": 140.0,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "STEPS IN THE PROCESS, FEEL IT GROW",
+   "bar": 65,
+   "beat": 1.328,
+   "t": 143.3,
+   "phrase": "verse",
+   "line": true,
+   "approximate": true
+  },
+  {
+   "text": "FEEL",
+   "bar": 66,
+   "beat": 1.0,
+   "t": 145.3211,
+   "phrase": "grow-66-0"
+  },
+  {
+   "text": "IT",
+   "bar": 66,
+   "beat": 1.5,
+   "t": 145.5963,
+   "phrase": "grow-66-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 66,
+   "beat": 2.0,
+   "t": 145.8716,
+   "phrase": "grow-66-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 66,
+   "beat": 3.0,
+   "t": 146.422,
+   "phrase": "grow-66-1"
+  },
+  {
+   "text": "IT",
+   "bar": 66,
+   "beat": 3.5,
+   "t": 146.6972,
+   "phrase": "grow-66-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 66,
+   "beat": 4.0,
+   "t": 146.9725,
+   "phrase": "grow-66-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 67,
+   "beat": 1.0,
+   "t": 147.5229,
+   "phrase": "grow-67-0"
+  },
+  {
+   "text": "IT",
+   "bar": 67,
+   "beat": 1.5,
+   "t": 147.7982,
+   "phrase": "grow-67-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 67,
+   "beat": 2.0,
+   "t": 148.0734,
+   "phrase": "grow-67-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 67,
+   "beat": 3.0,
+   "t": 148.6239,
+   "phrase": "grow-67-1"
+  },
+  {
+   "text": "IT",
+   "bar": 67,
+   "beat": 3.5,
+   "t": 148.8991,
+   "phrase": "grow-67-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 67,
+   "beat": 4.0,
+   "t": 149.1743,
+   "phrase": "grow-67-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 68,
+   "beat": 1.0,
+   "t": 149.7248,
+   "phrase": "grow-68-0"
+  },
+  {
+   "text": "IT",
+   "bar": 68,
+   "beat": 1.5,
+   "t": 150.0,
+   "phrase": "grow-68-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 68,
+   "beat": 2.0,
+   "t": 150.2752,
+   "phrase": "grow-68-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 68,
+   "beat": 3.0,
+   "t": 150.8257,
+   "phrase": "grow-68-1"
+  },
+  {
+   "text": "IT",
+   "bar": 68,
+   "beat": 3.5,
+   "t": 151.1009,
+   "phrase": "grow-68-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 68,
+   "beat": 4.0,
+   "t": 151.3761,
+   "phrase": "grow-68-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 69,
+   "beat": 1.0,
+   "t": 151.9266,
+   "phrase": "grow-69-0"
+  },
+  {
+   "text": "IT",
+   "bar": 69,
+   "beat": 1.5,
+   "t": 152.2018,
+   "phrase": "grow-69-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 69,
+   "beat": 2.0,
+   "t": 152.4771,
+   "phrase": "grow-69-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 69,
+   "beat": 3.0,
+   "t": 153.0275,
+   "phrase": "grow-69-1"
+  },
+  {
+   "text": "IT",
+   "bar": 69,
+   "beat": 3.5,
+   "t": 153.3028,
+   "phrase": "grow-69-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 69,
+   "beat": 4.0,
+   "t": 153.578,
+   "phrase": "grow-69-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 70,
+   "beat": 1.0,
+   "t": 154.1284,
+   "phrase": "grow-70-0"
+  },
+  {
+   "text": "IT",
+   "bar": 70,
+   "beat": 1.5,
+   "t": 154.4037,
+   "phrase": "grow-70-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 70,
+   "beat": 2.0,
+   "t": 154.6789,
+   "phrase": "grow-70-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 70,
+   "beat": 3.0,
+   "t": 155.2294,
+   "phrase": "grow-70-1"
+  },
+  {
+   "text": "IT",
+   "bar": 70,
+   "beat": 3.5,
+   "t": 155.5046,
+   "phrase": "grow-70-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 70,
+   "beat": 4.0,
+   "t": 155.7798,
+   "phrase": "grow-70-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 71,
+   "beat": 1.0,
+   "t": 156.3303,
+   "phrase": "grow-71-0"
+  },
+  {
+   "text": "IT",
+   "bar": 71,
+   "beat": 1.5,
+   "t": 156.6055,
+   "phrase": "grow-71-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 71,
+   "beat": 2.0,
+   "t": 156.8807,
+   "phrase": "grow-71-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 71,
+   "beat": 3.0,
+   "t": 157.4312,
+   "phrase": "grow-71-1"
+  },
+  {
+   "text": "IT",
+   "bar": 71,
+   "beat": 3.5,
+   "t": 157.7064,
+   "phrase": "grow-71-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 71,
+   "beat": 4.0,
+   "t": 157.9817,
+   "phrase": "grow-71-1"
+  },
+  {
+   "text": "FEEL",
+   "bar": 72,
+   "beat": 1.0,
+   "t": 158.5321,
+   "phrase": "grow-72-0"
+  },
+  {
+   "text": "IT",
+   "bar": 72,
+   "beat": 1.5,
+   "t": 158.8073,
+   "phrase": "grow-72-0"
+  },
+  {
+   "text": "GROW",
+   "bar": 72,
+   "beat": 2.0,
+   "t": 159.0826,
+   "phrase": "grow-72-0"
+  },
+  {
+   "text": "FEEL",
+   "bar": 72,
+   "beat": 3.0,
+   "t": 159.633,
+   "phrase": "grow-72-1"
+  },
+  {
+   "text": "IT",
+   "bar": 72,
+   "beat": 3.5,
+   "t": 159.9083,
+   "phrase": "grow-72-1"
+  },
+  {
+   "text": "GROW",
+   "bar": 72,
+   "beat": 4.0,
+   "t": 160.1835,
+   "phrase": "grow-72-1"
+  },
+  {
+   "text": "IS",
+   "bar": 74,
+   "beat": 4.5,
+   "t": 164.8624,
+   "phrase": "isthat-75"
+  },
+  {
+   "text": "THAT",
+   "bar": 75,
+   "beat": 1.0,
+   "t": 165.1376,
+   "phrase": "isthat-75"
+  },
+  {
+   "text": "ALL",
+   "bar": 75,
+   "beat": 1.5,
+   "t": 165.4079,
+   "phrase": "isthat-75"
+  },
+  {
+   "text": "YOU",
+   "bar": 75,
+   "beat": 2.0,
+   "t": 165.6782,
+   "phrase": "isthat-75"
+  },
+  {
+   "text": "IS",
+   "bar": 75,
+   "beat": 4.5,
+   "t": 167.0295,
+   "phrase": "isthat-76"
+  },
+  {
+   "text": "THAT",
+   "bar": 76,
+   "beat": 1.0,
+   "t": 167.2998,
+   "phrase": "isthat-76"
+  },
+  {
+   "text": "ALL",
+   "bar": 76,
+   "beat": 1.5,
+   "t": 167.57,
+   "phrase": "isthat-76"
+  },
+  {
+   "text": "YOU",
+   "bar": 76,
+   "beat": 2.0,
+   "t": 167.8403,
+   "phrase": "isthat-76"
+  },
+  {
+   "text": "IS",
+   "bar": 76,
+   "beat": 4.5,
+   "t": 169.1917,
+   "phrase": "isthat-77"
+  },
+  {
+   "text": "THAT",
+   "bar": 77,
+   "beat": 1.0,
+   "t": 169.4619,
+   "phrase": "isthat-77"
+  },
+  {
+   "text": "ALL",
+   "bar": 77,
+   "beat": 1.5,
+   "t": 169.7322,
+   "phrase": "isthat-77"
+  },
+  {
+   "text": "YOU",
+   "bar": 77,
+   "beat": 2.0,
+   "t": 170.0025,
+   "phrase": "isthat-77"
+  },
+  {
+   "text": "IS",
+   "bar": 77,
+   "beat": 4.5,
+   "t": 171.3538,
+   "phrase": "isthat-78"
+  },
+  {
+   "text": "THAT",
+   "bar": 78,
+   "beat": 1.0,
+   "t": 171.6241,
+   "phrase": "isthat-78"
+  },
+  {
+   "text": "ALL",
+   "bar": 78,
+   "beat": 1.5,
+   "t": 171.8944,
+   "phrase": "isthat-78"
+  },
+  {
+   "text": "YOU",
+   "bar": 78,
+   "beat": 2.0,
+   "t": 172.1646,
+   "phrase": "isthat-78"
+  },
+  {
+   "text": "GOT?",
+   "bar": 78,
+   "beat": 2.5,
+   "t": 172.4349,
+   "phrase": "isthat-78"
+  },
+  {
+   "text": "IS",
+   "bar": 78,
+   "beat": 4.5,
+   "t": 173.516,
+   "phrase": "isthat-79"
+  },
+  {
+   "text": "THAT",
+   "bar": 79,
+   "beat": 1.0,
+   "t": 173.7863,
+   "phrase": "isthat-79"
+  },
+  {
+   "text": "ALL",
+   "bar": 79,
+   "beat": 1.5,
+   "t": 174.0565,
+   "phrase": "isthat-79"
+  },
+  {
+   "text": "YOU",
+   "bar": 79,
+   "beat": 2.0,
+   "t": 174.3268,
+   "phrase": "isthat-79"
+  },
+  {
+   "text": "IS",
+   "bar": 79,
+   "beat": 4.5,
+   "t": 175.6782,
+   "phrase": "isthat-80"
+  },
+  {
+   "text": "THAT",
+   "bar": 80,
+   "beat": 1.0,
+   "t": 175.9484,
+   "phrase": "isthat-80"
+  },
+  {
+   "text": "ALL",
+   "bar": 80,
+   "beat": 1.5,
+   "t": 176.2187,
+   "phrase": "isthat-80"
+  },
+  {
+   "text": "YOU",
+   "bar": 80,
+   "beat": 2.0,
+   "t": 176.489,
+   "phrase": "isthat-80"
+  },
+  {
+   "text": "IS",
+   "bar": 80,
+   "beat": 4.5,
+   "t": 177.8403,
+   "phrase": "isthat-81"
+  },
+  {
+   "text": "THAT",
+   "bar": 81,
+   "beat": 1.0,
+   "t": 178.1106,
+   "phrase": "isthat-81"
+  },
+  {
+   "text": "ALL",
+   "bar": 81,
+   "beat": 1.5,
+   "t": 178.3809,
+   "phrase": "isthat-81"
+  },
+  {
+   "text": "YOU",
+   "bar": 81,
+   "beat": 2.0,
+   "t": 178.6511,
+   "phrase": "isthat-81"
+  },
+  {
+   "text": "IS",
+   "bar": 81,
+   "beat": 4.5,
+   "t": 180.0025,
+   "phrase": "isthat-82"
+  },
+  {
+   "text": "THAT",
+   "bar": 82,
+   "beat": 1.0,
+   "t": 180.2727,
+   "phrase": "isthat-82"
+  },
+  {
+   "text": "ALL",
+   "bar": 82,
+   "beat": 1.5,
+   "t": 180.543,
+   "phrase": "isthat-82"
+  },
+  {
+   "text": "YOU...",
+   "bar": 82,
+   "beat": 2.0,
+   "t": 180.8133,
+   "phrase": "isthat-82"
+  },
+  {
+   "text": "IS",
+   "bar": 82,
+   "beat": 4.5,
+   "t": 182.1646,
+   "phrase": "isthatall-83"
+  },
+  {
+   "text": "THAT",
+   "bar": 83,
+   "beat": 1.0,
+   "t": 182.4349,
+   "phrase": "isthatall-83"
+  },
+  {
+   "text": "ALL?",
+   "bar": 83,
+   "beat": 1.5,
+   "t": 182.7052,
+   "phrase": "isthatall-83"
+  },
+  {
+   "text": "IS",
+   "bar": 83,
+   "beat": 4.5,
+   "t": 184.3268,
+   "phrase": "isthatall-84"
+  },
+  {
+   "text": "THAT",
+   "bar": 84,
+   "beat": 1.0,
+   "t": 184.5971,
+   "phrase": "isthatall-84"
+  },
+  {
+   "text": "ALL",
+   "bar": 84,
+   "beat": 1.5,
+   "t": 184.8673,
+   "phrase": "isthatall-84"
+  },
+  {
+   "text": "YOU",
+   "bar": 84,
+   "beat": 2.0,
+   "t": 185.1376,
+   "phrase": "isthatall-84"
+  },
+  {
+   "text": "GOT?",
+   "bar": 84,
+   "beat": 2.5,
+   "t": 185.4079,
+   "phrase": "isthatall-84"
+  },
+  {
+   "text": "IS",
+   "bar": 84,
+   "beat": 4.5,
+   "t": 186.489,
+   "phrase": "isthatall-85"
+  },
+  {
+   "text": "THAT",
+   "bar": 85,
+   "beat": 1.0,
+   "t": 186.7592,
+   "phrase": "isthatall-85"
+  },
+  {
+   "text": "ALL?",
+   "bar": 85,
+   "beat": 1.5,
+   "t": 187.0295,
+   "phrase": "isthatall-85"
+  },
+  {
+   "text": "IS",
+   "bar": 85,
+   "beat": 4.5,
+   "t": 188.6511,
+   "phrase": "isthatall-86"
+  },
+  {
+   "text": "THAT",
+   "bar": 86,
+   "beat": 1.0,
+   "t": 188.9214,
+   "phrase": "isthatall-86"
+  },
+  {
+   "text": "ALL?",
+   "bar": 86,
+   "beat": 1.5,
+   "t": 189.1917,
+   "phrase": "isthatall-86"
+  },
+  {
+   "text": "IS",
+   "bar": 86,
+   "beat": 4.5,
+   "t": 190.8133,
+   "phrase": "isthatall-87"
+  },
+  {
+   "text": "THAT",
+   "bar": 87,
+   "beat": 1.0,
+   "t": 191.0836,
+   "phrase": "isthatall-87"
+  },
+  {
+   "text": "ALL?",
+   "bar": 87,
+   "beat": 1.5,
+   "t": 191.3538,
+   "phrase": "isthatall-87"
+  },
+  {
+   "text": "IS",
+   "bar": 87,
+   "beat": 4.5,
+   "t": 192.9755,
+   "phrase": "isthatall-88"
+  },
+  {
+   "text": "THAT",
+   "bar": 88,
+   "beat": 1.0,
+   "t": 193.2457,
+   "phrase": "isthatall-88"
+  },
+  {
+   "text": "ALL",
+   "bar": 88,
+   "beat": 1.5,
+   "t": 193.516,
+   "phrase": "isthatall-88"
+  },
+  {
+   "text": "YOU",
+   "bar": 88,
+   "beat": 2.0,
+   "t": 193.7863,
+   "phrase": "isthatall-88"
+  },
+  {
+   "text": "GOT?",
+   "bar": 88,
+   "beat": 2.5,
+   "t": 194.0565,
+   "phrase": "isthatall-88"
+  },
+  {
+   "text": "IS",
+   "bar": 88,
+   "beat": 4.5,
+   "t": 195.1376,
+   "phrase": "isthatall-89"
+  },
+  {
+   "text": "THAT",
+   "bar": 89,
+   "beat": 1.0,
+   "t": 195.4079,
+   "phrase": "isthatall-89"
+  },
+  {
+   "text": "ALL?",
+   "bar": 89,
+   "beat": 1.5,
+   "t": 195.6782,
+   "phrase": "isthatall-89"
+  },
+  {
+   "text": "IS",
+   "bar": 89,
+   "beat": 4.5,
+   "t": 197.2998,
+   "phrase": "isthatall-90"
+  },
+  {
+   "text": "THAT",
+   "bar": 90,
+   "beat": 1.0,
+   "t": 197.57,
+   "phrase": "isthatall-90"
+  },
+  {
+   "text": "ALL?",
+   "bar": 90,
+   "beat": 1.5,
+   "t": 197.8403,
+   "phrase": "isthatall-90"
+  },
+  {
+   "text": "LET",
+   "bar": 91,
+   "beat": 1.0,
+   "t": 199.7322,
+   "phrase": "chorus-91-0"
+  },
+  {
+   "text": "IT",
+   "bar": 91,
+   "beat": 1.5,
+   "t": 200.0025,
+   "phrase": "chorus-91-0"
+  },
+  {
+   "text": "GO",
+   "bar": 91,
+   "beat": 2.0,
+   "t": 200.2727,
+   "phrase": "chorus-91-0"
+  },
+  {
+   "text": "LET",
+   "bar": 91,
+   "beat": 3.0,
+   "t": 200.8133,
+   "phrase": "chorus-91-1"
+  },
+  {
+   "text": "IT",
+   "bar": 91,
+   "beat": 3.5,
+   "t": 201.0836,
+   "phrase": "chorus-91-1"
+  },
+  {
+   "text": "GO",
+   "bar": 91,
+   "beat": 4.0,
+   "t": 201.3538,
+   "phrase": "chorus-91-1"
+  },
+  {
+   "text": "LET",
+   "bar": 92,
+   "beat": 1.0,
+   "t": 201.8944,
+   "phrase": "chorus-92-0"
+  },
+  {
+   "text": "IT",
+   "bar": 92,
+   "beat": 1.5,
+   "t": 202.1646,
+   "phrase": "chorus-92-0"
+  },
+  {
+   "text": "GO",
+   "bar": 92,
+   "beat": 2.0,
+   "t": 202.4349,
+   "phrase": "chorus-92-0"
+  },
+  {
+   "text": "LET",
+   "bar": 92,
+   "beat": 3.0,
+   "t": 202.9755,
+   "phrase": "chorus-92-1"
+  },
+  {
+   "text": "IT",
+   "bar": 92,
+   "beat": 3.5,
+   "t": 203.2457,
+   "phrase": "chorus-92-1"
+  },
+  {
+   "text": "GO",
+   "bar": 92,
+   "beat": 4.0,
+   "t": 203.516,
+   "phrase": "chorus-92-1"
+  },
+  {
+   "text": "LET",
+   "bar": 93,
+   "beat": 1.0,
+   "t": 204.0565,
+   "phrase": "chorus-93-0"
+  },
+  {
+   "text": "IT",
+   "bar": 93,
+   "beat": 1.5,
+   "t": 204.3268,
+   "phrase": "chorus-93-0"
+  },
+  {
+   "text": "GO",
+   "bar": 93,
+   "beat": 2.0,
+   "t": 204.5971,
+   "phrase": "chorus-93-0"
+  },
+  {
+   "text": "LET",
+   "bar": 93,
+   "beat": 3.0,
+   "t": 205.1376,
+   "phrase": "chorus-93-1"
+  },
+  {
+   "text": "IT",
+   "bar": 93,
+   "beat": 3.5,
+   "t": 205.4079,
+   "phrase": "chorus-93-1"
+  },
+  {
+   "text": "GO",
+   "bar": 93,
+   "beat": 4.0,
+   "t": 205.6782,
+   "phrase": "chorus-93-1"
+  },
+  {
+   "text": "LET",
+   "bar": 94,
+   "beat": 1.0,
+   "t": 206.2187,
+   "phrase": "chorus-94-0"
+  },
+  {
+   "text": "IT",
+   "bar": 94,
+   "beat": 1.5,
+   "t": 206.489,
+   "phrase": "chorus-94-0"
+  },
+  {
+   "text": "GO",
+   "bar": 94,
+   "beat": 2.0,
+   "t": 206.7592,
+   "phrase": "chorus-94-0"
+  },
+  {
+   "text": "LET",
+   "bar": 94,
+   "beat": 3.0,
+   "t": 207.2998,
+   "phrase": "chorus-94-1"
+  },
+  {
+   "text": "IT",
+   "bar": 94,
+   "beat": 3.5,
+   "t": 207.57,
+   "phrase": "chorus-94-1"
+  },
+  {
+   "text": "GO",
+   "bar": 94,
+   "beat": 4.0,
+   "t": 207.8403,
+   "phrase": "chorus-94-1"
+  },
+  {
+   "text": "LET",
+   "bar": 95,
+   "beat": 1.0,
+   "t": 208.3809,
+   "phrase": "chorus-95-0"
+  },
+  {
+   "text": "IT",
+   "bar": 95,
+   "beat": 1.5,
+   "t": 208.6511,
+   "phrase": "chorus-95-0"
+  },
+  {
+   "text": "GO",
+   "bar": 95,
+   "beat": 2.0,
+   "t": 208.9214,
+   "phrase": "chorus-95-0"
+  },
+  {
+   "text": "LET",
+   "bar": 95,
+   "beat": 3.0,
+   "t": 209.4619,
+   "phrase": "chorus-95-1"
+  },
+  {
+   "text": "IT",
+   "bar": 95,
+   "beat": 3.5,
+   "t": 209.7322,
+   "phrase": "chorus-95-1"
+  },
+  {
+   "text": "GO",
+   "bar": 95,
+   "beat": 4.0,
+   "t": 210.0025,
+   "phrase": "chorus-95-1"
+  },
+  {
+   "text": "LET",
+   "bar": 96,
+   "beat": 1.0,
+   "t": 210.543,
+   "phrase": "chorus-96-0"
+  },
+  {
+   "text": "IT",
+   "bar": 96,
+   "beat": 1.5,
+   "t": 210.8133,
+   "phrase": "chorus-96-0"
+  },
+  {
+   "text": "GO",
+   "bar": 96,
+   "beat": 2.0,
+   "t": 211.0836,
+   "phrase": "chorus-96-0"
+  },
+  {
+   "text": "LET",
+   "bar": 96,
+   "beat": 3.0,
+   "t": 211.6241,
+   "phrase": "chorus-96-1"
+  },
+  {
+   "text": "IT",
+   "bar": 96,
+   "beat": 3.5,
+   "t": 211.8944,
+   "phrase": "chorus-96-1"
+  },
+  {
+   "text": "GO",
+   "bar": 96,
+   "beat": 4.0,
+   "t": 212.1646,
+   "phrase": "chorus-96-1"
+  },
+  {
+   "text": "LET",
+   "bar": 97,
+   "beat": 1.0,
+   "t": 212.7052,
+   "phrase": "chorus-97-0"
+  },
+  {
+   "text": "IT",
+   "bar": 97,
+   "beat": 1.5,
+   "t": 212.9755,
+   "phrase": "chorus-97-0"
+  },
+  {
+   "text": "GO",
+   "bar": 97,
+   "beat": 2.0,
+   "t": 213.2457,
+   "phrase": "chorus-97-0"
+  },
+  {
+   "text": "LET",
+   "bar": 97,
+   "beat": 3.0,
+   "t": 213.7863,
+   "phrase": "chorus-97-1"
+  },
+  {
+   "text": "IT",
+   "bar": 97,
+   "beat": 3.5,
+   "t": 214.0565,
+   "phrase": "chorus-97-1"
+  },
+  {
+   "text": "GO",
+   "bar": 97,
+   "beat": 4.0,
+   "t": 214.3268,
+   "phrase": "chorus-97-1"
+  },
+  {
+   "text": "LET",
+   "bar": 98,
+   "beat": 1.0,
+   "t": 214.8673,
+   "phrase": "chorus-98-0"
+  },
+  {
+   "text": "IT",
+   "bar": 98,
+   "beat": 1.5,
+   "t": 215.1376,
+   "phrase": "chorus-98-0"
+  },
+  {
+   "text": "GO",
+   "bar": 98,
+   "beat": 2.0,
+   "t": 215.4079,
+   "phrase": "chorus-98-0"
+  },
+  {
+   "text": "LET",
+   "bar": 98,
+   "beat": 3.0,
+   "t": 215.9484,
+   "phrase": "chorus-98-1"
+  },
+  {
+   "text": "IT",
+   "bar": 98,
+   "beat": 3.5,
+   "t": 216.2187,
+   "phrase": "chorus-98-1"
+  },
+  {
+   "text": "GO",
+   "bar": 98,
+   "beat": 4.0,
+   "t": 216.489,
+   "phrase": "chorus-98-1"
+  },
+  {
+   "text": "IT'S JUST STEPS IN A PROCESS",
+   "bar": 98,
+   "beat": 4.0,
+   "t": 216.489,
+   "phrase": "steps-99",
+   "line": true
+  },
+  {
+   "text": "FOR YOUR LIFE",
+   "bar": 99,
+   "beat": 3.0,
+   "t": 218.1106,
+   "phrase": "steps-99",
+   "line": true
+  },
+  {
+   "text": "IT'S JUST STEPS IN A PROCESS",
+   "bar": 102,
+   "beat": 4.0,
+   "t": 225.1376,
+   "phrase": "steps-103",
+   "line": true
+  },
+  {
+   "text": "FOR YOUR LIFE",
+   "bar": 103,
+   "beat": 3.0,
+   "t": 226.7592,
+   "phrase": "steps-103",
+   "line": true
+  },
+  {
+   "text": "IT'S JUST STEPS IN A PROCESS",
+   "bar": 106,
+   "beat": 4.0,
+   "t": 233.7863,
+   "phrase": "steps-107",
+   "line": true
+  },
+  {
+   "text": "LET",
+   "bar": 107,
+   "beat": 1.0,
+   "t": 234.3268,
+   "phrase": "chant-107-0"
+  },
+  {
+   "text": "IT",
+   "bar": 107,
+   "beat": 1.5,
+   "t": 234.5971,
+   "phrase": "chant-107-0"
+  },
+  {
+   "text": "GO",
+   "bar": 107,
+   "beat": 2.0,
+   "t": 234.8673,
+   "phrase": "chant-107-0"
+  },
+  {
+   "text": "FOR YOUR LIFE",
+   "bar": 107,
+   "beat": 3.0,
+   "t": 235.4079,
+   "phrase": "steps-107",
+   "line": true
+  },
+  {
+   "text": "LET",
+   "bar": 107,
+   "beat": 3.0,
+   "t": 235.4079,
+   "phrase": "chant-107-1"
+  },
+  {
+   "text": "IT",
+   "bar": 107,
+   "beat": 3.5,
+   "t": 235.6782,
+   "phrase": "chant-107-1"
+  },
+  {
+   "text": "GO",
+   "bar": 107,
+   "beat": 4.0,
+   "t": 235.9484,
+   "phrase": "chant-107-1"
+  },
+  {
+   "text": "LET",
+   "bar": 108,
+   "beat": 1.0,
+   "t": 236.489,
+   "phrase": "chant-108-0"
+  },
+  {
+   "text": "IT",
+   "bar": 108,
+   "beat": 1.5,
+   "t": 236.7592,
+   "phrase": "chant-108-0"
+  },
+  {
+   "text": "GO",
+   "bar": 108,
+   "beat": 2.0,
+   "t": 237.0295,
+   "phrase": "chant-108-0"
+  },
+  {
+   "text": "LET",
+   "bar": 108,
+   "beat": 3.0,
+   "t": 237.57,
+   "phrase": "chant-108-1"
+  },
+  {
+   "text": "IT",
+   "bar": 108,
+   "beat": 3.5,
+   "t": 237.8403,
+   "phrase": "chant-108-1"
+  },
+  {
+   "text": "GO",
+   "bar": 108,
+   "beat": 4.0,
+   "t": 238.1106,
+   "phrase": "chant-108-1"
+  },
+  {
+   "text": "LET",
+   "bar": 109,
+   "beat": 1.0,
+   "t": 238.6511,
+   "phrase": "chant-109-0"
+  },
+  {
+   "text": "IT",
+   "bar": 109,
+   "beat": 1.5,
+   "t": 238.9214,
+   "phrase": "chant-109-0"
+  },
+  {
+   "text": "GO",
+   "bar": 109,
+   "beat": 2.0,
+   "t": 239.1917,
+   "phrase": "chant-109-0"
+  },
+  {
+   "text": "LET",
+   "bar": 109,
+   "beat": 3.0,
+   "t": 239.7322,
+   "phrase": "chant-109-1"
+  },
+  {
+   "text": "IT",
+   "bar": 109,
+   "beat": 3.5,
+   "t": 240.0025,
+   "phrase": "chant-109-1"
+  },
+  {
+   "text": "GO",
+   "bar": 109,
+   "beat": 4.0,
+   "t": 240.2727,
+   "phrase": "chant-109-1"
+  },
+  {
+   "text": "LET",
+   "bar": 110,
+   "beat": 1.0,
+   "t": 240.8133,
+   "phrase": "chant-110-0"
+  },
+  {
+   "text": "IT",
+   "bar": 110,
+   "beat": 1.5,
+   "t": 241.0836,
+   "phrase": "chant-110-0"
+  },
+  {
+   "text": "GO",
+   "bar": 110,
+   "beat": 2.0,
+   "t": 241.3538,
+   "phrase": "chant-110-0"
+  },
+  {
+   "text": "LET",
+   "bar": 110,
+   "beat": 3.0,
+   "t": 241.8944,
+   "phrase": "chant-110-1"
+  },
+  {
+   "text": "IT",
+   "bar": 110,
+   "beat": 3.5,
+   "t": 242.1646,
+   "phrase": "chant-110-1"
+  },
+  {
+   "text": "IT'S JUST STEPS IN A PROCESS",
+   "bar": 110,
+   "beat": 4.0,
+   "t": 242.4349,
+   "phrase": "steps-111",
+   "line": true
+  },
+  {
+   "text": "GO",
+   "bar": 110,
+   "beat": 4.0,
+   "t": 242.4349,
+   "phrase": "chant-110-1"
+  },
+  {
+   "text": "LET",
+   "bar": 111,
+   "beat": 1.0,
+   "t": 242.9755,
+   "phrase": "chant-111-0"
+  },
+  {
+   "text": "IT",
+   "bar": 111,
+   "beat": 1.5,
+   "t": 243.2457,
+   "phrase": "chant-111-0"
+  },
+  {
+   "text": "GO",
+   "bar": 111,
+   "beat": 2.0,
+   "t": 243.516,
+   "phrase": "chant-111-0"
+  },
+  {
+   "text": "FOR YOUR LIFE",
+   "bar": 111,
+   "beat": 3.0,
+   "t": 244.0565,
+   "phrase": "steps-111",
+   "line": true
+  },
+  {
+   "text": "LET",
+   "bar": 111,
+   "beat": 3.0,
+   "t": 244.0565,
+   "phrase": "chant-111-1"
+  },
+  {
+   "text": "IT",
+   "bar": 111,
+   "beat": 3.5,
+   "t": 244.3268,
+   "phrase": "chant-111-1"
+  },
+  {
+   "text": "GO",
+   "bar": 111,
+   "beat": 4.0,
+   "t": 244.5971,
+   "phrase": "chant-111-1"
+  },
+  {
+   "text": "LET",
+   "bar": 112,
+   "beat": 1.0,
+   "t": 245.1376,
+   "phrase": "chant-112-0"
+  },
+  {
+   "text": "IT",
+   "bar": 112,
+   "beat": 1.5,
+   "t": 245.4079,
+   "phrase": "chant-112-0"
+  },
+  {
+   "text": "GO",
+   "bar": 112,
+   "beat": 2.0,
+   "t": 245.6782,
+   "phrase": "chant-112-0"
+  },
+  {
+   "text": "LET",
+   "bar": 112,
+   "beat": 3.0,
+   "t": 246.2187,
+   "phrase": "chant-112-1"
+  },
+  {
+   "text": "IT",
+   "bar": 112,
+   "beat": 3.5,
+   "t": 246.489,
+   "phrase": "chant-112-1"
+  },
+  {
+   "text": "GO",
+   "bar": 112,
+   "beat": 4.0,
+   "t": 246.7592,
+   "phrase": "chant-112-1"
+  }
+ ]
+}

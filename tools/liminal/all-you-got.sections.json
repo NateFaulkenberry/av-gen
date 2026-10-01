@@ -1,0 +1,1127 @@
+{
+ "song": "All You Got (the owner's song; ~/Desktop/All You Got.wav, never committed)",
+ "analyst": "space-art, 2026-09-30; see docs/prototypes/liminal-space/SONG-ANALYSIS.md",
+ "grid": {
+  "downbeat_s": 0.0,
+  "tempo": [
+   [
+    1,
+    109.0
+   ],
+   [
+    76,
+    111.0
+   ]
+  ],
+  "bars": 116,
+  "meter": "4/4",
+  "note": "bar 1 starts at 0 s; bars 1-75 at 109 BPM (2.2018 s), bars 76-116 at 111 BPM (2.1622 s); from the WAV's cue markers, confirmed by the kick onsets"
+ },
+ "sections": [
+  {
+   "id": "Intro",
+   "bar0": 1,
+   "bar1": 17,
+   "name": "Cinematic intro",
+   "note": "bar 1 is silent; sparse from bar 2, bass pulse from bar 6, riser from bar 13, the 'all you got' chop from 28.6 s (bar 14), a one-beat gap before bar 18",
+   "intent": {
+    "space": "A corridor, stair back to its start",
+    "speed": [
+     0.0,
+     0.8
+    ],
+    "coupling": 0.15,
+    "breathing": false,
+    "figure": false,
+    "palette": "K0"
+   }
+  },
+  {
+   "id": "Dance",
+   "bar0": 18,
+   "bar1": 25,
+   "name": "First dance section ('all you got')",
+   "intent": {
+    "space": "B great hall",
+    "speed": [
+     1.4,
+     1.7
+    ],
+    "coupling": 0.7,
+    "breathing": true,
+    "figure": true,
+    "palette": "K1"
+   }
+  },
+  {
+   "id": "Verse 1",
+   "bar0": 26,
+   "bar1": 41,
+   "name": "Verse 1 and pre-chorus ('How little do I know' ... 'let it go')",
+   "intent": {
+    "space": "C enfilade",
+    "speed": [
+     1.0,
+     1.2
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": true,
+    "palette": "K2"
+   }
+  },
+  {
+   "id": "Let go",
+   "bar0": 42,
+   "bar1": 48,
+   "name": "'Let it go' breakdown (bar 42: bass and kick out; then a stripped groove)",
+   "intent": {
+    "space": "B stairhead over the void, then down",
+    "speed": [
+     0.0,
+     0.6
+    ],
+    "coupling": 0.25,
+    "breathing": false,
+    "figure": true,
+    "palette": "K3",
+    "note": "bar 42 is total stillness (coupling 0)"
+   }
+  },
+  {
+   "id": "Build",
+   "bar0": 49,
+   "bar1": 50,
+   "name": "Synth rebuild",
+   "intent": {
+    "space": "narrow passage",
+    "speed": [
+     0.2,
+     0.6
+    ],
+    "coupling": 0.4,
+    "breathing": false,
+    "figure": false,
+    "palette": "K3>K4"
+   }
+  },
+  {
+   "id": "Verse 2",
+   "bar0": 51,
+   "bar1": 58,
+   "name": "Verse 2 ('do you wanna have fun?')",
+   "intent": {
+    "space": "D crossing stairwell",
+    "speed": [
+     1.1,
+     1.3
+    ],
+    "coupling": 0.6,
+    "breathing": true,
+    "figure": false,
+    "palette": "K4"
+   }
+  },
+  {
+   "id": "Bridge",
+   "bar0": 59,
+   "bar1": 66,
+   "name": "Bridge ('how little do I know' x4)",
+   "intent": {
+    "space": "C enfilade again, the same move",
+    "speed": [
+     1.1,
+     1.1
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": false,
+    "palette": "K5"
+   }
+  },
+  {
+   "id": "Grow",
+   "bar0": 67,
+   "bar1": 73,
+   "name": "'Feel it grow' (the lift to F; pivot bar 67)",
+   "intent": {
+    "space": "C the tiny room growing; the sky through a doorway",
+    "speed": [
+     0.9,
+     1.4
+    ],
+    "coupling": 0.6,
+    "breathing": true,
+    "figure": false,
+    "palette": "K6"
+   }
+  },
+  {
+   "id": "Break",
+   "bar0": 74,
+   "bar1": 75,
+   "name": "Break (drums out)",
+   "intent": {
+    "space": "stopped in that doorway",
+    "speed": [
+     0.0,
+     0.0
+    ],
+    "coupling": 0.0,
+    "breathing": false,
+    "figure": false,
+    "palette": "K7"
+   }
+  },
+  {
+   "id": "All you",
+   "bar0": 76,
+   "bar1": 83,
+   "name": "'Is that all you' (111 BPM, eighth-note pulse, no sub)",
+   "intent": {
+    "space": "A corridor again, one hue, compressing; dolly zoom bars 76-79",
+    "speed": [
+     1.8,
+     2.2
+    ],
+    "coupling": 0.8,
+    "breathing": false,
+    "figure": false,
+    "palette": "K8"
+   }
+  },
+  {
+   "id": "Is that all",
+   "bar0": 84,
+   "bar1": 91,
+   "name": "'Is that all?' (the beat returns; the fill on bar 91 beats 3-4)",
+   "intent": {
+    "space": "D Penrose stairwell; cracks of sky",
+    "speed": [
+     1.6,
+     2.0
+    ],
+    "coupling": 0.9,
+    "breathing": true,
+    "figure": false,
+    "palette": "K9"
+   }
+  },
+  {
+   "id": "Let go II",
+   "bar0": 92,
+   "bar1": 99,
+   "name": "Final chorus ('let it go')",
+   "intent": {
+    "space": "E the open: the building unfolds, a stair up into the sky",
+    "speed": [
+     1.4,
+     1.6
+    ],
+    "coupling": 0.5,
+    "breathing": true,
+    "figure": false,
+    "palette": "K10"
+   }
+  },
+  {
+   "id": "For your life",
+   "bar0": 100,
+   "bar1": 113,
+   "name": "Call and response ('steps in a process / for your life')",
+   "intent": {
+    "space": "E the parts standing free; bar 108 beside the figure",
+    "speed": [
+     0.3,
+     1.2
+    ],
+    "coupling": 0.45,
+    "breathing": true,
+    "figure": true,
+    "palette": "K11"
+   }
+  },
+  {
+   "id": "Out",
+   "bar0": 114,
+   "bar1": 116,
+   "name": "Outro",
+   "intent": {
+    "space": "white-gold haze",
+    "speed": [
+     0.0,
+     0.3
+    ],
+    "coupling": 0.0,
+    "breathing": false,
+    "figure": true,
+    "palette": "K12"
+   }
+  }
+ ],
+ "vocals": [
+  {
+   "t0": 28.6,
+   "t1": 54.6,
+   "text": "'all you got' vocal chop (with 'I'll show you'), about once a bar",
+   "confidence": "high (recognised in two independent runs; words at 28.8, 29.7, 31.1, 32.9, 34.5, 37.0, 39.2 s ...)"
+  },
+  {
+   "t0": 55.3,
+   "t1": 60.9,
+   "text": "How little do I know? (x3)",
+   "confidence": "medium"
+  },
+  {
+   "t0": 61.5,
+   "t1": 63.7,
+   "text": "Take steps in the process, breathe and grow",
+   "confidence": "high"
+  },
+  {
+   "t0": 63.7,
+   "t1": 67.6,
+   "text": "How little do I know? / How little do I know, I know?",
+   "confidence": "high"
+  },
+  {
+   "t0": 68.4,
+   "t1": 69.9,
+   "text": "Can you tell me it's fine though?",
+   "confidence": "high"
+  },
+  {
+   "t0": 70.2,
+   "t1": 72.4,
+   "text": "it's steps in the process, feel and grow",
+   "confidence": "high"
+  },
+  {
+   "t0": 72.4,
+   "t1": 78.5,
+   "text": "Come on, tell me what you wanna (x2) / maybe cause a little drama",
+   "confidence": "high"
+  },
+  {
+   "t0": 78.5,
+   "t1": 81.1,
+   "text": "if you feel it, say it, let it show",
+   "confidence": "high"
+  },
+  {
+   "t0": 81.1,
+   "t1": 85.1,
+   "text": "can you tell me it's fine though? / can you tell me we'll be fine though?",
+   "confidence": "high"
+  },
+  {
+   "t0": 85.1,
+   "t1": 87.5,
+   "text": "I know, get a little peace of mind though",
+   "confidence": "high"
+  },
+  {
+   "t0": 87.5,
+   "t1": 89.6,
+   "text": "It's steps in a process, let it go",
+   "confidence": "high"
+  },
+  {
+   "t0": 90.0,
+   "t1": 105.0,
+   "text": "[let it go], repeated every half bar through the stripped groove",
+   "confidence": "high (heard to 105 s)"
+  },
+  {
+   "t0": 109.8,
+   "t1": 118.7,
+   "text": "do you wanna have fun? / as the fires keep burning / and the world stops turning / and everyone under the sun / takes steps in the process to heal and grow",
+   "confidence": "medium (recognised on a short window: 'as if I was keep burning' 111.5, 'and the world stops turning' 113.1, 'healing' 117.8)"
+  },
+  {
+   "t0": 118.7,
+   "t1": 127.5,
+   "text": "tell me you're the one / to make the world stop hurting / and my heart keep pumping / while everyone under the sun / take steps in the process to feel it grow",
+   "confidence": "medium"
+  },
+  {
+   "t0": 127.5,
+   "t1": 140.8,
+   "text": "how little do I know? (x4) / steps in the process, breathe and grow / how little do I know? (x2)",
+   "confidence": "medium"
+  },
+  {
+   "t0": 140.0,
+   "t1": 145.0,
+   "text": "tell me it'll be fine though? / how little do I know? / steps in the process, feel it grow",
+   "confidence": "medium"
+  },
+  {
+   "t0": 145.0,
+   "t1": 160.6,
+   "text": "[feel it grow], repeated through the whole section",
+   "confidence": "high (recognised continuously 145.0-160.6 s)"
+  },
+  {
+   "t0": 164.6,
+   "t1": 180.6,
+   "text": "is that all you (x4) / is that all you got? (x2)",
+   "confidence": "high"
+  },
+  {
+   "t0": 181.9,
+   "t1": 199.1,
+   "text": "is that all? / is that all you got? / is that all? / is that all I show you? / is that all? / is that all you got? / is that all? / is that all?",
+   "confidence": "medium"
+  },
+  {
+   "t0": 199.1,
+   "t1": 216.6,
+   "text": "[let it go], repeated",
+   "confidence": "high"
+  },
+  {
+   "t0": 216.6,
+   "t1": 247.8,
+   "text": "just steps in a process / for your life / (make you feel right), call and response",
+   "confidence": "high"
+  }
+ ],
+ "palette_keys": {
+  "_roles": "air = fog and void (the far air); walls = plaster; light = the key light of the section; accent = the beacon, a colour plane, or the glimpse. sRGB hex starting points: convert to LINEAR RGB for the engine's palette block (ADR-1043 states are linear), which interpolates in OKLab.",
+  "K0": {
+   "name": "Grey dawn",
+   "air": "#BAC2CA",
+   "walls": "#C9CCD0",
+   "light": "#E6EAEE",
+   "accent": "#E2B06E"
+  },
+  "K1": {
+   "name": "Alive",
+   "air": "#3A52B8",
+   "walls": "#D8D2CC",
+   "light": "#F5D9A8",
+   "accent": "#C2456B"
+  },
+  "K2": {
+   "name": "Dusk interior",
+   "air": "#5A6B9A",
+   "walls": "#CFC3B8",
+   "light": "#F0B36B",
+   "accent": "#A8667A"
+  },
+  "K3": {
+   "name": "Surrender",
+   "air": "#AAA8B0",
+   "walls": "#B9B7B8",
+   "light": "#E9D2A6",
+   "accent": "#D9B58A"
+  },
+  "K4": {
+   "name": "Restless",
+   "air": "#4F8A8B",
+   "walls": "#C8C4BF",
+   "light": "#EDAE62",
+   "accent": "#B05A70"
+  },
+  "K5": {
+   "name": "Again",
+   "air": "#5A6B9A",
+   "walls": "#CFC3B8",
+   "light": "#F0B36B",
+   "accent": "#F2B85A"
+  },
+  "K6": {
+   "name": "Gold spreading",
+   "air": "#D8D0A8",
+   "walls": "#E9D9B8",
+   "light": "#F7C85C",
+   "accent": "#7FB8E8"
+  },
+  "K7": {
+   "name": "Held",
+   "air": "#C2BA95",
+   "walls": "#D2C3A5",
+   "light": "#DEB453",
+   "accent": "#72A5D0"
+  },
+  "K8": {
+   "name": "Ember",
+   "air": "#B8662A",
+   "walls": "#946040",
+   "light": "#FFA54A",
+   "accent": "#FFB85A"
+  },
+  "K9": {
+   "name": "Cracks",
+   "air": "#C07636",
+   "walls": "#A06A48",
+   "light": "#FFA54A",
+   "accent": "#8CC4F0"
+  },
+  "K10": {
+   "name": "Open",
+   "air": "#8EC5EE",
+   "walls": "#F2E8DA",
+   "light": "#FFF4DC",
+   "accent": "#E07A8F"
+  },
+  "K11": {
+   "name": "Clear",
+   "air": "#A5D2F2",
+   "walls": "#F7EFE4",
+   "light": "#FFF8E8",
+   "accent": "#E88A9C"
+  },
+  "K12": {
+   "name": "White",
+   "air": "#F8F1E4",
+   "walls": "#F8F1E4",
+   "light": "#FFFAF0",
+   "accent": "#F4EDE2"
+  }
+ },
+ "palette_timeline": [
+  [
+   0.0,
+   0.0,
+   "K0"
+  ],
+  [
+   37.43,
+   41.84,
+   "K1"
+  ],
+  [
+   55.05,
+   63.85,
+   "K2"
+  ],
+  [
+   90.28,
+   92.48,
+   "K3"
+  ],
+  [
+   105.69,
+   110.09,
+   "K4"
+  ],
+  [
+   127.71,
+   136.51,
+   "K5"
+  ],
+  [
+   145.32,
+   156.33,
+   "K6"
+  ],
+  [
+   160.73,
+   161.83,
+   "K7"
+  ],
+  [
+   164.6,
+   165.14,
+   "K8"
+  ],
+  [
+   182.43,
+   197.57,
+   "K9"
+  ],
+  [
+   199.73,
+   201.89,
+   "K10"
+  ],
+  [
+   217.03,
+   234.33,
+   "K11"
+  ],
+  [
+   247.3,
+   253.79,
+   "K12"
+  ]
+ ],
+ "synch_points": [
+  [
+   2.2,
+   "the music begins"
+  ],
+  [
+   11.01,
+   "the bass pulse"
+  ],
+  [
+   36.88,
+   "one-beat gap"
+  ],
+  [
+   37.43,
+   "the hall"
+  ],
+  [
+   55.05,
+   "the voice"
+  ],
+  [
+   90.28,
+   "let it go: stop"
+  ],
+  [
+   110.09,
+   "verse 2"
+  ],
+  [
+   145.32,
+   "the lift to F"
+  ],
+  [
+   160.73,
+   "break"
+  ],
+  [
+   165.14,
+   "111 BPM: the loop"
+  ],
+  [
+   182.43,
+   "the beat returns"
+  ],
+  [
+   198.65,
+   "the fill"
+  ],
+  [
+   199.73,
+   "the release"
+  ],
+  [
+   234.33,
+   "the last lift"
+  ],
+  [
+   247.3,
+   "ring-out"
+  ]
+ ],
+ "shots": [
+  {
+   "t": 0.0,
+   "bar": 1,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "hold, 0 m/s",
+   "event": "the opening frame: the pale corridor, a little off axis; the beacon far away at its end"
+  },
+  {
+   "t": 2.2,
+   "bar": 2,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "walk, easing to 0.6 m/s over 2 s",
+   "event": "the music begins; the walk begins"
+  },
+  {
+   "t": 6.61,
+   "bar": 4,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "slow to 0.2; look left 35°",
+   "event": "an empty side room; hold"
+  },
+  {
+   "t": 8.81,
+   "bar": 5,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "gaze back to the axis; 0.6 m/s",
+   "event": "walk on"
+  },
+  {
+   "t": 11.01,
+   "bar": 6,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "0.6 m/s",
+   "event": "the bass pulse; the sun patch lies on the floor ahead (walked through at about 13 s)"
+  },
+  {
+   "t": 15.41,
+   "bar": 8,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "turn right; climb at 0.5 m/s",
+   "event": "the side opening and the stair"
+  },
+  {
+   "t": 19.82,
+   "bar": 10,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "the landing; turn 180°; climb",
+   "event": "the second flight"
+  },
+  {
+   "t": 24.22,
+   "bar": 12,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "hold 1 bar",
+   "event": "**the opening frame again**: the corridor's start, where we began"
+  },
+  {
+   "t": 26.42,
+   "bar": 13,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "walk 0.7 m/s",
+   "event": "the riser; towards the wide stair and the brighter light"
+  },
+  {
+   "t": 28.62,
+   "bar": 14,
+   "beat": 1,
+   "section": "Intro",
+   "camera": "climb 0.8 m/s",
+   "event": "the first \"all you got\"; the beacon swells once a bar from here"
+  },
+  {
+   "t": 36.88,
+   "bar": 17,
+   "beat": 4,
+   "section": "Intro",
+   "camera": "stop for one beat on the top step",
+   "event": "the one-beat gap"
+  },
+  {
+   "t": 37.43,
+   "bar": 18,
+   "beat": 1,
+   "section": "Dance",
+   "camera": "step out; ease to 1.4 m/s; gaze up +10°",
+   "event": "**the great hall**: shafts, the rose wall, the tiny figure across the hall"
+  },
+  {
+   "t": 41.83,
+   "bar": 20,
+   "beat": 1,
+   "section": "Dance",
+   "camera": "down the long stair on the axis, 1.5 m/s",
+   "event": "the hall breathes with the bass"
+  },
+  {
+   "t": 46.24,
+   "bar": 22,
+   "beat": 1,
+   "section": "Dance",
+   "camera": "across the floor on the axis, 1.6 m/s",
+   "event": "one-point perspective; the beacon high above the target doorway"
+  },
+  {
+   "t": 53.94,
+   "bar": 25,
+   "beat": 3,
+   "section": "Dance",
+   "camera": "into the doorway's reveal",
+   "event": "**light threshold** (swap to the enfilade)"
+  },
+  {
+   "t": 55.05,
+   "bar": 26,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "1.1 m/s; the gaze follows the voice",
+   "event": "the enfilade; \"How little do I know?\""
+  },
+  {
+   "t": 63.85,
+   "bar": 30,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "threshold",
+   "event": "the figure two rooms ahead, in a doorway's light"
+  },
+  {
+   "t": 72.66,
+   "bar": 34,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "hesitate: 30 cm back, then on",
+   "event": "\"Come on, tell me what you wanna\""
+  },
+  {
+   "t": 74.86,
+   "bar": 35,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "turn left 90° through a side door",
+   "event": "the turn for no clear reason"
+  },
+  {
+   "t": 75.96,
+   "bar": 35,
+   "beat": 3,
+   "section": "Verse 1",
+   "camera": "a doorframe crosses the lens",
+   "event": "**the figure is gone** when it clears"
+  },
+  {
+   "t": 77.06,
+   "bar": 36,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "1.0 m/s",
+   "event": "a room identical to the one it left, beacon and all"
+  },
+  {
+   "t": 81.47,
+   "bar": 38,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "threshold",
+   "event": "\"can you tell me it's fine though?\""
+  },
+  {
+   "t": 88.07,
+   "bar": 41,
+   "beat": 1,
+   "section": "Verse 1",
+   "camera": "slowing, into the last door's reveal",
+   "event": "\"let it go\" (87.5 s); **light threshold** (swap to the stairhead)"
+  },
+  {
+   "t": 90.28,
+   "bar": 42,
+   "beat": 1,
+   "section": "Let go",
+   "camera": "**stop, 0 m/s**",
+   "event": "the stairhead above the void; the figure at the top step; colour drains; breathing stops"
+  },
+  {
+   "t": 92.48,
+   "bar": 43,
+   "beat": 1,
+   "section": "Let go",
+   "camera": "down a second flight, 0.5 m/s",
+   "event": "the pulse returns alone; \"[let it go]\" repeats; the sun patch slides"
+  },
+  {
+   "t": 99.08,
+   "bar": 46,
+   "beat": 1,
+   "section": "Let go",
+   "camera": "look back and up at the figure over 2 s; hold",
+   "event": "the figure left above"
+  },
+  {
+   "t": 103.49,
+   "bar": 48,
+   "beat": 1,
+   "section": "Let go",
+   "camera": "gaze forward; 0.5 m/s",
+   "event": "architecture settled to true"
+  },
+  {
+   "t": 105.69,
+   "bar": 49,
+   "beat": 1,
+   "section": "Build",
+   "camera": "pause in a narrow passage, 0.2 m/s",
+   "event": "the held breath; the light ahead brightens"
+  },
+  {
+   "t": 107.89,
+   "bar": 50,
+   "beat": 1,
+   "section": "Build",
+   "camera": "0.2 m/s",
+   "event": "the light brightens again"
+  },
+  {
+   "t": 109.54,
+   "bar": 50,
+   "beat": 4,
+   "section": "Build",
+   "camera": "walk resumes",
+   "event": "the pickup into verse 2"
+  },
+  {
+   "t": 110.09,
+   "bar": 51,
+   "beat": 1,
+   "section": "Verse 2",
+   "camera": "1.2 m/s",
+   "event": "the crossing stairwell; \"do you wanna have fun?\""
+  },
+  {
+   "t": 114.5,
+   "bar": 53,
+   "beat": 1,
+   "section": "Verse 2",
+   "camera": "**reversal**: stop, back 40 cm, turn to another flight",
+   "event": "the first change of mind"
+  },
+  {
+   "t": 118.35,
+   "bar": 54,
+   "beat": 4,
+   "section": "Verse 2",
+   "camera": "—",
+   "event": "phrase-end noise sweep: near-field tremble for one beat"
+  },
+  {
+   "t": 118.9,
+   "bar": 55,
+   "beat": 1,
+   "section": "Verse 2",
+   "camera": "slow; look left 60°",
+   "event": "**the window into the verse-1 rooms**, from an impossible angle; the figure's lamp still lit"
+  },
+  {
+   "t": 121.1,
+   "bar": 56,
+   "beat": 1,
+   "section": "Verse 2",
+   "camera": "**reversal**; down a flight",
+   "event": "the second change of mind"
+  },
+  {
+   "t": 123.3,
+   "bar": 57,
+   "beat": 1,
+   "section": "Verse 2",
+   "camera": "0.8 m/s; gaze down",
+   "event": "the beacon below, through the stairwell"
+  },
+  {
+   "t": 126.61,
+   "bar": 58,
+   "beat": 3,
+   "section": "Verse 2",
+   "camera": "into a door's reveal",
+   "event": "noise sweep, tremble; **light threshold** (swap to the enfilade's far end)"
+  },
+  {
+   "t": 127.71,
+   "bar": 59,
+   "beat": 1,
+   "section": "Bridge",
+   "camera": "**the verse 1 move repeated exactly** (path, height, speed)",
+   "event": "the enfilade from the other end, light flipped; \"how little do I know?\" (x4)"
+  },
+  {
+   "t": 136.51,
+   "bar": 63,
+   "beat": 1,
+   "section": "Bridge",
+   "camera": "the gaze passes over an empty doorway",
+   "event": "the figure's doorway, empty"
+  },
+  {
+   "t": 144.22,
+   "bar": 66,
+   "beat": 3,
+   "section": "Bridge",
+   "camera": "stop at a small doorway",
+   "event": "\"steps in the process, feel it grow\"; the tiny room with the beacon inside"
+  },
+  {
+   "t": 145.32,
+   "bar": 67,
+   "beat": 1,
+   "section": "Grow",
+   "camera": "step in; 0.9 m/s rising to 1.4 by bar 73",
+   "event": "the impact and the lift to F; **the room begins to grow**; gold spreads"
+  },
+  {
+   "t": 151.93,
+   "bar": 70,
+   "beat": 1,
+   "section": "Grow",
+   "camera": "gaze steady on the far wall",
+   "event": "**a doorway opens: sky and sun, seen for the first time**"
+  },
+  {
+   "t": 160.73,
+   "bar": 74,
+   "beat": 1,
+   "section": "Break",
+   "camera": "**stop in that doorway, 0 m/s**",
+   "event": "drums out; total stillness"
+  },
+  {
+   "t": 164.59,
+   "bar": 75,
+   "beat": 4,
+   "section": "Break",
+   "camera": "step into the light",
+   "event": "**the bright threshold** (swap to the first corridor, K8)"
+  },
+  {
+   "t": 165.14,
+   "bar": 76,
+   "beat": 1,
+   "section": "All you",
+   "camera": "1.8 m/s on the axis; FOV 45° → 90° over 4 bars",
+   "event": "**the first corridor again**, amber; the dolly zoom; \"is that all you\""
+  },
+  {
+   "t": 173.79,
+   "bar": 80,
+   "beat": 1,
+   "section": "All you",
+   "camera": "through a side door; FOV back to 55° in the reveal; 2.0-2.2 m/s",
+   "event": "**the start of the same corridor**; the sun patch has moved; narrower, lower"
+  },
+  {
+   "t": 181.35,
+   "bar": 83,
+   "beat": 3,
+   "section": "All you",
+   "camera": "ease to a stop in 0.5 s",
+   "event": "the pulse stops"
+  },
+  {
+   "t": 182.43,
+   "bar": 84,
+   "beat": 1,
+   "section": "Is that all",
+   "camera": "climb 1.8 m/s",
+   "event": "the beat returns: the Penrose stairwell's first flight; breathing returns"
+  },
+  {
+   "t": 185.68,
+   "bar": 85,
+   "beat": 3,
+   "section": "Is that all",
+   "camera": "landing; turn 90°; climb",
+   "event": "the second flight; the first cracks of sky"
+  },
+  {
+   "t": 188.92,
+   "bar": 87,
+   "beat": 1,
+   "section": "Is that all",
+   "camera": "landing; turn 90°; climb",
+   "event": "the third flight; the cracks wider, then closing; the flights already climbed visible across the void"
+  },
+  {
+   "t": 192.16,
+   "bar": 88,
+   "beat": 3,
+   "section": "Is that all",
+   "camera": "landing; turn 90°; climb",
+   "event": "the fourth flight; the offbeat glints"
+  },
+  {
+   "t": 195.41,
+   "bar": 90,
+   "beat": 1,
+   "section": "Is that all",
+   "camera": "**the same landing**; turn to its doorway",
+   "event": "four flights up and back where we were; the beacon's light is in the doorway, 3 m ahead"
+  },
+  {
+   "t": 198.65,
+   "bar": 91,
+   "beat": 3,
+   "section": "Is that all",
+   "camera": "the last steps",
+   "event": "**the fill: the doorway's light fills the frame**"
+  },
+  {
+   "t": 199.73,
+   "bar": 92,
+   "beat": 1,
+   "section": "Let go II",
+   "camera": "out; 1.4 m/s; gaze ahead and up +8°",
+   "event": "**the open**: sky, sun, the walls unfolding; the palette opens"
+  },
+  {
+   "t": 201.89,
+   "bar": 93,
+   "beat": 1,
+   "section": "Let go II",
+   "camera": "climb the long stair, 1.5 m/s, on the axis",
+   "event": "a stair from inside into the air; deep, slow breathing"
+  },
+  {
+   "t": 217.03,
+   "bar": 100,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "1.2 m/s among the free-standing parts",
+   "event": "\"just steps in a process / for your life\""
+  },
+  {
+   "t": 221.35,
+   "bar": 102,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "through a free-standing doorway",
+   "event": "one doorway per call"
+  },
+  {
+   "t": 225.68,
+   "bar": 104,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "through a doorway; the figure at the top, against the sky",
+   "event": "climbing towards it"
+  },
+  {
+   "t": 230.0,
+   "bar": 106,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "through a doorway",
+   "event": "the last before the top"
+  },
+  {
+   "t": 234.33,
+   "bar": 108,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "**arrive beside the figure; turn to its gaze, down**",
+   "event": "the last lift; the first corridor small and roofless below"
+  },
+  {
+   "t": 238.65,
+   "bar": 110,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "turn back to the sun; rise slowly",
+   "event": "the fragments begin to align"
+  },
+  {
+   "t": 245.14,
+   "bar": 113,
+   "beat": 1,
+   "section": "For your life",
+   "camera": "hold",
+   "event": "**a single doorway framing the sun**"
+  },
+  {
+   "t": 247.3,
+   "bar": 114,
+   "beat": 1,
+   "section": "Out",
+   "camera": "ease forward, 0.3 m/s → 0",
+   "event": "the air brightens to white-gold"
+  },
+  {
+   "t": 251.62,
+   "bar": 116,
+   "beat": 1,
+   "section": "Out",
+   "camera": "still",
+   "event": "everything dissolves into light; the tail"
+  }
+ ]
+}

@@ -34,6 +34,7 @@ namespace avgen::scene {
 // by name when a table has fallen behind it (the ADR-392 pattern).
 enum class TemporalEffectKind : std::uint8_t {
     FrameEcho = 0, // §9
+    Mosh = 1,      // ADR-1049: data-mosh blocks and channel shift (All You Got art pass 2)
     Count,
 };
 
@@ -46,11 +47,13 @@ constexpr int kMaxTemporalFrames = 32;
 
 inline constexpr std::array<TemporalEffectKind, kTemporalEffectKindCount> kTemporalEffectKinds{
     TemporalEffectKind::FrameEcho,
+    TemporalEffectKind::Mosh,
 };
 
 [[nodiscard]] constexpr const char* temporalEffectKindName(TemporalEffectKind kind) {
     switch (kind) {
     case TemporalEffectKind::FrameEcho: return "echo";
+    case TemporalEffectKind::Mosh: return "mosh";
     case TemporalEffectKind::Count: break;
     }
     return "unknown";
@@ -71,8 +74,27 @@ struct FrameEchoSettings {
     float decay = 0.72f;    // per-tap falloff; 0 is one ghost, near 1 is an even smear
 };
 
+// ADR-1049: simulation corruption. A block of the frame is replaced by the same block from up to
+// `frames` frames ago, dragged `smear` pixels -- the look of a data-moshed codec that lost its
+// keyframe -- and the colour channels are pulled apart by `shift` pixels. Which blocks, how far
+// back and which way are hashes of the block and of `floor(time * rate) + seed`, so the picture is a
+// pure function of the clean history ring and the clock: an FIR filter, scrub-safe like the echo.
+// `amount` (the share of blocks corrupted) and `shift` are the knobs to key or route from an event;
+// at 0 and 0 the pass is skipped and only the ring is kept warm.
+struct MoshSettings {
+    bool enabled = false;
+    int frames = 8;        // how far back a frozen block may come from (the bound)
+    float amount = 0.0f;   // 0..1, the share of blocks corrupted
+    float block = 32.0f;   // block edge in pixels at 1080 lines (scaled with the output height)
+    float smear = 24.0f;   // pixels a corrupted block is dragged, at 1080 lines
+    float shift = 0.0f;    // pixels the red and blue channels are pulled apart, at 1080 lines
+    float rate = 12.0f;    // how many times a second the corrupted blocks are re-chosen
+    float seed = 0.0f;     // added to the epoch: key it to pick a different pattern
+};
+
 struct TemporalSettings {
     FrameEchoSettings echo;
+    MoshSettings mosh;
 
     // The bound. `max` over the live effects, zero when none is on -- and zero means the ring is
     // released, because holding history for a feature nobody has enabled is exactly what §8 says
@@ -112,6 +134,14 @@ struct TemporalParameters {
     params::Parameter<float>* echoFrames = nullptr;
     params::Parameter<float>* echoStrength = nullptr;
     params::Parameter<float>* echoDecay = nullptr;
+    params::Parameter<bool>* moshEnabled = nullptr;
+    params::Parameter<float>* moshFrames = nullptr;
+    params::Parameter<float>* moshAmount = nullptr;
+    params::Parameter<float>* moshBlock = nullptr;
+    params::Parameter<float>* moshSmear = nullptr;
+    params::Parameter<float>* moshShift = nullptr;
+    params::Parameter<float>* moshRate = nullptr;
+    params::Parameter<float>* moshSeed = nullptr;
 };
 
 [[nodiscard]] TemporalParameters registerTemporalParameters(params::ParameterSet& params,

@@ -33,6 +33,14 @@ struct SdfLook {
     float edgeIntensity = 0.0f;    // emissive edges from the field's curvature (a 4-tap Laplacian); 0 = off
     float edgeWidth = 0.05f;       // the Laplacian's tap offset: wider picks up broader creases
     glm::vec3 edgeColor{0.25f, 0.8f, 1.0f};
+    // ADR-1047: the line look. `edgePixels` > 0 sets the edge's width in screen pixels at every distance
+    // (the tap offset follows the hit's distance), so lines stay a few pixels wide in a small room and do
+    // not shrink into moire far away; 0 keeps `edgeWidth` in tree-local units. The mask is
+    // smoothstep(edgeThreshold, edgeThreshold + edgeSoftness, 1 - cos angle): a small softness draws a
+    // hard, thin line, a large one a soft glow across the crease.
+    float edgePixels = 0.0f;
+    float edgeThreshold = 0.02f;
+    float edgeSoftness = 0.28f;
     float shadowStrength = 0.0f;   // an SDF soft shadow towards `shadowDirection`; 0 = off (a second march)
     float shadowSoftness = 8.0f;   // Quilez's k: larger = harder
     glm::vec3 shadowDirection{0.3f, 1.0f, 0.2f}; // world space, towards the light
@@ -66,6 +74,18 @@ struct SdfObject {
     bool compile = false;
     bool castShadows = true;
     SdfLook look;                        // ADR-1002
+    // ADR-1044: surfaces. Empty = one surface, the material as it always was. Otherwise a compiled tree's
+    // node `material` ids pick one per hit, and its `color` multiplies the material's base colour and its
+    // `emission` the material's emission (colour x intensity) -- so author the material white with emission
+    // colour white and intensity 1, and give each surface its real albedo and emitted radiance.
+    // Parameters: surface/<k>/color, surface/<k>/emission. Compiled objects only (the interpreter shades
+    // every hit as surface 0).
+    struct Surface {
+        glm::vec3 color{1.0f};
+        glm::vec3 emission{0.0f};
+        glm::vec3 edge{1.0f}; // ADR-1047: multiplies the object's edge colour on this surface (0 = no lines)
+    };
+    std::vector<Surface> surfaces;
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material
     // program. Runtime only (the Composition writes it every frame); 1 is the surface as authored.
     float emissionGain = 1.0f;

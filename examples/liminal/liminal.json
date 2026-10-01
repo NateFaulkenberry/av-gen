@@ -1,0 +1,1049 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "~/Desktop/All You Got.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "liminal.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.18,
+  "post/bloom/threshold": 1.2,
+  "post/grade/contrast": 1.05,
+  "post/grade/saturation": 1.0,
+  "post/output/vignette": 0.35,
+  "post/output/grain": 0.02,
+  "scene/volumeJitter": 0.5
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "sdf/world/node/breath/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 900,
+    "springHz": 0.35,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "sdf/world/node/breath/translation",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "enabled": true,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.energy",
+   "target": "sdf/world/node/breath/translation",
+   "amount": 0.11,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/world/node/tremble/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 500,
+    "springHz": 2.0,
+    "springDamping": 0.6
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/world/node/tremble/translation",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 500,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "sdf/world/look/edge/intensity",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400,
+    "springHz": 1.5,
+    "springDamping": 0.8
+   }
+  }
+ ],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/journey/distance",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       6.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       9.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.5,
+      "value": [
+       10.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       13.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.5,
+      "value": [
+       14.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.5,
+      "value": [
+       14.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0,
+      "value": [
+       17.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.0,
+      "value": [
+       26.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       34.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       38.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.0,
+      "value": [
+       40.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.0,
+      "value": [
+       41.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       49.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/yaw",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.5,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.5,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.5,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 17.0,
+      "value": [
+       48.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.0,
+      "value": [
+       52.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 21.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.0,
+      "value": [
+       -35.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.0,
+      "value": [
+       -25.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -10.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/pitch",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 21.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 23.0,
+      "value": [
+       9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.0,
+      "value": [
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 29.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.0,
+      "value": [
+       22.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       8.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/sway",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       2.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/figure/journey/distance",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       6.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       18.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       26.5
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 22.0,
+      "value": [
+       34.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       39.5
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       44.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "sdf/world/node/room/size",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       7.15,
+       4.65,
+       7.15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       7.15,
+       4.65,
+       7.15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       7.15,
+       7.15,
+       10.15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       7.15,
+       7.15,
+       10.15
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "sdf/world/node/roomAt/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0,
+       4.5,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       4.0,
+       4.5,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       4.0,
+       7.0,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       4.0,
+       7.0,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "sdf/world/node/roomLampAt/translation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0,
+       8.95,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       4.0,
+       8.95,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       4.0,
+       13.95,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       4.0,
+       13.95,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "palette/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "palette/value",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.8,
+      "value": [
+       2.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.4,
+      "value": [
+       2.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.5,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/exposure/compensation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.8,
+      "value": [
+       3.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.4,
+      "value": [
+       3.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.5,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "muted",
+    "colors": {
+     "plaster": [
+      0.42,
+      0.45,
+      0.5
+     ],
+     "floor": [
+      0.3,
+      0.31,
+      0.33
+     ],
+     "accent": [
+      0.55,
+      0.56,
+      0.6
+     ],
+     "lamp": [
+      5.0,
+      5.6,
+      6.0
+     ],
+     "light": [
+      0.7,
+      0.8,
+      1.0
+     ],
+     "fog": [
+      0.045,
+      0.05,
+      0.065
+     ],
+     "edge": [
+      0.45,
+      0.55,
+      0.8
+     ]
+    }
+   },
+   {
+    "name": "awake",
+    "colors": {
+     "plaster": [
+      0.55,
+      0.42,
+      0.38
+     ],
+     "floor": [
+      0.35,
+      0.25,
+      0.22
+     ],
+     "accent": [
+      0.75,
+      0.35,
+      0.3
+     ],
+     "lamp": [
+      6.0,
+      3.7,
+      2.1
+     ],
+     "light": [
+      1.0,
+      0.7,
+      0.45
+     ],
+     "fog": [
+      0.07,
+      0.035,
+      0.05
+     ],
+     "edge": [
+      1.0,
+      0.45,
+      0.35
+     ]
+    }
+   },
+   {
+    "name": "recede",
+    "colors": {
+     "plaster": [
+      0.3,
+      0.31,
+      0.33
+     ],
+     "floor": [
+      0.22,
+      0.22,
+      0.23
+     ],
+     "accent": [
+      0.34,
+      0.35,
+      0.37
+     ],
+     "lamp": [
+      2.2,
+      2.5,
+      2.7
+     ],
+     "light": [
+      0.5,
+      0.55,
+      0.6
+     ],
+     "fog": [
+      0.02,
+      0.022,
+      0.028
+     ],
+     "edge": [
+      0.3,
+      0.33,
+      0.4
+     ]
+    }
+   },
+   {
+    "name": "open",
+    "colors": {
+     "plaster": [
+      0.72,
+      0.68,
+      0.6
+     ],
+     "floor": [
+      0.5,
+      0.46,
+      0.4
+     ],
+     "accent": [
+      0.85,
+      0.72,
+      0.5
+     ],
+     "lamp": [
+      6.0,
+      5.5,
+      4.5
+     ],
+     "light": [
+      1.0,
+      0.9,
+      0.7
+     ],
+     "fog": [
+      0.16,
+      0.14,
+      0.12
+     ],
+     "edge": [
+      1.0,
+      0.85,
+      0.6
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "plaster",
+    "target": "sdf/world/surface/0/color"
+   },
+   {
+    "role": "floor",
+    "target": "sdf/world/surface/1/color"
+   },
+   {
+    "role": "accent",
+    "target": "sdf/world/surface/2/color"
+   },
+   {
+    "role": "lamp",
+    "target": "sdf/world/surface/3/emission"
+   },
+   {
+    "role": "plaster",
+    "target": "sdf/stairwell/surface/0/color"
+   },
+   {
+    "role": "floor",
+    "target": "sdf/stairwell/surface/1/color"
+   },
+   {
+    "role": "accent",
+    "target": "sdf/stairwell/surface/2/color"
+   },
+   {
+    "role": "lamp",
+    "target": "sdf/stairwell/surface/3/emission"
+   },
+   {
+    "role": "fog",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "edge",
+    "target": "sdf/world/look/edge/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/roomLamp0/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/hallLamp0/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/roomLamp1/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/hallLamp1/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/roomLamp2/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/hallLamp2/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/roomLamp3/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/hallLamp3/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/roomLamp4/color"
+   },
+   {
+    "role": "light",
+    "target": "lights/hallLamp4/color"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 48.0
+ }
+}

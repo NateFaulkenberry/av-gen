@@ -572,6 +572,49 @@ TEST_CASE("SDF interpreter matches spatial::evaluatePacked for nested trees", "[
         outer.size = glm::vec3(0.0f, 1.0f, 1.0f);
         cases.push_back({"recurse nested", treeOf(std::move(outer)), 1e-4f});
     }
+    // ADR-1040: the liminal vocabulary -- stairs (block and floating), the screw in both modes, the warp.
+    {
+        SdfNode stairs = node(SdfNodeKind::Stairs);
+        stairs.size = glm::vec3(0.3f, 0.18f, 0.6f);
+        stairs.count = 6;
+        stairs.height = 0.0f;
+        cases.push_back({"stairs block", treeOf(translate(glm::vec3(-0.9f, -0.5f, 0.0f), stairs)), 1e-4f});
+        stairs.height = 0.25f;
+        cases.push_back({"stairs floating", treeOf(translate(glm::vec3(-0.9f, -0.5f, 0.0f), stairs)), 1e-4f});
+        auto cell = [] {
+            return combo(SdfNodeKind::Union, {box(glm::vec3(0.4f, 0.1f, 0.3f)), translate(glm::vec3(0.2f, 0.3f, 0.0f), sphere(0.15f))},
+                         0.5f);
+        };
+        SdfNode slab = unary(SdfNodeKind::Screw, cell());
+        slab.translation = glm::vec3(1.1f, 0.35f, 0.2f);
+        cases.push_back({"screw translation", treeOf(std::move(slab)), 1e-4f});
+        SdfNode helix = unary(SdfNodeKind::Screw, translate(glm::vec3(0.9f, 0.0f, 0.0f), cell()));
+        helix.count = 4;
+        helix.translation = glm::vec3(0.0f, 0.4f, 0.0f);
+        helix.offset = 0.08f;
+        cases.push_back({"screw helix", treeOf(helix), 1e-4f});
+        SdfNode guardedSlab = unary(SdfNodeKind::Screw, cell());
+        guardedSlab.translation = glm::vec3(1.1f, 0.35f, 0.2f);
+        guardedSlab.offset = 0.05f;
+        cases.push_back({"screw seam guard", treeOf(std::move(guardedSlab)), 1e-4f});
+        SdfNode warped = unary(SdfNodeKind::Warp, cell());
+        warped.amount = 0.2f;
+        warped.frequency = 1.3f;
+        warped.size = glm::vec3(1.0f, 0.0f, 0.6f);
+        warped.translation = glm::vec3(0.4f, 1.7f, -2.2f);
+        warped.seed = 9;
+        cases.push_back({"warp", treeOf(warped), 1e-3f});
+        warped.axis = glm::vec3(1.0f, 0.2f, 0.0f);
+        warped.offset = 0.9f;
+        warped.rounding = 0.4f;
+        cases.push_back({"warp windowed", treeOf(warped), 1e-3f});
+        warped.count = 1; // the near-field sphere about `axis`
+        warped.axis = glm::vec3(0.2f, 0.1f, 0.0f);
+        cases.push_back({"warp near-field", treeOf(std::move(warped)), 1e-3f});
+        SdfNode shell = unary(SdfNodeKind::Shell, box(glm::vec3(0.8f, 0.6f, 0.7f)));
+        shell.offset = 0.15f;
+        cases.push_back({"shell", treeOf(std::move(shell)), 1e-4f});
+    }
     cases.push_back({"complex", treeOf(complexTree()), 1e-3f});
     checkParity(*ctx, harness, cases, fields, 1.37);
 }
@@ -861,6 +904,202 @@ TEST_CASE("SDF compiled trees render like the interpreter", "[gpu][sdf]") {
         // pixels may flip. The surface itself must agree.
         CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1040: the liminal kinds compile to WGSL and render as the interpreter does.
+TEST_CASE("SDF compiled liminal kinds render like the interpreter", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "liminal";
+    SdfNode stairs = node(SdfNodeKind::Stairs);
+    stairs.size = glm::vec3(0.35f, 0.2f, 0.5f);
+    stairs.count = 5;
+    SdfNode cell = combo(SdfNodeKind::Union,
+                         {translate(glm::vec3(-0.8f, -1.0f, 0.0f), std::move(stairs)), box(glm::vec3(1.0f, 0.05f, 0.6f))}, 0.5f);
+    SdfNode warp = unary(SdfNodeKind::Warp, std::move(cell));
+    warp.amount = 0.08f;
+    warp.frequency = 0.9f;
+    warp.size = glm::vec3(1.0f, 0.0f, 1.0f);
+    SdfNode screw = unary(SdfNodeKind::Screw, std::move(warp));
+    screw.translation = glm::vec3(1.9f, 1.0f, 0.0f);
+    o.tree = treeOf(std::move(screw));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    o.stepScale = 0.8f;
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 0.5;
+    const auto render = [&](bool compile) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        copy.sdfs.push_back(c);
+        auto img = renderer.renderToImage(copy, t, 160, 120);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    const auto interpreted = render(false);
+    const auto compiled = render(true);
+    long differing = 0;
+    long lit = 0;
+    for (std::uint32_t y = 0; y < compiled.height; ++y) {
+        for (std::uint32_t x = 0; x < compiled.width; ++x) {
+            for (int ch = 0; ch < 3; ++ch) {
+                differing += std::abs(int(interpreted.pixel(x, y)[ch]) - int(compiled.pixel(x, y)[ch])) > 2 ? 1 : 0;
+            }
+            lit += compiled.pixel(x, y)[0] + compiled.pixel(x, y)[1] + compiled.pixel(x, y)[2] > 30 ? 1 : 0;
+        }
+    }
+    INFO("differing channels " << differing << ", lit pixels " << lit);
+    CHECK(lit > static_cast<long>(compiled.width * compiled.height) / 20);
+    CHECK(differing < static_cast<long>(compiled.width * compiled.height) / 100);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1044: a compiled tree shades each hit with the surface its node ids choose.
+TEST_CASE("SDF surfaces: a compiled tree picks each hit's surface by node material id", "[gpu][sdf][liminal]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "surfaces";
+    SdfNode left = translate(glm::vec3(-0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    SdfNode right = translate(glm::vec3(0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    right.material = 1;
+    SdfNode beacon = translate(glm::vec3(0.0f, 1.1f, 0.0f), sphere(0.3f));
+    beacon.material = 2;
+    o.tree = treeOf(combo(SdfNodeKind::Union, {std::move(left), std::move(right), std::move(beacon)}));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.0f);
+    o.boundsMax = glm::vec3(3.0f);
+    o.material.baseColor = glm::vec3(1.0f);
+    o.material.emissiveColor = glm::vec3(1.0f);
+    o.material.emissiveIntensity = 1.0f;
+    o.surfaces = {{glm::vec3(0.8f, 0.1f, 0.1f), glm::vec3(0.0f)},
+                  {glm::vec3(0.1f, 0.1f, 0.8f), glm::vec3(0.0f)},
+                  {glm::vec3(0.0f), glm::vec3(0.0f, 6.0f, 0.0f)}};
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](bool compile) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.compile = compile;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, 0.5, 192, 192);
+    };
+    const auto sums = [](const gpu::Image8& img, std::uint32_t x0, std::uint32_t x1, std::uint32_t y0, std::uint32_t y1) {
+        glm::dvec3 acc(0.0);
+        for (std::uint32_t y = y0; y < y1; ++y) {
+            for (std::uint32_t x = x0; x < x1; ++x) {
+                acc += glm::dvec3(img.pixel(x, y)[0], img.pixel(x, y)[1], img.pixel(x, y)[2]);
+            }
+        }
+        return acc;
+    };
+    const auto compiled = render(true);
+    // Find the object's screen extent from the picture itself: columns whose red or blue beat green.
+    long redDominant = 0;
+    long blueDominant = 0;
+    long greenGlow = 0;
+    for (std::uint32_t y = 0; y < compiled.height; ++y) {
+        for (std::uint32_t x = 0; x < compiled.width; ++x) {
+            const auto* px = compiled.pixel(x, y);
+            redDominant += (px[0] > px[2] + 20 && px[0] > px[1] + 20) ? 1 : 0;
+            blueDominant += (px[2] > px[0] + 20 && px[2] > px[1] + 20) ? 1 : 0;
+            greenGlow += (px[1] > px[0] + 60 && px[1] > px[2] + 60) ? 1 : 0;
+        }
+    }
+    INFO("red " << redDominant << ", blue " << blueDominant << ", green glow " << greenGlow);
+    CHECK(redDominant > 200);
+    CHECK(blueDominant > 200);
+    CHECK(greenGlow > 30);
+    // Left half redder than the right, right bluer than the left.
+    const auto l = sums(compiled, 0, compiled.width / 2, 0, compiled.height);
+    const auto r = sums(compiled, compiled.width / 2, compiled.width, 0, compiled.height);
+    CHECK(l.x > r.x);
+    CHECK(r.z > l.z);
+    // The interpreter shades every hit as surface 0 (documented): no blue-dominant pixels.
+    const auto interpreted = render(false);
+    long blueInterp = 0;
+    for (std::uint32_t y = 0; y < interpreted.height; ++y) {
+        for (std::uint32_t x = 0; x < interpreted.width; ++x) {
+            const auto* px = interpreted.pixel(x, y);
+            blueInterp += (px[2] > px[0] + 20 && px[2] > px[1] + 20) ? 1 : 0;
+        }
+    }
+    CHECK(blueInterp < blueDominant / 10);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1047: the line look -- per-surface edge colour, and an edge width in pixels.
+TEST_CASE("SDF line look: edges take each surface's colour and a pixel width holds across resolutions",
+          "[gpu][sdf][liminal][adr1047]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "lines";
+    SdfNode left = translate(glm::vec3(-0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    SdfNode right = translate(glm::vec3(0.8f, 0.0f, 0.0f), box(glm::vec3(0.6f)));
+    right.material = 1;
+    o.tree = treeOf(combo(SdfNodeKind::Union, {std::move(left), std::move(right)}));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.0f);
+    o.boundsMax = glm::vec3(3.0f);
+    o.compile = true;
+    o.material.baseColor = glm::vec3(0.02f);
+    o.look.edgeIntensity = 6.0f;
+    o.look.edgeColor = glm::vec3(1.0f);
+    o.look.edgeWidth = 0.05f;
+    o.surfaces = {{glm::vec3(0.02f), glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f)},
+                  {glm::vec3(0.02f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f)}};
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](float pixels, std::uint32_t size) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.look.edgePixels = pixels;
+        c.look.edgeSoftness = 0.1f;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, 0.5, size, size);
+    };
+    struct Count {
+        long red = 0;
+        long blue = 0;
+    };
+    const auto count = [](const gpu::Image8& img) {
+        Count c;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const auto* px = img.pixel(x, y);
+                c.red += (px[0] > 120 && px[0] > px[2] + 60) ? 1 : 0;
+                c.blue += (px[2] > 120 && px[2] > px[0] + 60) ? 1 : 0;
+            }
+        }
+        return c;
+    };
+    // Per-surface colour: the left box's lines are red, the right box's blue.
+    const auto world = count(render(0.0f, 192));
+    INFO("world width at 192: red " << world.red << ", blue " << world.blue);
+    CHECK(world.red > 40);
+    CHECK(world.blue > 40);
+    // A width in pixels: doubling the resolution doubles a line's length in pixels but not its width,
+    // so the line pixels roughly double; a width in world units scales both, so they quadruple.
+    const auto px192 = count(render(1.5f, 192));
+    const auto px384 = count(render(1.5f, 384));
+    const auto world384 = count(render(0.0f, 384));
+    const double pixelRatio = static_cast<double>(px384.red + px384.blue) / static_cast<double>(px192.red + px192.blue);
+    const double worldRatio =
+        static_cast<double>(world384.red + world384.blue) / static_cast<double>(world.red + world.blue);
+    INFO("pixel-width ratio " << pixelRatio << ", world-width ratio " << worldRatio);
+    CHECK(pixelRatio > 1.4);
+    CHECK(pixelRatio < 2.8);
+    CHECK(worldRatio > 3.0);
     CHECK(ctx->errorCount() == 0);
 }
 

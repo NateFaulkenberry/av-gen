@@ -234,6 +234,15 @@ json chainToJson(const ProcessorChain& chain) {
     j["remapInMax"] = static_cast<double>(chain.remapInMax);
     j["remapOutMin"] = static_cast<double>(chain.remapOutMin);
     j["remapOutMax"] = static_cast<double>(chain.remapOutMax);
+    // ADR-1041: written only when used, like a route's depth (a key every route always carried would be
+    // noise in every project).
+    if (chain.springHz > 0.0f) {
+        j["springHz"] = static_cast<double>(chain.springHz);
+        j["springDamping"] = static_cast<double>(chain.springDamping);
+    }
+    if (chain.integrate) {
+        j["integrate"] = true;
+    }
     return j;
 }
 
@@ -242,7 +251,7 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 20> results{
+    std::array<Result<void>, 23> results{
         readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
@@ -263,6 +272,9 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         readFloat(j, "remapInMax", chain.remapInMax),
         readFloat(j, "remapOutMin", chain.remapOutMin),
         readFloat(j, "remapOutMax", chain.remapOutMax),
+        readFloat(j, "springHz", chain.springHz),           // ADR-1041; absent = off
+        readFloat(j, "springDamping", chain.springDamping), // ADR-1041; absent = critical
+        readBool(j, "integrate", chain.integrate),          // ADR-1041; absent = off
     };
     for (const auto& r : results) {
         if (!r) {
@@ -271,6 +283,10 @@ Result<ProcessorChain> chainFromJson(const json& j) {
     }
     if (chain.delayMs < 0.0f) {
         return fail("processor chain: 'delayMs' must be >= 0, got {:g}", chain.delayMs);
+    }
+    if (chain.springHz < 0.0f || chain.springHz > ProcessorChain::kMaxSpringHz || chain.springDamping < 0.0f) {
+        return fail("processor chain: 'springHz' must be in [0, {:g}] and 'springDamping' >= 0 (got {:g}, {:g})",
+                    ProcessorChain::kMaxSpringHz, chain.springHz, chain.springDamping);
     }
     return chain;
 }

@@ -40,6 +40,8 @@ struct SdfObjectUniforms {
     look1: vec4<f32>,       // edge colour rgb, max distance (0 = the bounds only)
     look2: vec4<f32>,       // shadow strength, shadow softness k, shadow steps, 1 = collect step statistics
     look3: vec4<f32>,       // shadow direction (world, towards the light)
+    surfaces: vec4<u32>,    // ADR-1044: x = surface records after the node offset, y = their count
+    look4: vec4<f32>,       // ADR-1047: edge width in pixels (0 = look0.w, local units), threshold, softness, 0
 };
 
 // ADR-1002: step statistics, accumulated by the lit pass on every 4th pixel in x and y.
@@ -60,6 +62,10 @@ struct SdfStepStats {
 // @@SDF_FIELD_BEGIN@@
 fn sdfField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     return sdfEvaluate(offset, count, p, t, world);
+}
+// ADR-1044: the surface id at p (a compiled tree replaces this; the interpreter shades surface 0).
+fn sdfSurface(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> u32 {
+    return 0u;
 }
 // @@SDF_FIELD_END@@
 
@@ -105,9 +111,10 @@ fn sdfOcclusion(offset: u32, count: u32, p: vec3<f32>, n: vec3<f32>, t: f32, wor
 // tetrahedron gradient of a linear field is exact whatever d(p) is), and so do coincident faces and
 // the kinks of bound-only unions, which a Laplacian turned into speckle; creases and edges within
 // `width` of the point do not. 0 = flat, 1 = a strong edge.
-fn sdfEdge(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>, width: f32, nFine: vec3<f32>) -> f32 {
+fn sdfEdge(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>, width: f32, nFine: vec3<f32>,
+           threshold: f32, softness: f32) -> f32 {
     let wide = sdfFieldNormal(offset, count, p, t, world, width);
-    return smoothstep(0.02, 0.3, 1.0 - dot(wide, nFine));
+    return smoothstep(threshold, threshold + softness, 1.0 - dot(wide, nFine));
 }
 
 // ADR-1002: soft shadow towards `dir` (local space) from the hit (Quilez, res = min(k h / t)).
@@ -291,7 +298,18 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     let screenUv = vec2<f32>(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
     var out: SdfFragmentOut;
     // The local hit point is the ADR-030 `localPosition` material input.
-    var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
+    // ADR-1044: the hit's surface multiplies the material's base colour and emission.
+    var colorMul = vec3<f32>(1.0);
+    var emissiveMul = vec3<f32>(1.0);
+    var edgeMul = vec3<f32>(1.0); // ADR-1047
+    if (sdf.surfaces.y > 0u) {
+        let id = min(sdfSurface(offset, count, pL, time, object.model), sdf.surfaces.y - 1u);
+        let rec = sdfNodes[offset + sdf.surfaces.x + id];
+        colorMul = rec.p0.xyz;
+        emissiveMul = rec.p1.xyz;
+        edgeMul = rec.p2.xyz;
+    }
+    var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, colorMul, emissiveMul,
                               materialInstanceZero(pL), screenUv);
     // ADR-1002: the field's own occlusion, soft shadow and edge emission. A cheap version: occlusion and
     // shadow scale the whole shaded colour (lighting, the material's emission and the fog alike); the
@@ -312,14 +330,22 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     shaded.color = vec4<f32>(shaded.color.rgb * visibility, shaded.color.a);
     shaded.emission = shaded.emission * visibility;
     if (sdf.look0.z > 0.0) {
-        let edge = sdfEdge(offset, count, pL, time, object.model, sdf.look0.w, nL);
+        // ADR-1047: a width in pixels follows the hit's distance (the angle one pixel subtends, times t),
+        // so a line is as wide on screen in a small room as far down a corridor.
+        var edgeWidth = sdf.look0.w;
+        if (sdf.look4.x > 0.0) {
+            let farUp = frame.invViewProj * vec4<f32>(in.ndc + vec2<f32>(0.0, 2.0 * frame.targetSize.w), 1.0, 1.0);
+            let pixelAngle = length(normalize(farUp.xyz / farUp.w - eye) - rdW);
+            edgeWidth = max(sdf.look4.x * pixelAngle * t, 1e-5);
+        }
+        let edge = sdfEdge(offset, count, pL, time, object.model, edgeWidth, nL, sdf.look4.y, sdf.look4.z);
         // ADR-1004: the edge light sits on the surface, so the air between the eye and the surface
         // dims it like the rest of the shaded colour. `applyFog` is `mix(fog, c, f)`, so its values at
         // c = 1 and c = 0 differ by exactly the transmittance `f`, whatever fog model is active. Unfogged,
         // a repeated structure's edges stayed at full strength to the march's end, which read as a flat
         // wireframe with no depth and aliased into moire where the edges shrank below a pixel.
         let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
-        let glow = sdf.look1.xyz * (sdf.look0.z * edge * transmittance);
+        let glow = sdf.look1.xyz * edgeMul * (sdf.look0.z * edge * transmittance);
         shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
         shaded.emission = shaded.emission + glow;
     }

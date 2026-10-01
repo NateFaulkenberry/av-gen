@@ -224,6 +224,15 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.lookLocalContrastRadius =
         &params.add(f("post/look/localContrastRadius", s.look.localContrastRadius, 1.0f, 128.0f, 4.0f, 64.0f));
     p.lookLightWrap = &params.add(f("post/look/lightWrap", s.look.lightWrap, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-1050: the spectrum sweep.
+    p.sweepProgress = &params.add(f("post/sweep/progress", s.sweepProgress, -1.0f, 2.0f, 0.0f, 1.0f));
+    p.sweepWidth = &params.add(f("post/sweep/width", s.sweepWidth, 0.01f, 2.0f, 0.05f, 1.0f));
+    p.sweepIntensity = &params.add(f("post/sweep/intensity", s.sweepIntensity, 0.0f, 100.0f, 0.0f, 4.0f));
+    p.sweepWash = &params.add(f("post/sweep/wash", s.sweepWash, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.sweepAngle = &params.add(f("post/sweep/angle", s.sweepAngle, -360.0f, 360.0f, -180.0f, 180.0f));
+    p.sweepSpan = &params.add(f("post/sweep/span", s.sweepSpan, 0.0f, 16.0f, 0.0f, 4.0f));
+    p.sweepHue = &params.add(f("post/sweep/hue", s.sweepHue, -16.0f, 16.0f, 0.0f, 1.0f));
+    p.sweepTrail = &params.add(f("post/sweep/trail", s.sweepTrail, 0.0f, 1.0f, 0.0f, 1.0f));
     return p;
 }
 
@@ -273,6 +282,10 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"lookLocalContrast", p.lookLocalContrast},
         {"lookLocalContrastRadius", p.lookLocalContrastRadius},
         {"lookLightWrap", p.lookLightWrap},
+        // ADR-1050
+        {"sweepProgress", p.sweepProgress}, {"sweepWidth", p.sweepWidth}, {"sweepIntensity", p.sweepIntensity},
+        {"sweepWash", p.sweepWash},         {"sweepAngle", p.sweepAngle}, {"sweepSpan", p.sweepSpan},
+        {"sweepHue", p.sweepHue},           {"sweepTrail", p.sweepTrail},
     };
     const std::pair<const char*, params::Parameter<bool>*> bools[] = {
         {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
@@ -435,6 +448,16 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
         s.look.localContrast = p.lookLocalContrast->value();
         s.look.localContrastRadius = p.lookLocalContrastRadius->value();
         s.look.lightWrap = p.lookLightWrap->value();
+    }
+    if (p.sweepProgress != nullptr) { // ADR-1050
+        s.sweepProgress = p.sweepProgress->value();
+        s.sweepWidth = p.sweepWidth->value();
+        s.sweepIntensity = p.sweepIntensity->value();
+        s.sweepWash = p.sweepWash->value();
+        s.sweepAngle = p.sweepAngle->value();
+        s.sweepSpan = p.sweepSpan->value();
+        s.sweepHue = p.sweepHue->value();
+        s.sweepTrail = p.sweepTrail->value();
     }
 }
 

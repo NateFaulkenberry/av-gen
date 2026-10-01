@@ -31,8 +31,9 @@ struct Uniforms {
     std::array<float, 4> outputSize{};
     std::array<float, 4> ring{};
     std::array<float, 4> params{};
+    std::array<float, 4> extra{}; // ADR-1049: mirrors temporal.wgsl (the mosh's epoch); unused by the capture
 };
-static_assert(sizeof(Uniforms) == 64);
+static_assert(sizeof(Uniforms) == 80);
 
 } // namespace
 

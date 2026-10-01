@@ -45,6 +45,7 @@ struct TemporalFrameInputs {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::uint64_t frameIndex = 0;
+    double renderTime = 0.0; // ADR-1049: the mosh's block choice is a function of the clock
     const scene::TemporalSettings* settings = nullptr;
     float resolutionScale = 0.5f; // from the quality tier
     wgpu::TextureFormat hdrFormat = wgpu::TextureFormat::RGBA16Float;

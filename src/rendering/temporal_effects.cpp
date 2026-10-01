@@ -5,6 +5,7 @@
 #include "gpu/shader_library.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <string>
 
@@ -16,8 +17,9 @@ struct Uniforms {
     std::array<float, 4> outputSize{};
     std::array<float, 4> ring{};
     std::array<float, 4> params{};
+    std::array<float, 4> extra{}; // ADR-1049: x = the mosh's epoch
 };
-static_assert(sizeof(Uniforms) == 64);
+static_assert(sizeof(Uniforms) == 80);
 
 // The two ceilings, tied. `scene/` cannot include a WebGPU header, so the constant exists twice;
 // this is the line that stops the copies drifting.
@@ -41,8 +43,11 @@ struct TemporalEffects::Impl {
     wgpu::BindGroupLayout layout;
     wgpu::PipelineLayout pipelineLayout;
     wgpu::RenderPipeline echo;
+    wgpu::RenderPipeline mosh; // ADR-1049
+    wgpu::Buffer moshUniforms; // its own buffer: one queue write per buffer per submit is what lands
     wgpu::RenderPipeline debugHistory;
     wgpu::TextureFormat echoFormat = wgpu::TextureFormat::Undefined;
+    wgpu::TextureFormat moshFormat = wgpu::TextureFormat::Undefined;
     wgpu::TextureFormat debugFormat = wgpu::TextureFormat::Undefined;
     wgpu::ShaderModule module;
     // A 1x1 2D texture for the debug pass's `source` binding. The history-state view samples only
@@ -54,7 +59,8 @@ struct TemporalEffects::Impl {
 
     [[nodiscard]] Result<wgpu::RenderPipeline> makePipeline(const char* entry, wgpu::TextureFormat format,
                                                             const char* label);
-    [[nodiscard]] wgpu::BindGroup makeGroup(const wgpu::TextureView& source, const wgpu::TextureView& history);
+    [[nodiscard]] wgpu::BindGroup makeGroup(const wgpu::TextureView& source, const wgpu::TextureView& history,
+                                            const wgpu::Buffer* buffer = nullptr);
 };
 
 Result<wgpu::RenderPipeline> TemporalEffects::Impl::makePipeline(const char* entry, wgpu::TextureFormat format,
@@ -91,10 +97,11 @@ Result<wgpu::RenderPipeline> TemporalEffects::Impl::makePipeline(const char* ent
     return pipeline;
 }
 
-wgpu::BindGroup TemporalEffects::Impl::makeGroup(const wgpu::TextureView& source, const wgpu::TextureView& history) {
+wgpu::BindGroup TemporalEffects::Impl::makeGroup(const wgpu::TextureView& source, const wgpu::TextureView& history,
+                                                 const wgpu::Buffer* buffer) {
     std::array<wgpu::BindGroupEntry, 4> entries{};
     entries[0].binding = 0;
-    entries[0].buffer = uniforms;
+    entries[0].buffer = buffer != nullptr ? *buffer : uniforms;
     entries[0].size = sizeof(Uniforms);
     entries[1].binding = 1;
     entries[1].sampler = sampler;
@@ -126,6 +133,8 @@ Result<void> TemporalEffects::init() {
         desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         desc.size = sizeof(Uniforms);
         im.uniforms = device.CreateBuffer(&desc);
+        desc.label = "temporal-mosh-uniforms";
+        im.moshUniforms = device.CreateBuffer(&desc);
     }
     {
         wgpu::SamplerDescriptor desc{};
@@ -193,8 +202,10 @@ Result<void> TemporalEffects::reload() {
     // The pipelines are format-dependent and built lazily in run(); dropping them here makes the
     // next frame rebuild against the new module rather than keep the old code silently.
     im.echo = nullptr;
+    im.mosh = nullptr;
     im.debugHistory = nullptr;
     im.echoFormat = wgpu::TextureFormat::Undefined;
+    im.moshFormat = wgpu::TextureFormat::Undefined;
     im.debugFormat = wgpu::TextureFormat::Undefined;
     return {};
 }
@@ -295,6 +306,63 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
             ++stats_.passes;
             im.passThisFrame = true;
         }
+    }
+
+    // ---- ADR-1049 data mosh and channel shift ----------------------------------------------
+    //
+    // After the echo (it corrupts what the viewer would otherwise see) and, like the echo, before the
+    // capture, so its taps are genuinely past frames and the ring never holds a corrupted frame. At an
+    // amount and a shift of zero nothing is encoded: the ring is kept warm for the event that turns
+    // it up, and the frame is byte-identical to one without the effect.
+    const scene::MoshSettings& mosh = settings.mosh;
+    if (mosh.enabled && (mosh.amount > 0.0f || mosh.shift > 0.0f)) {
+        const std::uint32_t taps =
+            std::min<std::uint32_t>(static_cast<std::uint32_t>(std::max(mosh.frames, 1)), state.framesValid);
+        if (im.mosh == nullptr || im.moshFormat != in.hdrFormat) {
+            auto pipeline = im.makePipeline("fs_mosh", in.hdrFormat, "temporal-mosh");
+            if (!pipeline) {
+                return result;
+            }
+            im.mosh = *pipeline;
+            im.moshFormat = in.hdrFormat;
+        }
+        // Pixel sizes are authored at 1080 lines and scaled with the output, so a preview and a 4K
+        // render corrupt the same share of the picture.
+        const float lines = static_cast<float>(in.height) / 1080.0f;
+        auto out = pool.acquire(in.width, in.height, in.hdrFormat);
+        Uniforms u{};
+        u.sizes = {static_cast<float>(history_->width()), static_cast<float>(history_->height()),
+                   1.0f / static_cast<float>(history_->width()), 1.0f / static_cast<float>(history_->height())};
+        u.outputSize = {static_cast<float>(in.width), static_cast<float>(in.height),
+                        1.0f / static_cast<float>(in.width), 1.0f / static_cast<float>(in.height)};
+        u.ring = {static_cast<float>(history_->frames(TemporalChannel::Colour)),
+                  static_cast<float>(history_->writeLayer(TemporalChannel::Colour)),
+                  static_cast<float>(state.framesValid), static_cast<float>(taps)};
+        u.params = {std::clamp(mosh.amount, 0.0f, 1.0f), std::max(mosh.block * lines, 1.0f), mosh.smear * lines,
+                    mosh.shift * lines};
+        const double epoch = std::floor(in.renderTime * static_cast<double>(std::max(mosh.rate, 0.0f))) +
+                             std::floor(static_cast<double>(mosh.seed));
+        u.extra = {static_cast<float>(std::fmod(epoch, 8388608.0)), 0.0f, 0.0f, 0.0f};
+        im.context.queue().WriteBuffer(im.moshUniforms, 0, &u, sizeof(u));
+
+        wgpu::BindGroup group = im.makeGroup(result, history_->arrayView(TemporalChannel::Colour), &im.moshUniforms);
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = out.view;
+        colour.loadOp = wgpu::LoadOp::Clear;
+        colour.storeOp = wgpu::StoreOp::Store;
+        colour.clearValue = {0.0, 0.0, 0.0, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "temporal-mosh";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetPipeline(im.mosh);
+        rp.SetBindGroup(0, group);
+        rp.Draw(3);
+        rp.End();
+        result = out.view;
+        ++stats_.passes;
+        im.passThisFrame = true;
     }
 
     // ---- capture: the clean scene radiance, never the effect's own output --------------------

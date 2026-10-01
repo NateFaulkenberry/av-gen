@@ -51,11 +51,21 @@ enum class SdfNodeKind : std::uint8_t {
     Union, Intersection, Difference, SmoothUnion, SmoothIntersection, SmoothDifference, Morph,
     Translate, Rotate, Scale, Twist, Bend, Repeat, PolarRepeat, Mirror, Fold, Recurse,
     DisplaceNoise, DisplaceVoronoi, DisplaceWave, DisplaceField,
+    // ADR-1040 (appended so the GPU kind numbers of the kinds above are unchanged): a staircase
+    // primitive, the screw repeat (a cell repeated by a translation, or by a turn about Y plus a
+    // rise), and a smooth vector-noise domain warp. The range predicates in sdf.cpp and
+    // shaders/sdf.wgsl special-case them.
+    Stairs, Screw, Warp,
+    // ADR-1040: a hollow shell of `offset` thickness centred on the child's surface (onion): a room from one box.
+    Shell,
 };
 [[nodiscard]] const char* sdfNodeKindName(SdfNodeKind kind);
 [[nodiscard]] std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name);
 [[nodiscard]] bool sdfNodeIsPrimitive(SdfNodeKind kind);
 [[nodiscard]] int sdfNodeMaxChildren(SdfNodeKind kind); // 0 primitives, 1 unary ops, 8 combinations
+
+// ADR-1044: surfaces per SDF object (base colour and emission per surface id).
+inline constexpr int kMaxSdfSurfaces = 8;
 
 struct SdfNode {
     SdfNodeKind kind = SdfNodeKind::Sphere;
@@ -78,6 +88,9 @@ struct SdfNode {
     float speed = 0.0f;
     int count = 0;
     std::uint32_t seed = 1;
+    // ADR-1044: the surface (0..kMaxSdfSurfaces-1) this subtree is shaded with, or -1 to inherit. Read
+    // only by a compiled tree (sdfSurface); structural (compiled in as a constant).
+    int material = -1;
     std::string reference;               // DisplaceField: field name
     std::vector<SdfNode> children;
     [[nodiscard]] nlohmann::json toJson() const;

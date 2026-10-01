@@ -73,8 +73,10 @@ struct SdfObjectUniforms {
     glm::vec4 look1;       // edge colour rgb, max distance (0 = bounds only)
     glm::vec4 look2;       // shadow strength, shadow softness, shadow steps, 1 = collect step statistics
     glm::vec4 look3;       // shadow direction (world, towards the light), 0
+    glm::uvec4 surfaces;   // ADR-1044: x = the surface records' index after the node offset, y = their count
+    glm::vec4 look4;       // ADR-1047: edge width in pixels (0 = look0.w in local units), threshold, softness, 0
 };
-static_assert(sizeof(SdfObjectUniforms) == 208);
+static_assert(sizeof(SdfObjectUniforms) == 240);
 
 class SdfRenderer {
 public:

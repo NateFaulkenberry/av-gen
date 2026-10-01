@@ -1,0 +1,34 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "LiminalEng",
+ "description": "Engineering example: a soft cold key from high in the void and a low ambient; the rooms are lit by their own lamps. Directional light is safe because every chapter wraps by a pure translation.",
+ "keyIntensity": 1.0,
+ "ambientIntensity": 0.12,
+ "ambientColor": [
+  0.55,
+  0.6,
+  0.75
+ ],
+ "ambientTemperature": 8000,
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 200.0,
+   "elevation": 55.0,
+   "distance": 2.0,
+   "intensity": 0.35,
+   "color": [
+    0.8,
+    0.85,
+    1.0
+   ],
+   "temperature": 7500,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  }
+ ]
+}

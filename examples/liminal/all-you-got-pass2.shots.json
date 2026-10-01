@@ -1,0 +1,218 @@
+[
+ {
+  "id": "s01",
+  "name": "seed",
+  "start": 0.0,
+  "end": 19.817
+ },
+ {
+  "id": "s02",
+  "name": "house",
+  "start": 19.817,
+  "end": 37.431
+ },
+ {
+  "id": "s03",
+  "name": "rel1",
+  "start": 37.431,
+  "end": 41.835
+ },
+ {
+  "id": "s04",
+  "name": "rel2",
+  "start": 41.835,
+  "end": 46.239
+ },
+ {
+  "id": "s05",
+  "name": "rel3",
+  "start": 46.239,
+  "end": 50.642
+ },
+ {
+  "id": "s06",
+  "name": "rel4",
+  "start": 50.642,
+  "end": 55.046
+ },
+ {
+  "id": "s07",
+  "name": "v1bed",
+  "start": 55.046,
+  "end": 63.303
+ },
+ {
+  "id": "s08",
+  "name": "v1liv",
+  "start": 63.303,
+  "end": 72.661
+ },
+ {
+  "id": "s09",
+  "name": "v1kit",
+  "start": 72.661,
+  "end": 83.67
+ },
+ {
+  "id": "s10",
+  "name": "v1hall",
+  "start": 83.67,
+  "end": 90.275
+ },
+ {
+  "id": "s11",
+  "name": "pause",
+  "start": 90.275,
+  "end": 92.477
+ },
+ {
+  "id": "s12",
+  "name": "ligStu",
+  "start": 92.477,
+  "end": 96.881
+ },
+ {
+  "id": "s13",
+  "name": "ligBath",
+  "start": 96.881,
+  "end": 101.284
+ },
+ {
+  "id": "s14",
+  "name": "ligBed",
+  "start": 101.284,
+  "end": 105.688
+ },
+ {
+  "id": "s15",
+  "name": "ligKit",
+  "start": 105.688,
+  "end": 109.541
+ },
+ {
+  "id": "s16",
+  "name": "v2a",
+  "start": 109.541,
+  "end": 113.945
+ },
+ {
+  "id": "s17",
+  "name": "v2b",
+  "start": 113.945,
+  "end": 118.349
+ },
+ {
+  "id": "s18",
+  "name": "v2c",
+  "start": 118.349,
+  "end": 122.752
+ },
+ {
+  "id": "s19",
+  "name": "v2d",
+  "start": 122.752,
+  "end": 127.156
+ },
+ {
+  "id": "s20",
+  "name": "v2e",
+  "start": 127.156,
+  "end": 131.56
+ },
+ {
+  "id": "s21",
+  "name": "v2f",
+  "start": 131.56,
+  "end": 135.963
+ },
+ {
+  "id": "s22",
+  "name": "v2g",
+  "start": 135.963,
+  "end": 140.367
+ },
+ {
+  "id": "s23",
+  "name": "v2h",
+  "start": 140.367,
+  "end": 147.523
+ },
+ {
+  "id": "s24",
+  "name": "tree",
+  "start": 147.523,
+  "end": 156.33
+ },
+ {
+  "id": "s25",
+  "name": "treeReveal",
+  "start": 156.33,
+  "end": 160.734
+ },
+ {
+  "id": "s26",
+  "name": "treeLand",
+  "start": 160.734,
+  "end": 165.138
+ },
+ {
+  "id": "s27",
+  "name": "gallery",
+  "start": 165.138,
+  "end": 182.435
+ },
+ {
+  "id": "s28",
+  "name": "d1",
+  "start": 182.435,
+  "end": 186.759
+ },
+ {
+  "id": "s29",
+  "name": "d2",
+  "start": 186.759,
+  "end": 191.084
+ },
+ {
+  "id": "s30",
+  "name": "d3",
+  "start": 191.084,
+  "end": 195.408
+ },
+ {
+  "id": "s31",
+  "name": "d4",
+  "start": 195.408,
+  "end": 199.732
+ },
+ {
+  "id": "s32",
+  "name": "chorusA",
+  "start": 199.732,
+  "end": 217.03
+ },
+ {
+  "id": "s33",
+  "name": "stair",
+  "start": 217.03,
+  "end": 234.327
+ },
+ {
+  "id": "s34",
+  "name": "summit",
+  "start": 234.327,
+  "end": 249.462
+ },
+ {
+  "id": "s35",
+  "name": "dawn",
+  "start": 249.462,
+  "end": 255.0
+ },
+ {
+  "id": "s36",
+  "name": "cursor",
+  "start": 255.0,
+  "end": 258.0
+ }
+]

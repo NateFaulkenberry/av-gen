@@ -227,6 +227,19 @@ struct PostSettings {
     // A member of this object rather than a rival to it (§52). Zero throughout by default; see the
     // struct's own comment for why that zero is enforced structurally.
     ImageLookIntegration look;
+
+    // ---- ADR-1050: the spectrum sweep ------------------------------------------------------------
+    // A band of saturated hues that travels across the frame as `sweepProgress` goes 0 -> 1: a
+    // high-pass filter sweep translated into colour and light (All You Got, bridge 3 bar 8). Off while
+    // both `sweepIntensity` and `sweepWash` are 0 (the defaults), so no existing picture changes.
+    float sweepProgress = 0.0f;  // 0 = the band waits off the leading edge, 1 = it has left the far edge
+    float sweepWidth = 0.35f;    // half-width of the band, as a fraction of the frame along the sweep
+    float sweepIntensity = 0.0f; // additive light of the band (HDR, so it blooms)
+    float sweepWash = 0.0f;      // 0..1: how far the band tints what is under it
+    float sweepAngle = 0.0f;     // degrees; 0 travels left to right, 90 top to bottom
+    float sweepSpan = 1.0f;      // hue cycles across the band (1 = one rainbow)
+    float sweepHue = 0.0f;       // hue offset in turns
+    float sweepTrail = 0.0f;     // 0..1: wash left behind the band once it has passed
 };
 
 struct PostParameters {
@@ -291,6 +304,15 @@ struct PostParameters {
     params::Parameter<float>* lookLocalContrast = nullptr;
     params::Parameter<float>* lookLocalContrastRadius = nullptr;
     params::Parameter<float>* lookLightWrap = nullptr;
+    // ADR-1050: the spectrum sweep (post/sweep/*).
+    params::Parameter<float>* sweepProgress = nullptr;
+    params::Parameter<float>* sweepWidth = nullptr;
+    params::Parameter<float>* sweepIntensity = nullptr;
+    params::Parameter<float>* sweepWash = nullptr;
+    params::Parameter<float>* sweepAngle = nullptr;
+    params::Parameter<float>* sweepSpan = nullptr;
+    params::Parameter<float>* sweepHue = nullptr;
+    params::Parameter<float>* sweepTrail = nullptr;
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);
