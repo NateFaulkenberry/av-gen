@@ -56,8 +56,11 @@ OutputDesc makeProjectionOutput(const AppSettings::Projection& settings,
         desc.width = settings.windowWidth;
         desc.height = settings.windowHeight;
     } else if (choice.width > 0 && choice.height > 0) {
-        desc.width = static_cast<std::uint32_t>(choice.width);
-        desc.height = static_cast<std::uint32_t>(choice.height);
+        // Automatic: the display's size on another display; on this screen, half of it, so the editor stays usable
+        // beside a windowed projection.
+        const int divisor = choice.primary && !desc.fullscreen ? 2 : 1;
+        desc.width = static_cast<std::uint32_t>(std::max(16, choice.width / divisor));
+        desc.height = static_cast<std::uint32_t>(std::max(16, choice.height / divisor));
     } // else OutputDesc's 1920x1080
     // A fullscreen projection has nothing to show but the picture. A windowed one keeps its title bar: without it
     // there is no way to move it to another screen or close it with the mouse.

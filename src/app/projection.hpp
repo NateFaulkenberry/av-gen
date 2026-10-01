@@ -53,7 +53,8 @@ struct ProjectionDisplayChoice {
 [[nodiscard]] bool projectionFullscreen(const AppSettings::Projection& settings, const ProjectionDisplayChoice& display);
 
 // The output window for these settings on these displays: borderless only when fullscreen (a windowed projection
-// keeps its title bar so it can be moved and closed); a windowed size of 0 matches the display.
+// keeps its title bar so it can be moved and closed). A windowed size of 0 is automatic: the display's size on
+// another display, half of it on the primary (so the editor stays usable beside it).
 [[nodiscard]] OutputDesc makeProjectionOutput(const AppSettings::Projection& settings,
                                               const std::vector<ProjectionDisplay>& displays);
 

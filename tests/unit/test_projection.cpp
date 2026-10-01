@@ -83,7 +83,7 @@ TEST_CASE("projection fullscreen defaults on for another display and off for thi
     CHECK(desc.display == 1);
     CHECK(desc.fullscreen);
     CHECK(desc.borderless);      // nothing but the picture
-    CHECK(desc.width == 1920);   // match display
+    CHECK(desc.width == 1920);   // automatic on another display: its own size
     CHECK(desc.height == 1080);
     CHECK(desc.mapping.isIdentity());
     CHECK(desc.validate().has_value());
@@ -92,7 +92,8 @@ TEST_CASE("projection fullscreen defaults on for another display and off for thi
     CHECK(desc.display == 0);
     CHECK_FALSE(desc.fullscreen); // would cover the editor
     CHECK_FALSE(desc.borderless); // a window that can be moved and closed
-    CHECK(desc.width == 1512);
+    CHECK(desc.width == 756);     // half this screen, so the editor stays usable beside it
+    CHECK(desc.height == 491);
 
     // The person's own choice wins either way, and a windowed size is honoured.
     settings.fullscreen = true;

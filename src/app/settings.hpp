@@ -134,7 +134,7 @@ struct AppSettings {
     struct Projection {
         std::string display;            // display name; "" = automatic (the first non-primary display, else the primary)
         std::optional<bool> fullscreen; // unset: fullscreen exactly when the chosen display is not the primary
-        std::uint32_t windowWidth = 0;  // windowed size in points; 0 = the display's own size ("match display")
+        std::uint32_t windowWidth = 0;  // windowed size in points; 0 = automatic (the display's size; half on the primary)
         std::uint32_t windowHeight = 0;
         ProjectionScaling scaling = ProjectionScaling::Fit;
     } projection;

@@ -139,7 +139,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             }
             ImGui::SameLine();
             {
-                static const char* sizes[] = {"Match display", "1920 x 1080", "1280 x 720", "960 x 540"};
+                static const char* sizes[] = {"Automatic size", "1920 x 1080", "1280 x 720", "960 x 540"};
                 static const std::uint32_t widths[] = {0, 1920, 1280, 960};
                 static const std::uint32_t heights[] = {0, 1080, 720, 540};
                 int size = 0;
@@ -157,7 +157,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
                 }
                 ImGui::EndDisabled();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    tooltip("The window's size when not fullscreen (in points). Fullscreen always fills the display.");
+                    tooltip("The window's size when not fullscreen, in points. Automatic: the display's size on another display, "
+                            "half of it on this screen. Fullscreen always fills the display.");
                 }
             }
             ImGui::SameLine();
