@@ -102,6 +102,15 @@ def build(end=END, validate=True):
     b.palette_at(t(91), "P11open")
     b.palette_at(t(107), "P12summit", ramp=G.BAR2)
     b.palette_at(t(114), "P13dawn", ramp=G.BAR2 * 2.0)
+    # a tear at every scene change that has no corruption of its own (section 21: transitions, scene changes)
+    covered = (t(17), t(42), t(49, 4), t(53, 4), t(57, 4), 255.0)
+    for i, tc in enumerate(sorted(set(b.cuts))):
+        if tc <= 0.0 or any(abs(tc - c) < 0.2 for c in covered):
+            continue
+        cl = b.clap(f"cut{i:02d}", tc, release=0.14)
+        film.route(cl, "temporal/mosh/amount", 0.32)
+        film.route(cl, "temporal/mosh/shift", 9.0)
+        film.route(cl, "post/lens/chromaticAberration", 0.35)
     b.breath_forbidden()
     b.write_figures(end)
     b.stamp_figure_spans()

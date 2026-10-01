@@ -1758,6 +1758,116 @@
       "strength": 1.0
      },
      {
+      "channel": "cut02",
+      "time": 72.66055,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut03",
+      "time": 81.46789,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut08",
+      "time": 147.52294,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut09",
+      "time": 156.33028,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut10",
+      "time": 160.73394,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut11",
+      "time": 165.13761,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut12",
+      "time": 182.43491,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut13",
+      "time": 199.73221,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut14",
+      "time": 217.02951,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut15",
+      "time": 234.3268,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "cut16",
+      "time": 249.46194,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "w000_ALL_YOU_GOT",
       "units": "seconds",
       "attack": 0.0,
@@ -9168,6 +9278,336 @@
    "source": "grid.song.crash",
    "target": "sdf/skyFurn/look/edge/intensity",
    "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut02",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut02",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut02",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut03",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut03",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut03",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut08",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut08",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut08",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut09",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut09",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut09",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut10",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut10",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut10",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut11",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut11",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut11",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut12",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut12",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut12",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut13",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut13",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut13",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut14",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut14",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut14",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut15",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut15",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut15",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut16",
+   "target": "temporal/mosh/amount",
+   "amount": 0.32,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut16",
+   "target": "temporal/mosh/shift",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.cut16",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -17241,7 +17681,7 @@
      {
       "time": 37.43119,
       "value": [
-       2002.11583
+       2002.11584
       ],
       "interp": "linear"
      },
@@ -17255,35 +17695,35 @@
      {
       "time": 37.63136,
       "value": [
-       2002.56286
+       2002.56287
       ],
       "interp": "linear"
      },
      {
       "time": 37.73144,
       "value": [
-       2002.72046
+       2002.72047
       ],
       "interp": "linear"
      },
      {
       "time": 37.83153,
       "value": [
-       2002.79145
+       2002.79146
       ],
       "interp": "linear"
      },
      {
       "time": 37.93161,
       "value": [
-       2002.84979
+       2002.8498
       ],
       "interp": "linear"
      },
      {
       "time": 38.03169,
       "value": [
-       2002.89911
+       2002.89912
       ],
       "interp": "linear"
      },
@@ -17297,28 +17737,28 @@
      {
       "time": 38.23186,
       "value": [
-       2002.97542
+       2002.97543
       ],
       "interp": "linear"
      },
      {
       "time": 38.33194,
       "value": [
-       2003.00481
+       2003.00482
       ],
       "interp": "linear"
      },
      {
       "time": 38.43203,
       "value": [
-       2003.02994
+       2003.02995
       ],
       "interp": "linear"
      },
      {
       "time": 38.53211,
       "value": [
-       2003.052
+       2003.05201
       ],
       "interp": "linear"
      },
@@ -17332,7 +17772,7 @@
      {
       "time": 38.73228,
       "value": [
-       2003.09092
+       2003.09093
       ],
       "interp": "linear"
      },
@@ -17346,7 +17786,7 @@
      {
       "time": 38.93244,
       "value": [
-       2003.12447
+       2003.12448
       ],
       "interp": "linear"
      },
@@ -17360,42 +17800,42 @@
      {
       "time": 39.13261,
       "value": [
-       2003.15337
+       2003.15338
       ],
       "interp": "linear"
      },
      {
       "time": 39.23269,
       "value": [
-       2003.16631
+       2003.16632
       ],
       "interp": "linear"
      },
      {
       "time": 39.33278,
       "value": [
-       2003.17837
+       2003.17838
       ],
       "interp": "linear"
      },
      {
       "time": 39.43286,
       "value": [
-       2003.18964
+       2003.18965
       ],
       "interp": "linear"
      },
      {
       "time": 39.53294,
       "value": [
-       2003.20022
+       2003.20023
       ],
       "interp": "linear"
      },
      {
       "time": 39.63303,
       "value": [
-       2003.2102
+       2003.21021
       ],
       "interp": "linear"
      },
@@ -17409,63 +17849,63 @@
      {
       "time": 39.83319,
       "value": [
-       2003.22874
+       2003.22875
       ],
       "interp": "linear"
      },
      {
       "time": 39.93328,
       "value": [
-       2003.23748
+       2003.23749
       ],
       "interp": "linear"
      },
      {
       "time": 40.03336,
       "value": [
-       2003.246
+       2003.24601
       ],
       "interp": "linear"
      },
      {
       "time": 40.13344,
       "value": [
-       2003.25439
+       2003.2544
       ],
       "interp": "linear"
      },
      {
       "time": 40.23353,
       "value": [
-       2003.26275
+       2003.26276
       ],
       "interp": "linear"
      },
      {
       "time": 40.33361,
       "value": [
-       2003.27116
+       2003.27117
       ],
       "interp": "linear"
      },
      {
       "time": 40.43369,
       "value": [
-       2003.27973
+       2003.27974
       ],
       "interp": "linear"
      },
      {
       "time": 40.53378,
       "value": [
-       2003.28854
+       2003.28855
       ],
       "interp": "linear"
      },
      {
       "time": 40.63386,
       "value": [
-       2003.29769
+       2003.2977
       ],
       "interp": "linear"
      },
@@ -17479,56 +17919,56 @@
      {
       "time": 40.83403,
       "value": [
-       2003.31739
+       2003.3174
       ],
       "interp": "linear"
      },
      {
       "time": 40.93411,
       "value": [
-       2003.32812
+       2003.32813
       ],
       "interp": "linear"
      },
      {
       "time": 41.0342,
       "value": [
-       2003.33957
+       2003.33958
       ],
       "interp": "linear"
      },
      {
       "time": 41.13428,
       "value": [
-       2003.35183
+       2003.35184
       ],
       "interp": "linear"
      },
      {
       "time": 41.23436,
       "value": [
-       2003.36499
+       2003.365
       ],
       "interp": "linear"
      },
      {
       "time": 41.33445,
       "value": [
-       2003.37915
+       2003.37916
       ],
       "interp": "linear"
      },
      {
       "time": 41.43453,
       "value": [
-       2003.3944
+       2003.39441
       ],
       "interp": "linear"
      },
      {
       "time": 41.53461,
       "value": [
-       2003.41092
+       2003.41093
       ],
       "interp": "linear"
      },
@@ -17542,105 +17982,105 @@
      {
       "time": 41.73478,
       "value": [
-       2003.45064
+       2003.45065
       ],
       "interp": "linear"
      },
      {
       "time": 41.83486,
       "value": [
-       2003.4738
+       2003.47381
       ],
       "interp": "linear"
      },
      {
       "time": 41.93495,
       "value": [
-       2003.49893
+       2003.49894
       ],
       "interp": "linear"
      },
      {
       "time": 42.03503,
       "value": [
-       2003.52585
+       2003.52586
       ],
       "interp": "linear"
      },
      {
       "time": 42.13511,
       "value": [
-       2003.55439
+       2003.5544
       ],
       "interp": "linear"
      },
      {
       "time": 42.2352,
       "value": [
-       2003.58438
+       2003.58439
       ],
       "interp": "linear"
      },
      {
       "time": 42.33528,
       "value": [
-       2003.61565
+       2003.61566
       ],
       "interp": "linear"
      },
      {
       "time": 42.43536,
       "value": [
-       2003.64802
+       2003.64803
       ],
       "interp": "linear"
      },
      {
       "time": 42.53545,
       "value": [
-       2003.68132
+       2003.68133
       ],
       "interp": "linear"
      },
      {
       "time": 42.63553,
       "value": [
-       2003.71538
+       2003.71539
       ],
       "interp": "linear"
      },
      {
       "time": 42.73561,
       "value": [
-       2003.75002
+       2003.75003
       ],
       "interp": "linear"
      },
      {
       "time": 42.8357,
       "value": [
-       2003.78508
+       2003.78509
       ],
       "interp": "linear"
      },
      {
       "time": 42.93578,
       "value": [
-       2003.82037
+       2003.82038
       ],
       "interp": "linear"
      },
      {
       "time": 43.03586,
       "value": [
-       2003.85573
+       2003.85574
       ],
       "interp": "linear"
      },
      {
       "time": 43.13595,
       "value": [
-       2003.89099
+       2003.891
       ],
       "interp": "linear"
      },
@@ -17654,49 +18094,49 @@
      {
       "time": 43.33611,
       "value": [
-       2003.96049
+       2003.9605
       ],
       "interp": "linear"
      },
      {
       "time": 43.4362,
       "value": [
-       2003.99439
+       2003.9944
       ],
       "interp": "linear"
      },
      {
       "time": 43.53628,
       "value": [
-       2004.02749
+       2004.0275
       ],
       "interp": "linear"
      },
      {
       "time": 43.63636,
       "value": [
-       2004.05962
+       2004.05963
       ],
       "interp": "linear"
      },
      {
       "time": 43.73645,
       "value": [
-       2004.09061
+       2004.09062
       ],
       "interp": "linear"
      },
      {
       "time": 43.83653,
       "value": [
-       2004.12028
+       2004.12029
       ],
       "interp": "linear"
      },
      {
       "time": 43.93661,
       "value": [
-       2004.14846
+       2004.14847
       ],
       "interp": "linear"
      },
@@ -17710,21 +18150,21 @@
      {
       "time": 44.13678,
       "value": [
-       2004.19967
+       2004.19968
       ],
       "interp": "linear"
      },
      {
       "time": 44.23686,
       "value": [
-       2004.22235
+       2004.22236
       ],
       "interp": "linear"
      },
      {
       "time": 44.33695,
       "value": [
-       2004.24285
+       2004.24286
       ],
       "interp": "linear"
      },
@@ -17738,7 +18178,7 @@
      {
       "time": 44.53711,
       "value": [
-       2004.27677
+       2004.27678
       ],
       "interp": "linear"
      },
@@ -17752,7 +18192,7 @@
      {
       "time": 44.73728,
       "value": [
-       2004.30535
+       2004.30536
       ],
       "interp": "linear"
      },
@@ -17766,21 +18206,21 @@
      {
       "time": 44.93745,
       "value": [
-       2004.33128
+       2004.33129
       ],
       "interp": "linear"
      },
      {
       "time": 45.03753,
       "value": [
-       2004.34336
+       2004.34337
       ],
       "interp": "linear"
      },
      {
       "time": 45.13761,
       "value": [
-       2004.35491
+       2004.35492
       ],
       "interp": "linear"
      },
@@ -17801,21 +18241,21 @@
      {
       "time": 45.43786,
       "value": [
-       2004.38682
+       2004.38683
       ],
       "interp": "linear"
      },
      {
       "time": 45.53795,
       "value": [
-       2004.39669
+       2004.3967
       ],
       "interp": "linear"
      },
      {
       "time": 45.63803,
       "value": [
-       2004.40625
+       2004.40626
       ],
       "interp": "linear"
      },
@@ -17829,21 +18269,21 @@
      {
       "time": 45.8382,
       "value": [
-       2004.42462
+       2004.42463
       ],
       "interp": "linear"
      },
      {
       "time": 45.93828,
       "value": [
-       2004.43351
+       2004.43352
       ],
       "interp": "linear"
      },
      {
       "time": 46.03837,
       "value": [
-       2004.44227
+       2004.44228
       ],
       "interp": "linear"
      },
@@ -17857,14 +18297,14 @@
      {
       "time": 46.23853,
       "value": [
-       2004.45957
+       2004.45958
       ],
       "interp": "linear"
      },
      {
       "time": 46.33862,
       "value": [
-       2004.4682
+       2004.46821
       ],
       "interp": "linear"
      },
@@ -17878,7 +18318,7 @@
      {
       "time": 46.53878,
       "value": [
-       2004.48562
+       2004.48563
       ],
       "interp": "linear"
      },
@@ -17892,105 +18332,105 @@
      {
       "time": 46.73895,
       "value": [
-       2004.50357
+       2004.50358
       ],
       "interp": "linear"
      },
      {
       "time": 46.83903,
       "value": [
-       2004.51285
+       2004.51286
       ],
       "interp": "linear"
      },
      {
       "time": 46.93912,
       "value": [
-       2004.52239
+       2004.5224
       ],
       "interp": "linear"
      },
      {
       "time": 47.0392,
       "value": [
-       2004.53224
+       2004.53225
       ],
       "interp": "linear"
      },
      {
       "time": 47.13928,
       "value": [
-       2004.54244
+       2004.54245
       ],
       "interp": "linear"
      },
      {
       "time": 47.23937,
       "value": [
-       2004.55304
+       2004.55305
       ],
       "interp": "linear"
      },
      {
       "time": 47.33945,
       "value": [
-       2004.56408
+       2004.56409
       ],
       "interp": "linear"
      },
      {
       "time": 47.43953,
       "value": [
-       2004.5756
+       2004.57561
       ],
       "interp": "linear"
      },
      {
       "time": 47.53962,
       "value": [
-       2004.5876
+       2004.58761
       ],
       "interp": "linear"
      },
      {
       "time": 47.6397,
       "value": [
-       2004.59974
+       2004.59975
       ],
       "interp": "linear"
      },
      {
       "time": 47.73978,
       "value": [
-       2004.61194
+       2004.61195
       ],
       "interp": "linear"
      },
      {
       "time": 47.83987,
       "value": [
-       2004.6242
+       2004.62421
       ],
       "interp": "linear"
      },
      {
       "time": 47.93995,
       "value": [
-       2004.63654
+       2004.63655
       ],
       "interp": "linear"
      },
      {
       "time": 48.04003,
       "value": [
-       2004.64897
+       2004.64898
       ],
       "interp": "linear"
      },
      {
       "time": 48.14012,
       "value": [
-       2004.6615
+       2004.66151
       ],
       "interp": "linear"
      },
@@ -18011,14 +18451,14 @@
      {
       "time": 48.44037,
       "value": [
-       2004.69979
+       2004.6998
       ],
       "interp": "linear"
      },
      {
       "time": 48.54045,
       "value": [
-       2004.71283
+       2004.71284
       ],
       "interp": "linear"
      },
@@ -18032,14 +18472,14 @@
      {
       "time": 48.74062,
       "value": [
-       2004.73939
+       2004.7394
       ],
       "interp": "linear"
      },
      {
       "time": 48.8407,
       "value": [
-       2004.75293
+       2004.75294
       ],
       "interp": "linear"
      },
@@ -18053,35 +18493,35 @@
      {
       "time": 49.04087,
       "value": [
-       2004.7806
+       2004.78061
       ],
       "interp": "linear"
      },
      {
       "time": 49.14095,
       "value": [
-       2004.79475
+       2004.79476
       ],
       "interp": "linear"
      },
      {
       "time": 49.24103,
       "value": [
-       2004.80912
+       2004.80913
       ],
       "interp": "linear"
      },
      {
       "time": 49.34112,
       "value": [
-       2004.82373
+       2004.82374
       ],
       "interp": "linear"
      },
      {
       "time": 49.4412,
       "value": [
-       2004.83858
+       2004.83859
       ],
       "interp": "linear"
      },
@@ -18095,63 +18535,63 @@
      {
       "time": 49.64137,
       "value": [
-       2004.86908
+       2004.86909
       ],
       "interp": "linear"
      },
      {
       "time": 49.74145,
       "value": [
-       2004.88474
+       2004.88475
       ],
       "interp": "linear"
      },
      {
       "time": 49.84153,
       "value": [
-       2004.9007
+       2004.90071
       ],
       "interp": "linear"
      },
      {
       "time": 49.94162,
       "value": [
-       2004.91696
+       2004.91697
       ],
       "interp": "linear"
      },
      {
       "time": 50.0417,
       "value": [
-       2004.93354
+       2004.93355
       ],
       "interp": "linear"
      },
      {
       "time": 50.14178,
       "value": [
-       2004.95044
+       2004.95045
       ],
       "interp": "linear"
      },
      {
       "time": 50.24187,
       "value": [
-       2004.96768
+       2004.96769
       ],
       "interp": "linear"
      },
      {
       "time": 50.34195,
       "value": [
-       2004.98527
+       2004.98528
       ],
       "interp": "linear"
      },
      {
       "time": 50.44204,
       "value": [
-       2005.00322
+       2005.00323
       ],
       "interp": "linear"
      },
@@ -18165,28 +18605,28 @@
      {
       "time": 50.6422,
       "value": [
-       2005.04035
+       2005.04036
       ],
       "interp": "linear"
      },
      {
       "time": 50.74229,
       "value": [
-       2005.06023
+       2005.06024
       ],
       "interp": "linear"
      },
      {
       "time": 50.84237,
       "value": [
-       2005.08131
+       2005.08132
       ],
       "interp": "linear"
      },
      {
       "time": 50.94245,
       "value": [
-       2005.10351
+       2005.10352
       ],
       "interp": "linear"
      },
@@ -18200,28 +18640,28 @@
      {
       "time": 51.14262,
       "value": [
-       2005.15103
+       2005.15104
       ],
       "interp": "linear"
      },
      {
       "time": 51.2427,
       "value": [
-       2005.17622
+       2005.17623
       ],
       "interp": "linear"
      },
      {
       "time": 51.34279,
       "value": [
-       2005.20228
+       2005.20229
       ],
       "interp": "linear"
      },
      {
       "time": 51.44287,
       "value": [
-       2005.22913
+       2005.22914
       ],
       "interp": "linear"
      },
@@ -18235,21 +18675,21 @@
      {
       "time": 51.64304,
       "value": [
-       2005.28499
+       2005.285
       ],
       "interp": "linear"
      },
      {
       "time": 51.74312,
       "value": [
-       2005.31386
+       2005.31387
       ],
       "interp": "linear"
      },
      {
       "time": 51.8432,
       "value": [
-       2005.34327
+       2005.34328
       ],
       "interp": "linear"
      },
@@ -18270,7 +18710,7 @@
      {
       "time": 52.14345,
       "value": [
-       2005.4341
+       2005.43411
       ],
       "interp": "linear"
      },
@@ -18284,7 +18724,7 @@
      {
       "time": 52.34362,
       "value": [
-       2005.49617
+       2005.49618
       ],
       "interp": "linear"
      },
@@ -18298,70 +18738,70 @@
      {
       "time": 52.54379,
       "value": [
-       2005.55885
+       2005.55886
       ],
       "interp": "linear"
      },
      {
       "time": 52.64387,
       "value": [
-       2005.59025
+       2005.59026
       ],
       "interp": "linear"
      },
      {
       "time": 52.74395,
       "value": [
-       2005.62161
+       2005.62162
       ],
       "interp": "linear"
      },
      {
       "time": 52.84404,
       "value": [
-       2005.65287
+       2005.65288
       ],
       "interp": "linear"
      },
      {
       "time": 52.94412,
       "value": [
-       2005.68395
+       2005.68396
       ],
       "interp": "linear"
      },
      {
       "time": 53.0442,
       "value": [
-       2005.71479
+       2005.7148
       ],
       "interp": "linear"
      },
      {
       "time": 53.14429,
       "value": [
-       2005.74533
+       2005.74534
       ],
       "interp": "linear"
      },
      {
       "time": 53.24437,
       "value": [
-       2005.77551
+       2005.77552
       ],
       "interp": "linear"
      },
      {
       "time": 53.34445,
       "value": [
-       2005.80525
+       2005.80526
       ],
       "interp": "linear"
      },
      {
       "time": 53.44454,
       "value": [
-       2005.83449
+       2005.8345
       ],
       "interp": "linear"
      },
@@ -18375,21 +18815,21 @@
      {
       "time": 53.6447,
       "value": [
-       2005.89123
+       2005.89124
       ],
       "interp": "linear"
      },
      {
       "time": 53.74479,
       "value": [
-       2005.91859
+       2005.9186
       ],
       "interp": "linear"
      },
      {
       "time": 53.84487,
       "value": [
-       2005.9452
+       2005.94521
       ],
       "interp": "linear"
      },
@@ -18403,35 +18843,35 @@
      {
       "time": 54.04504,
       "value": [
-       2005.99588
+       2005.99589
       ],
       "interp": "linear"
      },
      {
       "time": 54.14512,
       "value": [
-       2006.01983
+       2006.01984
       ],
       "interp": "linear"
      },
      {
       "time": 54.2452,
       "value": [
-       2006.04276
+       2006.04277
       ],
       "interp": "linear"
      },
      {
       "time": 54.34529,
       "value": [
-       2006.06461
+       2006.06462
       ],
       "interp": "linear"
      },
      {
       "time": 54.44537,
       "value": [
-       2006.08531
+       2006.08532
       ],
       "interp": "linear"
      },
@@ -18445,35 +18885,35 @@
      {
       "time": 54.64554,
       "value": [
-       2006.12061
+       2006.12062
       ],
       "interp": "linear"
      },
      {
       "time": 54.74562,
       "value": [
-       2006.13519
+       2006.1352
       ],
       "interp": "linear"
      },
      {
       "time": 54.8457,
       "value": [
-       2006.14992
+       2006.14993
       ],
       "interp": "linear"
      },
      {
       "time": 54.94579,
       "value": [
-       2006.16657
+       2006.16658
       ],
       "interp": "linear"
      },
      {
       "time": 55.04587,
       "value": [
-       2006.18693
+       2006.18694
       ],
       "interp": "linear"
      },
@@ -18487,14 +18927,14 @@
      {
       "time": 55.24604,
       "value": [
-       2006.24384
+       2006.24385
       ],
       "interp": "linear"
      },
      {
       "time": 55.34612,
       "value": [
-       2006.28022
+       2006.28023
       ],
       "interp": "linear"
      },
@@ -18508,70 +18948,70 @@
      {
       "time": 55.54629,
       "value": [
-       2006.36669
+       2006.3667
       ],
       "interp": "linear"
      },
      {
       "time": 55.64637,
       "value": [
-       2006.41591
+       2006.41592
       ],
       "interp": "linear"
      },
      {
       "time": 55.74646,
       "value": [
-       2006.46856
+       2006.46857
       ],
       "interp": "linear"
      },
      {
       "time": 55.84654,
       "value": [
-       2006.52421
+       2006.52422
       ],
       "interp": "linear"
      },
      {
       "time": 55.94662,
       "value": [
-       2006.58242
+       2006.58243
       ],
       "interp": "linear"
      },
      {
       "time": 56.04671,
       "value": [
-       2006.64277
+       2006.64278
       ],
       "interp": "linear"
      },
      {
       "time": 56.14679,
       "value": [
-       2006.70482
+       2006.70483
       ],
       "interp": "linear"
      },
      {
       "time": 56.24687,
       "value": [
-       2006.76816
+       2006.76817
       ],
       "interp": "linear"
      },
      {
       "time": 56.34696,
       "value": [
-       2006.83234
+       2006.83235
       ],
       "interp": "linear"
      },
      {
       "time": 56.44704,
       "value": [
-       2006.89695
+       2006.89696
       ],
       "interp": "linear"
      },
@@ -18585,77 +19025,77 @@
      {
       "time": 56.64721,
       "value": [
-       2007.02571
+       2007.02572
       ],
       "interp": "linear"
      },
      {
       "time": 56.74729,
       "value": [
-       2007.089
+       2007.08901
       ],
       "interp": "linear"
      },
      {
       "time": 56.84737,
       "value": [
-       2007.151
+       2007.15101
       ],
       "interp": "linear"
      },
      {
       "time": 56.94746,
       "value": [
-       2007.21128
+       2007.21129
       ],
       "interp": "linear"
      },
      {
       "time": 57.04754,
       "value": [
-       2007.2694
+       2007.26941
       ],
       "interp": "linear"
      },
      {
       "time": 57.14762,
       "value": [
-       2007.32494
+       2007.32495
       ],
       "interp": "linear"
      },
      {
       "time": 57.24771,
       "value": [
-       2007.37747
+       2007.37748
       ],
       "interp": "linear"
      },
      {
       "time": 57.34779,
       "value": [
-       2007.42656
+       2007.42657
       ],
       "interp": "linear"
      },
      {
       "time": 57.44787,
       "value": [
-       2007.47178
+       2007.47179
       ],
       "interp": "linear"
      },
      {
       "time": 57.54796,
       "value": [
-       2007.5127
+       2007.51271
       ],
       "interp": "linear"
      },
      {
       "time": 57.64804,
       "value": [
-       2007.54931
+       2007.54932
       ],
       "interp": "linear"
      },
@@ -18676,35 +19116,35 @@
      {
       "time": 57.94829,
       "value": [
-       2007.64601
+       2007.64602
       ],
       "interp": "linear"
      },
      {
       "time": 58.04837,
       "value": [
-       2007.67481
+       2007.67482
       ],
       "interp": "linear"
      },
      {
       "time": 58.14846,
       "value": [
-       2007.70215
+       2007.70216
       ],
       "interp": "linear"
      },
      {
       "time": 58.24854,
       "value": [
-       2007.72819
+       2007.7282
       ],
       "interp": "linear"
      },
      {
       "time": 58.34862,
       "value": [
-       2007.75309
+       2007.7531
       ],
       "interp": "linear"
      },
@@ -18732,63 +19172,63 @@
      {
       "time": 58.74896,
       "value": [
-       2007.84432
+       2007.84433
       ],
       "interp": "linear"
      },
      {
       "time": 58.84904,
       "value": [
-       2007.86581
+       2007.86582
       ],
       "interp": "linear"
      },
      {
       "time": 58.94912,
       "value": [
-       2007.88709
+       2007.8871
       ],
       "interp": "linear"
      },
      {
       "time": 59.04921,
       "value": [
-       2007.90831
+       2007.90832
       ],
       "interp": "linear"
      },
      {
       "time": 59.14929,
       "value": [
-       2007.92963
+       2007.92964
       ],
       "interp": "linear"
      },
      {
       "time": 59.24937,
       "value": [
-       2007.9512
+       2007.95121
       ],
       "interp": "linear"
      },
      {
       "time": 59.34946,
       "value": [
-       2007.97317
+       2007.97318
       ],
       "interp": "linear"
      },
      {
       "time": 59.44954,
       "value": [
-       2007.99571
+       2007.99572
       ],
       "interp": "linear"
      },
      {
       "time": 59.54962,
       "value": [
-       2008.01896
+       2008.01897
       ],
       "interp": "linear"
      },
@@ -18802,14 +19242,14 @@
      {
       "time": 59.74979,
       "value": [
-       2008.06824
+       2008.06825
       ],
       "interp": "linear"
      },
      {
       "time": 59.84987,
       "value": [
-       2008.09457
+       2008.09458
       ],
       "interp": "linear"
      },
@@ -18823,14 +19263,14 @@
      {
       "time": 60.05004,
       "value": [
-       2008.15141
+       2008.15142
       ],
       "interp": "linear"
      },
      {
       "time": 60.15013,
       "value": [
-       2008.18223
+       2008.18224
       ],
       "interp": "linear"
      },
@@ -18844,7 +19284,7 @@
      {
       "time": 60.35029,
       "value": [
-       2008.24942
+       2008.24943
       ],
       "interp": "linear"
      },
@@ -18865,7 +19305,7 @@
      {
       "time": 60.65054,
       "value": [
-       2008.36772
+       2008.36773
       ],
       "interp": "linear"
      },
@@ -18886,49 +19326,49 @@
      {
       "time": 60.95079,
       "value": [
-       2008.54975
+       2008.54976
       ],
       "interp": "linear"
      },
      {
       "time": 61.05088,
       "value": [
-       2008.62664
+       2008.62665
       ],
       "interp": "linear"
      },
      {
       "time": 61.15096,
       "value": [
-       2008.71007
+       2008.71008
       ],
       "interp": "linear"
      },
      {
       "time": 61.25104,
       "value": [
-       2008.79912
+       2008.79913
       ],
       "interp": "linear"
      },
      {
       "time": 61.35113,
       "value": [
-       2008.89284
+       2008.89285
       ],
       "interp": "linear"
      },
      {
       "time": 61.45121,
       "value": [
-       2008.9903
+       2008.99031
       ],
       "interp": "linear"
      },
      {
       "time": 61.55129,
       "value": [
-       2009.09057
+       2009.09058
       ],
       "interp": "linear"
      },
@@ -18949,7 +19389,7 @@
      {
       "time": 61.85154,
       "value": [
-       2009.39885
+       2009.39886
       ],
       "interp": "linear"
      },
@@ -18963,28 +19403,28 @@
      {
       "time": 62.05171,
       "value": [
-       2009.60125
+       2009.60126
       ],
       "interp": "linear"
      },
      {
       "time": 62.15179,
       "value": [
-       2009.69871
+       2009.69872
       ],
       "interp": "linear"
      },
      {
       "time": 62.25188,
       "value": [
-       2009.79243
+       2009.79244
       ],
       "interp": "linear"
      },
      {
       "time": 62.35196,
       "value": [
-       2009.88147
+       2009.88148
       ],
       "interp": "linear"
      },
@@ -18998,35 +19438,35 @@
      {
       "time": 62.55213,
       "value": [
-       2010.04179
+       2010.0418
       ],
       "interp": "linear"
      },
      {
       "time": 62.65221,
       "value": [
-       2010.11119
+       2010.1112
       ],
       "interp": "linear"
      },
      {
       "time": 62.75229,
       "value": [
-       2010.17218
+       2010.17219
       ],
       "interp": "linear"
      },
      {
       "time": 62.85238,
       "value": [
-       2010.22381
+       2010.22382
       ],
       "interp": "linear"
      },
      {
       "time": 62.95246,
       "value": [
-       2010.26516
+       2010.26517
       ],
       "interp": "linear"
      },
@@ -19040,7 +19480,7 @@
      {
       "time": 63.15263,
       "value": [
-       2010.3259
+       2010.32591
       ],
       "interp": "linear"
      },
@@ -19054,1281 +19494,1281 @@
      {
       "time": 63.35279,
       "value": [
-       2010.3793
+       2010.37929
       ],
       "interp": "linear"
      },
      {
       "time": 63.45288,
       "value": [
-       2010.40396
+       2010.40394
       ],
       "interp": "linear"
      },
      {
       "time": 63.55296,
       "value": [
-       2010.42738
+       2010.42735
       ],
       "interp": "linear"
      },
      {
       "time": 63.65304,
       "value": [
-       2010.44964
+       2010.44959
       ],
       "interp": "linear"
      },
      {
       "time": 63.75313,
       "value": [
-       2010.4708
+       2010.47074
       ],
       "interp": "linear"
      },
      {
       "time": 63.85321,
       "value": [
-       2010.49095
+       2010.49087
       ],
       "interp": "linear"
      },
      {
       "time": 63.95329,
       "value": [
-       2010.51017
+       2010.51007
       ],
       "interp": "linear"
      },
      {
       "time": 64.05338,
       "value": [
-       2010.52853
+       2010.52842
       ],
       "interp": "linear"
      },
      {
       "time": 64.15346,
       "value": [
-       2010.54612
+       2010.546
       ],
       "interp": "linear"
      },
      {
       "time": 64.25354,
       "value": [
-       2010.56302
+       2010.56288
       ],
       "interp": "linear"
      },
      {
       "time": 64.35363,
       "value": [
-       2010.5793
+       2010.57914
       ],
       "interp": "linear"
      },
      {
       "time": 64.45371,
       "value": [
-       2010.59504
+       2010.59487
       ],
       "interp": "linear"
      },
      {
       "time": 64.55379,
       "value": [
-       2010.61032
+       2010.61014
       ],
       "interp": "linear"
      },
      {
       "time": 64.65388,
       "value": [
-       2010.62523
+       2010.62504
       ],
       "interp": "linear"
      },
      {
       "time": 64.75396,
       "value": [
-       2010.63983
+       2010.63963
       ],
       "interp": "linear"
      },
      {
       "time": 64.85405,
       "value": [
-       2010.65422
+       2010.65401
       ],
       "interp": "linear"
      },
      {
       "time": 64.95413,
       "value": [
-       2010.66846
+       2010.66825
       ],
       "interp": "linear"
      },
      {
       "time": 65.05421,
       "value": [
-       2010.68263
+       2010.68243
       ],
       "interp": "linear"
      },
      {
       "time": 65.1543,
       "value": [
-       2010.69683
+       2010.69662
       ],
       "interp": "linear"
      },
      {
       "time": 65.25438,
       "value": [
-       2010.71111
+       2010.71091
       ],
       "interp": "linear"
      },
      {
       "time": 65.35446,
       "value": [
-       2010.72557
+       2010.72539
       ],
       "interp": "linear"
      },
      {
       "time": 65.45455,
       "value": [
-       2010.74028
+       2010.74011
       ],
       "interp": "linear"
      },
      {
       "time": 65.55463,
       "value": [
-       2010.75533
+       2010.75518
       ],
       "interp": "linear"
      },
      {
       "time": 65.65471,
       "value": [
-       2010.77078
+       2010.77066
       ],
       "interp": "linear"
      },
      {
       "time": 65.7548,
       "value": [
-       2010.78672
+       2010.78663
       ],
       "interp": "linear"
      },
      {
       "time": 65.85488,
       "value": [
-       2010.80323
+       2010.80317
       ],
       "interp": "linear"
      },
      {
       "time": 65.95496,
       "value": [
-       2010.82039
+       2010.82037
       ],
       "interp": "linear"
      },
      {
       "time": 66.05505,
       "value": [
-       2010.83804
+       2010.83803
       ],
       "interp": "linear"
      },
      {
       "time": 66.15513,
       "value": [
-       2010.85539
+       2010.85515
       ],
       "interp": "linear"
      },
      {
       "time": 66.25521,
       "value": [
-       2010.87229
+       2010.87158
       ],
       "interp": "linear"
      },
      {
       "time": 66.3553,
       "value": [
-       2010.88879
+       2010.88738
       ],
       "interp": "linear"
      },
      {
       "time": 66.45538,
       "value": [
-       2010.90491
+       2010.9026
       ],
       "interp": "linear"
      },
      {
       "time": 66.55546,
       "value": [
-       2010.92068
+       2010.91727
       ],
       "interp": "linear"
      },
      {
       "time": 66.65555,
       "value": [
-       2010.93613
+       2010.93147
       ],
       "interp": "linear"
      },
      {
       "time": 66.75563,
       "value": [
-       2010.95131
+       2010.94523
       ],
       "interp": "linear"
      },
      {
       "time": 66.85571,
       "value": [
-       2010.96623
+       2010.9586
       ],
       "interp": "linear"
      },
      {
       "time": 66.9558,
       "value": [
-       2010.98093
+       2010.97163
       ],
       "interp": "linear"
      },
      {
       "time": 67.05588,
       "value": [
-       2010.99544
+       2010.98437
       ],
       "interp": "linear"
      },
      {
       "time": 67.15596,
       "value": [
-       2011.00979
+       2010.99688
       ],
       "interp": "linear"
      },
      {
       "time": 67.25605,
       "value": [
-       2011.02401
+       2011.0092
       ],
       "interp": "linear"
      },
      {
       "time": 67.35613,
       "value": [
-       2011.03814
+       2011.02138
       ],
       "interp": "linear"
      },
      {
       "time": 67.45621,
       "value": [
-       2011.0522
+       2011.03348
       ],
       "interp": "linear"
      },
      {
       "time": 67.5563,
       "value": [
-       2011.06623
+       2011.04553
       ],
       "interp": "linear"
      },
      {
       "time": 67.65638,
       "value": [
-       2011.08025
+       2011.05759
       ],
       "interp": "linear"
      },
      {
       "time": 67.75646,
       "value": [
-       2011.09431
+       2011.06972
       ],
       "interp": "linear"
      },
      {
       "time": 67.85655,
       "value": [
-       2011.10842
+       2011.08195
       ],
       "interp": "linear"
      },
      {
       "time": 67.95663,
       "value": [
-       2011.12263
+       2011.09434
       ],
       "interp": "linear"
      },
      {
       "time": 68.05671,
       "value": [
-       2011.13696
+       2011.10694
       ],
       "interp": "linear"
      },
      {
       "time": 68.1568,
       "value": [
-       2011.15144
+       2011.1198
       ],
       "interp": "linear"
      },
      {
       "time": 68.25688,
       "value": [
-       2011.16611
+       2011.13297
       ],
       "interp": "linear"
      },
      {
       "time": 68.35696,
       "value": [
-       2011.181
+       2011.14649
       ],
       "interp": "linear"
      },
      {
       "time": 68.45705,
       "value": [
-       2011.19613
+       2011.16042
       ],
       "interp": "linear"
      },
      {
       "time": 68.55713,
       "value": [
-       2011.21155
+       2011.17481
       ],
       "interp": "linear"
      },
      {
       "time": 68.65721,
       "value": [
-       2011.22727
+       2011.1897
       ],
       "interp": "linear"
      },
      {
       "time": 68.7573,
       "value": [
-       2011.24333
+       2011.20516
       ],
       "interp": "linear"
      },
      {
       "time": 68.85738,
       "value": [
-       2011.25977
+       2011.22121
       ],
       "interp": "linear"
      },
      {
       "time": 68.95746,
       "value": [
-       2011.27662
+       2011.23792
       ],
       "interp": "linear"
      },
      {
       "time": 69.05755,
       "value": [
-       2011.2939
+       2011.25534
       ],
       "interp": "linear"
      },
      {
       "time": 69.15763,
       "value": [
-       2011.31164
+       2011.27351
       ],
       "interp": "linear"
      },
      {
       "time": 69.25771,
       "value": [
-       2011.32988
+       2011.29249
       ],
       "interp": "linear"
      },
      {
       "time": 69.3578,
       "value": [
-       2011.34866
+       2011.31232
       ],
       "interp": "linear"
      },
      {
       "time": 69.45788,
       "value": [
-       2011.36799
+       2011.33305
       ],
       "interp": "linear"
      },
      {
       "time": 69.55796,
       "value": [
-       2011.38792
+       2011.35474
       ],
       "interp": "linear"
      },
      {
       "time": 69.65805,
       "value": [
-       2011.40847
+       2011.37743
       ],
       "interp": "linear"
      },
      {
       "time": 69.75813,
       "value": [
-       2011.42967
+       2011.40117
       ],
       "interp": "linear"
      },
      {
       "time": 69.85822,
       "value": [
-       2011.45156
+       2011.42601
       ],
       "interp": "linear"
      },
      {
       "time": 69.9583,
       "value": [
-       2011.47417
+       2011.45201
       ],
       "interp": "linear"
      },
      {
       "time": 70.05838,
       "value": [
-       2011.49753
+       2011.4792
       ],
       "interp": "linear"
      },
      {
       "time": 70.15847,
       "value": [
-       2011.52166
+       2011.50765
       ],
       "interp": "linear"
      },
      {
       "time": 70.25855,
       "value": [
-       2011.54661
+       2011.5374
       ],
       "interp": "linear"
      },
      {
       "time": 70.35863,
       "value": [
-       2011.5724
+       2011.56849
       ],
       "interp": "linear"
      },
      {
       "time": 70.45872,
       "value": [
-       2011.59906
+       2011.60099
       ],
       "interp": "linear"
      },
      {
       "time": 70.5588,
       "value": [
-       2011.62632
+       2011.63759
       ],
       "interp": "linear"
      },
      {
       "time": 70.65888,
       "value": [
-       2011.6534
+       2011.68678
       ],
       "interp": "linear"
      },
      {
       "time": 70.75897,
       "value": [
-       2011.68069
+       2011.74902
       ],
       "interp": "linear"
      },
      {
       "time": 70.85905,
       "value": [
-       2011.7088
+       2011.82323
       ],
       "interp": "linear"
      },
      {
       "time": 70.95913,
       "value": [
-       2011.73834
+       2011.90828
       ],
       "interp": "linear"
      },
      {
       "time": 71.05922,
       "value": [
-       2011.7699
+       2012.00308
       ],
       "interp": "linear"
      },
      {
       "time": 71.1593,
       "value": [
-       2011.8041
+       2012.10653
       ],
       "interp": "linear"
      },
      {
       "time": 71.25938,
       "value": [
-       2011.84154
+       2012.21751
       ],
       "interp": "linear"
      },
      {
       "time": 71.35947,
       "value": [
-       2011.88282
+       2012.33493
       ],
       "interp": "linear"
      },
      {
       "time": 71.45955,
       "value": [
-       2011.92855
+       2012.45769
       ],
       "interp": "linear"
      },
      {
       "time": 71.55963,
       "value": [
-       2011.97933
+       2012.58467
       ],
       "interp": "linear"
      },
      {
       "time": 71.65972,
       "value": [
-       2012.03576
+       2012.71478
       ],
       "interp": "linear"
      },
      {
       "time": 71.7598,
       "value": [
-       2012.09846
+       2012.84691
       ],
       "interp": "linear"
      },
      {
       "time": 71.85988,
       "value": [
-       2012.16802
+       2012.97996
       ],
       "interp": "linear"
      },
      {
       "time": 71.95997,
       "value": [
-       2012.24505
+       2013.11282
       ],
       "interp": "linear"
      },
      {
       "time": 72.06005,
       "value": [
-       2012.33016
+       2013.24439
       ],
       "interp": "linear"
      },
      {
       "time": 72.16013,
       "value": [
-       2012.44548
+       2013.37674
       ],
       "interp": "linear"
      },
      {
       "time": 72.26022,
       "value": [
-       2012.67203
+       2013.52148
       ],
       "interp": "linear"
      },
      {
       "time": 72.3603,
       "value": [
-       2012.99157
+       2013.67705
       ],
       "interp": "linear"
      },
      {
       "time": 72.46038,
       "value": [
-       2013.36118
+       2013.83846
       ],
       "interp": "linear"
      },
      {
       "time": 72.56047,
       "value": [
-       2013.73795
+       2014.0007
       ],
       "interp": "linear"
      },
      {
       "time": 72.66055,
       "value": [
-       2014.0813
+       2014.15905
       ],
       "interp": "step"
      },
      {
       "time": 72.66055,
       "value": [
-       3002.1096
+       3002.10743
       ],
       "interp": "linear"
      },
      {
       "time": 72.76063,
       "value": [
-       3002.21218
+       3002.19292
       ],
       "interp": "linear"
      },
      {
       "time": 72.86072,
       "value": [
-       3002.31998
+       3002.28193
       ],
       "interp": "linear"
      },
      {
       "time": 72.9608,
       "value": [
-       3002.43054
+       3002.37279
       ],
       "interp": "linear"
      },
      {
       "time": 73.06088,
       "value": [
-       3002.54142
+       3002.46387
       ],
       "interp": "linear"
      },
      {
       "time": 73.16097,
       "value": [
-       3002.65017
+       3002.55351
       ],
       "interp": "linear"
      },
      {
       "time": 73.26105,
       "value": [
-       3002.75432
+       3002.64006
       ],
       "interp": "linear"
      },
      {
       "time": 73.36113,
       "value": [
-       3002.85144
+       3002.72188
       ],
       "interp": "linear"
      },
      {
       "time": 73.46122,
       "value": [
-       3002.93907
+       3002.79732
       ],
       "interp": "linear"
      },
      {
       "time": 73.5613,
       "value": [
-       3003.01477
+       3002.86473
       ],
       "interp": "linear"
      },
      {
       "time": 73.66138,
       "value": [
-       3003.07833
+       3002.92385
       ],
       "interp": "linear"
      },
      {
       "time": 73.76147,
       "value": [
-       3003.13719
+       3002.97925
       ],
       "interp": "linear"
      },
      {
       "time": 73.86155,
       "value": [
-       3003.19247
+       3003.0317
       ],
       "interp": "linear"
      },
      {
       "time": 73.96163,
       "value": [
-       3003.24447
+       3003.08144
       ],
       "interp": "linear"
      },
      {
       "time": 74.06172,
       "value": [
-       3003.29348
+       3003.12871
       ],
       "interp": "linear"
      },
      {
       "time": 74.1618,
       "value": [
-       3003.33978
+       3003.17377
       ],
       "interp": "linear"
      },
      {
       "time": 74.26188,
       "value": [
-       3003.38366
+       3003.21686
       ],
       "interp": "linear"
      },
      {
       "time": 74.36197,
       "value": [
-       3003.42542
+       3003.25822
       ],
       "interp": "linear"
      },
      {
       "time": 74.46205,
       "value": [
-       3003.46535
+       3003.29811
       ],
       "interp": "linear"
      },
      {
       "time": 74.56214,
       "value": [
-       3003.50373
+       3003.33678
       ],
       "interp": "linear"
      },
      {
       "time": 74.66222,
       "value": [
-       3003.54085
+       3003.37446
       ],
       "interp": "linear"
      },
      {
       "time": 74.7623,
       "value": [
-       3003.57701
+       3003.41141
       ],
       "interp": "linear"
      },
      {
       "time": 74.86239,
       "value": [
-       3003.6125
+       3003.44787
       ],
       "interp": "linear"
      },
      {
       "time": 74.96247,
       "value": [
-       3003.6476
+       3003.48409
       ],
       "interp": "linear"
      },
      {
       "time": 75.06255,
       "value": [
-       3003.6826
+       3003.52032
       ],
       "interp": "linear"
      },
      {
       "time": 75.16264,
       "value": [
-       3003.7178
+       3003.55681
       ],
       "interp": "linear"
      },
      {
       "time": 75.26272,
       "value": [
-       3003.75348
+       3003.5938
       ],
       "interp": "linear"
      },
      {
       "time": 75.3628,
       "value": [
-       3003.78993
+       3003.63153
       ],
       "interp": "linear"
      },
      {
       "time": 75.46289,
       "value": [
-       3003.82745
+       3003.67026
       ],
       "interp": "linear"
      },
      {
       "time": 75.56297,
       "value": [
-       3003.86633
+       3003.71024
       ],
       "interp": "linear"
      },
      {
       "time": 75.66305,
       "value": [
-       3003.90685
+       3003.75171
       ],
       "interp": "linear"
      },
      {
       "time": 75.76314,
       "value": [
-       3003.9493
+       3003.79491
       ],
       "interp": "linear"
      },
      {
       "time": 75.86322,
       "value": [
-       3003.99397
+       3003.8401
       ],
       "interp": "linear"
      },
      {
       "time": 75.9633,
       "value": [
-       3004.04116
+       3003.88752
       ],
       "interp": "linear"
      },
      {
       "time": 76.06339,
       "value": [
-       3004.09097
+       3003.9373
       ],
       "interp": "linear"
      },
      {
       "time": 76.16347,
       "value": [
-       3004.14283
+       3003.98913
       ],
       "interp": "linear"
      },
      {
       "time": 76.26355,
       "value": [
-       3004.19653
+       3004.0428
       ],
       "interp": "linear"
      },
      {
       "time": 76.36364,
       "value": [
-       3004.25193
+       3004.09817
       ],
       "interp": "linear"
      },
      {
       "time": 76.46372,
       "value": [
-       3004.30887
+       3004.15509
       ],
       "interp": "linear"
      },
      {
       "time": 76.5638,
       "value": [
-       3004.36718
+       3004.21339
       ],
       "interp": "linear"
      },
      {
       "time": 76.66389,
       "value": [
-       3004.42673
+       3004.27293
       ],
       "interp": "linear"
      },
      {
       "time": 76.76397,
       "value": [
-       3004.48734
+       3004.33354
       ],
       "interp": "linear"
      },
      {
       "time": 76.86405,
       "value": [
-       3004.54888
+       3004.39507
       ],
       "interp": "linear"
      },
      {
       "time": 76.96414,
       "value": [
-       3004.61117
+       3004.45737
       ],
       "interp": "linear"
      },
      {
       "time": 77.06422,
       "value": [
-       3004.67407
+       3004.52028
       ],
       "interp": "linear"
      },
      {
       "time": 77.1643,
       "value": [
-       3004.73743
+       3004.58364
       ],
       "interp": "linear"
      },
      {
       "time": 77.26439,
       "value": [
-       3004.80109
+       3004.64731
       ],
       "interp": "linear"
      },
      {
       "time": 77.36447,
       "value": [
-       3004.86488
+       3004.71112
       ],
       "interp": "linear"
      },
      {
       "time": 77.46455,
       "value": [
-       3004.92867
+       3004.77492
       ],
       "interp": "linear"
      },
      {
       "time": 77.56464,
       "value": [
-       3004.99229
+       3004.83855
       ],
       "interp": "linear"
      },
      {
       "time": 77.66472,
       "value": [
-       3005.05559
+       3004.90187
       ],
       "interp": "linear"
      },
      {
       "time": 77.7648,
       "value": [
-       3005.11841
+       3004.9647
       ],
       "interp": "linear"
      },
      {
       "time": 77.86489,
       "value": [
-       3005.1806
+       3005.02691
       ],
       "interp": "linear"
      },
      {
       "time": 77.96497,
       "value": [
-       3005.242
+       3005.08833
       ],
       "interp": "linear"
      },
      {
       "time": 78.06505,
       "value": [
-       3005.30247
+       3005.1488
       ],
       "interp": "linear"
      },
      {
       "time": 78.16514,
       "value": [
-       3005.36184
+       3005.20818
       ],
       "interp": "linear"
      },
      {
       "time": 78.26522,
       "value": [
-       3005.41996
+       3005.26631
       ],
       "interp": "linear"
      },
      {
       "time": 78.3653,
       "value": [
-       3005.47667
+       3005.32303
       ],
       "interp": "linear"
      },
      {
       "time": 78.46539,
       "value": [
-       3005.53182
+       3005.37819
       ],
       "interp": "linear"
      },
      {
       "time": 78.56547,
       "value": [
-       3005.58486
+       3005.43123
       ],
       "interp": "linear"
      },
      {
       "time": 78.66555,
       "value": [
-       3005.63465
+       3005.48101
       ],
       "interp": "linear"
      },
      {
       "time": 78.76564,
       "value": [
-       3005.68144
+       3005.52781
       ],
       "interp": "linear"
      },
      {
       "time": 78.86572,
       "value": [
-       3005.72565
+       3005.57201
       ],
       "interp": "linear"
      },
      {
       "time": 78.9658,
       "value": [
-       3005.76767
+       3005.61404
       ],
       "interp": "linear"
      },
      {
       "time": 79.06589,
       "value": [
-       3005.80792
+       3005.65428
       ],
       "interp": "linear"
      },
      {
       "time": 79.16597,
       "value": [
-       3005.84679
+       3005.69316
       ],
       "interp": "linear"
      },
      {
       "time": 79.26606,
       "value": [
-       3005.8847
+       3005.73106
       ],
       "interp": "linear"
      },
      {
       "time": 79.36614,
       "value": [
-       3005.92204
+       3005.76841
       ],
       "interp": "linear"
      },
      {
       "time": 79.46622,
       "value": [
-       3005.95923
+       3005.8056
       ],
       "interp": "linear"
      },
      {
       "time": 79.56631,
       "value": [
-       3005.99667
+       3005.84303
       ],
       "interp": "linear"
      },
      {
       "time": 79.66639,
       "value": [
-       3006.03476
+       3005.88112
       ],
       "interp": "linear"
      },
      {
       "time": 79.76647,
       "value": [
-       3006.07391
+       3005.92027
       ],
       "interp": "linear"
      },
      {
       "time": 79.86656,
       "value": [
-       3006.11452
+       3005.96088
       ],
       "interp": "linear"
      },
      {
       "time": 79.96664,
       "value": [
-       3006.157
+       3006.00336
       ],
       "interp": "linear"
      },
      {
       "time": 80.06672,
       "value": [
-       3006.20175
+       3006.04812
       ],
       "interp": "linear"
      },
      {
       "time": 80.16681,
       "value": [
-       3006.24918
+       3006.09555
       ],
       "interp": "linear"
      },
      {
       "time": 80.26689,
       "value": [
-       3006.2997
+       3006.14606
       ],
       "interp": "linear"
      },
      {
       "time": 80.36697,
       "value": [
-       3006.3537
+       3006.20007
       ],
       "interp": "linear"
      },
      {
       "time": 80.46706,
       "value": [
-       3006.4116
+       3006.25797
       ],
       "interp": "linear"
      },
      {
       "time": 80.56714,
       "value": [
-       3006.4738
+       3006.32017
       ],
       "interp": "linear"
      },
      {
       "time": 80.66722,
       "value": [
-       3006.5407
+       3006.38707
       ],
       "interp": "linear"
      },
      {
       "time": 80.76731,
       "value": [
-       3006.61271
+       3006.45908
       ],
       "interp": "linear"
      },
      {
       "time": 80.86739,
       "value": [
-       3006.69024
+       3006.5366
       ],
       "interp": "linear"
      },
      {
       "time": 80.96747,
       "value": [
-       3006.77967
+       3006.62603
       ],
       "interp": "linear"
      },
      {
       "time": 81.06756,
       "value": [
-       3006.90724
+       3006.7536
       ],
       "interp": "linear"
      },
      {
       "time": 81.16764,
       "value": [
-       3007.06556
+       3006.91192
       ],
       "interp": "linear"
      },
      {
       "time": 81.26772,
       "value": [
-       3007.24043
+       3007.08679
       ],
       "interp": "linear"
      },
      {
       "time": 81.36781,
       "value": [
-       3007.41766
+       3007.26403
       ],
       "interp": "linear"
      },
      {
       "time": 81.46789,
       "value": [
-       3007.5835
+       3007.42986
       ],
       "interp": "step"
      },
@@ -20342,245 +20782,245 @@
      {
       "time": 81.56797,
       "value": [
-       4002.11121
+       4002.17885
       ],
       "interp": "linear"
      },
      {
       "time": 81.66806,
       "value": [
-       4002.21999
+       4002.36376
       ],
       "interp": "linear"
      },
      {
       "time": 81.76814,
       "value": [
-       4002.32976
+       4002.54547
       ],
       "interp": "linear"
      },
      {
       "time": 81.86822,
       "value": [
-       4002.43924
+       4002.70999
       ],
       "interp": "linear"
      },
      {
       "time": 81.96831,
       "value": [
-       4002.54712
+       4002.84331
       ],
       "interp": "linear"
      },
      {
       "time": 82.06839,
       "value": [
-       4002.6521
+       4002.94247
       ],
       "interp": "linear"
      },
      {
       "time": 82.16847,
       "value": [
-       4002.7529
+       4003.03381
       ],
       "interp": "linear"
      },
      {
       "time": 82.26856,
       "value": [
-       4002.84821
+       4003.11976
       ],
       "interp": "linear"
      },
      {
       "time": 82.36864,
       "value": [
-       4002.93882
+       4003.20058
       ],
       "interp": "linear"
      },
      {
       "time": 82.46872,
       "value": [
-       4003.02998
+       4003.27655
       ],
       "interp": "linear"
      },
      {
       "time": 82.56881,
       "value": [
-       4003.12131
+       4003.34792
       ],
       "interp": "linear"
      },
      {
       "time": 82.66889,
       "value": [
-       4003.21201
+       4003.41496
       ],
       "interp": "linear"
      },
      {
       "time": 82.76897,
       "value": [
-       4003.30126
+       4003.47795
       ],
       "interp": "linear"
      },
      {
       "time": 82.86906,
       "value": [
-       4003.38827
+       4003.53714
       ],
       "interp": "linear"
      },
      {
       "time": 82.96914,
       "value": [
-       4003.47221
+       4003.59281
       ],
       "interp": "linear"
      },
      {
       "time": 83.06922,
       "value": [
-       4003.55229
+       4003.64521
       ],
       "interp": "linear"
      },
      {
       "time": 83.16931,
       "value": [
-       4003.6277
+       4003.69463
       ],
       "interp": "linear"
      },
      {
       "time": 83.26939,
       "value": [
-       4003.69762
+       4003.74131
       ],
       "interp": "linear"
      },
      {
       "time": 83.36947,
       "value": [
-       4003.76125
+       4003.78554
       ],
       "interp": "linear"
      },
      {
       "time": 83.46956,
       "value": [
-       4003.81778
+       4003.82757
       ],
       "interp": "linear"
      },
      {
       "time": 83.56964,
       "value": [
-       4003.8664
+       4003.86767
       ],
       "interp": "linear"
      },
      {
       "time": 83.66972,
       "value": [
-       4003.9077
+       4003.90582
       ],
       "interp": "linear"
      },
      {
       "time": 83.76981,
       "value": [
-       4003.94537
+       4003.94146
       ],
       "interp": "linear"
      },
      {
       "time": 83.86989,
       "value": [
-       4003.98004
+       4003.9748
       ],
       "interp": "linear"
      },
      {
       "time": 83.96997,
       "value": [
-       4004.01209
+       4004.00612
       ],
       "interp": "linear"
      },
      {
       "time": 84.07006,
       "value": [
-       4004.04187
+       4004.03569
       ],
       "interp": "linear"
      },
      {
       "time": 84.17014,
       "value": [
-       4004.06975
+       4004.06378
       ],
       "interp": "linear"
      },
      {
       "time": 84.27023,
       "value": [
-       4004.09611
+       4004.09068
       ],
       "interp": "linear"
      },
      {
       "time": 84.37031,
       "value": [
-       4004.1213
+       4004.11665
       ],
       "interp": "linear"
      },
      {
       "time": 84.47039,
       "value": [
-       4004.14568
+       4004.14197
       ],
       "interp": "linear"
      },
      {
       "time": 84.57048,
       "value": [
-       4004.16964
+       4004.16692
       ],
       "interp": "linear"
      },
      {
       "time": 84.67056,
       "value": [
-       4004.19353
+       4004.19176
       ],
       "interp": "linear"
      },
      {
       "time": 84.77064,
       "value": [
-       4004.21772
+       4004.21679
       ],
       "interp": "linear"
      },
      {
       "time": 84.87073,
       "value": [
-       4004.24258
+       4004.24226
       ],
       "interp": "linear"
      },
      {
       "time": 84.97081,
       "value": [
-       4004.26847
+       4004.26845
       ],
       "interp": "linear"
      },
@@ -38406,16 +38846,16 @@
      {
       "time": 62.4312,
       "value": [
-       -1.10182,
+       -1.10183,
        1.34476,
-       -2.67314
+       -2.67313
       ],
       "interp": "smooth"
      },
      {
       "time": 62.5312,
       "value": [
-       -0.68315,
+       -0.68316,
        1.29982,
        -2.90879
       ],
@@ -38424,7 +38864,7 @@
      {
       "time": 62.6312,
       "value": [
-       -0.17887,
+       -0.17888,
        1.25998,
        -3.05431
       ],
@@ -38433,7 +38873,7 @@
      {
       "time": 62.7312,
       "value": [
-       0.34163,
+       0.34162,
        1.23481,
        -3.06848
       ],
@@ -38442,27 +38882,27 @@
      {
       "time": 62.8312,
       "value": [
-       0.80749,
+       0.80748,
        1.22832,
-       -2.95411
+       -2.95412
       ],
       "interp": "smooth"
      },
      {
       "time": 62.9312,
       "value": [
-       1.16867,
+       1.16866,
        1.2383,
-       -2.75196
+       -2.75197
       ],
       "interp": "smooth"
      },
      {
       "time": 63.0312,
       "value": [
-       1.40906,
+       1.40905,
        1.25798,
-       -2.52182
+       -2.52183
       ],
       "interp": "smooth"
      },
@@ -38471,7 +38911,7 @@
       "value": [
        1.54131,
        1.2794,
-       -2.32754
+       -2.32755
       ],
       "interp": "smooth"
      },
@@ -38480,7 +38920,7 @@
       "value": [
        1.59503,
        1.29522,
-       -2.21439
+       -2.2144
       ],
       "interp": "smooth"
      },
@@ -38498,7 +38938,7 @@
       "value": [
        1.6549,
        1.25253,
-       -2.21506
+       -2.21505
       ],
       "interp": "smooth"
      },
@@ -38506,115 +38946,115 @@
       "time": 63.5312,
       "value": [
        1.7808,
-       1.14866,
-       -2.19103
+       1.14864,
+       -2.191
       ],
       "interp": "smooth"
      },
      {
       "time": 63.6312,
       "value": [
-       1.96078,
-       0.98877,
-       -2.1056
+       1.96076,
+       0.98873,
+       -2.10556
       ],
       "interp": "smooth"
      },
      {
       "time": 63.7312,
       "value": [
-       2.16641,
-       0.78061,
-       -1.92463
+       2.16637,
+       0.78056,
+       -1.92457
       ],
       "interp": "smooth"
      },
      {
       "time": 63.8312,
       "value": [
-       2.35586,
-       0.54279,
-       -1.61948
+       2.3558,
+       0.54272,
+       -1.61942
       ],
       "interp": "smooth"
      },
      {
       "time": 63.9312,
       "value": [
-       2.47745,
-       0.30659,
-       -1.17986
+       2.47737,
+       0.30649,
+       -1.17979
       ],
       "interp": "smooth"
      },
      {
       "time": 64.0312,
       "value": [
-       2.48028,
-       0.11216,
-       -0.62386
+       2.48018,
+       0.11205,
+       -0.62379
       ],
       "interp": "smooth"
      },
      {
       "time": 64.1312,
       "value": [
-       2.32896,
-       -0.0007,
-       -0.0001
+       2.32883,
+       -0.00081,
+       -3e-05
       ],
       "interp": "smooth"
      },
      {
       "time": 64.2312,
       "value": [
-       2.01669,
-       -0.00436,
-       0.62155
+       2.01656,
+       -0.00447,
+       0.62161
       ],
       "interp": "smooth"
      },
      {
       "time": 64.3312,
       "value": [
-       1.57046,
-       0.10702,
-       1.16845
+       1.57033,
+       0.10692,
+       1.1685
       ],
       "interp": "smooth"
      },
      {
       "time": 64.4312,
       "value": [
-       1.04534,
-       0.31437,
-       1.5861
+       1.04522,
+       0.31429,
+       1.58613
       ],
       "interp": "smooth"
      },
      {
       "time": 64.5312,
       "value": [
-       0.51044,
-       0.57833,
-       1.85297
+       0.51035,
+       0.57828,
+       1.85298
       ],
       "interp": "smooth"
      },
      {
       "time": 64.6312,
       "value": [
-       0.03279,
-       0.84902,
-       1.98352
+       0.03274,
+       0.84899,
+       1.98353
       ],
       "interp": "smooth"
      },
      {
       "time": 64.7312,
       "value": [
-       -0.33382,
-       1.0766,
+       -0.33385,
+       1.07659,
        2.01907
       ],
       "interp": "smooth"
@@ -38622,7 +39062,7 @@
      {
       "time": 64.8312,
       "value": [
-       -0.55137,
+       -0.55138,
        1.21872,
        2.01028
       ],
@@ -38640,7 +39080,7 @@
      {
       "time": 65.0312,
       "value": [
-       -0.60747,
+       -0.60746,
        1.2517,
        1.98239
       ],
@@ -38649,7 +39089,7 @@
      {
       "time": 65.1312,
       "value": [
-       -0.61258,
+       -0.61257,
        1.25294,
        1.96785
       ],
@@ -38658,675 +39098,675 @@
      {
       "time": 65.2312,
       "value": [
-       -0.61731,
+       -0.61729,
        1.25416,
-       1.95235
+       1.95234
       ],
       "interp": "smooth"
      },
      {
       "time": 65.3312,
       "value": [
-       -0.62177,
+       -0.62176,
        1.25537,
-       1.9359
+       1.93587
       ],
       "interp": "smooth"
      },
      {
       "time": 65.4312,
       "value": [
-       -0.62614,
+       -0.62612,
        1.25658,
-       1.91853
+       1.91849
       ],
       "interp": "smooth"
      },
      {
       "time": 65.5312,
       "value": [
-       -0.6306,
+       -0.63059,
        1.25784,
-       1.90032
+       1.90026
       ],
       "interp": "smooth"
      },
      {
       "time": 65.6312,
       "value": [
-       -0.63545,
+       -0.63543,
        1.25915,
-       1.88143
+       1.88135
       ],
       "interp": "smooth"
      },
      {
       "time": 65.7312,
       "value": [
-       -0.64108,
-       1.26056,
-       1.86222
+       -0.64107,
+       1.26057,
+       1.86211
       ],
       "interp": "smooth"
      },
      {
       "time": 65.8312,
       "value": [
-       -0.64815,
-       1.26211,
-       1.84347
+       -0.64814,
+       1.26212,
+       1.84333
       ],
       "interp": "smooth"
      },
      {
       "time": 65.9312,
       "value": [
-       -0.65745,
-       1.2638,
-       1.82714
+       -0.65747,
+       1.26381,
+       1.82697
       ],
       "interp": "smooth"
      },
      {
       "time": 66.0312,
       "value": [
-       -0.66842,
-       1.26538,
-       1.81738
+       -0.66846,
+       1.2654,
+       1.81723
       ],
       "interp": "smooth"
      },
      {
       "time": 66.1312,
       "value": [
-       -0.67542,
-       1.26633,
-       1.81726
+       -0.67514,
+       1.26631,
+       1.81724
       ],
       "interp": "smooth"
      },
      {
       "time": 66.2312,
       "value": [
-       -0.67773,
-       1.2667,
-       1.82023
+       -0.67689,
+       1.26661,
+       1.82008
       ],
       "interp": "smooth"
      },
      {
       "time": 66.3312,
       "value": [
-       -0.67739,
-       1.26676,
-       1.82347
+       -0.67597,
+       1.2666,
+       1.82287
       ],
       "interp": "smooth"
      },
      {
       "time": 66.4312,
       "value": [
-       -0.67541,
-       1.26664,
-       1.82628
+       -0.67339,
+       1.26641,
+       1.82502
       ],
       "interp": "smooth"
      },
      {
       "time": 66.5312,
       "value": [
-       -0.67228,
-       1.26639,
-       1.82851
+       -0.66966,
+       1.26611,
+       1.82634
       ],
       "interp": "smooth"
      },
      {
       "time": 66.6312,
       "value": [
-       -0.66828,
-       1.26607,
-       1.8301
+       -0.66507,
+       1.26573,
+       1.82681
       ],
       "interp": "smooth"
      },
      {
       "time": 66.7312,
       "value": [
-       -0.66361,
-       1.26568,
-       1.83107
+       -0.65981,
+       1.26529,
+       1.82651
       ],
       "interp": "smooth"
      },
      {
       "time": 66.8312,
       "value": [
-       -0.65839,
-       1.26524,
-       1.83144
+       -0.65401,
+       1.26481,
+       1.82546
       ],
       "interp": "smooth"
      },
      {
       "time": 66.9312,
       "value": [
-       -0.65274,
-       1.26478,
-       1.83129
+       -0.64778,
+       1.26431,
+       1.82374
       ],
       "interp": "smooth"
      },
      {
       "time": 67.0312,
       "value": [
-       -0.64672,
-       1.26429,
-       1.83063
+       -0.64119,
+       1.26378,
+       1.82143
       ],
       "interp": "smooth"
      },
      {
       "time": 67.1312,
       "value": [
-       -0.64041,
-       1.26379,
-       1.82956
+       -0.63432,
+       1.26325,
+       1.81862
       ],
       "interp": "smooth"
      },
      {
       "time": 67.2312,
       "value": [
-       -0.63387,
-       1.26328,
-       1.82813
+       -0.62722,
+       1.26271,
+       1.81538
       ],
       "interp": "smooth"
      },
      {
       "time": 67.3312,
       "value": [
-       -0.62715,
-       1.26277,
-       1.8264
+       -0.61994,
+       1.26218,
+       1.81179
       ],
       "interp": "smooth"
      },
      {
       "time": 67.4312,
       "value": [
-       -0.6203,
-       1.26227,
-       1.82445
+       -0.61254,
+       1.26165,
+       1.80793
       ],
       "interp": "smooth"
      },
      {
       "time": 67.5312,
       "value": [
-       -0.61337,
-       1.26176,
-       1.82234
+       -0.60506,
+       1.26113,
+       1.80392
       ],
       "interp": "smooth"
      },
      {
       "time": 67.6312,
       "value": [
-       -0.6064,
-       1.26127,
-       1.82014
+       -0.59754,
+       1.26062,
+       1.79982
       ],
       "interp": "smooth"
      },
      {
       "time": 67.7312,
       "value": [
-       -0.59942,
-       1.26079,
-       1.81793
+       -0.59003,
+       1.26013,
+       1.79572
       ],
       "interp": "smooth"
      },
      {
       "time": 67.8312,
       "value": [
-       -0.59248,
-       1.26032,
-       1.81576
+       -0.58255,
+       1.25965,
+       1.79173
       ],
       "interp": "smooth"
      },
      {
       "time": 67.9312,
       "value": [
-       -0.58562,
-       1.25987,
-       1.81371
+       -0.57516,
+       1.25919,
+       1.78791
       ],
       "interp": "smooth"
      },
      {
       "time": 68.0312,
       "value": [
-       -0.57887,
-       1.25943,
-       1.81185
+       -0.56788,
+       1.25875,
+       1.78437
       ],
       "interp": "smooth"
      },
      {
       "time": 68.1312,
       "value": [
-       -0.57226,
-       1.25901,
-       1.81026
+       -0.56075,
+       1.25833,
+       1.78119
       ],
       "interp": "smooth"
      },
      {
       "time": 68.2312,
       "value": [
-       -0.56584,
-       1.25861,
-       1.809
+       -0.55381,
+       1.25793,
+       1.77846
       ],
       "interp": "smooth"
      },
      {
       "time": 68.3312,
       "value": [
-       -0.55964,
-       1.25823,
-       1.80814
+       -0.5471,
+       1.25755,
+       1.77627
       ],
       "interp": "smooth"
      },
      {
       "time": 68.4312,
       "value": [
-       -0.55369,
-       1.25786,
-       1.80776
+       -0.54065,
+       1.25718,
+       1.77472
       ],
       "interp": "smooth"
      },
      {
       "time": 68.5312,
       "value": [
-       -0.54804,
-       1.25751,
-       1.80792
+       -0.5345,
+       1.25684,
+       1.77388
       ],
       "interp": "smooth"
      },
      {
       "time": 68.6312,
       "value": [
-       -0.54272,
-       1.25718,
-       1.8087
+       -0.52869,
+       1.25651,
+       1.77385
       ],
       "interp": "smooth"
      },
      {
       "time": 68.7312,
       "value": [
-       -0.53777,
-       1.25686,
-       1.81017
+       -0.52327,
+       1.25619,
+       1.77472
       ],
       "interp": "smooth"
      },
      {
       "time": 68.8312,
       "value": [
-       -0.53324,
-       1.25655,
-       1.8124
+       -0.51827,
+       1.25589,
+       1.77658
       ],
       "interp": "smooth"
      },
      {
       "time": 68.9312,
       "value": [
-       -0.52915,
-       1.25625,
-       1.81545
+       -0.51374,
+       1.2556,
+       1.77951
       ],
       "interp": "smooth"
      },
      {
       "time": 69.0312,
       "value": [
-       -0.52557,
-       1.25596,
-       1.81939
+       -0.50973,
+       1.25532,
+       1.78361
       ],
       "interp": "smooth"
      },
      {
       "time": 69.1312,
       "value": [
-       -0.52255,
-       1.25568,
-       1.8243
+       -0.50631,
+       1.25504,
+       1.78896
       ],
       "interp": "smooth"
      },
      {
       "time": 69.2312,
       "value": [
-       -0.52013,
-       1.2554,
-       1.83024
+       -0.50352,
+       1.25477,
+       1.79563
       ],
       "interp": "smooth"
      },
      {
       "time": 69.3312,
       "value": [
-       -0.51838,
-       1.25512,
-       1.83726
+       -0.50145,
+       1.25449,
+       1.80372
       ],
       "interp": "smooth"
      },
      {
       "time": 69.4312,
       "value": [
-       -0.51738,
-       1.25483,
-       1.84544
+       -0.50018,
+       1.25422,
+       1.8133
       ],
       "interp": "smooth"
      },
      {
       "time": 69.5312,
       "value": [
-       -0.51721,
-       1.25454,
-       1.85482
+       -0.4998,
+       1.25393,
+       1.82445
       ],
       "interp": "smooth"
      },
      {
       "time": 69.6312,
       "value": [
-       -0.51796,
-       1.25423,
-       1.86546
+       -0.50045,
+       1.25364,
+       1.83722
       ],
       "interp": "smooth"
      },
      {
       "time": 69.7312,
       "value": [
-       -0.51977,
-       1.25391,
-       1.87739
+       -0.50226,
+       1.25332,
+       1.85167
       ],
       "interp": "smooth"
      },
      {
       "time": 69.8312,
       "value": [
-       -0.52277,
-       1.25357,
-       1.89063
+       -0.50544,
+       1.25299,
+       1.86783
       ],
       "interp": "smooth"
      },
      {
       "time": 69.9312,
       "value": [
-       -0.52717,
-       1.25319,
-       1.90518
+       -0.51026,
+       1.25264,
+       1.8857
       ],
       "interp": "smooth"
      },
      {
       "time": 70.0312,
       "value": [
-       -0.53324,
-       1.25278,
-       1.921
+       -0.51706,
+       1.25226,
+       1.90522
       ],
       "interp": "smooth"
      },
      {
       "time": 70.1312,
       "value": [
-       -0.54133,
-       1.25232,
-       1.93794
+       -0.52639,
+       1.25184,
+       1.9262
       ],
       "interp": "smooth"
      },
      {
       "time": 70.2312,
       "value": [
-       -0.55197,
-       1.2518,
-       1.9557
+       -0.53901,
+       1.25138,
+       1.94821
       ],
       "interp": "smooth"
      },
      {
       "time": 70.3312,
       "value": [
-       -0.56593,
-       1.25121,
-       1.97368
+       -0.55613,
+       1.25089,
+       1.97025
       ],
       "interp": "smooth"
      },
      {
       "time": 70.4312,
       "value": [
-       -0.58429,
-       1.25052,
-       1.99049
+       -0.57943,
+       1.25036,
+       1.99001
       ],
       "interp": "smooth"
      },
      {
       "time": 70.5312,
       "value": [
-       -0.61325,
-       1.2474,
-       2.00006
+       -0.61572,
+       1.2462,
+       1.99908
       ],
       "interp": "smooth"
      },
      {
       "time": 70.6312,
       "value": [
-       -0.72472,
-       1.20963,
-       1.95215
+       -0.74207,
+       1.18851,
+       1.93755
       ],
       "interp": "smooth"
      },
      {
       "time": 70.7312,
       "value": [
-       -0.92191,
-       1.135,
-       1.82881
+       -0.95916,
+       1.07444,
+       1.78033
       ],
       "interp": "smooth"
      },
      {
       "time": 70.8312,
       "value": [
-       -1.17304,
-       1.03664,
-       1.62345
+       -1.22829,
+       0.92575,
+       1.52016
       ],
       "interp": "smooth"
      },
      {
       "time": 70.9312,
       "value": [
-       -1.44103,
-       0.92999,
-       1.33195
+       -1.50626,
+       0.76814,
+       1.15656
       ],
       "interp": "smooth"
      },
      {
       "time": 71.0312,
       "value": [
-       -1.68784,
-       0.83115,
-       0.95925
+       -1.751,
+       0.62816,
+       0.70205
       ],
       "interp": "smooth"
      },
      {
       "time": 71.1312,
       "value": [
-       -1.88001,
-       0.75455,
-       0.52255
+       -1.9287,
+       0.52882,
+       0.1844
       ],
       "interp": "smooth"
      },
      {
       "time": 71.2312,
       "value": [
-       -1.99443,
-       0.71056,
-       0.05022
+       -2.01999,
+       0.48513,
+       -0.35638
       ],
       "interp": "smooth"
      },
      {
       "time": 71.3312,
       "value": [
-       -2.02247,
-       0.70364,
-       -0.42313
+       -2.02373,
+       0.50108,
+       -0.87617
       ],
       "interp": "smooth"
      },
      {
       "time": 71.4312,
       "value": [
-       -1.97102,
-       0.73178,
-       -0.86368
+       -1.95584,
+       0.56947,
+       -1.33659
       ],
       "interp": "smooth"
      },
      {
       "time": 71.5312,
       "value": [
-       -1.85992,
-       0.78743,
-       -1.24528
+       -1.84395,
+       0.67451,
+       -1.71318
       ],
       "interp": "smooth"
      },
      {
       "time": 71.6312,
       "value": [
-       -1.71683,
-       0.85954,
-       -1.55374
+       -1.71958,
+       0.79648,
+       -1.99908
       ],
       "interp": "smooth"
      },
      {
       "time": 71.7312,
       "value": [
-       -1.57128,
-       0.93607,
-       -1.78771
+       -1.61081,
+       0.91643,
+       -2.20342
       ],
       "interp": "smooth"
      },
      {
       "time": 71.8312,
       "value": [
-       -1.44985,
-       1.00599,
-       -1.95609
+       -1.5378,
+       1.0195,
+       -2.34584
       ],
       "interp": "smooth"
      },
      {
       "time": 71.9312,
       "value": [
-       -1.37373,
-       1.06049,
-       -2.07338
+       -1.51206,
+       1.09599,
+       -2.44966
       ],
       "interp": "smooth"
      },
      {
       "time": 72.0312,
       "value": [
-       -1.35875,
-       1.09304,
-       -2.15427
+       -1.53899,
+       1.14028,
+       -2.5356
       ],
       "interp": "smooth"
      },
      {
       "time": 72.1312,
       "value": [
-       -1.41458,
-       1.09918,
-       -2.21313
+       -1.61997,
+       1.14929,
+       -2.6193
       ],
       "interp": "smooth"
      },
      {
       "time": 72.2312,
       "value": [
-       -1.47302,
-       1.08864,
-       -2.38505
+       -1.68688,
+       1.14318,
+       -2.76564
       ],
       "interp": "smooth"
      },
      {
       "time": 72.3312,
       "value": [
-       -1.49691,
-       1.07893,
-       -2.6757
+       -1.70869,
+       1.13771,
+       -2.97362
       ],
       "interp": "smooth"
      },
      {
       "time": 72.4312,
       "value": [
-       -1.50617,
-       1.0806,
-       -3.00053
+       -1.69686,
+       1.13862,
+       -3.20078
       ],
       "interp": "smooth"
      },
      {
       "time": 72.5312,
       "value": [
-       -1.55129,
-       1.09183,
-       -3.29582
+       -1.68539,
+       1.14548,
+       -3.4067
       ],
       "interp": "smooth"
      },
      {
       "time": 72.6312,
       "value": [
-       -1.68685,
-       1.10023,
-       -3.53901
+       -1.72266,
+       1.15046,
+       -3.56512
       ],
       "interp": "smooth"
      },
@@ -39334,7 +39774,7 @@
       "time": 72.6604,
       "value": [
        -1.75,
-       1.1,
+       1.15,
        -3.6
       ],
       "interp": "smooth"
@@ -39343,7 +39783,7 @@
       "time": 72.66045,
       "value": [
        -1.75,
-       1.1,
+       1.15,
        -3.6
       ],
       "interp": "step"
@@ -39351,313 +39791,313 @@
      {
       "time": 72.6606,
       "value": [
-       -1.0,
-       1.0,
-       -4.0
+       -1.75,
+       1.15,
+       -3.6
       ],
       "interp": "smooth"
      },
      {
       "time": 72.7606,
       "value": [
-       -0.96238,
-       0.99741,
-       -4.10787
+       -1.70965,
+       1.14147,
+       -3.7133
       ],
       "interp": "smooth"
      },
      {
       "time": 72.8606,
       "value": [
-       -0.88806,
-       0.99073,
-       -4.23075
+       -1.6236,
+       1.11887,
+       -3.87737
       ],
       "interp": "smooth"
      },
      {
       "time": 72.9606,
       "value": [
-       -0.78474,
-       0.98178,
-       -4.35998
+       -1.49203,
+       1.08714,
+       -4.07068
       ],
       "interp": "smooth"
      },
      {
       "time": 73.0606,
       "value": [
-       -0.65972,
-       0.97234,
-       -4.48724
+       -1.31661,
+       1.05164,
+       -4.27064
       ],
       "interp": "smooth"
      },
      {
       "time": 73.1606,
       "value": [
-       -0.52099,
-       0.96391,
-       -4.60587
+       -1.10558,
+       1.01758,
+       -4.45674
       ],
       "interp": "smooth"
      },
      {
       "time": 73.2606,
       "value": [
-       -0.37739,
-       0.95742,
-       -4.71152
+       -0.87544,
+       0.9891,
+       -4.61421
       ],
       "interp": "smooth"
      },
      {
       "time": 73.3606,
       "value": [
-       -0.23854,
-       0.95319,
-       -4.80197
+       -0.64956,
+       0.96849,
+       -4.73642
       ],
       "interp": "smooth"
      },
      {
       "time": 73.4606,
       "value": [
-       -0.11537,
-       0.95093,
-       -4.87595
+       -0.45581,
+       0.95599,
+       -4.8243
       ],
       "interp": "smooth"
      },
      {
       "time": 73.5606,
       "value": [
-       -0.02303,
-       0.95007,
-       -4.93246
+       -0.32589,
+       0.95048,
+       -4.88331
       ],
       "interp": "smooth"
      },
      {
       "time": 73.6606,
       "value": [
-       0.02807,
-       0.9499,
-       -4.9732
+       -0.27298,
+       0.94996,
+       -4.92118
       ],
       "interp": "smooth"
      },
      {
       "time": 73.7606,
       "value": [
-       0.06907,
-       0.94931,
-       -5.00178
+       -0.23116,
+       0.94971,
+       -4.9472
       ],
       "interp": "smooth"
      },
      {
       "time": 73.8606,
       "value": [
-       0.10091,
-       0.94824,
-       -5.02162
+       -0.19526,
+       0.94924,
+       -4.96514
       ],
       "interp": "smooth"
      },
      {
       "time": 73.9606,
       "value": [
-       0.12243,
-       0.94678,
-       -5.03589
+       -0.16649,
+       0.94859,
+       -4.97789
       ],
       "interp": "smooth"
      },
      {
       "time": 74.0606,
       "value": [
-       0.13386,
-       0.94506,
-       -5.04666
+       -0.14487,
+       0.94781,
+       -4.98737
       ],
       "interp": "smooth"
      },
      {
       "time": 74.1606,
       "value": [
-       0.13608,
-       0.9432,
-       -5.05502
+       -0.12987,
+       0.94696,
+       -4.99472
       ],
       "interp": "smooth"
      },
      {
       "time": 74.2606,
       "value": [
-       0.13022,
-       0.94135,
-       -5.06151
+       -0.12075,
+       0.9461,
+       -5.00055
       ],
       "interp": "smooth"
      },
      {
       "time": 74.3606,
       "value": [
-       0.11753,
-       0.93963,
-       -5.06633
+       -0.11665,
+       0.9453,
+       -5.0052
       ],
       "interp": "smooth"
      },
      {
       "time": 74.4606,
       "value": [
-       0.09927,
-       0.93815,
-       -5.0695
+       -0.11669,
+       0.94461,
+       -5.00881
       ],
       "interp": "smooth"
      },
      {
       "time": 74.5606,
       "value": [
-       0.07676,
-       0.937,
-       -5.07097
+       -0.11997,
+       0.94408,
+       -5.01145
       ],
       "interp": "smooth"
      },
      {
       "time": 74.6606,
       "value": [
-       0.05128,
-       0.93626,
-       -5.07068
+       -0.12559,
+       0.94373,
+       -5.01312
       ],
       "interp": "smooth"
      },
      {
       "time": 74.7606,
       "value": [
-       0.0241,
-       0.93596,
-       -5.0686
+       -0.13265,
+       0.9436,
+       -5.01385
       ],
       "interp": "smooth"
      },
      {
       "time": 74.8606,
       "value": [
-       -0.00353,
-       0.93612,
-       -5.06479
+       -0.14026,
+       0.94369,
+       -5.01364
       ],
       "interp": "smooth"
      },
      {
       "time": 74.9606,
       "value": [
-       -0.03038,
-       0.93673,
-       -5.05934
+       -0.14753,
+       0.94399,
+       -5.01256
       ],
       "interp": "smooth"
      },
      {
       "time": 75.0606,
       "value": [
-       -0.05528,
-       0.93775,
-       -5.05246
+       -0.15359,
+       0.94449,
+       -5.01069
       ],
       "interp": "smooth"
      },
      {
       "time": 75.1606,
       "value": [
-       -0.0771,
-       0.93912,
-       -5.04442
+       -0.1576,
+       0.94515,
+       -5.00817
       ],
       "interp": "smooth"
      },
      {
       "time": 75.2606,
       "value": [
-       -0.09474,
-       0.94076,
-       -5.03559
+       -0.15872,
+       0.94595,
+       -5.00519
       ],
       "interp": "smooth"
      },
      {
       "time": 75.3606,
       "value": [
-       -0.10718,
-       0.94256,
-       -5.02641
+       -0.15612,
+       0.94682,
+       -5.00196
       ],
       "interp": "smooth"
      },
      {
       "time": 75.4606,
       "value": [
-       -0.1134,
-       0.94442,
-       -5.0174
+       -0.149,
+       0.94771,
+       -4.99879
       ],
       "interp": "smooth"
      },
      {
       "time": 75.5606,
       "value": [
-       -0.11245,
-       0.9462,
-       -5.00915
+       -0.13658,
+       0.94855,
+       -4.996
       ],
       "interp": "smooth"
      },
      {
       "time": 75.6606,
       "value": [
-       -0.10339,
-       0.94778,
-       -5.00231
+       -0.11809,
+       0.94927,
+       -4.994
       ],
       "interp": "smooth"
      },
      {
       "time": 75.7606,
       "value": [
-       -0.08531,
-       0.94904,
-       -4.99761
+       -0.09277,
+       0.94982,
+       -4.99325
       ],
       "interp": "smooth"
      },
      {
       "time": 75.8606,
       "value": [
-       -0.05731,
-       0.94984,
-       -4.99585
+       -0.05988,
+       0.95012,
+       -4.9943
       ],
       "interp": "smooth"
      },
      {
       "time": 75.9606,
       "value": [
-       -0.01852,
-       0.95008,
-       -4.99791
+       -0.01871,
+       0.9501,
+       -4.99779
       ],
       "interp": "smooth"
      },
      {
       "time": 76.0606,
       "value": [
-       0.02731,
+       0.02729,
        0.94977,
        -5.00491
       ],
@@ -39666,189 +40106,189 @@
      {
       "time": 76.1606,
       "value": [
-       0.06249,
+       0.06243,
        0.94932,
-       -5.01765
+       -5.01764
       ],
       "interp": "smooth"
      },
      {
       "time": 76.2606,
       "value": [
-       0.08594,
+       0.08585,
        0.94886,
-       -5.03547
+       -5.03546
       ],
       "interp": "smooth"
      },
      {
       "time": 76.3606,
       "value": [
-       0.09847,
+       0.09836,
        0.94855,
-       -5.05741
+       -5.0574
       ],
       "interp": "smooth"
      },
      {
       "time": 76.4606,
       "value": [
-       0.10085,
+       0.10071,
        0.94859,
-       -5.08238
+       -5.08237
       ],
       "interp": "smooth"
      },
      {
       "time": 76.5606,
       "value": [
-       0.09383,
+       0.09368,
        0.9492,
-       -5.10921
+       -5.1092
       ],
       "interp": "smooth"
      },
      {
       "time": 76.6606,
       "value": [
-       0.07824,
+       0.07808,
        0.95059,
-       -5.13671
+       -5.13669
       ],
       "interp": "smooth"
      },
      {
       "time": 76.7606,
       "value": [
-       0.05497,
+       0.0548,
        0.95298,
-       -5.16371
+       -5.1637
       ],
       "interp": "smooth"
      },
      {
       "time": 76.8606,
       "value": [
-       0.02501,
+       0.02484,
        0.95654,
-       -5.18914
+       -5.18912
       ],
       "interp": "smooth"
      },
      {
       "time": 76.9606,
       "value": [
-       -0.01053,
+       -0.01069,
        0.9614,
-       -5.21205
+       -5.21203
       ],
       "interp": "smooth"
      },
      {
       "time": 77.0606,
       "value": [
-       -0.05043,
+       -0.05059,
        0.96765,
-       -5.23166
+       -5.23164
       ],
       "interp": "smooth"
      },
      {
       "time": 77.1606,
       "value": [
-       -0.09338,
+       -0.09352,
        0.97529,
-       -5.24742
+       -5.2474
       ],
       "interp": "smooth"
      },
      {
       "time": 77.2606,
       "value": [
-       -0.13798,
+       -0.13812,
        0.98429,
-       -5.25899
+       -5.25897
       ],
       "interp": "smooth"
      },
      {
       "time": 77.3606,
       "value": [
-       -0.18281,
+       -0.18293,
        0.99453,
-       -5.26633
+       -5.26631
       ],
       "interp": "smooth"
      },
      {
       "time": 77.4606,
       "value": [
-       -0.2264,
+       -0.22651,
        1.00583,
-       -5.26966
+       -5.26964
       ],
       "interp": "smooth"
      },
      {
       "time": 77.5606,
       "value": [
-       -0.26732,
+       -0.26742,
        1.01792,
-       -5.26946
+       -5.26944
       ],
       "interp": "smooth"
      },
      {
       "time": 77.6606,
       "value": [
-       -0.30419,
+       -0.30427,
        1.03051,
-       -5.26649
+       -5.26647
       ],
       "interp": "smooth"
      },
      {
       "time": 77.7606,
       "value": [
-       -0.3357,
+       -0.33577,
        1.04323,
-       -5.26173
+       -5.26172
       ],
       "interp": "smooth"
      },
      {
       "time": 77.8606,
       "value": [
-       -0.36064,
+       -0.36069,
        1.05568,
-       -5.25638
+       -5.25636
       ],
       "interp": "smooth"
      },
      {
       "time": 77.9606,
       "value": [
-       -0.37791,
+       -0.37795,
        1.06743,
-       -5.25177
+       -5.25175
       ],
       "interp": "smooth"
      },
      {
       "time": 78.0606,
       "value": [
-       -0.38652,
+       -0.38655,
        1.07803,
-       -5.24934
+       -5.24933
       ],
       "interp": "smooth"
      },
      {
       "time": 78.1606,
       "value": [
-       -0.38557,
+       -0.38559,
        1.08704,
-       -5.25056
+       -5.25055
       ],
       "interp": "smooth"
      },
@@ -39864,7 +40304,7 @@
      {
       "time": 78.3606,
       "value": [
-       -0.35166,
+       -0.35167,
        1.09851,
        -5.26958
       ],
@@ -40170,324 +40610,324 @@
      {
       "time": 81.4679,
       "value": [
-       4.0,
+       3.6,
        1.4,
-       -4.0
+       -4.6
       ],
       "interp": "smooth"
      },
      {
       "time": 81.5679,
       "value": [
-       4.09665,
-       1.39255,
-       -3.97812
+       3.79717,
+       1.39768,
+       -4.57721
       ],
       "interp": "smooth"
      },
      {
       "time": 81.6679,
       "value": [
-       4.17774,
-       1.36245,
-       -3.88426
+       4.03672,
+       1.37373,
+       -4.44899
       ],
       "interp": "smooth"
      },
      {
       "time": 81.7679,
       "value": [
-       4.23439,
-       1.31622,
-       -3.74267
+       4.2603,
+       1.33038,
+       -4.23144
       ],
       "interp": "smooth"
      },
      {
       "time": 81.8679,
       "value": [
-       4.26086,
-       1.26098,
-       -3.57988
+       4.40962,
+       1.27268,
+       -3.9566
       ],
       "interp": "smooth"
      },
      {
       "time": 81.9679,
       "value": [
-       4.2602,
-       1.20451,
-       -3.42287
+       4.44843,
+       1.21057,
+       -3.6681
       ],
       "interp": "smooth"
      },
      {
       "time": 82.0679,
       "value": [
-       4.24645,
-       1.15452,
-       -3.2954
+       4.38966,
+       1.15616,
+       -3.41457
       ],
       "interp": "smooth"
      },
      {
       "time": 82.1679,
       "value": [
-       4.24279,
-       1.11787,
-       -3.21495
+       4.31027,
+       1.11854,
+       -3.24808
       ],
       "interp": "smooth"
      },
      {
       "time": 82.2679,
       "value": [
-       4.27683,
-       1.10053,
-       -3.19305
+       4.28531,
+       1.10107,
+       -3.19199
       ],
       "interp": "smooth"
      },
      {
       "time": 82.3679,
       "value": [
-       4.35203,
-       1.10249,
-       -3.21841
+       4.34154,
+       1.10126,
+       -3.22631
       ],
       "interp": "smooth"
      },
      {
       "time": 82.4679,
       "value": [
-       4.41215,
-       1.10872,
-       -3.23053
+       4.38846,
+       1.10666,
+       -3.24685
       ],
       "interp": "smooth"
      },
      {
       "time": 82.5679,
       "value": [
-       4.45396,
-       1.11806,
-       -3.22644
+       4.42026,
+       1.11607,
+       -3.24861
       ],
       "interp": "smooth"
      },
      {
       "time": 82.6679,
       "value": [
-       4.47849,
-       1.13069,
-       -3.20906
+       4.43839,
+       1.12932,
+       -3.23509
       ],
       "interp": "smooth"
      },
      {
       "time": 82.7679,
       "value": [
-       4.48689,
-       1.14667,
-       -3.18198
+       4.44428,
+       1.14614,
+       -3.21004
       ],
       "interp": "smooth"
      },
      {
       "time": 82.8679,
       "value": [
-       4.48092,
-       1.16585,
-       -3.1491
+       4.43969,
+       1.16612,
+       -3.17726
       ],
       "interp": "smooth"
      },
      {
       "time": 82.9679,
       "value": [
-       4.46329,
-       1.18769,
-       -3.11424
+       4.42693,
+       1.18858,
+       -3.14048
       ],
       "interp": "smooth"
      },
      {
       "time": 83.0679,
       "value": [
-       4.43786,
-       1.2113,
-       -3.08077
+       4.409,
+       1.21249,
+       -3.10316
       ],
       "interp": "smooth"
      },
      {
       "time": 83.1679,
       "value": [
-       4.40956,
-       1.23534,
-       -3.05132
+       4.38961,
+       1.23653,
+       -3.06839
       ],
       "interp": "smooth"
      },
      {
       "time": 83.2679,
       "value": [
-       4.38421,
-       1.25815,
-       -3.02764
+       4.37307,
+       1.25911,
+       -3.03874
       ],
       "interp": "smooth"
      },
      {
       "time": 83.3679,
       "value": [
-       4.36814,
-       1.27781,
-       -3.01064
+       4.36416,
+       1.27841,
+       -3.01625
       ],
       "interp": "smooth"
      },
      {
       "time": 83.4679,
       "value": [
-       4.36763,
-       1.29227,
-       -3.00073
+       4.36785,
+       1.29251,
+       -3.00252
       ],
       "interp": "smooth"
      },
      {
       "time": 83.5679,
       "value": [
-       4.38831,
-       1.29951,
-       -2.99869
+       4.38891,
+       1.29953,
+       -2.99885
       ],
       "interp": "smooth"
      },
      {
       "time": 83.6679,
       "value": [
-       4.42544,
+       4.42347,
        1.30237,
-       -3.00068
+       -3.00051
       ],
       "interp": "smooth"
      },
      {
       "time": 83.7679,
       "value": [
-       4.45304,
-       1.31387,
-       -2.99079
+       4.44902,
+       1.3139,
+       -2.99073
       ],
       "interp": "smooth"
      },
      {
       "time": 83.8679,
       "value": [
-       4.47031,
-       1.33383,
-       -2.97044
+       4.46496,
+       1.33387,
+       -2.97069
       ],
       "interp": "smooth"
      },
      {
       "time": 83.9679,
       "value": [
-       4.47851,
-       1.36104,
-       -2.94216
+       4.47246,
+       1.3611,
+       -2.94278
       ],
       "interp": "smooth"
      },
      {
       "time": 84.0679,
       "value": [
-       4.47898,
-       1.39429,
-       -2.90828
+       4.47276,
+       1.39435,
+       -2.90924
       ],
       "interp": "smooth"
      },
      {
       "time": 84.1679,
       "value": [
-       4.47315,
-       1.43225,
-       -2.8709
+       4.4672,
+       1.43231,
+       -2.87212
       ],
       "interp": "smooth"
      },
      {
       "time": 84.2679,
       "value": [
-       4.46261,
-       1.47347,
-       -2.83187
+       4.45726,
+       1.47351,
+       -2.83324
       ],
       "interp": "smooth"
      },
      {
       "time": 84.3679,
       "value": [
-       4.4491,
-       1.5163,
-       -2.79278
+       4.44458,
+       1.51633,
+       -2.79417
       ],
       "interp": "smooth"
      },
      {
       "time": 84.4679,
       "value": [
-       4.4345,
-       1.55897,
-       -2.75492
+       4.43095,
+       1.55898,
+       -2.75622
       ],
       "interp": "smooth"
      },
      {
       "time": 84.5679,
       "value": [
-       4.42081,
+       4.41827,
        1.59953,
-       -2.71925
+       -2.72036
       ],
       "interp": "smooth"
      },
      {
       "time": 84.6679,
       "value": [
-       4.41012,
-       1.63592,
-       -2.68644
+       4.40852,
+       1.63591,
+       -2.68727
       ],
       "interp": "smooth"
      },
      {
       "time": 84.7679,
       "value": [
-       4.40448,
-       1.66601,
-       -2.65682
+       4.40366,
+       1.666,
+       -2.65733
       ],
       "interp": "smooth"
      },
      {
       "time": 84.8679,
       "value": [
-       4.40572,
-       1.68769,
-       -2.63041
+       4.40546,
+       1.68768,
+       -2.63062
       ],
       "interp": "smooth"
      },
      {
       "time": 84.9679,
       "value": [
-       4.41517,
-       1.69892,
-       -2.60697
+       4.41516,
+       1.69891,
+       -2.60698
       ],
       "interp": "smooth"
      },
@@ -40496,7 +40936,7 @@
       "value": [
        4.42931,
        1.68934,
-       -2.57769
+       -2.57768
       ],
       "interp": "smooth"
      },
@@ -40514,7 +40954,7 @@
       "value": [
        4.4397,
        1.54478,
-       -2.44545
+       -2.44544
       ],
       "interp": "smooth"
      },
@@ -40532,7 +40972,7 @@
       "value": [
        4.43722,
        1.28234,
-       -2.27386
+       -2.27385
       ],
       "interp": "smooth"
      },
@@ -40541,7 +40981,7 @@
       "value": [
        4.43402,
        1.13079,
-       -2.19254
+       -2.19253
       ],
       "interp": "smooth"
      },
@@ -67887,7 +68327,7 @@
       "interp": "step"
      },
      {
-      "time": 72.41,
+      "time": 72.37,
       "value": [
        1.0
       ],
@@ -68046,7 +68486,7 @@
       "interp": "step"
      },
      {
-      "time": 72.41,
+      "time": 72.37,
       "value": [
        0.0
       ],

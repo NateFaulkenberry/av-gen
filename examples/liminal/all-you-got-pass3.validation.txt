@@ -206,23 +206,32 @@ move v1w03 along wall -x to [-2.595,2.166,-1.08]
 (in: liv)
 
 WARNING
-v1w04 intersects livCurtain: text overlaps it by 2%
-overlap: 0.022
+v1w04 is jammed against livCurtain (0.06m of a 0.15m margin)
+gap: 0.062
+margin: 0.15
+
+Suggested correction:
+move v1w04 along wall +z to [1.476,2.109,2.195]
+(in: liv)
+
+WARNING
+v1w06 intersects livCurtain: text overlaps it by 1%
+overlap: 0.005
 
 Expected relationship:
 on a clear wall section
 
 Suggested correction:
-move v1w04 along wall +z to [1.467,1.909,2.195]
+move v1w06 along wall +z to [1.137,1.794,2.195]
 (in: liv)
 
 WARNING
 v1k00 is jammed against WallCupboard (0.12m of a 0.15m margin)
-gap: 0.121
+gap: 0.122
 margin: 0.15
 
 Suggested correction:
-move v1k00 along wall -z to [-0.065,2.347,-6.395]
+move v1k00 along wall -z to [-0.023,2.346,-6.395]
 (in: liv)
 
 WARNING
@@ -624,17 +633,12 @@ distance: 0.111
 (in: street)
 
 WARNING
-camera path of chapter 'liv' grazes 'livShell' (0.05m away at path metres 2.1-2.1)
+camera path of chapter 'liv' grazes 'livShell' (0.05m away at path metres 2.1-14.0)
 distance: 0.05
 (in: liv)
 
 WARNING
-camera path of chapter 'kit' grazes 'livShell' (0.10m away at path metres 2.1-2.1)
-distance: 0.105
-(in: kit)
-
-WARNING
-camera path of chapter 'kit' grazes 'kitShell' (0.10m away at path metres 2.3-2.5)
+camera path of chapter 'kit' grazes 'livShell' (0.10m away at path metres 2.2-2.2)
 distance: 0.101
 (in: kit)
 
@@ -675,5 +679,5 @@ PASS
 5 furniture relationships
 13 character poses
 150 entities complete
-181 lyric placements
+180 lyric placements
 12 camera paths clear
