@@ -57,9 +57,11 @@ def build_part2(b, end):
                         ("treeC", OD.tree_branch_group(range(10, 14)), "furn", (-6, 20, -6), (6, 34, 6), far)],
             "lights": []}
     b.world("tree", tree)
-    sky = {"objects": [("ringLow", OD.lantern_ring(16.0, 7, 9.0, "ringLowRot"), "furn2", (-22, 4, -22), (22, 16, 22), far),
-                       ("ringHigh", OD.lantern_ring(24.0, 9, 22.0, "ringHighRot"), "furn", (-30, 16, -30), (30, 30, 30), far),
-                       ("stair", K.T([-14.0, OD.ground(-14, 0) - 0.2, 0.0], OD.sky_stair(40, 0.45, 0.32, 2.4)), "furn2",
+    rings = {"objects": [("ringLow", OD.lantern_ring(16.0, 7, 9.0, "ringLowRot"), "furn2", (-22, 4, -22), (22, 16, 22), far),
+                         ("ringHigh", OD.lantern_ring(24.0, 9, 22.0, "ringHighRot"), "furn", (-30, 16, -30), (30, 30, 30), far)],
+             "lights": []}
+    b.world("rings", rings)
+    sky = {"objects": [("stair", K.T([-14.0, OD.ground(-14, 0) - 0.2, 0.0], OD.sky_stair(40, 0.45, 0.32, 2.4)), "furn2",
                         (-15, -3, -3), (5, 15, 3), far),
                        ("summit", K.T([10.0, 14.2, 0.0], OD.summit()), "wall", (3, 12.5, -7), (17, 16.0, 7), far),
                        ("sun", K.T([8.0, -8.0, -170.0], K.T([0, 0, 0], OD.sun_disc(8.0), name="sunAt")), "furn2",
@@ -72,7 +74,7 @@ def build_part2(b, end):
         "lifetimeMin": 900.0, "lifetimeMax": 1000.0, "speedMin": 0.0, "speedMax": 0.0, "spread": 1.0, "gravity": [0.0, 0.0, 0.0],
         "sizeStart": 0.22, "sizeEnd": 0.22, "blend": "additive", "colorStart": [0.85, 0.9, 1.0, 0.9],
         "colorEnd": [0.85, 0.9, 1.0, 0.9]}})
-    b.worlds["sky"]["names"].append("stars")
+    b.worlds["rings"]["names"].append("stars")
     fw_cols = {"fwA": ([1.0, 0.3, 0.85, 1.0], [0.55, 0.2, 1.0, 0.0]), "fwB": ([0.4, 0.95, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0]),
                "fwC": ([1.0, 0.82, 0.3, 1.0], [1.0, 0.35, 0.1, 0.0])}
     for nm_, (c0, c1) in fw_cols.items():
@@ -373,13 +375,13 @@ def build_part2(b, end):
             (x, y, z), _yaw = OD.tree_room_pose(i)
             look_tree.append((tb, (x * 0.45, y + 0.4, z * 0.45)))
     look_tree = [(t(67), (0.0, 7.0, 0.0))] + look_tree + [(t(71), (0.0, 22.0, 0.0))]
-    b.shot("tree", t(67), t(71), spiral, None, keys=("tree", "land", "sky"), look_keys=look_tree, fov=68.0, ease_kind="linear")
-    b.shot("treeReveal", t(71), t(73), [[10.0, 18.0, 12.0], [17.0, 20.0, 19.0], [24.0, 21.0, 26.0]], None, keys=("tree", "land", "sky"),
+    b.shot("tree", t(67), t(71), spiral, None, keys=("tree", "land", "rings"), look_keys=look_tree, fov=68.0, ease_kind="linear")
+    b.shot("treeReveal", t(71), t(73), [[10.0, 18.0, 12.0], [17.0, 20.0, 19.0], [24.0, 21.0, 26.0]], None, keys=("tree", "land", "rings"),
            look_keys=[(t(71), (0.0, 17.0, 0.0)), (t(73), (0.0, 14.0, 0.0))], fov=62.0)
     r12, yaw12 = OD.tree_room_pose(12)
     win = [r12[0] * 1.32, r12[1] + 1.0, r12[2] * 1.32]
     b.shot("treeLand", t(73), t(75), [[20.0, 30.0, 18.0], [12.0, r12[1] + 3.5, 10.0], [win[0] * 1.6, win[1] + 0.4, win[2] * 1.6], win],
-           None, keys=("tree", "land", "sky"), look_keys=[(t(73), (0.0, 22.0, 0.0)), (t(73, 3), (r12[0] * 0.5, r12[1] + 1.0, r12[2] * 0.5)),
+           None, keys=("tree", "land", "rings"), look_keys=[(t(73), (0.0, 22.0, 0.0)), (t(73, 3), (r12[0] * 0.5, r12[1] + 1.0, r12[2] * 0.5)),
                                                          (t(75), tuple(r12))],
            fov=[(t(73), 60.0), (t(75), 70.0)], ease_kind="inout")
     for i, tb in enumerate(blooms):
@@ -542,7 +544,7 @@ def build_part2(b, end):
     gy = OD.ground
     chA = [[0.0, gy(0, 46) + 2.2, 46.0], [2.0, gy(2, 34) + 2.6, 34.0], [-1.5, gy(-1.5, 22) + 4.0, 22.0], [-4.0, gy(-4, 10) + 7.5, 10.0],
            [-2.0, gy(-2, 0) + 10.0, 2.0]]
-    b.shot("chorusA", t(91), t(99), chA, None, keys=("land", "sky"),
+    b.shot("chorusA", t(91), t(99), chA, None, keys=("land", "rings", "sky"),
            look_keys=[(t(91), (0.0, 3.0, 0.0)), (t(93), (-3.0, 5.0, -20.0)), (t(95), (6.0, 8.0, -30.0)), (t(97), (-10.0, 9.0, -20.0)),
                       (t(99), (-14.0, 4.0, 0.0))], fov=[(t(91), 72.0), (t(93), 64.0), (t(99), 62.0)], ease_kind="linear")
     # LET IT GO, twice a bar, written across the hills: giant letters lying on the slopes
@@ -579,7 +581,7 @@ def build_part2(b, end):
         return [sx0 + dx, sy0 + min(max(dx, 0.0), 18.0) * slope + 1.85, z]
     stair_eye = [on_stair(-6.0, 2.4), on_stair(-1.5, 1.4), on_stair(3.0, 0.6), on_stair(8.0, 0.2), on_stair(13.0, 0.0),
                  on_stair(17.0, 0.0), on_stair(20.5, 0.0)]
-    b.shot("stair", t(99), t(107), stair_eye, None, keys=("land", "sky"),
+    b.shot("stair", t(99), t(107), stair_eye, None, keys=("land", "rings", "sky"),
            look_keys=[(t(99), (sx0 + 6.0, sy0 + 3.0, 0.0)), (t(103), (sx0 + 16.0, sy0 + 10.0, 0.0)), (t(107), (10.0, 14.0, 0.0))],
            fov=64.0, ease_kind="linear")
     words = ["IT'S", "JUST", "STEPS", "IN", "A", "PROCESS"]
@@ -595,7 +597,7 @@ def build_part2(b, end):
     b.pulse("sdf/stair/look/edge/intensity", 3.0, "quarter", g_ch)
     # bars 107-112: the summit; LET IT GO chants in the ring; fireworks of geometry on 2 and 4
     sum_eye = [[5.5, 16.0, 3.5], [8.5, 16.1, 4.8], [12.5, 16.2, 3.6], [14.5, 16.3, -0.8]]
-    b.shot("summit", t(107), t(114), sum_eye, None, keys=("land", "sky"),
+    b.shot("summit", t(107), t(114), sum_eye, None, keys=("land", "rings", "sky"),
            look_keys=[(t(107), (10.0, 15.5, -4.0)), (t(109), (0.0, 22.0, 0.0)), (t(111), (-10.0, 20.0, -10.0)),
                       (t(112, 3), (10.0, 15.0, 0.0)), (t(113), (10.0, 15.0, 0.0)), (t(114), (10.0, 18.0, 0.0))],
            fov=[(t(107), 66.0), (t(112, 3), 66.0), (t(113), 50.0), (t(113) + 0.4, 84.0), (t(114), 76.0)], ease_kind="linear",
@@ -662,7 +664,7 @@ def build_part2(b, end):
     # the cursor it began as
     # =========================================================================================================
     dawn_eye = [[3.0, gy(3, -8) + 1.9, -8.0], [2.0, gy(2, -10) + 1.85, -10.5], [1.2, gy(1.2, -12) + 1.8, -12.6]]
-    b.shot("dawn", t(114), 255.0, dawn_eye, None, keys=("land", "sky", "hillman"),
+    b.shot("dawn", t(114), 255.0, dawn_eye, None, keys=("land", "rings", "sky", "hillman"),
            look_keys=[(t(114), (2.0, 1.0, -40.0)), (252.0, (3.0, 3.0, -60.0)), (255.0, (4.0, 5.0, -80.0))],
            fov=[(t(114), 60.0), (255.0, 54.0)])
     f.track("sdf/sun/node/sunAt/translation", [(0.0, [0.0, -40.0, 0.0], "step"), (t(114), [0.0, -14.0, 0.0], "smooth"),
