@@ -233,6 +233,18 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.sweepSpan = &params.add(f("post/sweep/span", s.sweepSpan, 0.0f, 16.0f, 0.0f, 4.0f));
     p.sweepHue = &params.add(f("post/sweep/hue", s.sweepHue, -16.0f, 16.0f, 0.0f, 1.0f));
     p.sweepTrail = &params.add(f("post/sweep/trail", s.sweepTrail, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-1055: the world wave.
+    p.waveOrigin = &params.add(v3("post/wave/origin", s.waveOrigin, -1e5f, 1e5f));
+    p.waveDirection = &params.add(v3("post/wave/direction", s.waveDirection, -1.0f, 1.0f));
+    p.waveProgress = &params.add(f("post/wave/progress", s.waveProgress, -1e5f, 1e5f, -10.0f, 40.0f));
+    p.waveWidth = &params.add(f("post/wave/width", s.waveWidth, 0.01f, 1000.0f, 0.1f, 5.0f));
+    p.waveIntensity = &params.add(f("post/wave/intensity", s.waveIntensity, 0.0f, 1000.0f, 0.0f, 8.0f));
+    p.waveColor = &params.add(v3("post/wave/color", s.waveColor, 0.0f, 100.0f, true));
+    p.waveHue = &params.add(f("post/wave/hue", s.waveHue, -16.0f, 16.0f, 0.0f, 1.0f));
+    p.waveHueSpan = &params.add(f("post/wave/hueSpan", s.waveHueSpan, 0.0f, 16.0f, 0.0f, 4.0f));
+    p.waveEdgeTint = &params.add(f("post/wave/edgeTint", s.waveEdgeTint, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.waveTrail = &params.add(f("post/wave/trail", s.waveTrail, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.waveTrailColor = &params.add(v3("post/wave/trailColor", s.waveTrailColor, 0.0f, 100.0f, true));
     return p;
 }
 
@@ -286,6 +298,10 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"sweepProgress", p.sweepProgress}, {"sweepWidth", p.sweepWidth}, {"sweepIntensity", p.sweepIntensity},
         {"sweepWash", p.sweepWash},         {"sweepAngle", p.sweepAngle}, {"sweepSpan", p.sweepSpan},
         {"sweepHue", p.sweepHue},           {"sweepTrail", p.sweepTrail},
+        // ADR-1055
+        {"waveProgress", p.waveProgress},   {"waveWidth", p.waveWidth},       {"waveIntensity", p.waveIntensity},
+        {"waveHue", p.waveHue},             {"waveHueSpan", p.waveHueSpan},   {"waveEdgeTint", p.waveEdgeTint},
+        {"waveTrail", p.waveTrail},
     };
     const std::pair<const char*, params::Parameter<bool>*> bools[] = {
         {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
@@ -304,6 +320,10 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"halationTint", p.halationTint},
         {"anamorphicTint", p.anamorphicTint},
         {"lookAtmosphericTint", p.lookAtmosphericTint},
+        {"waveOrigin", p.waveOrigin}, // ADR-1055
+        {"waveDirection", p.waveDirection},
+        {"waveColor", p.waveColor},
+        {"waveTrailColor", p.waveTrailColor},
     };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;
@@ -458,6 +478,19 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
         s.sweepSpan = p.sweepSpan->value();
         s.sweepHue = p.sweepHue->value();
         s.sweepTrail = p.sweepTrail->value();
+    }
+    if (p.waveProgress != nullptr) { // ADR-1055
+        s.waveOrigin = p.waveOrigin->value();
+        s.waveDirection = p.waveDirection->value();
+        s.waveProgress = p.waveProgress->value();
+        s.waveWidth = p.waveWidth->value();
+        s.waveIntensity = p.waveIntensity->value();
+        s.waveColor = p.waveColor->value();
+        s.waveHue = p.waveHue->value();
+        s.waveHueSpan = p.waveHueSpan->value();
+        s.waveEdgeTint = p.waveEdgeTint->value();
+        s.waveTrail = p.waveTrail->value();
+        s.waveTrailColor = p.waveTrailColor->value();
     }
 }
 

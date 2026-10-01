@@ -45,7 +45,49 @@ struct SdfObjectUniforms {
                             // ADR-1052: w = rim power
     look5: vec4<f32>,       // ADR-1052: rim colour rgb, rim intensity (0 = off)
     look6: vec4<f32>,       // ADR-1054: static cell (local units), rate (Hz), roll strength, 0
+    // ADR-1055: the world wave: origin + progress, direction + width, colour + intensity, trail colour + trail,
+    // (hue, hue span, edge tint, 1 = on).
+    wave0: vec4<f32>,
+    wave1: vec4<f32>,
+    wave2: vec4<f32>,
+    wave3: vec4<f32>,
+    wave4: vec4<f32>,
 };
+
+// ADR-1055: the world wave at a world point -- the band's colour, how much of the band is here, and how
+// far behind the front the point is (0 ahead .. 1 passed).
+struct SdfWaveSample {
+    color: vec3<f32>,
+    band: f32,
+    behind: f32,
+};
+
+fn sdfWaveAt(worldPos: vec3<f32>) -> SdfWaveSample {
+    var w: SdfWaveSample;
+    let x = dot(worldPos - sdf.wave0.xyz, sdf.wave1.xyz);
+    let f = sdf.wave0.w - x;            // metres behind the front (> 0 = already passed)
+    let width = sdf.wave1.w;
+    w.band = exp(-(f / width) * (f / width));
+    w.behind = smoothstep(-width, width, f);
+    if (sdf.wave4.y > 0.0) {
+        let t = sdf.wave4.x + sdf.wave4.y * clamp(f / (2.0 * width), -1.0, 1.0);
+        w.color = 0.5 + 0.5 * cos(6.28318531 * (vec3<f32>(t) + vec3<f32>(0.0, 0.33333, 0.66667)));
+    } else {
+        w.color = sdf.wave2.xyz;
+    }
+    return w;
+}
+
+// Recolour `base` toward the wave: inside the band to its colour (edge tint), behind it to the trail colour,
+// keeping the base's luminance so lines keep their brightness and only change hue.
+fn sdfWaveRecolor(base: vec3<f32>, w: SdfWaveSample) -> vec3<f32> {
+    let lum = dot(base, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let bandC = w.color / max(dot(w.color, vec3<f32>(0.2126, 0.7152, 0.0722)), 1e-3) * lum;
+    let trailC = sdf.wave3.xyz / max(dot(sdf.wave3.xyz, vec3<f32>(0.2126, 0.7152, 0.0722)), 1e-3) * lum;
+    let tBand = clamp(w.band * sdf.wave4.z, 0.0, 1.0);
+    let tTrail = clamp(w.behind * sdf.wave3.w, 0.0, 1.0) * (1.0 - tBand);
+    return base * (1.0 - tBand - tTrail) + bandC * tBand + trailC * tTrail;
+}
 
 // ADR-1002: step statistics, accumulated by the lit pass on every 4th pixel in x and y.
 // [0] sum of steps, [1] max steps, [2] sampled rays, [3] hits, [4] rays that ran out of steps.
@@ -327,6 +369,13 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
             emissiveMul = emissiveMul * k;
         }
     }
+    // ADR-1055: the world wave recolours this surface's emission (and, below, its edges) and adds its light.
+    var wave: SdfWaveSample;
+    let waveOn = sdf.wave4.w > 0.5;
+    if (waveOn) {
+        wave = sdfWaveAt(worldPos);
+        emissiveMul = sdfWaveRecolor(emissiveMul, wave);
+    }
     var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, colorMul, emissiveMul,
                               materialInstanceZero(pL), screenUv);
     // ADR-1002: the field's own occlusion, soft shadow and edge emission. A cheap version: occlusion and
@@ -363,7 +412,11 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
         // a repeated structure's edges stayed at full strength to the march's end, which read as a flat
         // wireframe with no depth and aliased into moire where the edges shrank below a pixel.
         let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
-        let glow = sdf.look1.xyz * edgeMul * (sdf.look0.z * edge * transmittance);
+        var edgeColor = sdf.look1.xyz * edgeMul;
+        if (waveOn) {
+            edgeColor = sdfWaveRecolor(edgeColor, wave); // ADR-1055
+        }
+        let glow = edgeColor * (sdf.look0.z * edge * transmittance);
         shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
         shaded.emission = shaded.emission + glow;
     }
@@ -374,6 +427,13 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
         let rim = pow(1.0 - facing, sdf.look4.w);
         let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
         let glow = sdf.look5.xyz * (sdf.look5.w * rimMul * rim * transmittance);
+        shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
+        shaded.emission = shaded.emission + glow;
+    }
+    if (waveOn && sdf.wave2.w > 0.0) {
+        // ADR-1055: the band's own light on the surface, fogged like the edges.
+        let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
+        let glow = wave.color * (sdf.wave2.w * wave.band * transmittance);
         shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
         shaded.emission = shaded.emission + glow;
     }

@@ -1217,6 +1217,85 @@ TEST_CASE("SDF screen static: snow that changes with time, repeats at the same t
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SDF world wave: a band of light travels through the world and recolours the lines behind it (ADR-1055)",
+          "[gpu][sdf][liminal][adr1055]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "wall";
+    // Three separate slabs in a row, facing the camera, with luminous white edge lines.
+    o.tree = treeOf(combo(SdfNodeKind::Union, {translate(glm::vec3(-2.0f, 0.0f, 0.0f), box(glm::vec3(0.8f, 1.0f, 0.2f))),
+                                               box(glm::vec3(0.8f, 1.0f, 0.2f)),
+                                               translate(glm::vec3(2.0f, 0.0f, 0.0f), box(glm::vec3(0.8f, 1.0f, 0.2f)))}));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    o.compile = true;
+    o.material.baseColor = glm::vec3(0.02f);
+    o.look.edgeIntensity = 6.0f;
+    o.look.edgeColor = glm::vec3(1.0f);
+    o.look.edgeWidth = 0.05f;
+    s.sdfs.push_back(o);
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](float progress, float intensity, float trail) {
+        scene::Scene copy = s;
+        copy.post.waveOrigin = glm::vec3(-4.0f, 0.0f, 0.0f);
+        copy.post.waveDirection = glm::vec3(1.0f, 0.0f, 0.0f);
+        copy.post.waveProgress = progress;
+        copy.post.waveWidth = 0.4f;
+        copy.post.waveIntensity = intensity;
+        copy.post.waveColor = glm::vec3(1.0f, 0.0f, 0.0f);
+        copy.post.waveTrail = trail;
+        copy.post.waveTrailColor = glm::vec3(0.0f, 1.0f, 0.0f);
+        return renderWith(renderer, copy, 0.5, 192, 192);
+    };
+    // The mean x of the red pixels (the band's light), and the counts of red and green pixels.
+    struct Stats {
+        double redX = -1.0;
+        long red = 0;
+        long green = 0;
+    };
+    const auto stats = [](const gpu::Image8& img) {
+        Stats st;
+        double sx = 0.0;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const auto* px = img.pixel(x, y);
+                if (px[0] > 100 && px[0] > px[1] + 60 && px[0] > px[2] + 60) {
+                    ++st.red;
+                    sx += x;
+                }
+                if (px[1] > 100 && px[1] > px[0] + 60 && px[1] > px[2] + 60) {
+                    ++st.green;
+                }
+            }
+        }
+        if (st.red > 0) st.redX = sx / static_cast<double>(st.red);
+        return st;
+    };
+    const auto plain = render(2.0f, 0.0f, 0.0f);
+    const auto offElsewhere = render(5.0f, 0.0f, 0.0f);
+    const bool same = plain.rgba == offElsewhere.rgba;
+    CHECK(same); // off: the progress changes nothing
+    const Stats p0 = stats(plain);
+    CHECK(p0.red == 0);
+    const Stats left = stats(render(2.0f, 4.0f, 0.0f));  // the front at x = -2: the left slab
+    const Stats right = stats(render(6.0f, 4.0f, 0.0f)); // the front at x = +2: the right slab
+    INFO("red: left " << left.red << " at x " << left.redX << ", right " << right.red << " at x " << right.redX);
+    CHECK(left.red > 100);
+    CHECK(right.red > 100);
+    CHECK(left.redX < 80.0);
+    CHECK(right.redX > 112.0);
+    // The trail: once the front has passed everything, the white lines are green.
+    const Stats trailed = stats(render(12.0f, 0.0f, 1.0f));
+    INFO("green lines after the trail: " << trailed.green);
+    CHECK(trailed.green > 100);
+    CHECK(stats(render(12.0f, 0.0f, 0.0f)).green == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF compiled trees deeper than the interpreter's stacks render (ADR-1005)", "[gpu][sdf]") {
     auto ctx = makeContext();
     scene::Scene s = baseScene();

@@ -240,6 +240,26 @@ struct PostSettings {
     float sweepSpan = 1.0f;      // hue cycles across the band (1 = one rainbow)
     float sweepHue = 0.0f;       // hue offset in turns
     float sweepTrail = 0.0f;     // 0..1: wash left behind the band once it has passed
+
+    // ---- ADR-1055: the world wave ------------------------------------------------------------------
+    // A band of coloured light that travels THROUGH the world (unlike the sweep, which crosses the
+    // frame): a plane front at `waveProgress` metres from `waveOrigin` along `waveDirection`, `waveWidth`
+    // metres half-wide. Every ray-marched SDF surface it crosses gains `waveIntensity` of light in the
+    // band's colour, its edge lines and emission are recoloured toward the band (`waveEdgeTint`), and
+    // behind the front they are pulled toward `waveTrailColor` by `waveTrail` -- the new palette left
+    // behind. Shared by every SDF object, so one wave sweeps the whole house. Off (byte-identical)
+    // while intensity, edge tint and trail are all 0.
+    glm::vec3 waveOrigin{0.0f};
+    glm::vec3 waveDirection{0.0f, 0.0f, -1.0f};
+    float waveProgress = 0.0f;   // metres the front has travelled from the origin
+    float waveWidth = 0.6f;      // half-width of the band, metres
+    float waveIntensity = 0.0f;  // light added in the band (HDR; it blooms)
+    glm::vec3 waveColor{1.0f, 0.35f, 0.85f}; // the band's colour when waveHueSpan is 0
+    float waveHue = 0.0f;        // hue offset (turns) of the rainbow when waveHueSpan > 0
+    float waveHueSpan = 0.0f;    // hue cycles across the band (0 = one colour, waveColor)
+    float waveEdgeTint = 0.0f;   // 0..1: how far edges and emission take the band's colour inside it
+    float waveTrail = 0.0f;      // 0..1: how far edges and emission behind the front take waveTrailColor
+    glm::vec3 waveTrailColor{1.0f};
 };
 
 struct PostParameters {
@@ -313,6 +333,18 @@ struct PostParameters {
     params::Parameter<float>* sweepSpan = nullptr;
     params::Parameter<float>* sweepHue = nullptr;
     params::Parameter<float>* sweepTrail = nullptr;
+    // ADR-1055: the world wave (post/wave/*).
+    params::Parameter<glm::vec3>* waveOrigin = nullptr;
+    params::Parameter<glm::vec3>* waveDirection = nullptr;
+    params::Parameter<float>* waveProgress = nullptr;
+    params::Parameter<float>* waveWidth = nullptr;
+    params::Parameter<float>* waveIntensity = nullptr;
+    params::Parameter<glm::vec3>* waveColor = nullptr;
+    params::Parameter<float>* waveHue = nullptr;
+    params::Parameter<float>* waveHueSpan = nullptr;
+    params::Parameter<float>* waveEdgeTint = nullptr;
+    params::Parameter<float>* waveTrail = nullptr;
+    params::Parameter<glm::vec3>* waveTrailColor = nullptr;
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);

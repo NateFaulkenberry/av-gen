@@ -78,8 +78,15 @@ struct SdfObjectUniforms {
                            // ADR-1052: w = rim power
     glm::vec4 look5;       // ADR-1052: rim colour rgb, rim intensity (0 = off)
     glm::vec4 look6;       // ADR-1054: static cell (local units), rate (Hz), roll strength, 0
+    // ADR-1055: the world wave (scene-wide, copied into every object): origin + progress, direction + width,
+    // colour + intensity, trail colour + trail, (hue, hue span, edge tint, 1 = on).
+    glm::vec4 wave0;
+    glm::vec4 wave1;
+    glm::vec4 wave2;
+    glm::vec4 wave3;
+    glm::vec4 wave4;
 };
-static_assert(sizeof(SdfObjectUniforms) == 272);
+static_assert(sizeof(SdfObjectUniforms) == 352);
 
 class SdfRenderer {
 public:

@@ -681,6 +681,17 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                                 std::max(look.rimPower, 0.1f));
             u.look5 = glm::vec4(look.rimColor, look.rimIntensity); // ADR-1052
             u.look6 = glm::vec4(std::max(look.staticCell, 1e-4f), std::max(look.staticRate, 0.0f), look.staticRoll, 0.0f);
+            { // ADR-1055: the world wave, shared by every object
+                const scene::PostSettings& ps = scene.post;
+                const bool on = ps.waveIntensity > 0.0f || ps.waveEdgeTint > 0.0f || ps.waveTrail > 0.0f;
+                const glm::vec3 dir = glm::length(ps.waveDirection) > 1e-6f ? glm::normalize(ps.waveDirection)
+                                                                         : glm::vec3(0.0f, 0.0f, -1.0f);
+                u.wave0 = glm::vec4(ps.waveOrigin, ps.waveProgress);
+                u.wave1 = glm::vec4(dir, std::max(ps.waveWidth, 1e-3f));
+                u.wave2 = glm::vec4(ps.waveColor, ps.waveIntensity);
+                u.wave3 = glm::vec4(ps.waveTrailColor, std::clamp(ps.waveTrail, 0.0f, 1.0f));
+                u.wave4 = glm::vec4(ps.waveHue, ps.waveHueSpan, std::clamp(ps.waveEdgeTint, 0.0f, 1.0f), on ? 1.0f : 0.0f);
+            }
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
