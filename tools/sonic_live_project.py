@@ -147,11 +147,13 @@ LIVE_GARDEN = [
     # played high read 0.33 rough and went to the strike field; `rasp` (below) is roughness x (1 - inharmonicity),
     # which keeps distortion (inharmonicity 0.2) and noise (whose attack and unsteadiness carry it) and lets the
     # bell go. A clean synth rasps 0.05-0.12, a fully open saw or a single note driven hard about 0.18, a driven
-    # chord or a drive after the filter 0.23-0.32. The threshold sits so the first is clean, the second a blend of
-    # glass and rough (and rough the longer it is held), the third the chaotic world. (A frame late: a source reads
-    # its own outputs from the frame before, which the slow tier does not notice.)
+    # chord or a drive after the filter 0.23-0.32. The threshold sits so the first is clean, the second mostly glass
+    # (bright, buzzing through grit, about a fifth rough), the third the chaotic world. The top of a filter sweep is
+    # the second kind, and it must stay the filter's brightest moment: at a lower threshold it tipped into a dim
+    # in-between world for two seconds. (A frame late: a source reads its own outputs from the frame before, which
+    # the slow tier does not notice.)
     M("chaotic", [("visual.rasp", 3.0, False), ("sonic.sharpness.slow", 0.3, False),
-                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.38, 3.0, group="family"),
+                  ("sonic.smoothness.slow", 0.3, True)], "mean", -0.44, 3.0, group="family"),
     M("rasp", [("sonic.roughness.slow", 1.0, False), ("sonic.inharmonicity.slow", 1.0, True)], "product"),
     # heavy: loud AND full AND pitched AND low. The register term is what makes a distorted bass line the pressure
     # deep and a distorted high lead the strike field (notes.pitch holds the last note through rests).
