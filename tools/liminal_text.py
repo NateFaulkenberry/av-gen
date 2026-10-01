@@ -30,7 +30,9 @@ An entry (only `text`, a time and `position` are required):
      "fill": [0.02, 0.02, 0.02],   # base (lit) colour: dark, so the word reads as light
      "style": "pop",               # pop | rise | flash | flicker | cut  (how it arrives and leaves)
      "in": 0.12, "out": 0.25,      # seconds of the arrival and the departure
-     "chapter": "rooms"}           # optional: the journey chapter whose nodes list it joins
+     "chapter": "rooms",           # optional: the journey chapter whose nodes list it joins
+     "room": "livingRoom",         # optional (ADR-1051): the room entity whose walls the spatial validator checks it on
+     "category": "wallText"}       # optional (ADR-1051): wallText | floorText | stairText | floatingText
 
 A word is drawn only while its envelope is above zero (a route multiplies `nodes/<name>/visible`): the renderer
 draws at most 256 procedural objects at once, so 300 words are fine as long as no more than ~250 are up together.
@@ -129,6 +131,20 @@ def place_words(entries, grid="song", default_font=None, palette_target="emissiv
                              "roughness": float(e.get("roughness", 0.7))},
             },
         }
+        # ADR-1051: the spatial validator's annotation. Only when the entry says what the word is (a `room`
+        # or a `category`: wallText, floorText, stairText, floatingText); otherwise the validator infers it.
+        if "room" in e or "category" in e:
+            ent = {"category": e.get("category", "wallText")}
+            if "room" in e:
+                ent["room"] = e["room"]
+            if "t0" in e:
+                ent["t0"] = float(e["t0"])
+                ent["t1"] = float(e.get("t1", float(e["t0"]) + 0.5))
+            if style == "rise":
+                ent["offset"] = [0.0, rise, 0.0]  # where the word comes to rest
+            if "tilt" in e:
+                ent["tilt"] = float(e["tilt"])
+            node["entity"] = ent
         nodes.append(node)
         # The word's envelope on the beat grid: rises over `in` into t0 is wrong for a word (it must not
         # appear before it is sung), so the attack is zero and the arrival is shaped by the routes below.

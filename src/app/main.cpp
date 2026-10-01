@@ -2,6 +2,7 @@
 #include "app/reactivity_cli.hpp"
 #include "app/route_audit_cli.hpp"
 #include "app/sonic_trace_cli.hpp"
+#include "app/space_validate_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
 #include "core/log.hpp"
@@ -12,6 +13,10 @@
 #include <filesystem>
 
 int main(int argc, char** argv) {
+    // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
+    if (argc > 1 && std::string(argv[1]) == "--validate-space") {
+        return avgen::app::runSpaceValidateCommand(argc, argv);
+    }
     auto options = avgen::app::parseArgs(argc, argv);
     if (!options) {
         std::fprintf(stderr, "%s\n", options.error().message.c_str());

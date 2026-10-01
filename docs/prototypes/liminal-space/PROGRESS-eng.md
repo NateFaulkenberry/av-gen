@@ -4,6 +4,91 @@
 PROGRESS-art.md. Governing documents: `00-brief.md`, `01-addendum-emotion.md` (wins where they differ).
 Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 
+## ART PASS 3 (2026-10-01): Resume here
+
+*Governing: `03-art-pass-3-addendum.md` (the owner's). My items, in the coordinator's order. ADRs 1051-1059.
+Shared worktree: commit only my paths with `git commit -- <paths>`; never `tools/liminal/`, `examples/liminal/all-you-got*`,
+PROGRESS-art.md. The art agent renders with a pinned binary at `373a34a7`.*
+
+| # | item | status | ADR | tests |
+|---|---|---|---|---|
+| 1 | room / spatial validator (`avgen --validate-space`, `tools/liminal_space.py`) | **done** | 1051 | `[adr1051]` (10 cases) |
+| 2 | SDF rim / fresnel emission (`look/rim/*`), replacing "fix the head" (the coordinator, 2026-10-01) | next | 1052 | |
+| 3 | random entity jumping (§28) in the pass-2 film | todo | | |
+| 4 | animated static for screens (§22) | todo | | |
+| 5 | spatial colour wave through the environment (§30) | todo | | |
+| 6 | geometry tearing on events (§21), if cheap | todo | | |
+
+**Resume here:** item 1 is committed. Next is item 2: an optional rim/fresnel emission on SDF objects (`look/rim/intensity`,
+`color`, `power`), per object, keyable, palette-bindable, off and byte-identical by default, with an ADR and a GPU test.
+
+**The missing head (§33), found by the validator:** in `all-you-got-pass2.scene.json`, `hillMan` has boundsMax y = 2.5 and its
+head is at y = 2.896, so the head is never marched. This is a data fix in the art agent's generator (grow the bounds). The
+validator now reports it (`integrity`/`clipped`). The other mannequins' "black blob" is the crease-only line look on a rounded
+head, which the art agent is fixing in the kit. It is not an engine defect.
+
+**Real defects in the pass-2 film** (generated with the kit instrumented; `S/space/rep.json`, where
+`S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`):
+- `kit.armchair()` = `couch(seats=1)`. `repeat` gets count `seats // 2 if seats % 2 else 0` = 0, which means INFINITE: a row of
+  seat cushions runs through livMedia's whole march box, through the wall, the cabinet and a window. The fix is `seats // 2` for
+  odd seats (count 0 for one seat), or no repeat when seats == 1.
+- The cabinet and the wardrobe start at y = 0.05-0.06, so they float. The counter does too.
+- About 50 lyric placements overlap windows, curtains, paintings or furniture (see the report).
+- Door_01 in v2b is blocked by a plant and a box. The chairs flipped onto tables (v2b, v2d) read as "on top of the table" plus a
+  180-degree tilt. If that is intended, tag them `"tilted": true`.
+- Pendants hang 0.3-0.8 m below the ceiling, so they read as "not attached". Either the cord is short, or the rule wants
+  `mounts: ceiling` with a drop.
+
+### Art agent's guide, pass 3
+
+#### 1. The spatial validator (ADR-1051)
+
+Run it on any scene or project (headless, no GPU, about 2 s for the whole film):
+
+```sh
+./build/release/src/avgen --validate-space examples/liminal/all-you-got-pass2.json            # section 14 text report
+./build/release/src/avgen --validate-space <project.json> --json report.json --text report.txt  # both
+#   --rules r.json (deep-merged over the defaults)  --margin 0.25 (lyric clearance, m)  --eye 1.6  --no-camera
+#   --strict (exit 1 on errors)  --dump-rules (print every category, pose and tolerance)
+```
+
+Given a project, it reads the scene, the constant `camera/journey/height` (the eye height) and the `camera/journey/distance` keys
+(each chapter's path is checked only over the span the film visits).
+
+From Python (the generator):
+
+```python
+import sys; sys.path.insert(0, "tools"); sys.path.insert(0, "tools/liminal")
+import kit, liminal_space as ls
+ls.instrument_kit(kit)            # BEFORE importing rooms2 etc. or building anything: every kit prop tags itself
+...build...
+report = ls.validate(scene_dict)  # or a scene/project path (a project path also gives the camera span and eye height)
+print(ls.text(report))
+ls.apply_fixes(scene_dict, report)                    # the safe ones: floor, support, lyric, bounds (one translate per entity)
+ls.apply_fixes(scene_dict, report, rules={"intersection", "orientation"})   # opt-in
+```
+
+- **Naming and relationships:** every instrumented kit call takes `entity={...}`, for example
+  `K.chair(entity={"id": "DeskChair_01", "anchor": "Desk_01"})` and
+  `K.mannequin("sit", name="livMan", entity={"pose": "thinker", "anchor": "LivingChair_01"})`.
+- **Rooms:** `K.shell(ext)` is tagged `room` with its interior. Pass `entity={"id": "livingRoom"}` to name it, and
+  `{"sealed": True}` for a room that needs no door.
+- **Anything else:** `ls.tag(node, "toilet", id="Toilet_01")`. For a component, use `ls.part(node, "head")`.
+- **Categories:** room, door, doorway, window, stairs, couch, armchair, chair, table, coffeeTable, desk, bed, nightstand,
+  cabinet, wardrobe, shelf, counter, fridge, fireplace, sink, toilet, bathtub, lamp, tableLamp, hangingLamp, ceilingFan,
+  painting, mirror, clock, wallDecoration, coatHooks, curtains, television, monitor, plant, rug, prop, hangingObject,
+  mannequin, person, wallText, floorText, stairText, floatingText.
+- **Poses:** stand, wait, sit, thinker, headInHands, elbowsOnTable, toilet, desk (all seated: they need an `anchor` that supports
+  sitting); lie, couchLying, bedLying (they lie on the anchor's top); mirror, window (standing, facing the anchor). The mannequin's
+  `hip` comes from `kit.POSES[pose]["hip_y"]`. Add new poses to the rules (`{"poses": {"kneel": {"support": "floor"}}}`).
+- **Lyrics:** give a `liminal_text.place_words` entry `"room": "<room id>"` (and `"category": "floorText"` etc. when it is not
+  wall text). The validator then checks it against that room's walls. It reports the overlap %, the margin, the orientation and a
+  clear spot (`fix.position` + `fix.normal`). Words without a room are inferred: one lying on a wall plane is wall text, anything
+  else floats.
+- **Reading a violation:** `severity`, `rule`, `entities`, `message`, `measured`, `expected`, `suggestion`, `fix` and `groups` (the
+  chapters in which it was seen).
+- **Order (section 15):** validate, apply the safe fixes, render, critic, refine, validate again.
+
 ## ART PASS 2 (2026-10-01): Resume here
 
 *The governing brief is now `02-art-pass-2.md` (the owner's; it wins). My job is its section 19 Phase 4: the
