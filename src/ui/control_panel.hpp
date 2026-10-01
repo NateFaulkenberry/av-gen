@@ -20,6 +20,7 @@
 #include "labs/lab.hpp"
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
+#include "app/projection.hpp"
 #include "app/render_settings.hpp"
 #include "app/frame_range.hpp"
 #include "pathtrace/trace_job.hpp"
@@ -207,6 +208,18 @@ public:
     std::function<void(const std::string&)> onLiveMidiInput;
     std::function<void(float)> onLiveSmoothing;
     std::function<void()> onOpenLiveDemo;
+    // ADR-1026: the Live panel's projection. The host owns the state machine and the output; the panel shows what
+    // the host says and asks. The display, fullscreen, size and scaling choices are written straight into
+    // `settings.settings->projection` and announced with onProjectionSettingsChanged (saved, and a running
+    // projection reopens with them).
+    struct ProjectionView {
+        bool active = false;      // the button says Stop
+        bool awaiting = false;    // opening the demo first
+        std::string status;       // where it is projecting, or why it stopped
+    } projection;
+    std::function<void()> onStartProjection;
+    std::function<void()> onStopProjection;
+    std::function<void()> onProjectionSettingsChanged;
     // Outputs (1.2): the host owns the OutputManager; the tab edits descriptors and asks to reopen.
     app::OutputManager* outputs = nullptr;
     std::function<void()> onOutputsChanged; // re-open windows after add/remove/edit
@@ -591,6 +604,7 @@ private:
     std::vector<audio::AudioDeviceInfo> liveAudioDevices_;
     std::vector<control::MidiDeviceInfo> liveMidiDevices_;
     double liveLastScan_ = -1e9;
+    std::vector<app::ProjectionDisplay> liveDisplays_; // ADR-1026, rescanned with the devices
     int newOutputDisplay_ = 0;
     bool newOutputFullscreen_ = true;
     char shareName_[64] = "avgen";

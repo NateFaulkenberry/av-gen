@@ -78,6 +78,14 @@ void OutputManager::closeAll() {
     }
 }
 
+void OutputManager::closeProjectOutputs() {
+    for (auto& o : outputs_) {
+        if (!o->projection) {
+            o->runtime.reset();
+        }
+    }
+}
+
 void OutputManager::pumpEvents(bool pumpQueue) {
     // Only pump when nobody else did: the shared SDL queue is drained once per frame, and the
     // window that pumps it is the one that routes events to the UI.
@@ -90,7 +98,7 @@ void OutputManager::pumpEvents(bool pumpQueue) {
         }
         auto& rt = *o->runtime;
         const auto events = rt.window->takeEvents();
-        if (rt.window->wantsClose()) {
+        if (rt.window->wantsClose() || (o->projection && events.escape)) {
             log::info("output '{}' closed by the user", o->desc.name);
             o->runtime.reset();
             o->desc.enabled = false;

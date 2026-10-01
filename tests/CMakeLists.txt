@@ -124,7 +124,9 @@ target_sources(avgen_tests PRIVATE
     # The selected object's transform history (forensics 4.3/9.3): it reads the renderer's published
     # diagnosis, which is names and numbers, so it belongs where it can be checked without a device.
     "${CMAKE_SOURCE_DIR}/src/rendering/transform_history.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
+    "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
+    # ADR-1026: the Live panel's projection -- the display choice, the scaling and the state machine.
+    "${CMAKE_SOURCE_DIR}/src/app/projection.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)
 catch_discover_tests(avgen_tests

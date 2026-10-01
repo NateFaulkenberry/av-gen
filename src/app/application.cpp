@@ -176,6 +176,7 @@ std::string usageText() {
            "  --input [name]      analyze a live capture device (substring of its name; default device)\n"
            "  --live              turn live Sonic input on: MIDI notes and the audio input drive the Sonic\n"
            "                      Character and musical context (ADR-1025; a project with sonic.live does it)\n"
+           "  --start-projection  press the Live panel's Start projection once the editor is up (ADR-1026)\n"
            "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
            "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
            "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
@@ -390,6 +391,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             }
         } else if (arg == "--live") {
             options.live = true;
+        } else if (arg == "--start-projection") {
+            options.startProjection = true;
         } else if (arg == "--midi") {
             auto v = need(i, "--midi");
             if (!v) return std::unexpected(v.error());
@@ -1942,16 +1945,30 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             settings_.live.midiInput = filter.empty() ? "*" : filter;
             saveSettings();
         };
-        panel_->onOpenLiveDemo = [this, executablePath] {
-            if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
-                for (const auto& ex : *examples) {
-                    if (ex.name == "Sonic Live") {
-                        beginOpen(ex.file);
-                        return;
-                    }
+        if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
+            for (const auto& ex : *examples) {
+                if (ex.name == "Sonic Live") {
+                    liveDemoPath_ = ex.file;
                 }
             }
-            panel_->setStatus("the Sonic Live example was not found");
+        }
+        panel_->onOpenLiveDemo = [this] {
+            if (liveDemoPath_.empty()) {
+                panel_->setStatus("the Sonic Live example was not found");
+                return;
+            }
+            // Through the unsaved-changes prompt (ADR-440), like every other way of opening a project.
+            loadAny(liveDemoPath_);
+        };
+        panel_->onStartProjection = [this] { startProjection(); };
+        panel_->onStopProjection = [this] { stopProjection(); };
+        panel_->onProjectionSettingsChanged = [this] {
+            saveSettings();
+            // A running projection follows the new choice: the window is reopened with it.
+            if (projection_.state() == Projection::State::Running && outputs_.find(kProjectionOutputName) != nullptr) {
+                outputs_.remove(kProjectionOutputName);
+                openProjectionWindow();
+            }
         };
         panel_->onLiveSmoothing = [this](float smoothing) {
             settings_.live.smoothing = std::clamp(smoothing, 0.25f, 4.0f);
@@ -2805,7 +2822,8 @@ void Application::serviceDirectorStills() {
 }
 
 void Application::applyOutputsFromProject() {
-    outputs_.closeAll();
+    // The project's windows only: a running projection (ADR-1026) is this machine's and survives a project load.
+    outputs_.closeProjectOutputs();
     if (auto r = outputs_.fromJson(engine_->outputsJson()); !r) {
         log::warn("outputs: {}", r.error().message);
     }
@@ -5288,6 +5306,7 @@ int Application::runLive() {
         prof.add(kPhPresent, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                        presentStart).count());
         const auto outputsStart = std::chrono::steady_clock::now();
+        serviceProjection();
         if (outputs_.openCount() > 0) {
             if (auto r = outputs_.presentAll(*context_, finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("outputs: {}", r.error().message);
@@ -6639,6 +6658,138 @@ int Application::runHeadless() {
 } // namespace avgen::app
 
 namespace avgen::app {
+
+// ---- ADR-1026: the Live panel's projection ---------------------------------------------------------------------
+
+namespace {
+std::vector<ProjectionDisplay> connectedProjectionDisplays() {
+    std::vector<ProjectionDisplay> out;
+    for (const auto& d : platform::Window::displays()) {
+        out.push_back({.index = d.index, .name = d.name, .width = d.width, .height = d.height, .primary = d.primary});
+    }
+    return out;
+}
+} // namespace
+
+bool Application::projectIsLive() const {
+    const sonic::SonicSetup* setup = engine_->sonicSetup();
+    return setup != nullptr && setup->live;
+}
+
+void Application::startProjection() {
+    if (panel_ == nullptr || !context_ || !shaders_) {
+        return;
+    }
+    switch (projection_.start(projectIsLive())) {
+    case Projection::Action::OpenLiveDemo:
+        if (liveDemoPath_.empty()) {
+            projection_.failed("Projection not started: the Sonic Live example was not found.");
+            return;
+        }
+        log::info("projection: opening the Sonic Live demo first");
+        // Through the unsaved-changes prompt; a Cancel there leaves the projection idle (Projection::update).
+        loadAny(liveDemoPath_);
+        break;
+    case Projection::Action::OpenWindow:
+        openProjectionWindow();
+        break;
+    default:
+        break;
+    }
+}
+
+void Application::stopProjection() {
+    if (projection_.stop() == Projection::Action::CloseWindow) {
+        outputs_.remove(kProjectionOutputName);
+        log::info("projection stopped");
+    }
+}
+
+void Application::openProjectionWindow() {
+    // The projection is of the live world: live input on, whichever way the project arrived.
+    if (engine_->mode() == EngineMode::Live && !engine_->liveSonic()) {
+        if (auto r = engine_->setLiveSonic(true); !r) {
+            log::warn("projection: live input: {}", r.error().message);
+        }
+    }
+    projectionDisplays_ = connectedProjectionDisplays();
+    projectionLastScan_ = std::chrono::steady_clock::now();
+    const OutputDesc desc = makeProjectionOutput(settings_.projection, projectionDisplays_);
+    const ProjectionDisplayChoice choice = chooseProjectionDisplay(projectionDisplays_, settings_.projection.display);
+    outputs_.remove(kProjectionOutputName);
+    auto added = outputs_.add(desc);
+    if (!added) {
+        projection_.opened(false, {}, added.error().message);
+        return;
+    }
+    (*added)->projection = true;
+    // Errors land in each output's lastError; a project output failing is not the projection's business.
+    static_cast<void>(outputs_.open(*context_, *shaders_));
+    const Output* out = outputs_.find(kProjectionOutputName);
+    if (out == nullptr || !out->open()) {
+        const std::string error = out != nullptr ? out->lastError : std::string("the output was not added");
+        outputs_.remove(kProjectionOutputName);
+        projection_.opened(false, {}, error);
+        log::warn("projection: {}", error);
+        return;
+    }
+    projection_.opened(true, choice.name, {});
+    log::info("projection open on {} ({}): {}x{} px{}{}", choice.name.empty() ? "the default display" : choice.name,
+              desc.display, out->pixelWidth(), out->pixelHeight(), desc.fullscreen ? ", fullscreen" : ", windowed",
+              choice.fellBack ? fmt::format(" ('{}' is not connected)", settings_.projection.display) : "");
+}
+
+void Application::serviceProjection() {
+    if (panel_ == nullptr) {
+        return;
+    }
+    if (options_.startProjection) {
+        options_.startProjection = false;
+        startProjection();
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (projection_.active() && now - projectionLastScan_ > std::chrono::seconds(1)) {
+        projectionDisplays_ = connectedProjectionDisplays();
+        projectionLastScan_ = now;
+    }
+    Projection::Observed observed;
+    observed.loading = pendingOpen_.has_value() || closeGate_.busy() || panel_->loading.active;
+    observed.liveProject = projectIsLive();
+    {
+        const Output* out = outputs_.find(kProjectionOutputName);
+        observed.windowOpen = out != nullptr && out->open();
+    }
+    observed.displays = projectionDisplays_;
+    switch (projection_.update(observed)) {
+    case Projection::Action::OpenWindow:
+        openProjectionWindow();
+        break;
+    case Projection::Action::CloseWindow:
+        outputs_.remove(kProjectionOutputName);
+        log::info("projection: {}", projection_.message());
+        break;
+    default:
+        break;
+    }
+    // The picture's shape against the window's, every frame: the canvas and the window both resize.
+    Output* out = outputs_.find(kProjectionOutputName);
+    if (out != nullptr && out->open()) {
+        out->desc.mapping = projectionMapping(settings_.projection.scaling, renderWidth_, renderHeight_,
+                                              out->pixelWidth(), out->pixelHeight());
+    }
+    auto& view = panel_->projection;
+    view.active = projection_.active();
+    view.awaiting = projection_.state() == Projection::State::AwaitingProject;
+    if (view.awaiting) {
+        view.status = "Opening the Sonic Live demo...";
+    } else if (out != nullptr && out->open()) {
+        view.status = fmt::format("Projecting on {}: {}x{} px, the picture {}x{}. Esc in that window, or Stop, ends it.",
+                                  projection_.displayName().empty() ? "the default display" : projection_.displayName(),
+                                  out->pixelWidth(), out->pixelHeight(), renderWidth_, renderHeight_);
+    } else {
+        view.status = projection_.message();
+    }
+}
 
 // ---- ADR-1025: live Sonic input --------------------------------------------------------------------------------
 

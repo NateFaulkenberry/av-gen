@@ -9,8 +9,10 @@
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
 #include "params/parameter.hpp"
+#include "platform/window.hpp"
 #include "sonic/notes.hpp"
 #include "ui/style.hpp"
+#include "ui/theme.hpp"
 
 #include <imgui.h>
 
@@ -38,6 +40,14 @@ void light(bool on, const char* label) {
     }
 }
 
+std::vector<app::ProjectionDisplay> connectedDisplays() {
+    std::vector<app::ProjectionDisplay> out;
+    for (const auto& d : platform::Window::displays()) {
+        out.push_back({.index = d.index, .name = d.name, .width = d.width, .height = d.height, .primary = d.primary});
+    }
+    return out;
+}
+
 } // namespace
 
 void ControlPanel::drawLive(app::Engine& engine) {
@@ -49,11 +59,135 @@ void ControlPanel::drawLive(app::Engine& engine) {
     if (now - liveLastScan_ > 3.0) {
         liveAudioDevices_ = audio::listCaptureDevices();
         liveMidiDevices_ = control::listMidiInputs();
+        liveDisplays_ = connectedDisplays();
         liveLastScan_ = now;
     }
     app::AppSettings* machine = settings.settings;
     const bool on = engine.liveSonic();
     const auto st = engine.liveSonicStatus();
+
+    // ---- projection (ADR-1026): first, because it is the one thing done in front of an audience ----
+    {
+        const bool active = projection.active;
+        const ImU32 base = active ? palette().error : palette().accent;
+        ImGui::PushStyleColor(ImGuiCol_Button, base);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, mixColour(base, IM_COL32(255, 255, 255, 255), 0.15f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, mixColour(base, IM_COL32(0, 0, 0, 255), 0.15f));
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
+        const char* label = !active ? "Start projection" : (projection.awaiting ? "Cancel projection" : "Stop projection");
+        if (ImGui::Button(label, ImVec2(-1, ImGui::GetFrameHeight() * 1.6f))) {
+            if (active && onStopProjection) {
+                onStopProjection();
+            } else if (!active && onStartProjection) {
+                onStartProjection();
+            }
+        }
+        ImGui::PopStyleColor(4);
+        if (ImGui::IsItemHovered()) {
+            tooltip("Opens a clean window with just the picture -- no panels -- for a projector or a second screen. "
+                    "Opens the Sonic Live demo first if this is not a live project, and turns live input on. "
+                    "Esc in the projection window, closing it, or Stop ends it.");
+        }
+        if (machine != nullptr) {
+            auto& pj = machine->projection;
+            bool changed = false;
+            const app::ProjectionDisplayChoice choice = app::chooseProjectionDisplay(liveDisplays_, pj.display);
+            // The display: Automatic, every connected display, and the remembered one if it is missing.
+            std::vector<std::string> labels;
+            const app::ProjectionDisplayChoice automatic = app::chooseProjectionDisplay(liveDisplays_, {});
+            labels.push_back(automatic.name.empty() ? std::string("Automatic")
+                                                    : "Automatic (" + automatic.name + ")");
+            int current = 0;
+            for (std::size_t i = 0; i < liveDisplays_.size(); ++i) {
+                const auto& d = liveDisplays_[i];
+                labels.push_back(d.name + "  " + std::to_string(d.width) + "x" + std::to_string(d.height) +
+                                 (d.primary ? "  (this screen)" : ""));
+                if (!pj.display.empty() && d.name == pj.display) {
+                    current = static_cast<int>(i) + 1;
+                }
+            }
+            const bool missing = !pj.display.empty() && current == 0;
+            if (missing) {
+                labels.push_back(pj.display + "  (not connected)");
+                current = static_cast<int>(labels.size()) - 1;
+            }
+            std::vector<const char*> names;
+            for (const auto& l : labels) {
+                names.push_back(l.c_str());
+            }
+            ImGui::SetNextItemWidth(-90);
+            if (ImGui::Combo("Display", &current, names.data(), static_cast<int>(names.size()))) {
+                if (current == 0) {
+                    pj.display.clear();
+                    pj.fullscreen.reset(); // automatic: fullscreen exactly when it is not this screen
+                    changed = true;
+                } else if (current <= static_cast<int>(liveDisplays_.size())) {
+                    const auto& d = liveDisplays_[static_cast<std::size_t>(current - 1)];
+                    pj.display = d.name;
+                    pj.fullscreen = !d.primary; // a projector fills; this screen gets a window
+                    changed = true;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("Where the projection opens. Automatic is the first display that is not this screen, or "
+                        "this screen when there is only one. Remembered on this Mac, by name.");
+            }
+            bool fullscreen = app::projectionFullscreen(pj, choice);
+            if (ImGui::Checkbox("Fullscreen", &fullscreen)) {
+                pj.fullscreen = fullscreen;
+                changed = true;
+            }
+            ImGui::SameLine();
+            {
+                static const char* sizes[] = {"Match display", "1920 x 1080", "1280 x 720", "960 x 540"};
+                static const std::uint32_t widths[] = {0, 1920, 1280, 960};
+                static const std::uint32_t heights[] = {0, 1080, 720, 540};
+                int size = 0;
+                for (int i = 1; i < 4; ++i) {
+                    if (pj.windowWidth == widths[i] && pj.windowHeight == heights[i]) {
+                        size = i;
+                    }
+                }
+                ImGui::BeginDisabled(fullscreen);
+                ImGui::SetNextItemWidth(120);
+                if (ImGui::Combo("##projection-size", &size, sizes, 4)) {
+                    pj.windowWidth = widths[size];
+                    pj.windowHeight = heights[size];
+                    changed = true;
+                }
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    tooltip("The window's size when not fullscreen (in points). Fullscreen always fills the display.");
+                }
+            }
+            ImGui::SameLine();
+            {
+                static const char* scalings[] = {"Fit", "Fill", "Stretch"};
+                int scaling = static_cast<int>(pj.scaling);
+                ImGui::SetNextItemWidth(-1);
+                if (ImGui::Combo("##projection-scaling", &scaling, scalings, 3)) {
+                    pj.scaling = static_cast<app::ProjectionScaling>(scaling);
+                    changed = true;
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("When the screen's shape is not the picture's. Fit: the whole picture, black bars. Fill: "
+                            "the screen full, the picture's edges cut. Stretch: distorted to fill. For a picture "
+                            "that fills a 16:9 projector exactly, put the canvas in Output Frame mode.");
+                }
+            }
+            if (missing) {
+                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s is not connected: projecting on %s",
+                                   pj.display.c_str(), choice.name.empty() ? "the default display" : choice.name.c_str());
+            }
+            if (changed && onProjectionSettingsChanged) {
+                onProjectionSettingsChanged();
+            }
+        }
+        if (!projection.status.empty()) {
+            ImGui::TextWrapped("%s", projection.status.c_str());
+        }
+    }
+    ImGui::Separator();
 
     ImGui::TextDisabled("LIVE SONIC INPUT");
     bool enabled = on;
