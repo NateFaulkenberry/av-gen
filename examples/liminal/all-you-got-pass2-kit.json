@@ -1,0 +1,2280 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "~/Desktop/All You Got.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "all-you-got-pass2-kit.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.35,
+  "post/bloom/threshold": 0.9,
+  "post/grade/contrast": 1.08,
+  "post/grade/saturation": 1.1,
+  "post/output/vignette": 0.25,
+  "post/output/grain": 0.0,
+  "post/motionBlur/amount": 0.0
+ },
+ "sources": [
+  {
+   "kind": "beatgrid",
+   "name": "song",
+   "settings": {
+    "origin": 2.2018348623853212,
+    "beatsPerBar": 4,
+    "tempo": [
+     {
+      "bar": 1,
+      "bpm": 109
+     },
+     {
+      "bar": 75,
+      "bpm": 111
+     }
+    ],
+    "sections": {
+     "intro": 1,
+     "release": 17,
+     "verse1": 25,
+     "pause": 41,
+     "letgo": 42,
+     "verse2": 50,
+     "bridgein": 66,
+     "bridge1": 67,
+     "bridge2": 75,
+     "bridge3": 83,
+     "chorus": 91,
+     "ending": 115
+    },
+    "events": []
+   }
+  }
+ ],
+ "routes": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/journey/distance",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1002.11597
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.1,
+      "value": [
+       1002.11737
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.2,
+      "value": [
+       1002.12117
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.3,
+      "value": [
+       1002.12677
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.4,
+      "value": [
+       1002.13357
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.5,
+      "value": [
+       1002.14097
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.6,
+      "value": [
+       1002.14837
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.7,
+      "value": [
+       1002.15517
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.8,
+      "value": [
+       1002.16077
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.9,
+      "value": [
+       1002.16457
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       1002.16597
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       2002.08546
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.1,
+      "value": [
+       2002.08744
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.2,
+      "value": [
+       2002.09282
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.3,
+      "value": [
+       2002.10074
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.4,
+      "value": [
+       2002.11035
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.5,
+      "value": [
+       2002.12082
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.6,
+      "value": [
+       2002.13128
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.7,
+      "value": [
+       2002.1409
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.8,
+      "value": [
+       2002.14882
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.9,
+      "value": [
+       2002.1542
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2002.15618
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       3002.05363
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.1,
+      "value": [
+       3002.05561
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.2,
+      "value": [
+       3002.06099
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.3,
+      "value": [
+       3002.06891
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.4,
+      "value": [
+       3002.07853
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.5,
+      "value": [
+       3002.08899
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.6,
+      "value": [
+       3002.09946
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.7,
+      "value": [
+       3002.10907
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.8,
+      "value": [
+       3002.11699
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.9,
+      "value": [
+       3002.12237
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       3002.12435
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       4002.05363
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.1,
+      "value": [
+       4002.05561
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.2,
+      "value": [
+       4002.06099
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.3,
+      "value": [
+       4002.06891
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.4,
+      "value": [
+       4002.07853
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.5,
+      "value": [
+       4002.08899
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.6,
+      "value": [
+       4002.09946
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.7,
+      "value": [
+       4002.10907
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.8,
+      "value": [
+       4002.11699
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.9,
+      "value": [
+       4002.12237
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       4002.12435
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       5002.08546
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.1,
+      "value": [
+       5002.08744
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.2,
+      "value": [
+       5002.09282
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.3,
+      "value": [
+       5002.10074
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.4,
+      "value": [
+       5002.11035
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.5,
+      "value": [
+       5002.12082
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.6,
+      "value": [
+       5002.13128
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.7,
+      "value": [
+       5002.1409
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.8,
+      "value": [
+       5002.14882
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.9,
+      "value": [
+       5002.1542
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       5002.15618
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       6002.08546
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.1,
+      "value": [
+       6002.08744
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.2,
+      "value": [
+       6002.09282
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.3,
+      "value": [
+       6002.10074
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.4,
+      "value": [
+       6002.11035
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.5,
+      "value": [
+       6002.12082
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.6,
+      "value": [
+       6002.13128
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.7,
+      "value": [
+       6002.1409
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.8,
+      "value": [
+       6002.14882
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.9,
+      "value": [
+       6002.1542
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       6002.15618
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAt",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.6,
+       0.95,
+       -1.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       -0.6,
+       0.95,
+       -1.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       -1.9,
+       0.75,
+       -0.35
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       -1.9,
+       0.75,
+       -0.35
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2.2,
+       0.85,
+       -0.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       2.2,
+       0.85,
+       -0.3
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       1.5,
+       1.2,
+       -2.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       1.5,
+       1.2,
+       -2.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       -1.98,
+       1.0,
+       -0.45
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       -1.98,
+       1.0,
+       -0.45
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       -1.0,
+       0.6,
+       -1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       -1.0,
+       0.6,
+       -1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/fov",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/sway",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "palette/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       2.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAtWeight",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/height",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/bob",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/pitch",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/yaw",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/radius",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAhead",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/swayRate",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     }
+    ]
+   }
+  ]
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "P0boot",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "furn2": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.00518,
+      0.00518,
+      0.02956
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.04374,
+      0.10462,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P1compile",
+    "colors": {
+     "wall": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "furn": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "fill": [
+      0.00152,
+      0.00152,
+      0.00212
+     ],
+     "glow": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00518,
+      0.05127
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.02416,
+      0.67244
+     ]
+    }
+   },
+   {
+    "name": "P2allyougot",
+    "colors": {
+     "wall": [
+      0.21223,
+      0.89627,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "furn2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "figure": [
+      0.80695,
+      0.80695,
+      1.0
+     ],
+     "fog": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "fill": [
+      0.00121,
+      0.00152,
+      0.00368
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "screen": [
+      0.3467,
+      0.80695,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "canvas2": [
+      0.21223,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.01033,
+      0.02315,
+      0.14413
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.04971,
+      0.37124
+     ]
+    }
+   },
+   {
+    "name": "P3night",
+    "colors": {
+     "wall": [
+      0.33245,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      0.57758,
+      0.76052,
+      1.0
+     ],
+     "furn2": [
+      0.21223,
+      0.43415,
+      1.0
+     ],
+     "figure": [
+      0.80695,
+      0.85499,
+      1.0
+     ],
+     "fog": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "fill": [
+      0.00091,
+      0.00121,
+      0.00304
+     ],
+     "glow": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "screen": [
+      0.27468,
+      0.63076,
+      1.0
+     ],
+     "canvas": [
+      0.04231,
+      0.10462,
+      0.52712
+     ],
+     "canvas2": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "glass": [
+      0.00605,
+      0.01938,
+      0.07619
+     ],
+     "word": [
+      0.72306,
+      0.83077,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.43966,
+      0.10702
+     ]
+    }
+   },
+   {
+    "name": "P4ember",
+    "colors": {
+     "wall": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "furn": [
+      1.0,
+      0.25415,
+      0.04667
+     ],
+     "furn2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.7913,
+      0.63076
+     ],
+     "fog": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "fill": [
+      0.00273,
+      0.00061,
+      0.00091
+     ],
+     "glow": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "screen": [
+      1.0,
+      0.14413,
+      0.04667
+     ],
+     "canvas": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "canvas2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "glass": [
+      0.04231,
+      0.00304,
+      0.00304
+     ],
+     "word": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "accent": [
+      1.0,
+      0.7454,
+      0.25415
+     ]
+    }
+   },
+   {
+    "name": "P5void",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "glass": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ]
+    }
+   },
+   {
+    "name": "P6violet",
+    "colors": {
+     "wall": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "furn": [
+      0.69387,
+      0.53948,
+      1.0
+     ],
+     "furn2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "figure": [
+      0.87137,
+      0.7913,
+      1.0
+     ],
+     "fog": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "fill": [
+      0.00182,
+      0.00091,
+      0.00335
+     ],
+     "glow": [
+      1.0,
+      0.27468,
+      0.7913
+     ],
+     "screen": [
+      0.58408,
+      0.39157,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.01298,
+      0.00439,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ]
+    }
+   },
+   {
+    "name": "P7tension",
+    "colors": {
+     "wall": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "furn": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "furn2": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00061,
+      0.00121,
+      0.00152
+     ],
+     "glow": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "screen": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "canvas": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "canvas2": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "glass": [
+      0.00152,
+      0.02956,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.80695,
+      1.0,
+      0.04231
+     ]
+    }
+   },
+   {
+    "name": "P8growth",
+    "colors": {
+     "wall": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "fog": [
+      0.00304,
+      0.00243,
+      0.02956
+     ],
+     "fill": [
+      0.00182,
+      0.00121,
+      0.00913
+     ],
+     "glow": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "screen": [
+      1.0,
+      0.7913,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "canvas2": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "glass": [
+      0.02315,
+      0.01161,
+      0.08022
+     ],
+     "word": [
+      1.0,
+      0.88792,
+      0.63076
+     ],
+     "accent": [
+      1.0,
+      0.43415,
+      0.25415
+     ]
+    }
+   },
+   {
+    "name": "P9jewels",
+    "colors": {
+     "wall": [
+      0.521,
+      0.47932,
+      0.68669
+     ],
+     "furn": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "furn2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "fill": [
+      0.00121,
+      0.00061,
+      0.00273
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.04667
+     ],
+     "screen": [
+      0.10702,
+      0.87137,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "canvas2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00243,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.19462,
+      0.47932
+     ]
+    }
+   },
+   {
+    "name": "P10dance",
+    "colors": {
+     "wall": [
+      1.0,
+      0.19462,
+      0.02732
+     ],
+     "furn": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "furn2": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "figure": [
+      1.0,
+      0.80695,
+      0.63076
+     ],
+     "fog": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00368,
+      0.00091,
+      0.00121
+     ],
+     "glow": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "screen": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "canvas2": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "glass": [
+      0.04231,
+      0.00439,
+      0.00518
+     ],
+     "word": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "accent": [
+      0.02732,
+      0.7913,
+      0.67244
+     ]
+    }
+   },
+   {
+    "name": "P11open",
+    "colors": {
+     "wall": [
+      0.10702,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "furn2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00091,
+      0.00243,
+      0.01444
+     ],
+     "fill": [
+      0.00061,
+      0.00121,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "screen": [
+      0.21223,
+      0.7991,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "canvas2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "glass": [
+      0.00304,
+      0.01033,
+      0.06848
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.57758,
+      0.14703
+     ]
+    }
+   },
+   {
+    "name": "P12summit",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "furn2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00243,
+      0.00121,
+      0.01033
+     ],
+     "fill": [
+      0.00152,
+      0.00091,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "canvas2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "glass": [
+      0.01033,
+      0.00304,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.10702
+     ]
+    }
+   },
+   {
+    "name": "P13dawn",
+    "colors": {
+     "wall": [
+      1.0,
+      0.76815,
+      0.52712
+     ],
+     "furn": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "furn2": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "figure": [
+      1.0,
+      0.90466,
+      0.80695
+     ],
+     "fog": [
+      1.0,
+      0.34191,
+      0.19462
+     ],
+     "fill": [
+      0.02315,
+      0.01033,
+      0.01444
+     ],
+     "glow": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "screen": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "canvas2": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "glass": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.43415
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "fog",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/livShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/livSofa/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livSofa/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livSofa/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livSofa/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livSofa/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livSofa/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livSofa/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/livMedia/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMedia/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livMedia/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livMedia/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livMedia/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livMedia/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livMedia/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/livShelf/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livShelf/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livShelf/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livShelf/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livShelf/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livShelf/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livShelf/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/livMan/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/livMan/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/livMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/livMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/livMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/livMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/livMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/livLamp/color"
+   },
+   {
+    "role": "screen",
+    "target": "lights/livTV/color"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 12.0
+ }
+}
