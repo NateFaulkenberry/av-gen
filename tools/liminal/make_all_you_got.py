@@ -343,6 +343,8 @@ def world_corridor():
                                "children": [box([0.42, 0.012, 0.32])]}), LAMP)
     lamps = moved(lamps, "lampsAt")
     cell = union(walls, stacks, end, start, backs, flights, sun, lamps)
+    # horizontal only, so floors stay floors; any disagreement at the seams falls inside the floor slabs
+    cell = breathing(cell, amount=0.0, frequency=0.06, axes=(1.0, 0.0, 1.0), name="breath")
     mid = (A_H - 0.3) / 2.0
     tree = translate([0.0, mid, 0.0], screw(translate([0.0, -mid, 0.0], cell), [0.0, A_H, 0.0], seam=0.2,
                                             name="storeys"))
@@ -426,7 +428,7 @@ def world_hall():
     patches = translate([B_L / 2 + 5.1 - 4.4 / 2, 0.0, -4.05], {"kind": "repeat", "size": [4.4, 0.0, 0.0], "count": 1,
                                                                 "children": [slab(((-0.85, 0.85), (-0.01, 0.016), (-3.55, 3.55)))]})
     patches = surface(patches, SUN)
-    tree = union(building, entry, stair, fig, nowhere, patches)
+    tree = union(building, entry, stair, fig, nowhere)   # (the floor patches read as rugs, not light: cut)
     tree = breathing(tree, amount=0.0, frequency=0.05, axes=(1.0, 0.0, 1.0), name="breath")
     return tremble(tree, amount=0.0, frequency=3.0, radius=3.5, fade=2.0)
 
@@ -488,7 +490,7 @@ def path_enfilade(turn=True):
 # the crossing stairwell beyond (verse 2): a bridge, a flight up that the camera turns back from, a flight
 # down, a doorway in a wall plane full of light.
 # ======================================================================================================
-D_FIG = (4.0 + 22 * 0.3 + 0.15, -22 * 0.18, 2.0)   # 22 steps down flight R, facing the void
+D_FIG = (6.3, 0.0, 4.2)   # on a ledge past the head of the flights, facing the void
 D_L_STEPS = 19
 D_LOW_Y = -D_L_STEPS * 0.18          # -3.42
 D_FOOT_L = 4.0 + D_L_STEPS * 0.3      # 9.7
@@ -509,7 +511,9 @@ def world_void():
     door = slab(((-4.0, -2.0), (0.0, 3.2), (-0.75, 0.75)))
     near = difference(union(slab(((-3.4, -3.0), (-90.0, 40.0), (-30.0, 30.0))),
                             shellbox(((-7.3, -3.2), (-0.3, 3.5), (-1.1, 1.1)), 0.3, LAMP)), door)
-    head = union(slab(((-3.0, 4.0), (-0.5, 0.0), (-4.6, 4.6))),
+    ledge = union(slab(((D_FIG[0] - 0.8, D_FIG[0] + 0.8), (-0.4, 0.0), (D_FIG[2] - 0.8, D_FIG[2] + 0.8))),
+                  slab(((D_FIG[0] - 0.3, D_FIG[0] + 0.3), (-30.0, -0.4), (D_FIG[2] - 0.3, D_FIG[2] + 0.3))))
+    head = union(slab(((-3.0, 4.0), (-0.5, 0.0), (-4.6, 4.6))), ledge,
                  surface(slab(((-3.0, 4.0), (-0.02, 0.004), (-4.6, 4.6))), FLOOR))
     flights = union(stairway([D_FOOT_L, D_LOW_Y, -2.0], D_L_STEPS, run=0.3, rise=0.18, width=1.6, direction="-x",
                              thickness=0.3),
@@ -828,9 +832,10 @@ def build(check_only=False, end=SONG_END):
              "animation": {"state": state, "blend": 0.3, "updateHz": 0.0, "cullDistance": 0.0}}
         if journey is not None:
             n["journey"] = {"distance": journey}
+        n["roughnessScale"] = 2.0
         return n
     nodes.append(figure("figHall", wpt("hall", [B_FIG[0] + 0.3, B_FIG[1], B_FIG[2]]), 90.0))
-    nodes.append(figure("figWalk", [0.0, 0.0, 0.0], 0.0, state="Walk_Loop", journey=0.0))
+    nodes.append(figure("figWalk", wpt("enfilade", [3 * C_L + 0.35, 0.0, 0.1]), 90.0))   # in a doorway, two rooms on
     nodes.append(figure("figVoid", wpt("void", list(D_FIG)), 90.0))
     nodes.append(figure("figTop", wpt("open", [E_HX0 + 3.9, E_HIGH_Y, 1.3]), 90.0))
 
@@ -841,16 +846,6 @@ def build(check_only=False, end=SONG_END):
             "lifetimeMin": 9.0, "lifetimeMax": 16.0, "speedMin": 0.01, "speedMax": 0.06, "spread": 1.0,
             "gravity": [0.0, 0.004, 0.0], "sizeStart": 0.011, "sizeEnd": 0.0, "blend": "additive",
             "colorStart": color + [0.32], "colorEnd": color + [0.0]}}
-    # The hall's shafts: dust drifting down the sunlight from each high window, so the beams are made of the
-    # motes that hang in them (the fog itself does not shadow; a beam of dust does not need it to).
-    sun_dir = [0.25, -0.62, -0.74]
-    for k in range(-2, 3):
-        x = B_L / 2 + 4.4 * k
-        nodes.append({"name": f"shaft{k + 2}", "kind": "particles", "particles": {
-            "capacity": 12000, "spawnRate": 320.0, "shape": "box", "position": wpt("hall", [x - 0.6, 12.6, B_W - 0.6]),
-            "extent": [0.75, 2.9, 0.25], "lifetimeMin": 22.0, "lifetimeMax": 28.0, "direction": sun_dir, "spread": 0.025,
-            "speedMin": 0.55, "speedMax": 0.62, "gravity": [0.0, 0.0, 0.0], "drag": 0.0, "sizeStart": 0.04,
-            "sizeEnd": 0.03, "blend": "additive", "colorStart": [1.0, 0.86, 0.6, 0.09], "colorEnd": [1.0, 0.8, 0.55, 0.0]}})
     nodes.append(motes("motesGrow", "grow", [9.0, 4.0, 0.0], [8.0, 4.0, 5.5], 350.0, [1.0, 0.8, 0.45]))
 
     # ---- lights ---------------------------------------------------------------------------------------
@@ -1043,7 +1038,7 @@ def build(check_only=False, end=SONG_END):
            (bt(26), 0.0), (bt(28, 3), 0.0), (bt(29, 2), 24.0), (bt(30), 20.0), (bt(30, 3), 0.0),
            (bt(37), 0.0), (bt(37, 3), -28.0), (bt(38, 2), -22.0), (bt(39), 0.0),
            # let it go: still, looking out past the figure at the void; bar 46 look back up at it; bar 48 forward
-           (bt(41, 3), 0.0), (bt(42) - 0.3, -30.0), (bt(43), -30.0), (bt(44), -8.0), (bt(46), 0.0), (bt(46) + 2.2, 150.0), (bt(47, 3), 150.0), (bt(48) + 1.0, 0.0),
+           (bt(41, 3), 0.0), (bt(42) - 0.3, -30.0), (bt(43), -30.0), (bt(44), -8.0), (bt(46), 0.0), (bt(46) + 2.2, -112.0), (bt(47, 3), -112.0), (bt(48) + 1.0, 0.0),
            # verse 2: searching
            (bt(51), 0.0), (bt(52), 18.0), (bt(53), 30.0), (bt(54), -10.0), (bt(55), -40.0), (bt(56), -20.0),
            (bt(57), 0.0),
@@ -1056,8 +1051,8 @@ def build(check_only=False, end=SONG_END):
                                                  (bt(111, 3), 0.0), (end, 0.0)]
     T.append(track("camera/journey/yaw", yaw, interp="easeInOut"))
     pitch = [(0, 0.0), (bt(18), 0.0), (bt(18) + 1.5, 12.0), (bt(20), 18.0), (bt(21), 22.0), (bt(22), 6.0),
-             (bt(24), 10.0), (bt(25), 4.0), (bt(26), 0.0), (bt(42), 0.0), (bt(46), 0.0), (bt(46) + 2.2, 26.0),
-             (bt(47, 3), 26.0), (bt(48) + 1.0, -4.0), (bt(49), 0.0), (bt(56), 0.0), (bt(57), -24.0),
+             (bt(24), 10.0), (bt(25), 4.0), (bt(26), 0.0), (bt(42), 0.0), (bt(46), 0.0), (bt(46) + 2.2, 21.0),
+             (bt(47, 3), 21.0), (bt(48) + 1.0, -4.0), (bt(49), 0.0), (bt(56), 0.0), (bt(57), -24.0),
              (bt(58), -6.0), (bt(58, 4), 0.0), (bt(70), 0.0), (bt(84), 0.0), (bt(84) + 0.8, 14.0), (bt(89), 16.0),
              (bt(90), 2.0), (bt(92), 0.0), (bt(92) + 1.5, 8.0), (bt(99), 8.0), (bt(100), 4.0), (bt(107), 4.0),
              (bt(108), 0.0), (bt(108) + 2.6, -38.0), (bt(110), -39.0), (bt(111, 3), 4.0), (bt(113), 6.0),
@@ -1140,7 +1135,7 @@ def build(check_only=False, end=SONG_END):
                                           (bt(75, 4), 0.85), (bt(76), 1.0), (bt(114), 1.0), (end, 0.6)]))
 
     # World air: how thick the luminous fog is, per place (pure functions of time; chapters swap in light).
-    dens = [(0, 0.03), (bt(17, 3), 0.03), (bt(18), 0.011), (bt(25, 4), 0.011), (bt(26), 0.03), (bt(41, 3), 0.03),
+    dens = [(0, 0.026), (bt(17, 3), 0.026), (bt(18), 0.011), (bt(25, 4), 0.011), (bt(26), 0.03), (bt(41, 3), 0.03),
             (bt(42) - 0.2, 0.05), (bt(48), 0.05), (bt(50), 0.04), (bt(58, 4), 0.04), (bt(59), 0.03), (bt(66, 4), 0.03), (bt(67), 0.024),
             (bt(70), 0.014), (bt(73), 0.004), (bt(75, 4), 0.004), (bt(76), 0.034), (bt(83, 4), 0.034), (bt(84), 0.028),
             (bt(91, 4), 0.028), (bt(92), 0.007), (bt(100), 0.005), (bt(113), 0.005), (bt(116), 0.03), (end, 0.04)]
@@ -1168,7 +1163,7 @@ def build(check_only=False, end=SONG_END):
         (0, [0.0, 0.0, 0.0]), (bt(6), [0.0, 0.0, 0.0]), (bt(7), [1.7, 1.3, 0.75]), (bt(17), [1.7, 1.3, 0.75]),
         (bt(18), [0.0, 0.0, 0.0]), (bt(75), [0.0, 0.0, 0.0]), (bt(76), [1.4, 0.8, 0.35]), (end, [1.4, 0.8, 0.35])]))
     T.append(track(f"sdf/void/surface/{SUN}/emission", [(0, [1.5, 1.15, 0.7]), (end, [1.5, 1.15, 0.7])]))
-    T.append(track(f"sdf/hall/surface/{SUN}/emission", [(0, [2.6, 2.0, 1.25]), (end, [2.6, 2.0, 1.25])]))
+    T.append(track(f"sdf/hall/surface/{SUN}/emission", [(0, [0.95, 0.62, 0.3]), (end, [0.95, 0.62, 0.3])]))
     T.append(track("sdf/void/node/sunSlide/translation", [(bt(42), [D_FOOT_L + 0.9, D_LOW_Y - 0.009, -2.6]),
                                                            (bt(51), [D_FOOT_L + 2.3, D_LOW_Y - 0.009, -1.6])], interp="linear"))
     # Emission levels (the palette multiplies them by the colour): lamps, beacons, the sky glow, thresholds.
@@ -1265,16 +1260,6 @@ def build(check_only=False, end=SONG_END):
                                                             (bt(113), [0.0, 0.0, 0.0]), (end, [0.0, 0.0, 0.0])]))
 
     # The walking figure in verse 1: ahead in the rooms from bar 30, through the side door, then gone.
-    fig_d = []
-    for i in range(0, 120):
-        t = bt(29) + i * 0.1
-        if t > bt(35, 3):
-            break
-        cam = walk.distance(t)
-        lead = 9.5 if t < bt(33) else 9.5 - (t - bt(33)) * 0.6
-        fig_d.append((t, cam + lead))
-    T.append(track("nodes/figWalk/journey/distance", [(0, fig_d[0][1])] + fig_d + [(end, fig_d[-1][1])],
-                   interp="linear"))
     T.append(track("nodes/figWalk/visible", [(0, 0.0), (bt(29, 3), 1.0), (bt(35, 3), 0.0), (end, 0.0)], interp="step"))
 
     # ---- sources and routes: sparse, congruent; nothing reacts in silence -------------------------------
@@ -1287,15 +1272,17 @@ def build(check_only=False, end=SONG_END):
                                                                                (bt(43) - 0.3, 0.0), (bt(43) + 0.4, 0.25)] + \
         [k for k in coupling if k[0] > bt(43) + 0.5]
     coupling = sorted(coupling)
-    breath_on = [(0.0, 0.0), (bt(18) - 0.5, 0.0), (bt(18) + 1.0, 1.0), (bt(41, 4), 1.0), (bt(42), 0.0),
+    breath_on = [(0.0, 0.0), (bt(6), 0.0), (bt(8), 0.4), (bt(17, 3), 0.4), (bt(18) - 0.5, 0.0), (bt(18) + 1.0, 1.0), (bt(41, 4), 1.0), (bt(42), 0.0),
                  (bt(51) - 0.5, 0.0), (bt(51) + 1.0, 0.8), (bt(58, 4), 0.8), (bt(59), 1.0), (bt(73, 4), 0.6),
                  (bt(74), 0.0), (bt(84), 0.0), (bt(84) + 0.8, 1.0), (bt(91, 3), 1.0), (bt(91, 4), 0.0),
                  (bt(92), 0.0), (bt(93), 1.6), (bt(113), 1.6), (bt(114), 0.0), (end, 0.0)]
     voice_on = [(0.0, 0.0), (bt(14) - 0.5, 0.0), (bt(14), 0.6), (bt(25, 4), 0.6), (bt(26), 1.0), (bt(74), 1.0),
                 (bt(74) + 0.2, 0.0), (bt(76) - 0.3, 0.0), (bt(76), 1.0), (bt(113), 1.0), (bt(114), 0.0), (end, 0.0)]
-    sources = [tl_source("coupling", coupling), tl_source("breath", breath_on), tl_source("voice", voice_on)]
+    rough = [(0.0, 0.0), (bt(76) - 0.3, 0.0), (bt(76) + 0.5, 0.8), (bt(91, 3), 0.9), (bt(92), 0.0), (end, 0.0)]
+    sources = [tl_source("coupling", coupling), tl_source("breath", breath_on), tl_source("voice", voice_on),
+               tl_source("rough", rough)]
     routes = []
-    for wname in ("hall", "enfilade", "void", "grow", "penrose", "open"):
+    for wname in ("corridor", "hall", "enfilade", "void", "grow", "penrose", "open"):
         # The world breathes under the low end: a slow, heavy spring into a low-frequency warp.
         routes.append(route("audio.bass", f"sdf/{wname}/node/breath/amount", 0.22, depth="timeline.breath",
                             attackMs=250, decayMs=1800, springHz=0.4, springDamping=0.6))
@@ -1309,7 +1296,7 @@ def build(check_only=False, end=SONG_END):
         routes.append(route("audio.mid", f"sdf/{wname}/surface/{BEACON}/emission", 3.5, depth="timeline.voice",
                             attackMs=200, decayMs=1500, springHz=1.2, springDamping=0.8))
         # The bright, noisy top as a nearby shiver, only where the coupling allows it.
-        routes.append(route("audio.treble", f"sdf/{wname}/node/tremble/amount", 0.012, depth="timeline.coupling",
+        routes.append(route("audio.treble", f"sdf/{wname}/node/tremble/amount", 0.012, depth="timeline.rough",
                             attackMs=40, decayMs=400, springHz=2.0, springDamping=0.6))
         routes.append(route("audio.treble", f"sdf/{wname}/node/tremble/translation", 2.0, 1, attackMs=40,
                             decayMs=400, integrate=True))
@@ -1353,7 +1340,7 @@ def build(check_only=False, end=SONG_END):
         "environment": {"intensity": 0.0, "background": k0air, "fogColor": k0air,
                         "lightRig": "all-you-got.rig.json", "volumeDensity": 0.03, "volumeAbsorption": 1.0,
                         "volumeEmission": 1.0, "volumeScattering": 0.6, "volumeMaxDistance": 70.0,
-                        "volumeJitter": 0.5, "volumeLocalLights": 1.0,
+                        "volumeJitter": 0.2, "volumeLocalLights": 1.0,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                                 "zenithColor": k0air, "horizonColor": k0air, "groundColor": k0air,
                                 "sunColor": [1.0, 0.95, 0.85], "sunDirection": [0.9967, 0.0785, 0.0209],
@@ -1377,7 +1364,7 @@ def build(check_only=False, end=SONG_END):
         "parameters": {
             "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0, "post/tonemap/operator": 1,
             "post/bloom/enabled": True, "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0,
-            "post/grade/contrast": 1.12, "post/grade/saturation": 1.0, "post/output/vignette": 0.22,
+            "post/grade/contrast": 1.2, "post/grade/saturation": 1.0, "post/output/vignette": 0.3,
             "post/output/grain": 0.0, "post/motionBlur/amount": 0.5,
         },
         "sources": sources,

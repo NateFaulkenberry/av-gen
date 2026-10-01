@@ -483,8 +483,9 @@ TEST_CASE("All You Got: every chapter's walk is clear of its world", "[liminal][
             root = root["children"][0];
         }
         // The world as the camera meets it: the breathing at its largest (the bass route's 0.22 m at full depth,
-        // 1.6 times that in the release).
-        set(root, "breath", "amount", chapter.name == "open" ? 0.36f : 0.22f, set);
+        // 0.4 of that in the intro's corridor, 1.6 times it in the release).
+        const bool corridor = chapter.name == "corridor" || chapter.name == "loop";
+        set(root, "breath", "amount", chapter.name == "open" ? 0.36f : (corridor ? 0.09f : 0.22f), set);
         if (chapter.name == "loop") {
             set(root, "wallL", "translation", vec(0.0f, 0.0f, 0.32f), set);
             set(root, "wallR", "translation", vec(0.0f, 0.0f, -0.32f), set);
@@ -525,7 +526,10 @@ TEST_CASE("All You Got: every chapter's walk is clear of its world", "[liminal][
             }
         }
         INFO("chapter '" << chapter.name << "': closest approach " << worst << " m at local distance " << worstAt
-                         << " m, eye (" << worstEye.x << ", " << worstEye.y << ", " << worstEye.z << ")");
-        CHECK(worst > 0.22f);
+                         << " m, eye (" << worstEye.x << ", " << worstEye.y << ", " << worstEye.z << ") (guard radius "
+                         << chapter.world.radius << ")");
+        // Clear of the guard's radius everywhere: the walk never needs the guard (whose push is a visible jolt).
+        // Near a screw seam the field is a bound (min(d, boundary + seam)), so this is conservative there.
+        CHECK(worst > chapter.world.radius);
     }
 }

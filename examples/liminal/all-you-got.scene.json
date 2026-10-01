@@ -958,7 +958,7 @@
   "volumeEmission": 1.0,
   "volumeScattering": 0.6,
   "volumeMaxDistance": 70.0,
-  "volumeJitter": 0.5,
+  "volumeJitter": 0.2,
   "volumeLocalLights": 1.0,
   "sky": {
    "enabled": true,
@@ -1047,255 +1047,23 @@
             ],
             "children": [
              {
-              "kind": "union",
+              "kind": "warp",
+              "amount": 0.0,
+              "frequency": 0.06,
+              "size": [
+               1.0,
+               0.0,
+               1.0
+              ],
+              "translation": [
+               0.0,
+               0.0,
+               0.0
+              ],
+              "seed": 1,
               "children": [
                {
-                "kind": "difference",
-                "children": [
-                 {
-                  "kind": "union",
-                  "children": [
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     0.0,
-                     0.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       68.85,
-                       2.375,
-                       -1.75
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         81.15,
-                         3.375,
-                         0.15000000000000002
-                        ]
-                       }
-                      ]
-                     }
-                    ],
-                    "name": "wallL"
-                   },
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     0.0,
-                     0.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       68.85,
-                       2.375,
-                       1.75
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         81.15,
-                         3.375,
-                         0.15000000000000002
-                        ]
-                       }
-                      ]
-                     }
-                    ],
-                    "name": "wallR"
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   1.5,
-                   0.0,
-                   0.0
-                  ],
-                  "children": [
-                   {
-                    "kind": "repeat",
-                    "size": [
-                     3.0,
-                     0.0,
-                     0.0
-                    ],
-                    "count": 0,
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.0,
-                       2.4,
-                       -1.75
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.55,
-                         1.55,
-                         1.0499999999999998
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   4.6,
-                   0.0,
-                   0.0
-                  ],
-                  "children": [
-                   {
-                    "kind": "repeat",
-                    "size": [
-                     8.8,
-                     0.0,
-                     0.0
-                    ],
-                    "count": 0,
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.0,
-                       1.525,
-                       1.75
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.7,
-                         1.525,
-                         1.0499999999999998
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "difference",
-                "children": [
-                 {
-                  "kind": "union",
-                  "children": [
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     0.0,
-                     0.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       68.85,
-                       4.6,
-                       3.9000000000000004
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         81.15,
-                         0.1499999999999999,
-                         5.800000000000001
-                        ]
-                       }
-                      ]
-                     }
-                    ],
-                    "name": "ceiling"
-                   },
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     68.85,
-                     -0.15,
-                     3.9000000000000004
-                    ],
-                    "children": [
-                     {
-                      "kind": "box",
-                      "size": [
-                       81.15,
-                       0.15,
-                       5.800000000000001
-                      ]
-                     }
-                    ]
-                   },
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     69.0,
-                     -0.01,
-                     3.9000000000000004
-                    ],
-                    "children": [
-                     {
-                      "kind": "box",
-                      "size": [
-                       81.0,
-                       0.01,
-                       5.5
-                      ]
-                     }
-                    ],
-                    "material": 1
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   0.4750000000000001,
-                   2.375,
-                   2.95
-                  ],
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     3.125,
-                     3.375,
-                     0.95
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 0.0,
-                 0.0
-                ],
+                "kind": "union",
                 "children": [
                  {
                   "kind": "difference",
@@ -1306,16 +1074,191 @@
                      {
                       "kind": "translate",
                       "translation": [
-                       66.15,
-                       2.375,
+                       0.0,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         68.85,
+                         2.375,
+                         -1.75
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           81.15,
+                           3.375,
+                           0.15000000000000002
+                          ]
+                         }
+                        ]
+                       }
+                      ],
+                      "name": "wallL"
+                     },
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0.0,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         68.85,
+                         2.375,
+                         1.75
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           81.15,
+                           3.375,
+                           0.15000000000000002
+                          ]
+                         }
+                        ]
+                       }
+                      ],
+                      "name": "wallR"
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     1.5,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       3.0,
+                       0.0,
+                       0.0
+                      ],
+                      "count": 0,
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         2.4,
+                         -1.75
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.55,
+                           1.55,
+                           1.0499999999999998
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     4.6,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       8.8,
+                       0.0,
+                       0.0
+                      ],
+                      "count": 0,
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         1.525,
+                         1.75
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.7,
+                           1.525,
+                           1.0499999999999998
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "difference",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0.0,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         68.85,
+                         4.6,
+                         3.9000000000000004
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           81.15,
+                           0.1499999999999999,
+                           5.800000000000001
+                          ]
+                         }
+                        ]
+                       }
+                      ],
+                      "name": "ceiling"
+                     },
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       68.85,
+                       -0.15,
                        3.9000000000000004
                       ],
                       "children": [
                        {
                         "kind": "box",
                         "size": [
-                         0.14999999999999858,
-                         3.375,
+                         81.15,
+                         0.15,
                          5.800000000000001
                         ]
                        }
@@ -1324,274 +1267,350 @@
                      {
                       "kind": "translate",
                       "translation": [
-                       68.0,
-                       1.5,
-                       0.0
+                       69.0,
+                       -0.01,
+                       3.9000000000000004
                       ],
                       "children": [
                        {
-                        "kind": "shell",
-                        "offset": 0.3,
-                        "children": [
-                         {
-                          "kind": "box",
-                          "size": [
-                           1.85,
-                           1.85,
-                           1.85
-                          ]
-                         }
+                        "kind": "box",
+                        "size": [
+                         81.0,
+                         0.01,
+                         5.5
                         ]
                        }
                       ],
-                      "material": 4
+                      "material": 1
                      }
                     ]
                    },
                    {
                     "kind": "translate",
                     "translation": [
-                     66.15,
-                     1.5,
-                     0.0
+                     0.4750000000000001,
+                     2.375,
+                     2.95
                     ],
                     "children": [
                      {
                       "kind": "box",
                       "size": [
-                       1.1499999999999986,
-                       1.5,
-                       0.7
+                       3.125,
+                       3.375,
+                       0.95
                       ]
                      }
                     ]
                    }
                   ]
-                 }
-                ],
-                "name": "beaconWall"
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -12.15,
-                 2.375,
-                 3.9000000000000004
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.15000000000000036,
-                   3.375,
-                   5.800000000000001
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "union",
-                "children": [
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   -0.19999999999999973,
-                   2.375,
-                   4.05
-                  ],
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     6.699999999999999,
-                     3.375,
-                     0.15000000000000013
-                    ]
-                   }
-                  ]
                  },
                  {
                   "kind": "translate",
                   "translation": [
-                   -6.75,
-                   2.375,
-                   2.9000000000000004
-                  ],
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     0.1499999999999999,
-                     3.375,
-                     1.3
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   6.35,
-                   2.375,
-                   5.65
-                  ],
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     0.1499999999999999,
-                     3.375,
-                     4.050000000000001
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   78.1,
-                   2.375,
-                   9.55
-                  ],
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     71.9,
-                     3.375,
-                     0.15000000000000036
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "union",
-                "children": [
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   3.6,
                    0.0,
-                   2.95
-                  ],
-                  "children": [
-                   {
-                    "kind": "rotate",
-                    "rotation": [
-                     0.0,
-                     180.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "stairs",
-                      "size": [
-                       0.25,
-                       0.19,
-                       0.95
-                      ],
-                      "count": 25,
-                      "height": 0.28
-                     }
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   3.6,
-                   -4.75,
-                   2.95
-                  ],
-                  "children": [
-                   {
-                    "kind": "rotate",
-                    "rotation": [
-                     0.0,
-                     180.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "stairs",
-                      "size": [
-                       0.25,
-                       0.19,
-                       0.95
-                      ],
-                      "count": 25,
-                      "height": 0.28
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 1.4,
-                 -0.009,
-                 -0.55
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.8000000000000002,
-                   0.01,
-                   0.8999999999999999
-                  ]
-                 }
-                ],
-                "material": 5
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 0.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "translate",
-                  "translation": [
-                   1.08,
-                   4.446000000000001,
+                   0.0,
                    0.0
                   ],
                   "children": [
                    {
-                    "kind": "repeat",
-                    "size": [
-                     2.16,
-                     0.0,
-                     0.0
-                    ],
-                    "count": 0,
+                    "kind": "difference",
                     "children": [
                      {
-                      "kind": "box",
-                      "size": [
-                       0.42,
-                       0.012,
-                       0.32
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         66.15,
+                         2.375,
+                         3.9000000000000004
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.14999999999999858,
+                           3.375,
+                           5.800000000000001
+                          ]
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         68.0,
+                         1.5,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "shell",
+                          "offset": 0.3,
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             1.85,
+                             1.85,
+                             1.85
+                            ]
+                           }
+                          ]
+                         }
+                        ],
+                        "material": 4
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       66.15,
+                       1.5,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "box",
+                        "size": [
+                         1.1499999999999986,
+                         1.5,
+                         0.7
+                        ]
+                       }
                       ]
                      }
                     ]
                    }
                   ],
-                  "material": 3
+                  "name": "beaconWall"
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   -12.15,
+                   2.375,
+                   3.9000000000000004
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.15000000000000036,
+                     3.375,
+                     5.800000000000001
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     -0.19999999999999973,
+                     2.375,
+                     4.05
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       6.699999999999999,
+                       3.375,
+                       0.15000000000000013
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     -6.75,
+                     2.375,
+                     2.9000000000000004
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       0.1499999999999999,
+                       3.375,
+                       1.3
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     6.35,
+                     2.375,
+                     5.65
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       0.1499999999999999,
+                       3.375,
+                       4.050000000000001
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     78.1,
+                     2.375,
+                     9.55
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       71.9,
+                       3.375,
+                       0.15000000000000036
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     3.6,
+                     0.0,
+                     2.95
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       180.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "stairs",
+                        "size": [
+                         0.25,
+                         0.19,
+                         0.95
+                        ],
+                        "count": 25,
+                        "height": 0.28
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     3.6,
+                     -4.75,
+                     2.95
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       180.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "stairs",
+                        "size": [
+                         0.25,
+                         0.19,
+                         0.95
+                        ],
+                        "count": 25,
+                        "height": 0.28
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   1.4,
+                   -0.009,
+                   -0.55
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.8000000000000002,
+                     0.01,
+                     0.8999999999999999
+                    ]
+                   }
+                  ],
+                  "material": 5
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     1.08,
+                     4.446000000000001,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "repeat",
+                      "size": [
+                       2.16,
+                       0.0,
+                       0.0
+                      ],
+                      "count": 0,
+                      "children": [
+                       {
+                        "kind": "box",
+                        "size": [
+                         0.42,
+                         0.012,
+                         0.32
+                        ]
+                       }
+                      ]
+                     }
+                    ],
+                    "material": 3
+                   }
+                  ],
+                  "name": "lampsAt"
                  }
-                ],
-                "name": "lampsAt"
+                ]
                }
-              ]
+              ],
+              "name": "breath"
              }
             ]
            }
@@ -2261,46 +2280,6 @@
               ]
              }
             ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             13.900000000000002,
-             0.0,
-             -4.05
-            ],
-            "children": [
-             {
-              "kind": "repeat",
-              "size": [
-               4.4,
-               0.0,
-               0.0
-              ],
-              "count": 1,
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 0.003,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.85,
-                   0.013000000000000001,
-                   3.55
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
-            ],
-            "material": 5
            }
           ]
          }
@@ -3190,6 +3169,47 @@
                    3.5,
                    0.25,
                    4.6
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   6.3,
+                   -0.2,
+                   4.2
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.7999999999999998,
+                     0.2,
+                     0.7999999999999998
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   6.3,
+                   -15.2,
+                   4.2
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.2999999999999998,
+                     14.8,
+                     0.2999999999999998
+                    ]
+                   }
                   ]
                  }
                 ]
@@ -5671,50 +5691,17 @@
     "blend": 0.3,
     "updateHz": 0.0,
     "cullDistance": 0.0
-   }
+   },
+   "roughnessScale": 2.0
   },
   {
    "name": "figWalk",
    "kind": "gltf",
    "asset": "../../assets/quaternius/animations/UAL1_Standard.glb",
    "position": [
+    29.45,
     0.0,
-    0.0,
-    0.0
-   ],
-   "rotation": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "tint": [
-    0.1,
-    0.1,
-    0.1
-   ],
-   "animation": {
-    "state": "Walk_Loop",
-    "blend": 0.3,
-    "updateHz": 0.0,
-    "cullDistance": 0.0
-   },
-   "journey": {
-    "distance": 0.0
-   }
-  },
-  {
-   "name": "figVoid",
-   "kind": "gltf",
-   "asset": "../../assets/quaternius/animations/UAL1_Standard.glb",
-   "position": [
-    10.75,
-    -3.96,
-    3002.0
+    2000.1
    ],
    "rotation": [
     0.0,
@@ -5736,7 +5723,40 @@
     "blend": 0.3,
     "updateHz": 0.0,
     "cullDistance": 0.0
-   }
+   },
+   "roughnessScale": 2.0
+  },
+  {
+   "name": "figVoid",
+   "kind": "gltf",
+   "asset": "../../assets/quaternius/animations/UAL1_Standard.glb",
+   "position": [
+    6.3,
+    0.0,
+    3004.2
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "tint": [
+    0.1,
+    0.1,
+    0.1
+   ],
+   "animation": {
+    "state": "Idle_Loop",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   },
+   "roughnessScale": 2.0
   },
   {
    "name": "figTop",
@@ -5767,257 +5787,8 @@
     "blend": 0.3,
     "updateHz": 0.0,
     "cullDistance": 0.0
-   }
-  },
-  {
-   "name": "shaft0",
-   "kind": "particles",
-   "particles": {
-    "capacity": 12000,
-    "spawnRate": 320.0,
-    "shape": "box",
-    "position": [
-     1.5999999999999992,
-     12.6,
-     1010.4
-    ],
-    "extent": [
-     0.75,
-     2.9,
-     0.25
-    ],
-    "lifetimeMin": 22.0,
-    "lifetimeMax": 28.0,
-    "direction": [
-     0.25,
-     -0.62,
-     -0.74
-    ],
-    "spread": 0.025,
-    "speedMin": 0.55,
-    "speedMax": 0.62,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.0,
-    "sizeStart": 0.04,
-    "sizeEnd": 0.03,
-    "blend": "additive",
-    "colorStart": [
-     1.0,
-     0.86,
-     0.6,
-     0.09
-    ],
-    "colorEnd": [
-     1.0,
-     0.8,
-     0.55,
-     0.0
-    ]
-   }
-  },
-  {
-   "name": "shaft1",
-   "kind": "particles",
-   "particles": {
-    "capacity": 12000,
-    "spawnRate": 320.0,
-    "shape": "box",
-    "position": [
-     6.0,
-     12.6,
-     1010.4
-    ],
-    "extent": [
-     0.75,
-     2.9,
-     0.25
-    ],
-    "lifetimeMin": 22.0,
-    "lifetimeMax": 28.0,
-    "direction": [
-     0.25,
-     -0.62,
-     -0.74
-    ],
-    "spread": 0.025,
-    "speedMin": 0.55,
-    "speedMax": 0.62,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.0,
-    "sizeStart": 0.04,
-    "sizeEnd": 0.03,
-    "blend": "additive",
-    "colorStart": [
-     1.0,
-     0.86,
-     0.6,
-     0.09
-    ],
-    "colorEnd": [
-     1.0,
-     0.8,
-     0.55,
-     0.0
-    ]
-   }
-  },
-  {
-   "name": "shaft2",
-   "kind": "particles",
-   "particles": {
-    "capacity": 12000,
-    "spawnRate": 320.0,
-    "shape": "box",
-    "position": [
-     10.4,
-     12.6,
-     1010.4
-    ],
-    "extent": [
-     0.75,
-     2.9,
-     0.25
-    ],
-    "lifetimeMin": 22.0,
-    "lifetimeMax": 28.0,
-    "direction": [
-     0.25,
-     -0.62,
-     -0.74
-    ],
-    "spread": 0.025,
-    "speedMin": 0.55,
-    "speedMax": 0.62,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.0,
-    "sizeStart": 0.04,
-    "sizeEnd": 0.03,
-    "blend": "additive",
-    "colorStart": [
-     1.0,
-     0.86,
-     0.6,
-     0.09
-    ],
-    "colorEnd": [
-     1.0,
-     0.8,
-     0.55,
-     0.0
-    ]
-   }
-  },
-  {
-   "name": "shaft3",
-   "kind": "particles",
-   "particles": {
-    "capacity": 12000,
-    "spawnRate": 320.0,
-    "shape": "box",
-    "position": [
-     14.8,
-     12.6,
-     1010.4
-    ],
-    "extent": [
-     0.75,
-     2.9,
-     0.25
-    ],
-    "lifetimeMin": 22.0,
-    "lifetimeMax": 28.0,
-    "direction": [
-     0.25,
-     -0.62,
-     -0.74
-    ],
-    "spread": 0.025,
-    "speedMin": 0.55,
-    "speedMax": 0.62,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.0,
-    "sizeStart": 0.04,
-    "sizeEnd": 0.03,
-    "blend": "additive",
-    "colorStart": [
-     1.0,
-     0.86,
-     0.6,
-     0.09
-    ],
-    "colorEnd": [
-     1.0,
-     0.8,
-     0.55,
-     0.0
-    ]
-   }
-  },
-  {
-   "name": "shaft4",
-   "kind": "particles",
-   "particles": {
-    "capacity": 12000,
-    "spawnRate": 320.0,
-    "shape": "box",
-    "position": [
-     19.2,
-     12.6,
-     1010.4
-    ],
-    "extent": [
-     0.75,
-     2.9,
-     0.25
-    ],
-    "lifetimeMin": 22.0,
-    "lifetimeMax": 28.0,
-    "direction": [
-     0.25,
-     -0.62,
-     -0.74
-    ],
-    "spread": 0.025,
-    "speedMin": 0.55,
-    "speedMax": 0.62,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.0,
-    "sizeStart": 0.04,
-    "sizeEnd": 0.03,
-    "blend": "additive",
-    "colorStart": [
-     1.0,
-     0.86,
-     0.6,
-     0.09
-    ],
-    "colorEnd": [
-     1.0,
-     0.8,
-     0.55,
-     0.0
-    ]
-   }
+   },
+   "roughnessScale": 2.0
   },
   {
    "name": "motesGrow",
