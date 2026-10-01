@@ -760,7 +760,10 @@ def tl_source(name, keys, interp="smooth"):
 
 
 WORLDS = ["corridor", "hall", "enfilade", "void", "grow", "penrose", "open"]
-OFFSET = {w: [0.0, 0.0, 1000.0 * i] for i, w in enumerate(WORLDS)}
+# Every world at the origin. Only the active chapter's nodes and lights are drawn, so the worlds may overlap;
+# and they must stay near the origin: placed 1000-6000 m out, the image jittered horizontally by up to 20 px
+# at 1080p with the camera still (float precision; measured with every track frozen, gone at the origin).
+OFFSET = {w: [0.0, 0.0, 0.0] for w in WORLDS}
 
 
 def wpt(world, p):
@@ -1046,7 +1049,7 @@ def build(check_only=False, end=SONG_END):
            (bt(26), 0.0), (bt(28, 3), 0.0), (bt(29, 2), 24.0), (bt(30), 20.0), (bt(30, 3), 0.0),
            (bt(37), 0.0), (bt(37, 3), -28.0), (bt(38, 2), -22.0), (bt(39), 0.0),
            # let it go: still, looking out past the figure at the void; bar 46 look back up at it; bar 48 forward
-           (bt(41, 3), 0.0), (bt(42) - 0.3, -30.0), (bt(43), -30.0), (bt(44), -8.0), (bt(46), 0.0), (bt(46) + 2.2, -112.0), (bt(47, 3), -112.0), (bt(48) + 1.0, 0.0),
+           (bt(41, 3), 0.0), (bt(42) - 0.3, -30.0), (bt(43), -30.0), (bt(44), -8.0), (bt(46) - 0.6, 0.0), (bt(46) + 2.8, -112.0), (bt(47, 3), -112.0), (bt(48) + 1.6, 0.0),
            # verse 2: searching
            (bt(51), 0.0), (bt(52), 18.0), (bt(53), 30.0), (bt(54), -10.0), (bt(55), -40.0), (bt(56), -20.0),
            (bt(57), 0.0),
@@ -1059,7 +1062,7 @@ def build(check_only=False, end=SONG_END):
                                                  (bt(111, 3), 0.0), (end, 0.0)]
     T.append(track("camera/journey/yaw", yaw, interp="easeInOut"))
     pitch = [(0, 0.0), (bt(18), 0.0), (bt(18) + 1.5, 12.0), (bt(20), 18.0), (bt(21), 22.0), (bt(22), 6.0),
-             (bt(24), 10.0), (bt(25), 4.0), (bt(26), 0.0), (bt(42), 0.0), (bt(46), 0.0), (bt(46) + 2.2, 21.0),
+             (bt(24), 10.0), (bt(25), 4.0), (bt(26), 0.0), (bt(42), 0.0), (bt(46) - 0.6, 0.0), (bt(46) + 2.8, 21.0),
              (bt(47, 3), 21.0), (bt(48) + 1.0, -4.0), (bt(49), 0.0), (bt(56), 0.0), (bt(57), -24.0),
              (bt(58), -6.0), (bt(58, 4), 0.0), (bt(70), 0.0), (bt(84), 0.0), (bt(84) + 0.8, 14.0), (bt(89), 16.0),
              (bt(90), 2.0), (bt(92), 0.0), (bt(92) + 1.5, 8.0), (bt(99), 8.0), (bt(100), 4.0), (bt(107), 4.0),
@@ -1131,7 +1134,7 @@ def build(check_only=False, end=SONG_END):
     threshold(bt(75, 3), bt(75, 4) + 0.2, bt(76) + 0.1, bt(76) + 0.9, 1.5, 1.2)      # into the light; the loop
     threshold(bt(83, 3), bt(83, 4) - 0.1, bt(84) + 0.1, bt(84) + 0.9, 1.4, 1.0)      # the pulse stops
     threshold(bt(91, 3), bt(91, 4), bt(92) + 0.3, bt(93), 1.7, 1.5)        # the fill: the brightest door
-    value.extend([(bt(42) + 0.6, 0.8), (bt(48), 0.8), (bt(50), 1.0)])
+    value.extend([(bt(42) + 0.6, 0.74), (bt(48), 0.74), (bt(50), 1.0)])
 
     value.extend([(bt(114), 1.0), (bt(116), 1.35), (end, 1.45)])
     value.sort()

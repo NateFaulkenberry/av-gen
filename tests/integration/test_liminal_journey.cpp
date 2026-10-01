@@ -507,16 +507,23 @@ TEST_CASE("All You Got: every chapter's walk is clear of its world", "[liminal][
         }
         auto tree = spatial::SdfTree::fromJson(nlohmann::json{{"root", root}});
         REQUIRE(tree.has_value());
-        const glm::vec3 last = chapter.world.path.back();
+        // Where the walk leaves this chapter: at the next chapter's start (its own distance there), or, for the
+        // last chapter, at its last authored point (the generator carries every path two points straight on
+        // past its end, so the gaze never runs onto the closing segment; those points are never walked).
+        const auto& pts = chapter.world.path;
+        const glm::vec3 last = pts.size() > 3 ? pts[pts.size() - 3] : pts.back();
+        const double walkedEnd = c + 1 < journey->size()
+                                     ? chapter.from + (journey->chapter(c + 1).start - chapter.start)
+                                     : path.cellLength();
         float worst = 1e9f;
         double worstAt = 0.0;
         glm::vec3 worstEye(0.0f);
-        for (double d = chapter.from; d < path.cellLength(); d += 0.05) {
+        for (double d = chapter.from; d < std::min(walkedEnd, static_cast<double>(path.cellLength())); d += 0.05) {
             scene::JourneyView v;
             v.distance = d;
             const auto pose = scene::journeyPose(path, v);
-            if (glm::length(path.sample(d).position - last) < 0.4f) {
-                break; // the walk ends at the path's last point (the closing segment is never walked)
+            if (c + 1 == journey->size() && glm::length(path.sample(d).position - last) < 0.4f) {
+                break;
             }
             const float clearance = tree->evaluate(pose.eye, 0.0);
             if (clearance < worst) {
