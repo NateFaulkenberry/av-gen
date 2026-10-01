@@ -1,0 +1,134 @@
+[
+ {
+  "id": "s01",
+  "name": "thinker0",
+  "start": 0.0,
+  "end": 1.0
+ },
+ {
+  "id": "s02",
+  "name": "thinker1",
+  "start": 1.0,
+  "end": 2.0
+ },
+ {
+  "id": "s03",
+  "name": "couch_lie0",
+  "start": 2.0,
+  "end": 3.0
+ },
+ {
+  "id": "s04",
+  "name": "couch_lie1",
+  "start": 3.0,
+  "end": 4.0
+ },
+ {
+  "id": "s05",
+  "name": "head_hands0",
+  "start": 4.0,
+  "end": 5.0
+ },
+ {
+  "id": "s06",
+  "name": "head_hands1",
+  "start": 5.0,
+  "end": 6.0
+ },
+ {
+  "id": "s07",
+  "name": "window0",
+  "start": 6.0,
+  "end": 7.0
+ },
+ {
+  "id": "s08",
+  "name": "window1",
+  "start": 7.0,
+  "end": 8.0
+ },
+ {
+  "id": "s09",
+  "name": "table0",
+  "start": 8.0,
+  "end": 9.0
+ },
+ {
+  "id": "s10",
+  "name": "table1",
+  "start": 9.0,
+  "end": 10.0
+ },
+ {
+  "id": "s11",
+  "name": "mirror0",
+  "start": 10.0,
+  "end": 11.0
+ },
+ {
+  "id": "s12",
+  "name": "mirror1",
+  "start": 11.0,
+  "end": 12.0
+ },
+ {
+  "id": "s13",
+  "name": "toilet0",
+  "start": 12.0,
+  "end": 13.0
+ },
+ {
+  "id": "s14",
+  "name": "toilet1",
+  "start": 13.0,
+  "end": 14.0
+ },
+ {
+  "id": "s15",
+  "name": "bed0",
+  "start": 14.0,
+  "end": 15.0
+ },
+ {
+  "id": "s16",
+  "name": "bed1",
+  "start": 15.0,
+  "end": 16.0
+ },
+ {
+  "id": "s17",
+  "name": "desk0",
+  "start": 16.0,
+  "end": 17.0
+ },
+ {
+  "id": "s18",
+  "name": "desk1",
+  "start": 17.0,
+  "end": 18.0
+ },
+ {
+  "id": "s19",
+  "name": "bed_edge0",
+  "start": 18.0,
+  "end": 19.0
+ },
+ {
+  "id": "s20",
+  "name": "bed_edge1",
+  "start": 19.0,
+  "end": 20.0
+ },
+ {
+  "id": "s21",
+  "name": "stair0",
+  "start": 20.0,
+  "end": 21.0
+ },
+ {
+  "id": "s22",
+  "name": "stair1",
+  "start": 21.0,
+  "end": 22.0
+ }
+]
