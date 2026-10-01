@@ -5,29 +5,19 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status (19:10): everything is in. Next: the wave check, then the final 1080p render and the gate.**
-- **Pin:** `$S/liminal2/bin-5dd835a4` (the world wave ADR-1055, rim ADR-1052, static ADR-1054). `$S/liminal3/avgen.sh`
-  points at it. The coordinator has the engineer holding all GPU work until my final and gate are through: message
-  the coordinator when they are.
-- **Previews** in `~/Desktop/av-gen-review/24-liminal-space/pass3/`:
-  - v1 (`976152d1`);
-  - v2 (bug: intro objects hidden; fixed in `37387309`);
-  - v3 (`37387309`, the travelBeam stand-in).
-- **Critic on v3** (job `job_1a0f9aa4f7f37d21d`): 0.93 overall; composition, colour, pacing and creative intent
-  1.0; musical sync 0.98; technical 0.73 (intended flashes and the dawn white-out), motion 0.76 (corruption effects
-  read as shake). Acted on: the walls' quarter swell halved (F002 "whole-frame pulse"), shorter splash and impact
-  holds, a gentler dawn.
-- **`pass2_av` v2:** quarter lock +12 to +27 dB in most sections; 16 of 18 BIG CLAPs unmistakable. C12 and C14
-  are corruption cuts that read by structure, not brightness.
-- **The world wave (`c3b2f896`):** it runs from the back of the house forward past the camera and out of the front
-  door; trail = the open's blue; the palette turns on the cut. Check render: `$S/liminal3/wave1/wave2.mp4`
-  (194-202 s).
-- **The final:** `$S/liminal3/final.sh` snapshots the committed project into `$S/liminal3/p3-final/`, renders
-  `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4` (1920x1080, 30 fps, h264 q90, the
-  song), then runs `pass2_av` into `$S/liminal3/av-final/`. After it:
-  1. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"`, which must exit 0;
-  2. the Critic on the final;
-  3. the report.
+**Status (19:45): the final is rendered and the gate passes. Take 2 is queued.**
+- **Final take 1** (`e98fb52c`, pin `5dd835a4`):
+  - `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4`: 1920x1080, 30 fps, h264 q90, the
+    song, 258 s; 0 GPU errors. A copy is kept at `$S/liminal3/all-you-got-pass3-take1.mp4`.
+  - `pass2_av`: quarter lock +12 to +30 dB in most sections; 15 of 18 BIG CLAPs unmistakable (C10 visible; C12
+    and C14 not read); entry boundaries 2x to 41x, except the pause and the ending (by design).
+- **Gate:** `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0 (41,918 assertions in
+  102 test cases). The coordinator was told at 19:39, so the engineer has the GPU back.
+- **Take 2** (`2f4ad1ef`) is queued: `$S/liminal3/final.sh` renders to a temp file and replaces the final only on
+  success. It has the wave band at half the light (lines stay visible in the band), and C12 and C14 readable.
+  When it lands, look at 198.3-199.9 (`fps=15` tile) and compare `$S/liminal3/av-final` with
+  `$S/liminal3/av-take1`.
+- **The Critic on take 1** is running: `$S/liminal3/critic-take1/`.
 
 **Generate, then check (CPU, about 80 s):**
 ```sh
@@ -102,8 +92,9 @@ then point `$S/liminal3/avgen.sh` at it.
 - [x] M7: verse 2 upstairs, with 6 tableaux and 8 corruptions (written, not yet seen).
 - [x] M8: corruption at transitions, claps, lyrics and peaks; static screens; the world wave; the coda on the
   road's dashes.
-- [ ] M9: the validator, fixes, a preview, `pass2_av.py`, the Critic on representative sections, refinement.
-- [ ] M10: the final 1080p render with the song, `[sdf],[liminal]` exit 0, the report in the hand-back.
+- [x] M9: the validator (0 errors), fixes, previews v1-v3, `pass2_av.py`, the Critic on v3 (0.93), refinement.
+- [x] M10: the final 1080p render with the song (take 1; take 2 queued); `[sdf],[liminal]` exits 0; the report goes
+  in the hand-back.
 
 ## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
 
