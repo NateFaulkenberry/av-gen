@@ -698,7 +698,7 @@ def round_tree(h=3.2, k=FILL, leaves=ACCENT):
     """A broadleaf: a trunk and a faceted crown (a rounded box turned 45 degrees, so it has edges to draw)
     (about 7 nodes)."""
     return U(S(CY([0, h * 0.25, 0], h * 0.045, h * 0.5), k),
-             S(T([0, h * 0.68, 0], R([35, 45, 0], rbox([h * 0.22, h * 0.22, h * 0.22], h * 0.06))), leaves))
+             S(T([0, h * 0.68, 0], R([35, 45, 0], rbox([h * 0.22, h * 0.22, h * 0.22], h * 0.012))), leaves))
 
 
 def rock(s=0.6, k=FILL, seed=0):

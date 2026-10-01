@@ -38,14 +38,19 @@ GRID = {"origin": G.BAR1, "beatsPerBar": 4, "tempo": [{"bar": 1, "bpm": 109}, {"
 
 # ---- palettes (PASS2-PLAN.md §3): sRGB hex -> linear; roles bound below -----------------------------------
 ROLES = ["wall", "furn", "furn2", "figure", "fog", "fill", "glow", "screen", "canvas", "canvas2", "glass", "word",
-         "accent"]
+         "accent", "jewel1", "jewel2", "jewel3", "jewel4", "jewel5", "jewel6"]
+JEWELS = {"P9jewels": ["#FF3355", "#3D7BFF", "#FFB33D", "#FFFFFF", "#FF7AB8", "#5CF0FF"]}
 
 
 def P(name, wall, furn, furn2, figure, fog, glow, screen, canvas, canvas2, glass, word, accent, fill="#050507"):
-    return name, {"wall": srgb(wall), "furn": srgb(furn), "furn2": srgb(furn2), "figure": srgb(figure),
-                  "fog": srgb(fog), "fill": srgb(fill), "glow": srgb(glow), "screen": srgb(screen),
-                  "canvas": srgb(canvas), "canvas2": srgb(canvas2), "glass": srgb(glass), "word": srgb(word),
-                  "accent": srgb(accent)}
+    roles = {"wall": srgb(wall), "furn": srgb(furn), "furn2": srgb(furn2), "figure": srgb(figure),
+             "fog": srgb(fog), "fill": srgb(fill), "glow": srgb(glow), "screen": srgb(screen),
+             "canvas": srgb(canvas), "canvas2": srgb(canvas2), "glass": srgb(glass), "word": srgb(word),
+             "accent": srgb(accent)}
+    jewels = JEWELS.get(name, [furn, furn2, wall, accent, canvas, screen])
+    for i, h in enumerate(jewels):
+        roles[f"jewel{i + 1}"] = srgb(h)
+    return name, roles
 
 
 PALETTES = [
@@ -80,16 +85,22 @@ PALETTES = [
 ]
 PALETTE_INDEX = {name: i for i, (name, _) in enumerate(PALETTES)}
 
-LINE_ROLE = {"wall": "wall", "furn": "furn", "furn2": "furn2", "figure": "figure"}
+LINE_ROLE = {"wall": "wall", "furn": "furn", "furn2": "furn2", "figure": "figure",
+             **{f"jewel{i}": f"jewel{i}" for i in range(1, 7)}}
 SURFACE_ROLE = {K.GLOW: "glow", K.SCREEN: "screen", K.CANVAS: "canvas", K.CANVAS2: "canvas2", K.GLASS: "glass"}
 
 
 def add_world(film: Film, room: dict, edge_width=0.011, edge_intensity=4.0, max_distance=30.0):
     names = []
-    for name, tree, role, bmin, bmax in room["objects"]:
-        film.sdf(name, tree, edge_width=edge_width, edge_intensity=edge_intensity, bmin=bmin, bmax=bmax,
-                 max_distance=max_distance)
-        film.bind(LINE_ROLE[role], f"sdf/{name}/look/edge/color")
+    for obj in room["objects"]:
+        name, tree, role, bmin, bmax = obj[:5]
+        opts = dict(edge_width=edge_width, edge_intensity=edge_intensity, max_distance=max_distance)
+        if len(obj) > 5:
+            opts.update(obj[5])
+        own_line = opts.pop("own_line", False)
+        film.sdf(name, tree, bmin=bmin, bmax=bmax, **opts)
+        if not own_line:
+            film.bind(LINE_ROLE[role], f"sdf/{name}/look/edge/color")
         film.bind("fill", f"sdf/{name}/surface/{K.FILL}/color")
         film.bind("fill", f"sdf/{name}/surface/{K.FLOOR}/color")
         film.bind("fill", f"sdf/{name}/surface/{K.ACCENT}/color")
@@ -108,7 +119,7 @@ def add_world(film: Film, room: dict, edge_width=0.011, edge_intensity=4.0, max_
 def environment(fog_hex="#04061A", stem="all-you-got-pass2"):
     fog = srgb(fog_hex)
     return {"intensity": 0.0, "background": fog, "fogColor": fog, "lightRig": f"{stem}.rig.json",
-            "volumeDensity": 0.0, "volumeAbsorption": 1.0, "volumeEmission": 0.0, "volumeScattering": 0.5,
+            "volumeDensity": 0.022, "volumeAbsorption": 1.0, "volumeEmission": 0.0, "volumeScattering": 0.0,
             "volumeMaxDistance": 0.0, "volumeLocalLights": 0.0,
             "sky": {"enabled": False, "background": False, "useKeyLight": False, "zenithColor": fog,
                     "horizonColor": fog, "groundColor": fog, "sunColor": [1.0, 0.9, 0.8],
@@ -116,7 +127,9 @@ def environment(fog_hex="#04061A", stem="all-you-got-pass2"):
                     "intensity": 0.0}}
 
 
-PARAMS = {"camera/exposure/mode": 0, "camera/exposure/compensation": 0.0, "post/tonemap/operator": 1,
+PARAMS = {"temporal/mosh/enabled": True, "temporal/mosh/amount": 0.0, "temporal/mosh/shift": 0.0,
+          "temporal/mosh/block": 40.0, "temporal/mosh/smear": 30.0, "temporal/mosh/frames": 10.0, "temporal/mosh/rate": 12.0,
+          "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0, "post/tonemap/operator": 1,
           "post/bloom/enabled": True, "post/bloom/intensity": 0.35, "post/bloom/threshold": 0.9,
           "post/grade/contrast": 1.08, "post/grade/saturation": 1.1, "post/output/vignette": 0.25,
           "post/output/grain": 0.0, "post/motionBlur/amount": 0.35}
@@ -133,35 +146,114 @@ def palettes(film: Film):
 # =============================================================================================================
 
 def build_kit(palette_name="P2allyougot"):
-    film = Film(end=12.0)
+    import outdoor2 as OD
+    film = Film(end=40.0)
     palettes(film)
+    shots = []
+
+    def room_views(room, views):
+        names, lights = add_world(film, room)
+        for nm_, eye, look in views:
+            shots.append((nm_, eye, look, names, lights))
     liv = RM.living_room()
-    names, lights = add_world(film, liv)
-    a = liv["anchors"]
-    views = [("impact", [[-0.6, 1.5, 1.95], [-0.6, 1.5, 1.9]], (-0.6, 0.95, -1.6)),
-             ("couch", [[1.9, 1.55, 1.75], [1.85, 1.55, 1.7]], (-1.9, 0.75, -0.35)),
-             ("tv", [[-1.3, 1.35, 1.8], [-1.25, 1.35, 1.75]], (2.2, 0.85, -0.3)),
-             ("door", [[-0.3, 1.6, 1.9], [-0.25, 1.6, 1.85]], (1.5, 1.2, -2.2)),
-             ("man", [[0.4, 1.25, 0.9], [0.35, 1.25, 0.85]], a["man"]),
-             ("wide", [[2.3, 2.25, 1.95], [2.25, 2.25, 1.9]], (-1.0, 0.6, -1.0))]
-    for i, (nm, eye, look) in enumerate(views):
-        film.shot(nm, i * 1.0, (i + 1) * 1.0, eye, look, nodes=names, lights=lights, fov=62)
-    film.track("palette/position", [(0.0, float(PALETTE_INDEX[palette_name])), (12.0, float(PALETTE_INDEX[palette_name]))])
+    room_views(liv, [("liv-impact", (-0.6, 1.5, 1.95), (-0.6, 0.95, -1.6)), ("liv-couch", (1.9, 1.55, 1.75), (-1.9, 0.75, -0.35)),
+                     ("liv-tv", (-1.3, 1.35, 1.8), (2.2, 0.85, -0.3))])
+    bed = RM.bedroom()
+    room_views(bed, [("bed-a", (1.3, 1.55, 1.55), (-0.6, 0.9, -1.4)), ("bed-b", (-1.6, 1.6, 1.5), (1.4, 1.1, -1.3))])
+    kit_ = RM.kitchen()
+    room_views(kit_, [("kit-a", (1.6, 1.55, 1.6), (-0.6, 0.9, -1.2)), ("kit-b", (-1.7, 1.5, 1.4), (1.2, 1.0, -1.0))])
+    hall = RM.hallway()
+    room_views(hall, [("hall-a", (0.0, 1.55, 0.7), (0.0, 1.2, -4.0))])
+    stu = RM.study()
+    room_views(stu, [("stu-a", (-1.2, 1.55, 1.4), (0.6, 0.95, -1.3))])
+    bath = RM.bathroom()
+    room_views(bath, [("bath-a", (1.0, 1.6, 1.2), (-0.8, 0.8, -0.6))])
+    gal = RM.gallery()
+    room_views(gal, [("gal-a", (0.0, 1.7, 3.1), (0.0, 0.9, 0.0)), ("gal-b", (2.6, 1.3, 2.4), (0.0, 1.0, 0.0))])
+    # the open
+    far = {"max_distance": 220.0}
+    land = {"objects": [("landGround", OD.terrain(), "wall", (-170, -12, -170), (170, 6, 170), far),
+                        ("landMtn", OD.mountains(), "furn2", (-130, -10, -175), (130, 50, -90), far),
+                        ("landTrees", OD.grove([("pine", -6, -10, 3.2), ("pine", -9, -14, 4.0), ("round", 7, -12, 3.6),
+                                                ("pine", 12, -20, 4.4), ("round", -15, -24, 4.0), ("pine", 3, -26, 3.8)]),
+                         "furn", (-30, -6, -40), (30, 12, 2), far),
+                        ("landStones", U_(OD.stones([(-3, -6, 0.7), (4, -8, 0.5), (9, -5, 0.9)]),
+                                          OD.tufts([(-1.5, -4), (1.2, -5), (2.6, -3.5), (-2.8, -7)])),
+                         "furn2", (-12, -6, -12), (12, 4, 0), far),
+                        ("landRing", OD.lantern_ring(14.0, 7, 9.0, "ring"), "furn2", (-20, 3, -20), (20, 16, 20), far)],
+            "lights": []}
+    room_views(land, [("land-a", (0.0, OD.ground(0, 6) + 1.7, 6.0), (0.0, 3.0, -30.0)),
+                      ("land-b", (0.0, OD.ground(0, 25) + 6.0, 25.0), (0.0, 6.0, -10.0))])
+    tree = {"objects": [("treeTrunk", OD.tree_trunk(), "wall", (-1, -2.5, -1), (1, 35, 1), far),
+                        ("treeA", OD.tree_branch_group(range(0, 5)), "furn", (-6, -1, -6), (6, 13, 6), far),
+                        ("treeB", OD.tree_branch_group(range(5, 10)), "furn2", (-6, 9, -6), (6, 24, 6), far),
+                        ("treeC", OD.tree_branch_group(range(10, 14)), "furn", (-6, 20, -6), (6, 34, 6), far)],
+            "lights": []}
+    room_views(tree, [("tree-a", (9.0, 8.0, 9.0), (0.0, 12.0, 0.0)), ("tree-b", (22.0, 14.0, 22.0), (0.0, 15.0, 0.0))])
+    for i, (nm_, eye, look, names, lights) in enumerate(shots):
+        e = list(eye)
+        film.shot(nm_, i * 1.0, (i + 1) * 1.0, [e, [e[0] + 0.01, e[1], e[2] - 0.01]], look, nodes=names, lights=lights, fov=62)
+    film.end = float(len(shots))
+    film.track("palette/position", [(0.0, float(PALETTE_INDEX[palette_name])), (film.end, float(PALETTE_INDEX[palette_name]))])
     path = film.write(OUT, "all-you-got-pass2-kit", GRID, environment(stem="all-you-got-pass2-kit"),
                       dict(PARAMS, **{"post/motionBlur/amount": 0.0}))
     print("\n".join(film.report))
-    print("wrote", path)
+    print("wrote", path, len(shots), "views")
+
+
+def U_(*parts):
+    return K.U(*parts)
+
+
+def build_film(end=END, stem="all-you-got-pass2"):
+    import film_build as FB
+    from liminal_text import place_words
+    film = Film(end=end)
+    palettes(film)
+    b = FB.build(film, add_world, PALETTE_INDEX, GRID)
+    # the slow voices
+    film.track("palette/position", b.pal + [(end, b.pal[-1][1], "step")])
+    film.track("camera/breath/amount", sorted(b.breath) + [(end, b.breath[-1][1])])
+    film.track("post/bloom/intensity", [(0.0, 0.35), (end, 0.35)])
+    film.track("camera/exposure/compensation", [(0.0, 0.0), (end, 0.0)])
+    film.track("post/grade/hueShift", [(0.0, 0.0), (end, 0.0)])
+    film.track("post/lens/chromaticAberration", [(0.0, 0.0), (end, 0.0)])
+    film.track("post/lens/distortion", [(0.0, 0.0), (end, 0.0)])
+    film.track("temporal/mosh/amount", [(0.0, 0.0), (end, 0.0)])
+    film.track("temporal/mosh/shift", [(0.0, 0.0), (end, 0.0)])
+    for target, v in (("post/sweep/progress", 0.0), ("post/sweep/intensity", 0.0), ("post/sweep/wash", 0.0)):
+        film.track(target, [(0.0, v), (end, v)])
+    film.track("palette/saturation", [(0.0, 1.0), (end, 1.0)])
+    film.track("palette/value", sorted(b.val, key=lambda k: k[0]) + [(end, 1.0)])
+    # cuts: no motion blur on the first frame of a shot (its previous frame is another camera)
+    mb = [(0.0, 0.35, "step")]
+    for tc in sorted(set(b.cuts)):
+        if tc <= 0.0:
+            continue
+        mb += [(tc - 0.002, 0.35, "step"), (tc - 0.001, 0.0, "step"), (tc + 0.045, 0.35, "step")]
+    film.track("post/motionBlur/amount", mb)
+    # the words
+    out = place_words(b.words, grid="song")
+    film.nodes += out["nodes"]
+    film.events += out["events"]
+    film.routes += out["routes"]
+    film.bindings += out["bindings"]
+    path = film.write(OUT, stem, GRID, environment(stem=stem), PARAMS)
+    print(f"wrote {path}: {len(film.shots)} shots, {len(film.nodes)} nodes, {len(film.routes)} routes, "
+          f"{len(film.events)} grid events, {len(b.words)} words")
+    return path
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--kit", action="store_true")
     ap.add_argument("--palette", default="P2allyougot")
+    ap.add_argument("--end", type=float, default=END)
     a = ap.parse_args()
     if a.kit:
         build_kit(a.palette)
     else:
-        raise SystemExit("the film is not assembled yet; use --kit")
+        build_film(a.end)
 
 
 if __name__ == "__main__":

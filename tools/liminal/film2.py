@@ -142,7 +142,7 @@ class Film:
     # ---- SDF objects with the line look ---------------------------------------------------------------
     def sdf(self, name, tree, *, edge=(1.0, 1.0, 1.0), edge_intensity=4.0, edge_width=0.012, surfaces=None,
             bmin=(-8, -1, -8), bmax=(8, 4, 8), max_distance=40.0, ao=0.25, step_scale=0.85, roughness=0.8,
-            visible=True, epsilon=0.0009):
+            visible=True, epsilon=0.0009, edge_pixels=2.2, edge_softness=0.14, edge_threshold=0.02):
         n, ops, depth = K.count(tree)
         assert n <= 96, (name, n)
         assert depth <= 16, (name, depth)
@@ -156,7 +156,9 @@ class Film:
                         "surfaces": surfs,
                         "boundsMin": list(map(float, bmin)), "boundsMax": list(map(float, bmax)),
                         "look": {"aoStrength": ao, "aoDistance": 0.5, "edgeIntensity": edge_intensity,
-                                 "edgeWidth": edge_width, "edgeColor": list(map(float, edge))},
+                                 "edgeWidth": edge_width, "edgeColor": list(map(float, edge)),
+                                 "edgePixels": edge_pixels, "edgeSoftness": edge_softness,
+                                 "edgeThreshold": edge_threshold},
                         "castShadows": False, "depthPrepass": False, "maxSteps": 160, "epsilon": epsilon,
                         "stepScale": step_scale, "normalEpsilon": 0.002, "maxDistance": max_distance},
                 "position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]}
