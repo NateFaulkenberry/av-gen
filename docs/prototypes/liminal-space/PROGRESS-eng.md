@@ -23,6 +23,11 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 | f | `examples/liminal/` (48 s) via `tools/make_liminal_example.py`; capture in `~/Desktop/av-gen-review/24-liminal-space/eng/` | done (`liminal-example.mp4`, 48 s, 1280x720, rendered at 18.9 fps) |
 | 3 | analyzer: `tools/liminal_critic.py` (Critic inputs for an SDF project + the section 16 temporal checks) | done (see below) |
 
+## Suites at hand-back (fd66212d code)
+
+- `avgen_tests`: exit 0; 3,945 cases: 3,925 passed, 19 skipped, 1 failed as expected (the slope lean).
+- `avgen_render_tests`: exit 0; 561 cases: 560 passed, 1 skipped.
+
 ## Test commands
 
 ```sh
