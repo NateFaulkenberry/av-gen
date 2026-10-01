@@ -85,20 +85,30 @@ docs/prototypes/liminal-space/PROGRESS-art.md`.
 - [x] The world kit and every world, as data (commits `c471a4cb`, `5b740615`).
 - [x] The whole film assembled: 36 shots, 18 BIG CLAPs each with its own treatment, 256 words. v1 preview at
   `$S/liminal2/v1-full.mp4`.
-- [ ] Fixes after v1, in code but not yet rendered:
-  - the terrain ribs;
-  - the stair camera path;
-  - ceiling words with tilt 0;
-  - the summit at the stair top;
-  - bridge 2's eighth pulse;
+- [x] Fixes after v1, all in code and committed (`a0aa13ee` to `26a24f59`):
+  - the track order;
   - the cursor reset;
-  - track order;
-  - the dawn sky;
-  - stars;
-  - sky furniture;
-  - the tree canopy and its camera.
-- [ ] Next: render stills of the chorus, dawn, bridge T and the tree to check those fixes. Then v2 full at 960x540,
-  `pass2_av.py`, the Critic (`critic_pass2.py --submit`), then iterate.
+  - the stair path;
+  - the summit;
+  - the terrain ribs;
+  - the sky, stars and sky furniture;
+  - fireworks;
+  - the riser's escalation;
+  - a typeface per section;
+  - the mannequin's head turn on GOT?;
+  - the gallery orbit inside its room;
+  - the growing trunk and canopy;
+  - verse 2's clutter.
+- [x] **Every word placed where the camera looks.**
+  - `Builder.word_at` casts a view ray at the word's moment onto the room box, the terrain or open air.
+  - The generator prints "words not seen when they appear", which must be 0 (it is 0 of 254).
+  - `--clearance` checks every shot's eye against its SDF objects on the CPU (`tools/liminal/sdf_eval.py`).
+    About 0.09 m in a doorway is the CSG bound, not a collision.
+- [ ] **Next, when the GPU is free.** (The engineer's full suites held it from 12:08 into the afternoon.)
+  - A flipbook: `$S/liminal2/flipbook.sh <tag> 1 0.5:257.5` waits for a free GPU, then writes 1 fps stills with
+    motion blur off, and sheets in `$S/liminal2/fb-<tag>/`.
+  - Then a preview, `tools/liminal/render_pass2.sh preview` with `AVGEN=$S/liminal2/avgen.sh`.
+  - Then `pass2_av.py` and the Critic, then iterate.
 - [ ] The full render: `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4` at 1920x1080 with
   `--particle-warmup 120`.
 - [ ] `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0; the REPORT-pass2 text.
