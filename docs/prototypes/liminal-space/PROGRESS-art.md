@@ -5,30 +5,29 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status (18:42):**
-- **v1 preview:** `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3-preview-v1.mp4` (960x540). It
-  was rendered at `976152d1` with the old pin. Contact sheets are in `$S/liminal3/sheets/v1-*.png`, and
-  `pass2_av` is in `$S/liminal3/av-v1/`.
-  - **What works:** the intro's neighbourhood; the cut inside on the downbeat (frame 1123); the living-room sweep
-    with four tableaux; the kitchen; the climb with one word a riser, the dissolve and the void; the basement;
-    the upstairs tableaux; the dawn figure with its head.
-  - **Quarter lock:** +12 to +27 dB in most sections, with no camera breathing.
-  - **BIG CLAPs:** 11 unmistakable, 6 visible, 2 not read (C04, C09).
-- **v1 fixes, at `8c675031`:** see that commit's message. They include rim and static on, re-pinned to
-  `dd5c0fe1`, and the travelBeam stand-in for the wave.
-- **v2 preview:** rendering at 18:40 (`$S/liminal3/preview.sh v2`).
-- **Next:**
-  1. Sheets for v2 and `pass2_av`.
-  2. The Critic: `python3 tools/liminal/critic_pass3.py --project examples/liminal/all-you-got-pass3.json
-     --video <v2.mp4> --out $S/liminal3/critic-v2 --submit --label pass3-v2 --track film`.
-  3. Fix, then v3.
-  4. The engineer's wave (`post/wave/*`, about 19:45): re-pin, replace the travelBeam, and key `progress`
-     0 to 10 over 90.3-91.1 from the front door, with the trail as P11's palette.
-  5. The final 1080p: `tools/gpu-lock.sh $S/liminal3/avgen.sh --headless --project ... --render
-     ~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4 --range 0:258 --size 1920x1080 --fps 30
-     --codec h264 --quality 90 --particle-warmup 30`.
-  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` must exit 0.
-  7. The report.
+**Status (19:10): everything is in. Next: the wave check, then the final 1080p render and the gate.**
+- **Pin:** `$S/liminal2/bin-5dd835a4` (the world wave ADR-1055, rim ADR-1052, static ADR-1054). `$S/liminal3/avgen.sh`
+  points at it. The coordinator has the engineer holding all GPU work until my final and gate are through: message
+  the coordinator when they are.
+- **Previews** in `~/Desktop/av-gen-review/24-liminal-space/pass3/`:
+  - v1 (`976152d1`);
+  - v2 (bug: intro objects hidden; fixed in `37387309`);
+  - v3 (`37387309`, the travelBeam stand-in).
+- **Critic on v3** (job `job_1a0f9aa4f7f37d21d`): 0.93 overall; composition, colour, pacing and creative intent
+  1.0; musical sync 0.98; technical 0.73 (intended flashes and the dawn white-out), motion 0.76 (corruption effects
+  read as shake). Acted on: the walls' quarter swell halved (F002 "whole-frame pulse"), shorter splash and impact
+  holds, a gentler dawn.
+- **`pass2_av` v2:** quarter lock +12 to +27 dB in most sections; 16 of 18 BIG CLAPs unmistakable. C12 and C14
+  are corruption cuts that read by structure, not brightness.
+- **The world wave (`c3b2f896`):** it runs from the back of the house forward past the camera and out of the front
+  door; trail = the open's blue; the palette turns on the cut. Check render: `$S/liminal3/wave1/wave2.mp4`
+  (194-202 s).
+- **The final:** `$S/liminal3/final.sh` snapshots the committed project into `$S/liminal3/p3-final/`, renders
+  `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4` (1920x1080, 30 fps, h264 q90, the
+  song), then runs `pass2_av` into `$S/liminal3/av-final/`. After it:
+  1. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"`, which must exit 0;
+  2. the Critic on the final;
+  3. the report.
 
 **Generate, then check (CPU, about 80 s):**
 ```sh
@@ -101,7 +100,8 @@ then point `$S/liminal3/avgen.sh` at it.
 - [x] M5: the living room sweep with 4 tableaux, and the kitchen (written, not yet seen).
 - [x] M6: the climb (one word a riser), the fall, and the basement (written, not yet seen).
 - [x] M7: verse 2 upstairs, with 6 tableaux and 8 corruptions (written, not yet seen).
-- [ ] M8: corruption at transitions, claps, lyrics and peaks; static screens; the colour wave; the ending.
+- [x] M8: corruption at transitions, claps, lyrics and peaks; static screens; the world wave; the coda on the
+  road's dashes.
 - [ ] M9: the validator, fixes, a preview, `pass2_av.py`, the Critic on representative sections, refinement.
 - [ ] M10: the final 1080p render with the song, `[sdf],[liminal]` exit 0, the report in the hand-back.
 
