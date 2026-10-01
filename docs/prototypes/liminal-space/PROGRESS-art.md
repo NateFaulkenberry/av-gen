@@ -54,9 +54,20 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
   0.7-degree sun inside the final doorway, daylight from behind, the figure far down the stair and 4 m away at the
   top, warm hall light, sun patches on the hall floor, a dimmer and emptier let-it-go, the first corridor visible
   at bar 108, a look round at the release.
-- [ ] Full render v2 (running from about 22:57): `all-you-got-v2.mp4`; script `scratchpad/liminal/full-v2.sh`.
-- [ ] Analysis of v2; if it is better, it becomes `all-you-got-final.mp4`.
-- [ ] REPORT.md (the brief's 22 ten items) + copy in the review folder.
+- [x] v2 (`ed1dce5d`, `all-you-got-v2.mp4`): snaps all minor (6), "let it go" 15 % below its neighbours (the major
+  finding gone), clipping 11 -> 6 high, technical quality 0.55 -> 0.70. Still: the hall's dust read as snow, the
+  walking figure rendered pale (its tint does not apply to a keyed or journey-anchored GLTF node; a static figure's
+  does), the floor sun patches read as rugs.
+- [x] v3 (`8184a73d`, `all-you-got-v3.mp4`): no hall dust, a standing figure in a doorway two rooms on, the
+  stairhead figure on a ledge, the tremble only in the rough bars, the corridor breathing from bar 6. The clearance
+  test passes. The Critic's wobble rose to 36 findings: the swaps, plus 10 Hz velocity steps from the linear 0.1 s
+  distance keys during accelerations. The grow room's motes were drawing in the hall (they belonged to no chapter);
+  now gated.
+- [ ] v4 (`80491f03`, rendering from 23:34): C1 (`smooth`) walk keys, the walk carried by the bass pulse from bar 6,
+  a brighter and richer hall, a quieter let-it-go, almost no volumetric jitter.
+- [ ] Final: v4 plus the sun centred in the final doorway (azimuth 2.3 degrees) and the grow light's peak lowered
+  (it clipped), rendered as `all-you-got-final.mp4`; then `[sdf],[liminal]` under the lock; then the report (the
+  harness refuses report files from this agent, so its text goes to the coordinator in the hand-back).
 
 ### How to analyse a render
 
