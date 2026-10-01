@@ -1,0 +1,679 @@
+ROOM VALIDATION
+
+Errors: 5
+Warnings: 71
+Notes: 2
+
+ERROR
+w002_ALL_YOU_GOT intersects HallStair: text overlaps it by 85%
+overlap: 0.847
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move w002_ALL_YOU_GOT along wall +x to [2.595,2.4,0.341]
+(in: liv)
+
+ERROR
+v1w03 intersects LivingKitchenDoor: text overlaps the door opening by 1%
+overlap: 0.009
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move v1w03 along wall -x to [-2.595,2.166,-1.08]
+(in: liv)
+
+ERROR
+lig09 intersects BoxesA: text overlaps it by 100%
+overlap: 1.0
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move lig09 along wall +x to [0.895,-1.807,-0.97]
+(in: lig)
+
+ERROR
+lig09 intersects BoxesB: text overlaps it by 39%
+overlap: 0.39
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move lig09 along wall +x to [0.895,-1.807,-0.97]
+(in: lig)
+
+ERROR
+b3w88 intersects HallStair: text overlaps it by 100%
+overlap: 1.0
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move b3w88 along wall +x to [4.945,1.797,-5.563]
+(in: liv)
+
+WARNING
+Prop_01 has no valid support relationship (nothing under it; 0.75m above the floor)
+heightAboveFloor: 0.75
+
+Suggested correction:
+set it on a table, shelf or the floor
+(in: gallery)
+
+WARNING
+Clock_01 has no valid support relationship: it faces no wall of Room_17
+(in: gallery)
+
+WARNING
+Television_01 has no valid support relationship (nothing under it; 0.60m above the floor)
+heightAboveFloor: 0.6
+
+Suggested correction:
+set it on a table, shelf or the floor
+(in: gallery)
+
+WARNING
+Plant_01 has no valid support relationship (nothing under it; 0.60m above the floor)
+heightAboveFloor: 0.6
+
+Suggested correction:
+set it on a table, shelf or the floor
+(in: gallery)
+
+WARNING
+Chair_03: floor clearance = 0.30m (chair appears to float)
+clearance: 0.3
+
+Suggested correction:
+lower Chair_03 by 0.30m
+(in: gallery)
+
+WARNING
+Prop_02 has no valid support relationship (nothing under it; 1.05m above the floor)
+heightAboveFloor: 1.05
+
+Suggested correction:
+set it on a table, shelf or the floor
+(in: gallery)
+
+WARNING
+Painting_01 has no valid support relationship: 1.53m from wall -x of Room_17, facing 10 degrees off
+angle: 10.0
+wallDistance: 1.53
+
+Suggested correction:
+move Painting_01 onto wall -x (1.53m)
+(in: gallery)
+
+WARNING
+Prop_03 has no valid support relationship (nothing under it; 1.05m above the floor)
+heightAboveFloor: 1.05
+
+Suggested correction:
+set it on a table, shelf or the floor
+(in: gallery)
+
+WARNING
+w001_ALL_YOU_GOT intersects Pendant: text overlaps it by 22%
+overlap: 0.22
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move w001_ALL_YOU_GOT along wall -z to [1.401,2.363,-2.195]
+(in: liv)
+
+WARNING
+w003_ALL_YOU_GOT is jammed against the edge of wall +z (0.13m of a 0.15m margin)
+gap: 0.135
+margin: 0.15
+
+Suggested correction:
+move w003_ALL_YOU_GOT along wall +z to [1.722,1.831,2.195]
+(in: liv)
+
+WARNING
+w006_ALL_YOU_GOT is jammed against LivingKitchenDoor (0.06m of a 0.15m margin)
+gap: 0.064
+margin: 0.15
+
+Suggested correction:
+move w006_ALL_YOU_GOT along wall -x to [-2.595,2.19,-1.201]
+(in: liv)
+
+WARNING
+w006_ALL_YOU_GOT is jammed against SofaPainting (0.14m of a 0.15m margin)
+gap: 0.144
+margin: 0.15
+
+Suggested correction:
+move w006_ALL_YOU_GOT along wall -x to [-2.595,2.19,-1.201]
+(in: liv)
+
+WARNING
+w006_ALL_YOU_GOT is jammed against the edge of wall -x (0.11m of a 0.15m margin)
+gap: 0.109
+margin: 0.15
+
+Suggested correction:
+move w006_ALL_YOU_GOT along wall -x to [-2.595,2.19,-1.201]
+(in: liv)
+
+WARNING
+v1w02 is jammed against LivingKitchenDoor (0.07m of a 0.15m margin)
+gap: 0.068
+margin: 0.15
+
+Suggested correction:
+move v1w02 along wall -x to [-2.595,2.267,-0.984]
+(in: liv)
+
+WARNING
+v1w02 is jammed against the edge of wall -x (0.11m of a 0.15m margin)
+gap: 0.107
+margin: 0.15
+
+Suggested correction:
+move v1w02 along wall -x to [-2.595,2.267,-0.984]
+(in: liv)
+
+WARNING
+v1w03 intersects SofaPainting: text overlaps it by 0%
+overlap: 0.002
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move v1w03 along wall -x to [-2.595,2.166,-1.08]
+(in: liv)
+
+WARNING
+v1w03 is jammed against the edge of wall -x (0.03m of a 0.15m margin)
+gap: 0.028
+margin: 0.15
+
+Suggested correction:
+move v1w03 along wall -x to [-2.595,2.166,-1.08]
+(in: liv)
+
+WARNING
+v1w04 intersects livCurtain: text overlaps it by 2%
+overlap: 0.022
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move v1w04 along wall +z to [1.467,1.909,2.195]
+(in: liv)
+
+WARNING
+v1k00 is jammed against WallCupboard (0.12m of a 0.15m margin)
+gap: 0.121
+margin: 0.15
+
+Suggested correction:
+move v1k00 along wall -z to [-0.065,2.347,-6.395]
+(in: liv)
+
+WARNING
+v1k02 is jammed against the edge of wall -z (0.13m of a 0.15m margin)
+gap: 0.126
+margin: 0.15
+
+Suggested correction:
+move v1k02 along wall -z to [1.674,1.98,-6.395]
+(in: liv)
+
+WARNING
+lig09 is jammed against lig11 (0.10m of a 0.15m margin)
+gap: 0.096
+margin: 0.15
+
+Suggested correction:
+move lig09 along wall +x to [0.895,-1.807,-0.97]
+(in: lig)
+
+WARNING
+lig11 intersects BoxesA: text overlaps it by 2%
+overlap: 0.022
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move lig11 along wall +x to [0.895,-1.771,-1.0]
+(in: lig)
+
+WARNING
+lig11 intersects BoxesB: text overlaps it by 1%
+overlap: 0.01
+
+Expected relationship:
+on a clear wall section
+
+Suggested correction:
+move lig11 along wall +x to [0.895,-1.771,-1.0]
+(in: lig)
+
+WARNING
+v2w12 is jammed against BathroomWindow (0.14m of a 0.15m margin)
+gap: 0.141
+margin: 0.15
+
+Suggested correction:
+move v2w12 along wall +z to [2.856,4.387,2.195]
+(in: v2bath)
+
+WARNING
+v2w15 is jammed against StudyWindow (0.10m of a 0.15m margin)
+gap: 0.104
+margin: 0.15
+
+Suggested correction:
+move v2w15 along wall -z to [0.399,4.424,-6.395]
+(in: v2stu)
+
+WARNING
+isth00 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth01 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth02 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth03 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth04 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth05 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth06 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth07 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth08 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth09 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth10 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth11 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth12 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth13 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth14 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth15 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth16 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth17 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth18 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth19 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth20 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth21 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth22 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth23 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth24 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth25 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth26 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth27 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth28 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth29 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth30 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+isth31 is not on any room wall (no wall plane within 0.6m)
+
+Expected relationship:
+on a wall
+
+Suggested correction:
+place it on a wall, or tag it floatingText
+
+WARNING
+b3w83 is jammed against LivingKitchenDoor (0.13m of a 0.15m margin)
+gap: 0.133
+margin: 0.15
+
+Suggested correction:
+move b3w83 along wall -x to [-2.595,1.051,-1.391]
+(in: liv)
+
+WARNING
+b3w83 is jammed against Sofa (0.11m of a 0.15m margin)
+gap: 0.109
+margin: 0.15
+
+Suggested correction:
+move b3w83 along wall -x to [-2.595,1.051,-1.391]
+(in: liv)
+
+WARNING
+b3w85 is jammed against the edge of wall -x (0.11m of a 0.15m margin)
+gap: 0.109
+margin: 0.15
+
+Suggested correction:
+move b3w85 along wall -x to [-2.595,0.387,-3.874]
+(in: liv)
+
+WARNING
+steps13x floats 0.11m off wall +x of Room_05
+wallDistance: 0.106
+
+Expected relationship:
+lying on the wall plane
+
+Suggested correction:
+move steps13x along wall +x to [-2.195,10.001,0.008]
+(in: tree)
+
+WARNING
+steps13x is jammed against the edge of wall +x (0.03m of a 0.15m margin)
+gap: 0.028
+margin: 0.15
+
+Suggested correction:
+move steps13x along wall +x to [-2.195,10.001,0.008]
+(in: tree)
+
+WARNING
+camera path of chapter 'street' grazes 'heroParts' (0.11m away at path metres 58.6-58.7)
+distance: 0.111
+(in: street)
+
+WARNING
+camera path of chapter 'liv' grazes 'livShell' (0.05m away at path metres 2.1-2.1)
+distance: 0.05
+(in: liv)
+
+WARNING
+camera path of chapter 'kit' grazes 'livShell' (0.10m away at path metres 2.1-2.1)
+distance: 0.105
+(in: kit)
+
+WARNING
+camera path of chapter 'kit' grazes 'kitShell' (0.10m away at path metres 2.3-2.5)
+distance: 0.101
+(in: kit)
+
+WARNING
+camera path of chapter 'hall' grazes 'hallShell' (0.03m away at path metres 2.3-6.9)
+distance: 0.031
+(in: hall)
+
+WARNING
+camera path of chapter 'lig' grazes 'stoShell' (0.10m away at path metres 5.3-10.9)
+distance: 0.103
+(in: lig)
+
+WARNING
+camera path of chapter 'lig' grazes 'boiShell' (0.12m away at path metres 10.8-10.8)
+distance: 0.12
+(in: lig)
+
+WARNING
+camera path of chapter 'dance' grazes 'livShell' (0.09m away at path metres 7.4-7.6)
+distance: 0.091
+(in: dance)
+
+WARNING
+camera path of chapter 'dance' grazes 'hallShell' (0.10m away at path metres 13.1-13.4)
+distance: 0.097
+(in: dance)
+
+INFO
+Room_15 sits under a repeat/mirror/fold; its placement is not checked
+
+INFO
+Room_16 sits under a repeat/mirror/fold; its placement is not checked
+
+PASS
+87 architectural relationships
+267 entity placements
+5 furniture relationships
+13 character poses
+150 entities complete
+181 lyric placements
+12 camera paths clear

@@ -174,7 +174,7 @@ def hero_parts(names):
 
 def hero_tree():
     """The tree in the hero's front garden (it grows on the riser: `heroTree` scale)."""
-    return T([-1.8, 0.0, 5.2], {"kind": "scale", "scale": 1.0, "name": "heroTree", "children": [K.pine(4.4)]})
+    return T([-2.3, 0.0, 5.9], {"kind": "scale", "scale": 1.0, "name": "heroTree", "children": [K.pine(4.4)]})
 
 
 def objects():
@@ -189,5 +189,5 @@ def objects():
         ("heroShell", hero_shell(), "wall", (HERO["x0"] - 0.3, -0.1, HERO["z0"] - 0.3), (HERO["x1"] + 0.3, 6.2, HERO["z1"] + 0.6), far),
         ("heroParts", hero_parts([p[0] for p in HERO_PARTS]), "furn",
          (HERO["x0"] - 20.0, -6.0, HERO["z0"] - 1.0), (HERO["x1"] + 20.0, 25.0, 14.0), far),
-        ("heroTree", hero_tree(), "furn", (-4.5, -0.1, 2.5), (1.0, 6.5, 8.0), far),
+        ("heroTree", hero_tree(), "furn", (-5.0, -0.1, 3.2), (0.4, 6.5, 8.6), far),
     ]

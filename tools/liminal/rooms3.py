@@ -145,7 +145,8 @@ def living_room():
              place(tag(PR.pillow(0.5, 0.34, 0.12), "prop", "SofaPillow", rid, anchor="Sofa"),
                    (sofa_at[0] + 0.08, 0.42, sofa_at[2] + 0.66), sofa_yaw + 90.0),
              place(K.rug(2.0, 1.5, entity={"id": "LivingRug", "room": rid}), (-1.05, 0.0, 0.2), 90.0),
-             place(K.coffee_table(1.0, 0.55, 0.42, entity={"id": "CoffeeTable", "room": rid}), (-1.05, 0.0, 0.2), 90.0, name="livTable"),
+             place(R([0, 0, 0], K.coffee_table(1.0, 0.55, 0.42, entity={"id": "CoffeeTable", "room": rid}), name="livTableRock"),
+                   (-1.05, 0.0, 0.2), 90.0, name="livTable"),
              place(K.floor_lamp(1.6, entity={"id": "ReadingLamp", "room": rid}), (x0 + 0.3, 0.0, 1.85), name="livLampAt"))
     media = U(place(tag(PR.low_cabinet(1.4, 0.48, 0.42), "cabinet", "TVCabinet", rid), (x1 - 0.22, 0.0, 0.6), -90.0),
               place(K.tv(0.9, 0.55, entity={"id": "TV", "room": rid}), (x1 - 0.3, 0.48, 0.6), -90.0, name="livTV"),
@@ -185,7 +186,7 @@ def kitchen():
               on_wall(tag(PR.wall_cupboard(1.2, 0.6, 0.32), "wallCupboard", "WallCupboard", rid), "-z", ext, -1.8, 1.85),
               on_wall(K.painting(0.5, 0.65, motif="grid", entity={"id": "KitchenPicture", "room": rid}), "-x", ext, -4.4, 1.55))
     counter = U(place(tag(PR.counter3(2.6, 0.9, 0.6, sink_x=0.2), "counter", "Counter", rid), (-0.6, 0.0, z0 + 0.3)),
-                place(K.kettle(entity={"id": "Kettle", "room": rid}), (-1.5, 0.9, z0 + 0.3), name="kitKettle"),
+                place(R([0, 0, 0], K.kettle(entity={"id": "Kettle", "room": rid}), name="kitKettleRock"), (-1.5, 0.9, z0 + 0.3), name="kitKettle"),
                 place(K.fridge(0.7, 1.75, 0.62, entity={"id": "Fridge", "room": rid}), (1.75, 0.0, z0 + 0.33)),
                 place(K.stack_of_books(entity={"id": "CookBooks", "room": rid}), (0.35, 0.9, z0 + 0.22)))
     # the tableau's chair on the far side of the table, facing the living-room door (+Z)
@@ -193,7 +194,8 @@ def kitchen():
     fig_at, fig_yaw = fig_from_anchor("table", chair_at, 0.0)
     table = U(place(K.table(1.1, 0.75, 0.75, entity={"id": "KitchenTable", "room": rid}), (0.0, 0.0, -4.4), name="kitTableAt"),
               place(K.chair(entity={"id": "KitchenChair", "room": rid, "anchor": "KitchenTable"}), chair_at, 0.0, name="kitChairB"),
-              place(K.chair(entity={"id": "KitchenChair2", "room": rid, "anchor": "KitchenTable"}), (0.35, 0.0, -3.675), 180.0, name="kitChairA"),
+              place(R([0, 0, 0], K.chair(entity={"id": "KitchenChair2", "room": rid, "anchor": "KitchenTable"}), name="kitChairARock"),
+                    (0.35, 0.0, -3.675), 180.0, name="kitChairA"),
               place(K.plate_and_cup(entity={"id": "PlateAndCup", "room": rid}), (0.0, 0.75, -4.65), 180.0, name="kitPlate"),
               place(PR.pendant(0.85, name="kitPendant", eid="Pendant", room=rid), (0.0, y1, -4.4)))
     figs = figure_objects(rid, [("kitMan", "table", fig_at, fig_yaw, "KitchenChair")])
@@ -400,7 +402,8 @@ def study():
     ext = ((-2.6, 1.2), (UP, UP + CEIL), (-6.4, -2.35))
     (x0, x1), (y0, y1), (z0, z1) = ext
     doors = [("+x", -3.0, 0.9, "StudyDoor")]
-    shell = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.9, 1.2, 1.1, 1.05)]),
+    walls = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.9, 1.2, 1.1, 1.05)], ceiling=False))
+    shell = U(K.wave(walls, 0.0, 7.0, [1.0, 0.0, 0.0], name="stuWarp"),
               window_on("-z", ext, -0.9, 1.2, 1.1, 1.05, eid="StudyWindow", room=rid),
               place(tag(U(K.ceiling_fan(name="stuFan"), K.CY([0, -0.02, 0], 0.08, 0.04)), "ceilingFan", "CeilingFan", rid), (-0.8, y1, -4.3)),
               on_wall(K.painting(0.8, 0.55, motif="horizon", entity={"id": "StudyPainting", "room": rid}), "+x", ext, -5.0, y0 + 1.6))
@@ -415,10 +418,21 @@ def study():
     return {"id": rid, "interior": ext,
             "objects": [("stuShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("stuFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05)),
-                        ("stuShelf", shelf, "furn2", (x1 - 0.5, y0 - 0.05, -4.2), (x1 + 0.05, y0 + 2.0, -3.0))] + figs,
+                        ("stuShelf", shelf, "furn2", (x1 - 0.5, y0 - 0.05, -4.2), (x1 + 0.05, y0 + 2.0, -3.0)),
+                        ("stuCeil", ceiling_halves(ext, "stu"), "wall", (x0 - 12, y1 - 0.3, z0 - 12), (x1 + 12, y1 + 40.0, z1 + 12))] + figs,
             "lights": [("stuLamp", (-0.2, y0 + 1.6, z0 + 0.5), "lamp"), ("stuScreen", (-1.1, y0 + 1.0, z0 + 0.9), "screen")],
             "anchors": {"desk": (desk_at[0], y0 + 0.9, desk_at[2]), "monitor": (-1.1, y0 + 1.0, z0 + 0.31), "window": (-0.9, y0 + 1.6, z0),
                         "wall": (x0, y0 + 1.0, -4.2), "door": (x1, y0 + 1.0, -3.0), "fan": (-0.8, y1 - 0.3, -4.3)}}
+
+
+def ceiling_halves(ext, prefix):
+    """A room's ceiling as its own object in two halves (`<prefix>CeilL`, `<prefix>CeilR`: named translates) and a
+    rose (`<prefix>CeilRose`), so the roof can split and fly off (bars 65.4-66.4)."""
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    xm = (x0 + x1) / 2
+    ceil = U(T([0, 0, 0], X(((x0 - 0.15, xm), (y1, y1 + 0.15), (z0 - 0.15, z1 + 0.15))), name=f"{prefix}CeilL"),
+             T([0, 0, 0], X(((xm, x1 + 0.15), (y1, y1 + 0.15), (z0 - 0.15, z1 + 0.15))), name=f"{prefix}CeilR"))
+    return S(ceil, FILL)
 
 
 def upstairs():

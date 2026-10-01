@@ -1,0 +1,110 @@
+[
+ {
+  "id": "s01",
+  "name": "street",
+  "start": 0.0,
+  "end": 37.431
+ },
+ {
+  "id": "s02",
+  "name": "liv",
+  "start": 37.431,
+  "end": 72.661
+ },
+ {
+  "id": "s03",
+  "name": "kit",
+  "start": 72.661,
+  "end": 81.468
+ },
+ {
+  "id": "s04",
+  "name": "hall",
+  "start": 81.468,
+  "end": 92.477
+ },
+ {
+  "id": "s05",
+  "name": "lig",
+  "start": 92.477,
+  "end": 109.541
+ },
+ {
+  "id": "s06",
+  "name": "v2bed",
+  "start": 109.541,
+  "end": 118.349
+ },
+ {
+  "id": "s07",
+  "name": "v2bath",
+  "start": 118.349,
+  "end": 127.156
+ },
+ {
+  "id": "s08",
+  "name": "v2stu",
+  "start": 127.156,
+  "end": 147.523
+ },
+ {
+  "id": "s09",
+  "name": "tree",
+  "start": 147.523,
+  "end": 156.33
+ },
+ {
+  "id": "s10",
+  "name": "treeReveal",
+  "start": 156.33,
+  "end": 160.734
+ },
+ {
+  "id": "s11",
+  "name": "treeLand",
+  "start": 160.734,
+  "end": 165.138
+ },
+ {
+  "id": "s12",
+  "name": "gallery",
+  "start": 165.138,
+  "end": 182.435
+ },
+ {
+  "id": "s13",
+  "name": "dance",
+  "start": 182.435,
+  "end": 199.732
+ },
+ {
+  "id": "s14",
+  "name": "chorusA",
+  "start": 199.732,
+  "end": 217.03
+ },
+ {
+  "id": "s15",
+  "name": "stair",
+  "start": 217.03,
+  "end": 234.327
+ },
+ {
+  "id": "s16",
+  "name": "summit",
+  "start": 234.327,
+  "end": 249.462
+ },
+ {
+  "id": "s17",
+  "name": "dawn",
+  "start": 249.462,
+  "end": 255.0
+ },
+ {
+  "id": "s18",
+  "name": "coda",
+  "start": 255.0,
+  "end": 258.0
+ }
+]
