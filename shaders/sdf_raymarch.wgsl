@@ -41,7 +41,10 @@ struct SdfObjectUniforms {
     look2: vec4<f32>,       // shadow strength, shadow softness k, shadow steps, 1 = collect step statistics
     look3: vec4<f32>,       // shadow direction (world, towards the light)
     surfaces: vec4<u32>,    // ADR-1044: x = surface records after the node offset, y = their count
-    look4: vec4<f32>,       // ADR-1047: edge width in pixels (0 = look0.w, local units), threshold, softness, 0
+    look4: vec4<f32>,       // ADR-1047: edge width in pixels (0 = look0.w, local units), threshold, softness;
+                            // ADR-1052: w = rim power
+    look5: vec4<f32>,       // ADR-1052: rim colour rgb, rim intensity (0 = off)
+    look6: vec4<f32>,       // ADR-1054: static cell (local units), rate (Hz), roll strength, 0
 };
 
 // ADR-1002: step statistics, accumulated by the lit pass on every 4th pixel in x and y.
@@ -302,12 +305,27 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     var colorMul = vec3<f32>(1.0);
     var emissiveMul = vec3<f32>(1.0);
     var edgeMul = vec3<f32>(1.0); // ADR-1047
+    var rimMul = 1.0;             // ADR-1052
     if (sdf.surfaces.y > 0u) {
         let id = min(sdfSurface(offset, count, pL, time, object.model), sdf.surfaces.y - 1u);
         let rec = sdfNodes[offset + sdf.surfaces.x + id];
         colorMul = rec.p0.xyz;
         emissiveMul = rec.p1.xyz;
         edgeMul = rec.p2.xyz;
+        rimMul = rec.p2.w;
+        // ADR-1054: screen static -- a hash per local cell, re-rolled `rate` times a second (a pure function
+        // of time, so seeks match play), with a bright bar rolling down the screen. Mean brightness ~1.
+        let staticAmount = rec.p1.w;
+        if (staticAmount > 0.0) {
+            let cell = vec3<i32>(floor(pL / sdf.look6.x));
+            let frameNo = u32(max(floor(time * sdf.look6.y), 0.0));
+            let n = hash01(cell, frameNo + 17u);
+            let bar = smoothstep(0.0, 0.15, fract(pL.y * 1.5 - time * 0.45)) * (1.0 - smoothstep(0.15, 0.3, fract(pL.y * 1.5 - time * 0.45)));
+            let snow = n * 2.0 * (1.0 - sdf.look6.z * 0.5) + bar * sdf.look6.z * 1.5;
+            let k = mix(1.0, snow, clamp(staticAmount, 0.0, 1.0));
+            colorMul = colorMul * k;
+            emissiveMul = emissiveMul * k;
+        }
     }
     var shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, colorMul, emissiveMul,
                               materialInstanceZero(pL), screenUv);
@@ -346,6 +364,16 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
         // wireframe with no depth and aliased into moire where the edges shrank below a pixel.
         let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
         let glow = sdf.look1.xyz * edgeMul * (sdf.look0.z * edge * transmittance);
+        shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
+        shaded.emission = shaded.emission + glow;
+    }
+    if (sdf.look5.w > 0.0 && rimMul > 0.0) {
+        // ADR-1052: a fresnel rim from the world normal and the view direction, fogged like the edges, added
+        // into the colour and the bloom target so a smooth silhouette glows against the dark.
+        let facing = clamp(abs(dot(normal, -rdW)), 0.0, 1.0);
+        let rim = pow(1.0 - facing, sdf.look4.w);
+        let transmittance = applyFog(vec3<f32>(1.0), worldPos).x - applyFog(vec3<f32>(0.0), worldPos).x;
+        let glow = sdf.look5.xyz * (sdf.look5.w * rimMul * rim * transmittance);
         shaded.color = vec4<f32>(shaded.color.rgb + glow, shaded.color.a);
         shaded.emission = shaded.emission + glow;
     }

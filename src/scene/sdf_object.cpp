@@ -536,6 +536,12 @@ json SdfObject::toJson() const {
             if (s.edge != glm::vec3(1.0f)) { // ADR-1047; written only when used
                 sj["edge"] = vecToJson(s.edge);
             }
+            if (s.rim != 1.0f) { // ADR-1052
+                sj["rim"] = s.rim;
+            }
+            if (s.staticAmount != 0.0f) { // ADR-1054
+                sj["static"] = s.staticAmount;
+            }
             arr.push_back(std::move(sj));
         }
         j["surfaces"] = std::move(arr);
@@ -549,6 +555,16 @@ json SdfObject::toJson() const {
         j["look"]["edgePixels"] = look.edgePixels;
         j["look"]["edgeThreshold"] = look.edgeThreshold;
         j["look"]["edgeSoftness"] = look.edgeSoftness;
+    }
+    if (look.rimIntensity != 0.0f || look.rimColor != glm::vec3(1.0f) || look.rimPower != 3.0f) { // ADR-1052
+        j["look"]["rimIntensity"] = look.rimIntensity;
+        j["look"]["rimColor"] = vecToJson(look.rimColor);
+        j["look"]["rimPower"] = look.rimPower;
+    }
+    if (look.staticCell != 0.012f || look.staticRate != 24.0f || look.staticRoll != 0.35f) { // ADR-1054
+        j["look"]["staticCell"] = look.staticCell;
+        j["look"]["staticRate"] = look.staticRate;
+        j["look"]["staticRoll"] = look.staticRoll;
     }
     return j;
 }
@@ -637,6 +653,12 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
             auto edge = readVec3(sj, "edge", s.edge);
             if (!edge) return std::unexpected(edge.error());
             s.edge = *edge;
+            auto rim = readFloat(sj, "rim", s.rim); // ADR-1052
+            if (!rim) return std::unexpected(rim.error());
+            s.rim = *rim;
+            auto stat = readFloat(sj, "static", s.staticAmount); // ADR-1054
+            if (!stat) return std::unexpected(stat.error());
+            s.staticAmount = *stat;
             o.surfaces.push_back(s);
         }
     }
@@ -662,7 +684,10 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
                        rv(o.look.edgeColor, "edgeColor"), rf(o.look.shadowStrength, "shadowStrength"),
                        rf(o.look.shadowSoftness, "shadowSoftness"), rv(o.look.shadowDirection, "shadowDirection"),
                        rf(o.look.edgePixels, "edgePixels"), rf(o.look.edgeThreshold, "edgeThreshold"),
-                       rf(o.look.edgeSoftness, "edgeSoftness")}) {
+                       rf(o.look.edgeSoftness, "edgeSoftness"), rf(o.look.rimIntensity, "rimIntensity"),
+                       rv(o.look.rimColor, "rimColor"), rf(o.look.rimPower, "rimPower"),
+                       rf(o.look.staticCell, "staticCell"), rf(o.look.staticRate, "staticRate"),
+                       rf(o.look.staticRoll, "staticRoll")}) {
             if (!r) return std::unexpected(r.error());
         }
         auto steps = readInt(lj, "shadowSteps", o.look.shadowSteps);
@@ -707,6 +732,8 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
         r.v3(base + "color", base + "color", rest.surfaces[k].color, 0.0f, 100.0f, 0.0f, 1.0f, true);
         r.v3(base + "emission", base + "emission", rest.surfaces[k].emission, 0.0f, 1000.0f, 0.0f, 10.0f, true);
         r.v3(base + "edge", base + "edge", rest.surfaces[k].edge, 0.0f, 100.0f, 0.0f, 4.0f, true); // ADR-1047
+        r.f(base + "rim", base + "rim", rest.surfaces[k].rim, 0.0f, 100.0f, 0.0f, 4.0f); // ADR-1052
+        r.f(base + "static", base + "static", rest.surfaces[k].staticAmount, 0.0f, 1.0f, 0.0f, 1.0f); // ADR-1054
     }
     r.i("march/maxSteps", rest.maxSteps, 1, 1024, 16, 512);
     r.f("march/epsilon", "march/epsilon", rest.epsilon, 1e-6f, 0.1f, 1e-4f, 0.01f);
@@ -721,6 +748,14 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("look/edge/pixels", "look/edge/pixels", rest.look.edgePixels, 0.0f, 64.0f, 0.0f, 8.0f);
     r.f("look/edge/threshold", "look/edge/threshold", rest.look.edgeThreshold, 0.0f, 1.0f, 0.0f, 0.2f);
     r.f("look/edge/softness", "look/edge/softness", rest.look.edgeSoftness, 1e-3f, 2.0f, 0.01f, 0.6f);
+    // ADR-1052: the rim.
+    r.f("look/rim/intensity", "look/rim/intensity", rest.look.rimIntensity, 0.0f, 1000.0f, 0.0f, 20.0f);
+    r.v3("look/rim/color", "look/rim/color", rest.look.rimColor, 0.0f, 100.0f, 0.0f, 1.0f, true);
+    r.f("look/rim/power", "look/rim/power", rest.look.rimPower, 0.1f, 64.0f, 0.5f, 12.0f);
+    // ADR-1054: screen static.
+    r.f("look/static/cell", "look/static/cell", rest.look.staticCell, 1e-4f, 10.0f, 0.002f, 0.1f);
+    r.f("look/static/rate", "look/static/rate", rest.look.staticRate, 0.0f, 240.0f, 0.0f, 60.0f);
+    r.f("look/static/roll", "look/static/roll", rest.look.staticRoll, 0.0f, 4.0f, 0.0f, 1.0f);
     r.f("look/shadow/strength", "look/shadow/strength", rest.look.shadowStrength, 0.0f, 1.0f, 0.0f, 1.0f);
     r.f("look/shadow/softness", "look/shadow/softness", rest.look.shadowSoftness, 0.1f, 256.0f, 1.0f, 64.0f);
     r.v3("look/shadow/direction", "look/shadow/direction", rest.look.shadowDirection, -1.0f, 1.0f, -1.0f, 1.0f);
@@ -823,6 +858,8 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
         index.copy("surface/" + std::to_string(k) + "/color", live.surfaces[k].color);
         index.copy("surface/" + std::to_string(k) + "/emission", live.surfaces[k].emission);
         index.copy("surface/" + std::to_string(k) + "/edge", live.surfaces[k].edge);
+        index.copy("surface/" + std::to_string(k) + "/rim", live.surfaces[k].rim);
+        index.copy("surface/" + std::to_string(k) + "/static", live.surfaces[k].staticAmount);
     }
     index.copy("march/maxSteps", live.maxSteps);
     index.copy("march/epsilon", live.epsilon);
@@ -836,6 +873,12 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("look/edge/pixels", live.look.edgePixels);
     index.copy("look/edge/threshold", live.look.edgeThreshold);
     index.copy("look/edge/softness", live.look.edgeSoftness);
+    index.copy("look/rim/intensity", live.look.rimIntensity);
+    index.copy("look/rim/color", live.look.rimColor);
+    index.copy("look/rim/power", live.look.rimPower);
+    index.copy("look/static/cell", live.look.staticCell);
+    index.copy("look/static/rate", live.look.staticRate);
+    index.copy("look/static/roll", live.look.staticRoll);
     index.copy("look/shadow/strength", live.look.shadowStrength);
     index.copy("look/shadow/softness", live.look.shadowSoftness);
     index.copy("look/shadow/direction", live.look.shadowDirection);

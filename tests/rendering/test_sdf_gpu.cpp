@@ -1103,6 +1103,120 @@ TEST_CASE("SDF line look: edges take each surface's colour and a pixel width hol
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SDF rim emission: a smooth silhouette glows, the centre does not, and off is byte-identical (ADR-1052)",
+          "[gpu][sdf][liminal][adr1052]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "head";
+    // A sphere has no creases: the edge term draws nothing on it, which is the mannequin head's problem.
+    o.tree = treeOf(sphere(0.8f));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-1.0f);
+    o.boundsMax = glm::vec3(1.0f);
+    o.compile = true;
+    o.material.baseColor = glm::vec3(0.0f);
+    o.surfaces = {{glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f)}};
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](float intensity, float power, float surfaceRim) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.look.rimIntensity = intensity;
+        c.look.rimPower = power;
+        c.look.rimColor = glm::vec3(0.2f, 0.6f, 1.0f);
+        c.surfaces[0].rim = surfaceRim;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, 0.5, 192, 192);
+    };
+    // The sphere's projected centre and its rim: find the brightest blue pixels and the centre pixel.
+    const auto blue = [](const gpu::Image8& img) {
+        long n = 0;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const auto* px = img.pixel(x, y);
+                n += (px[2] > 90 && px[2] > px[0] + 40) ? 1 : 0;
+            }
+        }
+        return n;
+    };
+    const auto off = render(0.0f, 3.0f, 1.0f);
+    const auto offOtherSettings = render(0.0f, 7.0f, 0.5f);
+    const bool same = off.rgba == offOtherSettings.rgba;
+    CHECK(same); // intensity 0: nothing else matters
+    const auto on = render(4.0f, 3.0f, 1.0f);
+    const auto sharp = render(4.0f, 10.0f, 1.0f);
+    const auto masked = render(4.0f, 3.0f, 0.0f);
+    const long nOff = blue(off), nOn = blue(on), nSharp = blue(sharp), nMasked = blue(masked);
+    INFO("blue pixels: off " << nOff << ", on " << nOn << ", power 10 " << nSharp << ", surface rim 0 " << nMasked);
+    CHECK(nOff == 0);
+    CHECK(nOn > 150);
+    CHECK(nSharp < nOn);   // a higher power is a thinner rim
+    CHECK(nSharp > 0);
+    CHECK(nMasked == 0);   // the surface multiplier switches it off per surface
+    // The rim is a ring: the image centre (facing the eye) stays dark while the rim is lit.
+    const std::uint32_t cx = on.width / 2, cy = on.height / 2;
+    const auto* centre = on.pixel(cx, cy);
+    const auto* centreOff = off.pixel(cx, cy);
+    CHECK(std::abs(int(centre[2]) - int(centreOff[2])) < 25);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("SDF screen static: snow that changes with time, repeats at the same time, and is off by default (ADR-1054)",
+          "[gpu][sdf][liminal][adr1054]") {
+    auto ctx = makeContext();
+    scene::Scene s = baseScene();
+    scene::SdfObject o;
+    o.name = "screen";
+    o.tree = treeOf(box(glm::vec3(1.6f, 1.2f, 0.05f)));
+    REQUIRE(o.tree.validate());
+    o.boundsMin = glm::vec3(-2.0f);
+    o.boundsMax = glm::vec3(2.0f);
+    o.compile = true;
+    o.material.baseColor = glm::vec3(1.0f); // the surface colour drives the shade (it multiplies this)
+    o.surfaces = {{glm::vec3(0.45f), glm::vec3(0.0f), glm::vec3(1.0f)}};
+    o.look.staticCell = 0.08f;
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    const auto render = [&](float amount, double time) {
+        scene::Scene copy = s;
+        scene::SdfObject c = o;
+        c.surfaces[0].staticAmount = amount;
+        copy.sdfs.push_back(c);
+        return renderWith(renderer, copy, time, 128, 128);
+    };
+    // Grain: the mean difference between horizontally neighbouring pixels over the middle of the frame. A
+    // smooth (lit) surface has almost none; snow of a few pixels per cell has a lot.
+    const auto spread = [](const gpu::Image8& img) {
+        double sum = 0.0;
+        int n = 0;
+        for (std::uint32_t y = 48; y < 80; ++y) {
+            for (std::uint32_t x = 48; x < 80; ++x) {
+                sum += std::abs(int(img.pixel(x + 1, y)[1]) - int(img.pixel(x, y)[1]));
+                ++n;
+            }
+        }
+        return sum / n;
+    };
+    const auto plain = render(0.0f, 1.0);
+    const auto plainLater = render(0.0f, 1.3);
+    const bool still = plain.rgba == plainLater.rgba;
+    CHECK(still); // no static: nothing changes with time
+    const auto a = render(1.0f, 1.0);
+    const auto again = render(1.0f, 1.0);
+    const auto b = render(1.0f, 1.3);
+    INFO("spread plain " << spread(plain) << ", static " << spread(a));
+    CHECK(spread(plain) < 3.0);
+    CHECK(spread(a) > 10.0);
+    const bool repeats = a.rgba == again.rgba;
+    const bool moves = a.rgba != b.rgba;
+    CHECK(repeats); // a pure function of time: a seek shows what play showed
+    CHECK(moves);   // and it moves
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF compiled trees deeper than the interpreter's stacks render (ADR-1005)", "[gpu][sdf]") {
     auto ctx = makeContext();
     scene::Scene s = baseScene();

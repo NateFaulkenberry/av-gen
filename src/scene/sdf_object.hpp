@@ -41,6 +41,18 @@ struct SdfLook {
     float edgePixels = 0.0f;
     float edgeThreshold = 0.02f;
     float edgeSoftness = 0.28f;
+    // ADR-1052: a rim (fresnel) emission: rimColor * rimIntensity * (1 - |n . v|)^rimPower, added as light
+    // where the surface turns away from the eye, so a smooth silhouette (a rounded head, a sphere) glows
+    // against the dark where the crease-only edge term draws nothing. Off at intensity 0 (byte-identical).
+    float rimIntensity = 0.0f;
+    glm::vec3 rimColor{1.0f};
+    float rimPower = 3.0f;
+    // ADR-1054: screen static. A surface with `static` > 0 shows animated snow: its colour and emission are
+    // multiplied by a hash per cell of `staticCell` metres (object-local) that re-rolls `staticRate` times a
+    // second, with a rolling bar of strength `staticRoll` drifting down it. A pure function of time.
+    float staticCell = 0.012f;
+    float staticRate = 24.0f;
+    float staticRoll = 0.35f;
     float shadowStrength = 0.0f;   // an SDF soft shadow towards `shadowDirection`; 0 = off (a second march)
     float shadowSoftness = 8.0f;   // Quilez's k: larger = harder
     glm::vec3 shadowDirection{0.3f, 1.0f, 0.2f}; // world space, towards the light
@@ -84,6 +96,8 @@ struct SdfObject {
         glm::vec3 color{1.0f};
         glm::vec3 emission{0.0f};
         glm::vec3 edge{1.0f}; // ADR-1047: multiplies the object's edge colour on this surface (0 = no lines)
+        float rim = 1.0f;     // ADR-1052: multiplies the object's rim on this surface (0 = no rim)
+        float staticAmount = 0.0f; // ADR-1054: 0 = a plain surface, 1 = full static (TV snow)
     };
     std::vector<Surface> surfaces;
     // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material

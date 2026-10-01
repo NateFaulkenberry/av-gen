@@ -654,8 +654,8 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                     spatial::SdfNodeGpu rec{};
                     rec.fieldSlot = -1;
                     rec.p0 = glm::vec4(s.color, 0.0f);
-                    rec.p1 = glm::vec4(s.emission, 0.0f);
-                    rec.p2 = glm::vec4(s.edge, 0.0f); // ADR-1047: the surface's edge colour multiplier
+                    rec.p1 = glm::vec4(s.emission, s.staticAmount); // ADR-1054: w = static amount
+                    rec.p2 = glm::vec4(s.edge, s.rim); // ADR-1047: edge colour multiplier; ADR-1052: w = rim multiplier
                     im.packScratch.push_back(rec);
                 }
             }
@@ -677,7 +677,10 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             u.look2 = glm::vec4(look.shadowStrength, look.shadowSoftness,
                                 static_cast<float>(std::clamp(look.shadowSteps, 1, 256)), 1.0f);
             u.look3 = glm::vec4(look.shadowDirection, 0.0f);
-            u.look4 = glm::vec4(look.edgePixels, look.edgeThreshold, std::max(look.edgeSoftness, 1e-3f), 0.0f);
+            u.look4 = glm::vec4(look.edgePixels, look.edgeThreshold, std::max(look.edgeSoftness, 1e-3f),
+                                std::max(look.rimPower, 0.1f));
+            u.look5 = glm::vec4(look.rimColor, look.rimIntensity); // ADR-1052
+            u.look6 = glm::vec4(std::max(look.staticCell, 1e-4f), std::max(look.staticRate, 0.0f), look.staticRoll, 0.0f);
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));

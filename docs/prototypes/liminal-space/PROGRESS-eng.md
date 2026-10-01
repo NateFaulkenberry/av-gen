@@ -12,15 +12,17 @@ PROGRESS-art.md. The art agent renders with a pinned binary at `373a34a7`.*
 
 | # | item | status | ADR | tests |
 |---|---|---|---|---|
-| 1 | room / spatial validator (`avgen --validate-space`, `tools/liminal_space.py`) | **done** | 1051 | `[adr1051]` (10 cases) |
-| 2 | SDF rim / fresnel emission (`look/rim/*`), replacing "fix the head" (the coordinator, 2026-10-01) | next | 1052 | |
-| 3 | random entity jumping (§28) in the pass-2 film | todo | | |
-| 4 | animated static for screens (§22) | todo | | |
-| 5 | spatial colour wave through the environment (§30) | todo | | |
-| 6 | geometry tearing on events (§21), if cheap | todo | | |
+| 1 | room / spatial validator (`avgen --validate-space`, `tools/liminal_space.py`); t0/t1-aware since `225e70b0` | **done** | 1051 | `[adr1051]` (12 cases) |
+| 2 | SDF rim / fresnel emission (`look/rim/*`), replacing "fix the head" (coordinator) | **done** | 1052 | `[adr1052]` (CPU + GPU) |
+| 3 | random entity jumping (§28): cause found, `transform-step` hazard, `avgen --trace-jumps` | **done** (the data fix is the art agent's) | 1053 | `[adr1053]` |
+| 4 | screen static (`surface/<k>/static`, `look/static/*`) | **done** | 1054 | `[adr1054]` (CPU + GPU) |
+| 5 | spatial colour wave (§30): REUSE the `travelBeam` world effect (ADR-207/702); it lights raymarched SDF surfaces | **done** (recipe + demo render, no engine code) | - | - |
+| 6 | geometry tearing on events (§21) | **not built** (budget); a recipe with existing ops is below | - | - |
 
-**Resume here:** item 1 is committed. Next is item 2: an optional rim/fresnel emission on SDF objects (`look/rim/intensity`,
-`color`, `power`), per object, keyable, palette-bindable, off and byte-identical by default, with an ADR and a GPU test.
+**Resume here:** items 1-5 are committed. What remains is the final hand-back: run both full suites under the lock, one
+after the other, then restore `temporal-*.png`. Item 6 would be a new SDF domain op (`tear`: a band-wise offset
+`p.x += amount * (hash(floor(p.y * bands + seed)) - 0.5)`), which touches `src/spatial/sdf.*`, `shaders/sdf.wgsl` and the
+compiled path, in the pattern of ADR-1040's `warp`.
 
 **The missing head (§33), found by the validator:** in `all-you-got-pass2.scene.json`, `hillMan` has boundsMax y = 2.5 and its
 head is at y = 2.896, so the head is never marched. This is a data fix in the art agent's generator (grow the bounds). The
@@ -88,6 +90,73 @@ ls.apply_fixes(scene_dict, report, rules={"intersection", "orientation"})   # op
 - **Reading a violation:** `severity`, `rule`, `entities`, `message`, `measured`, `expected`, `suggestion`, `fix` and `groups` (the
   chapters in which it was seen).
 - **Order (section 15):** validate, apply the safe fixes, render, critic, refine, validate again.
+- **Time:** entities with `t0`/`t1` are checked only against entities whose spans overlap theirs. With a project path, the camera
+  is checked only against what is present when it passes.
+
+#### 2. Rim glow on SDF objects (ADR-1052)
+
+- **Parameters:** `sdf/<o>/look/rim/intensity` (0 = off, the default; 1-4 is a visible contour), `look/rim/color` (bind it in
+  the palette), and `look/rim/power` (3 by default; 6-10 is a thin line on the silhouette).
+- **Per surface:** `sdf/<o>/surface/<k>/rim` (a multiplier, default 1). To light only the head, set 0 on the body's surfaces and
+  1 on the head's.
+- **JSON:** `"look": {"rimIntensity": 2, "rimColor": [0.6, 0.8, 1], "rimPower": 6}` and `"surfaces": [..., {"rim": 0}]`.
+- It is fogged like the edges and blooms. Route the beat into `look/rim/intensity` for a head that pulses.
+
+#### 3. Jumps (ADR-1053)
+
+- A bob is `grid.song.quarter.wave` (or `.half.wave`), never the bare pulse. A pulse into a position needs
+  `"chain": {"springHz": 6, "springDamping": 0.6}`.
+- The `transform-step` hazard (a load warning, and in `--audit-routes`) names any route that breaks this.
+- **Measure:** `./build/release/src/avgen --trace-jumps <project.json> --fps 30 [--range a:b] [--json f]` (about 40 s, no GPU).
+- **Pass 2's offenders:** from 38 s, livArm, livPlant and livTable /translation (gRel and gB3). From 187 s, kitKettle,
+  kitChairA, kitChairB and kitPlate /translation, and nodes/b3w83..90/position. Also the grid.song.c10 routes into the bed
+  room's transform/position; that one may be deliberate.
+
+#### 4. Screen static (ADR-1054)
+
+- **Switch it on:** `sdf/<o>/surface/<k>/static` = 1 on the screen surface (the kit's `SCREEN`, k = 3). JSON:
+  `"surfaces": [..., {"color": ..., "emission": ..., "static": 1}]`.
+- **Object-wide:** `look/static/cell` (m, 0.012), `look/static/rate` (re-rolls per second, 24; 0 = frozen) and `look/static/roll`
+  (the rolling bar, 0.35).
+- It multiplies the surface's colour and emission. A screen needs emission (or a lit colour) for the snow to show.
+- Route a clap channel into `static`, or into `rate`, for interference bursts.
+
+#### 5. The spatial colour wave (§30): a `travelBeam` effect (existing, ADR-207/702)
+
+- **What it is:** a directional wave front that adds coloured light to every surface it crosses, SDF walls included, with a
+  rainbow ramp through the band.
+- **Demo:** rendered at `~/Desktop/av-gen-review/24-liminal-space/pass3/eng/colour-wave-travelBeam-15.5-19s.png`, with its
+  scene `colour-wave-demo.scene.json`. Add to the scene's `"effects"`:
+
+```json
+{"id": "colourWave", "type": "travelBeam", "name": "Colour wave", "owner": {"kind": "world"}, "enabled": true, "order": 0,
+ "activation": "window", "timing": {"delay": 0, "lifetime": 0, "fadeIn": 0.2, "fadeOut": 1.0, "windowStart": 208.0, "windowSeconds": 4.0, "repeatSeconds": 0},
+ "parameters": {"propagation": {"kind": "directional", "direction": "explicit", "explicitDirection": [0, 0, 1], "speed": 5.0, "range": 40.0,
+     "frontWidth": 1.2, "trailLength": 8.0, "falloff": 1.2, "startOffset": 0.0, "verticalExtent": 20.0, "verticalGrowth": 0.0, "ringCount": 0, "beamRadius": 0},
+   "appearance": {"color": [1, 0.3, 0.8], "intensity": 1.5, "edgeColor": [1, 1, 1], "edgeIntensity": 4.0, "width": 1.0, "rainbow": true,
+     "rainbowSpeed": 0.2, "rainbowScale": 0.15, "rainbowSaturation": 0.9, "rainbowBrightness": 1.2},
+   "sparkle": {"enabled": false}, "response": {"ground": 1, "foliage": 1, "surface": 1, "emissive": 1},
+   "source": {"kind": "world", "position": [0, 0, -3]}}}
+```
+
+- **The settings:**
+  - `source` with `explicitDirection` sets where the front starts and which way it travels (world metres, in the room's
+    frame). `"source": {"kind": "camera"}` with `"direction": "cameraForward"` sends it away from the eye.
+  - `speed` x `windowSeconds` sets how far it travels: 5 m/s crosses a 5 m room in a bar at 111 BPM.
+  - `trailLength` sets how long surfaces stay coloured after it passes.
+- **The palette:** the wave adds light; it does not change base colours. To make the room come out in a new palette, key
+  `palette/position` across the same window so that it lands as the front leaves the room.
+
+#### 6. More corruption, with what exists (no new engine code)
+
+- **Geometry displacement on an event:** wrap a world or prop in a `warp` (ADR-1040) or a `displaceNoise` node and route the
+  clap channel into its `amount` (for example `{"source": "grid.song.c05", "target": "sdf/<o>/node/<warp>/amount", "amount": 0.15}`).
+  Relax `stepScale` to about 0.8.
+- **Positional glitches:** a pulse with NO chain into a translation (the `transform-step` hazard, deliberately). Give it
+  `attackMs: 1` to mark it intended.
+- **Texture corruption:** route the channel into `surface/<k>/static` on any surface, not only the screens.
+- **Frame corruption:** `temporal/mosh/*` (ADR-1049) on the same channel.
+
 
 ## ART PASS 2 (2026-10-01): Resume here
 
