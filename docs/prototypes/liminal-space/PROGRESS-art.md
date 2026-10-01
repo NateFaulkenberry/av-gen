@@ -5,20 +5,28 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 2 (2026-10-01, the owner's `02-art-pass-2.md` governs)
 
-**Where pass 2 stands (12:45):**
-- The whole film is built as data and committed: 36 shots, 18 BIG CLAPs each with its own treatment, 254
-  words all seen when they appear, a clean CPU clearance.
-- All seven of the engineer's systems are in.
-- The v1 preview measured:
+**Where pass 2 stands (12:55):**
+- The final 1920x1080 render is running from `82f8edba` into
+  `~/Desktop/av-gen-review/24-liminal-space/pass2/all-you-got-pass2.mp4`.
+- When it finishes:
+  1. tell the coordinator, who releases the engineer's render suite;
+  2. run `python3 tools/liminal/pass2_av.py` and `critic_pass2.py` on it;
+  3. run the test gate `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"`, which must exit 0;
+  4. hand back.
+- **v2 preview** (`$S/liminal2/v2-full.mp4`):
   - 17 of 18 BIG CLAPs unmistakable;
-  - +11 to +26 dB of quarter lock in most sections (pass 1: +0 to +8);
-  - an onset-locked z of 5.6 in the Critic (pass 1: 0.2).
-- The many fixes since v1 are committed but not yet rendered. The GPU was held by the engineer's full CPU suite
-  from 12:08.
-- The coordinator has the engineer's render suite waiting until the art's final 1080p render is done. **Tell
-  the coordinator the moment the final render is finished.** Commit only art paths:
-`git commit -- tools/liminal/ examples/liminal/all-you-got* docs/prototypes/liminal-space/PASS2-PLAN.md
-docs/prototypes/liminal-space/PROGRESS-art.md`.
+  - quarter lock +14 to +24 dB in every pulse section;
+  - the Critic: 25 issues (1 high: the dawn's intended white-out), an onset-locked z of 8.4, technical
+    quality 0.94.
+- **Since v2 (all in the final):**
+  - every word is checked on the CPU to lie on solid wall, with a clear line of sight, fully on screen;
+  - the house parts arrive from above and below;
+  - verse 2's lamps are amber (no green cast);
+  - the chorus's LET IT GO stands on the hills;
+  - the sun clears the mountains;
+  - dawn breathes before the breakdown;
+  - C02 has a light burst;
+  - the gallery's sparkle is fine glitter.
 
 - **Owner numbering everywhere:** owner bar N = analysis bar N+1. `tools/liminal/pass2_grid.py` is the one grid.
   It writes `tools/liminal/all-you-got.pass2.json` (sections, 18 BIG CLAPs in seconds, events, 274 lyric
