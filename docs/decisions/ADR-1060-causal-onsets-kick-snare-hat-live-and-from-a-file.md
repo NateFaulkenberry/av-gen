@@ -23,8 +23,10 @@ Two more live defects:
 
 1. **A causal detector** runs one per frame stream, on the analyzer's 2048/512 frames. Its value at frame n is a
    function of frames 0..n.
-   - The detection function is SuperFlux on `log(1 + 100|X|)`: the previous frame is max-filtered across 3 bins, then
-     the flux is averaged per band.
+   - The detection function is SuperFlux on `log(1 + 40|X|/ref)`, where `ref` is a causal spectral peak (up at once,
+     down over 3 s, floored at -80 dB). The previous frame is max-filtered across 3 bins, then the flux is averaged
+     per band. Being relative to `ref` makes the detector level-free: a take 12 dB quieter gives the same kicks
+     (ADR-1062's test).
    - Its threshold is `max(1.4 x median(last 31 frames) + delta, 0.12 x decaying peak)`. The decaying peak is Dixon's
      (tau 0.12 s): a bump on the tail of a big attack is not a hit.
    - The output per class is a continuous **ratio** (the ODF over its threshold), plus a default **hit**
@@ -64,7 +66,8 @@ Precision and recall are against the placed hits. In the same kit:
 - the mean latency is -10 to -7 ms: a frame's time is its window's centre, so the attack enters it early;
 - a pad alone fires no drum.
 
-On ADR-898's groove with an off-beat bass: kick recall is 1.0, and the kick fired on 4 of 63 bass notes.
+On ADR-898's groove with an off-beat bass (a sine with a 4 ms attack, the clickiest bass): kick recall is 1.0, and
+the kick fired on 7 of 63 bass notes.
 
 Against ADR-898's offline answers on night-shift (a real mix, 105 s), the causal hats agree P 0.83 / R 0.86 and the
 causal kicks find every offline kick (R 1.00) plus 38 more. The offline "mid" onsets there are mostly hats and

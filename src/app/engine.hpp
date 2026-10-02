@@ -1214,6 +1214,8 @@ private:
     sonic::SignalEventDeriver signalDeriver_;   // ADR-1061: a file's Signal-trigger events, derived from the piece
     std::uint64_t signalTriggerKey_ = 0;
     void serviceSignalTriggers();
+    sonic::ResponseControls responseControls_; // ADR-1062: `sonic/response/*`, read each frame
+    void syncResponseControls();
     mutable analysis::LiveEventLatch liveLatch_; // ADR-1060: a live event carried onto several frames fires once
     std::unique_ptr<world::HistoryAutomation> historyAutomation_;
     const scene::Composition* historyComposition_ = nullptr;

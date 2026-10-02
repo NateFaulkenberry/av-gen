@@ -46,8 +46,8 @@ void InterpretSource::attach(signals::SignalBus& bus, params::ParameterSet& para
     for (Mapping& m : mappings_) {
         m.output = bus.declare("visual." + m.name, 0.0f, 1.0f);
         const std::string base = prefix + m.name + "/";
-        m.biasParam = addParam(params, base + "bias", m.bias, -4.0f, 4.0f, -1.0f, 1.0f);
-        m.gainParam = addParam(params, base + "gain", m.gain, -16.0f, 16.0f, 0.0f, 4.0f);
+        m.biasParam = addParam(params, base + "bias", m.bias, -64.0f, 64.0f, -1.0f, 1.0f); // ADR-1062: wide hard ranges
+        m.gainParam = addParam(params, base + "gain", m.gain, -256.0f, 256.0f, 0.0f, 4.0f); // for narrow register bumps
         m.curveParam = addParam(params, base + "curve", m.curve, 0.05f, 16.0f, 0.25f, 4.0f);
         for (std::size_t i = 0; i < m.inputs.size(); ++i) {
             Input& in = m.inputs[i];

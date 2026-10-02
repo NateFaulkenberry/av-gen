@@ -212,6 +212,7 @@ public:
 
     void declare(signals::SignalBus& bus) { runtime_.declare(bus); }
     void setSmoothing(float scale) { runtime_.setTimeScale(scale); }
+    void setControls(const ResponseControls& c) { runtime_.setControls(c); } // ADR-1062
     [[nodiscard]] const SonicRuntime& runtime() const { return runtime_; }
     [[nodiscard]] LiveNotes& notes() { return notes_; }
     [[nodiscard]] Status status(double frameSeconds) const;

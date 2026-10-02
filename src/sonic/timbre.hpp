@@ -44,6 +44,7 @@ struct TimbreFeatures {
     int f0Count = 0;             // fundamentals found
     float width = 0.0f;          // the analyzer's stereo side/mid
     bool stereo = false;
+    analysis::CausalOnsets causal; // ADR-1060: the frame's causal onsets (the response model's hits and levels)
 };
 
 struct TimbreConfig {

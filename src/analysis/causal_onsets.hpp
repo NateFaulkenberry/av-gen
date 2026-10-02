@@ -9,7 +9,8 @@
 // the file at load, in the same order, with the same answer (the Sonic response model reads it on both paths).
 //
 // Per frame:
-//   Y(k)      = log(1 + 100 |X(k)|)                                   level-free compression (FMP, madmom)
+//   Y(k)      = log(1 + 100 |X(k)| / ref)                             compression relative to a causal spectral peak
+//                                                                     (up at once, down over 3 s): level-free
 //   flux(k)   = max(0, Y(k) - max(Y'(k-1), Y'(k), Y'(k+1)))           SuperFlux: the previous frame max-filtered
 //                                                                     across 3 bins, so vibrato is not an onset
 //   ODF(band) = mean of flux(k) over the band's bins
@@ -125,7 +126,8 @@ private:
     float binHz_ = 0.0f;
     Band kick_, harmonic_, body_, snare_, hat_, broad_, bass_;
     std::array<Band, 6> split_{};
-    std::vector<float> previous_; // Y of the previous frame
+    std::vector<float> previous_; // the previous frame's magnitudes
+    float reference_ = 0.0f;      // the causal spectral peak the compression is relative to
     std::vector<float> flux_;     // this frame's per-bin flux
     bool havePrevious_ = false;
     // Per class: the ODF history for the median (a ring), and the default picker.

@@ -262,6 +262,7 @@ TimbreFeatures TimbreAnalyzer::analyze(const analysis::AnalysisFrame& frame) {
     out.relativeFlux = frame.relativeFlux;
     out.width = frame.width;
     out.stereo = frame.stereo;
+    out.causal = frame.causal; // ADR-1060/1062: the causal onsets, carried with the snapshot to the response model
     const std::vector<float>& m = frame.magnitude;
     const std::size_t bins = m.size();
     if (bins < 8) {

@@ -243,7 +243,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             const float linear = std::max(gain->baseComponent(0), 1e-4f);
             float db = 20.0f * std::log10(linear);
             ImGui::SetNextItemWidth(-90);
-            if (ImGui::SliderFloat("Sensitivity", &db, -24.0f, 18.0f, "%+.1f dB")) {
+            if (ImGui::SliderFloat("Input gain", &db, -24.0f, 18.0f, "%+.1f dB")) {
                 gain->setBaseComponent(0, std::clamp(std::pow(10.0f, db / 20.0f), 0.0f, 8.0f));
             }
             if (ImGui::IsItemHovered()) {
@@ -253,6 +253,58 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
     }
     ImGui::Separator();
+
+    // ---- ADR-1062: the response (how the world answers), not an audio-engineering panel ----
+    if (engine.params().find("sonic/response/sensitivity") != nullptr) {
+        ImGui::TextUnformatted("Response");
+        const auto slider = [&](const char* path, const char* label, float lo, float hi, const char* format,
+                                ImGuiSliderFlags flags, const char* help) {
+            auto* p = engine.params().find(path);
+            if (p == nullptr) {
+                return;
+            }
+            float v = p->baseComponent(0);
+            ImGui::SetNextItemWidth(-90);
+            if (ImGui::SliderFloat(label, &v, lo, hi, format, flags)) {
+                p->setBaseComponent(0, std::clamp(v, lo, hi));
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("%s", help);
+            }
+        };
+        slider("sonic/response/sensitivity", "Sensitivity", 0.0f, 1.0f, "%.2f", 0,
+               "How readily the world answers: lowers the floor quiet sounds must clear and lifts small values, "
+               "without pushing loud ones past full. Moves both Transients and Sustain.");
+        slider("sonic/response/transient", "Transients", 0.0f, 1.0f, "%.2f", 0,
+               "How strongly attacks fire: kicks, snares, hats, notes. 0 turns every hit off.");
+        slider("sonic/response/sustain", "Sustain", 0.0f, 1.0f, "%.2f", 0,
+               "How strongly held sound moves the world: bass, level, sustained energy. 0 turns them off.");
+        slider("sonic/response/attack", "Attack", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
+               "How quickly a response appears (a multiplier on every attack time).");
+        slider("sonic/response/release", "Release", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
+               "How long a response lingers: the feel. A multiplier on every release and decay time.");
+        // What the detector hears, as four meters: the hits' envelopes.
+        const auto& bus = engine.signals();
+        const char* names[] = {"response.kickEnv", "response.snareEnv", "response.hatEnv", "response.noteEnv"};
+        const char* labels[] = {"kick", "snare", "hat", "note"};
+        const float w = (ImGui::GetContentRegionAvail().x - 3.0f * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
+        for (int i = 0; i < 4; ++i) {
+            if (i > 0) {
+                ImGui::SameLine();
+            }
+            const auto id = bus.find(names[i]);
+            ImGui::ProgressBar(id ? std::clamp(bus.value(*id), 0.0f, 1.0f) : 0.0f, ImVec2(w, 0), labels[i]);
+        }
+        if (ImGui::Button("Reset response")) {
+            for (const char* path : {"sonic/response/sensitivity", "sonic/response/transient", "sonic/response/sustain",
+                                     "sonic/response/attack", "sonic/response/release"}) {
+                if (auto* p = engine.params().find(path)) {
+                    p->resetToDefault();
+                }
+            }
+        }
+        ImGui::Separator();
+    }
 
     // ---- MIDI ----
     {

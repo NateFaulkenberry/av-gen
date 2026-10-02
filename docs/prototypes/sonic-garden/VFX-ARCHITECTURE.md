@@ -64,11 +64,16 @@ MIDI gets its own signals, separate from the audio. The per-note signals are new
 | signal | what |
 |---|---|
 | `notes.lastPitch`, `notes.lastVelocity` | the latest note-on's pitch (0..1) and velocity: per-note placement and strength, not the context's centroid |
-| `notes.interval` | the latest step in semitones / 12, signed in `notes.step` (-1..1) |
+| `notes.interval` | the latest melodic step, signed, semitones / 12 (-1..1) |
+| `notes.lowest`, `notes.highest` | the sounding notes' range, 0..1 |
+| `notes.voice.<0..7>.{held, velocity, pitch, age}`, event `notes.voice.<i>.on` | voice slots: a note owns the lowest free slot for its life (ADR-1062) |
+| `notes.class.<0..11>`, event `notes.classOn.<k>` | pitch-class lanes (C = 0): the loudest sounding velocity |
 | `notes.velocitySpread` | the standard deviation of velocity over the context window / 0.5 |
 | `notes.held` | how long the longest sounding note has been held, log-scaled 0.05-4 s: tells a pad from a stab |
 | `notes.release` (E) | a note-off whose strength is the note's duration (log 0.05-4 s), so short and long notes end differently |
 | `notes.low` (E), `notes.high` (E) | a note-on below or above the register split (`sonic.response.splitKey`, default 60), strength = velocity |
+
+As built (ADR-1062): every name above exists. `notes.step` was folded into a signed `notes.interval`.
 | `notes.channel` | the latest note's channel / 15 |
 | `response.note` (E), `response.noteEnv` | the note-on through the transient chain (velocity curve, attack/release) |
 

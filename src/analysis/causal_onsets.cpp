@@ -9,7 +9,7 @@ namespace avgen::analysis {
 
 namespace {
 
-constexpr float kCompression = 100.0f; // Y = log(1 + 100 |X|): a -40 dB partial is log 2
+constexpr float kCompression = 40.0f; // Y = log(1 + 40 |X| / ref): tuned on the kit at full level and 12 dB down
 
 float smoothstep(float a, float b, float x) {
     const float t = std::clamp((x - a) / (b - a), 0.0f, 1.0f);
@@ -77,6 +77,7 @@ void CausalOnsetDetector::reset() {
     }
     previousOnsetRatio_ = 0.0f;
     snareFloorDb_ = -120.0f;
+    reference_ = 0.0f;
 }
 
 void CausalOnsetDetector::layout(std::size_t bins, float binHz) {
@@ -133,21 +134,33 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
         layout(bins, binHz);
     }
     // ---- SuperFlux over the compressed spectrum ----
+    // The compression is relative to a causal peak of the spectrum (up at once, down over 3 s, never below -80 dB),
+    // so a take 12 dB quieter gives the same flux: log(1 + 100 |X|) alone is linear for quiet partials and
+    // logarithmic for loud ones, which moved the band shares the classes read with the input level.
     const auto& m = frame.magnitude;
+    float framePeak = 0.0f;
+    for (std::size_t k = 1; k < bins; ++k) {
+        framePeak = std::max(framePeak, m[k]);
+    }
+    if (framePeak > reference_) {
+        reference_ = framePeak;
+    } else {
+        reference_ += static_cast<float>(1.0 - std::exp(-hopSeconds / 3.0)) * (framePeak - reference_);
+    }
+    const float gain = kCompression / std::max(reference_, 1e-4f);
     for (std::size_t k = 0; k < bins; ++k) {
-        const float y = std::log1p(kCompression * std::max(m[k], 0.0f));
+        const float y = std::log1p(gain * std::max(m[k], 0.0f));
         if (havePrevious_) {
-            const float lo = previous_[k > 0 ? k - 1 : k];
-            const float hi = previous_[k + 1 < bins ? k + 1 : k];
-            const float ref = std::max(previous_[k], std::max(lo, hi));
+            const auto prev = [&](std::size_t i) { return std::log1p(gain * previous_[i]); };
+            const float ref = std::max(prev(k), std::max(prev(k > 0 ? k - 1 : k), prev(k + 1 < bins ? k + 1 : k)));
             flux_[k] = std::max(0.0f, y - ref);
         } else {
             flux_[k] = 0.0f;
         }
     }
-    // Stored in a second pass: the max filter above reads the neighbours' previous values.
+    // The previous frame is kept raw and compressed with this frame's reference, so the two are compared alike.
     for (std::size_t k = 0; k < bins; ++k) {
-        previous_[k] = std::log1p(kCompression * std::max(m[k], 0.0f));
+        previous_[k] = std::max(m[k], 0.0f);
     }
     const bool first = !havePrevious_;
     havePrevious_ = true;

@@ -5071,6 +5071,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     // ADR-1025: while live input runs, the live session publishes these instead (after this, on the engine's own
     // bus); a replay bus then carries nothing sonic, like any other live-only signal.
     if (!liveSonic_.running()) {
+        clock.sonic.setControls(responseControls_); // ADR-1062: the performer's controls, the same on a replay
         if (sonic_ && track_ != nullptr && !track_->empty()) {
             clock.sonic.advance(*sonic_, *track_, time.renderTime);
         }
@@ -5080,6 +5081,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
 }
 
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
+    syncResponseControls(); // ADR-1062: before the clock steps the response model
     const auto& midiClock = controlHub_.midiClock();
     midiClockActive_ = tempoSource_ == TempoSource::MidiClock && midiClock.running() && midiClock.hasTempo();
     // The same resolution the transport readout uses, so the picture and the display cannot be
@@ -5099,6 +5101,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     in.playing = isPlaying();
     const bool pulse = advanceClock(clock_, bus_, time, newAnalysisFrame, in);
     if (liveSonic_.running()) {
+        liveSonic_.setControls(responseControls_);
         liveSonic_.frame(*activeSonicSetup(), liveTimbre_.get(), bus_, liveFrameSeconds_, liveFrameNs_);
     }
 
@@ -6438,7 +6441,31 @@ Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem
     log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
               sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
     refreshSonicTimbre();
+    syncResponseControls(); // ADR-1062: the response parameters exist before the project's parameters are applied
     return {};
+}
+
+void Engine::syncResponseControls() {
+    // ADR-1062: `sonic/response/*`, registered while the project has a `sonic` block or live input runs. Their
+    // defaults are the block's `response` values; the Live panel's Response sliders edit them.
+    if (!sonic_ && !liveSonic_.running()) {
+        responseControls_ = sonic::ResponseControls{};
+        return;
+    }
+    const sonic::ResponseControls& d = activeSonicSetup()->response.controls;
+    const auto param = [&](const char* path, float fallback, float lo, float hi, float softLo, float softHi) {
+        auto* p = params_.findAs<float>(path);
+        if (p == nullptr) {
+            p = &params_.add(params::ParamDesc<float>{.path = path, .defaultValue = fallback, .hardMin = lo,
+                                                      .hardMax = hi, .softMin = softLo, .softMax = softHi});
+        }
+        return p->value();
+    };
+    responseControls_.sensitivity = param("sonic/response/sensitivity", d.sensitivity, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.transient = param("sonic/response/transient", d.transient, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.sustain = param("sonic/response/sustain", d.sustain, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.attack = param("sonic/response/attack", d.attack, 0.25f, 4.0f, 0.25f, 4.0f);
+    responseControls_.release = param("sonic/response/release", d.release, 0.25f, 4.0f, 0.25f, 4.0f);
 }
 
 void Engine::refreshSonicTimbre() {
