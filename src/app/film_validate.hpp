@@ -33,6 +33,7 @@ struct FilmValidateOptions {
     bool camera = true;
     bool motion = true;
     std::string cameraTrace; // a CSV of every sample: time, frame, eye, target, fov, near, clearance, nearest object
+    std::string motionTrace; // "<path substring>=<file.csv>": every sample of the matching watched transforms
 };
 
 // `project`: the project file. `scene`: its scene document (for entity annotations). `staticReport`: the

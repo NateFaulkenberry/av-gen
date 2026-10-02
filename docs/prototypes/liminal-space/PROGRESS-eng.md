@@ -19,7 +19,8 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 | 5 | film pass `--film`: camera inside solid, near-plane clipping, close-geometry distortion, crossing between frames, entering early; build-lock (twitch) on structural transforms | **landed** | 1057 |
 | 6 | tiers (critical/warning/info; expected overlaps are info), Markdown "Scene Validation Report" (`--md`) | **landed** | 1056 |
 | 7 | ~2:15: root cause found and the engine half fixed (`camera/near`, journey auto near 5 cm) | **engine fixed; data half is the art agent's** | 1058 |
-| 8 | tests (Catch2 `[adr1056]`, `[adr1057]`, `[adr1058]`), ADR text | in progress | - |
+| 8 | tests: Catch2 `[adr1056]` (9 cases), `[adr1057]` + `[adr1058]` (5 cases), python `tools/liminal_space.py --selftest`; ADRs 1056-1058 written | **done** | - |
+| 9 | final hand-back: both full suites under the lock | pending (see the end of this section) | - |
 
 ### For the art agent (pass 4): the validator, now
 
@@ -33,6 +34,8 @@ Build: `cmake --build --preset release -j 10` (or use the binary at `build/relea
 ./build/release/src/avgen --validate-space examples/liminal/all-you-got-pass3.json --film \
     --json report.json --md report.md [--range a:b] [--fps 30] [--camera-trace cam.csv] [--no-motion]
 #   --strict: exit 1 on any critical.   --dump-rules: every tolerance and category (deep-merge your own with --rules r.json)
+#   --motion-trace "rowRoof=roof.csv": every sample of the watched transforms whose path contains "rowRoof"
+# from python: ls.validate("examples/liminal/<project>.json", film=True, md="report.md")
 ```
 
 - **Tiers:** `severity` ERROR/WARNING/INFO = `tier` critical/warning/info. Expected overlaps (a category's `mayIntersect`,
@@ -87,16 +90,37 @@ the look-at keys swinging from (-1.2, 3.9, -5.4) to (1.6, 3.6, -2.6)) should kee
 Also: `StudyBookcase` stands across a third of `StudyDoor`'s opening (wall +x of study, z -3.52..-2.48 against the
 bookcase's -4.11..-3.09) and 5 cm into the wall (`openingCrossed`).
 
-### Findings on pass 3 (static, before the art pass)
+### Findings on pass 3 (before the art pass): 27 critical, 45 warnings, 36 info
 
-Static run (`all-you-got-pass3.json`): **24 critical, 34 warnings, 3 info**. The film pass's numbers are below once run.
+Full report (static + film): `~/Desktop/av-gen-review/24-liminal-space/pass4/eng/pass3-scene-validation.md` (and `.json`,
+`.txt`). Command: `avgen --validate-space examples/liminal/all-you-got-pass3.json --film --md ... --json ...` (about 1 min).
 - **Trim runs across every doorway** (23 critical `openingCrossed`): `kit.wall_band` (the skirting at 0-0.10 m and the dado at
   0.88-0.92 m) is a shell round the room clipped to a band, and the door cuts are subtracted from the walls only, so each band
-  crosses every door (and the dado crosses `FrontWindow`) as a floating strip. Fix in the kit: subtract the same cuts from the
-  bands (`D(band, *cuts)`), or pass the cuts to `wall_band`.
-- `StudyBookcase` in front of `StudyDoor` (above); `HallStair` ends at y 2.70 with no floor (deliberate, the cliff: mark
-  `"terminates": true`); five gallery plinths "off the wall" (mark `"freestanding": true`); 13 text/geometry intersections
-  (the `grow*` words cut the tree rooms' walls by 8-25%; `b3w86` inside `kitDisco`), 2 text/text overlaps.
+  crosses every door (and the dado crosses `FrontWindow`) as a floating strip. Fix in the kit or `rooms3.shell_with`: subtract
+  the same cuts from the bands (`D(band, *cuts)`). This is the owner's "wall details intersecting doors".
+- **Camera through the walls of tree room `Room_13`** (object `treeC`) at 2:44.83-2:45.03 (frames 4945-4951): close-up, near-plane
+  clip, 4 cm inside, then through, just before the cut into the gallery (165.14 s). Visible in take 3 as black frames.
+- **~2:15** (`closeGeometry` on `StudyBookcase`, 2:15.43-2:15.60): see PART 7 above; `StudyBookcase` also stands across a third
+  of `StudyDoor` (`openingCrossed`). Note the study itself lurches 1 m (`sdf/stu*/transform/position`, routes `grid.song.c14`
+  x 0.22 and `c14b` x -0.16, 2:15.97-2:20.87): the C14 corruption moves the room under the camera.
+- **Build-lock (6 warnings, PART 3/15's "twitch")**: `sdf/row/transform/position` (a keyed step shake of the house row, 0.61 m,
+  0:28.8-0:32.4); `sdf/row/node/rowRoof/rotation [y]` (the row's roofs flick 25 degrees and back, 0:20.7-0:28.4: "once a
+  roof is established, it should not twitch"); `sdf/skyline/node/towerA|towerB/size` (heights pulsed by
+  `grid.song.sixteenth` x 4 under `riserBar`, 0:28.6-0:36.9); the dance's coffee table and kitchen chair rocking
+  (`grid.song.half.wave`, 3:02-3:18; tag `"moves": true` if that is the dance).
+- Others: `HallStair` ends at y 2.70 with no floor (the cliff: mark `"terminates": true`); five gallery plinths "off the wall"
+  (mark `"freestanding": true`); `stuFloor` (a figure) 1 cm from the study's -x wall; 13 text/geometry intersections (the
+  `grow*` words cut the tree rooms' walls by 8-25%; `b3w86` inside `kitDisco`), 2 text/text overlaps; the static path checks'
+  7 grazes.
+
+### Gaps (not built)
+
+- Mesh text and particles are not part of the film pass's camera geometry (SDF only); 45 frustum rays can miss a thin pole.
+- Glyph-level self-overlap (no glyph ranges in the text mesh; tracking is the proxy).
+- "Entering before it has opened" needs an authored `"opensAt": s` on the room entity; nothing infers it.
+- Walls are the axis-aligned box of a room's interior (as ADR-1051): an angled or curved wall is not a wall to these checks.
+- Trim and sills are found geometrically in pass 3; from now on the instrumented kit tags `wall_band`/`skirting` as `trim`
+  and `window_frame`'s `frame`/`sill` parts (`tools/liminal_space.py`), which makes them exact.
 
 ## ART PASS 3 (2026-10-01): Resume here
 

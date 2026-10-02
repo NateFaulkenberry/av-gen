@@ -305,3 +305,17 @@ TEST_CASE("Report: the Scene Validation Report has the three tiers and the count
     for (const auto& v : merged["violations"]) tiered = tiered && v.contains("tier");
     CHECK(tiered);
 }
+
+TEST_CASE("Containment: a mannequin brushing a wall is reported with its gap; one standing clear is not", "[space][liminal][adr1056]") {
+    auto man = [](double x) {
+        json head = boxAt(0.0, 1.7, 0.0, 0.1, 0.12, 0.1);
+        head["part"] = "head";
+        return at(x, 0.0, 0.0, tagged(unionOf({boxAt(0.0, 0.8, 0.0, 0.2, 0.8, 0.12), head}),
+                                      {{"category", "mannequin"}, {"id", "Man"}, {"pose", "stand"}}));
+    };
+    // its side 1 cm from the -x wall (x = -3)
+    const json v = find(run(sceneOf(unionOf({shell()}), unionOf({man(-2.79)}))), "characterClearance", "Man");
+    REQUIRE(v != nullptr);
+    CHECK_THAT(v["measured"]["gap"].get<double>(), WithinAbs(0.01, 0.006));
+    CHECK(find(run(sceneOf(unionOf({shell()}), unionOf({man(-2.0)}))), "characterClearance", "Man") == nullptr);
+}

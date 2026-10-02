@@ -33,12 +33,14 @@ twitching" is about motion over time, which no static check can see.
    Runs of frames are grouped; each item has the time and 30 fps frame range, the eye and the point, the object and
    the entity whose box holds the point. `--camera-trace f.csv` writes every sample.
 2. **Build-lock** (`buildLock`, PART 15: build, then lock). Every transform parameter of SDF objects and nodes and of
-   composition nodes (translation, position, size, scale, rotation) is watched while visible. A transform is "built"
-   once it has held still for `settle` (0.3 s). After that its motion is split into episodes (bursts of movement
-   with holds under `episodeGap`, 0.5 s, between them). An episode with at least `minReversals` (3) direction changes
-   whose range is small (0.3 m, 25%, 45 degrees), or which reverses 3 times a second or more within three times
-   that range, is a wobble. One-way moves (a drop into place, a rebuild) are build events and pass; a spin's
-   wrap is not a reversal.
+   composition nodes (translation, position, size, scale; rotation one axis at a time) is watched while visible. A
+   transform is "built" once it has held still for `settle` (0.3 s). After that, every DIRECTION REVERSAL is an
+   event: a burst of motion that goes back the way the previous one came, or a turn within a burst. Reversals no
+   more than `clusterGap` (1.5 s) apart form a cluster. A cluster of at least `minReversals` (3) whose range is
+   small (0.3 m, 25%, 45 degrees), or which reverses `jitterRate` (3) times a second or more within three times
+   that range, is a wobble. One-way moves (a drop into place, a rebuild, a spin, whose wrap is not a reversal) never
+   reverse, so a build-and-lock rhythm passes however often it builds. `--motion-trace "<path part>=<f.csv>"` writes
+   the samples of the matching transforms.
    - It is a WARNING on a structural transform: one carrying an architecture or furniture entity, or untagged
      (treated as structural). Decor that may move (`moves: true` in the rules: hanging lamps, fans, curtains,
      plants), characters, text and entities tagged `"moves": true` are not watched; `motion.allow` lists path
@@ -53,7 +55,9 @@ twitching" is about motion over time, which no static check can see.
 
 - On pass 3 (about 1 minute for the 258 s film): the ~2:15 near-plane clipping and close-up (`StudyBookcase`), a
   camera pass through the walls of tree room `Room_13` at 2:44.93-2:45.03 (the cut into the gallery), and six
-  wobbles: the row of houses' keyed shake (28.8-32.4 s, 0.61 m), the row's roof rotation (22.9-28.4 s, 25 degrees),
-  the skyline towers' heights pulsed on the sixteenth (28.6-36.9 s), and the dance's rocking furniture (3:02-3:18).
+  wobbles: the row of houses' keyed shake (28.8-32.4 s, 0.61 m), the row's roof yaw flicks (20.7-28.4 s, 25
+  degrees), the skyline towers' heights pulsed on the sixteenth (28.6-36.9 s), and the dance's rocking furniture
+  (3:02-3:18). Large swings (INFO): the falling road dashes, the dance's kettle, and the study's C14 lurch (the
+  whole study moves 1 m back and forth, 2:15.97-2:20.87).
 - Gaps: mesh text and particles are not part of the camera's geometry (SDF only); the near-plane test uses 45 rays,
   so a thin pole can slip between them; `opensAt` must be authored.

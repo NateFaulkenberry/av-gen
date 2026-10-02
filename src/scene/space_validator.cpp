@@ -62,12 +62,12 @@ const char* kDefaultRules = R"json({
     "searchStep": 0.05
   },
   "door": {"clearanceDepth": 0.7, "minWidth": 0.7, "height": 1.9},
-  "structure": {"alignWarn": 0.015, "alignError": 0.05, "sillWarn": 0.02, "wallGap": 0.15, "chairSpacing": 0.5},
+  "structure": {"alignWarn": 0.015, "alignError": 0.05, "sillWarn": 0.02, "wallGap": 0.15, "chairSpacing": 0.5, "characterWallGap": 0.02},
   "window": {"clearanceDepth": 0.3},
   "camera": {"eyeHeight": 1.6, "clearance": 0.12, "step": 0.1},
   "film": {"closeDistance": 0.3, "closeShare": 0.35, "clearance": 0.12, "cutDistance": 1.5, "raysX": 9, "raysY": 5},
-  "motion": {"settle": 0.3, "episodeGap": 0.5, "jitterRate": 3.0, "epsilon": 0.0015, "epsilonRelative": 0.003, "epsilonDegrees": 0.1, "twitchRange": 0.3,
-             "twitchRangeRelative": 0.25, "twitchRangeDegrees": 45.0, "minActiveSeconds": 0.5, "minReversals": 3,
+  "motion": {"settle": 0.3, "clusterGap": 1.5, "jitterRate": 3.0, "epsilon": 0.0015, "epsilonRelative": 0.003, "epsilonDegrees": 0.1, "twitchRange": 0.3,
+             "twitchRangeRelative": 0.25, "twitchRangeDegrees": 45.0, "minReversals": 3,
              "allow": []},
   "categories": {
     "room":        {"group": "architecture"},
@@ -3000,6 +3000,36 @@ void checkContainment(SpCtx& ctx, const SpGroup& g, const std::string& gname) {
                          fmt::format("{} extends {} outside {} through wall {}", e.id, fmtM(worst.second), room.id, worst.first),
                          "inside the room it belongs to", "", fmt::format("move {} {} into the room", e.id, fmtM(worst.second))},
                         gname);
+            }
+        }
+        // a figure brushing a wall (its geometry within `characterWallGap` of the wall plane, but not through it)
+        if (group == "character") {
+            const float near = ctx.rules.value("structure", json::object()).value("characterWallGap", 0.02f);
+            for (const SpWall& w : wallsOf(in)) {
+                float closest = kInf;
+                for (int ix = 0; ix < 6; ++ix) {
+                    for (int iy = 0; iy < 8; ++iy) {
+                        const float u = b.lo[w.uAxis] + (b.hi[w.uAxis] - b.lo[w.uAxis]) * (static_cast<float>(ix) + 0.5f) / 6.0f;
+                        const float v = b.lo.y + (b.hi.y - b.lo.y) * (static_cast<float>(iy) + 0.5f) / 8.0f;
+                        // march from the wall plane into the room until the figure is reached
+                        float d = 0.0f;
+                        for (int k = 0; k < 40 && d < 0.3f; ++k) {
+                            const float g = e.geom.dist(w.point(u, v, d));
+                            if (g < 1e-3f) {
+                                closest = std::min(closest, d);
+                                break;
+                            }
+                            d += std::max(g, 1e-3f);
+                        }
+                    }
+                }
+                if (closest > 1e-3f && closest < near) {
+                    ctx.add({"WARNING", "characterClearance", {e.id, room.id},
+                             fmt::format("{} is within {} of wall {} of {} ({} away)", e.id, fmtM(near), w.side, room.id, fmtM(closest)),
+                             "a figure clear of the walls", "", fmt::format("move {} {} away from the wall", e.id, fmtM(near - closest + 0.03f)),
+                             json{{"gap", r3(closest)}}},
+                            gname);
+                }
             }
         }
         // the right kind of room

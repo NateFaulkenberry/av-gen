@@ -250,38 +250,41 @@ SemanticMap semanticMap(const json& scene) {
 
 // ---- motion watchers ------------------------------------------------------------------------------------
 
-// A motion episode: bursts of movement separated by holds shorter than the episode gap.
+// A wobble: direction reversals of a built transform, clustered in time (reversals no further apart than the
+// cluster gap). One-way moves (a drop into place, a rebuild) never reverse, so they never cluster.
 struct Episode {
     double t0 = 0.0, t1 = 0.0;
     std::array<float, 3> lo{kInf, kInf, kInf};
     std::array<float, 3> hi{-kInf, -kInf, -kInf};
     int reversals = 0;
-    int bursts = 0;
-    float activeSeconds = 0.0f;
 };
 
 struct Watch {
     params::IParameter* param = nullptr;
     TransformClass cls;
-    std::string path;
+    std::string path;      // the parameter, plus " [x]" etc. for one axis of a rotation
+    std::string target;    // the parameter path (routes and tracks are keyed by it)
+    int component = -1;    // one axis of a rotation, or -1 for the whole vector
     params::IParameter* visible = nullptr;
     bool hasPrev = false;
     std::array<float, 3> prev{};
     double firstVisible = -1.0;
-    // build -> lock: the first time it has held still for `settleHold` after appearing; motion before is its build
+    // build -> lock: the first time it has held still for `settle` after appearing; motion before is its build
     bool settled = false;
     double stillSince = -1.0;
     double settledAt = -1.0;
-    // the current burst and episode
     bool inBurst = false;
     std::array<float, 3> burstNet{};
-    int lastSign = 0;   // sign of the last frame's dominant step (within-burst reversals)
-    int lastBurstSign = 0;
+    int lastSign = 0;      // the last moving frame's direction on `lastAxis`
     int lastAxis = -1;
-    double lastActive = -1.0;
-    bool inEpisode = false;
-    Episode ep;
-    std::vector<Episode> episodes; // finished episodes with at least one burst
+    int lastBurstSign = 0; // the last burst's net direction on `lastBurstAxis`
+    int lastBurstAxis = -1;
+    double lastMove = -1.0;
+    int moves = 0;         // moving frames after the build
+    bool inCluster = false;
+    Episode cluster;
+    double lastReversal = -1.0;
+    std::vector<Episode> episodes; // finished clusters
 };
 
 float magnitude(const Watch& w, const std::array<float, 3>& d, const std::array<float, 3>& ref) {
@@ -332,11 +335,10 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
     const float twitchMetres = mr.value("twitchRange", 0.3f);
     const float twitchRelative = mr.value("twitchRangeRelative", 0.15f);
     const float twitchDegrees = mr.value("twitchRangeDegrees", 20.0f);
-    const double minActive = mr.value("minActiveSeconds", 0.5);
     const int minReversals = mr.value("minReversals", 3);
     const json allow = mr.value("allow", json::array());
-    const double episodeGap = mr.value("episodeGap", 0.5);
     const double jitterRate = mr.value("jitterRate", 3.0);
+    const double clusterGap = mr.value("clusterGap", 1.5);
 
     const double rate = options.fps > 0.0 ? options.fps : std::max(1.0, engine.renderSettings().fps);
     const double renderFps = std::max(1.0, engine.renderSettings().fps);
@@ -413,13 +415,24 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
             w.param = p;
             w.cls = *c;
             w.path = p->path();
+            w.target = p->path();
             const std::string prefix = w.path.substr(0, w.path.find('/'));
             w.visible = set.find(prefix + "/" + w.cls.owner + "/visible");
             if (structuralOf(w, nullptr) == 0) {
                 ++skippedMoving;
                 continue;
             }
-            watches.push_back(w);
+            if (w.cls.measure == TransformMeasure::Degrees && p->componentCount() >= 3) {
+                // each axis on its own: a roll that spins and a yaw that flicks are different motions
+                for (int a = 0; a < 3; ++a) {
+                    Watch wa = w;
+                    wa.component = a;
+                    wa.path = w.path + (a == 0 ? " [x]" : a == 1 ? " [y]" : " [z]");
+                    watches.push_back(wa);
+                }
+            } else {
+                watches.push_back(w);
+            }
         }
     }
 
@@ -427,6 +440,13 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
     if (!options.cameraTrace.empty()) {
         trace.open(options.cameraTrace);
         trace << "time,frame,eye_x,eye_y,eye_z,target_x,target_y,target_z,fov_deg,near,clearance,nearest\n";
+    }
+    std::ofstream mtrace;
+    std::string mtraceMatch;
+    if (const auto eq = options.motionTrace.find('='); eq != std::string::npos) {
+        mtraceMatch = options.motionTrace.substr(0, eq);
+        mtrace.open(options.motionTrace.substr(eq + 1));
+        mtrace << "time,path,visible,x,y,z,settled,inCluster,reversals,moves\n";
     }
     std::vector<Event> events;
     float minClearance = kInf;
@@ -561,7 +581,15 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
         for (Watch& w : watches) {
             const bool visible = w.visible == nullptr || w.visible->finalComponent(0) >= 0.5f;
             std::array<float, 3> v{};
-            for (std::size_t i = 0; i < std::min<std::size_t>(3, w.param->componentCount()); ++i) v[i] = w.param->finalComponent(i);
+            if (w.component >= 0) {
+                v[0] = w.param->finalComponent(static_cast<std::size_t>(w.component));
+            } else {
+                for (std::size_t i = 0; i < std::min<std::size_t>(3, w.param->componentCount()); ++i) v[i] = w.param->finalComponent(i);
+            }
+            if (mtrace && w.path.find(mtraceMatch) != std::string::npos) {
+                mtrace << fmt::format("{:.4f},{},{},{:.4f},{:.4f},{:.4f},{},{},{},{}\n", now, w.path, visible ? 1 : 0, v[0], v[1], v[2],
+                                      w.settled ? 1 : 0, w.inCluster ? 1 : 0, w.cluster.reversals, w.moves);
+            }
             if (!visible) {
                 w.hasPrev = false;
                 continue;
@@ -591,57 +619,55 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
                         w.settledAt = now;
                     }
                 } else {
-                    auto closeBurst = [&]() {
-                        if (!w.inBurst) return;
+                    auto addToCluster = [&](const std::array<float, 3>& x) {
+                        for (std::size_t i = 0; i < 3; ++i) {
+                            w.cluster.lo[i] = std::min(w.cluster.lo[i], x[i]);
+                            w.cluster.hi[i] = std::max(w.cluster.hi[i], x[i]);
+                        }
+                    };
+                    auto reversal = [&]() {
+                        if (w.inCluster && now - w.lastReversal > clusterGap) {
+                            w.episodes.push_back(w.cluster);
+                            w.inCluster = false;
+                        }
+                        if (!w.inCluster) {
+                            w.inCluster = true;
+                            w.cluster = Episode{};
+                            w.cluster.t0 = now;
+                            addToCluster(w.prev);
+                        }
+                        ++w.cluster.reversals;
+                        w.cluster.t1 = now;
+                        w.lastReversal = now;
+                    };
+                    if (moving) {
+                        ++w.moves;
+                        const int sign = d[static_cast<std::size_t>(axis)] > 0.0f ? 1 : -1;
+                        if (!w.inBurst) {
+                            // a new burst: does it go back the way the last one came?
+                            w.inBurst = true;
+                            w.burstNet = {};
+                            if (w.lastBurstSign != 0 && axis == w.lastBurstAxis && sign != w.lastBurstSign) reversal();
+                        } else if (w.lastSign != 0 && axis == w.lastAxis && sign != w.lastSign) {
+                            reversal(); // it turned within a burst
+                        }
+                        w.lastSign = sign;
+                        w.lastAxis = axis;
+                        for (std::size_t i = 0; i < 3; ++i) w.burstNet[i] += d[i];
+                        w.lastMove = now;
+                        if (w.inCluster) {
+                            addToCluster(v);
+                            w.cluster.t1 = now;
+                        }
+                    } else if (w.inBurst) {
                         w.inBurst = false;
                         int ax = 0;
                         for (std::size_t i = 0; i < 3; ++i) {
                             if (std::abs(w.burstNet[i]) > std::abs(w.burstNet[static_cast<std::size_t>(ax)])) ax = static_cast<int>(i);
                         }
-                        const int sign = w.burstNet[static_cast<std::size_t>(ax)] >= 0.0f ? 1 : -1;
-                        if (w.lastBurstSign != 0 && ax == w.lastAxis && sign != w.lastBurstSign) ++w.ep.reversals;
-                        w.lastBurstSign = sign;
-                        w.lastAxis = ax;
-                    };
-                    auto closeEpisode = [&]() {
-                        closeBurst();
-                        if (w.inEpisode && w.ep.bursts > 0) w.episodes.push_back(w.ep);
-                        w.inEpisode = false;
-                        w.ep = Episode{};
-                        w.lastBurstSign = 0;
+                        w.lastBurstSign = w.burstNet[static_cast<std::size_t>(ax)] >= 0.0f ? 1 : -1;
+                        w.lastBurstAxis = ax;
                         w.lastSign = 0;
-                        w.lastAxis = -1;
-                    };
-                    if (moving) {
-                        if (w.inEpisode && now - w.lastActive > episodeGap) closeEpisode();
-                        if (!w.inEpisode) {
-                            w.inEpisode = true;
-                            w.ep.t0 = now;
-                            for (std::size_t i = 0; i < 3; ++i) w.ep.lo[i] = w.ep.hi[i] = w.prev[i];
-                        }
-                        if (!w.inBurst) {
-                            w.inBurst = true;
-                            w.burstNet = {};
-                            ++w.ep.bursts;
-                        }
-                        const int sign = d[static_cast<std::size_t>(axis)] > 0.0f ? 1 : -1;
-                        if (w.lastSign != 0 && sign != w.lastSign) ++w.ep.reversals; // turned within a burst
-                        w.lastSign = sign;
-                        for (std::size_t i = 0; i < 3; ++i) {
-                            w.burstNet[i] += d[i];
-                            w.ep.lo[i] = std::min(w.ep.lo[i], v[i]);
-                            w.ep.hi[i] = std::max(w.ep.hi[i], v[i]);
-                        }
-                        w.ep.t1 = now;
-                        w.ep.activeSeconds += static_cast<float>(1.0 / rate);
-                        w.lastActive = now;
-                    } else {
-                        // a still frame ends the burst; the next burst's direction is compared with this one's
-                        if (w.inBurst) {
-                            closeBurst();
-                            w.lastSign = 0;
-                        }
-                        if (w.inEpisode && now - w.lastActive > episodeGap) closeEpisode();
                     }
                 }
             }
@@ -650,18 +676,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
         }
     }
     for (Watch& w : watches) {
-        if (w.inEpisode && w.ep.bursts > 0) {
-            if (w.inBurst) {
-                // the last burst's reversal against the one before it
-                int ax = 0;
-                for (std::size_t i = 0; i < 3; ++i) {
-                    if (std::abs(w.burstNet[i]) > std::abs(w.burstNet[static_cast<std::size_t>(ax)])) ax = static_cast<int>(i);
-                }
-                const int sign = w.burstNet[static_cast<std::size_t>(ax)] >= 0.0f ? 1 : -1;
-                if (w.lastBurstSign != 0 && ax == w.lastAxis && sign != w.lastBurstSign) ++w.ep.reversals;
-            }
-            w.episodes.push_back(w.ep);
-        }
+        if (w.inCluster) w.episodes.push_back(w.cluster);
     }
 
     // ---- camera runs -> violations
@@ -752,7 +767,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
         return a.second["time"].template get<double>() < b.second["time"].template get<double>();
     });
 
-    // ---- motion -> violations: per transform, its wobble episodes (small, reversing) and its large ones
+    // ---- motion -> violations: per transform, its wobbles (reversal clusters with a small range) and large swings
     int lockedOk = 0, twitch = 0, animated = 0, rebuilds = 0;
     for (Watch& w : watches) {
         if (w.firstVisible < 0.0) continue;
@@ -769,12 +784,9 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
                 mid[i] = (e.hi[i] + e.lo[i]) * 0.5f;
             }
             const float extent = magnitude(w, range, mid);
-            if (e.reversals < minReversals || e.activeSeconds < static_cast<float>(minActive) * 0.25f) {
-                ++rebuilds; // a build event: it moved and locked again
-                continue;
-            }
-            const double span = std::max(1.0 / rate, e.t1 - e.t0);
-            const bool jitter = static_cast<double>(e.reversals) / span >= jitterRate && extent <= limit * 3.0f;
+            if (e.reversals < minReversals) continue;
+            const double dur = std::max(1.0 / rate, e.t1 - e.t0);
+            const bool jitter = static_cast<double>(e.reversals) / dur >= jitterRate && extent <= limit * 3.0f;
             if (extent <= limit || jitter) {
                 wobble.push_back(&e);
                 worstWobble = std::max(worstWobble, extent);
@@ -786,14 +798,15 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
             }
         }
         if (wobble.empty() && large.empty()) {
-            ++lockedOk;
+            if (w.moves > 0) ++rebuilds;
+            else ++lockedOk;
             continue;
         }
         std::string why;
         const int structural = structuralOf(w, &why);
         json drivers = json::array();
         std::string driverText;
-        if (auto it = routesByTarget.find(w.path); it != routesByTarget.end()) {
+        if (auto it = routesByTarget.find(w.target); it != routesByTarget.end()) {
             for (const json* r : it->second) {
                 json c{{"kind", "route"}, {"source", r->value("source", std::string())}, {"amount", r->value("amount", 1.0)}};
                 if (r->contains("depthSource")) c["depthSource"] = (*r)["depthSource"];
@@ -803,7 +816,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
                                           r3(r->value("amount", 1.0)));
             }
         }
-        if (auto it = trackKeys.find(w.path); it != trackKeys.end()) {
+        if (auto it = trackKeys.find(w.target); it != trackKeys.end()) {
             drivers.push_back(json{{"kind", "track"}, {"keys", it->second}});
             driverText += fmt::format("{}a timeline track ({} keys)", driverText.empty() ? "" : ", ", it->second);
         }
@@ -811,7 +824,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
         auto episodeJson = [&](const std::vector<const Episode*>& list) {
             json a = json::array();
             for (const Episode* e : list) {
-                a.push_back(json{{"from", r3(e->t0)}, {"to", r3(e->t1)}, {"reversals", e->reversals}, {"bursts", e->bursts}});
+                a.push_back(json{{"from", r3(e->t0)}, {"to", r3(e->t1)}, {"reversals", e->reversals}});
             }
             return a;
         };

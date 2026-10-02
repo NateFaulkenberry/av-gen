@@ -62,6 +62,7 @@ int runSpaceValidateCommand(int argc, char** argv) {
         else if (a == "--fps") filmOptions.fps = std::atof(next("--fps").c_str());
         else if (a == "--no-motion") filmOptions.motion = false;
         else if (a == "--camera-trace") filmOptions.cameraTrace = next("--camera-trace");
+        else if (a == "--motion-trace") filmOptions.motionTrace = next("--motion-trace");
         else if (a == "--no-film-camera") filmOptions.camera = false;
         else if (a == "--range") {
             const std::string r = next("--range");
