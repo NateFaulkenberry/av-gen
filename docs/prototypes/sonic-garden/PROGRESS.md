@@ -1,6 +1,6 @@
 # Sonic Garden POC: progress
 
-Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1025).
+Resume from here. Branch `proto/sonic-garden` in `../av-gen-sonic`. ADR block 1020-1039 (used: 1020-1026).
 
 Staffing: the engineering agent did phases 0-4 and the engineering half of Phase 5. The art agent (sonic-art) owns
 the mappings, the families, the look and the §34-36 judgements; its pass 1 is recorded in "Art pass 1" below, and the
@@ -32,6 +32,7 @@ review media and ART-NOTES.md are in `~/Desktop/av-gen-review/23-sonic-garden/`.
 | second brief PARTS 9-14 (integration, live MIDI, live audio, sync, UI, demo plumbing) | done (2026-09-30), ADR-1025 | see "Live input" below; the owner's hands-on test is `LIVE-QUICKSTART.md` |
 | second brief PARTS 15-16 (live demo art, live art direction) | done (art agent, 2026-09-30) | see "Live art (PARTS 15-16)" below; `tools/sonic_live_project.py` writes the live tuning; review media in `23-sonic-garden/live-art/` |
 | second brief PART 22 (the hardware test) | the owner's | `LIVE-QUICKSTART.md` |
+| projection (owner's request, 2026-10-01) | done (engineering agent), ADR-1026 | see "Projection" below; Start projection at the top of the Live panel |
 
 ## Architecture (ADR-1020; details in RESEARCH.md §3)
 
@@ -753,6 +754,43 @@ sharpness 4; a world's forms appear from a weight of 0.375 and are full by 0.8; 
 - **Found for the engineer (not changed):** a MIDI input chosen by name does not connect a source that appears later
   (`onSourceAdded` connects only under the wildcard); once in eight runs All MIDI inputs connected the probe's new
   virtual source about 2.7 s late.
+
+## Projection (engineering agent, 2026-10-01, the owner's request) -- ADR-1026
+
+The owner: "a button at the top of the live panel ... 'start projection' which opens a new window with the live
+workspace there ... a clean window to send to a projector".
+
+### Resume here (projection)
+
+- Committed on `proto/sonic-garden`: the implementation, `tests/unit/test_projection.cpp` (`[projection]`, 8 cases),
+  ADR-1026 (indexed), the quickstart's "Projecting to a second screen", and this section.
+- The manual check is done (one display on this Mac, so windowed on it). The media are in
+  `~/Desktop/av-gen-review/23-sonic-garden/projection/`:
+  - 01 is the editor window;
+  - 02 is the projection window (Fit letterbox, no UI);
+  - 03 and 04 are the Live panel before and during projection.
+  - The window captures use `screencapture -l<window id>`, with the ids found by the app's pid. A full-screen
+    capture photographs the owner's desktop: don't take one.
+- Frame cost: within noise (see ADR-1026, "Measured").
+- Suites at `de626773`, run under the lock one after the other:
+  - `avgen_tests`: exit 0; 3,939 cases, 3,919 passed, 19 skipped, 1 failed as expected (the slope lean);
+  - `avgen_render_tests`: exit 0; 559 cases, 558 passed, 1 skipped.
+- Next: the coordinator merges. The owner tries it with the projector (LIVE-QUICKSTART, "Projecting to a second
+  screen").
+- Not tested on hardware: a real second display, fullscreen on it, unplugging. The unplug path is covered by the
+  unit test only.
+
+### What was built
+
+- `src/app/projection.{hpp,cpp}`: GPU-free decisions (display, fullscreen, window size, Fit/Fill/Stretch mapping)
+  and the state machine `Projection` (Idle -> AwaitingProject -> Running -> Idle).
+- The window is an ordinary `OutputManager` output named "Live projection", with `Output::projection = true`:
+  never written to the project's `outputs`, kept across project loads, Esc in it closes it.
+- Settings: `settings.json` `projection` (display name, fullscreen, windowWidth/Height, scaling).
+- `Application::serviceProjection` (each frame, just before the outputs present): opens the window once the
+  demo has loaded, writes the scaling mapping, stops when the window is closed or its display is unplugged.
+- `--start-projection` presses the button at start-up.
+- "Open live demo" now goes through the unsaved-changes prompt (it called `beginOpen` directly before).
 
 ## Readings (the default character, mean of the medium tier over voiced frames, phrase)
 

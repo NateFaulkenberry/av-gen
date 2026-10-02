@@ -217,6 +217,16 @@ void Window::pumpEvents(const std::function<void(const SDL_Event&)>& sink) {
             }
             continue;
         }
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && !event.key.repeat) {
+            // Only the flag: the key itself still reaches the UI through the sink above, as before.
+            for (Window* w : live) {
+                if (w->id_ == event.key.windowID) {
+                    w->pending_.escape = true;
+                    break;
+                }
+            }
+            continue;
+        }
         if (event.type == SDL_EVENT_DROP_FILE) {
             for (Window* w : live) {
                 if (w->id_ == event.drop.windowID) {

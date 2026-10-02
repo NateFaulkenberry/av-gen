@@ -33,6 +33,7 @@
 
 #include <filesystem>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace avgen::app {
@@ -41,6 +42,13 @@ enum class AppearanceTheme : std::uint8_t { System, Dark, Light };
 
 [[nodiscard]] const char* appearanceThemeName(AppearanceTheme theme);
 [[nodiscard]] bool appearanceThemeFromName(const std::string& name, AppearanceTheme& out);
+
+// ADR-1026: how the projection's picture meets a screen of another shape. Fit letterboxes (the whole frame, black
+// bars), Fill crops (the screen full, the frame's edges lost), Stretch distorts (the existing outputs' identity).
+enum class ProjectionScaling : std::uint8_t { Fit, Fill, Stretch };
+
+[[nodiscard]] const char* projectionScalingName(ProjectionScaling scaling);
+[[nodiscard]] bool projectionScalingFromName(const std::string& name, ProjectionScaling& out);
 
 struct AppSettings {
     static constexpr const char* kFormatName = "avgen-settings";
@@ -119,6 +127,17 @@ struct AppSettings {
         std::string midiInput = "*"; // MIDI source filter: "*" every source, else a name substring
         float smoothing = 1.0f;     // multiplier on the Sonic Character's time constants (0.25..4)
     } live;
+
+    // ---- projection (ADR-1026) ----
+    // The Live panel's "Start projection": which screen the clean output window goes to and how. This machine's, for
+    // the reason the devices above are: the projector is plugged into this Mac, not into the project.
+    struct Projection {
+        std::string display;            // display name; "" = automatic (the first non-primary display, else the primary)
+        std::optional<bool> fullscreen; // unset: fullscreen exactly when the chosen display is not the primary
+        std::uint32_t windowWidth = 0;  // windowed size in points; 0 = automatic (the display's size; half on the primary)
+        std::uint32_t windowHeight = 0;
+        ProjectionScaling scaling = ProjectionScaling::Fit;
+    } projection;
 
     // ---- ai ----
     ai::AiSettings ai;

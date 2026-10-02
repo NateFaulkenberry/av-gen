@@ -20,6 +20,25 @@ const char* appearanceThemeName(AppearanceTheme theme) {
     return "System";
 }
 
+const char* projectionScalingName(ProjectionScaling scaling) {
+    switch (scaling) {
+    case ProjectionScaling::Fit: return "fit";
+    case ProjectionScaling::Fill: return "fill";
+    case ProjectionScaling::Stretch: return "stretch";
+    }
+    return "fit";
+}
+
+bool projectionScalingFromName(const std::string& name, ProjectionScaling& out) {
+    for (const auto s : {ProjectionScaling::Fit, ProjectionScaling::Fill, ProjectionScaling::Stretch}) {
+        if (name == projectionScalingName(s)) {
+            out = s;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool appearanceThemeFromName(const std::string& name, AppearanceTheme& out) {
     for (const auto theme : {AppearanceTheme::System, AppearanceTheme::Dark, AppearanceTheme::Light}) {
         if (name == appearanceThemeName(theme)) {
@@ -57,6 +76,16 @@ json AppSettings::toJson() const {
         {"toolbar", preview.toolbar},
     };
     doc["live"] = json{{"audioInput", live.audioInput}, {"midiInput", live.midiInput}, {"smoothing", live.smoothing}};
+    {
+        json pj{{"display", projection.display},
+                {"windowWidth", projection.windowWidth},
+                {"windowHeight", projection.windowHeight},
+                {"scaling", projectionScalingName(projection.scaling)}};
+        if (projection.fullscreen.has_value()) {
+            pj["fullscreen"] = *projection.fullscreen;
+        }
+        doc["projection"] = std::move(pj);
+    }
     doc["ai"] = ai.toJson();
     return doc;
 }
@@ -109,6 +138,29 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
             out.live.midiInput = "*";
         }
         out.live.smoothing = std::clamp(lv->value("smoothing", out.live.smoothing), 0.25f, 4.0f);
+    }
+    if (const auto pj = doc.find("projection"); pj != doc.end() && pj->is_object()) {
+        // Lenient like `live`: a projector preference is never worth refusing the settings file over.
+        out.projection.display = pj->value("display", out.projection.display);
+        if (const auto fs = pj->find("fullscreen"); fs != pj->end() && fs->is_boolean()) {
+            out.projection.fullscreen = fs->get<bool>();
+        }
+        const auto size = [&](const char* key) -> std::uint32_t {
+            const auto it = pj->find(key);
+            if (it == pj->end() || !it->is_number()) {
+                return 0;
+            }
+            const double v = it->get<double>();
+            return v >= 16.0 && v <= 16384.0 ? static_cast<std::uint32_t>(v) : 0;
+        };
+        out.projection.windowWidth = size("windowWidth");
+        out.projection.windowHeight = size("windowHeight");
+        if (out.projection.windowWidth == 0 || out.projection.windowHeight == 0) {
+            out.projection.windowWidth = out.projection.windowHeight = 0;
+        }
+        if (const auto sc = pj->find("scaling"); sc != pj->end() && sc->is_string()) {
+            static_cast<void>(projectionScalingFromName(sc->get<std::string>(), out.projection.scaling));
+        }
     }
     if (const auto pv = doc.find("outputPreview"); pv != doc.end() && pv->is_object()) {
         // A name this build does not know is a hard failure rather than a silent fall back to the
