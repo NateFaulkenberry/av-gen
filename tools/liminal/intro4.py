@@ -107,9 +107,27 @@ def lamps():
              S(X(((-0.22, 0.22), (4.3, 4.5), (-1.45, -0.95))), GLOW))
     lamp_row = T([HERO_X + LOT / 2, 0, ROAD_Z], K.mirror([0, 0, 1], T([0, 0, 3.9], K.repeat([LOT, 0, 0], LOTS, pole))))
     lamp_row = K.I(lamp_row, T([HERO_X, 3.0, ROAD_Z], box([0.0, 0.0, 0.0], name="lampClip")))
-    tree = {"kind": "scale", "scale": 1.0, "name": "treeGrow", "children": [K.round_tree(4.2)]}
+    import props4 as P4
+    tree = {"kind": "scale", "scale": 1.0, "name": "treeGrow", "children": [P4.street_tree(4.2)]}
     tree_row = T([HERO_X + LOT / 2 - 3.6, 0, ROAD_Z], K.mirror([0, 0, 1], T([0, 0, 6.4], K.repeat([LOT, 0, 0], LOTS, tree))))
     return U(lamp_row, tree_row)
+
+
+# ---- the front fences ------------------------------------------------------------------------------------------
+FENCE_Z = ROAD_Z - 7.03       # the hero's own fence (a flying part) stands at z = 7.03: the neighbours' match it
+
+
+def fences():
+    """Pass 4: a picket fence along every neighbour's front garden (a gap at its path), revealed outward from the
+    hero lot by `fenceClip` (they snap in lot by lot on the eighths of bar 8); the hero lot's own fence is one of its
+    flying parts, so that lot is cut out on its own side."""
+    import props4 as P4
+    one = T([HERO_X, 0.0, FENCE_Z], P4.picket_fence(-4.0, 4.0, (-0.7, 0.7)))
+    lots = K.repeat([LOT, 0, 0], LOTS, one)
+    sides = T([0, 0, ROAD_Z], K.mirror([0, 0, 1], lots))
+    clip = T([HERO_X, 1.0, ROAD_Z], box([0.0, 0.0, 0.0], name="fenceClip"))
+    hero_lot = X(((HERO_X - 6.4, HERO_X + 6.4), (-1.0, 3.0), (ROAD_Z - FENCE_Z - 1.0, ROAD_Z - FENCE_Z + 1.0)))
+    return K.D(K.I(sides, clip), hero_lot)
 
 
 # ---- the cars in the driveways -----------------------------------------------------------------------------------
@@ -209,6 +227,7 @@ def objects():
         ("faller", faller(), "furn2", (HERO_X - LOT * LOTS - 5, -12.0, -6.0), (HERO_X + LOT * LOTS + 5, 44.0, 30.0), far),
         ("lamps", lamps(), "furn", (HERO_X - LOT * LOTS - 8, -0.1, 4.0), (HERO_X + LOT * LOTS + 8, 9.0, 20.0), far),
         ("parked", parked(), "furn", (HERO_X - LOT * LOTS - 5, -0.1, -2.0), (HERO_X + LOT * LOTS + 12, 2.0, 26.0), far),
+        ("fences", fences(), "furn", (HERO_X - LOT * LOTS - 5, -0.1, ROAD_Z - FENCE_Z - 0.3), (HERO_X + LOT * LOTS + 5, 1.0, ROAD_Z + FENCE_Z + 0.3), far),
         ("heroShell", hero_shell(), "wall", (HERO["x0"] - 0.3, -0.1, HERO["z0"] - 0.3), (HERO["x1"] + 0.3, 6.2, HERO["z1"] + 0.6), far),
         ("heroParts", hero_parts([p[0] for p in HERO_PARTS if p[0] not in ROOF_PARTS]), "furn",
          (HERO["x0"] - 20.0, -6.0, HERO["z0"] - 1.0), (HERO["x1"] + 20.0, 25.0, 14.0), far),

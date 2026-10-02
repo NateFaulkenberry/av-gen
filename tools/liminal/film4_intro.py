@@ -14,6 +14,7 @@ The music, beat by beat:
   4.1         every roof slams down onto its house at once (they land without them) and stays; 4.3 the trees sprout
   5-6         the bass: street lamps pop up along the pavements on the eighths, alternating sides
   7           a car lands in every driveway on the eighths, outward from the hero lot
+  8           a picket fence snaps in along every front garden on the eighths, outward (pass 4)
   7-9         behind the houses the city's first blocks rise a storey a beat (the podiums in three, the slabs in nine)
   9-12        the riser: the house we will enter rises out of the ground (9.1-10.1) and its parts fly in, faster each
               bar; the towers climb a storey a beat, the downtown core a storey an eighth from 13 (build -> lock)
@@ -185,6 +186,15 @@ def build(b):
         f.route(c, "sdf/parked/look/edge/intensity", 6.0)
         f.route(c, "sdf/parked/surface/2/emission", 5.0)
     f.track("sdf/parked/node/carClip/size", cars)
+
+    # ---- 8: a picket fence snaps in along every front garden on the eighths, outward from the hero lot ------------
+    fence = [(0.0, [0.0, 0.0, 0.0], "step")]
+    for k in range(1, IN.LOTS + 1):
+        tk = t(8, 1 + 0.5 * (k - 1))
+        fence.append((tk, [IN.LOT * k + 4.5, 2.0, 30.0], "step"))
+        c = b.clap(f"fence{k}", tk, release=0.22)
+        f.route(c, "sdf/fences/look/edge/intensity", 6.0)
+    f.track("sdf/fences/node/fenceClip/size", fence)
     b.pulse("sdf/street/look/edge/intensity", 2.0, "quarter", b.gate("iQuarter", t(1), t(16, 4)))
 
     # ---- 9-12: the hero house rises, then its parts fly in, faster each bar; the neighbours mutate --------------
@@ -232,7 +242,7 @@ def build(b):
 
     # ---- 16.4, the gap: the world freezes and goes dark but for the lit front window; the camera keeps rushing ----
     gap = t(16, 4)
-    for o in ("street", "row", "faller", "lamps", "parked", "heroParts", "heroRoof", "heroTree") + tuple(f"cityIn{nm_}" for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky")):
+    for o in ("street", "row", "faller", "lamps", "parked", "fences", "heroParts", "heroRoof", "heroTree") + tuple(f"cityIn{nm_}" for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky")):
         f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 1.0, "step"), (gap - 0.001, 1.0, "step"), (gap + 0.03, 0.12, "smooth"),
                                                  (ENTRY, 0.12, "step")], mode="multiply")
     f.track("sdf/heroShell/look/edge/intensity", [(0.0, 1.0, "step"), (gap, 1.0, "smooth"), (ENTRY - 0.12, 0.35, "step")], mode="multiply")

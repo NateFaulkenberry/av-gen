@@ -246,3 +246,26 @@ def bus_shelter(w=3.0, k=FILL, glass=GLASS, ad=CANVAS2):
 def planter(w=1.2, h=0.5, k=FILL, leaves=ACCENT):
     """A street planter with a low hedge (about 4 nodes)."""
     return U(S(X(((-w / 2, w / 2), (0.0, h), (-w / 4, w / 4))), k), S(X(((-w / 2 + 0.05, w / 2 - 0.05), (h, h + 0.35), (-w / 4 + 0.05, w / 4 - 0.05))), leaves))
+
+
+def street_tree(h=4.2, k=FILL, leaves=ACCENT):
+    """A street tree for the line look, standing level on its foot: a square trunk and two flat octagonal crowns,
+    the upper one smaller and turned 22.5 degrees (pass 3's round tree was a cube balanced on a corner on a stick,
+    which read as a die tumbling, not a tree) (about 14 nodes)."""
+    def octo(r, hh, yaw=0.0):
+        o = K.I(box([r, hh, r]), R([0, 45, 0], box([r, hh, r])))
+        return R([0, yaw, 0], o) if yaw else o
+    trunk = S(T([0, h * 0.27, 0], box([h * 0.024, h * 0.27, h * 0.024])), k)
+    low = S(T([0, h * 0.6, 0], octo(h * 0.25, h * 0.13)), leaves)
+    top = S(T([0, h * 0.84, 0], octo(h * 0.16, h * 0.11, 22.5)), leaves)
+    return U(trunk, low, top)
+
+
+def picket_fence(x0=-4.0, x1=4.0, gap=(-0.7, 0.7), h=0.8, pitch=0.5, k=FILL):
+    """A front garden's picket fence along x (its face at z = 0, 3 cm thick), a gap for the path; the hero house's
+    fence's proportions (rails at 0.28 and 0.58 of a 0.8 m fence, pickets every 0.5 m) (about 14 nodes)."""
+    n = int((x1 - x0) / pitch / 2) + 2
+    pickets = T([0.0, h / 2, 0.0], K.repeat([pitch, 0, 0], n, box([0.03, h / 2, 0.03])))
+    pickets = K.I(pickets, X(((x0, x1), (0.0, h + 0.1), (-0.1, 0.1))))
+    rails = U(X(((x0, x1), (0.25, 0.31), (-0.03, 0.03))), X(((x0, x1), (0.55, 0.62), (-0.03, 0.03))))
+    return S(K.D(U(pickets, rails), X(((gap[0], gap[1]), (-0.5, h + 0.5), (-0.2, 0.2)))), k)

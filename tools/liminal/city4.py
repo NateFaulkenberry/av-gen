@@ -42,7 +42,9 @@ MAIN_Z = 12.0
 XI = HX + 20.0           # the z-road through the downtown intersection
 ZK = -108.0              # the x-road through it
 NEIGH = ((-92.8, 95.2), (-22.0, 46.0))     # the neighbourhood superblock (x, z) the city leaves alone
-INNER = ((-100.0, 140.0), (-235.0, -22.0))  # the blocks the intro's camera sees (x, z)
+INNER = ((-100.0, 140.0), (-235.0, -22.0))  # the blocks the intro's camera sees (x, z): the far towers
+INNER_NEAR = ((-100.0, 140.0), (-62.0, -22.0))   # the first row of blocks behind the neighbourhood: the rest grows at bar 67
+INNER_OF = {"Low": INNER_NEAR, "Mid": INNER_NEAR, "TowerA": INNER_NEAR, "TowerB": INNER_NEAR, "Sky": INNER}
 SET_PIECE_BLOCKS = [(HX, -88.0), (HX + 40.0, -88.0)]   # the park (SW of the intersection), the bar's block (SE)
 STOREY = 3.2
 CROSS_OFF = ROAD_HALF - 0.75     # a crossing's centre from its junction's centre: on the line of the pavement
@@ -171,16 +173,21 @@ def traffic(axis, region, gap=24.0, name="traffic", cut=None):
 
 
 # ---- the set pieces at the downtown intersection -----------------------------------------------------------------------
+SIGNALS = [([XI + 6.4, 0.12, ZK + 6.4], -90.0), ([XI - 6.4, 0.12, ZK - 6.4], 90.0),     # NS: SE (his), NW
+           ([XI - 6.4, 0.12, ZK + 6.4], 180.0), ([XI + 6.4, 0.12, ZK - 6.4], 0.0)]     # EW: SW, NE
+
+
 def intersection():
     """The four traffic lights on its corners, a bus shelter, kerbside planters (about 70 nodes). The signal facing
     the northbound lane (his) is `sigN*`; the cross street's `sigE*`."""
     c = 6.4
     sig = []
     # NE, NW, SE, SW corners; each light's arm reaches over the road it controls
-    sig.append(T([XI + c, 0.12, ZK + c], R([0, 180, 0], P4.traffic_light(3.6, 3.2))))      # SE corner: for the northbound lane
-    sig.append(T([XI - c, 0.12, ZK - c], P4.traffic_light(3.6, 3.2)))                     # NW corner: southbound
-    sig.append(T([XI - c, 0.12, ZK + c], R([0, 90, 0], P4.traffic_light(3.6, 3.2))))       # SW corner: eastbound
-    sig.append(T([XI + c, 0.12, ZK - c], R([0, -90, 0], P4.traffic_light(3.6, 3.2))))      # NE corner: westbound
+    # each mast arm reaches over the lanes it governs, its head facing the cars waiting at it (the prop's arm is +Z and
+    # its head faces +X): SE arm west over the northbound lane facing south (his); NW arm east facing north; SW arm
+    # north facing west (eastbound); NE arm south facing east (westbound)
+    for at, yaw in SIGNALS:
+        sig.append(T(at, R([0, yaw, 0], P4.traffic_light(3.6, 3.2))))
     shelter = T([XI + 12.0, 0.12, ZK + 7.4], R([0, 180, 0], P4.bus_shelter(3.2)))
     planters = U(T([XI + 9.0, 0.12, ZK + 13.0], P4.planter()), T([XI + 9.0, 0.12, ZK + 18.0], P4.planter()))
     return U(*sig, shelter, planters)
@@ -196,24 +203,29 @@ def signal_heads():
     def heads(at, yaw):
         lamp = lambda dy, k: S(T([0.13, h - 0.5 + dy, arm - 0.1], R([0, 0, 90], K.cyl(0.085, 0.03))), k)   # noqa: E731
         return T(at, R([0, yaw, 0], U(lamp(0.27, CANVAS), lamp(0.0, CANVAS2), lamp(-0.27, SCREEN))))
-    ns = U(heads([XI + c, 0.12, ZK + c], 180.0), heads([XI - c, 0.12, ZK - c], 0.0))
-    ew = U(heads([XI - c, 0.12, ZK + c], 90.0), heads([XI + c, 0.12, ZK - c], -90.0))
+    ns = U(*[heads(at, yaw) for at, yaw in SIGNALS[:2]])
+    ew = U(*[heads(at, yaw) for at, yaw in SIGNALS[2:]])
     return ns, ew
 
 
 def park():
     """The block south-west of the intersection (x -12.8..15.2, z -102..-74): a lawn, an east-west path and a
-    north-south one, trees, two lamps, three benches facing the path (the lead's is `ParkBench`), a low hedge
+    north-south one, two lamps (the trees are park_trees()), three benches facing the path (the lead's is `ParkBench`), a low hedge
     round it (about 80 nodes)."""
     cx, cz = HX, -88.0
     lawn = X(((cx - 14.0, cx + 14.0), (0.0, 0.14), (cz - 14.0, cz + 14.0)))
     paths = U(X(((cx - 14.0, cx + 14.0), (0.14, 0.16), (cz - 1.3, cz + 1.3))), X(((cx - 1.3, cx + 1.3), (0.14, 0.16), (cz - 14.0, cz + 14.0))))
     hedge = K.D(X(((cx - 13.8, cx + 13.8), (0.14, 0.75), (cz - 13.8, cz + 13.8))), X(((cx - 13.2, cx + 13.2), (0.0, 1.0), (cz - 13.2, cz + 13.2))),
                 X(((cx - 1.5, cx + 1.5), (0.0, 1.0), (cz - 15.0, cz + 15.0))), X(((cx - 15.0, cx + 15.0), (0.0, 1.0), (cz - 1.5, cz + 1.5))))
-    trees = U(*[K.place(K.round_tree(h), (cx + x, 0.14, cz + z)) for x, z, h in
-                ((-8.0, -7.5, 6.5), (7.5, -8.0, 7.0), (-8.5, 7.0, 6.0), (8.0, 7.5, 6.8), (-3.5, -10.5, 5.5), (10.5, 3.0, 5.8))])
     lamps = U(K.place(P4.street_lamp(4.2, 0.4), (cx + 4.2, 0.14, cz + 2.1), 0.0), K.place(P4.street_lamp(4.2, 0.4), (cx - 4.6, 0.14, cz - 2.1), 180.0))
-    return U(S(lawn, FLOOR), S(paths, ACCENT), S(hedge, ACCENT), trees, lamps)
+    return U(S(lawn, FLOOR), S(paths, ACCENT), S(hedge, ACCENT), lamps)
+
+
+def park_trees():
+    """The park's six trees (their own object: about 90 nodes)."""
+    cx, cz = HX, -88.0
+    return U(*[K.place(P4.street_tree(h), (cx + x, 0.14, cz + z)) for x, z, h in
+               ((-8.0, -7.5, 6.5), (7.5, -8.0, 7.0), (-8.5, 7.0, 6.0), (8.0, 7.5, 6.8), (-3.5, -10.5, 5.5), (10.5, 3.0, 5.8))])
 
 
 BENCH_AT = (HX + 3.6, 0.14, -88.0 + 2.3)      # the lead's bench, facing the path (its front -Z)
@@ -261,13 +273,13 @@ def objects():
     far = {"max_distance": 420.0}
     out = []
     reg_all = ((-420.0, 420.0), (-420.0, 300.0))
-    inner_cut = zone(INNER)
     for name in ("Low", "Mid", "TowerA", "TowerB", "Sky"):
         w, d, h, *_ = SETS[name]
+        reg = INNER_OF[name]
         role = {"Low": "furn2", "Mid": "furn", "TowerA": "wall", "TowerB": "wall", "Sky": "wall"}[name]
-        out.append((f"cityIn{name}", set_tree(name, INNER), role, (INNER[0][0], -0.5, INNER[1][0]), (INNER[0][1], h + 1.5, INNER[1][1]),
+        out.append((f"cityIn{name}", set_tree(name, reg), role, (reg[0][0], -0.5, reg[1][0]), (reg[0][1], h + 1.5, reg[1][1]),
                     dict(far, edge_pixels=1.5)))
-        out.append((f"cityOut{name}", set_tree(name, reg_all, extra_cut=inner_cut), role, (-420.0, -0.5, -420.0), (420.0, h + 1.5, 300.0),
+        out.append((f"cityOut{name}", set_tree(name, reg_all, extra_cut=zone(reg)), role, (-420.0, -0.5, -420.0), (420.0, h + 1.5, 300.0),
                     dict(far, edge_pixels=1.4)))
     out.append(("cityKerbs", pavements(reg_all), "wall", (-420.0, -0.2, -420.0), (420.0, 0.3, 300.0), dict(far, edge_pixels=1.3)))
     out.append(("cityMarks", markings(reg_all), "furn", (-420.0, -0.2, -420.0), (420.0, 0.3, 300.0), dict(far, edge_pixels=1.2)))

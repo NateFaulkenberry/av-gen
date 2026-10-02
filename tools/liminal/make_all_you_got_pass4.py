@@ -60,7 +60,9 @@ PARAMS.update({"camera/breath/amount": 0.0})
 # pass 4's palettes, appended after pass 2's (their indices unchanged): the lonely city of the 'is that all you'
 # bridge (a cool night, sodium lamps, the red of the signal and the tail lights) and the city alive (bridge 3)
 PALETTES4 = [
-    P2.P("P9lonely", "#8FA8D8", "#C8D6F0", "#6F86C0", "#FFFFFF", "#030614", "#FFB25C", "#5CF0FF", "#FF3B3B", "#FFD27A",
+    # (pass 4 review: the canvas role -- the podiums' shopfronts -- was red, and a street of red bands drowned the one
+    # red that matters, the light he is stopped at; the shops are a low amber now, the cars' tails keep their own red)
+    P2.P("P9lonely", "#8FA8D8", "#C8D6F0", "#6F86C0", "#FFFFFF", "#030614", "#FFB25C", "#5CF0FF", "#B8733A", "#FFD27A",
          "#1A2440", "#FFFFFF", "#FFB25C", fill="#030409"),
     P2.P("P10alive", "#5CE1FF", "#FF4FD8", "#FFC94A", "#FFFFFF", "#070318", "#FFC94A", "#2EE6D6", "#FF4F8B", "#2EE6D6",
          "#2A0E40", "#FFFFFF", "#FFC94A", fill="#050210"),

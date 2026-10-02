@@ -45,6 +45,7 @@ FAR = {"max_distance": 460.0}
 CAR_SPEED = 11.0          # m/s, the generic traffic
 REG_ALL = ((-420.0, 420.0), (-420.0, 300.0))
 HERO_CUT = K.X(((C.XI - 60.0, C.XI + 60.0), (-1.0, 10.0), (C.ZK - 60.0, C.ZK + 60.0)))
+TAIL = {K.CANVAS: [1.6, 0.1, 0.06]}     # the cars' tail lights are red whatever the palette (it paints the shopfronts)
 
 # the lead's car, stopped at the line south of the downtown crossing (his lane is northbound: facing -Z)
 CROSSWALK_Z = C.ZK + C.CROSS_OFF                                    # the south crossing's centre line (z)
@@ -71,17 +72,24 @@ def worlds(b):
     b.world("cityOut", {"objects": [o for o in objs if o[0].startswith("cityOut")], "lights": []})
     b.world("cityGround", {"objects": [o for o in objs if o[0] in ("cityKerbs", "cityMarks", "cityLamps")], "lights": []})
     b.world("cityTraffic", {"objects": [
-        ("cityTrafX", C.traffic("x", REG_ALL, name="trafX"), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3)),
-        ("cityTrafZ", C.traffic("z", REG_ALL, name="trafZ"), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3))],
+        ("cityTrafX", C.traffic("x", REG_ALL, name="trafX"), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3, emission=dict(TAIL))),
+        ("cityTrafZ", C.traffic("z", REG_ALL, name="trafZ"), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3, emission=dict(TAIL)))],
         "lights": []})
     b.world("cityTraffic2", {"objects": [
-        ("cityTrafX2", C.traffic("x", REG_ALL, name="trafX2", cut=HERO_CUT), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3)),
-        ("cityTrafZ2", C.traffic("z", REG_ALL, name="trafZ2", cut=HERO_CUT), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3))],
+        ("cityTrafX2", C.traffic("x", REG_ALL, name="trafX2", cut=HERO_CUT), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3, emission=dict(TAIL))),
+        ("cityTrafZ2", C.traffic("z", REG_ALL, name="trafZ2", cut=HERO_CUT), "furn", (-420, -0.2, -420), (420, 2.0, 300), dict(FAR, edge_pixels=1.3, emission=dict(TAIL)))],
         "lights": []})
+    # the city's night sky: a field of stars high over it (pass 4 review: the late world's stars, 30-110 m up, hung among
+    # the towers like dust); shown in the city's aerial shots
+    f.nodes.append({"name": "cityStars", "kind": "particles", "particles": {
+        "capacity": 2600, "spawnRate": 2600.0, "shape": "box", "position": [0.0, 380.0, -140.0], "extent": [560.0, 40.0, 480.0],
+        "lifetimeMin": 900.0, "lifetimeMax": 1000.0, "speedMin": 0.0, "speedMax": 0.0, "spread": 1.0, "gravity": [0.0, 0.0, 0.0],
+        "sizeStart": 0.8, "sizeEnd": 0.8, "blend": "additive", "colorStart": [0.85, 0.9, 1.0, 0.85], "colorEnd": [0.85, 0.9, 1.0, 0.85]}})
     ns, ew = C.signal_heads()
     off = {K.CANVAS: [0.05, 0.0, 0.0], K.CANVAS2: [0.05, 0.03, 0.0], K.SCREEN: [0.0, 0.05, 0.02]}
     b.world("citySet", {"objects": [
         ("cityPark", C.park(), "furn", (C.HX - 15, -0.2, -103), (C.HX + 15, 9, -73), FAR),
+        ("cityParkTrees", C.park_trees(), "furn", (C.HX - 15, -0.2, -103), (C.HX + 15, 7.5, -73), FAR),
         ("cityBenches", C.benches(), "furn2", (C.HX - 8, -0.2, -96), (C.HX + 8, 2, -80), FAR),
         ("cityBar", C.bar_building(), "furn2", (C.HX + 26, -0.2, -102), (C.HX + 55, 14, -74), FAR),
         ("cityCross", C.intersection(), "furn", (C.XI - 9, -0.2, C.ZK - 9), (C.XI + 15, 5, C.ZK + 20), FAR),
@@ -185,6 +193,16 @@ def grow_keys(b):
             b.lock(f"sdf/cityIn{nm_}/surface/{k_}/emission", [(t(66), [v * 0.04 for v in lit]), (tw, lit)], lit, ease=0.04)
         c = b.clap(f"wake{nm_}", tw, release=0.3)
         f.route(c, f"sdf/cityIn{nm_}/look/edge/intensity", 4.0)
+    # the set pieces arrive with their ring (pass 4 review: the park, the bar and the crossing stood finished on bare ground
+    # before the city reached them): the ring a beat behind the roads covers the park and the bar's block on the second
+    # GROW beat, the junction on the third
+    for objs_, tb in ((("cityPark", "cityParkTrees", "cityBenches", "cityBar"), grow_beats[1] + lag["Low"]),
+                      (("cityCross", "citySigNS", "citySigEW"), grow_beats[2] + lag["Low"])):
+        for o in objs_:
+            b.key(f"nodes/{o}/visible", 0.0, 0.0)
+            b.key(f"nodes/{o}/visible", tb, 1.0)
+            c = b.clap(f"arrive{o}", tb + 0.03, release=0.3)
+            f.route(c, f"sdf/{o}/look/edge/intensity", 5.0)
     for i, tb in enumerate(grow_beats):
         c = b.clap(f"grow{i:02d}", tb, release=0.35)
         f.route(c, "sdf/cityKerbs/look/edge/intensity", 6.0)
@@ -211,7 +229,7 @@ def rise_shot(b):
             (t(70), (14.0, 9.0, -72.0)), (t(71), (20.0, 18.0, -112.0)), (t(72), (24.0, 28.0, -132.0)), (t(73), (21.0, 16.0, -112.0)),
             (163.0, (21.0, 4.0, -108.0)), (t(75), (21.2, 1.5, -106.0))]
     nodes = ("street", "cityIn", "cityOut", "cityGround", "cityTraffic", "citySet", "bed", "bath", "stu")
-    b.glide("rise", keys, look, nodes_keys=nodes, extra=["stars"], fov=66.0)
+    b.glide("rise", keys, look, nodes_keys=nodes, extra=["cityStars"], fov=66.0)
     f.shots[-1]["fov"] = [(t(67), 76.0), (149.9, 70.0), (t(69), 64.0), (t(73), 60.0), (t(75), 56.0)]
 
 
@@ -222,13 +240,14 @@ def grow_words(b):
     pats = [(-0.4, -0.25), (0.0, -0.45), (0.4, -0.25)]
     for bar in range(67, 73):
         for half, b0 in ((0, 1.0), (1, 3.0)):
+            placed = []
             for j, wd in enumerate(("FEEL", "IT", "GROW")):
                 tw = t(bar, b0 + 0.5 * j)
                 sx, sy = pats[j]
-                road_word(b, wd, tw, t(bar, b0 + 1.95), sx, sy + 0.08 * half, name=f"grow{bar}{half}{j}")
+                road_word(b, wd, tw, t(bar, b0 + 1.95), sx, sy + 0.08 * half, name=f"grow{bar}{half}{j}", placed=placed)
 
 
-def road_word(b, text, t0, t1, sx, sy, name):
+def road_word(b, text, t0, t1, sx, sy, name, placed=None):
     """A word on the nearest road where the view ray through (sx, sy) meets the ground: snapped to the road's centre
     line, lying flat, read from the camera, as big as the distance needs."""
     f = b.f
@@ -246,6 +265,9 @@ def road_word(b, text, t0, t1, sx, sy, name):
         p = [xi, 0.17, p[2]]
     dist = math.dist(eye, p)
     h = min(max(dist * 0.06, 1.2), 4.2)
+    if placed is not None and any(math.dist(p, q) < 0.5 * (hq * Lq + h * len(text)) + 0.5 * (hq + h) for q, hq, Lq in placed):
+        p = [e + v * s_ for e, v in zip(eye, d)]          # the snap put it on a word of the same line: stay on the ray
+        p[1] = 0.17
     e_, fw, rt, upv, fov = f.basis(t0 + 0.12)
     dd = [a - c for a, c in zip(p, e_)]
     z = sum(a * c for a, c in zip(dd, fw))
@@ -256,6 +278,8 @@ def road_word(b, text, t0, t1, sx, sy, name):
     tilt = f.flat_tilt([0, 1, 0], fwd)
     e = b.word(text, t0, t1, p, [0.0, 1.0, 0.0], h, style="rise", role="word", tilt=tilt, name=name, intensity=4.0, tin=0.18,
                tout=0.3, category="floorText")
+    if placed is not None:
+        placed.append((p, h, len(text)))
     return e
 
 
@@ -318,7 +342,8 @@ def isolation(b):
     car_tree = K.place(ls.tag(P4.car(open_cabin=True), "carSeat", id="HeroCarSeat", seatHeight=0.4), CAR, CAR_YAW)
     fig_at, fig_yaw = fig_in_car()
     man_tree, lo, hi = T4.placed("car_sit", "carMan", fig_at, fig_yaw, room=None, anchor_id="HeroCarSeat")
-    b.room_world("heroCar", {"objects": [("heroCar", car_tree, "furn2", (CAR[0] - 3, -0.1, CAR[2] - 3), (CAR[0] + 3, 2.0, CAR[2] + 3), FAR),
+    b.room_world("heroCar", {"objects": [("heroCar", car_tree, "furn2", (CAR[0] - 3, -0.1, CAR[2] - 3), (CAR[0] + 3, 2.0, CAR[2] + 3),
+                                          dict(FAR, emission=dict(TAIL))),
                                          ("carMan", man_tree, "figure", lo, hi, dict(FAR, figure=True))], "lights": []})
     # the cross traffic in front of him: two streams through the crossing on the green
     cross = K.U(K.T([0.0, 0.0, 0.0], K.T([C.XI, 0.0, C.ZK + C.LANE], K.I(K.repeat([16.0, 0.0, 0.0], 0, K.R([0, 90, 0], P4.car())),
@@ -326,7 +351,8 @@ def isolation(b):
                 K.T([0.0, 0.0, 0.0], K.T([C.XI + 8.0, 0.0, C.ZK - C.LANE], K.I(K.repeat([16.0, 0.0, 0.0], 0, K.R([0, -90, 0], P4.car())),
                                                                                  K.X(((-70.0, 70.0), (-1.0, 3.0), (-3.0, 3.0))))), name="crossBack"))
     clip = K.X(((C.XI - 60.0, C.XI + 60.0), (-1.0, 3.0), (C.ZK - 5.0, C.ZK + 5.0)))
-    b.world("crossTraffic", {"objects": [("crossTraffic", K.I(cross, clip), "furn", (C.XI - 61, -0.2, C.ZK - 6), (C.XI + 61, 2.0, C.ZK + 6), FAR)],
+    b.world("crossTraffic", {"objects": [("crossTraffic", K.I(cross, clip), "furn", (C.XI - 61, -0.2, C.ZK - 6), (C.XI + 61, 2.0, C.ZK + 6),
+                                           dict(FAR, emission=dict(TAIL)))],
                              "lights": []})
     steady(b, "crossTraffic", "crossFwd", t(75) - 2.0, t(83), [1.0, 0.0, 0.0], 9.5)
     steady(b, "crossTraffic", "crossBack", t(75) - 2.0, t(83), [-1.0, 0.0, 0.0], 9.5)
@@ -383,12 +409,17 @@ def isolation(b):
     base = ("street", "cityIn", "cityOut", "cityGround", "cityTraffic2", "citySet", "crossTraffic")
     fx, _, fz = fig_at
     # A: the red light (75-76)
-    # (from the southbound lane behind him: his profile in the car, the crossing ahead with the cross traffic, the bar's
-    # lit window to the right, the words on the podium across the junction)
-    eyeA = [(t(75), (C.XI - 0.75, 1.45, fz + 4.85)), (167.3, (C.XI - 0.65, 1.42, fz + 3.9)), (t(77), (C.XI - 0.55, 1.4, fz + 2.9))]
-    lookA = [(t(75), (fx + 1.7, 1.25, fz - 3.6)), (t(77), (fx + 1.3, 1.2, fz - 2.7))]
+    # (pass 4 review: from behind his car, over the boot and through the open cabin, a slow push: the back of his head
+    # and shoulders, the windscreen's frame, the people crossing just ahead, the cross traffic streaming through the
+    # junction on its green and, high on the right, the red light over his lane. v1 looked past the car's flank and
+    # read as a parked car in front of a red shopfront)
+    eyeA = [(t(75), (CAR[0] + 0.1, 1.34, CAR[2] + 2.75)), (t(77), (CAR[0] + 0.05, 1.31, CAR[2] + 2.3))]
+    lookA = [(t(75), (CAR[0] + 0.9, 2.15, C.ZK - 1.0)), (t(77), (CAR[0] + 0.9, 2.1, C.ZK - 0.5))]
     b.glide("redlight", eyeA, lookA, nodes_keys=base + ("heroCar", "walkA", "walkA2", "barPeople"), extra=["barBack", "barFurn", "barTables"], fov=48.0)
     b.show("carMan", t(75), t(77))
+    # his silhouette's rim stronger in the city than in the house: one figure among moving lines, the one that glows
+    for fig_ in ("carMan", "barMan2", "benchMan", "crowdMan"):
+        f.track(f"sdf/{fig_}/look/rim/intensity", [(0.0, 2.3, "step"), (f.end, 2.3, "step")])
     set_signals(b, t(74, 4), t(77), ns="red", ew="green")
     # B: the bar (77-78)
     eyeB, lookB = bar["camera"]
@@ -477,9 +508,10 @@ def bridge2_words(b):
             pos, nrm, cat = (xs[min(j, 3)], 5.4 - (0.9 if second else 0.0), -88.0 - 40.0 + 13.0 + 0.01), (0, 0, 1), "floatingText"
         elif shot == "bar":          # over the bottles on the back wall; GOT? lower and bigger
             h = 0.26 if wd != "GOT?" else 0.4
-            zs = row_x(line, 0.26, (bb["z0"] + bb["z1"]) / 2 - 2.6, 0.45)
-            zz = zs[min(j, 3)] if wd != "GOT?" else (bb["z0"] + bb["z1"]) / 2 + 0.6
-            pos, nrm, cat = (bb["x1"] - 0.02, 0.12 + (2.66 if wd != "GOT?" else 3.3), zz), (-1, 0, 0), "wallText"
+            # one line above the neon tube (its top 2.42 m), GOT? bigger over the middle of it
+            zs = row_x(line, 0.26, (bb["z0"] + bb["z1"]) / 2 - 3.0, 0.45)
+            zz = zs[min(j, 3)] if wd != "GOT?" else (zs[0] + zs[3]) / 2
+            pos, nrm, cat = (bb["x1"] - 0.02, 0.12 + (2.55 if wd != "GOT?" else 3.12), zz), (-1, 0, 0), "wallText"
         elif shot == "bench":        # stacked in the dark between the trees, over him
             h = 0.5
             pos, nrm, cat = (bx - 0.3 + (0.9 if second else 0.0), 4.4 - 0.62 * j, bz + 2.6), (0, 0, -1), "floatingText"
@@ -557,8 +589,13 @@ def bar_room(b):
     for k_ in (K.CANVAS, K.CANVAS2, K.SCREEN):
         f.route("grid.song.eighth", f"sdf/barBack/surface/{k_}/emission", 1.0, depth=g)
     # the camera: in from the window side along the room towards him, his back to us, the bar's light on him
-    eye = [(t(77), (x0 + 1.2, y0 + 1.5, z1 - 1.1)), (171.6, (x0 + 2.6, y0 + 1.45, z1 - 1.4)), (t(79), (x0 + 3.9, y0 + 1.42, z1 - 1.75))]
-    look = [(t(77), (fig_at[0] + 0.3, y0 + 1.1, fig_at[2])), (t(79), (fig_at[0] + 0.6, y0 + 1.2, fig_at[2] - 0.2))]
+    # (pass 4 review: v1 kept 4.7 m off him with the talkers big in the foreground; now the two talking at the far table
+    # are on the left of the first frame and the camera pushes in to 2.2 m behind his left shoulder, the bartender and
+    # the bottles beyond him, the others left behind out of frame)
+    eye = [(t(77), (fig_at[0] - 3.8, y0 + 1.48, fig_at[2] + 3.0)), (171.6, (fig_at[0] - 2.4, y0 + 1.42, fig_at[2] + 2.1)),
+           (t(79), (fig_at[0] - 1.5, y0 + 1.38, fig_at[2] + 1.5))]
+    look = [(t(77), (fig_at[0] - 0.6, y0 + 1.05, fig_at[2] - 0.6)), (171.6, (fig_at[0] + 0.4, y0 + 1.3, fig_at[2] - 0.25)),
+            (t(79), (fig_at[0] + 0.7, y0 + 1.3, fig_at[2] - 0.15))]
     return {"camera": (eye, look), "man": fig_at}
 
 
@@ -569,19 +606,24 @@ def bar_room(b):
 def alive(b):
     f = b.f
     # the low parts of the flight keep to the roads (the avenue x = XI north from the crossing, the x-road z = -268);
-    # the orbit is round the downtown tower west of the avenue (Sky at (7.2, -243)) above the slabs (28.8 m)
+    # the orbit goes round the downtown tower west of the avenue (Sky at (7.2, -243)) clockwise seen from above --
+    # its south, west and north sides, 26 m out, above the slabs (28.8 m) -- so it leaves along its own tangent, east
+    # down the x-road (pass 4 review: the first orbit went the other way and had to turn back on itself, looking
+    # straight down and spinning, 190.2-191.6)
     X0, ZR, TW = C.XI, -268.0, (C.HX + 6.0, -243.0)
+    O, RAD = (TW[0], TW[1] + 2.0), 26.0
     keys = [(t(83), (X0, 4.5, -118.0)), (t(84), (X0, 6.5, -158.0)), (t(84, 3), (X0 + 0.5, 16.0, -186.0)), (t(85), (X0 + 1.8, 30.0, -212.0)),
-            (t(85, 3), (TW[0] + 24.0, 40.0, TW[1] + 7.0)), (t(86), (TW[0] + 18.0, 44.0, TW[1] - 19.0)), (t(86, 3), (TW[0], 46.0, TW[1] - 27.0)),
-            (t(87), (TW[0] - 17.7, 34.0, TW[1] - 19.0)), (t(87, 3), (X0 - 39.2, 14.0, ZR + 2.0)), (t(88), (X0 - 33.2, 7.0, ZR)),
-            (t(88, 3), (X0 - 3.2, 6.5, ZR)), (t(89), (X0 + 26.8, 7.0, ZR)), (t(89, 3), (X0 + 48.8, 30.0, ZR)), (t(90), (X0 + 60.8, 90.0, ZR + 6.0)),
-            (t(90, 3), (X0 + 68.8, 150.0, ZR + 23.0)), (t(91), (X0 + 72.8, 175.0, ZR + 36.0))]
+            (t(85, 3), (O[0] + 4.0, 40.0, O[1] + RAD)), (t(86), (O[0] - RAD * 0.707, 44.0, O[1] + RAD * 0.707)),
+            (t(86, 3), (O[0] - RAD, 46.0, O[1])), (t(87), (O[0] - RAD * 0.707, 40.0, O[1] - RAD * 0.707)),
+            (t(87, 3), (O[0] + 2.0, 24.0, ZR - 0.5)), (t(88), (X0 + 6.0, 9.0, ZR)), (t(88, 3), (X0 + 30.0, 6.5, ZR)),
+            (t(89), (X0 + 56.0, 7.0, ZR)), (t(89, 3), (X0 + 74.0, 30.0, ZR)), (t(90), (X0 + 84.0, 90.0, ZR + 6.0)),
+            (t(90, 3), (X0 + 90.0, 150.0, ZR + 23.0)), (t(91), (X0 + 94.0, 175.0, ZR + 36.0))]
     look = [(t(83), (X0, 6.0, -170.0)), (t(84), (X0, 14.0, -215.0)), (t(84, 3), (TW[0] + 7.0, 40.0, TW[1])), (t(85), (TW[0], 55.0, TW[1])),
-            (t(85, 3), (TW[0], 50.0, TW[1])), (t(86), (TW[0], 48.0, TW[1])), (t(86, 3), (TW[0], 40.0, TW[1])),
-            (t(87), (X0 - 40.0, 2.0, ZR)), (t(87, 3), (X0 - 21.2, 3.0, ZR)), (t(88), (X0 + 18.8, 5.0, ZR)), (t(88, 3), (X0 + 48.8, 6.0, ZR)),
-            (t(89), (X0 + 78.8, 12.0, ZR)), (t(89, 3), (X0 + 48.8, 2.0, -180.0)), (t(90), (X0 + 18.8, 0.0, -150.0)),
-            (t(90, 3), (X0 - 1.2, 0.0, -170.0)), (t(91), (X0 - 11.2, 0.0, -200.0))]
-    b.glide("alive", keys, look, nodes_keys=("street", "cityIn", "cityOut", "cityGround", "cityTraffic", "citySet"), extra=["stars"], fov=68.0)
+            (t(85, 3), (TW[0], 50.0, TW[1])), (t(86), (TW[0], 50.0, TW[1])), (t(86, 3), (TW[0], 48.0, TW[1])),
+            (t(87), (TW[0], 44.0, TW[1])), (t(87, 3), (X0 + 24.0, 6.0, ZR + 3.0)), (t(88), (X0 + 50.0, 5.0, ZR)),
+            (t(88, 3), (X0 + 74.0, 6.0, ZR)), (t(89), (X0 + 100.0, 12.0, ZR)), (t(89, 3), (X0 + 58.8, 2.0, -180.0)),
+            (t(90), (X0 + 28.8, 0.0, -150.0)), (t(90, 3), (X0 + 8.8, 0.0, -170.0)), (t(91), (X0 - 1.2, 0.0, -200.0))]
+    b.glide("alive", keys, look, nodes_keys=("street", "cityIn", "cityOut", "cityGround", "cityTraffic", "citySet"), extra=["cityStars"], fov=68.0)
     f.shots[-1]["fov"] = [(t(83), 72.0), (t(85), 66.0), (t(87, 3), 74.0), (t(88, 3), 70.0), (t(89, 3), 62.0), (t(91), 58.0)]
     c = b.clap("aliveIn", t(83), release=0.5)
     f.route(c, "camera/exposure/compensation", 1.4)

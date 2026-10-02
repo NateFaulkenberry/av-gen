@@ -176,6 +176,20 @@ def laundry():
     return room
 
 
+def gym_mirror(w, h, entity=None):
+    """The gym's wall mirror (pass 4 review: the kit's pane read as a black hole in a frame): a pale pane (GLASS, its
+    own faint emission) with two diagonal glints across its upper left (CANVAS2, brighter), the way a drawing says
+    'mirror' (about 14 nodes). Its back on z = 0, facing +Z."""
+    import liminal_space as ls
+    frame = S(K.D(X(((-w / 2, w / 2), (-h / 2, h / 2), (0.0, 0.035))), X(((-w / 2 + 0.04, w / 2 - 0.04), (-h / 2 + 0.04, h / 2 - 0.04), (0.02, 0.1)))), FILL)
+    pane = S(X(((-w / 2 + 0.04, w / 2 - 0.04), (-h / 2 + 0.04, h / 2 - 0.04), (0.0, 0.02))), GLASS)
+    inside = X(((-w / 2 + 0.06, w / 2 - 0.06), (-h / 2 + 0.06, h / 2 - 0.06), (0.0, 0.03)))
+    glints = K.I(U(T([-w * 0.22, h * 0.08, 0.022], R([0, 0, -38], K.box([0.05, h, 0.004]))),
+                   T([-w * 0.22 + 0.17, h * 0.08, 0.022], R([0, 0, -38], K.box([0.016, h, 0.004])))), inside)
+    m = U(frame, pane, S(glints, CANVAS2))
+    return ls.tag(m, "mirror", **entity) if entity else m
+
+
 def gym():
     """Where the storage room was (x 1.05..4.95): a rubber-tiled floor, a mirror along the right wall over a rack of
     dumbbells, a squat rack against the front wall with its barbell racked, a flat bench in the middle, a mat, an
@@ -187,7 +201,7 @@ def gym():
     doors = [("-x", 0.0, 0.9, "GymLaundryDoor"), ("-z", 3.0, 0.9, "GymLoungeDoor")]
     shell = U(*shell_with(ext, rid, doors=doors, windows=[("+z", 3.0, 1.2, 0.4, 2.05)], tiled=True, dado=False),
               window_on("+z", ext, 3.0, 1.2, 0.4, 2.05, eid="GymWindow", room=rid),
-              on_wall(K.mirror_frame(2.2, 1.3, entity={"id": "GymMirror", "room": rid}), "+x", ext, -0.2, y0 + 1.45),
+              on_wall(gym_mirror(2.2, 1.3, entity={"id": "GymMirror", "room": rid}), "+x", ext, -0.2, y0 + 1.45),
               place(tag(PR.floor_bulb(0.45), "hangingLamp", "GymBulb", rid), (3.0, y1, 0.0)))
     furn = U(place(tag(P4.squat_rack(), "gymRack", "SquatRack", rid), (2.2, y0, z1 - 0.55), 180.0),
              place(tag(P4.weight_bench(), "gymBench", "WeightBench", rid), (3.15, y0, 0.15)),
@@ -196,7 +210,8 @@ def gym():
              place(tag(P4.exercise_bike(), "gymBike", "ExerciseBike", rid), (4.2, y0, 1.55), -90.0))
     figs = figures(rid, [("gymMan", "gym_stand", (3.85, y0, 0.9), 90.0, None)])
     return {"id": rid, "interior": ext,
-            "objects": [("gymShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+            "objects": [("gymShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5),
+                         {"emission": {GLASS: [0.16, 0.15, 0.24], CANVAS2: [0.75, 0.72, 0.95]}}),
                         ("gymFurn", furn, "furn2", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.3, z1 + 0.05))] + figs,
             "lights": [("gymBulb", (3.0, y1 - 0.55, 0.0), "lamp")],
             "anchors": {"mirror": (x1, y0 + 1.45, -0.2), "bench": (3.15, y0 + 0.5, 0.15), "rack": (2.2, y0 + 1.2, z1),

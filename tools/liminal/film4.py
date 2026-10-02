@@ -61,6 +61,66 @@ class Builder4(F3.Builder3):
         self.f.track(target, keys, mode=mode, component=component)
         return keys
 
+    # ---- the gaze turns level ---------------------------------------------------------------------------------
+    def _angular_gaze(self, shot, dt=0.1):
+        """Pass 3's gaze re-keying (film3.Builder3._angular_gaze), with the direction interpolated as a heading and a
+        pitch instead of along the great circle. The great circle between two headings far apart with the same slight
+        downward pitch passes under the camera: a half-turn from a door to a bed slerped through the floor (the pass 4
+        review found five such whip-downs: the bedroom, the bathroom, the study twice, the bar). Level turns take the
+        shorter way round; a key pair more than 180 degrees apart needs a key between them to choose the side. Near
+        the vertical (|pitch| > 80) the heading is meaningless and it slerps as before."""
+        import math
+        lk = shot["look_keys"]
+        t0, t1 = shot["t0"], shot["t1"]
+        eye_at = lambda tt: self.f.camera_at(min(max(tt, t0), t1 - 1e-4))[0]      # noqa: E731
+        dirs = []
+        for tk, p in lk:
+            e = eye_at(tk)
+            d = [a - b for a, b in zip(p, e)]
+            L = math.sqrt(sum(v * v for v in d)) or 1.0
+            dirs.append((tk, [v / L for v in d], L))
+
+        def hp(d):
+            return math.atan2(d[0], -d[2]), math.asin(max(-1.0, min(1.0, d[1])))
+
+        def from_hp(h, pt):
+            c = math.cos(pt)
+            return [math.sin(h) * c, math.sin(pt), -math.cos(h) * c]
+
+        out = []
+        tt = t0
+        while tt < t1 - 1e-6:
+            if tt <= dirs[0][0]:
+                _, d, L = dirs[0]
+            elif tt >= dirs[-1][0]:
+                _, d, L = dirs[-1]
+            else:
+                i = max(j for j in range(len(dirs)) if dirs[j][0] <= tt)
+                (ta, da, La), (tb, db, Lb) = dirs[i], dirs[min(i + 1, len(dirs) - 1)]
+                u = (tt - ta) / max(tb - ta, 1e-9)
+                u = u * u * (3 - 2 * u)
+                (ha, pa), (hb, pb) = hp(da), hp(db)
+                if max(abs(pa), abs(pb)) > math.radians(80.0):
+                    c = max(-1.0, min(1.0, sum(a * b for a, b in zip(da, db))))
+                    om = math.acos(c)
+                    if om < 1e-4:
+                        d = da
+                    else:
+                        sa, sb = math.sin((1 - u) * om) / math.sin(om), math.sin(u * om) / math.sin(om)
+                        d = [sa * a + sb * b for a, b in zip(da, db)]
+                else:
+                    dh = (hb - ha + math.pi) % (2.0 * math.pi) - math.pi
+                    d = from_hp(ha + dh * u, pa + (pb - pa) * u)
+                L = La + (Lb - La) * u
+            e = eye_at(tt)
+            out.append((round(tt, 4), tuple(a + b * L for a, b in zip(e, d))))
+            tt += dt
+        e = eye_at(t1 - 1e-4)
+        _, d, L = dirs[-1]
+        out.append((round(t1 - 2e-4, 4), tuple(a + b * L for a, b in zip(e, d))))
+        shot["look_keys"] = out
+        self.f._paths.pop(id(shot), None)
+
     # ---- words: a floor's clear area must be clear right down to the floor (a mat or a rug 2 cm high is not clear) ----
     def _surface_mask(self, m):
         if m["grid"] is None and m["key"] == "floor":

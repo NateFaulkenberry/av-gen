@@ -170,11 +170,13 @@ def build(b):
     # light. Then the table set for one; C05 (36.4) lifts its plate, the kettle and the empty chair; out to the hall.
     # =========================================================================================================
     CLAP = t(34, 4)
-    eye = [(t(33), (-1.75, 1.5, -2.3)), (74.4, (-1.4, 1.52, -3.15)), (75.7, (-0.95, 1.55, -3.65)), (CLAP, (-0.8, 1.55, -3.78)),
-           (79.4, (-0.45, 1.5, -4.05)), (80.7, (0.05, 1.48, -3.05)), (82.2, (0.95, 1.48, -3.0)), (83.1, (1.85, 1.47, -4.0)),
+    # pass 4 review: on the clap the camera is close behind his left shoulder (1.9 m), the pot and its steam past it,
+    # and stays there, pushing in a little, for the next two lines; then it steps back to the table for C05
+    eye = [(t(33), (-1.75, 1.5, -2.3)), (74.4, (-0.95, 1.53, -3.4)), (75.7, (0.1, 1.55, -3.8)), (CLAP, (0.7, 1.55, -3.95)),
+           (78.9, (0.95, 1.52, -4.2)), (80.7, (0.05, 1.48, -3.05)), (82.2, (0.95, 1.48, -3.0)), (83.1, (1.85, 1.47, -4.0)),
            (t(38), (2.45, 1.46, -4.6))]
-    look = [(t(33), (-2.45, 1.0, -4.7)), (74.0, (-2.35, 1.0, -6.3)), (75.35, (-0.95, 0.98, -6.4)), (CLAP, (1.58, 1.08, -5.8)),
-            (79.2, (1.55, 1.12, -5.9)), (80.6, (0.0, 0.85, -4.6)), (t(36, 4) + 0.6, (0.1, 1.0, -4.6)), (82.4, (1.6, 1.2, -5.0)),
+    look = [(t(33), (-2.45, 1.0, -4.7)), (74.0, (-2.35, 1.0, -6.3)), (75.35, (-0.95, 0.98, -6.4)), (CLAP, (1.55, 1.0, -5.9)),
+            (78.9, (1.6, 0.98, -5.95)), (80.6, (0.0, 0.85, -4.6)), (t(36, 4) + 0.6, (0.1, 1.0, -4.6)), (82.4, (1.6, 1.2, -5.0)),
             (t(38), (3.7, 1.4, -4.6))]
     b.glide("kit", eye, look, nodes_keys=ground, fov=62.0)
     s4 = b.swap("livWindow", "kitStove", t(32, 4) + 0.3)
@@ -224,7 +226,7 @@ def build(b):
     def climb_y(z):      # the eye 1.5 m above the treads (1.52 at the foot)
         return 1.52 + max(0.0, min(z - (-4.95), 4.5)) / 4.5 * 2.68
     zs = {86.4: -4.95, 87.75: -3.64, 89.6: -1.95, 90.25: top_z - 0.08}
-    eye = [(t(38), (2.45, 1.46, -4.6)), (84.6, (3.3, 1.5, -4.92)), (85.6, (4.1, 1.5, -5.25))] + \
+    eye = [(t(38), (2.45, 1.46, -4.6)), (84.8, (3.25, 1.5, -5.05)), (85.6, (4.0, 1.5, -5.3))] + \
           [(tt, (4.42, climb_y(z), z)) for tt, z in sorted(zs.items())] + \
           [(90.6, (4.42, 4.15, 0.25)), (91.0, (4.42, 3.6, 1.4)), (91.6, (4.42, 3.05, 2.6)), (t(42), (4.42, 1.0, 3.6))]
 
@@ -242,7 +244,7 @@ def build(b):
         pos, nrm, h = R3.riser(8 + i)
         b.word(wd, tw, t(41, 3), pos, nrm, min(0.11, h * 0.62), style="pop", role="word", room="hall", category="stairText",
                intensity=4.5, name=f"steps{i}")
-    b.word_at("I KNOW, GET A LITTLE PEACE OF MIND THOUGH", 85.1, 87.6, ("box", hall["interior"]), 0.1, 0.45, k=0.028,
+    b.word_at("I KNOW, GET A LITTLE PEACE OF MIND THOUGH", 85.1, 86.9, ("box", hall["interior"]), 0.1, 0.45, k=0.028,
               style="rise", role="accent", room="hall")
     lyric_glitch(b, "lgh0", 85.1)
     g_h = b.gate("gV1h", t(38), t(40, 4))
@@ -301,8 +303,8 @@ def kitchen_words(b, kit):
           ("WHAT YOU WANNA", 74.7, 76.1, 0.35, 0.45, 0.05, "flicker", "accent"),
           ("MAYBE CAUSE A LITTLE DRAMA", 77.2, 78.4, -0.45, 0.6, 0.032, "pop", "word"),
           ("IF YOU FEEL IT, SAY IT", 78.5, 79.6, -0.45, 0.55, 0.04, "rise", "accent"),
-          ("LET IT SHOW", 79.7, 81.0, 0.35, 0.4, 0.06, "rise", "word"),
-          ("CAN YOU TELL ME IT'S FINE THOUGH?", 81.1, 83.5, 0.0, 0.5, 0.03, "flicker", "word")]
+          ("LET IT SHOW", 79.7, 81.0, -0.35, 0.4, 0.06, "rise", "word"),          # pass 4: left of him, not across him
+          ("CAN YOU TELL ME IT'S FINE THOUGH?", 81.1, 83.5, 0.0, 0.5, 0.038, "flicker", "word")]
     for i, (text, t0, t1, sx, sy, kk, style, role) in enumerate(kw):
         b.word_at(text, t0, t1, ("box", kit["interior"]), sx, sy, k=kk, style=style, role=role, name=f"v1k{i:02d}", room="kitchen")
         if i in (0, 5):

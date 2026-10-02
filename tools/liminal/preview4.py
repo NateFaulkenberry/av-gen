@@ -110,6 +110,7 @@ def city(palette="P3night"):
     P2.palettes(film)
     w = W.add_world(film, {"objects": C.objects() + [
         ("cityPark", C.park(), "furn", (C.HX - 15, -0.2, -103), (C.HX + 15, 8, -73), {"max_distance": 300.0}),
+        ("cityParkTrees", C.park_trees(), "furn", (C.HX - 15, -0.2, -103), (C.HX + 15, 7.5, -73), {"max_distance": 300.0}),
         ("cityBenches", C.benches(), "furn2", (C.HX - 8, -0.2, -96), (C.HX + 8, 2, -80), {"max_distance": 300.0}),
         ("cityBar", C.bar_building(), "furn2", (C.HX + 26, -0.2, -102), (C.HX + 55, 14, -74), {"max_distance": 300.0}),
         ("cityCross", C.intersection(), "furn", (C.XI - 9, -0.2, C.ZK - 9), (C.XI + 15, 5, C.ZK + 20), {"max_distance": 300.0}),

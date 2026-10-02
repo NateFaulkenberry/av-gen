@@ -27,6 +27,9 @@ t = G.t
 BEAT1 = G.BAR1 / 4.0
 BEAT2 = G.BAR2 / 4.0
 SUMMIT = (10.0, 14.2, 0.0)
+# pass 4 review: he stands AT THE TOP OF THE STAIRS -- on the summit's edge where the flight arrives, through the gap in
+# its wall, facing out to the east -- not in the middle of the summit, where its edge hid him from the whole climb
+TOP = (5.3, 14.2, 0.0)       # his soles
 DAWN = t(113, 3)             # 248.38 s: the crash's bright attack has fallen; the chord rings on to 251.4
 
 
@@ -72,7 +75,10 @@ def build(b):
         ("landStones", K.U(OD.stones([(-3, -5, 0.7), (4, -7, 0.5), (9, -4, 0.9), (-8, 3, 0.8)]),
                            OD.tufts([(-1.5, -3), (1.2, -4), (2.6, -2.5), (-2.8, -6), (5.5, 0.5), (-5.2, 1.5)])),
          "furn2", (-14, -6, -12), (14, 4, 6), far),
-        ("farCity", far_city(), "wall", (-345, -2, -135), (-168, 125, 135), dict(far, edge_pixels=1.2))], "lights": []}
+        # (its windows and roof lights its own warm light, so the city reads from the summit whatever the palette)
+        ("farCity", far_city(), "wall", (-345, -2, -135), (-168, 125, 135),
+         dict(far, edge_pixels=1.2, emission={K.CANVAS2: [1.5, 1.25, 0.85], K.GLOW: [2.6, 1.7, 0.8], K.CANVAS: [1.6, 0.8, 0.35]}))],
+        "lights": []}
     b.world("land", land)
     rings = {"objects": [("ringLow", OD.lantern_ring(16.0, 7, 9.0, "ringLowRot"), "furn2", (-22, 4, -22), (22, 16, 22), far),
                          ("ringHigh", OD.lantern_ring(24.0, 9, 22.0, "ringHighRot"), "furn", (-30, 16, -30), (30, 30, 30), far)],
@@ -86,7 +92,7 @@ def build(b):
                        ("skyFurn", OD.sky_furniture(), "furn", (-17, 5, -21), (15, 18, -1), far)], "lights": []}
     b.world("sky", sky)
     # him, at the top: the triumph tableau in the middle of the summit, facing east (the open sky, the sunrise)
-    man_tree, lo, hi = T4.placed("triumph", "topMan", SUMMIT, 90.0, room=None)
+    man_tree, lo, hi = T4.placed("triumph", "topMan", TOP, 90.0, room=None)
     b.room_world("topman", {"objects": [("topMan", man_tree, "figure", lo, hi, dict(far, figure=True))], "lights": []})
     f.nodes.append({"name": "stars", "kind": "particles", "particles": {
         "capacity": 3500, "spawnRate": 3500.0, "shape": "box", "position": [0.0, 70.0, -40.0], "extent": [170.0, 40.0, 140.0],
@@ -160,12 +166,13 @@ def build(b):
 
     def on_stair(dx, z):
         return [sx0 + dx, sy0 + min(max(dx, 0.0), 18.0) * slope + 1.85, z]
-    stair_eye = [on_stair(-6.0, 2.4), on_stair(-1.5, 1.4), on_stair(3.0, 0.6), on_stair(8.0, 0.2), on_stair(13.0, 0.0),
-                 on_stair(17.0, 0.0), on_stair(19.6, 0.0)]
+    # (the climb stops 2.7 m short of him: he is standing on the top step's landing)
+    stair_eye = [on_stair(-6.0, 2.4), on_stair(-1.5, 1.4), on_stair(3.0, 0.6), on_stair(7.5, 0.2), on_stair(11.5, 0.0),
+                 on_stair(14.6, 0.0), on_stair(16.6, 0.0)]
     # the climb looks up the flight to him: he stands at the top against the sky, his back to us
     b.shot("stair", t(99), t(107), stair_eye, None, keys=keys,
-           look_keys=[(t(99), (sx0 + 6.0, sy0 + 3.0, 0.0)), (t(101), (sx0 + 13.0, sy0 + 8.0, 0.0)),
-                      (t(103), (SUMMIT[0] - 2.0, SUMMIT[1] + 1.4, 0.0)), (t(107), (SUMMIT[0], SUMMIT[1] + 1.4, 0.0))],
+           look_keys=[(t(99), (sx0 + 9.0, sy0 + 5.5, 0.0)), (t(100, 3), (TOP[0], TOP[1] + 1.1, 0.0)),
+                      (t(103), (TOP[0], TOP[1] + 1.25, 0.0)), (t(107), (TOP[0], TOP[1] + 1.35, 0.0))],
            fov=64.0, ease_kind="linear")
     b.show("topMan", t(99), 255.0)
     words = ["IT'S", "JUST", "STEPS", "IN", "A", "PROCESS"]
@@ -185,18 +192,23 @@ def build(b):
     f.track("sdf/topMan/look/rim/intensity", [(0.0, 1.15, "step"), (t(105), 1.15, "smooth"), (t(107), 2.4, "step")])
 
     # ---- the summit (107-113.3): up beside him, a look back down at everything below, round to his front --------
-    sx, sy, sz = SUMMIT
-    sum_eye = [[sx - 4.4, sy + 1.85, 0.0], [sx - 1.2, sy + 1.05, 3.6], [sx + 1.8, sy + 0.95, 4.1], [sx + 4.2, sy + 0.85, 1.6],
-               [sx + 4.4, sy + 0.8, -0.5]]
+    sx, sy, sz = TOP
+    # up from the top step to beside him and above the summit's wall, the look back down at everything below (the stair,
+    # the land, the far city), then round in front of him and low, the city he came through behind him
+    sum_eye = [on_stair(16.6, 0.0), [sx - 0.9, sy + 2.4, 2.4], [sx + 1.5, sy + 1.9, 3.4], [sx + 3.6, sy + 1.0, 1.6],
+               [sx + 3.9, sy + 0.9, -0.4]]
     b.shot("summit", t(107), DAWN, sum_eye, None, keys=keys,
-           look_keys=[(t(107), (sx, sy + 1.4, 0.0)), (t(108), (sx, sy + 1.3, 0.3)), (t(109), (-90.0, -6.0, 30.0)),
+           look_keys=[(t(107), (sx, sy + 1.35, 0.0)), (t(108), (sx, sy + 1.3, 0.3)), (t(109), (-90.0, -6.0, 30.0)),
                       (t(110), (-200.0, 4.0, 10.0)), (t(111), (sx, sy + 1.6, 0.0)), (t(112, 3), (sx, sy + 1.5, 0.0)),
                       (t(113), (sx, sy + 1.5, 0.0)), (DAWN, (sx, sy + 2.5, 0.0))],
            fov=[(t(107), 66.0), (t(109), 58.0), (t(110), 52.0), (t(111), 62.0), (t(112, 3), 62.0), (t(113), 50.0),
                 (t(113) + 0.4, 84.0), (DAWN, 80.0)], ease_kind="linear",
            moves=[(t(107), 0.0), (t(109), 0.42), (t(111), 0.75), (t(113), 0.97), (DAWN, 1.0)])
+    # the gaze turns by angle (film4.Builder4._angular_gaze): a straight line from him, two metres off, to the far city
+    # swept the look point past the lens and whipped the view round in a sixth of a second (236.5)
+    b._angular_gaze(f.shots[-1])
     k = 0
-    arcs = [[(-0.6, 0.3), (0.0, 0.48), (0.6, 0.3)], [(-0.55, -0.1), (0.0, 0.1), (0.55, -0.1)], [(-0.4, 0.55), (0.05, 0.35), (0.5, 0.55)]]
+    arcs = [[(-0.6, 0.3), (0.0, 0.42), (0.6, 0.3)], [(-0.55, -0.1), (0.0, 0.1), (0.55, -0.1)], [(-0.4, 0.42), (0.05, 0.25), (0.5, 0.42)]]
     for bar in range(107, 113):
         for half, b0 in ((0, 1.0), (1, 3.0)):
             arc = arcs[(2 * (bar - 107) + half) % 3]
@@ -236,6 +248,11 @@ def build(b):
         c = b.clap(f"build{int(bt)}", t(112, bt), release=0.4)
         f.route(c, "camera/exposure/compensation", 1.0)
         f.route(c, "temporal/mosh/amount", 0.3)
+    # the air clears at the summit (the open's fog is 0.022: at 250 m the far city was gone in it) and comes back in the crash
+    b.key("scene/volumeDensity", t(107), 0.022, "smooth")
+    b.key("scene/volumeDensity", t(108, 2), 0.006, "step")
+    b.key("scene/volumeDensity", t(112, 4), 0.006, "step")
+    b.key("scene/volumeDensity", t(113), 0.022, "step")
     # ---- 113.1: the crash -- the digital transition (pass 3's, its tail shortened so the dawn can follow at once) --
     c = b.clap("crash", t(113), release=1.0)
     f.route(c, "camera/exposure/compensation", 2.8)
@@ -251,7 +268,7 @@ def build(b):
     # =========================================================================================================
     # DAWN (113.3-255): at once, on the summit; he faces the sunrise; the world washes out; back to the road
     # =========================================================================================================
-    dawn_eye = [[sx - 2.6, sy + 0.95, 1.2], [sx - 3.1, sy + 0.9, 0.9], [sx - 3.6, sy + 0.85, 0.6]]
+    dawn_eye = [[sx - 2.4, sy + 1.1, 1.0], [sx - 2.9, sy + 1.05, 0.8], [sx - 3.4, sy + 1.0, 0.5]]
     b.shot("dawn", DAWN, 255.0, dawn_eye, None, keys=keys,
            look_keys=[(DAWN, (140.0, 18.0, -4.0)), (252.0, (150.0, 22.0, -2.0)), (255.0, (160.0, 26.0, 0.0))],
            fov=[(DAWN, 58.0), (255.0, 52.0)])
@@ -270,7 +287,7 @@ def build(b):
                                                  (t_out, 0.0, "step")], mode="multiply")
     # the coda: the road's four dashes in the black, as at the count-in, going out one by one
     b.shot("coda", 255.0, end, [[-46.0, 2.0, 12.6], [-45.99, 2.0, 12.6]], (-20.0, 0.8, 12.0), keys=("street",), fov=54.0)
-    for o in ("row", "faller", "lamps", "parked", "heroShell", "heroParts", "heroRoof", "heroTree"):
+    for o in ("row", "faller", "lamps", "parked", "fences", "heroShell", "heroParts", "heroRoof", "heroTree"):
         b.key(f"nodes/{o}/visible", 254.99, 0.0)
     f.track("sdf/street/node/gridClip/size", [(254.99, [0.0, 0.5, 0.0], "step"), (end, [0.0, 0.5, 0.0], "step")], mode="replace")
     f.track("sdf/street/look/edge/intensity", [(0.0, 1.0, "step"), (254.99, 0.0, "step"), (end, 0.0, "step")], mode="multiply")
