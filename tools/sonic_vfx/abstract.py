@@ -13,6 +13,8 @@ reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modu
     python3 tools/sonic_vfx/abstract.py frame <id> --class allyougot --at 12   # one frame of a reactive clip
     python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the eight
     python3 tools/sonic_vfx/abstract.py maps [id ...]                           # each one's as-built modulation map
+    python3 tools/sonic_vfx/abstract.py tour [--class allyougot] [--seconds 3.6] # one piece of music, eight worlds
+    python3 tools/sonic_vfx/abstract.py notes [id ...]                          # each one's one-page note
 
 Files go to ~/Desktop/av-gen-review/28-sonic-abstract/, named by set-list position (`01-sacred-geometry-still.png`,
 `01-sacred-geometry-allyougot.mp4`). Every render goes through tools/gpu-lock.sh with the pinned engine (review.py's
@@ -231,9 +233,83 @@ def write_map(sid):
     print(dst)
 
 
+def make_caption(text, dst, size=(1920, 1080)):
+    """A transparent 1080p overlay with the caption at the bottom left (this ffmpeg has no drawtext)."""
+    from PIL import Image, ImageDraw, ImageFont
+    im = Image.new("RGBA", size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 30)
+    except OSError:
+        font = ImageFont.load_default()
+    d.text((42, size[1] - 72), text, fill=(255, 255, 255, 215), font=font)
+    im.save(dst)
+
+
+def tour(cls, seg):
+    """One continuous piece of music through the eight worlds: every clip of `cls` starts the same excerpt at 0, so
+    prototype k's clip cut at [k seg, (k + 1) seg] continues the music where the previous one stopped. Hard cuts, the
+    excerpt's own audio underneath, each segment captioned with its prototype."""
+    work = os.path.join(OUT, "work", "tour-" + cls)
+    os.makedirs(work, exist_ok=True)
+    parts = []
+    for k, sid in enumerate(scene_ids()):
+        src = os.path.join(OUT, "%s-%s.mp4" % (numbered(sid), cls))
+        if not os.path.exists(src):
+            print("missing", src)
+            continue
+        part = os.path.join(work, "%02d.mp4" % k)
+        caption = os.path.join(work, "%02d-caption.png" % k)
+        make_caption(numbered(sid).split("-", 1)[0] + "   " + sid.replace("-", " ").upper(), caption)
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", "%.3f" % (k * seg), "-t", "%.3f" % seg, "-i", src,
+                        "-i", caption, "-filter_complex", "[0:v]scale=1920:1080[b];[b][1:v]overlay=0:0", "-an",
+                        "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "30", part], check=True)
+        parts.append(part)
+    listing = os.path.join(work, "parts.txt")
+    open(listing, "w").write("".join("file '%s'\n" % p for p in parts))
+    silent = os.path.join(work, "video.mp4")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", listing, "-c", "copy", silent],
+                   check=True)
+    wav = review.material(cls)[0]
+    dst = os.path.join(OUT, "00-tour-%s.mp4" % cls)
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", silent, "-t", "%.3f" % (seg * len(parts)), "-i", wav,
+                    "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", dst],
+                   check=True)
+    print(dst)
+
+
+def write_note(sid):
+    from tools.sonic_vfx.abstract_notes import NOTES
+    import json
+    n = NOTES[sid]
+    proj = json.load(open(project_path(sid)))
+    title = proj.get("sonicScene", {}).get("title", sid)
+    num = numbered(sid)
+    lines = ["# %s: %s (%s)" % (num.split("-", 1)[0], title, n["working_title"]), "",
+             "**Open it:** File > Examples > Sonic Abstract > %s (`examples/sonic-abstract/%s.json`). Live input turns "
+             "on when it opens." % (title, sid), "",
+             "## What it is", "", n["language"], "",
+             "## What drives what", ""]
+    lines += ["- " + d for d in n["drives"]]
+    lines += ["", "The full as-built map, every route by audio dimension: `%s-modulation.md`." % num, "",
+              "## What would expand it into more scenes", ""]
+    lines += ["- " + e for e in n["expand"]]
+    if n.get("verdict"):
+        lines += ["", "## Verdict", "", n["verdict"]]
+    lines += ["", "## Media", "", "- `%s-still.png`: the frame with no modulation at all (the silent test)." % num]
+    for cls, what in (("allyougot", "with All You Got (34-64 s)"), ("rebuild", "with Rebuild (156-186 s)"),
+                      ("full", "with the synthesized MIDI test material (pads, bass, lead and drums with their notes)")):
+        if os.path.exists(os.path.join(OUT, "%s-%s.mp4" % (num, cls))):
+            lines.append("- `%s-%s.mp4`: the reactive clip %s." % (num, cls, what))
+    dst = os.path.join(OUT, num + "-note.md")
+    open(dst, "w").write("\n".join(lines) + "\n")
+    print(dst)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet", "maps"])
+    ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet", "maps",
+                                         "tour", "notes"])
     ap.add_argument("scene", nargs="*")
     ap.add_argument("--at", type=float, default=6.0)
     ap.add_argument("--size", default="")
@@ -249,6 +325,13 @@ def main():
     proj = a.projects or None
     if a.mode == "build":
         build(a.scene, proj)
+        return
+    if a.mode == "tour":
+        tour(a.cls, a.seconds or 3.6)
+        return
+    if a.mode == "notes":
+        for sid in (a.scene or scene_ids()):
+            write_note(sid)
         return
     if a.mode == "maps":
         for sid in (a.scene or scene_ids()):

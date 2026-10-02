@@ -33,6 +33,14 @@ SUN = "#ffd08a"
 CELL = 14.0
 RUN, RISE, STEPS = 0.45, 0.32, 14
 OFFSET = 3.6              # each flight's distance from the cell's centre line
+# Cost (a ray marches the whole cell at every step, plus a shadow march): the rooms' recursion depth at rest, the
+# shadow march's steps, the primary march's steps and reach. `SONIC_IA_COST=light` builds the cheap arm for a perf A/B.
+import os as _os
+LIGHT = _os.environ.get("SONIC_IA_COST") == "light"
+ROOMS_AT_REST = 1 if LIGHT else 2
+SHADOW_STEPS = 16 if LIGHT else 28
+MAX_STEPS = 80 if LIGHT else 110
+REACH = 55.0 if LIGHT else 75.0
 P1 = (90.0, 0.0, 90.0)    # x->y, y->z, z->x: the flight that climbs Y, its floor behind
 P2 = (0.0, 270.0, 270.0)  # x->z, y->x, z->y: the flight that climbs Z, its floor to the side
 
@@ -99,7 +107,7 @@ def rooms():
     """An open cube (a frame with square openings on all six faces), nested in itself by `recurse`."""
     cube = sd_diff(sd_box((2.0, 2.0, 2.0), m=0), sd_box((1.55, 1.55, 2.6)), sd_box((1.55, 2.6, 1.55)),
                    sd_box((2.6, 1.55, 1.55)))
-    return {"kind": "recurse", "name": "rooms", "count": 2, "scale": 2.35, "translation": [0.0, 0.0, 0.0],
+    return {"kind": "recurse", "name": "rooms", "count": ROOMS_AT_REST, "scale": 2.35, "translation": [0.0, 0.0, 0.0],
             "rotation": [0.0, 35.0, 20.0], "size": [0.0, 0.0, 0.0], "children": [cube]}
 
 
@@ -170,12 +178,12 @@ def build():
                 {"color": hexrgb(CREAM), "emission": [0.0, 0.0, 0.0]}]
     s.sdf("court", lattice(), (-120.0, -120.0, -120.0), (120.0, 120.0, 120.0), surfaces=surfaces,
           look={"aoStrength": 0.0, "shadowStrength": 0.62, "shadowSoftness": 0.02,
-                "shadowDirection": [-c for c in sun_dir], "shadowSteps": 28},
+                "shadowDirection": [-c for c in sun_dir], "shadowSteps": SHADOW_STEPS},
           material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 0.8,
                     "metallic": 0.0,
                     "toon": {"bands": 2, "softness": 0.02, "terminator": 0.0, "shadowColor": [0.42, 0.52, 0.62],
                              "ambient": 0.62, "rimWidth": 0.0, "specular": 0.0}},
-          max_steps=110, epsilon=0.0012, step_scale=0.9, max_distance=75.0)
+          max_steps=MAX_STEPS, epsilon=0.0012, step_scale=0.9, max_distance=REACH)
 
     # the world turns slowly about the view axis (a full turn in four minutes)
     s.track("sdf/court/transform/rotation", [
