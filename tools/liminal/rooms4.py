@@ -177,9 +177,10 @@ def laundry():
 
 
 def gym_mirror(w, h, entity=None):
-    """The gym's wall mirror (pass 4 review: the kit's pane read as a black hole in a frame): a pale pane (GLASS, its
-    own faint emission) with two diagonal glints across its upper left (CANVAS2, brighter), the way a drawing says
-    'mirror' (about 14 nodes). Its back on z = 0, facing +Z."""
+    """The gym's wall mirror (pass 4 review: the kit's pane read as a black hole in a frame): the dark pane (GLASS) with
+    two diagonal glints across its upper left (CANVAS2, lit), the way a drawing says 'mirror' (about 14 nodes). (A
+    faintly lit pane showed concentric rings of speckle in preview v2: keep the pane black.) Its back on z = 0, facing
+    +Z."""
     import liminal_space as ls
     frame = S(K.D(X(((-w / 2, w / 2), (-h / 2, h / 2), (0.0, 0.035))), X(((-w / 2 + 0.04, w / 2 - 0.04), (-h / 2 + 0.04, h / 2 - 0.04), (0.02, 0.1)))), FILL)
     pane = S(X(((-w / 2 + 0.04, w / 2 - 0.04), (-h / 2 + 0.04, h / 2 - 0.04), (0.0, 0.02))), GLASS)
@@ -211,7 +212,7 @@ def gym():
     figs = figures(rid, [("gymMan", "gym_stand", (3.85, y0, 0.9), 90.0, None)])
     return {"id": rid, "interior": ext,
             "objects": [("gymShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5),
-                         {"emission": {GLASS: [0.16, 0.15, 0.24], CANVAS2: [0.75, 0.72, 0.95]}}),
+                         {"emission": {GLASS: [0.0, 0.0, 0.0], CANVAS2: [0.75, 0.72, 0.95]}}),     # the pane dark, its glints lit
                         ("gymFurn", furn, "furn2", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.3, z1 + 0.05))] + figs,
             "lights": [("gymBulb", (3.0, y1 - 0.55, 0.0), "lamp")],
             "anchors": {"mirror": (x1, y0 + 1.45, -0.2), "bench": (3.15, y0 + 0.5, 0.15), "rack": (2.2, y0 + 1.2, z1),

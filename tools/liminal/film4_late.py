@@ -173,7 +173,9 @@ def build(b):
     b.shot("stair", t(99), t(107), stair_eye, None, keys=keys,
            look_keys=[(t(99), (sx0 + 9.0, sy0 + 5.5, 0.0)), (t(100, 3), (TOP[0], TOP[1] + 1.1, 0.0)),
                       (t(103), (TOP[0], TOP[1] + 1.25, 0.0)), (t(107), (TOP[0], TOP[1] + 1.35, 0.0))],
-           fov=64.0, ease_kind="linear")
+           fov=[(t(99), 50.0), (t(102), 54.0), (t(105), 60.0), (t(107), 64.0)], ease_kind="linear")
+    # (preview v2: at 64 degrees he was a speck at the top for the first half of the climb; a longer lens at the
+    # bottom of the stair, opening as we come up to him)
     b.show("topMan", t(99), 255.0)
     words = ["IT'S", "JUST", "STEPS", "IN", "A", "PROCESS"]
     for rep, bar in enumerate((99, 103)):
@@ -268,7 +270,9 @@ def build(b):
     # =========================================================================================================
     # DAWN (113.3-255): at once, on the summit; he faces the sunrise; the world washes out; back to the road
     # =========================================================================================================
-    dawn_eye = [[sx - 2.4, sy + 1.1, 1.0], [sx - 2.9, sy + 1.05, 0.8], [sx - 3.4, sy + 1.0, 0.5]]
+    # (preview v2: from 1.1 m up, off to one side of the wall's gap, a piece of the summit's wall filled a quarter of the
+    # dawn; from over the gap's middle and higher the wall lies below the horizon on both sides)
+    dawn_eye = [[sx - 2.6, sy + 1.6, 0.35], [sx - 3.0, sy + 1.55, 0.25], [sx - 3.4, sy + 1.5, 0.15]]
     b.shot("dawn", DAWN, 255.0, dawn_eye, None, keys=keys,
            look_keys=[(DAWN, (140.0, 18.0, -4.0)), (252.0, (150.0, 22.0, -2.0)), (255.0, (160.0, 26.0, 0.0))],
            fov=[(DAWN, 58.0), (255.0, 52.0)])

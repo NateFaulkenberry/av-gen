@@ -203,6 +203,10 @@ def grow_keys(b):
             b.key(f"nodes/{o}/visible", tb, 1.0)
             c = b.clap(f"arrive{o}", tb + 0.03, release=0.3)
             f.route(c, f"sdf/{o}/look/edge/intensity", 5.0)
+    # (preview v2: from the air the park's many lines -- six trees' crowns, three benches' slats, the hedge -- merged into
+    # one white tile, the brightest thing over the city; its lines are dimmed until the descent brings us close)
+    for o in ("cityPark", "cityParkTrees", "cityBenches"):
+        f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 0.3, "step"), (t(73, 3), 0.3, "smooth"), (t(74, 4), 1.0, "step")], mode="multiply")
     for i, tb in enumerate(grow_beats):
         c = b.clap(f"grow{i:02d}", tb, release=0.35)
         f.route(c, "sdf/cityKerbs/look/edge/intensity", 6.0)
@@ -413,7 +417,7 @@ def isolation(b):
     # and shoulders, the windscreen's frame, the people crossing just ahead, the cross traffic streaming through the
     # junction on its green and, high on the right, the red light over his lane. v1 looked past the car's flank and
     # read as a parked car in front of a red shopfront)
-    eyeA = [(t(75), (CAR[0] + 0.1, 1.34, CAR[2] + 2.75)), (t(77), (CAR[0] + 0.05, 1.31, CAR[2] + 2.3))]
+    eyeA = [(t(75), (CAR[0] + 0.1, 1.33, CAR[2] + 2.6)), (t(77), (CAR[0] + 0.02, 1.3, CAR[2] + 1.95))]
     lookA = [(t(75), (CAR[0] + 0.9, 2.15, C.ZK - 1.0)), (t(77), (CAR[0] + 0.9, 2.1, C.ZK - 0.5))]
     b.glide("redlight", eyeA, lookA, nodes_keys=base + ("heroCar", "walkA", "walkA2", "barPeople"), extra=["barBack", "barFurn", "barTables"], fov=48.0)
     b.show("carMan", t(75), t(77))
@@ -611,7 +615,7 @@ def alive(b):
     # down the x-road (pass 4 review: the first orbit went the other way and had to turn back on itself, looking
     # straight down and spinning, 190.2-191.6)
     X0, ZR, TW = C.XI, -268.0, (C.HX + 6.0, -243.0)
-    O, RAD = (TW[0], TW[1] + 2.0), 26.0
+    O, RAD = (TW[0], TW[1] + 2.0), 32.0          # (preview v2: at 26 m the tower's face filled the frame for two seconds)
     keys = [(t(83), (X0, 4.5, -118.0)), (t(84), (X0, 6.5, -158.0)), (t(84, 3), (X0 + 0.5, 16.0, -186.0)), (t(85), (X0 + 1.8, 30.0, -212.0)),
             (t(85, 3), (O[0] + 4.0, 40.0, O[1] + RAD)), (t(86), (O[0] - RAD * 0.707, 44.0, O[1] + RAD * 0.707)),
             (t(86, 3), (O[0] - RAD, 46.0, O[1])), (t(87), (O[0] - RAD * 0.707, 40.0, O[1] - RAD * 0.707)),
@@ -624,7 +628,7 @@ def alive(b):
             (t(88, 3), (X0 + 74.0, 6.0, ZR)), (t(89), (X0 + 100.0, 12.0, ZR)), (t(89, 3), (X0 + 58.8, 2.0, -180.0)),
             (t(90), (X0 + 28.8, 0.0, -150.0)), (t(90, 3), (X0 + 8.8, 0.0, -170.0)), (t(91), (X0 - 1.2, 0.0, -200.0))]
     b.glide("alive", keys, look, nodes_keys=("street", "cityIn", "cityOut", "cityGround", "cityTraffic", "citySet"), extra=["cityStars"], fov=68.0)
-    f.shots[-1]["fov"] = [(t(83), 72.0), (t(85), 66.0), (t(87, 3), 74.0), (t(88, 3), 70.0), (t(89, 3), 62.0), (t(91), 58.0)]
+    f.shots[-1]["fov"] = [(t(83), 72.0), (t(85), 68.0), (t(86), 74.0), (t(87, 3), 74.0), (t(88, 3), 70.0), (t(89, 3), 62.0), (t(91), 58.0)]
     c = b.clap("aliveIn", t(83), release=0.5)
     f.route(c, "camera/exposure/compensation", 1.4)
     f.route(c, "post/bloom/intensity", 1.4)
