@@ -991,18 +991,18 @@
      {
       "time": 7.0,
       "value": [
-       27.575,
+       28.475,
        1.6,
-       -97.5
+       -96.6
       ],
       "interp": "step"
      },
      {
       "time": 7.9999,
       "value": [
-       27.575,
+       28.475,
        1.6,
-       -97.5
+       -96.6
       ],
       "interp": "step"
      },
@@ -4715,6 +4715,47 @@
     "mode": "multiply"
    },
    {
+    "role": "furn",
+    "target": "sdf/cityParkTrees/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/cityParkTrees/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/cityParkTrees/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/cityParkTrees/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/cityParkTrees/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/cityParkTrees/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/cityParkTrees/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/cityParkTrees/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/cityParkTrees/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
     "role": "furn2",
     "target": "sdf/cityBenches/look/edge/color"
    },
@@ -5125,6 +5166,47 @@
     "mode": "multiply"
    },
    {
+    "role": "furn",
+    "target": "sdf/fences/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/fences/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/fences/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/fences/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/fences/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/fences/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/fences/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/fences/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/fences/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
     "role": "wall",
     "target": "sdf/heroShell/look/edge/color"
    },
@@ -5204,6 +5286,47 @@
    {
     "role": "glass",
     "target": "sdf/heroParts/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/heroRoof/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/heroRoof/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/heroRoof/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/heroRoof/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/heroRoof/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/heroRoof/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/heroRoof/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/heroRoof/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/heroRoof/surface/7/emission",
     "mode": "multiply"
    },
    {

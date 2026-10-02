@@ -69,6 +69,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -79,8 +80,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -147,6 +150,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -157,8 +161,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -225,6 +231,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -235,8 +242,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -303,6 +312,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -313,8 +323,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -381,6 +393,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -391,8 +404,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -459,6 +474,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -469,8 +485,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -537,6 +555,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -547,8 +566,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -615,6 +636,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -625,8 +647,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -693,6 +717,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -703,8 +728,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -771,6 +798,7 @@
       "cityMarks",
       "cityLamps",
       "cityPark",
+      "cityParkTrees",
       "cityBenches",
       "cityBar",
       "cityCross",
@@ -781,8 +809,10 @@
       "faller",
       "lamps",
       "parked",
+      "fences",
       "heroShell",
       "heroParts",
+      "heroRoof",
       "heroTree"
      ],
      "lights": []
@@ -1063,7 +1093,7 @@
         "translation": [
          20.0,
          199.5,
-         -128.5
+         -42.0
         ],
         "children": [
          {
@@ -1071,7 +1101,7 @@
           "size": [
            120.0,
            200.5,
-           106.5
+           20.0
           ]
          }
         ]
@@ -1221,7 +1251,7 @@
     "boundsMin": [
      -100.0,
      -0.5,
-     -235.0
+     -62.0
     ],
     "boundsMax": [
      140.0,
@@ -1478,7 +1508,7 @@
             "translation": [
              20.0,
              199.5,
-             -128.5
+             -42.0
             ],
             "children": [
              {
@@ -1486,7 +1516,7 @@
               "size": [
                120.0,
                200.5,
-               106.5
+               20.0
               ]
              }
             ]
@@ -1877,7 +1907,7 @@
         "translation": [
          20.0,
          199.5,
-         -128.5
+         -42.0
         ],
         "children": [
          {
@@ -1885,7 +1915,7 @@
           "size": [
            120.0,
            200.5,
-           106.5
+           20.0
           ]
          }
         ]
@@ -2035,7 +2065,7 @@
     "boundsMin": [
      -100.0,
      -0.5,
-     -235.0
+     -62.0
     ],
     "boundsMax": [
      140.0,
@@ -2250,7 +2280,7 @@
             "translation": [
              20.0,
              199.5,
-             -128.5
+             -42.0
             ],
             "children": [
              {
@@ -2258,7 +2288,7 @@
               "size": [
                120.0,
                200.5,
-               106.5
+               20.0
               ]
              }
             ]
@@ -2578,19 +2608,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 67.5,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   5.4,
-                   0.29999999999999716,
-                   5.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.45,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     6.0,
+                     0.25,
+                     6.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.2,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     5.65,
+                     1.0,
+                     5.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -2668,7 +2721,7 @@
         "translation": [
          20.0,
          199.5,
-         -128.5
+         -42.0
         ],
         "children": [
          {
@@ -2676,7 +2729,7 @@
           "size": [
            120.0,
            200.5,
-           106.5
+           20.0
           ]
          }
         ]
@@ -2826,7 +2879,7 @@
     "boundsMin": [
      -100.0,
      -0.5,
-     -235.0
+     -62.0
     ],
     "boundsMax": [
      140.0,
@@ -2974,19 +3027,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 67.5,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   5.4,
-                   0.29999999999999716,
-                   5.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.45,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     6.0,
+                     0.25,
+                     6.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.2,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     5.65,
+                     1.0,
+                     5.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -3060,7 +3136,7 @@
             "translation": [
              20.0,
              199.5,
-             -128.5
+             -42.0
             ],
             "children": [
              {
@@ -3068,7 +3144,7 @@
               "size": [
                120.0,
                200.5,
-               106.5
+               20.0
               ]
              }
             ]
@@ -3388,19 +3464,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 67.5,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   5.4,
-                   0.29999999999999716,
-                   5.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.45,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     6.0,
+                     0.25,
+                     6.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.2,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     5.65,
+                     1.0,
+                     5.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -3478,7 +3577,7 @@
         "translation": [
          20.0,
          199.5,
-         -128.5
+         -42.0
         ],
         "children": [
          {
@@ -3486,7 +3585,7 @@
           "size": [
            120.0,
            200.5,
-           106.5
+           20.0
           ]
          }
         ]
@@ -3636,7 +3735,7 @@
     "boundsMin": [
      -100.0,
      -0.5,
-     -235.0
+     -62.0
     ],
     "boundsMax": [
      140.0,
@@ -3784,19 +3883,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 67.5,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   5.4,
-                   0.29999999999999716,
-                   5.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.45,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     6.0,
+                     0.25,
+                     6.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   67.2,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     5.65,
+                     1.0,
+                     5.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -3870,7 +3992,7 @@
             "translation": [
              20.0,
              199.5,
-             -128.5
+             -42.0
             ],
             "children": [
              {
@@ -3878,7 +4000,7 @@
               "size": [
                120.0,
                200.5,
-               106.5
+               20.0
               ]
              }
             ]
@@ -4198,19 +4320,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 121.9,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   7.4,
-                   0.29999999999999716,
-                   7.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   121.85000000000001,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     8.0,
+                     0.25,
+                     8.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   121.60000000000001,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     7.65,
+                     1.0,
+                     7.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -4594,19 +4739,42 @@
                 "material": 5
                },
                {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 121.9,
-                 0.0
-                ],
+                "kind": "difference",
                 "children": [
                  {
-                  "kind": "box",
-                  "size": [
-                   7.4,
-                   0.29999999999999716,
-                   7.4
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   121.85000000000001,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     8.0,
+                     0.25,
+                     8.0
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   121.60000000000001,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     7.65,
+                     1.0,
+                     7.65
+                    ]
+                   }
                   ]
                  }
                 ],
@@ -5323,7 +5491,7 @@
                    {
                     "kind": "translate",
                     "translation": [
-                     7.2,
+                     5.25,
                      0.0,
                      0.0
                     ],
@@ -5408,7 +5576,7 @@
                     "translation": [
                      0.0,
                      0.0,
-                     7.2
+                     5.25
                     ],
                     "children": [
                      {
@@ -6260,377 +6428,6 @@
          {
           "kind": "translate",
           "translation": [
-           -6.825,
-           0.14,
-           -95.5
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.625,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.2925,
-                "height": 3.25
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               4.42,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.43,
-                   1.43,
-                   1.43
-                  ],
-                  "rounding": 0.078
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           8.675,
-           0.14,
-           -96.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.75,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.315,
-                "height": 3.5
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               4.760000000000001,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.54,
-                   1.54,
-                   1.54
-                  ],
-                  "rounding": 0.084
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -7.325,
-           0.14,
-           -81.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.5,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.27,
-                "height": 3.0
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               4.08,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.32,
-                   1.32,
-                   1.32
-                  ],
-                  "rounding": 0.07200000000000001
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           9.175,
-           0.14,
-           -80.5
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.7,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.306,
-                "height": 3.4
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               4.6240000000000006,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.496,
-                   1.496,
-                   1.496
-                  ],
-                  "rounding": 0.0816
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -2.325,
-           0.14,
-           -98.5
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.375,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.2475,
-                "height": 2.75
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               3.74,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.21,
-                   1.21,
-                   1.21
-                  ],
-                  "rounding": 0.066
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           11.675,
-           0.14,
-           -85.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.45,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.261,
-                "height": 2.9
-               }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               3.944,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 35.0,
-                 45.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "roundedBox",
-                  "size": [
-                   1.276,
-                   1.276,
-                   1.276
-                  ],
-                  "rounding": 0.0696
-                 }
-                ]
-               }
-              ],
-              "material": 6
-             }
-            ]
-           }
-          ]
-         }
-        ]
-       },
-       {
-        "kind": "union",
-        "children": [
-         {
-          "kind": "translate",
-          "translation": [
            5.375,
            0.14,
            -85.9
@@ -6929,6 +6726,933 @@
    ]
   },
   {
+   "name": "cityParkTrees",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "translate",
+        "translation": [
+         -6.825,
+         0.14,
+         -95.5
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.7550000000000001,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.156,
+               1.7550000000000001,
+               0.156
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.9,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.625,
+                 0.845,
+                 1.625
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.625,
+                   0.845,
+                   1.625
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             5.46,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.04,
+                   0.715,
+                   1.04
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     1.04,
+                     0.715,
+                     1.04
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         8.675,
+         0.14,
+         -96.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.8900000000000001,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.168,
+               1.8900000000000001,
+               0.168
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             4.2,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.75,
+                 0.91,
+                 1.75
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.75,
+                   0.91,
+                   1.75
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             5.88,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.12,
+                   0.77,
+                   1.12
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     1.12,
+                     0.77,
+                     1.12
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         -7.325,
+         0.14,
+         -81.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.62,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.14400000000000002,
+               1.62,
+               0.14400000000000002
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.5999999999999996,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.5,
+                 0.78,
+                 1.5
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.5,
+                   0.78,
+                   1.5
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             5.04,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.96,
+                   0.66,
+                   0.96
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.96,
+                     0.66,
+                     0.96
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         9.175,
+         0.14,
+         -80.5
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.836,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.1632,
+               1.836,
+               0.1632
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             4.08,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.7,
+                 0.884,
+                 1.7
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.7,
+                   0.884,
+                   1.7
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             5.712,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.088,
+                   0.748,
+                   1.088
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     1.088,
+                     0.748,
+                     1.088
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         -2.325,
+         0.14,
+         -98.5
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.485,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.132,
+               1.485,
+               0.132
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.3,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.375,
+                 0.7150000000000001,
+                 1.375
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.375,
+                   0.7150000000000001,
+                   1.375
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             4.62,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.88,
+                   0.605,
+                   0.88
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.88,
+                     0.605,
+                     0.88
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         11.675,
+         0.14,
+         -85.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             1.566,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.1392,
+               1.566,
+               0.1392
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.48,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 1.45,
+                 0.754,
+                 1.45
+                ]
+               },
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 45.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   1.45,
+                   0.754,
+                   1.45
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             4.872,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               22.5,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "intersection",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.9279999999999999,
+                   0.638,
+                   0.9279999999999999
+                  ]
+                 },
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   45.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.9279999999999999,
+                     0.638,
+                     0.9279999999999999
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "material": 6
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ],
+      "static": 1.0
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     -13.825,
+     -0.2,
+     -103.0
+    ],
+    "boundsMax": [
+     16.175,
+     7.5,
+     -73.0
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 300.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
    "name": "cityBenches",
    "kind": "sdf",
    "visible": true,
@@ -7134,7 +7858,12 @@
               ],
               "material": 6
              }
-            ]
+            ],
+            "entity": {
+             "category": "parkBench",
+             "id": "ParkBench",
+             "seatHeight": 0.47
+            }
            }
           ]
          }
@@ -7719,9 +8448,9 @@
          {
           "kind": "translate",
           "translation": [
-           32.875,
+           33.775,
            1.9200000000000002,
-           -97.5
+           -96.6
           ],
           "children": [
            {
@@ -7729,7 +8458,7 @@
             "size": [
              5.299999999999999,
              1.8,
-             4.099999999999994
+             4.100000000000001
             ]
            }
           ]
@@ -7737,9 +8466,9 @@
          {
           "kind": "translate",
           "translation": [
-           27.375,
+           28.275,
            1.95,
-           -97.7
+           -96.80000000000001
           ],
           "children": [
            {
@@ -7747,7 +8476,7 @@
             "size": [
              0.40000000000000036,
              1.05,
-             2.8999999999999915
+             2.8999999999999986
             ]
            }
           ]
@@ -7755,9 +8484,9 @@
          {
           "kind": "translate",
           "translation": [
-           33.074999999999996,
+           33.974999999999994,
            1.95,
-           -101.79999999999998
+           -100.9
           ],
           "children": [
            {
@@ -7773,9 +8502,9 @@
          {
           "kind": "translate",
           "translation": [
-           27.375,
+           28.275,
            1.21,
-           -94.15
+           -93.25
           ],
           "children": [
            {
@@ -7867,9 +8596,9 @@
        {
         "kind": "translate",
         "translation": [
-         27.075,
+         27.974999999999998,
          3.3499999999999996,
-         -97.5
+         -96.6
         ],
         "children": [
          {
@@ -7877,7 +8606,7 @@
           "size": [
            0.5,
            0.050000000000000044,
-           4.099999999999994
+           4.100000000000001
           ]
          }
         ],
@@ -8054,7 +8783,7 @@
           "kind": "rotate",
           "rotation": [
            0.0,
-           180.0,
+           -90.0,
            0.0
           ],
           "children": [
@@ -8147,95 +8876,6 @@
          14.775,
          0.12,
          -114.4
-        ],
-        "children": [
-         {
-          "kind": "union",
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               1.8,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.07,
-                "height": 3.6
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.05,
-               0.0
-              ],
-              "children": [
-               {
-                "kind": "cylinder",
-                "radius": 0.16,
-                "height": 0.1
-               }
-              ]
-             }
-            ],
-            "material": 0
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             3.56,
-             1.6
-            ],
-            "children": [
-             {
-              "kind": "box",
-              "size": [
-               0.04,
-               0.040000000000000036,
-               1.6
-              ]
-             }
-            ],
-            "material": 0
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             3.1,
-             3.1
-            ],
-            "children": [
-             {
-              "kind": "box",
-              "size": [
-               0.12,
-               0.41999999999999993,
-               0.14000000000000012
-              ]
-             }
-            ],
-            "material": 0
-           }
-          ]
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         14.775,
-         0.12,
-         -101.6
         ],
         "children": [
          {
@@ -8332,16 +8972,16 @@
        {
         "kind": "translate",
         "translation": [
-         27.575000000000003,
+         14.775,
          0.12,
-         -114.4
+         -101.6
         ],
         "children": [
          {
           "kind": "rotate",
           "rotation": [
            0.0,
-           -90.0,
+           180.0,
            0.0
           ],
           "children": [
@@ -8423,6 +9063,95 @@
               "material": 0
              }
             ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         27.575000000000003,
+         0.12,
+         -114.4
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               1.8,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "cylinder",
+                "radius": 0.07,
+                "height": 3.6
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.05,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "cylinder",
+                "radius": 0.16,
+                "height": 0.1
+               }
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.56,
+             1.6
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.04,
+               0.040000000000000036,
+               1.6
+              ]
+             }
+            ],
+            "material": 0
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             3.1,
+             3.1
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.12,
+               0.41999999999999993,
+               0.14000000000000012
+              ]
+             }
+            ],
+            "material": 0
            }
           ]
          }
@@ -8847,7 +9576,7 @@
               "translation": [
                1.175,
                0.0,
-               10.0
+               14.0
               ],
               "children": [
                {
@@ -9049,7 +9778,7 @@
               "translation": [
                13.175,
                0.0,
-               14.0
+               10.0
               ],
               "children": [
                {
@@ -10975,8 +11704,8 @@
              {
               "kind": "translate",
               "translation": [
-               0.0,
-               0.0,
+               13.0,
+               -10.0,
                0.0
               ],
               "children": [
@@ -11336,12 +12065,12 @@
     ],
     "boundsMin": [
      -94.825,
-     -0.1,
+     -12.0,
      -6.0
     ],
     "boundsMax": [
      97.175,
-     60.0,
+     44.0,
      30.0
     ],
     "look": {
@@ -11561,14 +12290,17 @@
                     "kind": "translate",
                     "translation": [
                      0.0,
-                     1.05,
+                     1.1340000000000001,
                      0.0
                     ],
                     "children": [
                      {
-                      "kind": "cylinder",
-                      "radius": 0.189,
-                      "height": 2.1
+                      "kind": "box",
+                      "size": [
+                       0.1008,
+                       1.1340000000000001,
+                       0.1008
+                      ]
                      }
                     ],
                     "material": 0
@@ -11577,26 +12309,90 @@
                     "kind": "translate",
                     "translation": [
                      0.0,
-                     2.8560000000000003,
+                     2.52,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "intersection",
+                      "children": [
+                       {
+                        "kind": "box",
+                        "size": [
+                         1.05,
+                         0.546,
+                         1.05
+                        ]
+                       },
+                       {
+                        "kind": "rotate",
+                        "rotation": [
+                         0.0,
+                         45.0,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           1.05,
+                           0.546,
+                           1.05
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ],
+                    "material": 6
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0.0,
+                     3.528,
                      0.0
                     ],
                     "children": [
                      {
                       "kind": "rotate",
                       "rotation": [
-                       35.0,
-                       45.0,
+                       0.0,
+                       22.5,
                        0.0
                       ],
                       "children": [
                        {
-                        "kind": "roundedBox",
-                        "size": [
-                         0.924,
-                         0.924,
-                         0.924
-                        ],
-                        "rounding": 0.0504
+                        "kind": "intersection",
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.672,
+                           0.462,
+                           0.672
+                          ]
+                         },
+                         {
+                          "kind": "rotate",
+                          "rotation": [
+                           0.0,
+                           45.0,
+                           0.0
+                          ],
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             0.672,
+                             0.462,
+                             0.672
+                            ]
+                           }
+                          ]
+                         }
+                        ]
                        }
                       ]
                      }
@@ -12155,6 +12951,370 @@
    ]
   },
   {
+   "name": "fences",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "difference",
+      "children": [
+       {
+        "kind": "intersection",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.0,
+           12.0
+          ],
+          "children": [
+           {
+            "kind": "mirror",
+            "size": [
+             0.0,
+             0.0,
+             1.0
+            ],
+            "children": [
+             {
+              "kind": "repeat",
+              "size": [
+               13.0,
+               0.0,
+               0.0
+              ],
+              "count": 7,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 1.175,
+                 0.0,
+                 4.97
+                ],
+                "children": [
+                 {
+                  "kind": "difference",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "intersection",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.4,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "repeat",
+                          "size": [
+                           0.5,
+                           0.0,
+                           0.0
+                          ],
+                          "count": 10,
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             0.03,
+                             0.4,
+                             0.03
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.45,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           4.0,
+                           0.45,
+                           0.1
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.28,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           4.0,
+                           0.03,
+                           0.03
+                          ]
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.585,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           4.0,
+                           0.034999999999999976,
+                           0.03
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0.0,
+                     0.4,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       0.7,
+                       0.9,
+                       0.2
+                      ]
+                     }
+                    ]
+                   }
+                  ],
+                  "material": 0
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           1.175,
+           1.0,
+           12.0
+          ],
+          "children": [
+           {
+            "kind": "box",
+            "size": [
+             0.0,
+             0.0,
+             0.0
+            ],
+            "name": "fenceClip"
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         1.1749999999999998,
+         1.0,
+         7.030000000000001
+        ],
+        "children": [
+         {
+          "kind": "box",
+          "size": [
+           6.4,
+           2.0,
+           1.0000000000000004
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ],
+      "static": 1.0
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     -94.825,
+     -0.1,
+     6.73
+    ],
+    "boundsMax": [
+     97.175,
+     1.0,
+     17.27
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 200.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
    "name": "heroShell",
    "kind": "sdf",
    "visible": true,
@@ -12292,6 +13452,25 @@
                0.6000000000000001,
                0.6000000000000001
               ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             1.175,
+             5.625,
+             -2.1
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.0,
+               0.0,
+               0.0
+              ],
+              "name": "heroLid"
              }
             ]
            }
@@ -12613,259 +13792,121 @@
       "kind": "union",
       "children": [
        {
-        "kind": "union",
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
         "children": [
          {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
-           {
-            "kind": "intersection",
-            "children": [
-             {
-              "kind": "plane",
-              "axis": [
-               0.0,
-               0.7808688094430303,
-               0.6246950475544243
-              ],
-              "offset": 5.918985575578169
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               1.1749999999999998,
-               7.85,
-               0.2749999999999999
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 4.175,
-                 2.15,
-                 2.375
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "hp_roofL"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
-           {
-            "kind": "intersection",
-            "children": [
-             {
-              "kind": "plane",
-              "axis": [
-               0.0,
-               0.7808688094430303,
-               -0.6246950475544243
-              ],
-              "offset": 8.54270477530675
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               1.1749999999999998,
-               7.85,
-               -4.475
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 4.175,
-                 2.15,
-                 2.375
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "hp_roofR"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
+          "kind": "union",
           "children": [
            {
             "kind": "translate",
             "translation": [
-             3.5999999999999996,
-             8.100000000000001,
-             -4.1
+             3.45,
+             0.08,
+             2.975
             ],
             "children": [
              {
               "kind": "box",
               "size": [
-               0.30000000000000004,
-               1.7000000000000002,
-               0.30000000000000027
+               0.8499999999999999,
+               0.08,
+               0.625
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             3.4499999999999997,
+             2.5,
+             2.975
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.8999999999999999,
+               0.04999999999999982,
+               0.625
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             2.6500000000000004,
+             1.3050000000000002,
+             3.48
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.030000000000000027,
+               1.145,
+               0.029999999999999805
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             4.25,
+             1.3050000000000002,
+             3.48
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.03000000000000025,
+               1.145,
+               0.029999999999999805
               ]
              }
             ]
            }
-          ],
-          "name": "hp_chimney"
-         },
+          ]
+         }
+        ],
+        "name": "hp_porch"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
          {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
+          "kind": "union",
           "children": [
            {
-            "kind": "union",
+            "kind": "difference",
             "children": [
              {
               "kind": "translate",
               "translation": [
                3.45,
-               0.08,
-               2.975
+               1.1,
+               2.4000000000000004
               ],
               "children": [
                {
                 "kind": "box",
                 "size": [
-                 0.8499999999999999,
-                 0.08,
-                 0.625
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               3.4499999999999997,
-               2.5,
-               2.975
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.8999999999999999,
-                 0.04999999999999982,
-                 0.625
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               2.6500000000000004,
-               1.3050000000000002,
-               3.48
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.030000000000000027,
-                 1.145,
-                 0.029999999999999805
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               4.25,
-               1.3050000000000002,
-               3.48
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.03000000000000025,
-                 1.145,
-                 0.029999999999999805
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "hp_porch"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "difference",
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 3.45,
+                 0.55,
                  1.1,
-                 2.4000000000000004
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.55,
-                   1.1,
-                   0.050000000000000044
-                  ]
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 3.45,
-                 1.1,
-                 2.45
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.44999999999999996,
-                   1.02,
-                   0.15000000000000013
-                  ]
-                 }
+                 0.050000000000000044
                 ]
                }
               ]
@@ -12875,7 +13916,7 @@
               "translation": [
                3.45,
                1.1,
-               2.39
+               2.45
               ],
               "children": [
                {
@@ -12883,380 +13924,668 @@
                 "size": [
                  0.44999999999999996,
                  1.02,
-                 0.020000000000000018
+                 0.15000000000000013
                 ]
                }
-              ],
-              "material": 0
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               4.125,
-               2.0,
-               2.4299999999999997
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.07500000000000018,
-                 0.10000000000000009,
-                 0.07000000000000006
-                ]
-               }
-              ],
-              "material": 2
+              ]
              }
             ]
-           }
-          ],
-          "name": "hp_frontDoor"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
+           },
            {
-            "kind": "difference",
+            "kind": "translate",
+            "translation": [
+             3.45,
+             1.1,
+             2.39
+            ],
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               -0.6000000000000001,
-               4.4,
-               2.39
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.72,
-                 0.72,
-                 0.06000000000000005
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               -0.6,
-               4.3999999999999995,
-               2.4000000000000004
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.62,
-                 0.6199999999999999,
-                 0.19999999999999996
-                ]
-               }
+              "kind": "box",
+              "size": [
+               0.44999999999999996,
+               1.02,
+               0.020000000000000018
               ]
              }
-            ]
-           }
-          ],
-          "name": "hp_bedWin"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
+            ],
+            "material": 0
+           },
            {
-            "kind": "difference",
+            "kind": "translate",
+            "translation": [
+             4.125,
+             2.0,
+             2.4299999999999997
+            ],
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               -0.6,
-               1.5,
-               2.4000000000000004
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.82,
-                 0.8199999999999998,
-                 0.07000000000000006
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               -0.6,
-               1.5,
-               2.4000000000000004
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.7000000000000001,
-                 0.7000000000000001,
-                 0.19999999999999996
-                ]
-               }
+              "kind": "box",
+              "size": [
+               0.07500000000000018,
+               0.10000000000000009,
+               0.07000000000000006
               ]
              }
-            ]
+            ],
+            "material": 2
            }
-          ],
-          "name": "hp_livWin"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               3.45,
-               0.015,
-               4.1
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.55,
-                 0.015,
-                 0.30000000000000027
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               3.45,
-               0.015,
-               4.85
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.5000000000000002,
-                 0.015,
-                 0.30000000000000027
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               3.45,
-               0.015,
-               5.6
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.55,
-                 0.015,
-                 0.30000000000000027
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               3.45,
-               0.015,
-               6.35
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.5000000000000002,
-                 0.015,
-                 0.30000000000000027
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "hp_path"
+          ]
          }
-        ]
+        ],
+        "name": "hp_frontDoor"
        },
        {
-        "kind": "union",
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "difference",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6000000000000001,
+             4.4,
+             2.39
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.72,
+               0.72,
+               0.06000000000000005
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6,
+             4.3999999999999995,
+             2.4000000000000004
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.62,
+               0.6199999999999999,
+               0.19999999999999996
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_bedWin"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "difference",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6,
+             1.5,
+             2.4000000000000004
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.82,
+               0.8199999999999998,
+               0.07000000000000006
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.6,
+             1.5,
+             2.4000000000000004
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.7000000000000001,
+               0.7000000000000001,
+               0.19999999999999996
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_livWin"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             3.45,
+             0.015,
+             4.1
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.55,
+               0.015,
+               0.30000000000000027
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             3.45,
+             0.015,
+             4.85
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.5000000000000002,
+               0.015,
+               0.30000000000000027
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             3.45,
+             0.015,
+             5.6
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.55,
+               0.015,
+               0.30000000000000027
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             3.45,
+             0.015,
+             6.35
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.5000000000000002,
+               0.015,
+               0.30000000000000027
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_path"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -0.050000000000000044,
+             0.585,
+             7.029999999999999
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               2.6500000000000004,
+               0.034999999999999976,
+               0.029999999999999805
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.050000000000000044,
+             0.28,
+             7.029999999999999
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               2.6500000000000004,
+               0.03,
+               0.029999999999999805
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             0.4,
+             7.03
+            ],
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "repeat",
+                "size": [
+                 0.5,
+                 0.0,
+                 0.0
+                ],
+                "count": 0,
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.03,
+                   0.4,
+                   0.03
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "box",
+                "size": [
+                 2.6,
+                 1.0,
+                 0.2
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_fence"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             4.64,
+             0.525,
+             7.04
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.040000000000000036,
+               0.525,
+               0.040000000000000036
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             4.65,
+             1.175,
+             7.074999999999999
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.19999999999999973,
+               0.125,
+               0.2250000000000001
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_mailbox"
+       }
+      ],
+      "material": 0
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    },
+    "surfaces": [
+     {
+      "color": [
+       0.02,
+       0.02,
+       0.025
+      ]
+     },
+     {
+      "color": [
+       0.015,
+       0.015,
+       0.02
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.0,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.4,
+       0.7,
+       1.0
+      ],
+      "static": 1.0
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.22,
+       0.22,
+       0.22
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.45,
+       0.45,
+       0.45
+      ]
+     },
+     {
+      "color": [
+       0.03,
+       0.025,
+       0.03
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.08,
+       0.12,
+       0.25
+      ]
+     }
+    ],
+    "boundsMin": [
+     -22.75,
+     -6.0,
+     -7.55
+    ],
+    "boundsMax": [
+     25.1,
+     25.0,
+     14.0
+    ],
+    "look": {
+     "aoStrength": 0.25,
+     "aoDistance": 0.5,
+     "edgeIntensity": 4.0,
+     "edgeWidth": 0.011,
+     "edgeColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "edgePixels": 2.2,
+     "edgeSoftness": 0.14,
+     "edgeThreshold": 0.02,
+     "staticCell": 0.011,
+     "staticRate": 24.0,
+     "staticRoll": 0.35
+    },
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 160,
+    "epsilon": 0.0009,
+    "stepScale": 0.85,
+    "normalEpsilon": 0.002,
+    "maxDistance": 200.0
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "heroRoof",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "intersection",
+          "children": [
+           {
+            "kind": "plane",
+            "axis": [
+             0.0,
+             0.7808688094430303,
+             0.6246950475544243
+            ],
+            "offset": 5.918985575578169
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             1.1749999999999998,
+             7.85,
+             0.2749999999999999
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               4.175,
+               2.15,
+               2.375
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_roofL"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "intersection",
+          "children": [
+           {
+            "kind": "plane",
+            "axis": [
+             0.0,
+             0.7808688094430303,
+             -0.6246950475544243
+            ],
+            "offset": 8.54270477530675
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             1.1749999999999998,
+             7.85,
+             -4.475
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               4.175,
+               2.15,
+               2.375
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "hp_roofR"
+       },
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
         "children": [
          {
           "kind": "translate",
           "translation": [
-           0.0,
-           0.0,
-           0.0
+           3.5999999999999996,
+           8.100000000000001,
+           -4.1
           ],
           "children": [
            {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               -0.050000000000000044,
-               0.585,
-               7.029999999999999
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 2.6500000000000004,
-                 0.034999999999999976,
-                 0.029999999999999805
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               -0.050000000000000044,
-               0.28,
-               7.029999999999999
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 2.6500000000000004,
-                 0.03,
-                 0.029999999999999805
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.4,
-               7.03
-              ],
-              "children": [
-               {
-                "kind": "intersection",
-                "children": [
-                 {
-                  "kind": "repeat",
-                  "size": [
-                   0.5,
-                   0.0,
-                   0.0
-                  ],
-                  "count": 0,
-                  "children": [
-                   {
-                    "kind": "box",
-                    "size": [
-                     0.03,
-                     0.4,
-                     0.03
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "box",
-                  "size": [
-                   2.6,
-                   1.0,
-                   0.2
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
+            "kind": "box",
+            "size": [
+             0.30000000000000004,
+             1.7000000000000002,
+             0.30000000000000027
             ]
            }
-          ],
-          "name": "hp_fence"
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           0.0,
-           0.0
-          ],
-          "children": [
-           {
-            "kind": "union",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               4.64,
-               0.525,
-               7.04
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.040000000000000036,
-                 0.525,
-                 0.040000000000000036
-                ]
-               }
-              ]
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               4.65,
-               1.175,
-               7.074999999999999
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.19999999999999973,
-                 0.125,
-                 0.2250000000000001
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "hp_mailbox"
+          ]
          }
-        ]
+        ],
+        "name": "hp_chimney"
        }
       ],
       "material": 0

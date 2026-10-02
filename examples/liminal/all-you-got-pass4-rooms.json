@@ -3485,47 +3485,6 @@
    },
    {
     "role": "figure",
-    "target": "sdf/kitMan/look/edge/color"
-   },
-   {
-    "role": "figure",
-    "target": "sdf/kitMan/look/rim/color"
-   },
-   {
-    "role": "fill",
-    "target": "sdf/kitMan/surface/0/color"
-   },
-   {
-    "role": "fill",
-    "target": "sdf/kitMan/surface/1/color"
-   },
-   {
-    "role": "glow",
-    "target": "sdf/kitMan/surface/2/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "screen",
-    "target": "sdf/kitMan/surface/3/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "canvas",
-    "target": "sdf/kitMan/surface/4/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "canvas2",
-    "target": "sdf/kitMan/surface/5/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "figure",
-    "target": "sdf/kitMan/surface/7/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "figure",
     "target": "sdf/kitStove/look/edge/color"
    },
    {
@@ -3732,16 +3691,6 @@
     "mode": "multiply"
    },
    {
-    "role": "canvas2",
-    "target": "sdf/gymShell/surface/5/emission",
-    "mode": "multiply"
-   },
-   {
-    "role": "glass",
-    "target": "sdf/gymShell/surface/7/emission",
-    "mode": "multiply"
-   },
-   {
     "role": "furn2",
     "target": "sdf/gymFurn/look/edge/color"
    },
@@ -3924,11 +3873,6 @@
    {
     "role": "fill",
     "target": "sdf/lngBar/surface/6/color"
-   },
-   {
-    "role": "screen",
-    "target": "sdf/lngBar/surface/3/emission",
-    "mode": "multiply"
    },
    {
     "role": "glass",
