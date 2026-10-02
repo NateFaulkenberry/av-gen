@@ -439,12 +439,12 @@ def isolation(b):
     b.glide("bar", eyeB, lookB, nodes_keys=("barRoom", "barPeople", "street", "cityIn", "cityGround", "cityTraffic2", "crossTraffic"), fov=56.0)
     b.show("barMan2", t(77), t(79))
     # C: the park bench (79-80)
-    eyeC = [(t(79), (bx - 2.4, 1.42, pz - 3.8)), (176.0, (bx - 0.6, 1.38, pz - 3.6)), (t(81), (bx + 1.4, 1.35, pz - 3.3))]
-    lookC = [(t(79), (bx, 0.85, bz)), (t(81), (bx + 0.2, 0.85, bz))]
+    eyeC = [(t(79), (bx - 0.9, 1.4, pz - 3.75)), (t(81), (bx + 0.2, 1.37, pz - 3.55))]        # near-still: 1.1 m
+    lookC = [(t(79), (bx, 1.2, bz)), (t(81), (bx + 0.2, 1.2, bz))]     # (level: the stacked words over him stay in frame)
     b.glide("bench", eyeC, lookC, nodes_keys=base + ("parkMan", "walkC", "parkPair"), fov=50.0)
     b.show("benchMan", t(79), t(81))
     # D: the crossing (81-82): from above, slowly rising; 82.3 the pulse stops and everything with it; 82.4 black
-    eyeD = [(t(81), (C.XI - 3.2, 9.0, cz + 9.0)), (t(82, 3), (C.XI - 2.6, 14.0, cz + 7.5)), (t(83), (C.XI - 2.5, 14.5, cz + 7.3))]
+    eyeD = [(t(81), (C.XI - 3.0, 10.5, cz + 8.6)), (t(82, 3), (C.XI - 2.7, 12.5, cz + 7.9)), (t(83), (C.XI - 2.65, 12.7, cz + 7.8))]
     lookD = [(t(81), (C.XI + 0.4, 0.6, cz)), (t(83), (C.XI + 0.4, 0.6, cz - 0.3))]
     b.glide("crossing", eyeD, lookD, nodes_keys=base + ("crowdMan", "walkD", "walkD2"), fov=54.0)
     b.show("crowdMan", t(81), t(83))
@@ -605,8 +605,8 @@ def bar_room(b):
     # (pass 4 review: v1 kept 4.7 m off him with the talkers big in the foreground; now the two talking at the far table
     # are on the left of the first frame and the camera pushes in to 2.2 m behind his left shoulder, the bartender and
     # the bottles beyond him, the others left behind out of frame)
-    eye = [(t(77), (fig_at[0] - 3.8, y0 + 1.48, fig_at[2] + 3.0)), (171.6, (fig_at[0] - 2.4, y0 + 1.42, fig_at[2] + 2.1)),
-           (t(79), (fig_at[0] - 1.5, y0 + 1.38, fig_at[2] + 1.5))]
+    # (take 2's critic: bridge 2's camera language is near-still and observational; the push is a slow 1.2 m)
+    eye = [(t(77), (fig_at[0] - 3.0, y0 + 1.46, fig_at[2] + 2.4)), (t(79), (fig_at[0] - 2.0, y0 + 1.4, fig_at[2] + 1.75))]
     look = [(t(77), (fig_at[0] - 0.6, y0 + 1.05, fig_at[2] - 0.6)), (171.6, (fig_at[0] + 0.4, y0 + 1.3, fig_at[2] - 0.25)),
             (t(79), (fig_at[0] + 0.7, y0 + 1.3, fig_at[2] - 0.15))]
     return {"camera": (eye, look), "man": fig_at}
