@@ -23,18 +23,37 @@ bool ratio(std::size_t i) {
 } // namespace
 
 std::vector<ExampleInfo> liveSceneList(const std::vector<ExampleInfo>& examples) {
+    return liveSceneSet(examples, kLiveSceneCategory);
+}
+
+std::vector<ExampleInfo> liveSceneSet(const std::vector<ExampleInfo>& examples, const std::string& category) {
     std::vector<ExampleInfo> out;
-    for (const ExampleInfo& e : examples) {
-        if (e.name == "Sonic Live") {
-            out.push_back(e);
+    if (category == kLiveSceneCategory) {
+        for (const ExampleInfo& e : examples) {
+            if (e.name == "Sonic Live") {
+                out.push_back(e);
+            }
         }
     }
     for (const ExampleInfo& e : examples) {
-        if (e.category == kLiveSceneCategory) {
+        if (e.category == category && e.name != "Sonic Live") {
             out.push_back(e);
         }
     }
     return out;
+}
+
+std::vector<ExampleInfo> liveSceneListFor(const std::vector<ExampleInfo>& examples,
+                                          const std::filesystem::path& project) {
+    if (!project.empty()) {
+        for (const char* category : kLiveSceneSets) {
+            std::vector<ExampleInfo> set = liveSceneSet(examples, category);
+            if (liveSceneIndex(set, project) >= 0) {
+                return set;
+            }
+        }
+    }
+    return liveSceneList(examples);
 }
 
 int liveSceneIndex(const std::vector<ExampleInfo>& list, const std::filesystem::path& project) {
@@ -65,8 +84,13 @@ int liveSceneForProgram(int program, int count) {
 }
 
 std::string liveSceneLabel(const ExampleInfo& scene) {
-    const std::string prefix = std::string(kLiveSceneCategory) + " - ";
-    return scene.name.rfind(prefix, 0) == 0 ? scene.name.substr(prefix.size()) : scene.name;
+    for (const std::string& category : {scene.category, std::string(kLiveSceneCategory)}) {
+        const std::string prefix = category + " - ";
+        if (!category.empty() && scene.name.rfind(prefix, 0) == 0) {
+            return scene.name.substr(prefix.size());
+        }
+    }
+    return scene.name;
 }
 
 std::optional<ResponseCarry> captureResponse(const params::ParameterSet& params) {

@@ -17,17 +17,19 @@ agent (`sonic-art`) builds the prototypes on the same branch and reads the "Read
 |---|---|---|---|
 | 1 | per-material cel lighting | 1071 | **landed** (procedural nodes, SDF objects, mesh entities via `Material::toon`) |
 | 2 | screen-space outline `post/outline/*` | 1072 | **landed** |
-| 3 | mesh wireframe / edge lines | 1073 | in progress |
+| 3 | wire lines (edges as lines) on procedural nodes | 1073 | **landed** (procedural nodes incl. instancing, deformers, culling; not glTF entities yet) |
 | 4 | live probe recording limit | - | **landed**: `--record-seconds`, default covers the tour |
+| 5 | live switcher steps through the open project's set (coordinator's request) | 1074 | **landed** |
 
 ## Resume here
 
-1. Feature 3 (wireframe): design chosen below; not started in code at the time of writing unless a later section says.
+1. Possible next steps: wire lines and toon for glTF mesh entities (needs a uniform of their own: ObjectUniforms is
+   full); outline cost (0.72 ms) could drop by reading the linear-depth target.
 2. Final hand-back: both FULL suites, under the lock, one after the other; report exit codes.
 
 ## Ready for the art agent: cel lighting (ADR-1071)
 
-**Pin:** the commit that adds this section (see `git log -- docs/prototypes/sonic-garden/PROGRESS-stylized-eng.md`).
+**Pin:** `eac7cb96` (toon + outline), or any later commit of this file.
 
 **Uniform block change, loudly:** `ObjectUniforms` grew 464 -> 512 bytes (`toon0..2`). A build and the shaders of the
 SAME commit are consistent; an older binary with these shaders (or this binary with older shaders) is not. Re-pin both
@@ -83,7 +85,41 @@ GPU cost: `post/outline` 0.72 ms at 1920x1080, width 2.
 `tools/sonic_live_probe.cpp`: `--record-seconds <s>` sets the WAV recording buffer. Default: 180 s, or for `tour`
 `lead-in + 1 + 20 x scenes + 30` (371 s for 17 scenes), whichever is longer.
 
-## Design notes: wireframe (ADR-1073, planned)
+## Ready for the art agent: wire lines (ADR-1073)
+
+**Pin:** the commit that adds this section (`git log -1 -- docs/decisions/ADR-1073-wire-lines.md`). `ProceduralUniforms`
+grew 752 -> 768 bytes (no stride change), and `shaders/wire.wgsl` is new: re-pin binary and shaders together.
+
+JSON, inside a procedural node's `material`:
+
+```json
+"material": { "baseColor": [0.02, 0.02, 0.03],
+  "wire": { "mode": "feature", "crease": 30, "color": [0.2, 1.0, 0.9], "intensity": 3.0,
+            "opacity": 1.0, "width": 2.0, "fill": 1, "occlude": 1 } }
+```
+
+- `mode`: 0/"off", 1/"feature" (boundaries + edges sharper than `crease` degrees), 2/"all" (every triangle edge).
+- `color` x `intensity`: scene-linear, written to the emission target too, so > 1 blooms (neon).
+- `width`: pixels at 1080 lines. `opacity` 0..1.
+- `fill` 0: the surface is not drawn at all (no depth, no shadow): lines alone. `occlude` 0: lines show through
+  everything (x-ray); 1: hidden lines are hidden.
+- Lines follow every deformer, the instancing, wind and effect displacement. Culled (`lod.cull`) objects draw lines
+  on their LOD 0 instances. Point sources draw none.
+
+Parameters: `procedural/<node>/wire/{mode, crease, color, intensity, opacity, width, fill, occlude}`, registered for
+every procedural. On the beat: route an onset to `wire/intensity` or `wire/width`. UI: World panel, select the object,
+Inspector section **wire**.
+
+GPU cost (1920x1080, `stylized-eng/bench-wire*.scene.json`, 400 spheres + 24 towers + floor): scene pass 9.70 ms
+without, 10.09 ms with feature edges (+0.4 ms), 10.68 ms with every triangle edge (about 600k edges, +1.0 ms).
+
+## Live switcher sets (ADR-1074)
+
+PageUp/PageDown, the Live panel's Scenes row and MIDI program change step through the set the open project belongs
+to: "Sonic VFX" (Sonic Live first, then the VFX examples: unchanged) or "Sonic Abstract" (its examples in index
+order). Any other project: the Sonic VFX list. A set is a category named in `kLiveSceneSets` (`src/app/live_scenes.hpp`).
+
+## Design notes: wire lines (ADR-1073)
 
 Edge extraction on the CPU, drawn as screen-space quads by a vertex entry in the SAME shader module as the surface
 (`vs_proc_wire` in procedural.wgsl, `vs_entity_wire` in pbr.wgsl), so the line runs the identical deformer chain,
@@ -93,5 +129,7 @@ pipeline (depth, shadow, lit), where the edge list costs nothing to any draw tha
 
 ## Log
 
+- 2026-10-02: feature 3 (wire lines) and the switcher sets landed; `[adr1073]` GPU (1 case) and CPU (3 cases) pass,
+  `[live]` CPU passes.
 - 2026-10-02: features 1, 2, 4 landed; GPU tests `[adr1071]`, `[adr1072]` pass (3 cases, 66 assertions); CPU
   `[adr1071],[adr1072],[layout]` pass.

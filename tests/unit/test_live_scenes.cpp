@@ -84,3 +84,40 @@ TEST_CASE("The performer's response carries as offsets from each scene's default
     params::ParameterSet none;
     CHECK_FALSE(app::captureResponse(none).has_value());
 }
+
+TEST_CASE("The switcher steps through the set the open project belongs to", "[live][adr1074]") {
+    // A fixture index, not the real one: two sets interleaved with everything else.
+    const std::vector<app::ExampleInfo> all{example("The Temple", "Showcase", "t.json"),
+                                            example("Sonic Abstract - Sacred Geometry", "Sonic Abstract", "sg.json"),
+                                            example("Sonic VFX - Event Horizon", "Sonic VFX", "eh.json"),
+                                            example("Sonic Live", "Lab", "live.json"),
+                                            example("Sonic Abstract - Neon Vector", "Sonic Abstract", "nv.json"),
+                                            example("Sonic VFX - Tesla Choir", "Sonic VFX", "tc.json"),
+                                            example("Sonic Abstract - Particle World", "Sonic Abstract", "pw.json")};
+    const auto names = [](const std::vector<app::ExampleInfo>& list) {
+        std::vector<std::string> out;
+        for (const auto& e : list) {
+            out.push_back(e.name);
+        }
+        return out;
+    };
+    const std::vector<std::string> vfx{"Sonic Live", "Sonic VFX - Event Horizon", "Sonic VFX - Tesla Choir"};
+    const std::vector<std::string> abstract{"Sonic Abstract - Sacred Geometry", "Sonic Abstract - Neon Vector",
+                                            "Sonic Abstract - Particle World"};
+    // Sonic VFX keeps today's behaviour, from Sonic Live and from any of its scenes.
+    CHECK(names(app::liveSceneListFor(all, "/ex/live.json")) == vfx);
+    CHECK(names(app::liveSceneListFor(all, "/ex/tc.json")) == vfx);
+    // Sonic Abstract is its own list, in index order.
+    const auto fromAbstract = app::liveSceneListFor(all, "/ex/nv.json");
+    CHECK(names(fromAbstract) == abstract);
+    CHECK(app::liveSceneIndex(fromAbstract, "/ex/nv.json") == 1);
+    CHECK(app::liveSceneIndex(fromAbstract, "/ex/eh.json") == -1); // no stepping across sets
+    // Any other project, or none: today's default list.
+    CHECK(names(app::liveSceneListFor(all, "/ex/t.json")) == vfx);
+    CHECK(names(app::liveSceneListFor(all, "/elsewhere/mine.json")) == vfx);
+    CHECK(names(app::liveSceneListFor(all, "")) == vfx);
+    // Labels drop the set's own prefix.
+    CHECK(app::liveSceneLabel(fromAbstract[0]) == "Sacred Geometry");
+    CHECK(app::liveSceneLabel(all[2]) == "Event Horizon");
+    CHECK(app::liveSceneLabel(all[3]) == "Sonic Live");
+}

@@ -446,3 +446,103 @@ TEST_CASE("The outline is off at amount 0, draws round silhouettes, ignores a gr
     CHECK(testing::byteDiff(lined.rgba, again->rgba).identical());
     CHECK(h.ctx->errorCount() == 0);
 }
+
+// ---- ADR-1073: wire lines ------------------------------------------------------------------------------
+
+namespace {
+
+// A grid of 3 x 3 boxes, twisted by a deformer, on black: the lines must follow the deformed, instanced
+// surface. The key light is dim so the surfaces are dark and the lines read.
+const char* kWireScene = R"({
+  "format": "avgen-scene", "version": 1, "name": "wire",
+  "camera": { "mode": 1, "position": [0, 4, 9], "target": [0, 0, 0], "fov": 45.0 },
+  "environment": { "background": [0, 0, 0], "intensity": 0.0 },
+  "lights": [ { "id": "key", "name": "key", "type": "directional", "direction": [0.3, -1, -0.4],
+                "color": [1, 1, 1], "intensity": 0.5 } ],
+  "nodes": [
+    { "name": "boxes", "kind": "procedural", "procedural": {
+        "source": { "kind": "box", "size": [1.2, 1.2, 1.2] },
+        "distribution": { "kind": "grid", "gridCount": [3, 1, 3], "gridSpacing": [2.2, 1, 2.2] },
+        "deformers": [ { "kind": "twist", "amount": 0.6 } ],
+        "material": { "baseColor": [0.1, 0.1, 0.1], "roughness": 0.8,
+                      "wire": { "mode": 0, "color": [0, 1, 0], "intensity": 1.0, "width": 12 } } } }
+  ]
+})";
+
+int greenPixels(const gpu::Image8& img) {
+    int n = 0;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            const glm::vec3 c = rgb(img, x, y);
+            if (c.g > 120.0f && c.r < 0.6f * c.g && c.b < 0.6f * c.g) {
+                ++n;
+            }
+        }
+    }
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("Wire lines draw a procedural node's feature edges, follow its width, and can stand alone",
+          "[gpu][wire][adr1073]") {
+    Harness h;
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto scene = load(kWireScene, registry);
+    const gpu::Image8 off = h.render(scene->comp->scene());
+    dump(off, "wire-off");
+    CHECK(greenPixels(off) == 0);
+
+    scene->param("procedural/boxes/wire/mode").setBase(1.0f);
+    scene->frame();
+    const gpu::Image8 feature = h.render(scene->comp->scene());
+    dump(feature, "wire-feature");
+    const int featureLines = greenPixels(feature);
+    INFO("green pixels, feature edges at 12 px (1080 lines): " << featureLines);
+    CHECK(featureLines > 400);
+
+    scene->param("procedural/boxes/wire/width").setBase(30.0f);
+    scene->frame();
+    const gpu::Image8 wide = h.render(scene->comp->scene());
+    dump(wide, "wire-wide");
+    const int wideLines = greenPixels(wide);
+    INFO("green pixels at 30 px: " << wideLines);
+    CHECK(wideLines > featureLines * 3 / 2);
+
+    // Hidden lines: the far edges of each box are behind its own faces. X-ray shows them.
+    scene->param("procedural/boxes/wire/width").setBase(12.0f);
+    scene->param("procedural/boxes/wire/occlude").setBase(0.0f);
+    scene->frame();
+    const gpu::Image8 xray = h.render(scene->comp->scene());
+    dump(xray, "wire-xray");
+    INFO("green pixels, x-ray: " << greenPixels(xray));
+    CHECK(greenPixels(xray) > featureLines);
+
+    // Lines only: the surface is gone (the dark faces become background) and the lines remain.
+    scene->param("procedural/boxes/wire/occlude").setBase(1.0f);
+    scene->param("procedural/boxes/wire/fill").setBase(0.0f);
+    scene->frame();
+    const gpu::Image8 alone = h.render(scene->comp->scene());
+    dump(alone, "wire-alone");
+    CHECK(greenPixels(alone) > featureLines);
+    int litSurface = 0;
+    for (std::uint32_t y = 0; y < kH; ++y) {
+        for (std::uint32_t x = 0; x < kW; ++x) {
+            const glm::vec3 c = rgb(alone, x, y);
+            if (c.r > 4.0f && c.g < 60.0f) {
+                ++litSurface;
+            }
+        }
+    }
+    CHECK(litSurface < 20);
+
+    // Seek-deterministic: a fresh renderer, the same instant, the same bytes.
+    rendering::SceneRenderer fresh(*h.ctx, h.shaders);
+    REQUIRE(fresh.init().has_value());
+    FrameTime t{};
+    t.renderTime = 1.0;
+    auto again = fresh.renderToImage(scene->comp->scene(), t, kW, kH);
+    REQUIRE(again.has_value());
+    CHECK(testing::byteDiff(alone.rgba, again->rgba).identical());
+    CHECK(h.ctx->errorCount() == 0);
+}

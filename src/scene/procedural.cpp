@@ -2871,6 +2871,9 @@ json ProceduralGeometry::toJson() const {
         if (!toonShadingIsDefault(material.toon)) {
             s["toon"] = toonShadingToJson(material.toon); // ADR-1071
         }
+        if (!wireLinesIsDefault(material.wire)) {
+            s["wire"] = wireLinesToJson(material.wire); // ADR-1073
+        }
         if (!material.program.empty()) {
             s["program"] = material.program; // ADR-030 material program name
         }
@@ -3189,6 +3192,11 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         if (j.contains("toon")) { // ADR-1071
             if (auto toon = readToonShading(j.at("toon"), m.toon); !toon) {
                 return fail("material: {}", toon.error().message);
+            }
+        }
+        if (j.contains("wire")) { // ADR-1073
+            if (auto wire = readWireLines(j.at("wire"), m.wire); !wire) {
+                return fail("material: {}", wire.error().message);
             }
         }
         if (j.contains("alphaMode")) {
@@ -3616,6 +3624,8 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     // ADR-1071: the material's cel lighting, toon/* (registered always, so the look can be switched on
     // from the panel; `toon/bands` 0 is off).
     p.toon = registerToonParameters(params, prefix, group, m.toon, &p.all);
+    // ADR-1073: the surface's edges as lines, wire/* (`wire/mode` 0 is off).
+    p.wire = registerWireParameters(params, prefix, group, m.wire, &p.all);
 
     // Material variation
     const MaterialVariation& mv = rest.materialVariation;
@@ -3779,6 +3789,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     copyValue(p, "material/roughness", m.roughness);
     copyValue(p, "material/metallic", m.metallic);
     applyToonParameters(p.toon, m.toon); // ADR-1071
+    applyWireParameters(p.wire, m.wire); // ADR-1073
 
     MaterialVariation& mv = live.materialVariation;
     copyValue(p, "materialVariation/hueShift", mv.hueShift);

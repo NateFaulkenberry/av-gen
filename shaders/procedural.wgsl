@@ -91,6 +91,9 @@ struct ProceduralUniforms {
     sourceMatrix: mat4x4<f32>,
     sourceNormalMatrix: mat4x4<f32>,
     deformers: array<DeformerUniform, 8>,
+    // ADR-1073: the wire lines, read only by vs_proc_wire / fs_proc_wire. rgb = colour x intensity,
+    // w = opacity. The line's width (pixels at 1080 lines) rides in prevInfo.w. Fills the 768-byte slot.
+    wire: vec4<f32>,
 };
 
 @group(1) @binding(1) var<storage, read> instances: array<InstanceRecord>;
@@ -614,4 +617,72 @@ fn fs_proc_depth(in: ProcVertexOut) {
     if (clipped) {
         discard;
     }
+}
+
+// ---- ADR-1073: wire lines ------------------------------------------------------------------------
+//
+// The edge list of the source mesh (scene/wire_edges.hpp), drawn instanced like the surface. Each
+// endpoint goes through the same steps as vs_proc's p0: the source transform, the deformer chain, the
+// instance, the object, the world deformers, the Tier 0/1 wind bend and the FXL displacement -- so a
+// line stays on the edge it outlines however the surface moves. Point sources draw no lines (the CPU
+// never issues the draw).
+#include "wire.wgsl"
+
+fn wireSurfacePoint(pIn: vec3<f32>, nIn: vec3<f32>, inst: InstanceRecord, recordIndex: u32) -> vec3<f32> {
+    let srcPos = (proc.sourceMatrix * vec4<f32>(pIn, 1.0)).xyz;
+    let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(nIn, 0.0)).xyz;
+    let n = normalize(select(srcNormal, nIn, dot(srcNormal, srcNormal) < 1e-20));
+    let s = inst.scale.xyz;
+    let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
+    let nInst = quatRotate(inst.rotation, n / safeScale);
+    let nRef = normalize((object.normalMatrix * vec4<f32>(nInst, 0.0)).xyz);
+    let now = proc.timeInfo.x;
+    var p = deformChain(srcPos, n, nRef, inst, now, object.model);
+    if (proc.windSway.w > 0.5) {
+        let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let w = windSampleAt(root, now - proc.windTiming.x);
+        var bend = windBend(w, proc.windSway, proc.windTiming, proc.windPlant.w, inst.random, now);
+        if (proc.prevInfo.y > 0.5) {
+            let slot = plantSlots[recordIndex];
+            if (slot != 0u) {
+                bend = plantBend[slot - 1u].xy;
+            }
+        }
+        p = p + bendDisplacement(srcPos.y, bend, proc.windTiming, proc.windPlant, inst.scale.y);
+    }
+    if (object.fxA.z != 0.0) {
+        let fxFlags = u32(object.fxA.z + 0.5);
+        if ((fxFlags & FX_DISPLACE) != 0u) {
+            let lanes = fxVertexLanesOf(entityFx[u32(object.fxA.w + 0.5)]);
+            p = p + fxVertexOffset(p, nRef, now, fxFlags, lanes);
+        }
+    }
+    return p;
+}
+
+@vertex
+fn vs_proc_wire(in: WireVertexIn, @builtin(instance_index) instanceIndex: u32) -> WireVertexOut {
+    var recordIndex = instanceIndex;
+    if (proc.fieldInfo.w > 0.5) { recordIndex = visibleIndices[instanceIndex]; }
+    let inst = instances[recordIndex];
+    let pThis = wireSurfacePoint(in.position, in.normal, inst, recordIndex);
+    let pOther = wireSurfacePoint(in.otherPosition, in.otherNormal, inst, recordIndex);
+    return wireExpand(pThis, pOther, in.corner, proc.prevInfo.w);
+}
+
+// Colour and emission blend over the frame (the line glows through the bloom); the normal, velocity and
+// identifier targets are write-masked off, so they keep the surface's.
+@fragment
+fn fs_proc_wire(in: WireVertexOut) -> SceneOut {
+    let a = wireCoverage(in) * clamp(proc.wire.w, 0.0, 1.0);
+    if (a <= 0.0) {
+        discard;
+    }
+    var out: SceneOut;
+    out.color = vec4<f32>(applyFog(proc.wire.rgb, in.worldPos), a);
+    out.normalRoughness = vec4<f32>(0.0);
+    out.velocity = vec2<f32>(0.0);
+    out.emission = vec4<f32>(proc.wire.rgb, a);
+    out.ids = 0u;
+    return out;
 }

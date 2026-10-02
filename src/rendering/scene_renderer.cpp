@@ -4333,6 +4333,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 ++stats_.drawCalls;
             }
         }
+        // ADR-1073: wire lines, over every opaque surface and the sky, before the grid and the particles.
+        procedurals_->drawWire(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         drawItems(grid, false);
         if (toggles_.particles) {
             particles_->draw(rp, scene);

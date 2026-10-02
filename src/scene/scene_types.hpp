@@ -218,6 +218,23 @@ struct ToonShading {
     [[nodiscard]] bool enabled() const { return bands >= 0.5f; }
 };
 
+// ADR-1073: a surface's edges drawn as lines; the settings, file block and parameters are documented in
+// scene/wire_lines.hpp.
+struct WireLines {
+    float mode = 0.0f;       // 0 off, 1 feature edges (boundary + crease), 2 every triangle edge (rounded)
+    float crease = 30.0f;    // degrees: feature edges are where faces meet at more than this
+    glm::vec3 color{0.2f, 1.0f, 0.9f};
+    float intensity = 2.0f;  // multiplies the colour (scene-linear; > 1 glows)
+    float opacity = 1.0f;    // 0..1
+    float width = 1.5f;      // pixels at 1080 lines
+    float fill = 1.0f;       // >= 0.5: the surface draws as well; < 0.5: lines only
+    float occlude = 1.0f;    // >= 0.5: lines are hidden by surfaces; < 0.5: drawn through everything
+    [[nodiscard]] int modeIndex() const { return mode < 0.5f ? 0 : (mode < 1.5f ? 1 : 2); }
+    [[nodiscard]] bool enabled() const { return modeIndex() != 0 && opacity > 0.0f; }
+    // The surface is skipped only while there are lines to show instead of it.
+    [[nodiscard]] bool hidesSurface() const { return modeIndex() != 0 && fill < 0.5f; }
+};
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -243,6 +260,7 @@ struct Material {
     TextureRef emissiveTexture;          // sRGB
     TextureRef occlusionTexture;         // linear, r
     ToonShading toon;                    // ADR-1071: cel lighting (off by default)
+    WireLines wire;                      // ADR-1073: edges drawn as lines (off by default)
 };
 
 // ---- geometry ------------------------------------------------------------------------------

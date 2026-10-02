@@ -1959,12 +1959,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                     liveDemoPath_ = ex.file;
                 }
             }
-            // ADR-1063: the scenes a performer steps through.
-            liveScenes_ = liveSceneList(*examples);
-            panel_->liveScenes.clear();
-            for (const ExampleInfo& scene : liveScenes_) {
-                panel_->liveScenes.push_back(liveSceneLabel(scene));
-            }
+            // ADR-1063/1074: the scenes a performer steps through -- the set the open project belongs to,
+            // chosen again whenever the open project changes (refreshLiveScenes).
+            liveExamples_ = *examples;
+            liveScenesFor_.reset();
+            refreshLiveScenes();
         }
         panel_->onLiveScene = [this](int index) { switchLiveScene(index); };
         panel_->onOpenLiveDemo = [this] {
@@ -2340,7 +2339,24 @@ void Application::loadAny(const std::filesystem::path& path) {
 
 // ---- ADR-1063: the live scene switcher ------------------------------------------------------------------------
 
+// ADR-1074: the list follows the open project's set. Recomputed only when the project changes.
+void Application::refreshLiveScenes() {
+    const std::filesystem::path project = engine_ != nullptr ? engine_->projectPath() : std::filesystem::path{};
+    if (liveScenesFor_ && *liveScenesFor_ == project) {
+        return;
+    }
+    liveScenesFor_ = project;
+    liveScenes_ = liveSceneListFor(liveExamples_, project);
+    if (panel_ != nullptr) {
+        panel_->liveScenes.clear();
+        for (const ExampleInfo& scene : liveScenes_) {
+            panel_->liveScenes.push_back(liveSceneLabel(scene));
+        }
+    }
+}
+
 void Application::switchLiveScene(int index) {
+    refreshLiveScenes();
     if (engine_ == nullptr || index < 0 || index >= static_cast<int>(liveScenes_.size())) {
         return;
     }
@@ -2363,6 +2379,7 @@ void Application::serviceLiveScenes() {
     if (engine_ == nullptr) {
         return;
     }
+    refreshLiveScenes();
     if (panel_ != nullptr) {
         panel_->liveSceneCurrent = liveSceneIndex(liveScenes_, engine_->projectPath());
     }
@@ -3728,6 +3745,7 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
     case SDLK_PAGEUP:
     case SDLK_PAGEDOWN: {
         // ADR-1063: the previous / next live scene, while live input runs or a live scene is open.
+        refreshLiveScenes();
         const int count = static_cast<int>(liveScenes_.size());
         const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
         if (count == 0 || (current < 0 && !engine_->liveSonic())) {

@@ -482,9 +482,12 @@ private:
     [[nodiscard]] bool projectIsLive() const;
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
-    std::vector<ExampleInfo> liveScenes_;           // ADR-1063: Sonic Live and the Sonic VFX examples
+    std::vector<ExampleInfo> liveScenes_;           // ADR-1063/1074: the open project's live scene set
+    std::vector<ExampleInfo> liveExamples_;         // ADR-1074: the whole examples index the sets come from
+    std::optional<std::filesystem::path> liveScenesFor_; // the project `liveScenes_` was chosen for
     std::optional<ResponseCarry> carryResponse_;    // ADR-1063: the performer's response, across a switch
     void switchLiveScene(int index);
+    void refreshLiveScenes(); // ADR-1074: choose the open project's set
     void serviceLiveScenes();
     std::vector<ProjectionDisplay> projectionDisplays_;
     std::chrono::steady_clock::time_point projectionLastScan_{};

@@ -1,5 +1,6 @@
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/toon_pack.hpp"
+#include "scene/wire_edges.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -182,6 +183,13 @@ struct ProceduralRenderer::Impl {
         glm::vec3 boundsMax{0.0f};
         std::uint64_t lastUsed = 0;
     };
+    // ADR-1073: a source mesh's edge quads (scene/wire_edges.hpp), cached by (mesh, mode, crease).
+    struct WireMesh {
+        wgpu::Buffer vertices;
+        wgpu::Buffer indices;
+        std::uint32_t indexCount = 0;
+        std::uint64_t lastUsed = 0;
+    };
     struct ObjectState {
         std::uint64_t structureVersion = ~0ull; // of the uploaded instances
         std::size_t uploadedCount = 0;
@@ -274,6 +282,8 @@ struct ProceduralRenderer::Impl {
         // would otherwise be left unshaded (the clear colour: solid black through a dissolving
         // saucer's holes). The mesh entities' `fxTwoSided`, for procedural nodes.
         bool fxTwoSided = false;
+        // ADR-1073: the edge list this object's wire lines draw (null: no lines this frame).
+        const WireMesh* wire = nullptr;
     };
     struct ComputeItem {
         const ObjectState* state;
@@ -319,12 +329,14 @@ struct ProceduralRenderer::Impl {
     Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
                                                 bool depthOnly = false);
     Result<void> createPipelines(const wgpu::ShaderModule& module);
+    Result<wgpu::RenderPipeline> createWirePipeline(const wgpu::ShaderModule& module, bool occlude);
     Result<void> createComputePipeline(const wgpu::ShaderModule& module);
     Result<void> createCullPipelines(const wgpu::ShaderModule& module);
     Result<wgpu::ComputePipeline> makeCompute(const wgpu::PipelineLayout& layout, const wgpu::ShaderModule& module,
                                               const char* entry, const char* label);
     CachedMesh uploadMesh(const Result<scene::MeshData>& mesh, const std::string& name);
     const CachedMesh* ensureMesh(const scene::ProceduralGeometry& object);
+    const WireMesh* ensureWireMesh(const scene::ProceduralGeometry& object);
     // The mesh of one LOD level, cached under a key derived from the object's meshHash.
     const CachedMesh* ensureLodMesh(const scene::ProceduralGeometry& object, int level);
     // Everything the object needs this frame, in dependency order: record/uniform buffers, the
@@ -350,6 +362,9 @@ struct ProceduralRenderer::Impl {
     wgpu::RenderPipeline pipelineCull;
     wgpu::RenderPipeline pipelineDepth; // depth-only: the prepass and the shadow passes (ADR-034)
     wgpu::RenderPipeline pipelineNoCull;
+    wgpu::RenderPipeline pipelineWire;      // ADR-1073: depth-tested lines
+    wgpu::RenderPipeline pipelineWireXray;  // ADR-1073: lines through everything
+    wgpu::Buffer wireArgs;                  // ADR-1073: indirect args of culled objects' lines, one per slot
     wgpu::BindGroupLayout computeLayout;
     wgpu::PipelineLayout computePipelineLayout;
     wgpu::ComputePipeline effectorPipeline;
@@ -386,6 +401,7 @@ struct ProceduralRenderer::Impl {
     std::vector<std::uint8_t> deformerStaging;
     std::vector<std::uint32_t> statsZero; // the cull-stats prefix cleared each frame
     std::map<std::uint64_t, CachedMesh> meshes;
+    std::map<std::uint64_t, WireMesh> wireMeshes; // ADR-1073
     std::map<std::string, ObjectState> objects;
     std::vector<DrawItem> items;
     std::vector<ComputeItem> computeItems;
@@ -629,6 +645,11 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
                       wgpu::BufferUsage::CopySrc;
         idesc.size = static_cast<std::uint64_t>(kCullSlots) * scene::kMaxLodLevels * kIndirectStride;
         im.indirectArgs = device.CreateBuffer(&idesc);
+        wgpu::BufferDescriptor wdesc{};
+        wdesc.label = "procedural-wire-indirect";
+        wdesc.usage = wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst;
+        wdesc.size = static_cast<std::uint64_t>(kCullSlots) * kIndirectStride;
+        im.wireArgs = device.CreateBuffer(&wdesc);
         wgpu::BufferDescriptor sdesc{};
         sdesc.label = "procedural-cull-shadow-volumes";
         sdesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
@@ -717,7 +738,88 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     pipelineCull = *cull;
     pipelineNoCull = *noCull;
     pipelineDepth = *depthOnly;
+    auto wire = createWirePipeline(module, true);
+    if (!wire) return std::unexpected(wire.error());
+    auto xray = createWirePipeline(module, false);
+    if (!xray) return std::unexpected(xray.error());
+    pipelineWire = *wire;
+    pipelineWireXray = *xray;
     return {};
+}
+
+// ADR-1073: the line pipeline. Its own vertex layout (scene::WireEdgeVertex), the surface's bind groups.
+// Colour and emission blend; the normal, velocity and identifier targets keep the surface's.
+Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createWirePipeline(const wgpu::ShaderModule& module,
+                                                                          bool occlude) {
+    std::array<wgpu::VertexAttribute, 5> attributes{};
+    const std::array<std::pair<wgpu::VertexFormat, std::uint64_t>, 5> fields{{
+        {wgpu::VertexFormat::Float32x3, offsetof(scene::WireEdgeVertex, position)},
+        {wgpu::VertexFormat::Float32x3, offsetof(scene::WireEdgeVertex, normal)},
+        {wgpu::VertexFormat::Float32x2, offsetof(scene::WireEdgeVertex, corner)},
+        {wgpu::VertexFormat::Float32x3, offsetof(scene::WireEdgeVertex, otherPosition)},
+        {wgpu::VertexFormat::Float32x3, offsetof(scene::WireEdgeVertex, otherNormal)},
+    }};
+    for (std::uint32_t i = 0; i < attributes.size(); ++i) {
+        attributes[i].format = fields[i].first;
+        attributes[i].offset = fields[i].second;
+        attributes[i].shaderLocation = i;
+    }
+    wgpu::VertexBufferLayout layout{};
+    layout.arrayStride = sizeof(scene::WireEdgeVertex);
+    layout.stepMode = wgpu::VertexStepMode::Vertex;
+    layout.attributeCount = attributes.size();
+    layout.attributes = attributes.data();
+
+    wgpu::BlendState blend{};
+    blend.color.srcFactor = wgpu::BlendFactor::SrcAlpha;
+    blend.color.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
+    blend.color.operation = wgpu::BlendOperation::Add;
+    blend.alpha.srcFactor = wgpu::BlendFactor::One;
+    blend.alpha.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
+    blend.alpha.operation = wgpu::BlendOperation::Add;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, &blend, wgpu::ColorWriteMask::None);
+    colorTargets[3].writeMask = wgpu::ColorWriteMask::All; // the emission target: the line blooms
+    colorTargets[3].blend = &blend;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_proc_wire";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::False;
+    depth.depthCompare = occlude ? wgpu::CompareFunction::LessEqual : wgpu::CompareFunction::Always;
+
+    const char* label = occlude ? "procedural-wire" : "procedural-wire-xray";
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = label;
+    desc.layout = pipelineLayout;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_proc_wire";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = sampleCount;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    const auto& device = context.device();
+    device.PushErrorScope(wgpu::ErrorFilter::Validation);
+    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    std::string error;
+    auto future = device.PopErrorScope(
+        wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+            if (type != wgpu::ErrorType::NoError) {
+                error = gpu::Context::toString(msg);
+            }
+        });
+    context.waitFor(future);
+    if (!error.empty() || !pipeline) {
+        return fail("pipeline '{}' creation failed: {}", label, error);
+    }
+    return pipeline;
 }
 
 Result<wgpu::ComputePipeline> ProceduralRenderer::Impl::makeCompute(const wgpu::PipelineLayout& layout,
@@ -863,6 +965,44 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureMesh
                                            ? Result<scene::MeshData>(scene::makePointQuad(object.source.pointSize))
                                            : scene::makeSourceMesh(object.source);
         it = meshes.emplace(object.meshHash, uploadMesh(mesh, object.name)).first;
+    }
+    it->second.lastUsed = frame;
+    return it->second.indexCount > 0 ? &it->second : nullptr;
+}
+
+const ProceduralRenderer::Impl::WireMesh* ProceduralRenderer::Impl::ensureWireMesh(
+    const scene::ProceduralGeometry& object) {
+    const scene::WireLines& w = object.material.wire;
+    const int mode = w.modeIndex();
+    const auto creaseKey = static_cast<std::uint64_t>(std::lround(std::clamp(w.crease, 0.0f, 180.0f) * 10.0f));
+    const std::uint64_t key =
+        (object.meshHash * 0x9E3779B97F4A7C15ull) ^ (static_cast<std::uint64_t>(mode) << 20) ^ creaseKey;
+    auto it = wireMeshes.find(key);
+    if (it == wireMeshes.end()) {
+        WireMesh wm;
+        if (auto mesh = scene::makeSourceMesh(object.source); mesh) {
+            const scene::WireEdgeMesh edges = scene::buildWireEdges(*mesh, mode, w.crease);
+            if (edges.edgeCount > 0) {
+                const auto& device = context.device();
+                wgpu::BufferDescriptor vdesc{};
+                vdesc.label = "procedural-wire-vertices";
+                vdesc.size = edges.vertices.size() * sizeof(scene::WireEdgeVertex);
+                vdesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst;
+                wm.vertices = device.CreateBuffer(&vdesc);
+                context.queue().WriteBuffer(wm.vertices, 0, edges.vertices.data(), vdesc.size);
+                wgpu::BufferDescriptor idesc{};
+                idesc.label = "procedural-wire-indices";
+                idesc.size = edges.indices.size() * sizeof(std::uint32_t);
+                idesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst;
+                wm.indices = device.CreateBuffer(&idesc);
+                context.queue().WriteBuffer(wm.indices, 0, edges.indices.data(), idesc.size);
+                wm.indexCount = static_cast<std::uint32_t>(edges.indices.size());
+            }
+        } else {
+            log::warn("procedural '{}': wire lines: source mesh not generated: {}", object.name,
+                      mesh.error().message);
+        }
+        it = wireMeshes.emplace(key, std::move(wm)).first;
     }
     it->second.lastUsed = frame;
     return it->second.indexCount > 0 ? &it->second : nullptr;
@@ -1807,6 +1947,13 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // switches the Tier 1 lookup on, and is uniform across the draw.
         u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime),
                                state.simActive ? 1.0f : 0.0f, 0.0f, 0.0f);
+        // ADR-1073: the wire lines' colour, opacity and width (read only by the line entries).
+        {
+            const scene::WireLines& w = object.material.wire;
+            u.wire = glm::vec4(glm::max(w.color, glm::vec3(0.0f)) * std::max(w.intensity, 0.0f),
+                               std::clamp(w.opacity, 0.0f, 1.0f));
+            u.prevInfo.w = std::max(w.width, 0.0f);
+        }
         // Step 1 of the transform chain. It is a uniform rather than a baked mesh because
         // source/position|rotation|scale animate; the shader applies it before the deformers so
         // the GPU matches ProceduralGeometry::instanceMatrix().
@@ -1986,6 +2133,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
 
         im.items.push_back(Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive,
                                           fullyCulled, shadowFullyCulled, levels, fxTwoSided});
+        if (object.material.wire.enabled() && !isPoint) {
+            im.items.back().wire = im.ensureWireMesh(object); // ADR-1073
+        }
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -2071,6 +2221,19 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         scanStage(im.cullTopPipeline, true);
         scanStage(im.cullScatterPipeline, false);
         cp.End();
+        // ADR-1073: a culled object's lines draw the camera list's LOD 0 instances. Their indirect args
+        // are the edge list's index count with the instance count the cull just wrote for level 0.
+        for (const auto& item : im.items) {
+            if (item.wire == nullptr || !item.indirect || item.fullyCulled) {
+                continue;
+            }
+            const std::uint64_t slotOffset = static_cast<std::uint64_t>(item.state->statsSlot) * kIndirectStride;
+            const std::array<std::uint32_t, 5> args{item.wire->indexCount, 0u, 0u, 0u, 0u};
+            queue.WriteBuffer(im.wireArgs, slotOffset, args.data(), sizeof(args));
+            const std::uint64_t level0 =
+                static_cast<std::uint64_t>(item.state->statsSlot) * scene::kMaxLodLevels * kIndirectStride;
+            encoder.CopyBufferToBuffer(im.indirectArgs, level0 + 4, im.wireArgs, slotOffset + 4, 4);
+        }
         ++stats_.cullDispatches;
         im.cullPassThisFrame = true;
         stats_.cullMs = im.lastCullMs;
@@ -2119,6 +2282,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     }
     for (auto it = im.objects.begin(); it != im.objects.end();) {
         it = it->second.lastUsed + cacheFrames_ < im.frame ? im.objects.erase(it) : std::next(it);
+    }
+    for (auto it = im.wireMeshes.begin(); it != im.wireMeshes.end();) {
+        it = it->second.lastUsed + cacheFrames_ < im.frame ? im.wireMeshes.erase(it) : std::next(it);
     }
     stats_.sourceMeshes = static_cast<std::uint32_t>(im.meshes.size());
     stats_.cpuUpdateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -2200,6 +2366,10 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         }
         const auto& object = scene.procedurals[item.objectIndex];
         if (shadowPass && !object.castsShadow) {
+            continue;
+        }
+        // ADR-1073: `wire/fill` 0 -- the lines alone; the surface draws in no pass.
+        if (object.material.wire.hidesSurface()) {
             continue;
         }
         // Nothing survived this object's cull, and the CPU knew it before the pass was encoded.
@@ -2294,6 +2464,37 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                 ++stats_.drawCalls;
             }
         }
+    }
+}
+
+void ProceduralRenderer::drawWire(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                  const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+    Impl& im = *impl_;
+    if (!im.initialised || im.items.empty() || !im.pipelineWire) {
+        return;
+    }
+    for (const auto& item : im.items) {
+        if (item.wire == nullptr || item.objectIndex >= scene.procedurals.size() || item.fullyCulled) {
+            continue;
+        }
+        const auto& object = scene.procedurals[item.objectIndex];
+        pass.SetPipeline(object.material.wire.occlude >= 0.5f ? im.pipelineWire : im.pipelineWireXray);
+        const auto& groups = item.state->usesLive ? item.state->groupsLive : item.state->groups;
+        if (!groups[0]) {
+            continue;
+        }
+        pass.SetBindGroup(1, groups[0], 1, &item.offset);
+        pass.SetBindGroup(2, materialBindGroup(object.material));
+        pass.SetVertexBuffer(0, item.wire->vertices);
+        pass.SetIndexBuffer(item.wire->indices, wgpu::IndexFormat::Uint32);
+        if (item.indirect) {
+            pass.DrawIndexedIndirect(im.wireArgs,
+                                     static_cast<std::uint64_t>(item.state->statsSlot) * kIndirectStride);
+        } else {
+            pass.DrawIndexed(item.wire->indexCount, item.instanceCount);
+        }
+        ++stats_.drawCalls;
+        ++stats_.wireDraws;
     }
 }
 

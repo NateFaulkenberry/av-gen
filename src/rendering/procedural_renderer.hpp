@@ -86,6 +86,7 @@ struct ProceduralStats {
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
     std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level
+    std::uint32_t wireDraws = 0;        // ADR-1073: wire-line draws (also counted in drawCalls)
     // ADR-077: the geometry actually handed to each class of pass, accumulated while the draws are
     // recorded. A direct draw's instance count is the CPU's own; an indirect draw's was written by
     // the cull pass on the GPU, so it is taken from the last completed cull readback and counted in
@@ -195,8 +196,11 @@ struct ProceduralUniforms {
     glm::mat4 sourceMatrix;
     glm::mat4 sourceNormalMatrix; // inverse transpose of sourceMatrix
     DeformerUniform deformers[scene::kMaxDeformers];
+    // ADR-1073: the wire lines (vs_proc_wire / fs_proc_wire only): rgb = colour x intensity, w = opacity.
+    // The width rides in prevInfo.w. It fills the 768-byte slot the 752-byte block was padded to.
+    glm::vec4 wire{0.0f};
 };
-static_assert(sizeof(ProceduralUniforms) == 48 + 64 + 128 + 64 * scene::kMaxDeformers);
+static_assert(sizeof(ProceduralUniforms) == 48 + 64 + 128 + 64 * scene::kMaxDeformers + 16);
 
 // The effector pass parameters (shaders/points.wgsl `PointsParams`, 528 bytes).
 struct EffectorPassUniforms {
@@ -311,6 +315,11 @@ public:
                     const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     void drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
+    // ADR-1073: every object whose material asks for wire lines, its edge list drawn instanced over the
+    // frame (blended, depth-tested unless `wire/occlude` is off, no depth write). Call inside the scene
+    // pass after the opaque geometry and the sky.
+    void drawWire(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                  const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     // Pumps the effector-pass timer after the frame's command buffer was submitted (update()
     // also does this at the start of the next frame).
     // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves

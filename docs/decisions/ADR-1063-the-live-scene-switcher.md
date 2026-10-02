@@ -1,7 +1,8 @@
 # ADR-1063: The live scene switcher: step through the Sonic VFX scenes while playing
 
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion; the coordinator's request for the brief's
-  §20 live demo)
+  §20 live demo). **Amended by ADR-1074:** the list is the set the open project belongs to ("Sonic VFX", led
+  by Sonic Live, as here; or "Sonic Abstract"); any other project gets this list.
 - **Code:**
   - `src/app/live_scenes.*` holds the decisions (GPU-free).
   - `Application::switchLiveScene` and `serviceLiveScenes` hold the wiring, along with the PageUp/PageDown case in
