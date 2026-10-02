@@ -17,37 +17,24 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
     (`VERDICTS`, filled after the run); `live.py` runs the probe's `tour` with per-scene live stats (`tour.md`).
 - **The pin is `96bc0214`** (ADR-1069 voronoiEdge, ADR-1070 the live sky): `$S/vfx/bin-96bc0214`. The matrix's first
   seven scenes ran on e6978f28; ADR-1070 changes only live rendering, so their numbers stand.
-- **In flight (2026-10-02 ~13:15):**
-  - the matrix re-run (`matrix.py run` per scene, one loop) had done scenes 1-7 and was on Ferrofluid;
-  - look development, each built to `$S/vfx/look-<xx>` and rendered with `review.py stills|clip --projects`:
-    - Silk Theatre: the silk is a band (a box emitter as tall as a hand, fibres of tiny additive particles), a darker
-      stage (haze 0.0035, wash 150), the rim light's source moved out of frame (it showed as a red dot), the camera
-      closer (radius 7), no note on the spot or the bloom (the evaluator's "whole frame answers");
-    - Abyssal Bloom v2: 56 bigger zooids with hanging palps lit by the same program, jellies larger and nearer,
-      brighter snow, a brighter note band and jelly answer;
-    - Aurora Tundra: the curtains reflected in the black ice (ops 21-32 of `atIce`; colour bound to the palette's low
-      role, gain routed by sustain and kick);
-    - Salt Flat: the near crust darkened by camera distance (a value plan against "muddy midtones");
-    - Cymatic Plate: a tighter key (8/19 degrees), a pool instead of a flood;
-    - Storm Cell: a wall-cloud ceiling (cloudWidth 11) and more funnel detail;
-    - Ember Forest: the coal seams thinner and broken into live lengths (OP_SEAM moved to 10), the slow sky route back
-      (ADR-1070 makes it cheap live);
-    - Breathing Deep: the sustain bloom capped (the gill ring burnt out to a white ellipse under dense playing);
-    - Lantern Lake (built to examples): the kick's ripple ring on the mirror (an expanding band where the view ray
-      crosses the waterline), fireflies along the jetty.
-  - perf ablations (`$S/vfx/ablate.py <id> <tag> <edits>`, then `$S/vfx/abl-perf.sh <id> <tags>`): the Cathedral's
-    parts (floor, warp, piers, arcades, ribs, rose, edges, steps, volume), Ferrofluid's (dish, swell, tower, spikes,
-    rings, steps, epsilon), and the volume march of six scenes (steps 16, no volumetric lights, no noise).
-- **Next:**
-  1. Read the look-dev renders; keep what improves, `git checkout` the module otherwise; rebuild to examples.
-  2. Re-run the matrix for every scene changed after its run, then `matrix.py report`, write `VERDICTS`, commit.
-  3. Perf: apply what the ablations justify; re-measure all 16 with `perf.py` (realtime and preview, 1080p).
-  4. Live: `live.py salt-flat-mirage --scenario tour --no-capture` (all 16 through the switcher, ~6 min), then one
-     with capture.
-  5. Captures: `capture.py still|clip <id>` for all 16, `capture.py tour`, `capture.py tourfull --seconds 8 --size
-     1280x720` (one full mix through every scene).
-  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 (the engineer's build).
-  7. The final report (deliverable 24) through SubagentHandback.
+- **State at 14:40 (2026-10-02):**
+  - all 16 scenes final in examples (commits through `66c3c8d5`), audited clean; `[sonic]` passed (207060
+    assertions, 39 cases, exit 0) with the engineer's build at 14:11;
+  - captures in `~/Desktop/av-gen-review/25-sonic-vfx/`: `NN-<id>.mp4` (1080p30, the full mix, with audio) and
+    `NN-<id>.png` for all 16, `00-tour.mp4` (10 s of each, cross-faded, one piece of music through sixteen worlds),
+    `00-live-tour.mp4` (the live switcher through all 16 with live input, captured at 960x540, the probe's audio);
+  - the evaluator on every capture: `critic/NN-<id>.critic.md`;
+  - perf: `perf-realtime-1080p.md` and `perf-preview-1080p.md` (final);
+  - the live tour without capture: `live/salt-flat-mirage--tour--nocap/tour.md`, pasted into `matrix_notes.LIVE`;
+  - the matrix: scenes 1-10 and Datascape done; the main loop runs on through Event Horizon; re-runs for
+    Lantern Lake, Aurora Tundra, Abyssal Bloom, Silk Theatre, Ferrofluid Crown and Tesla Choir (changed after their
+    first run). Breathing Deep's and the Cymatic Plate's rows are from their first run (their later changes were a
+    bloom cap and a key light, not a response).
+- **Next:** when the matrix finishes, fill `VERDICTS` for Datascape to Event Horizon (`tools/sonic_vfx/matrix_notes.py`),
+  `python3 tools/sonic_vfx/matrix.py report` (writes `TEST-MATRIX.md`), commit; re-capture any scene changed after
+  14:16 (`capture.py clip <id>` then `still <id>`, then `capture.py tour`); re-run `[sonic]`; hand back.
+- **Pending decisions:** Datascape's nearer numerals (`look-ds2`, module edited, not built); a meshed Tesla hall
+  (`abl/tc-mesh`: 24.1 -> 22.4 ms) and a milder Ferrofluid tower twist (`abl/ff4-*`), both awaiting a look.
 - **GPU etiquette:** one job per lock hold. The lock is shared with the engineer and other agents (a full
   `avgen_tests` run held it for 45 minutes at 12:25); do CPU work meanwhile.
 - **The set list** is `scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher

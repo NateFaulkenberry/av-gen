@@ -109,4 +109,59 @@ settled at 0.5 within seven seconds and ran at a 17.1 ms median interval.
 """.strip()
 
 # scene id -> the art agent's verdict, written from the clips and the sheets after the matrix run
-VERDICTS = {}
+VERDICTS = {
+    "salt-flat-mirage": """
+Keep. The strongest frame of the set's opening: a black monolith with the sun at its edge, its shadow a wedge to the
+camera across Uyuni's salt polygons, a lavender dusk. The drums answer at 0 ms in both drum classes (kick 4.8-7.9, snare
+3.1-6.5, hat 5.2 alone), each in its own place (the ring from the monolith's foot, its outline, the salt's glints), and
+the chord colours the sky (tension 4.6-10.9). A meteor falls per note; the arp's sixteenths come too fast for one
+meteor each to read (silent). The second pass's value plan removed the evaluator's "muddy midtones" in every class.""",
+    "lantern-lake": """
+Keep. The quietest scene, and it reads as one place: lanterns released across a dusk lake at their pitch, doubled in a
+built mirror (the engine has no planar reflection). Notes and chords answer strongly (polyphony z 9-33, sparse notes
+z 33). The first run measured the kick and the hats silent: a shimmer on a smooth gradient moves no pixel. The kick
+now sends a ripple ring across the water from the jetty's end and the fireflies blink along the jetty; see the
+re-run's drum rows.""",
+    "aurora-tundra": """
+Keep. A green-to-violet curtain over a spruce line and black lake ice. The routes, not the effect's own spectrum
+response, drive it, so it holds still between phrases. Bass and kick answer clearly (bass 11, kick 65 in the full-mix
+capture). The snare lights the ice's cracks, which since ADR-1069 include the long cracks between plates. Tension moves
+the palette slowly, which a 16 s clip barely shows. The hats' diamond dust is too fine to measure in a full mix.""",
+    "breathing-deep": """
+Keep. It reads as one enormous creature, not a field of mushrooms: the gill ring the only warm light, eleven threads
+into the haze. Pitch picks the thread a pulse climbs, and the drums answer in their own places: the kick contracts the
+cap on a spring, the snare flashes the ring (z 58 in the capture). Dense held playing used to burn the ring out to a
+white ellipse; its sustain gain is capped. The cavern is meshed once at load (24 ms raymarched).""",
+    "abyssal-bloom": """
+Kept after a second pass; the first was the weakest scene in the set. It read as a dotted line and specks in black
+water. The siphonophore is now 56 translucent bells trailing fishing palps, with the jellyfish larger, nearer and
+rim-lit. The melody's light runs along the stem to the pitch's place (notes answered in 9 of 12 classes on the first
+run). The answering jelly lights magenta, so the accent is on screen. Drums: kick 14 and snare 24 in the capture.""",
+    "cymatic-plate": """
+Keep. The most legible instrument in the set: every input draws a different Chladni figure in the sand (the sheet is
+thirteen different figures), and a chord is two figures at war. The kick throws the sand (25 in the capture); the
+snare's burst from the nodes and the hats' glitter are too small against the figure to measure. The key light is a
+pool now, so the figure's centre leads.""",
+    "silk-theatre": """
+Kept after a second pass. The first drew the silk as a thick red tube in a beige fog, and the evaluator flagged the
+whole stage pumping with every note. The silk is now a band woven from fine fibres that twists as it flies, on a dark
+stage with the spot's pool on the floor. Pitch draws the contour (lastPitch z 7-8), velocity the width (z 26), and a
+chord adds a gold sheaf (polyphony z 9-28). The kick cracks the silk like a whip; the snare throws gold (45 in the
+capture). The hats' glitter stays ornament.""",
+    "ferrofluid-crown": """
+Keep. It reads as a material with a will, after Kodama: glossy black seen only through the softbox's and the strip's
+reflections. Each note pulls a spike up at its pitch's place round the crown, and a held note keeps it up (held z
+5.8). Chords raise the field (polyphony z 7-31). The first run had silent drums: black droplets on black liquid read as
+nothing. The droplets are now the softbox's highlights on each bead, the glints are larger, the ripple's crest
+brighter and the bass's heave deeper; see the re-run. It is the second-heaviest scene (28 ms at 1080p).""",
+    "feedback-mirror": """
+Keep. The loop is the instrument's own echo: a gold sigil whose echoes curl into a nautilus spiral. Every drum answers
+at 0 ms in both drum classes (kick 7-11, snare 5-8, hat 6-7), the melody turns the triangle and draws its contour into
+the echoes (lastPitch z 4-42), and velocity sets the glyph's brightness (z 25). A feedback loop is the whole frame, so
+the evaluator's "whole frame answers" is the scene's nature here, not a pump. The lightest scene (3.5 ms).""",
+    "tesla-choir": """
+Keep. A VFX frame: copper coils on the circle of fifths round a humming core, sodium windows, arcs that draw the
+chord's shape. The kick's discharge is the strongest drum answer in the set (z 20-28 in the drum classes, 77 in the
+capture), and the bass charges the core (z 8-11). Fast notes (arp, rapid, dense) keep every arc lit, so single notes
+stop reading there. The snare's crackle was lost on the glowing top-load; it now snaps the core's light too.""",
+}
