@@ -440,7 +440,7 @@ def isolation(b):
     b.show("barMan2", t(77), t(79))
     # C: the park bench (79-80)
     eyeC = [(t(79), (bx - 0.9, 1.4, pz - 3.75)), (t(81), (bx + 0.2, 1.37, pz - 3.55))]        # near-still: 1.1 m
-    lookC = [(t(79), (bx, 1.2, bz)), (t(81), (bx + 0.2, 1.2, bz))]     # (level: the stacked words over him stay in frame)
+    lookC = [(t(79), (bx, 1.4, bz)), (t(81), (bx + 0.2, 1.4, bz))]     # (level: the stacked words over him stay in frame)
     b.glide("bench", eyeC, lookC, nodes_keys=base + ("parkMan", "walkC", "parkPair"), fov=50.0)
     b.show("benchMan", t(79), t(81))
     # D: the crossing (81-82): from above, slowly rising; 82.3 the pulse stops and everything with it; 82.4 black
@@ -527,7 +527,7 @@ def bridge2_words(b):
             pos, nrm, cat = (bb["x1"] - 0.02, 0.12 + (2.55 if wd != "GOT?" else 3.12), zz), (-1, 0, 0), "wallText"
         elif shot == "bench":        # stacked in the dark between the trees, over him
             h = 0.5
-            pos, nrm, cat = (bx - 0.3 + (0.9 if second else 0.0), 4.4 - 0.62 * j, bz + 2.6), (0, 0, -1), "floatingText"
+            pos, nrm, cat = (bx - 0.3 - (0.9 if second else 0.0), 4.0 - 0.62 * j, bz + 2.6), (0, 0, -1), "floatingText"
         else:                        # the crossing: in rows on the road between him and us, read from above
             h = 0.8
             pos, nrm, cat = (C.XI + 0.3, 0.02, C.ZK + C.CROSS_OFF + 1.7 + 1.15 * j + (0.5 if second else 0.0)), (0, 1, 0), "floorText"
@@ -659,23 +659,178 @@ def alive(b):
     city_wave(b)
 
 
-def alive_words(b):
-    f = b.f
-    for bar in range(83, 91):
-        tt = t(bar - 1, 4.5)
-        cam = f.camera_at(min(tt + 0.25, t(91) - 0.01))
-        if cam is None:
+def city_boxes():
+    """The grown city's building bodies as boxes (x0, x1, height, z0, z1): city4's sets on their grids, without the
+    neighbourhood and the set-piece blocks (for placing signs on their faces and testing what hides them)."""
+    out = []
+    for name, (w, d, h, (ox, oz), (px, pz), (bi, bk)) in C.SETS.items():
+        si, sk = int(round(px / C.PITCH)), int(round(pz / C.PITCH))
+        for i in range(-11, 12):
+            for k in range(-11, 9):
+                if (i - bi) % si or (k - bk) % sk:
+                    continue
+                cx, cz = C.block_centre(i, k)
+                if C.NEIGH[0][0] - 5 <= cx <= C.NEIGH[0][1] + 5 and C.NEIGH[1][0] - 5 <= cz <= C.NEIGH[1][1] + 5:
+                    continue
+                if any(abs(cx - qx) < 15.0 and abs(cz - qz) < 15.0 for qx, qz in C.SET_PIECE_BLOCKS):
+                    continue
+                x, z = cx + ox, cz + oz
+                if -420.0 <= x <= 420.0 and -420.0 <= z <= 300.0:
+                    out.append((x - w / 2, x + w / 2, h, z - d / 2, z + d / 2))
+    return out
+
+
+def _ray_box(o, d, bx):
+    """Slab test: the entry distance and the entry face's normal of a ray against a box, or None."""
+    x0, x1, h, z0, z1 = bx
+    lo, hi = (x0, 0.0, z0), (x1, h, z1)
+    tn, tf, nrm = -1e9, 1e9, None
+    for a in range(3):
+        if abs(d[a]) < 1e-9:
+            if o[a] < lo[a] or o[a] > hi[a]:
+                return None
             continue
-        eye, fwd, right, up, fov = f.basis(tt + 0.25)
-        dist = 18.0 + 4.0 * (bar % 3)
-        p = [e + d * dist + r * (4.0 if bar % 2 else -4.0) for e, d, r in zip(eye, fwd, right)]
+        ta, tb = (lo[a] - o[a]) / d[a], (hi[a] - o[a]) / d[a]
+        sgn = -1.0 if ta < tb else 1.0
+        if ta > tb:
+            ta, tb = tb, ta
+        if ta > tn:
+            tn = ta
+            nrm = [0.0, 0.0, 0.0]
+            nrm[a] = sgn
+        tf = min(tf, tb)
+        if tn > tf:
+            return None
+    return (tn, nrm) if tn > 0.0 else None
+
+
+def alive_words(b):
+    """IS THAT ALL? once a bar, as signs on the buildings the soaring camera passes. Floating words failed here (take
+    3): the camera covers 20-30 m a second, so a word set ahead of it was flown into, and one set to the side went
+    behind a tower as the camera turned. Each word now goes on the face of a building the view meets at the middle of
+    its span, 12-70 m away. It is kept within that face, sized by the distance, and kept only if it stays in frame,
+    more than 8 m away and unhidden by any other building from its appearance to its end. Where no wall is in view
+    (the sky round the tower, the climb at the end) it floats in the view, under the same tests."""
+    f = b.f
+    boxes = city_boxes()
+
+    def screen(tt, p):
+        eye, fwd, right, up, fov = f.basis(tt)
+        d = [a - c for a, c in zip(p, eye)]
+        z = sum(a * c for a, c in zip(d, fwd))
+        if z <= 0.1:
+            return None
+        ty = math.tan(math.radians(fov / 2))
+        return (sum(a * c for a, c in zip(d, right)) / z / (ty * 16 / 9), sum(a * c for a, c in zip(d, up)) / z / ty, math.dist(p, eye))
+
+    def first_hit(o, d, tmax, near=None):
+        best = None
+        for bx in near if near is not None else boxes:
+            r = _ray_box(o, d, bx)
+            if r and r[0] < tmax and (best is None or r[0] < best[0]):
+                best = (r[0], r[1], bx)
+        return best
+
+    def hidden(tt, p):
+        eye = f.basis(tt)[0]
+        d = [a - c for a, c in zip(p, eye)]
+        L = math.sqrt(sum(v * v for v in d))
+        d = [v / L for v in d]
+        h = first_hit(eye, d, L - 0.4)
+        return h is not None
+
+    def floating(tt, bar, text):
+        """The nearest point along the view at the span's middle that stays in frame, more than 6.5 m away and
+        unhidden from the word's appearance to its end (its size from the nearest of those distances)."""
+        for span, lim, near in ((1.4, 0.6, 9.0), (1.1, 0.72, 8.0), (0.85, 0.82, 6.5), (0.65, 0.88, 5.5)):
+            t1 = min(tt + span, t(bar, 4.0), t(91) - 0.05)
+            tm = (tt + t1) / 2
+            for dist in (10.0, 12.0, 14.0, 16.0, 18.0, 21.0, 24.0):
+                for sx, sy in ((0.0, 0.12), (0.25, 0.15), (-0.25, 0.15), (0.0, 0.3), (0.3, 0.0), (-0.3, 0.0)):
+                    eye, d, _ = f.ray(tm, sx, sy)
+                    p = [e + v * dist for e, v in zip(eye, d)]
+                    scs = [screen(ts, p) for ts in (tt + 0.12, tm, t1)]
+                    if all(sc is not None and abs(sc[0]) < lim and abs(sc[1]) < lim and sc[2] > near for sc in scs) and \
+                            not any(hidden(ts, p) for ts in (tt + 0.12, tm, t1)):
+                        eye_m = f.basis(tm)[0]
+                        nrm = [eye_m[0] - p[0], 0.0, eye_m[2] - p[2]]
+                        L = math.sqrt(sum(v * v for v in nrm)) or 1.0
+                        dmin = min(sc[2] for sc in scs)
+                        return p, [v / L for v in nrm], dmin * (0.05 if len(text) > 12 else 0.065), t1
+        return None
+
+    def sign(tt, bar, text, roofs):
+        best = None
+        pts = [(0.38, 0.12), (-0.38, 0.12), (0.25, 0.28), (-0.25, 0.28), (0.0, 0.2), (0.5, 0.0), (-0.5, 0.0), (0.0, 0.4)]
+        pts += [(x * 0.15, y * 0.15) for y in (-1, 0, 1, 2, 3) for x in (-4, -3, -2, -1, 0, 1, 2, 3, 4)]
+        for span, lim in ((1.4, 0.7), (1.1, 0.8), (0.85, 0.88), (0.65, 0.9)):
+            t1 = min(tt + span, t(bar, 4.0), t(91) - 0.05)
+            tm = (tt + t1) / 2
+            for sx, sy in pts:
+                eye, d, _ = f.ray(tm, sx, sy)
+                hit = first_hit(eye, d, 150.0 if roofs else 70.0)      # (the climb looks down from 60-150 m)
+                if hit is None or hit[0] < 12.0:
+                    continue
+                dist, nrm, (x0, x1, hb, z0, z1) = hit
+                if abs(nrm[1]) > 0.5:
+                    if not roofs:
+                        continue                              # walls first; a roof only where no wall will do
+                    p = [e + v * dist for e, v in zip(eye, d)]
+                    h = min(max(dist * 0.045, 1.0), 6.0)
+                    tw = text_width(text, h)
+                    span_ = min(x1 - x0, z1 - z0) - 1.0
+                    if span_ < tw:
+                        h *= span_ / tw
+                        tw = text_width(text, h)
+                    if h < 0.8:
+                        continue
+                    p = [min(max(p[0], x0 + 0.5 + tw / 2), x1 - 0.5 - tw / 2), hb + 0.05, min(max(p[2], z0 + 0.5 + tw / 2), z1 - 0.5 - tw / 2)]
+                    scs = [screen(ts, p) for ts in (tt + 0.12, tm, t1)]
+                    if not all(sc is not None and abs(sc[0]) < lim and abs(sc[1]) < lim and sc[2] > 8.0 for sc in scs):
+                        continue
+                    if any(hidden(ts, p) for ts in (tt + 0.12, tm, t1)):
+                        continue
+                    best = (p, [0.0, 1.0, 0.0], h, t1, f.flat_tilt([0, 1, 0], f.basis(tm)[1]))
+                    break
+                p = [e + v * dist for e, v in zip(eye, d)]
+                h = min(max(dist * 0.045, 0.7), 2.6)
+                tw = text_width(text, h)
+                ax = 2 if abs(nrm[0]) > 0.5 else 0            # the face's horizontal axis
+                lo, hi = (z0, z1) if ax == 2 else (x0, x1)
+                if hi - lo < tw + 0.6:
+                    h *= (hi - lo - 0.6) / tw
+                    tw = text_width(text, h)
+                    if h < 0.5:
+                        continue
+                p[ax] = min(max(p[ax], lo + 0.3 + tw / 2), hi - 0.3 - tw / 2)
+                p[1] = min(max(p[1], 2.0 + h / 2), hb - 0.6 - h / 2)
+                p = [p[i] + nrm[i] * 0.06 for i in range(3)]
+                scs = [screen(ts, p) for ts in (tt + 0.12, tm, t1)]
+                if not all(sc is not None and abs(sc[0]) < lim and abs(sc[1]) < lim and sc[2] > 8.0 for sc in scs):
+                    continue
+                if any(hidden(ts, p) for ts in (tt + 0.12, tm, t1)):
+                    continue
+                best = (p, nrm, h, t1, 0.0)
+                break
+            if best:
+                break
+        return best
+
+    for bar in range(83, 91):
+        tt = t(bar - 1, 4.5) if bar > 83 else t(83) + 0.04       # (83's pickup falls in C18's black: it starts on the cut)
         text = "IS THAT ALL YOU GOT?" if bar in (84, 88) else "IS THAT ALL?"
-        h = dist * 0.07
-        nrm = [-v for v in fwd]
-        nrm[1] = 0.0
-        L = math.sqrt(sum(v * v for v in nrm)) or 1.0
-        b.word(text, tt, t(bar, 4.0), p, [v / L for v in nrm], h, style="pop", role="accent" if bar % 2 else "word",
-               name=f"b3w{bar}", tin=0.12, intensity=4.2, category="floatingText")
+        best = sign(tt, bar, text, roofs=False)
+        if best is None:
+            f4 = floating(tt, bar, text)          # no wall in view (the orbit's sky): it floats in the view
+            best = f4 + (0.0,) if f4 else None
+        if best is None:
+            best = sign(tt, bar, text, roofs=True)    # the climb looks down on the roofs: it is written on one
+        if best is None:
+            print(f"alive_words: no place for bar {bar}")
+            continue
+        p, nrm, h, t1, tilt = best
+        b.word(text, tt, t1, p, nrm, h, style="pop", role="accent" if bar % 2 else "word", name=f"b3w{bar}", tin=0.12,
+               intensity=4.2, tilt=tilt, category="floorText" if nrm[1] > 0.5 else "floatingText")
 
 
 def city_wave(b):
