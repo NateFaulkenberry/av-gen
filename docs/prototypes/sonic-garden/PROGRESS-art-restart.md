@@ -1,3 +1,5 @@
+STOPPED 2026-10-02: realistic direction rejected by the owner; superseded by 04-brief-abstract-direction.md
+
 # Sonic Garden art restart: progress (sonic-art)
 
 Brief: `03-brief-art-restart.md` (the owner's words govern). Worktree `/Users/natefaulkenberry/Documents/GitHub/av-gen-sonic`,
