@@ -5,28 +5,26 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 4 (2026-10-02, the owner's `04-art-pass-4.md` governs; my parts: 2-6 and 8-16)
 
-**State (2026-10-02 17:20, commit `9999adf9`):** pass 4 is in its final render. The film generates with 0 errors
-and 8 explained warnings (static), and the film pass reports **0 critical, 9 warnings**
-(`$S/liminal4/val10/film.{md,txt}`, copied to `~/Desktop/av-gen-review/24-liminal-space/pass4/validation/`).
-The art gate `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` passed: binary exit 0, 42,058
-assertions in 116 test cases (`$S/liminal4/gate.log`).
-
-The finals all go through `$S/liminal4/final4.sh <tag>`: 1920x1080, 30 fps, h264 q90, the song, a snapshot of the
-committed project, then `pass2_av`.
-- **Take 1** (`0ac17df9`, `$S/liminal4/all-you-got-pass4-take1.mp4`): all 18 BIG CLAPs unmistakable. Critic
-  `job_1a0fe5fbc74f410ed`: 0.925. The basement's, bridge 1's and bridge 3's beat lock were weaker than pass 3's,
-  because pass 4 purged the walls' swell.
-- **Take 2** (`ddef165a`): local light pulses (the gym mirror's glints, the bar's neon, the growing city's lamps,
-  kerbs and windows on layered divisions). The beat lock is up in the basement (+14.2 dB) and bridge 1 (+13.9 and
-  +15.8 dB); 18/18 BIG CLAPs. Critic `job_1a0fe7518428b7462`: 0.925, unchanged.
-  - I tried and dropped a whole-frame breath (palette value and bloom on the quarter): take 1's critic already
-    flagged "the whole frame pulses with the audio".
-- **Take 3** (`9999adf9`, rendering): bridge 2's camera near-still. Take 2's critic measured the bar, bench and
-  crossing shots as moving; the brief asks for restraint.
-
-Pick the final by `pass2_av` (no BIG CLAP worse, no section's lock lower) and the critic (`critic compare <a> <b>`).
-Copy it to `~/Desktop/av-gen-review/24-liminal-space/pass4/all-you-got-pass4.mp4`, cut the section clips with
-`$S/liminal4/sections.sh <mp4> <review>/sections`, then hand back.
+**Status (2026-10-02 18:20): PASS 4 IS COMPLETE.** The final is take 4 (`cee2cc27`, pin `47ad4c73`):
+`~/Desktop/av-gen-review/24-liminal-space/pass4/all-you-got-pass4.mp4`, 1920x1080, 30 fps, h264 q90, with the song,
+258 s; render exit 0, 0 GPU errors.
+- **Review folder:** `sections/` holds the ten PART 16 sections cut from the final, `qa-sheets/` its labelled
+  contact sheets, and `validation/` the scene validation (`.md`/`.txt`, the film pass), the static report and the
+  A/V measurements.
+- **Validation:** 0 critical, 9 warnings, all explained (`$S/liminal4/val12`):
+  - LoungeTV faces its sofa, not the room's centre;
+  - seven camera passes through doorways and the study's open top at the CSG bound;
+  - "camera enters bathroom before it opens" at 90.2-91.4: a false positive. The top of the climb lies inside the
+    bathroom's volume, but only the hall is drawn there and C06 has dissolved it.
+- **Gate:** `[sdf],[liminal]`, binary exit 0, 42,058 assertions in 116 test cases.
+- **pass2_av** (`$S/liminal4/av-take4`): all 18 BIG CLAPs unmistakable. Bridge 3's beat lock is +19.0 dB (take 3
+  +2.7): the floating words that filled the frame are now signs on the towers.
+- **Critic:** `job_1a0fead3227caceb2`, 0.922 (take 1 0.925, takes 2-3 within the noise band).
+- **The takes** (`$S/liminal4/all-you-got-pass4-take{1..4}.mp4`, `final4.sh <tag>`):
+  - take 1 `0ac17df9`;
+  - take 2 `ddef165a`: local light pulses;
+  - take 3 `9999adf9`: bridge 2's camera near-still;
+  - take 4 `cee2cc27`: bridge 3's words as signs, the bench's words in frame.
 
 **Preview v1 review, what changed (`457b358d`):**
 - intro: the street trees stand level (`props4.street_tree`: two flat octagonal crowns; the kit's round tree was a
