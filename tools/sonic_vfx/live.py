@@ -18,7 +18,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, REPO)
-from tools.sonic_vfx import review  # noqa: E402
+from tools.sonic_vfx import review, kit  # noqa: E402
 
 PIN_DIR = os.path.dirname(os.path.realpath(review.PIN))
 PROBE_LEN = {"demo": 27.5, "patches": 40.0, "play": 82.0, "latency": 21.0, "chords": 20.0, "arp": 16.0,
@@ -86,11 +86,15 @@ def main():
     ap.add_argument("--no-capture", action="store_true",
                     help="measure the live frame rate only (the capture re-renders every 2nd frame and costs time)")
     ap.add_argument("--probe", default="", help="a probe binary other than the pin's (e.g. one with a longer recording)")
+    ap.add_argument("--abstract", action="store_true",
+                    help="a Sonic Abstract prototype (examples/sonic-abstract/; review media in 28-sonic-abstract)")
     a = ap.parse_args()
+    if a.abstract and a.out == ap.get_default("out"):
+        a.out = os.path.expanduser("~/Desktop/av-gen-review/28-sonic-abstract/live")
     out = os.path.join(a.out, "%s--%s%s" % (a.scene, a.scenario, "--nocap" if a.no_capture else ""))
     subprocess.run(["rm", "-rf", out])
     os.makedirs(os.path.join(out, "frames"), exist_ok=True)
-    project = os.path.join(REPO, "examples", "sonic-vfx", a.scene + ".json")
+    project = os.path.join(kit.ABSTRACT_DIR if a.abstract else kit.OUT_DIR, a.scene + ".json")
     length = PROBE_LEN.get(a.scenario, 30.0) + 4.0
     frames = int(length * 120)
     b = pin_bin()

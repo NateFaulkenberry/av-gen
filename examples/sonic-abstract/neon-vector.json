@@ -1,0 +1,509 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "neon-vector.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 0.7,
+  "post/bloom/emissionWeight": 1.0,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.3,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       6.5,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       1.1314,
+       6.85,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.6,
+       6.5,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.1314,
+       6.15,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       0.0,
+       6.5,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -1.1314,
+       6.85,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       -1.6,
+       6.5,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -1.1314,
+       6.15,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -0.0,
+       6.5,
+       14.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.6939,
+       -28.1778,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       2.9486,
+       -28.3585,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       2.476,
+       -29.1876,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.553,
+       -29.0069,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       -1.6939,
+       -28.1778,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -2.9486,
+       -28.3585,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       -2.476,
+       -29.1876,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -0.553,
+       -29.0069,
+       -182.3792
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       1.6939,
+       -28.1778,
+       -182.3792
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/plainNoise/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 600.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 600.0,
+      "value": [
+       0.0,
+       0.0,
+       4800.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "field/peakNoise/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 600.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 600.0,
+      "value": [
+       0.0,
+       0.0,
+       5400.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-neon-vector.mp4"
+ },
+ "sonicScene": {
+  "category": "vector",
+  "thesis": "Pulsar Plain: a poster you can fly through. Hidden-line ridgelines ripple to the horizon under a colossal outline circle; the drums build flat blocks of one bold colour.",
+  "composition": {
+   "background": "pure black sky, one hairline horizon, a colossal outline circle of concentric rings",
+   "midground": "a flat accent-colour triangle standing in the plain, half hidden by the ridges",
+   "foreground": "the ridgelines, close and bright, rippling under the camera",
+   "focal": "the spiky central peaks leading to the circle on the horizon",
+   "secondary": [
+    "the colour block",
+    "the circle's rings"
+   ],
+   "atmosphere": "(none: lines and planes only)",
+   "post": "bloom on the lines; a split on the snare",
+   "camera": "low and level, flying forward (the plain's shapes advance toward it)"
+  },
+  "palette": {
+   "dominant": "#000000",
+   "secondary": "#f4f4f0",
+   "accent": "#ff2e88",
+   "highlight": "#ffe500",
+   "background_value": "black",
+   "saturation": "white lines; one accent colour per section"
+  },
+  "motion": {
+   "very_slow": [
+    "the circle's rings turning"
+   ],
+   "medium": [
+    "the flight",
+    "the plain's swell"
+   ],
+   "fast": [
+    "peaks rising under notes"
+   ],
+   "extremely_fast": [
+    "blocks snapping into place",
+    "line flashes"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the near rows swell"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a forward lurch and a rolling wave"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a colour block snaps into existence"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "fine jitter on the lines"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the middle rows swell; the circle breathes"
+   ],
+   [
+    "highs",
+    "audio.highMid",
+    "the far rows swell"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "a peak rises at the pitch's place across the plain"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "the peaks grow taller as the piece builds"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the plain glides slowly under a still circle"
+   ]
+  ],
+  "tier": "light: six tube nodes (about 70 rows), a few rings and slabs, unlit",
+  "id": "neon-vector",
+  "title": "Neon Vector World",
+  "regions": [
+   {
+    "id": "peaks",
+    "box": [
+     0.38,
+     0.35,
+     0.62,
+     0.75
+    ]
+   },
+   {
+    "id": "circle",
+    "box": [
+     0.25,
+     0.05,
+     0.75,
+     0.45
+    ]
+   },
+   {
+    "id": "block",
+    "box": [
+     0.1,
+     0.15,
+     0.4,
+     0.6
+    ]
+   }
+  ]
+ }
+}

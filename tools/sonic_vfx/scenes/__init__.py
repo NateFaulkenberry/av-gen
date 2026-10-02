@@ -24,3 +24,12 @@ SCENES = [
     "stellar_nursery",      # 15 cosmic: stars igniting
     "event_horizon",        # 16 the cosmic finale
 ]
+
+# SONIC ABSTRACT (04-brief-abstract-direction.md, docs/prototypes/sonic-garden/ABSTRACT-PLAN.md): the abstract
+# direction's eight prototypes, each a distinct visual language. Their own project (the owner's decision, 2026-10-02):
+# examples/sonic-abstract/, the index category "Sonic Abstract", built by tools/sonic_vfx/abstract.py `build`. Numbered
+# as the owner's brief numbers its directions.
+ABSTRACT = [
+    "sacred_geometry",          # 1 Sacred Geometry Garden: The Armillary
+    "neon_vector",              # 2 Neon Vector World: Pulsar Plain
+]

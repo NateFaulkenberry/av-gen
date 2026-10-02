@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.dirname(os.path.dirname(HERE)))
 from tools.sonic_vfx.variant import make_variant  # noqa: E402
+from tools.sonic_vfx import kit  # noqa: E402
 
 PIN = "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/vfx/avgen.sh"
 AVGEN = os.environ.get("AVGEN") or (PIN if os.path.exists(PIN) else os.path.join(REPO, "build/release/src/avgen"))
@@ -27,9 +28,17 @@ LOCK = os.path.join(REPO, "tools", "gpu-lock.sh")
 CLASSES = ["pads", "chords", "bass", "lead", "arp", "edrums", "drumloop", "dense", "sparse", "velocity", "rapid",
            "sustained", "full"]
 DRUM_ONLY = {"edrums", "drumloop"}
+# Real music (the owner's own tracks, 30 s excerpts cut into the gitignored assets/audio by tools/sonic_vfx/abstract.py
+# `music`): audio only, no MIDI.
+REAL_MUSIC = {"allyougot": "sonic-abstract-allyougot.wav", "rebuild": "sonic-abstract-rebuild.wav"}
 
 
 def material(cls):
+    if cls in REAL_MUSIC:
+        wav = os.path.join(REPO, "assets", "audio", REAL_MUSIC[cls])
+        if not os.path.exists(wav):
+            sys.exit("missing %s: run python3 tools/sonic_vfx/abstract.py music" % wav)
+        return wav, None
     wav = os.path.join(REPO, "assets", "audio", "sonic-vfx-%s.wav" % cls)
     mid = None if cls in DRUM_ONLY else os.path.join(REPO, "examples", "sonic-vfx", "test", "%s.mid" % cls)
     if not os.path.exists(wav):
@@ -44,7 +53,7 @@ def duration(wav):
 
 
 def variant(scene, cls, workdir, project_dir=None):
-    project = os.path.join(project_dir or os.path.join(REPO, "examples", "sonic-vfx"), scene + ".json")
+    project = os.path.join(project_dir or kit.OUT_DIR, scene + ".json")  # kit.OUT_DIR: examples/sonic-vfx
     wav, mid = material(cls)
     out = os.path.join(workdir, "%s--%s.json" % (scene, cls))
     make_variant(project, wav, mid, out)

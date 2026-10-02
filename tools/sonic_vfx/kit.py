@@ -28,6 +28,11 @@ from .signals import S
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(REPO, "examples", "sonic-vfx")
+# The abstract direction (04-brief-abstract-direction.md): its eight prototypes are their own project, "Sonic
+# Abstract" (the owner's decision, 2026-10-02), in their own folder and index category; Sonic Garden and the Sonic VFX
+# set are untouched.
+ABSTRACT_DIR = os.path.join(REPO, "examples", "sonic-abstract")
+ABSTRACT_CATEGORY = "Sonic Abstract"
 GARDEN_LIVE = os.path.join(REPO, "examples", "sonic-garden", "sonic-live.json")
 
 
@@ -933,17 +938,22 @@ class Scene:
         sp = os.path.join(out_dir, self.id + ".scene.json")
         pp = os.path.join(out_dir, self.id + ".json")
         doc = self.scene_doc()
-        if os.path.abspath(out_dir) != os.path.abspath(OUT_DIR):
-            # look development elsewhere: the asset paths are relative to examples/sonic-vfx/, so make them absolute
-            absolute = os.path.join(REPO, "assets") + "/"
-
+        # Asset paths are written relative to examples/sonic-vfx/ (ASSETS); rewrite them for the folder actually
+        # written (relative inside the repository, absolute for look development elsewhere).
+        out_abs = os.path.abspath(out_dir)
+        assets_abs = os.path.join(REPO, "assets")
+        if out_abs.startswith(REPO + os.sep):
+            prefix = os.path.relpath(assets_abs, out_abs) + "/"
+        else:
+            prefix = assets_abs + "/"
+        if prefix != ASSETS:
             def fix(o):
                 if isinstance(o, dict):
                     return {k: fix(v) for k, v in o.items()}
                 if isinstance(o, list):
                     return [fix(v) for v in o]
                 if isinstance(o, str) and o.startswith(ASSETS):
-                    return absolute + o[len(ASSETS):]
+                    return prefix + o[len(ASSETS):]
                 return o
             doc = fix(doc)
         with open(sp, "w") as f:
@@ -976,19 +986,33 @@ BASE_PARAMS = {
 }
 
 
-def write_index(scenes, category="Sonic VFX"):
-    """Lists every scene in the Examples menu (examples/index.json), replacing this category's entries."""
+def write_index(scenes, category="Sonic VFX", out_dir=OUT_DIR, prefix=None, doc="SCENE-CATALOG.md"):
+    """Lists every scene in the Examples menu (examples/index.json), replacing this category's entries (and only
+    them). "Sonic VFX" is the live switcher's category (ADR-1063); "Sonic Abstract" is the abstract project's."""
     path = os.path.join(REPO, "examples", "index.json")
     with open(path) as f:
         idx = json.load(f)
-    keep = [e for e in idx["examples"] if e.get("category") != category]
+    examples = os.path.join(REPO, "examples")
+    prefix = prefix if prefix is not None else category + " - "
+    entries = []
     for sc in scenes:
-        keep.append({"category": category,
-                     "description": sc.design.get("thesis", "") + " Live: opening it turns live input on "
-                     "(View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-                     "name": "Sonic VFX - " + sc.title,
-                     "project": "sonic-vfx/" + sc.id + ".json"})
-    idx["examples"] = keep
+        entries.append({"category": category,
+                        "description": sc.design.get("thesis", "") + " Live: opening it turns live input on "
+                        "(View > Live). See docs/prototypes/sonic-garden/" + doc + ".",
+                        "name": prefix + sc.title,
+                        "project": os.path.relpath(os.path.join(out_dir, sc.id + ".json"), examples)})
+    # replace the category's entries where they stand (or append them), keeping every other entry in place
+    out, placed = [], False
+    for e in idx["examples"]:
+        if e.get("category") == category:
+            if not placed:
+                out.extend(entries)
+                placed = True
+            continue
+        out.append(e)
+    if not placed:
+        out.extend(entries)
+    idx["examples"] = out
     with open(path, "w") as f:
         json.dump(idx, f, indent=2)
         f.write("\n")

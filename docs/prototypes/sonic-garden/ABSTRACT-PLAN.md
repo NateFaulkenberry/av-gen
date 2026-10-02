@@ -1,8 +1,13 @@
-# Sonic Garden, abstract direction: eight visual languages (the plan)
+# Sonic Abstract: eight visual languages (the plan)
 
 The art agent, 2026-10-02, under `04-brief-abstract-direction.md` (the owner's words govern). This is the plan written
 before the build. It is a living document: each section gets an "as built" note when its prototype changes from what is
 written here. Progress and resume notes: `PROGRESS-abstract.md`.
+
+**Its own project** (the owner's decision, 2026-10-02): the eight prototypes are "Sonic Abstract" (a working title),
+separate from Sonic Garden, whose live scene and Sonic VFX set stay as they are. The projects live in
+`examples/sonic-abstract/`, listed under their own index category, "Sonic Abstract". They are built by
+`tools/sonic_vfx/abstract.py build` from the modules in `tools/sonic_vfx/scenes/` named in `scenes.ABSTRACT`.
 
 ## What every prototype obeys
 
@@ -442,9 +447,10 @@ an eclipse.
 
 ---
 
-## The set list (the live switcher)
+## The set list
 
-`examples/index.json` "Sonic VFX" category, in this order (MIDI program n opens scene n mod 9, after Sonic Live):
-1 Sacred Geometry Garden, 2 Neon Vector World, 3 Cel-Shaded Dream World, 4 Infinite Color Geometry, 5 Organic Digital
-Garden, 6 Particle / VFX World, 7 Impossible Architecture, 8 Abstract Cinematic Void. Each is listed under its direction's
-name, with its working title, so the owner can say "number three" and be understood.
+`examples/index.json`, category "Sonic Abstract", in this order: 1 Sacred Geometry Garden, 2 Neon Vector World,
+3 Cel-Shaded Dream World, 4 Infinite Color Geometry, 5 Organic Digital Garden, 6 Particle / VFX World, 7 Impossible
+Architecture, 8 Abstract Cinematic Void. Entries are named "Sonic Abstract - <direction>", so the owner can say
+"number three" and be understood. The live switcher (ADR-1063) steps through the Sonic VFX set; the engineer is
+making it step through the set the open project belongs to. Until that lands, each prototype is opened directly.

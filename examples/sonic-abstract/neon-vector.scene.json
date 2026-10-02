@@ -1,0 +1,1526 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "neon-vector",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   6.5,
+   14.0
+  ],
+  "target": [
+   0.0,
+   -28.6827,
+   -182.3792
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fogColor": [
+   0,
+   0,
+   0
+  ],
+  "volumeDensity": 0.0075,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 0.0,
+  "sky": {
+   "enabled": false,
+   "zenithColor": [
+    0,
+    0,
+    0
+   ],
+   "horizonColor": [
+    0,
+    0,
+    0
+   ],
+   "groundColor": [
+    0,
+    0,
+    0
+   ],
+   "haze": 0.0,
+   "sunIntensity": 0.0,
+   "intensity": 0.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "plainNoise",
+   "kind": "field",
+   "field": {
+    "kind": "noise",
+    "frequency": 0.11,
+    "seed": 21,
+    "strength": 1.0,
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "plain",
+   "kind": "field",
+   "field": {
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "plainNoise",
+     "plainBand"
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "plainBand",
+   "kind": "field",
+   "field": {
+    "kind": "radial",
+    "radius": 60.0,
+    "scale": [
+     1.0,
+     1.0,
+     1000.0
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "peakNoise",
+   "kind": "field",
+   "field": {
+    "kind": "noise",
+    "frequency": 0.32,
+    "seed": 5,
+    "strength": 1.0,
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "peakStripe",
+   "kind": "field",
+   "field": {
+    "kind": "radial",
+    "radius": 16.0,
+    "scale": [
+     1.0,
+     1.0,
+     1000.0
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "peaks",
+   "kind": "field",
+   "field": {
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "peakNoise",
+     "peakStripe"
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "notePeak",
+   "kind": "field",
+   "field": {
+    "kind": "radial",
+    "radius": 7.0,
+    "scale": [
+     1.0,
+     1.0,
+     1000.0
+    ],
+    "strength": 1.0,
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "lines_near",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.022,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 16,
+     "start": [
+      0.0,
+      0.0,
+      -31.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      2.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 2.2,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "materialVariation": {
+     "emissiveGradient": 0.6
+    }
+   }
+  },
+  {
+   "name": "fins_near",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.0,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 16,
+     "start": [
+      0.0,
+      0.0,
+      -31.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      2.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "sourceTransform": {
+     "position": [
+      0.0,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      3.4,
+      0.004
+     ]
+    }
+   }
+  },
+  {
+   "name": "lines_mid",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.034,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 22,
+     "start": [
+      0.0,
+      0.0,
+      -79.4
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -33.2
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 1.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "materialVariation": {
+     "emissiveGradient": 0.6
+    }
+   }
+  },
+  {
+   "name": "fins_mid",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.0,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 22,
+     "start": [
+      0.0,
+      0.0,
+      -79.4
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -33.2
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "sourceTransform": {
+     "position": [
+      0.0,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      3.4,
+      0.004
+     ]
+    }
+   }
+  },
+  {
+   "name": "lines_far",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.06,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 30,
+     "start": [
+      0.0,
+      0.0,
+      -145.4
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -81.60000000000001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 1.5,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "materialVariation": {
+     "emissiveGradient": 0.6
+    }
+   }
+  },
+  {
+   "name": "fins_far",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.0,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 320,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -70.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 30,
+     "start": [
+      0.0,
+      0.0,
+      -145.4
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -81.60000000000001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.25,
+      "frequency": 0.09,
+      "speed": 0.35,
+      "phase": 0.0,
+      "axis": [
+       0.8,
+       0.0,
+       0.6
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "plain",
+      "amount": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "peaks",
+      "amount": 3.2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 1.7,
+      "speed": 2.0,
+      "seed": 11,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "notePeak",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "sourceTransform": {
+     "position": [
+      0.0,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      3.4,
+      0.004
+     ]
+    }
+   }
+  },
+  {
+   "name": "circle0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 27.0,
+     "minorRadius": 0.4,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 24.8,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 22.6,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 20.4,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 18.2,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 16.0,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "circle6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 13.799999999999999,
+     "minorRadius": 0.22,
+     "majorSegments": 256,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      34.0,
+      46.0,
+      -215.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "horizon",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1400.0,
+      0.25,
+      0.25
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.0,
+      -185.4
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 6.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "block",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 13.0,
+     "height": 0.2,
+     "radialSegments": 3,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -26.0,
+      9.0,
+      -75.0
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      30.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.02732,
+      0.2462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.02732,
+      0.2462
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "blockEdge",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 15.0,
+     "minorRadius": 0.16,
+     "majorSegments": 3,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -24.8,
+      10.0,
+      -74.4
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      30.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.90466,
+      0.90466,
+      0.87137
+     ],
+     "emissiveIntensity": 3.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  }
+ ]
+}

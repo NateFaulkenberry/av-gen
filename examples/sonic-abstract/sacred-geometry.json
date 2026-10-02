@@ -1,0 +1,460 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "sacred-geometry.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.1
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.55,
+  "post/bloom/threshold": 0.6,
+  "post/bloom/emissionWeight": 1.0,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.008,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 50.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 64.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       25.7
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.9899,
+       0.5,
+       25.8757
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       1.4,
+       0.0,
+       26.3
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       0.9899,
+       -0.5,
+       26.7243
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       0.0,
+       -0.0,
+       26.9
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       -0.9899,
+       0.5,
+       26.7243
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -1.4,
+       0.0,
+       26.3
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       -0.9899,
+       -0.5,
+       25.8757
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.0,
+      "value": [
+       -0.0,
+       -0.0,
+       25.7
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 64.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.0,
+      "value": [
+       0.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-sacred-geometry.mp4"
+ },
+ "sonicScene": {
+  "category": "sacred geometry",
+  "thesis": "The Armillary: a giant living geometric diagram in gold light. Its rings turn at harmonic rates, open into a sphere on the music and close back into a flat mandala; chords draw their own polygons.",
+  "composition": {
+   "background": "a flower-of-life lattice, dim gold on ultramarine black, behind a soft indigo halo",
+   "midground": "the armillary rings and the 12-pointed star; the well of nested polygons spiralling away",
+   "foreground": "the crown of 24 vesica petals and the bead ring, at the frame's edge",
+   "focal": "the seed of life and its vermilion core at the exact centre",
+   "secondary": [
+    "the 12-pointed star",
+    "the polygon well",
+    "the crown"
+   ],
+   "atmosphere": "deeper layers dimmer (an indigo depth)",
+   "post": "bloom; light trails from the feedback when the rings turn",
+   "camera": "locked frontal on the axis, a slow breathing arc"
+  },
+  "palette": {
+   "dominant": "#05061a",
+   "secondary": "#0d1240",
+   "accent": "#ff4a24",
+   "highlight": "#f2b84b",
+   "background_value": "near black (ultramarine)",
+   "saturation": "gold and ivory lines; vermilion only at the core and the chord's ring"
+  },
+  "motion": {
+   "very_slow": [
+    "the base rotation (k turns per period)",
+    "the camera's breath"
+   ],
+   "medium": [
+    "the armillary opening and closing",
+    "the well's spiral"
+   ],
+   "fast": [
+    "the petals answering the pitch classes"
+   ],
+   "extremely_fast": [
+    "the kick's snap open",
+    "bead flashes"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the diagram breathes radially; the core glows"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "the rings snap open about their diameters and spring back flat"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the star flashes vermilion; the crown fires sparks"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "beads run along the rings"
+   ],
+   [
+    "melodic",
+    "response.melodic",
+    "the differential rotation speeds up"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "the inner star's polygon order (3 notes a triangle, 4 a square...)"
+   ],
+   [
+    "pitch class",
+    "notes.class.0",
+    "each of the 12 pitch classes lights its petal pair on the crown"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the camera pushes into the well; the trails lengthen"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "more rings and petals switch on as a piece builds"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the diagram turns slowly, flat and complete"
+   ]
+  ],
+  "tier": "light: about 30 procedural objects of thin tori, unlit; bloom; feedback trails",
+  "id": "sacred-geometry",
+  "title": "Sacred Geometry Garden",
+  "regions": [
+   {
+    "id": "seed",
+    "box": [
+     0.442,
+     0.396,
+     0.558,
+     0.604
+    ]
+   },
+   {
+    "id": "armillary",
+    "box": [
+     0.317,
+     0.175,
+     0.683,
+     0.825
+    ]
+   },
+   {
+    "id": "crown",
+    "box": [
+     0.2,
+     0.0,
+     0.8,
+     1.0
+    ]
+   }
+  ]
+ }
+}
