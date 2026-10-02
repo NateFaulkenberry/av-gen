@@ -3,6 +3,61 @@
 *Kept current after every step so a cold successor can resume. The engineering agent's notes are `PROGRESS-eng.md`;
 these are the art side's. Newest state first.*
 
+## RESUME HERE: ART PASS 4 (2026-10-02, the owner's `04-art-pass-4.md` governs; my parts: 2-6 and 8-16)
+
+**State (13:40):** the scaffold is committed; the stills of the city, the new tableaux and the new rooms are queued on
+the GPU (`$S/liminal4/stills.sh city tableaux rooms`, results in `$S/liminal4/stills/<what>/`, log `done.log`).
+Next: look at the stills, then write the film modules' changes (below), generate, validate, preview.
+
+**What the owner saw (frame-grabbed from pass 3 take 3, `$S/liminal4/p3grab/*.png`, `sheet4.py` labels film time
+and owner bar):**
+- 0:15-0:22 (bars 6.8-10): little changes; the roofs flip and twist (bars 4.3-4.4 and 9-12) and the row shudders
+  on the sixteenths (13-16): the "twitching".
+- 1:17 is the hit on owner bar 34 beat 4 (76.51 s): a clap with a long tail and a sub boom on 4.5-4.75, louder than
+  the same slot in the bars around it (`$S/liminal4/unique.py 74.5 80`). It is not in the BIG CLAP list.
+- 1:25: pass 3 cuts to the hall at 81.47 (bar 37); pass 2 cut at 83.67 (bar 38) and only reached the stair foot
+  by 86. The climb itself (86-90.25) and the fall (90.28-92.48) are kept.
+- The basement: laundry 92.5-96, storage 96-101, the tool bench 102-110 (dark and empty). No mannequin.
+- ~2:15 (134.6-135.9): the study camera passes 15-35 cm from the bookcase and looks into it: the jagged lines are the
+  shelf's edges seen from a hand's width. Then C14's lurch at 135.96. (The engineer is root-causing it too.)
+- 4:08: the crash 247.30-248.4 is good; then 1 s of the summit at night and 1 s of a dark hill: the dawn only shows
+  from about 250.5.
+
+**The pass 4 film (owner bars; `t()` from `pass2_grid.py`):**
+
+| bars | seconds | place | what |
+|---|---|---|---|
+| 0-16 | 0-37.43 | the street | the intro, build -> lock: houses land (1-2), roofs slam once (4), lamps (5-6), driveway cars on the eighths (7), the city's first blocks rise a storey a beat behind the houses (7-12), towers (9-16); no flips, no shudder, no stutter |
+| 17-32 | 37.43-72.66 | the living room | as pass 3 (no wall swell) |
+| 33-37 | 72.66-83.67 | the kitchen | the table empty; the pan lands on him at the stove on 34.4 (76.51), steam; then at the table for C05 (36.4) |
+| 38-41 | 83.67-92.48 | the hall, the climb, the fall | the cut to the hall on 38.1 (pass 2's timing); the climb 86.4-90.25; the fall kept |
+| 42-49 | 92.48-110.09 | the basement | laundry (folding), gym (standing with a dumbbell), the lounge's bar (sitting), the sofa (alone); no tool bench |
+| 50-65 | 110.09-145.32 | upstairs | verse 2 as pass 3; the study camera kept 0.6 m+ from the bookcase |
+| 66-74 | 145.32-165.14 | out of the roof: the city | house -> neighbourhood -> city: roads, lamps, traffic, blocks ring by ring, storeys on the beat |
+| 75-82 | 165.14-182.43 | the city, alone | the red light (75-76), the bar (77-78, GOT? C17), the park bench (79-80), the crosswalk (81-82); C18 freeze and black |
+| 83-90 | 182.43-199.73 | the breathing city | the camera soars; the colour wave through the city at 90.3 |
+| 91-112 | 199.73-247.30 | the open, the stair, the summit | pass 3's, with him standing at the top (`triumph`), the city far below |
+| 113- | 247.30- | the crash, then dawn at once | the digital transition, then dawn on the summit as it clears (no night summit, no dark hill), the coda |
+
+**Modules (`tools/liminal/`, all new; pass 3's are imported, never edited):** `make_all_you_got_pass4.py` (entry),
+`film4.py` (Builder4: `lock()`, `audit_structure()` refusing beat/wave routes into structural transforms, `opens()`),
+`film4_intro.py`, `film4_house.py`, `film4_upper.py`, `film4_late.py` (copies of pass 3's, being revised), `intro4.py`
+(the neighbourhood: roof translate, 420 m slab, parked cars), `city4.py` (the grid, the inner and outer building sets
+with `<set>Ring` and `<set>Rise` clips, kerbs, markings, lamps, traffic, the intersection, the park, the bar
+building), `rooms4.py` (kitchen with the range; laundry, gym, lounge), `props4.py`, `tableaux4.py` (nine new poses,
+`python3 tools/liminal/tableaux4.py` exits 0), `walkers4.py` (the rigged extras: `walk()`, `talk()`), `world4.py`
+(own emission colours), `preview4.py tableaux|rooms|city` (stills projects).
+
+**Commands:**
+```sh
+S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad
+python3 tools/liminal/make_all_you_got_pass4.py          # writes examples/liminal/all-you-got-pass4*.json + .validation.txt
+python3 tools/liminal/preview4.py city                    # stills projects; render with $S/liminal4/stills.sh city
+python3 $S/liminal4/sheet4.py <mp4> <out.png> 6 400 12:24:0.5   # labelled contact sheets
+```
+Render with the pinned engine `$S/liminal3/avgen.sh` (bin-5dd835a4) through `tools/gpu-lock.sh`, one job per hold.
+
+
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
 **Status (2026-10-02, coordinator): TAKE 3 IS THE FINAL.** `final3.log` ends "replaced the final with take 3": C10 visible -> unmistakable, C14 not read -> unmistakable, no section worse, so all 18 BIG CLAPs are unmistakable. The art agent hit the old account's usage limit before handing back; pass 3 is complete. *(Earlier status, 20:32: take 2 is the final.)* Take 3 (C10 and C14 only, approved by the coordinator) is rendering and
