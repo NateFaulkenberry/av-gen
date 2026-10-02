@@ -21,6 +21,7 @@ import copy
 import json
 import math
 import os
+import zlib
 
 from . import signals as sig
 from .signals import S
@@ -419,7 +420,8 @@ class Scene:
         return prog
 
     def entity(self, name, node=None, tags=None, **extra):
-        e = {"name": name, "node": node or name, "seed": abs(hash(name)) % 1000000}
+        # a stable seed: Python's str hash is salted per process, which made every build differ
+        e = {"name": name, "node": node or name, "seed": zlib.crc32(name.encode()) % 1000000}
         if tags:
             e["tags"] = tags
         e.update(extra)
