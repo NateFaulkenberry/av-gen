@@ -111,6 +111,81 @@ ARMILLARY = [
 ]
 
 
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 1). Every audio dimension has its own job."""
+    P = "procedural/%s/"
+    rings = [a[0] for a in ARMILLARY]
+    # ---- BASS: the diagram breathes radially, inner layers more (a pulse from the centre); the core glows
+    for node, depth in (("rimOuter", 0.025), ("rimInner", 0.025), ("beads", 0.025), ("petals", 0.03),
+                        ("petalsInner", 0.035), ("star", 0.045), ("ring1", 0.05), ("ring2", 0.055), ("ring3", 0.06),
+                        ("ring4", 0.065), ("seed", 0.12), ("seedCentre", 0.12), ("seedRim", 0.1)):
+        s.route(R("bass", P % node + "transform/scale", depth, attackMs=25, decayMs=320))
+    s.route(R("bass", P % "core" + "material/emissive", 14.0, attackMs=20, decayMs=260))
+    # ---- KICK: the armillary snaps OPEN about its diameters, a ripple inward (staggered), and rings back flat on a
+    # loose spring; the outer rim flashes
+    for k, name in enumerate(rings):
+        s.route(R("kick", P % name + "deform/2/phase", (1.15 if k % 2 == 0 else -1.15) * (1.0 - 0.12 * k),
+                  attackMs=0, decayMs=260, delayMs=55 * k, springHz=1.3, springDamping=0.32))
+    s.route(R("kick", P % "rimOuter" + "material/emissive", 5.0, attackMs=0, decayMs=220),
+            R("kick", "camera/lens/focalLength", 2.2, attackMs=0, decayMs=240))
+    # ---- SNARE: the star and the seed's rim flash vermilion-white; sparks fly off the crown
+    s.route(R("snare", P % "star" + "material/emissive", 7.0, attackMs=0, decayMs=200),
+            R("snare", P % "seedRim" + "material/emissive", 8.0, attackMs=0, decayMs=260),
+            R("snare", "particles/sparks/burst", 420.0, threshold="binary", thresholdLevel=0.05))
+    # ---- HIGHS: beads run along the armillary; the bead crown shimmers
+    s.route(R("hat", "particles/beadRun/burst", 60.0, threshold="binary", thresholdLevel=0.05),
+            R("hat", "particles/beads3/burst", 50.0, threshold="binary", thresholdLevel=0.05),
+            R("audio.treble", "particles/beadRun/spawnRate", 220.0, attackMs=30, decayMs=300),
+            R("audio.treble", P % "beads" + "material/emissive", 4.0, attackMs=20, decayMs=200))
+    # ---- MIDS: the differential rotation speeds up (ring k gains k x the turn), integrated so it never jumps
+    for k, name in enumerate(rings, start=1):
+        s.route(R("audio.mid", P % name + "deform/1/phase", 0.45 * k * (1 if k % 2 else -1), integrate=True,
+                  attackMs=80, decayMs=600))
+    s.route(R("response.melodic", P % "star" + "deform/1/phase", 0.6, integrate=True, attackMs=120, decayMs=900),
+            R("audio.mid", P % "wellHex" + "deform/1/phase", 0.5, integrate=True, attackMs=120, decayMs=900),
+            R("audio.mid", P % "wellSquare" + "deform/1/phase", -0.4, integrate=True, attackMs=120, decayMs=900))
+    # ---- CENTROID (brightness): gold toward ivory and pale cyan-white
+    for node in ("rimOuter", "petals", "ring1", "ring3", "star"):
+        s.route(R("brightness", P % node + "material/emissiveColor", 0.35, comp=2, **SLOW),
+                R("brightness", P % node + "material/emissiveColor", 0.12, comp=1, **SLOW))
+    # ---- BANDS: each band owns a layer, from the core (bass) to the crown (treble)
+    s.route(R("audio.bass", P % "seedCentre" + "material/emissive", 3.0, attackMs=30, decayMs=300),
+            R("audio.lowMid", P % "wellHex" + "material/emissive", 1.6, attackMs=40, decayMs=350),
+            R("audio.lowMid", P % "wellSquare" + "material/emissive", 1.4, attackMs=40, decayMs=350),
+            R("audio.mid", P % "ring2" + "material/emissive", 2.0, attackMs=40, decayMs=350),
+            R("audio.mid", P % "ring4" + "material/emissive", 2.0, attackMs=40, decayMs=350),
+            R("audio.highMid", P % "petalsInner" + "material/emissive", 2.4, attackMs=30, decayMs=300),
+            R("audio.treble", P % "petals" + "material/emissive", 1.8, attackMs=30, decayMs=300))
+    # ---- SUSTAIN: the camera pushes into the well; the light trails lengthen
+    s.route(R("sustain", "camera/position", -3.5, comp=2, **SLOW),
+            R("sustain", "temporal/feedback/decay", 0.22, **SLOW))
+    # ---- TEMPO: the petals breathe on the beat; the crown's petals flip about their own long axis on the bar
+    s.route(R("beat", P % "petals" + "transform/scale", 0.02, attackMs=0, decayMs=180),
+            R("beat.bar", P % "petals" + "deform/1/phase", math.pi, attackMs=0, decayMs=0))
+    # ---- INTENSITY: STRUCTURE -- the crown doubles its petals (24 to 48) and the well deepens as the piece builds
+    for node, extra in (("petals", 24.0), ("petalsInner", 24.0), ("wellHex", 8.0), ("wellSquare", 8.0)):
+        s.route(R("intensity", P % node + "distribution/count", extra, threshold="binary", thresholdLevel=0.55))
+    # ---- MIDI: the pitch classes light their diamonds and spokes (a chord draws its polygon); polyphony is the star's
+    # polygon order (STRUCTURE); a held note keeps the armillary open; velocity flares the core
+    for k in range(12):
+        sig = "notes.class.%d" % k
+        s.route(R(sig, P % ("pc%d" % k) + "material/emissive", 7.0, attackMs=0, decayMs=420),
+                R(sig, P % ("spoke%d" % k) + "material/emissive", 4.5, attackMs=0, decayMs=520))
+    # the chord's own polygon in the heart: as many sides as notes sounding (3 to 8), shown only while a chord sounds
+    s.route(R("polyphony", P % "chordGon" + "source/majorSegments", 1.0, gain=8.0, offset=-3.0, clampEnabled=True,
+              clampMin=0.0, clampMax=5.0),
+            R("polyphony", P % "chordGon" + "material/emissive", 5.0, threshold="binary", thresholdLevel=0.3,
+              attackMs=40, decayMs=500))
+    for k, name in enumerate(rings):
+        s.route(R("held", P % name + "deform/2/phase", (0.5 if k % 2 == 0 else -0.5), **MEDIUM))
+    s.route(R("noteEnv", P % "core" + "material/emissive", 10.0, depth="lastVelocity", attackMs=0, decayMs=300),
+            R("noteEnv", P % "seedRim" + "material/emissive", 3.0, depth="lastVelocity", attackMs=0, decayMs=400))
+    # ---- MOD WHEEL: opens the whole armillary into a sphere by hand
+    wheel = s.modwheel()
+    for k, name in enumerate(rings):
+        s.route(R(wheel, P % name + "deform/2/phase", 1.5 if k % 2 == 0 else -1.5, attackMs=60, decayMs=60))
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
@@ -225,6 +300,7 @@ def build():
            transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
     s.proc("seedCentre", torus(0.55, 0.02, 96, 5), material=glow(IVORY, 2.6), transform=face(-2.4))
     s.proc("seedRim", torus(1.1, 0.03, 128, 5), material=glow(VERMILION, 3.0), transform=face(-2.4))
+    s.proc("chordGon", torus(1.02, 0.03, 3, 4), material=glow(VERMILION, 0.0), transform=face(-2.35))
     s.proc("core", {"kind": "sphere", "radius": 0.16, "segments": 24, "rings": 12},
            material=glow("#ffe6c2", 9.0), transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0],
                                                       "scale": [1, 1, 1]})
@@ -232,13 +308,52 @@ def build():
     # ---- camera: frontal on the axis, a slow breathing arc (4 degrees, 64 s)
     s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.55, "post/bloom/threshold": 0.6,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.45, "post/output/grain": 0.008,
-               "post/tonemap/operator": 4})
+               "post/tonemap/operator": 4, "temporal/feedback/enabled": True, "temporal/feedback/frames": 8,
+               "temporal/feedback/amount": 0.7, "temporal/feedback/decay": 0.5, "temporal/feedback/zoom": 1.0,
+               "temporal/feedback/rotate": 0.0, "temporal/feedback/hue": 0.0})
     s.camera = {"mode": 1, "position": [0.0, 0.0, CAM_Z], "target": [0.0, 0.0, -2.0], "fov": 30.0,
                 "orbitSpeed": 0.0}
     s.drift_camera([0.0, 0.0, CAM_Z], [0.0, 0.0, -2.0], period=64.0, amp=(1.4, 0.5, 0.6), tamp=(0.0, 0.0, 0.0))
 
-    # ---- the instrument -------------------------------------------------------------------------------------------
-    # (routes come after the silent still passes)
+    # ---- the twelve pitch classes: a clock of faint diamonds and spokes round the crown (C at the top, clockwise,
+    # chromatic, so a chord's interval structure is its shape: an augmented triad is a triangle, a diminished seventh a
+    # square). A sounding class lights its diamond and spoke, so a chord draws its own polygon.
+    for k in range(12):
+        ang = math.radians(90.0 - 30.0 * k)
+        c, sn = math.cos(ang), math.sin(ang)
+        s.proc("pc%d" % k, torus(0.34, 0.026, 4, 4), material=glow(PALE_GOLD, 0.35),
+               transform={"position": [7.55 * c, 7.55 * sn, 0.1], "rotation": [90.0, 0.0, math.degrees(ang) - 90.0],
+                          "scale": [0.55, 1.0, 1.0]})
+        s.proc("spoke%d" % k, {"kind": "box", "size": [0.035, 0.035, 2.4], "subdivisions": 1},
+               material=glow(GOLD, 0.0),
+               transform={"position": [5.75 * c, 5.75 * sn, -0.15], "rotation": [0.0, 0.0, 0.0], "scale": [1, 1, 1]},
+               extra={"sourceTransform": {"rotation": [math.degrees(-ang) + 90.0, 90.0, 0.0]}})
+
+    # ---- sparks off the crown (the snare) and beads along the armillary (the hats)
+    s.nodes.append({"name": "crownPath", "kind": "spline", "spline": {
+        "kind": "catmullRom", "generator": "circle", "closed": True, "count": 48, "radius": 5.6,
+        "center": [0.0, 0.0, -0.2], "axis": [0.0, 0.0, 1.0], "up": [0.0, 0.0, 1.0], "samplesPerSegment": 8}})
+    s.particles("sparks", capacity=4000, seed=17, shape="spline", spline="crownPath", position=[0, 0, 0],
+                extent=[0.05, 0.05, 0.05], direction=[-1.0, 0.0, 0.0], spawnRate=0.0, lifetimeMin=0.5,
+                lifetimeMax=1.1, spread=0.08, speedMin=2.5, speedMax=5.5, gravity=[0, 0, 0], drag=1.6,
+                sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb("#ffd9a0") + [1.0], colorEnd=hexrgb(VERMILION) + [0.0],
+                emissive=6.0, blend="additive", velocityStretch=1.2, stretchMax=0.35)
+    for name, rad, *_ in ARMILLARY:
+        s.nodes.append({"name": name + "Path", "kind": "spline", "spline": {
+            "kind": "catmullRom", "generator": "circle", "closed": True, "count": 48, "radius": rad,
+            "center": [0.0, 0.0, 0.0], "axis": [0.0, 0.0, 1.0], "up": [0.0, 0.0, 1.0], "samplesPerSegment": 8}})
+    s.particles("beadRun", capacity=3000, seed=23, shape="spline", spline="ring1Path", position=[0, 0, 0],
+                extent=[0.02, 0.02, 0.02], direction=[0.0, 0.0, 1.0], spawnRate=0.0, lifetimeMin=0.25,
+                lifetimeMax=0.6, spread=0.0, speedMin=0.6, speedMax=1.4, gravity=[0, 0, 0], drag=0.5,
+                sizeStart=0.075, sizeEnd=0.0, colorStart=hexrgb("#fffaf0") + [1.0], colorEnd=hexrgb(GOLD) + [0.0],
+                emissive=7.0, blend="additive")
+    s.particles("beads3", capacity=3000, seed=29, shape="spline", spline="ring3Path", position=[0, 0, -1.2],
+                extent=[0.02, 0.02, 0.02], direction=[0.0, 0.0, -1.0], spawnRate=0.0, lifetimeMin=0.25,
+                lifetimeMax=0.6, spread=0.0, speedMin=0.6, speedMax=1.4, gravity=[0, 0, 0], drag=0.5,
+                sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb("#fffaf0") + [1.0], colorEnd=hexrgb(PALE_GOLD) + [0.0],
+                emissive=7.0, blend="additive")
+
+    instrument(s)
     s.region("seed", centre=[0.0, 0.0, -2.4], radius=1.4)
     s.region("armillary", centre=[0.0, 0.0, -1.2], radius=4.2)
     s.region("crown", box=[0.2, 0.0, 0.8, 1.0])

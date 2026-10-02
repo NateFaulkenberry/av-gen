@@ -1521,6 +1521,157 @@
      "unlit": true
     }
    }
+  },
+  {
+   "name": "buildBar",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      26.0,
+      3.2,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      14.0,
+      26.0,
+      -95.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      -12.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.78354,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.78354,
+      0.0
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "buildSquare",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      9.0,
+      9.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.0,
+      18.0,
+      -82.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      45.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.04231,
+      0.04667,
+      1.0
+     ],
+     "emissiveColor": [
+      0.04231,
+      0.04667,
+      1.0
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "buildDisc",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 7.0,
+     "minorRadius": 0.5,
+     "majorSegments": 96,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -44.0,
+      22.0,
+      -105.0
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.02732,
+      0.2462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.02732,
+      0.2462
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
   }
  ]
 }

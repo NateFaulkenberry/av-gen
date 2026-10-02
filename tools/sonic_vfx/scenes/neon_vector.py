@@ -109,6 +109,66 @@ def terrain_deformers():
     ]
 
 
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 2). A deformer route goes to a group's lines AND its fins (the same
+    displacement, or the hidden-line occlusion would come apart)."""
+    def both(group, rel, *a, **k):
+        for kind in ("lines_", "fins_"):
+            s.route(R(a[0], "procedural/%s%s/%s" % (kind, group, rel), *a[1:], **k))
+    # ---- BASS: the near rows swell under the camera; the plain heaves on the kick
+    both("near", "deform/2/amount", "bass", 2.4, attackMs=30, decayMs=380)
+    for g in ("near", "mid", "far"):
+        both(g, "deform/1/amount", "kick", 1.1, attackMs=0, decayMs=420)
+    # ---- BANDS: the middle rows answer the low mids and mids, the far rows the high mids: the spectrum lies across the
+    # landscape in depth
+    both("mid", "deform/2/amount", "audio.lowMid", 2.2, attackMs=40, decayMs=420)
+    both("mid", "deform/3/amount", "audio.mid", 2.6, attackMs=40, decayMs=420)
+    both("far", "deform/2/amount", "audio.highMid", 2.6, attackMs=40, decayMs=420)
+    both("far", "deform/3/amount", "audio.highMid", 3.0, attackMs=40, decayMs=420)
+    # ---- HIGHS: fine jitter on every line; the hats flick it
+    for g in ("near", "mid", "far"):
+        both(g, "deform/4/amount", "audio.treble", 0.22, attackMs=15, decayMs=160)
+        both(g, "deform/4/amount", "hat", 0.18, attackMs=0, decayMs=90)
+    # ---- KICK: a forward lurch (the plain's shapes jump toward the camera); a zoom punch
+    for fld in ("plainNoise", "peakNoise"):
+        s.route(R("kick", "field/%s/position" % fld, 14.0, comp=2, attackMs=0, decayMs=260, integrate=True))
+    s.route(R("kick", "camera/lens/focalLength", 2.0, attackMs=0, decayMs=220))
+    # ---- SNARE: construction -- three flat shapes snap into existence in sequence and shrink away; the lines flash
+    for k, name in enumerate(("buildBar", "buildSquare", "buildDisc")):
+        s.route(R("snare", "procedural/%s/transform/scale" % name, 1.0, attackMs=0, decayMs=650, delayMs=90 * k))
+    for g in ("near", "mid", "far"):
+        s.route(R("snare", "procedural/lines_%s/material/emissive" % g, 2.5, attackMs=0, decayMs=160))
+    # ---- ONSET: the hairline outlines flash
+    s.route(R("onset", "procedural/blockEdge/material/emissive", 6.0, attackMs=0, decayMs=200))
+    # ---- MIDS: the horizon circle breathes and turns
+    for i in range(7):
+        s.route(R("audio.mid", "procedural/circle%d/transform/scale" % i, 0.05 + 0.012 * i, attackMs=60, decayMs=500),
+                R("audio.mid", "procedural/circle%d/transform/rotation" % i, (12.0 + 6 * i) * (1 if i % 2 else -1),
+                  comp=1, integrate=True, attackMs=200, decayMs=900))
+    # ---- CENTROID: the section's accent colour (the whole image's hue turns; the white lines stay white)
+    s.route(R("brightnessSlow", "post/grade/hueShift", 0.42, **VERY_SLOW))
+    # ---- TEMPO: the lines pulse on the beat
+    for g in ("near", "mid", "far"):
+        s.route(R("beat", "procedural/lines_%s/material/emissive" % g, 0.8, attackMs=0, decayMs=150))
+    # ---- INTENSITY: STRUCTURE -- the plain grows denser (more rows) and the peaks taller as the piece builds
+    for g, extra in (("near", 8.0), ("mid", 10.0)):
+        both(g, "distribution/count", "intensity", extra, threshold="binary", thresholdLevel=0.55)
+    for g in ("near", "mid", "far"):
+        both(g, "deform/3/amount", "intensity", 2.0, **VERY_SLOW)
+    # ---- MIDI: a note raises a peak across the plain at its pitch's place (low left, high right), as tall as its
+    # velocity; a held note holds it; a chord turns the horizon circle into a polygon (STRUCTURE)
+    s.route(R("lastPitch", "field/notePeak/position", 90.0, comp=0, offset=-0.5, springHz=3.0, springDamping=0.8))
+    for g in ("near", "mid", "far"):
+        both(g, "deform/5/amount", "noteEnv", 5.0, depth="lastVelocity", attackMs=0, decayMs=700)
+        both(g, "deform/5/amount", "held", 2.5, **MEDIUM)
+    for i in (0, 2, 4, 6):
+        s.route(R("polyphony", "procedural/circle%d/source/majorSegments" % i, -256.0, gain=1.0, threshold="binary",
+                  thresholdLevel=0.3),
+                R("polyphony", "procedural/circle%d/source/majorSegments" % i, 8.0, attackMs=0, decayMs=500))
+    # ---- MOD WHEEL: the plain's wavelength (smooth swells to jagged peaks)
+    s.route(R(s.modwheel(), "field/plainNoise/frequency", 0.3, attackMs=60, decayMs=60))
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.6, "sustain": 0.5, "attack": 1.0, "release": 1.0}
@@ -186,6 +246,18 @@ def build():
                                             {"time": 600.0, "value": [0.0, 0.0, 600.0 * speed], "interp": "linear"}],
                 loop=600.0)
 
+    # ---- construction: three flat shapes the snare builds (scale 0 at rest), each a different accent shape
+    for name, src, pos, rot, col in (
+            ("buildBar", {"kind": "box", "size": [26.0, 3.2, 0.2], "subdivisions": 1}, [14.0, 26.0, -95.0],
+             [0.0, 0.0, -12.0], YELLOW),
+            ("buildSquare", {"kind": "box", "size": [9.0, 9.0, 0.2], "subdivisions": 1}, [-4.0, 18.0, -82.0],
+             [0.0, 0.0, 45.0], ULTRA),
+            ("buildDisc", {"kind": "torus", "majorRadius": 7.0, "minorRadius": 0.5, "majorSegments": 96,
+                           "minorSegments": 4}, [-44.0, 22.0, -105.0], [90.0, 0.0, 0.0], MAGENTA)):
+        s.proc(name, src, material=accent_mat(col, 1.6),
+               transform={"position": pos, "rotation": rot, "scale": [0.001, 0.001, 0.001]})
+
+    instrument(s)
     s.region("peaks", box=[0.38, 0.35, 0.62, 0.75])
     s.region("circle", box=[0.25, 0.05, 0.75, 0.45])
     s.region("block", box=[0.1, 0.15, 0.4, 0.6])

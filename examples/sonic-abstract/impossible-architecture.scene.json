@@ -137,118 +137,11 @@
           ]
          },
          {
-          "kind": "union",
-          "children": [
-           {
-            "kind": "translate",
-            "translation": [
-             -3.15,
-             -2.24,
-             3.6
-            ],
-            "children": [
-             {
-              "kind": "stairs",
-              "size": [
-               0.45,
-               0.32,
-               1.1
-              ],
-              "count": 14,
-              "height": 0.45,
-              "material": 1
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             -4.05,
-             -2.4400000000000004,
-             3.6
-            ],
-            "children": [
-             {
-              "kind": "box",
-              "size": [
-               0.9,
-               0.2,
-               1.1
-              ],
-              "material": 2
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             4.05,
-             2.04,
-             3.6
-            ],
-            "children": [
-             {
-              "kind": "box",
-              "size": [
-               0.9,
-               0.2,
-               1.1
-              ],
-              "material": 2
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             4.75,
-             3.79,
-             3.6
-            ],
-            "children": [
-             {
-              "kind": "difference",
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 0.16,
-                 1.55,
-                 1.05
-                ],
-                "material": 0
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 -0.35,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "box",
-                  "size": [
-                   0.4,
-                   1.25,
-                   0.62
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ],
-          "name": "flightA"
-         },
-         {
-          "kind": "rotate",
-          "rotation": [
-           90.0,
+          "kind": "translate",
+          "translation": [
            0.0,
-           90.0
+           0.0,
+           0.0
           ],
           "children": [
            {
@@ -331,7 +224,7 @@
                    1.55,
                    1.05
                   ],
-                  "material": 0
+                  "material": 3
                  },
                  {
                   "kind": "translate",
@@ -356,9 +249,138 @@
               ]
              }
             ],
-            "name": "flightB"
+            "name": "flightA"
            }
-          ]
+          ],
+          "name": "slideA"
+         },
+         {
+          "kind": "rotate",
+          "rotation": [
+           0.0,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             90.0
+            ],
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 -3.15,
+                 -2.24,
+                 3.6
+                ],
+                "children": [
+                 {
+                  "kind": "stairs",
+                  "size": [
+                   0.45,
+                   0.32,
+                   1.1
+                  ],
+                  "count": 14,
+                  "height": 0.45,
+                  "material": 1
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -4.05,
+                 -2.4400000000000004,
+                 3.6
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.9,
+                   0.2,
+                   1.1
+                  ],
+                  "material": 2
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 4.05,
+                 2.04,
+                 3.6
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.9,
+                   0.2,
+                   1.1
+                  ],
+                  "material": 2
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 4.75,
+                 3.79,
+                 3.6
+                ],
+                "children": [
+                 {
+                  "kind": "difference",
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.16,
+                     1.55,
+                     1.05
+                    ],
+                    "material": 4
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0.0,
+                     -0.35,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "box",
+                      "size": [
+                       0.4,
+                       1.25,
+                       0.62
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "name": "flightB"
+             }
+            ]
+           }
+          ],
+          "name": "foldB"
          },
          {
           "kind": "rotate",
@@ -448,7 +470,7 @@
                    1.55,
                    1.05
                   ],
-                  "material": 0
+                  "material": 5
                  },
                  {
                   "kind": "translate",
@@ -550,6 +572,42 @@
        0.7454,
        0.37124,
        0.09759
+      ]
+     },
+     {
+      "color": [
+       0.89627,
+       0.76815,
+       0.54572
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.89627,
+       0.76815,
+       0.54572
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "color": [
+       0.89627,
+       0.76815,
+       0.54572
+      ],
+      "emission": [
+       0.0,
+       0.0,
+       0.0
       ]
      }
     ],

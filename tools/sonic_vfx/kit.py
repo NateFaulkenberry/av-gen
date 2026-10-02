@@ -491,6 +491,7 @@ class Scene:
         self.character = None
         self.response = None
         self.regions = []         # the evaluator's screen-space regions (sonicScene.regions), see region()
+        self.control = None       # the project's control map (MIDI CC / OSC bindings), see modwheel()
 
     # ---------------------------------------------------------------- world
     def proc(self, name, source, distribution=None, material=None, deformers=None, variation=None,
@@ -742,6 +743,15 @@ class Scene:
     def param(self, path, value):
         self.params[path] = value
 
+    def modwheel(self):
+        """Binds the MIDI mod wheel (CC 1, any source and channel) to the bus signal `control.modwheel` (0..1), and
+        returns that id for routes."""
+        self.control = self.control or {"midi": {"enabled": True, "filter": "*", "bindings": []}}
+        binds = self.control["midi"]["bindings"]
+        if not any(b.get("signal") == "modwheel" for b in binds):
+            binds.append({"signal": "modwheel", "source": "*", "channel": -1, "kind": "cc", "number": 1})
+        return "control.modwheel"
+
     def params_(self, d):
         self.params.update(d)
 
@@ -931,6 +941,8 @@ class Scene:
             doc["palette"] = self.palette
         if self.publish:
             doc["publish"] = self.publish
+        if self.control:
+            doc["control"] = self.control
         return doc
 
     def write(self, out_dir=OUT_DIR):

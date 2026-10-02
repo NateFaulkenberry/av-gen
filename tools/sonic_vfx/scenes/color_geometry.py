@@ -79,10 +79,11 @@ DESIGN = {
 
 def corridor():
     half_edge = APOTHEM * math.tan(math.pi / SIDES) + FRAME * 0.5
-    slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge)))
+    slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge), name="slab"))
     portal = sd_polar(SIDES, slab, name="polygon")
     # a floating card in each bay, tilted, off-axis: the slabs that cross the space
-    card = sd_move((1.9, SPACING * 0.5, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((1.25, 0.035, 0.7))), m=0)
+    card = sd_move((1.9, SPACING * 0.5, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((1.25, 0.035, 0.7)), name="card"),
+                   m=0)
     cell = sd_union(portal, card)
     rep = sd_repeat((0.0, SPACING, 0.0), cell, count=0, name="accordion")
     travel = sd_move((0.0, 0.0, 0.0), rep, name="travel")
@@ -105,6 +106,50 @@ def colour_program():
         ],
         "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.55, "opacity": -1,
     }
+
+
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 4)."""
+    N = "sdf/corridor/node/%s/"
+    HUE = "material/cgSpace/op/6/hueShift/value"
+    # ---- BASS: the accordion -- the spacing and the travel are scaled by the same factor (1 + 0.28 bass), so the
+    # corridor breathes round the viewer without a jump; the haze thickens a little
+    breath = dict(op="multiply", gain=0.28, offset=1.0, attackMs=40, decayMs=420)
+    s.route(R("bass", N % "accordion" + "size", 1.0, comp=1, **breath),
+            R("bass", N % "travel" + "translation", 1.0, comp=1, **breath),
+            R("bass", "scene/volumeDensity", 0.008, attackMs=60, decayMs=600))
+    # ---- KICK: a zoom punch toward the light; the light flares
+    s.route(R("kick", "post/radial/amount", 0.1, attackMs=0, decayMs=200),
+            R("kick", "camera/lens/focalLength", 3.0, attackMs=0, decayMs=240),
+            R("kick", "lights/end/intensity", 30000.0, attackMs=0, decayMs=260))
+    # ---- SNARE: the whole colour sequence jumps a step round the wheel (an integrated hit: it stays where it lands)
+    s.route(R("snare", HUE, 1.1, attackMs=0, decayMs=180, integrate=True))
+    # ---- MIDS: the corridor winds and unwinds its twist
+    s.route(R("audio.mid", N % "twist" + "amount", 0.03, attackMs=120, decayMs=900))
+    # ---- HIGHS: a fine light traces every edge
+    s.route(R("audio.treble", "sdf/corridor/look/edge/intensity", 2.0, attackMs=20, decayMs=200),
+            R("hat", "sdf/corridor/look/edge/intensity", 1.2, attackMs=0, decayMs=90))
+    # ---- CENTROID: the colour range cools as the sound brightens
+    s.route(R("brightnessSlow", HUE, 0.3, **SLOW))
+    # ---- FLUX: the floating cards tumble
+    s.route(R("flux", N % "card" + "rotation", 50.0, comp=0, attackMs=60, decayMs=500),
+            R("flux", N % "card" + "rotation", -35.0, comp=2, attackMs=60, decayMs=500))
+    # ---- TEMPO: the corridor surges a little on each beat
+    s.route(R("beat", N % "travel" + "translation", -1.4, comp=1, attackMs=0, decayMs=260))
+    # ---- INTENSITY: the light at the end grows; the bloom opens
+    s.route(R("intensity", "lights/end/intensity", 22000.0, **VERY_SLOW),
+            R("intensity", "post/bloom/intensity", 0.3, **VERY_SLOW))
+    # ---- MIDI: each note recolours the space (the pitch sets the hue's phase); a chord sets the portal's polygon
+    # order (STRUCTURE: 3 notes a triangle, 4 a square, 6 a hexagon; a single note keeps the square); velocity flares
+    # the light; held notes glow the haze
+    s.route(R("lastPitch", HUE, 0.9, springHz=1.5, springDamping=0.8),
+            R("polyphony", N % "polygon" + "count", -1.0, threshold="binary", thresholdLevel=0.3),
+            R("polyphony", N % "polygon" + "count", 1.0, gain=8.0, offset=-3.0, clampEnabled=True, clampMin=0.0,
+              clampMax=5.0),
+            R("noteEnv", "lights/end/intensity", 26000.0, depth="lastVelocity", attackMs=0, decayMs=400),
+            R("held", "scene/volumeDensity", 0.01, **MEDIUM))
+    # ---- MOD WHEEL: the frames thicken from slender to monumental
+    s.route(R(s.modwheel(), N % "slab" + "size", 1.6, comp=0, attackMs=60, decayMs=60))
 
 
 def build():
@@ -147,6 +192,7 @@ def build():
     cam = [0.55, -0.35, 4.0]
     s.camera = {"mode": 1, "position": cam, "target": [-0.6, 0.25, -60.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(cam, [-0.6, 0.25, -60.0], period=40.0, amp=(0.7, 0.45, 0.0), tamp=(2.0, 1.4, 0.0))
+    instrument(s)
     s.region("vanishing", box=[0.4, 0.35, 0.6, 0.6])
     s.region("near", box=[0.0, 0.0, 1.0, 1.0])
     return s

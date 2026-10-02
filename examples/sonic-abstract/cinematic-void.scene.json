@@ -171,6 +171,118 @@
    }
   },
   {
+   "name": "beacon",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      12.193306486745385,
+      17.0,
+      11.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 150.0,
+     "plane": "xy",
+     "orientation": "outward",
+     "startAngle": 1.5708,
+     "endAngle": 7.854
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      128.0,
+      -949.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00802,
+      0.00802,
+      0.01033
+     ],
+     "emissiveColor": [
+      1.0,
+      0.90466,
+      0.71569
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.45,
+     "metallic": 0.35
+    }
+   }
+  },
+  {
+   "name": "beaconTwin",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      12.193306486745385,
+      17.0,
+      11.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 150.0,
+     "plane": "xy",
+     "orientation": "outward",
+     "startAngle": 1.5708,
+     "endAngle": 7.854
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -128.0,
+      -949.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00802,
+      0.00802,
+      0.01033
+     ],
+     "emissiveColor": [
+      1.0,
+      0.90466,
+      0.71569
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.45,
+     "metallic": 0.35
+    }
+   }
+  },
+  {
    "name": "figureBody",
    "kind": "procedural",
    "procedural": {

@@ -133,7 +133,265 @@
   "post/tonemap/operator": 3
  },
  "sources": [],
- "routes": [],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "sdf/corridor/node/accordion/size",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": 0.28,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/corridor/node/travel/translation",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": 0.28,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "scene/volumeDensity",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/radial/amount",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "camera/lens/focalLength",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/end/intensity",
+   "amount": 30000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 180,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/corridor/node/twist/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/corridor/look/edge/intensity",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "sdf/corridor/look/edge/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "sdf/corridor/node/card/rotation",
+   "amount": 50.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "sdf/corridor/node/card/rotation",
+   "amount": -35.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "sdf/corridor/node/travel/translation",
+   "amount": -1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "lights/end/intensity",
+   "amount": 22000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "post/bloom/intensity",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "springHz": 1.5,
+    "springDamping": 0.8
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "sdf/corridor/node/polygon/count",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "sdf/corridor/node/polygon/count",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 8.0,
+    "offset": -3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 5.0
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "lights/end/intensity",
+   "amount": 26000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "scene/volumeDensity",
+   "amount": 0.01,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "sdf/corridor/node/slab/size",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 60
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -463,5 +721,20 @@
     ]
    }
   ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
  }
 }

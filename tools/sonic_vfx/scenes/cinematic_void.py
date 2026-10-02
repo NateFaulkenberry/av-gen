@@ -86,6 +86,49 @@ def ring(s, name, centre):
            transform={"position": list(centre), "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]})
 
 
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 8). Restraint: the void moves slowly, light and air carry it."""
+    P = "procedural/%s/"
+    # ---- BASS: the haze breathes; the sun's glow swells
+    s.route(R("bass", "scene/volumeDensity", 0.0009, attackMs=80, decayMs=700),
+            R("bass", "lights/sun/intensity", 2.5, attackMs=60, decayMs=600))
+    # ---- KICK: a pulse of light round the ring's seams (its segments glow amber and fade)
+    for node in ("ring", "ringTwin"):
+        s.route(R("kick", P % node + "material/emissive", 3.5, attackMs=0, decayMs=600))
+    # ---- SNARE: dust bursts in the light
+    s.route(R("snare", "particles/dust/burst", 500.0, threshold="binary", thresholdLevel=0.05))
+    # ---- HIGHS: the dust glitters
+    s.route(R("audio.treble", "particles/dust/emissive", 2.5, attackMs=20, decayMs=250),
+            R("hat", "particles/dust/emissive", 1.5, attackMs=0, decayMs=90))
+    # ---- MIDS: the ring turns slowly about its axis (integrated)
+    for node in ("ring", "ringTwin", "beacon", "beaconTwin"):
+        s.route(R("audio.mid", P % node + "transform/rotation", 4.0 if "Twin" not in node else -4.0, comp=2,
+                  integrate=True, attackMs=300, decayMs=1500))
+    # ---- CENTROID: the grade -- amber for a dark timbre, rose and teal for a bright one
+    s.route(R("brightnessSlow", "env/sky/horizonColor", -0.35, comp=1, **SLOW),
+            R("brightnessSlow", "env/sky/horizonColor", 0.25, comp=2, **SLOW),
+            R("brightnessSlow", "post/grade/temperature", -0.25, **SLOW))
+    # ---- SUSTAIN: the sun inside the ring brightens
+    s.route(R("sustain", "lights/sun/intensity", 5.0, **SLOW))
+    # ---- TEMPO: the ring breathes its radius on the beat (a few metres at 300)
+    for node in ("ring", "ringTwin"):
+        s.route(R("beat", P % node + "distribution/radius", 2.5, attackMs=0, decayMs=400))
+    # ---- INTENSITY: STRUCTURE -- the ring parts: its segments move apart as the piece builds
+    for node in ("ring", "ringTwin", "beacon", "beaconTwin"):
+        s.route(R("intensity", P % node + "distribution/radius", 22.0, **VERY_SLOW))
+    # ---- MIDI: the segment at the pitch's angle lights (a beacon round the ring), as bright as the velocity;
+    # STRUCTURE: a chord sets the segment count; held notes drift the segments outward
+    for node in ("beacon", "beaconTwin"):
+        s.route(R("lastPitch", P % node + "distribution/startAngle", 2.0 * math.pi * (1 if "Twin" not in node else -1),
+                  springHz=1.2, springDamping=0.85),
+                R("noteEnv", P % node + "material/emissive", 9.0, depth="lastVelocity", attackMs=0, decayMs=900))
+    for node in ("ring", "ringTwin"):
+        s.route(R("polyphony", P % node + "distribution/count", 64.0, attackMs=0, decayMs=1500),
+                R("held", P % node + "distribution/radius", 9.0, **MEDIUM))
+    # ---- MOD WHEEL: the sun's height inside the ring (a sunrise by hand)
+    s.route(R(s.modwheel(), "lights/sun/elevation", 6.0, attackMs=100, decayMs=100))
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.5}
@@ -105,6 +148,18 @@ def build():
 
     ring(s, "ring", RING_C)
     ring(s, "ringTwin", (RING_C[0], -RING_C[1], RING_C[2]))
+
+    # the beacon: one segment that the notes place round the ring (a radial distribution of one, its start angle
+    # routed), and its twin
+    seg_len = 2.0 * math.pi * RING_R / SEGMENTS * 0.9
+    for name, cy in (("beacon", RING_C[1]), ("beaconTwin", -RING_C[1])):
+        s.proc(name, {"kind": "box", "size": [seg_len * 0.92, 17.0, 11.6], "subdivisions": 1},
+               distribution={"kind": "radial", "count": 1, "radius": RING_R, "plane": "xy", "orientation": "outward",
+                             "startAngle": 1.5708, "endAngle": 1.5708 + 6.2832},
+               material={"baseColor": hexrgb("#16161a"), "emissiveColor": hexrgb(LIGHT), "emissiveIntensity": 0.0,
+                         "roughness": 0.45, "metallic": 0.35},
+               transform={"position": [RING_C[0], cy, RING_C[2] + 0.4], "rotation": [0.0, 0.0, 0.0],
+                          "scale": [1.0, 1.0, 1.0]})
 
     # the figure (a simple silhouette) and its twin
     for name, sign in (("figure", 1.0), ("figureTwin", -1.0)):
@@ -161,6 +216,7 @@ def build():
                "post/bloom/emissionWeight": 0.8, "post/halation/enabled": True, "post/halation/intensity": 0.25,
                "post/halation/warmth": 0.8, "post/output/vignette": 0.45, "post/output/grain": 0.03,
                "post/tonemap/operator": 3, "scene/volumeAnisotropy": 0.72, "scene/volumeSteps": 24})
+    instrument(s)
     s.region("ring", centre=list(RING_C), radius=RING_R)
     s.region("figure", centre=[FIGURE[0], 0.9, FIGURE[2]], radius=2.0)
     return s

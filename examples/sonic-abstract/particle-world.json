@@ -138,10 +138,860 @@
   "temporal/feedback/decay": 0.72,
   "temporal/feedback/zoom": 1.0,
   "temporal/feedback/rotate": 0.0,
-  "temporal/feedback/hue": 0.0
+  "temporal/feedback/hue": 0.0,
+  "post/shock/radius": 1.0,
+  "post/shock/width": 0.06,
+  "post/shock/chroma": 0.6,
+  "post/shock/centerX": 0.419,
+  "post/shock/centerY": 0.464
  },
  "sources": [],
- "routes": [],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_in/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_in/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_mid/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_mid/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_out/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm0_out/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_in/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_in/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_mid/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_mid/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_out/radius",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "spline/arm1_out/radiusGrowth",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.16,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "particles/core/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/heart/material/emissive",
+   "amount": 20.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/blast/burst",
+   "amount": 1800.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/shock/amount",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/shock/radius",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/p_arm0_mid/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/p_arm0_out/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "post/split/amount",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/glitter/burst",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "particles/glitter/spawnRate",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm0_in/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm0_mid/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm0_out/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm1_in/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm1_mid/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/arm1_out/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/xarm0/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/xarm1/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/xarm2/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "spline/xarm3/startAngle",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm0_in/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm0_mid/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm0_out/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm1_in/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm1_mid/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "particles/p_arm1_out/turbulence",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm0_in/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm0_mid/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm0_out/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm1_in/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm1_mid/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "particles/p_arm1_out/size",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "post/grade/hueShift",
+   "amount": -0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "particles/core/emissive",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm0_in/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm0_mid/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm0_out/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm1_in/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm1_mid/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/p_arm1_out/spawnRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "particles/halo/spawnRate",
+   "amount": 2000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "spline/cometArc/startAngle",
+   "amount": 6.283185307179586,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "response.note",
+   "target": "particles/comet/burst",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "particles/comet/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/xp0/spawnRate",
+   "amount": 3200.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.3,
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/xp1/spawnRate",
+   "amount": 3200.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.45,
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/xp2/spawnRate",
+   "amount": 3200.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.6,
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/xp3/spawnRate",
+   "amount": 3200.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.72,
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "particles/halo/emissive",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm0_in/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm0_mid/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm0_out/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm1_in/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm1_mid/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/arm1_out/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/xarm0/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/xarm1/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/xarm2/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "spline/xarm3/axis",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -263,6 +1113,86 @@
      {
       "time": 80.0,
       "value": 14.57698991265664,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/xarm0/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 1.5707963267948966,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 7.853981633974483,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/xarm1/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 4.71238898038469,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 10.995574287564276,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/xarm2/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.7853981633974483,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 7.0685834705770345,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/xarm3/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 3.9269908169872414,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 10.210176124166829,
       "interp": "linear"
      }
     ]
@@ -708,5 +1638,20 @@
     ]
    }
   ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
  }
 }

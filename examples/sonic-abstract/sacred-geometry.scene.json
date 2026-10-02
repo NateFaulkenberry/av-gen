@@ -1175,6 +1175,55 @@
    }
   },
   {
+   "name": "chordGon",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 1.02,
+     "minorRadius": 0.03,
+     "majorSegments": 3,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.0,
+      -2.35
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.06848,
+      0.01764
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
    "name": "core",
    "kind": "procedural",
    "procedural": {
@@ -1220,6 +1269,1589 @@
      "metallic": 0.0,
      "unlit": true
     }
+   }
+  },
+  {
+   "name": "pc0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.623041666781258e-16,
+      7.55,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.5208595475486404e-16,
+      5.75,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.775000000000001,
+      6.538491798572511,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -30.000000000000007
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.8750000000000004,
+      4.979646071760522,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      30.000000000000007,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      6.538491798572512,
+      3.7749999999999995,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -60.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.979646071760523,
+      2.8749999999999996,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      60.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      7.55,
+      0.0,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -90.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.75,
+      0.0,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      6.538491798572512,
+      -3.7749999999999995,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -120.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.979646071760523,
+      -2.8749999999999996,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      120.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.775000000000001,
+      -6.538491798572511,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -150.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.8750000000000004,
+      -4.979646071760522,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      150.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.623041666781258e-16,
+      -7.55,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -180.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.5208595475486404e-16,
+      -5.75,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      180.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.7749999999999986,
+      -6.538491798572512,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -210.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.874999999999999,
+      -4.979646071760523,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      210.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.538491798572512,
+      -3.7749999999999995,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -240.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.979646071760523,
+      -2.8749999999999996,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      240.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.55,
+      -9.246083333562517e-16,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -270.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -5.75,
+      -7.041719095097281e-16,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      270.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.538491798572511,
+      3.775000000000001,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -300.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.979646071760522,
+      2.8750000000000004,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      300.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pc11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.34,
+     "minorRadius": 0.026,
+     "majorSegments": 4,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.7750000000000035,
+      6.53849179857251,
+      0.1
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      -330.0
+     ],
+     "scale": [
+      0.55,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "spoke11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      0.035,
+      2.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.8750000000000027,
+      4.979646071760521,
+      -0.15
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "sourceTransform": {
+     "rotation": [
+      330.0,
+      90.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "crownPath",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 48,
+    "radius": 5.6,
+    "center": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "sparks",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4000,
+    "seed": 17,
+    "shape": "spline",
+    "spline": "crownPath",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.05,
+     0.05,
+     0.05
+    ],
+    "direction": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.5,
+    "lifetimeMax": 1.1,
+    "spread": 0.08,
+    "speedMin": 2.5,
+    "speedMax": 5.5,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 1.6,
+    "sizeStart": 0.06,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.69387,
+     0.35153,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.06848,
+     0.01764,
+     0.0
+    ],
+    "emissive": 6.0,
+    "blend": "additive",
+    "velocityStretch": 1.2,
+    "stretchMax": 0.35
+   }
+  },
+  {
+   "name": "ring1Path",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 48,
+    "radius": 4.3,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "ring2Path",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 48,
+    "radius": 3.88,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "ring3Path",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 48,
+    "radius": 3.5,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "ring4Path",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 48,
+    "radius": 3.14,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "beadRun",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 23,
+    "shape": "spline",
+    "spline": "ring1Path",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.02,
+     0.02,
+     0.02
+    ],
+    "direction": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.25,
+    "lifetimeMax": 0.6,
+    "spread": 0.0,
+    "speedMin": 0.6,
+    "speedMax": 1.4,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.5,
+    "sizeStart": 0.075,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.95597,
+     0.87137,
+     1.0
+    ],
+    "colorEnd": [
+     0.88792,
+     0.47932,
+     0.07036,
+     0.0
+    ],
+    "emissive": 7.0,
+    "blend": "additive"
+   }
+  },
+  {
+   "name": "beads3",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 29,
+    "shape": "spline",
+    "spline": "ring3Path",
+    "position": [
+     0,
+     0,
+     -1.2
+    ],
+    "extent": [
+     0.02,
+     0.02,
+     0.02
+    ],
+    "direction": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.25,
+    "lifetimeMax": 0.6,
+    "spread": 0.0,
+    "speedMin": 0.6,
+    "speedMax": 1.4,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.5,
+    "sizeStart": 0.06,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.95597,
+     0.87137,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.69387,
+     0.25415,
+     0.0
+    ],
+    "emissive": 7.0,
+    "blend": "additive"
    }
   }
  ],

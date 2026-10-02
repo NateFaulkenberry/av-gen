@@ -115,8 +115,73 @@ def creature(s, name, pos, body_col, facing=0.0, scale=1.0):
         s.proc("%sFoot%s" % (name, "L" if side < 0 else "R"), sphere(0.24, 10, 6),
                material=toon(body_col, ambient=0.55), position=(0.38 * side, -0.78, 0.18), scale=(1.0, 0.5, 1.3),
                parent=name)
+    s.proc(name + "Mouth", sphere(0.17, 12, 6), material=toon("#4a1a3a", bands=1, ambient=0.9),
+           position=(0.0, 0.02, 0.8), scale=(1.0, 0.08, 0.45), parent=name)
     s.proc(name + "Sprout", cyl(0.05, 0.5, 6), material=toon(MINT_DARK), position=(0.0, 0.98, 0.0), parent=name)
     s.proc(name + "Bud", sphere(0.16, 10, 6), material=toon(PINK, rim=0.3), position=(0.0, 1.28, 0.0), parent=name)
+
+
+CREATURES = ("blob1", "blob2", "blob3")
+EXTRA = ("blob4", "blob5")
+RAINBOW = ["#ff9aa8", "#ffc38a", "#fff09a", "#a8f0b8", "#9ad4ff", "#c8a8ff"]
+
+
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 3)."""
+    N = "nodes/%s/"
+    # ---- KICK: the creatures hop, a ripple left to right, landing on a spring; velocity sets the height
+    for k, name in enumerate(CREATURES + EXTRA):
+        s.route(R("kick", N % name + "position", 0.75, comp=1, attackMs=0, decayMs=240, delayMs=70 * k,
+                  springHz=2.4, springDamping=0.45))
+    # ---- BASS: squash and stretch (wider and lower on the bass); the camera bobs
+    for name in CREATURES + EXTRA:
+        s.route(R("bass", N % name + "scale", -0.16, comp=1, attackMs=20, decayMs=260),
+                R("bass", N % name + "scale", 0.1, comp=0, attackMs=20, decayMs=260),
+                R("bass", N % name + "scale", 0.1, comp=2, attackMs=20, decayMs=260))
+    s.route(R("bass", "camera/position", 0.35, comp=1, attackMs=60, decayMs=500))
+    # ---- SNARE: the flower's petals flick open; a confetti puff from its heart
+    s.route(R("snare", "procedural/petals/transform/scale", 0.22, attackMs=0, decayMs=260, springHz=3.0,
+              springDamping=0.4),
+            R("snare", "particles/confetti/burst", 140.0, threshold="binary", thresholdLevel=0.05))
+    # ---- HATS: sparkles round the flower
+    s.route(R("hat", "particles/sparkle/burst", 18.0, threshold="binary", thresholdLevel=0.05),
+            R("audio.treble", "particles/sparkle/spawnRate", 60.0, attackMs=30, decayMs=300))
+    # ---- MIDS: the clouds sway; the creatures turn their heads
+    for k in range(4):
+        s.route(R("audio.mid", "procedural/cloud%d/transform/position" % k, 2.4 * (1 if k % 2 else -1), comp=0,
+                  attackMs=300, decayMs=1200))
+    for k, name in enumerate(CREATURES):
+        s.route(R("audio.mid", N % name + "rotation", (-22.0, 10.0, 26.0)[k], comp=1, attackMs=200, decayMs=800))
+    # ---- CENTROID: the time of day (a bright timbre is a blue-pink noon, a dark one a lavender dusk)
+    s.route(R("brightnessSlow", "env/sky/zenithColor", -0.35, comp=0, **SLOW),
+            R("brightnessSlow", "env/sky/zenithColor", 0.15, comp=1, **SLOW),
+            R("brightnessSlow", "env/sky/zenithColor", 0.3, comp=2, **SLOW),
+            R("brightnessSlow", "lights/sun/intensity", 1.0, **SLOW))
+    # ---- SUSTAIN: the giant flower blooms (its petals spread)
+    s.route(R("sustain", "procedural/petals/distribution/radius", 0.6, **SLOW),
+            R("sustain", "procedural/heart/transform/scale", 0.25, **SLOW))
+    # ---- TEMPO: everyone bobs on the beat
+    for name in CREATURES + EXTRA:
+        s.route(R("beat", N % name + "position", 0.1, comp=1, attackMs=0, decayMs=200))
+    # ---- INTENSITY: STRUCTURE -- two more creatures join as the piece builds
+    for name in EXTRA:
+        s.route(R("intensity", N % name + "scale", 1.0, threshold="binary", thresholdLevel=0.5, attackMs=300,
+                  decayMs=900, springHz=1.6, springDamping=0.5))
+    # ---- MIDI: the creature at the pitch's place sings (low left, high right): its mouth opens and it lifts;
+    # STRUCTURE: as many lawn flowers bloom as there are notes in the chord; a held note raises the rainbow
+    for k, name in enumerate(CREATURES):
+        hit = "visual.singHit%d" % k
+        s.route(R(hit, N % (name + "Mouth") + "scale", 0.9, comp=1, attackMs=0, decayMs=420),
+                R(hit, N % name + "position", 0.35, comp=1, depth="lastVelocity", attackMs=0, decayMs=380))
+    for node in ("tulipStems", "tulips"):
+        s.route(R("polyphony", "procedural/%s/distribution/count" % node, 16.0, attackMs=0, decayMs=900))
+    for k in range(len(RAINBOW)):
+        s.route(R("held", "procedural/rainbow%d/transform/scale" % k, 1.0, delayMs=60 * k, **MEDIUM))
+    # ---- MOD WHEEL: day to night
+    wheel = s.modwheel()
+    s.route(R(wheel, "lights/sun/intensity", -2.4, attackMs=80, decayMs=80),
+            R(wheel, "env/sky/zenithColor", 1.0, op="multiply", gain=-0.75, offset=1.0, attackMs=80, decayMs=80),
+            R(wheel, "env/sky/horizonColor", 1.0, op="multiply", gain=-0.6, offset=1.0, attackMs=80, decayMs=80))
 
 
 def build():
@@ -195,6 +260,38 @@ def build():
                 sizeStart=0.09, sizeEnd=0.05, sizeVariance=0.4, colorStart=hexrgb("#e8f8ff") + [0.95],
                 colorEnd=hexrgb("#b9e6ff") + [0.0], emissive=1.0, blend="alpha", velocityStretch=1.2,
                 stretchMax=0.6)
+
+    # ---- extra creatures that join as a piece builds (scale 0 at rest), small lawn flowers (one per chord voice),
+    # a rainbow behind the island for held notes (scale 0 at rest)
+    for name, x, z, col, face in (("blob4", -0.9, 2.2, PINK, 26.0), ("blob5", 4.2, 2.6, "#9ff0d0", 12.0)):
+        creature(s, name, (x, 0.95, z), col, facing=face, scale=0.001)
+    tulip_dist = {"kind": "radial", "count": 3, "radius": 7.2, "plane": "xz", "orientation": "outward",
+                  "startAngle": 0.6, "endAngle": 2.9}
+    s.proc("tulipStems", cyl(0.05, 0.7, 6), distribution=tulip_dist, material=toon(MINT_DARK),
+           transform=at(0.0, 0.35, 0.0))
+    s.proc("tulips", sphere(0.26, 10, 6), distribution=tulip_dist, material=toon(PINK, rim=0.25),
+           transform=at(0.0, 0.85, 0.0), material_variation={"hueGradient": 0.6, "perceptualHue": True})
+    for k, col in enumerate(RAINBOW):
+        s.proc("rainbow%d" % k, {"kind": "torus", "majorRadius": 9.0 - 0.42 * k, "minorRadius": 0.2,
+                                 "majorSegments": 64, "minorSegments": 6},
+               material=toon(col, bands=1, ambient=0.9, emissive=0.25),
+               transform={"position": [0.0, -0.4, -3.5], "rotation": [90.0, 0.0, 0.0], "scale": [0.001, 0.001, 0.001]})
+
+    # ---- confetti (the snare) and sparkles (the hats) from the flower
+    s.particles("confetti", capacity=2000, seed=19, shape="sphere", position=list(head), extent=[0.4, 0.4, 0.4],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=1.6, lifetimeMax=2.6, spread=0.9, speedMin=2.0,
+                speedMax=4.0, gravity=[0, -3.0, 0], drag=1.2, turbulence=0.6, turbulenceScale=0.8,
+                sizeStart=0.11, sizeEnd=0.08, colorStart=hexrgb(PINK) + [1.0], colorEnd=hexrgb(BUTTER) + [0.0],
+                colorCurve=[{"t": 0.0, "color": hexrgb(PINK)}, {"t": 0.33, "color": hexrgb(BUTTER)},
+                            {"t": 0.66, "color": hexrgb("#8ff0c0")}, {"t": 1.0, "color": hexrgb(LILAC)}],
+                emissive=1.0, blend="alpha", shape2d="leaf", tumbleRate=6.0, leafAspect=0.7)
+    s.particles("sparkle", capacity=1200, seed=27, shape="sphere", position=list(head), extent=[2.2, 1.6, 1.4],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.3, lifetimeMax=0.7, spread=1.0, speedMin=0.0,
+                speedMax=0.2, gravity=[0, 0, 0], drag=1.0, sizeStart=0.09, sizeEnd=0.0,
+                colorStart=hexrgb("#ffffff") + [1.0], colorEnd=hexrgb(BUTTER) + [0.0], emissive=5.0,
+                blend="additive")
+    s.places("sing", "lastPitch", [0.36, 0.5, 0.64], 0.07, event="noteOn")
+    instrument(s)
 
     # ---- camera: a slow arc round the diorama from slightly above; the creatures and flower left of centre
     focal = 32.0

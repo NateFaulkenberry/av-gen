@@ -389,6 +389,14 @@
        0.0
       ],
       "space": "local"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 9.0,
+      "speed": 4.0,
+      "seed": 40,
+      "space": "local"
      }
     ]
    }
@@ -531,6 +539,14 @@
        0.0,
        0.0
       ],
+      "space": "local"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 9.0,
+      "speed": 4.0,
+      "seed": 41,
       "space": "local"
      }
     ]
@@ -675,6 +691,14 @@
        0.0
       ],
       "space": "local"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 9.0,
+      "speed": 4.0,
+      "seed": 42,
+      "space": "local"
      }
     ]
    }
@@ -818,6 +842,14 @@
        0.0
       ],
       "space": "local"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 9.0,
+      "speed": 4.0,
+      "seed": 43,
+      "space": "local"
      }
     ]
    }
@@ -960,6 +992,14 @@
        0.0,
        0.0
       ],
+      "space": "local"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 9.0,
+      "speed": 4.0,
+      "seed": 44,
       "space": "local"
      }
     ]
@@ -2259,6 +2299,1218 @@
     "blend": "additive",
     "pulseRate": 0.6,
     "pulseDepth": 0.5
+   }
+  },
+  {
+   "name": "budStalk0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -2.9,
+         0.0,
+         -1.9
+        ]
+       },
+       {
+        "position": [
+         -2.85,
+         0.35,
+         -1.9
+        ]
+       },
+       {
+        "position": [
+         -2.94,
+         0.7,
+         -1.9
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.94,
+      0.73,
+      -1.9
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.15896,
+      0.11954
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.94,
+      0.75,
+      -1.9
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budStalk1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -2.1,
+         0.0,
+         -2.6
+        ]
+       },
+       {
+        "position": [
+         -2.0500000000000003,
+         0.425,
+         -2.6
+        ]
+       },
+       {
+        "position": [
+         -2.14,
+         0.85,
+         -2.6
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.14,
+      0.88,
+      -2.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.14,
+      0.9,
+      -2.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budStalk2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -1.2,
+         0.0,
+         -2.9
+        ]
+       },
+       {
+        "position": [
+         -1.15,
+         0.5,
+         -2.9
+        ]
+       },
+       {
+        "position": [
+         -1.24,
+         1.0,
+         -2.9
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.24,
+      1.03,
+      -2.9
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.24,
+      1.05,
+      -2.9
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budStalk3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         2.3,
+         0.0,
+         -2.2
+        ]
+       },
+       {
+        "position": [
+         2.3499999999999996,
+         0.35,
+         -2.2
+        ]
+       },
+       {
+        "position": [
+         2.26,
+         0.7,
+         -2.2
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      2.26,
+      0.73,
+      -2.2
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.26,
+      0.75,
+      -2.2
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budStalk4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         3.0,
+         0.0,
+         -1.3
+        ]
+       },
+       {
+        "position": [
+         3.05,
+         0.425,
+         -1.3
+        ]
+       },
+       {
+        "position": [
+         2.96,
+         0.85,
+         -1.3
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      2.96,
+      0.88,
+      -1.3
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.96,
+      0.9,
+      -1.3
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budStalk5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.025,
+     "tubeTaper": 0.6,
+     "tubeSides": 6,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         2.6,
+         0.0,
+         -0.4
+        ]
+       },
+       {
+        "position": [
+         2.65,
+         0.5,
+         -0.4
+        ]
+       },
+       {
+        "position": [
+         2.56,
+         1.0,
+         -0.4
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "budPetals5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 5,
+     "radius": 0.11,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      2.56,
+      1.03,
+      -0.4
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.001,
+      0.001,
+      0.001
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      -35.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.45,
+      0.15,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "budHeart5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.06,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.56,
+      1.05,
+      -0.4
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "puff",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2000,
+    "seed": 31,
+    "shape": "sphere",
+    "position": [
+     -0.62,
+     1.9499999999999997,
+     0.08
+    ],
+    "extent": [
+     0.12,
+     0.08,
+     0.12
+    ],
+    "direction": [
+     0,
+     -1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 1.5,
+    "lifetimeMax": 3.0,
+    "spread": 0.8,
+    "speedMin": 0.3,
+    "speedMax": 0.9,
+    "gravity": [
+     0,
+     -0.05,
+     0
+    ],
+    "drag": 1.2,
+    "turbulence": 0.3,
+    "turbulenceScale": 1.5,
+    "sizeStart": 0.02,
+    "sizeEnd": 0.008,
+    "colorStart": [
+     1.0,
+     0.45079,
+     0.25415,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.15896,
+     0.11954,
+     0.0
+    ],
+    "emissive": 5.0,
+    "blend": "additive"
+   }
+  },
+  {
+   "name": "mushSpores",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2500,
+    "seed": 37,
+    "shape": "sphere",
+    "position": [
+     1.25,
+     0.8,
+     0.35
+    ],
+    "extent": [
+     0.6,
+     0.15,
+     0.6
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 4.0,
+    "spread": 0.5,
+    "speedMin": 0.3,
+    "speedMax": 0.8,
+    "gravity": [
+     0,
+     -0.02,
+     0
+    ],
+    "drag": 0.8,
+    "turbulence": 0.35,
+    "turbulenceScale": 1.0,
+    "sizeStart": 0.015,
+    "sizeEnd": 0.006,
+    "colorStart": [
+     0.56471,
+     1.0,
+     0.11193,
+     1.0
+    ],
+    "colorEnd": [
+     0.521,
+     1.0,
+     0.80695,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive"
+   }
+  },
+  {
+   "name": "petalFall",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 600,
+    "seed": 43,
+    "shape": "sphere",
+    "position": [
+     -0.62,
+     2.05,
+     0.08
+    ],
+    "extent": [
+     0.3,
+     0.1,
+     0.3
+    ],
+    "direction": [
+     0,
+     -1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 3.0,
+    "lifetimeMax": 4.5,
+    "spread": 0.6,
+    "speedMin": 0.1,
+    "speedMax": 0.3,
+    "gravity": [
+     0,
+     -0.25,
+     0
+    ],
+    "drag": 1.5,
+    "turbulence": 0.4,
+    "turbulenceScale": 1.2,
+    "sizeStart": 0.07,
+    "sizeEnd": 0.05,
+    "colorStart": [
+     1.0,
+     0.15896,
+     0.11954,
+     0.95
+    ],
+    "colorEnd": [
+     0.64448,
+     0.19807,
+     1.0,
+     0.0
+    ],
+    "emissive": 1.6,
+    "blend": "alpha",
+    "shape2d": "leaf",
+    "tumbleRate": 3.0,
+    "leafAspect": 0.45
    }
   }
  ],

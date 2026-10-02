@@ -82,7 +82,7 @@ def stairs(name=None, m=None):
     return o
 
 
-def flight(tag):
+def flight(tag, door_m):
     """One flight with its two landings and a doorway on the top landing, climbing +X, floor below, centred on the
     cell's X axis at z = OFFSET."""
     L, H = RUN * STEPS, RISE * STEPS
@@ -90,7 +90,8 @@ def flight(tag):
     low = sd_move((-L * 0.5 - 0.9, -H * 0.5 - 0.2, OFFSET), sd_box((0.9, 0.2, 1.1), m=2))
     high = sd_move((L * 0.5 + 0.9, H * 0.5 - 0.2, OFFSET), sd_box((0.9, 0.2, 1.1), m=2))
     door = sd_move((L * 0.5 + 1.6, H * 0.5 + 1.55, OFFSET),
-                   sd_diff(sd_box((0.16, 1.55, 1.05), m=0), sd_move((0.0, -0.35, 0.0), sd_box((0.4, 1.25, 0.62)))))
+                   sd_diff(sd_box((0.16, 1.55, 1.05), m=door_m), sd_move((0.0, -0.35, 0.0),
+                                                                        sd_box((0.4, 1.25, 0.62)))))
     return sd_union(st, low, high, door, name="flight" + tag)
 
 
@@ -103,8 +104,48 @@ def rooms():
 
 
 def lattice():
-    cell = sd_union(rooms(), flight("A"), sd_rot(P1, flight("B")), sd_rot(P2, flight("C")))
+    cell = sd_union(rooms(), sd_move((0.0, 0.0, 0.0), flight("A", 3), name="slideA"),
+                    sd_rot((0.0, 0.0, 0.0), sd_rot(P1, flight("B", 4)), name="foldB"),
+                    sd_rot(P2, flight("C", 5)))
     return sd_repeat((CELL, CELL, CELL), cell, count=0, name="lattice")
+
+
+def instrument(s, sun_dir):
+    """The modulation map (ABSTRACT-PLAN.md section 7)."""
+    N = "sdf/court/node/%s/"
+    # ---- BASS: the lattice breathes apart and together (anchored round the viewer at the origin)
+    s.route(R("bass", N % "lattice" + "size", 1.0, op="multiply", gain=0.1, offset=1.0, attackMs=60, decayMs=600))
+    # ---- KICK: flight A slides two steps along its climb and springs back
+    s.route(R("kick", N % "slideA" + "translation", RUN * 2.0, comp=0, attackMs=0, decayMs=220, springHz=2.2,
+              springDamping=0.45))
+    # ---- SNARE: flight B folds over a quarter turn into a new gravity and swings back
+    s.route(R("snare", N % "foldB" + "rotation", 90.0, comp=2, attackMs=0, decayMs=500, springHz=0.9,
+              springDamping=0.55))
+    # ---- HIGHS: the ink sharpens and thickens
+    s.route(R("audio.treble", "post/outline/width", 1.4, attackMs=20, decayMs=200),
+            R("hat", "post/outline/intensity", 0.6, attackMs=0, decayMs=100))
+    # ---- MIDS: the sun sweeps, so the long shadows move (the toon light and the shadow march together)
+    s.route(R("audio.mid", "lights/sun/azimuth", 28.0, **SLOW),
+            R("audio.mid", "sdf/court/look/shadow/direction", -0.45, comp=0, **SLOW))
+    # ---- CENTROID: the sky and the haze (teal dusk for a dark timbre, a pale gold noon for a bright one)
+    s.route(R("brightnessSlow", "env/sky/horizonColor", 0.5, comp=0, **SLOW),
+            R("brightnessSlow", "env/sky/horizonColor", 0.25, comp=1, **SLOW),
+            R("brightnessSlow", "scene/fogColor", 0.25, comp=2, **SLOW))
+    # ---- TEMPO: the doorways glow faintly on the beat
+    for k in (3, 4, 5):
+        s.route(R("beat", "sdf/court/surface/%d/emission" % k, 0.5, attackMs=0, decayMs=200))
+    # ---- INTENSITY: STRUCTURE -- more rooms nest inside the room
+    s.route(R("intensity", N % "rooms" + "count", 2.0, threshold="binary", thresholdLevel=0.5))
+    # ---- MIDI: a note lights the doorways of the flight at its register (low A, middle B, high C), as bright as its
+    # velocity; a chord twists the nested rooms; a held note warms the sun
+    for k, surf in enumerate((3, 4, 5)):
+        for comp, val in enumerate(hexrgb(SUN, 9.0)):
+            s.route(R("visual.doorHit%d" % k, "sdf/court/surface/%d/emission" % surf, val, comp=comp,
+                      depth="lastVelocity", attackMs=0, decayMs=700))
+    s.route(R("polyphony", N % "rooms" + "rotation", 60.0, comp=1, attackMs=200, decayMs=1200),
+            R("held", "lights/sun/intensity", 1.5, **MEDIUM))
+    # ---- MOD WHEEL: the world's roll by hand
+    s.route(R(s.modwheel(), "sdf/court/transform/rotation", 90.0, comp=2, attackMs=80, decayMs=80))
 
 
 def build():
@@ -123,7 +164,9 @@ def build():
     s.light("sun", "directional", direction=sun_dir, color=hexrgb(SUN), intensity=3.0, castsShadow=False)
     s.light("sky", "directional", direction=[-0.3, 0.8, 0.5], color=hexrgb("#7fd0c8"), intensity=0.5,
             castsShadow=False)
-    surfaces = [{"color": hexrgb(CREAM)}, {"color": hexrgb(TERRACOTTA)}, {"color": hexrgb(OCHRE)}]
+    surfaces = [{"color": hexrgb(CREAM)}, {"color": hexrgb(TERRACOTTA)}, {"color": hexrgb(OCHRE)},
+                {"color": hexrgb(CREAM), "emission": [0.0, 0.0, 0.0]}, {"color": hexrgb(CREAM), "emission": [0.0, 0.0, 0.0]},
+                {"color": hexrgb(CREAM), "emission": [0.0, 0.0, 0.0]}]
     s.sdf("court", lattice(), (-120.0, -120.0, -120.0), (120.0, 120.0, 120.0), surfaces=surfaces,
           look={"aoStrength": 0.0, "shadowStrength": 0.62, "shadowSoftness": 0.02,
                 "shadowDirection": [-c for c in sun_dir], "shadowSteps": 28},
@@ -147,6 +190,8 @@ def build():
     tgt = [-6.0, -2.0, -14.0]
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 50.0, "orbitSpeed": 0.0}
     s.drift_camera(cam, tgt, period=56.0, amp=(1.0, 0.6, 1.2), tamp=(2.0, 1.4, 0.0))
+    s.places("door", "lastPitch", [0.36, 0.5, 0.64], 0.07, event="noteOn")
+    instrument(s, sun_dir)
     s.region("rooms", centre=[0.0, 0.0, 0.0], radius=2.5)
     s.region("lattice", box=[0.0, 0.0, 1.0, 1.0])
     return s

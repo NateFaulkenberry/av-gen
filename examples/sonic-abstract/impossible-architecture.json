@@ -145,8 +145,559 @@
   "post/outline/fadeStart": 25.0,
   "post/outline/fadeEnd": 70.0
  },
- "sources": [],
- "routes": [],
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "door0_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.814285714285714,
+      "gain": 6.428571428571428
+     },
+     {
+      "name": "door1_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.714285714285714,
+      "gain": 6.428571428571428
+     },
+     {
+      "name": "door2_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.614285714285714,
+      "gain": 6.428571428571428
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "door0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "door0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "door1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "door1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "door2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "door2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.door2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
+   "settings": {
+    "mappings": [
+     {
+      "name": "door0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door0_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "doorHit0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door0_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "door1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door1_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "doorHit1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door1_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "door2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door2_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "doorHit2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.door2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.door2_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "sdf/court/node/lattice/size",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.1,
+    "offset": 1.0,
+    "attackMs": 60,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "sdf/court/node/slideA/translation",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "sdf/court/node/foldB/rotation",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500,
+    "springHz": 0.9,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "post/outline/width",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "post/outline/intensity",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 100
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "lights/sun/azimuth",
+   "amount": 28.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/court/look/shadow/direction",
+   "amount": -0.45,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "env/sky/horizonColor",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "env/sky/horizonColor",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "scene/fogColor",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "sdf/court/surface/3/emission",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "sdf/court/surface/4/emission",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "sdf/court/surface/5/emission",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "sdf/court/node/rooms/count",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   }
+  },
+  {
+   "source": "visual.doorHit0",
+   "target": "sdf/court/surface/3/emission",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit0",
+   "target": "sdf/court/surface/3/emission",
+   "amount": 5.67681,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit0",
+   "target": "sdf/court/surface/3/emission",
+   "amount": 2.28737,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit1",
+   "target": "sdf/court/surface/4/emission",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit1",
+   "target": "sdf/court/surface/4/emission",
+   "amount": 5.67681,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit1",
+   "target": "sdf/court/surface/4/emission",
+   "amount": 2.28737,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit2",
+   "target": "sdf/court/surface/5/emission",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit2",
+   "target": "sdf/court/surface/5/emission",
+   "amount": 5.67681,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "visual.doorHit2",
+   "target": "sdf/court/surface/5/emission",
+   "amount": 2.28737,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "sdf/court/node/rooms/rotation",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "lights/sun/intensity",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "sdf/court/transform/rotation",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -476,5 +1027,20 @@
     ]
    }
   ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
  }
 }

@@ -959,6 +959,494 @@
     "emissive": 8.0,
     "blend": "additive"
    }
+  },
+  {
+   "name": "blast",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 8000,
+    "seed": 61,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "extent": [
+     0.4,
+     0.2,
+     0.4
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.9,
+    "lifetimeMax": 1.8,
+    "spread": 1.0,
+    "speedMin": 6.0,
+    "speedMax": 14.0,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 2.2,
+    "turbulence": 0.4,
+    "turbulenceScale": 0.4,
+    "sizeStart": 0.06,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.92158,
+     0.7454,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.04971,
+     0.45641,
+     0.0
+    ],
+    "emissive": 5.0,
+    "blend": "additive",
+    "velocityStretch": 1.5,
+    "stretchMax": 0.6
+   }
+  },
+  {
+   "name": "cometArc",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "spiral",
+    "count": 6,
+    "radius": 13.5,
+    "radiusGrowth": 0.0,
+    "turns": 0.03,
+    "startAngle": 0.0,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
+   "name": "comet",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4000,
+    "seed": 67,
+    "shape": "spline",
+    "spline": "cometArc",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.3,
+     0.3,
+     0.3
+    ],
+    "direction": [
+     -1.0,
+     0.05,
+     0.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 1.4,
+    "lifetimeMax": 2.2,
+    "spread": 0.06,
+    "speedMin": 5.0,
+    "speedMax": 9.0,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.4,
+    "attractorPosition": [
+     0,
+     0,
+     0
+    ],
+    "attractorStrength": 1.5,
+    "attractorRadius": 20.0,
+    "orbit": 1.2,
+    "sizeStart": 0.07,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     0.80695,
+     0.96469,
+     1.0,
+     1.0
+    ],
+    "colorEnd": [
+     0.11444,
+     0.67244,
+     1.0,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 16,
+    "trailStride": 1,
+    "trailWidth": 0.8,
+    "trailFade": 0.0
+   }
+  },
+  {
+   "name": "xarm0",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "spiral",
+    "count": 32,
+    "radius": 1.2,
+    "radiusGrowth": 10.5,
+    "turns": 1.2,
+    "startAngle": 1.5707963267948966,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "samplesPerSegment": 12
+   }
+  },
+  {
+   "name": "xp0",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 7000,
+    "seed": 71,
+    "shape": "spline",
+    "spline": "xarm0",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.45,
+     0.45,
+     0.45
+    ],
+    "direction": [
+     0.0,
+     0.12,
+     -1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 3.0,
+    "spread": 0.12,
+    "speedMin": 0.25,
+    "speedMax": 0.6,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.15,
+    "turbulence": 0.2,
+    "turbulenceScale": 0.35,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.02,
+    "sizeVariance": 0.5,
+    "colorStart": [
+     1.0,
+     0.14413,
+     0.66539,
+     1.0
+    ],
+    "colorEnd": [
+     0.14413,
+     0.04519,
+     1.0,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 10,
+    "trailStride": 2,
+    "trailWidth": 0.8
+   }
+  },
+  {
+   "name": "xarm1",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "spiral",
+    "count": 32,
+    "radius": 1.2,
+    "radiusGrowth": 10.5,
+    "turns": 1.2,
+    "startAngle": 4.71238898038469,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "samplesPerSegment": 12
+   }
+  },
+  {
+   "name": "xp1",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 7000,
+    "seed": 72,
+    "shape": "spline",
+    "spline": "xarm1",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.45,
+     0.45,
+     0.45
+    ],
+    "direction": [
+     0.0,
+     0.12,
+     -1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 3.0,
+    "spread": 0.12,
+    "speedMin": 0.25,
+    "speedMax": 0.6,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.15,
+    "turbulence": 0.2,
+    "turbulenceScale": 0.35,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.02,
+    "sizeVariance": 0.5,
+    "colorStart": [
+     1.0,
+     0.14413,
+     0.66539,
+     1.0
+    ],
+    "colorEnd": [
+     0.14413,
+     0.04519,
+     1.0,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 10,
+    "trailStride": 2,
+    "trailWidth": 0.8
+   }
+  },
+  {
+   "name": "xarm2",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "spiral",
+    "count": 32,
+    "radius": 1.2,
+    "radiusGrowth": 10.5,
+    "turns": 1.2,
+    "startAngle": 0.7853981633974483,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "samplesPerSegment": 12
+   }
+  },
+  {
+   "name": "xp2",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 7000,
+    "seed": 73,
+    "shape": "spline",
+    "spline": "xarm2",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.45,
+     0.45,
+     0.45
+    ],
+    "direction": [
+     0.0,
+     0.12,
+     -1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 3.0,
+    "spread": 0.12,
+    "speedMin": 0.25,
+    "speedMax": 0.6,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.15,
+    "turbulence": 0.2,
+    "turbulenceScale": 0.35,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.02,
+    "sizeVariance": 0.5,
+    "colorStart": [
+     1.0,
+     0.14413,
+     0.66539,
+     1.0
+    ],
+    "colorEnd": [
+     0.14413,
+     0.04519,
+     1.0,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 10,
+    "trailStride": 2,
+    "trailWidth": 0.8
+   }
+  },
+  {
+   "name": "xarm3",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "spiral",
+    "count": 32,
+    "radius": 1.2,
+    "radiusGrowth": 10.5,
+    "turns": 1.2,
+    "startAngle": 3.9269908169872414,
+    "center": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "samplesPerSegment": 12
+   }
+  },
+  {
+   "name": "xp3",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 7000,
+    "seed": 74,
+    "shape": "spline",
+    "spline": "xarm3",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "extent": [
+     0.45,
+     0.45,
+     0.45
+    ],
+    "direction": [
+     0.0,
+     0.12,
+     -1.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 3.0,
+    "spread": 0.12,
+    "speedMin": 0.25,
+    "speedMax": 0.6,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.15,
+    "turbulence": 0.2,
+    "turbulenceScale": 0.35,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.02,
+    "sizeVariance": 0.5,
+    "colorStart": [
+     1.0,
+     0.14413,
+     0.66539,
+     1.0
+    ],
+    "colorEnd": [
+     0.14413,
+     0.04519,
+     1.0,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 10,
+    "trailStride": 2,
+    "trailWidth": 0.8
+   }
   }
  ]
 }

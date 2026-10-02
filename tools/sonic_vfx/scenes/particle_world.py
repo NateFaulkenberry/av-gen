@@ -84,6 +84,63 @@ def arm_splines(s, arm, phase):
     return names
 
 
+EXTRA_ARMS = [(math.pi * 0.5, 0.3), (math.pi * 1.5, 0.45), (math.pi * 0.25, 0.6), (math.pi * 1.25, 0.72)]
+
+
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 6)."""
+    arms = ["arm%d_%s" % (a, seg[0]) for a in (0, 1) for seg in SEGMENTS]
+    # ---- BASS: the pull -- the arms contract toward the core (their splines shrink) and bloom out again
+    for name in arms:
+        s.route(R("bass", "spline/%s/radius" % name, 1.0, op="multiply", gain=-0.16, offset=1.0, attackMs=40,
+                  decayMs=500),
+                R("bass", "spline/%s/radiusGrowth" % name, 1.0, op="multiply", gain=-0.16, offset=1.0, attackMs=40,
+                  decayMs=500))
+    s.route(R("bass", "particles/core/emissive", 6.0, attackMs=20, decayMs=300),
+            R("bass", "procedural/heart/material/emissive", 20.0, attackMs=20, decayMs=300))
+    # ---- KICK: an explosion from the core, a shock ring on the screen; the arms reform after it
+    s.route(R("kick", "particles/blast/burst", 1800.0, threshold="binary", thresholdLevel=0.05),
+            R("kick", "post/shock/amount", 40.0, attackMs=0, decayMs=380),
+            R("kick", "post/shock/radius", -0.9, attackMs=0, decayMs=0, envelope="linearfall",
+              envelopeFallPerSecond=2.2))     # the ring starts small and expands to its resting 1.0 as the hit falls
+    # ---- SNARE: a flare runs along one arm
+    s.route(R("snare", "particles/p_arm0_mid/burst", 900.0, threshold="binary", thresholdLevel=0.05),
+            R("snare", "particles/p_arm0_out/burst", 900.0, threshold="binary", thresholdLevel=0.05),
+            R("snare", "post/split/amount", 6.0, attackMs=0, decayMs=160))
+    # ---- HIGHS: glitter through the disc
+    s.route(R("hat", "particles/glitter/burst", 90.0, threshold="binary", thresholdLevel=0.05),
+            R("audio.treble", "particles/glitter/spawnRate", 900.0, attackMs=20, decayMs=250))
+    # ---- MIDS: the galaxy turns faster (integrated, on top of its own turn); FLUX: turbulence frays the arms
+    for name in arms + ["xarm%d" % k for k in range(len(EXTRA_ARMS))]:
+        s.route(R("audio.mid", "spline/%s/startAngle" % name, 0.9, integrate=True, attackMs=150, decayMs=900))
+    for name in arms:
+        s.route(R("flux", "particles/p_%s/turbulence" % name, 1.4, attackMs=40, decayMs=400))
+    # ---- CENTROID: a bright sound pushes the arms' rim toward cyan and the points grow
+    for name in arms:
+        s.route(R("brightness", "particles/p_%s/size" % name, 0.5, **SLOW))
+    s.route(R("brightness", "post/grade/hueShift", -0.06, **SLOW))
+    # ---- TEMPO: the core flashes on the beat
+    s.route(R("beat", "particles/core/emissive", 4.0, attackMs=0, decayMs=160))
+    # ---- INTENSITY: STRUCTURE -- more points, and the halo thickens, as the piece builds
+    for name in arms:
+        s.route(R("intensity", "particles/p_%s/spawnRate" % name, 1.0, op="multiply", gain=1.2, offset=1.0,
+                  **VERY_SLOW))
+    s.route(R("intensity", "particles/halo/spawnRate", 2000.0, **VERY_SLOW))
+    # ---- MIDI: each note launches a comet from the rim at its pitch's angle (velocity its brightness);
+    # STRUCTURE: a chord lights more arms (3 notes a third arm ... 6 notes all six); held notes thicken the halo
+    s.route(R("lastPitch", "spline/cometArc/startAngle", 2.0 * math.pi),
+            R("note", "particles/comet/burst", 260.0, threshold="binary", thresholdLevel=0.05),
+            R("noteEnv", "particles/comet/emissive", 6.0, depth="lastVelocity", attackMs=0, decayMs=500))
+    for k, (_, level) in enumerate(EXTRA_ARMS):
+        s.route(R("polyphony", "particles/xp%d/spawnRate" % k, 3200.0, threshold="binary", thresholdLevel=level,
+                  attackMs=200, decayMs=1200))
+    s.route(R("held", "particles/halo/emissive", 2.0, **MEDIUM))
+    # ---- MOD WHEEL: the galaxy tilts (every spline's axis leans)
+    wheel = s.modwheel()
+    for name in arms + ["xarm%d" % k for k in range(len(EXTRA_ARMS))]:
+        s.route(R(wheel, "spline/%s/axis" % name, 0.7, comp=0, attackMs=80, decayMs=80))
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.6, "sustain": 0.5, "attack": 1.0, "release": 1.0}
@@ -149,6 +206,41 @@ def build():
                 speedMax=0.3, gravity=[0, 0, 0], drag=1.0, sizeStart=0.025, sizeEnd=0.0,
                 colorStart=hexrgb("#ffffff") + [1.0], colorEnd=hexrgb(CYAN) + [0.0], emissive=8.0, blend="additive")
 
+    # ---- the explosion (the kick): a burst from the core outward, slowed by drag so the arms reform round it
+    s.particles("blast", capacity=8000, seed=61, shape="sphere", position=[0.0, 0.0, 0.0], extent=[0.4, 0.2, 0.4],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.9, lifetimeMax=1.8, spread=1.0, speedMin=6.0,
+                speedMax=14.0, gravity=[0, 0, 0], drag=2.2, turbulence=0.4, turbulenceScale=0.4,
+                sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb(WHITE) + [1.0], colorEnd=hexrgb(MAGENTA) + [0.0],
+                emissive=5.0, blend="additive", velocityStretch=1.5, stretchMax=0.6)
+    # ---- comets (notes): a short arc on the rim whose angle the pitch sets; points fall inward from it
+    s.nodes.append({"name": "cometArc", "kind": "spline", "spline": {
+        "kind": "catmullRom", "generator": "spiral", "count": 6, "radius": 13.5, "radiusGrowth": 0.0, "turns": 0.03,
+        "startAngle": 0.0, "center": [0.0, 0.0, 0.0], "axis": [0.0, 1.0, 0.0], "samplesPerSegment": 8}})
+    s.particles("comet", capacity=4000, seed=67, shape="spline", spline="cometArc", position=[0, 0, 0],
+                extent=[0.3, 0.3, 0.3], direction=[-1.0, 0.05, 0.0], spawnRate=0.0, lifetimeMin=1.4,
+                lifetimeMax=2.2, spread=0.06, speedMin=5.0, speedMax=9.0, gravity=[0, 0, 0], drag=0.4,
+                attractorPosition=[0, 0, 0], attractorStrength=1.5, attractorRadius=20.0, orbit=1.2,
+                sizeStart=0.07, sizeEnd=0.0, colorStart=hexrgb("#e8fbff") + [1.0], colorEnd=hexrgb(CYAN) + [0.0],
+                emissive=4.0, blend="additive", trailEnabled=True, trailLength=16, trailStride=1, trailWidth=0.8,
+                trailFade=0.0)
+    # ---- the extra arms (chords): single magenta-violet spirals between the two arms, dark at rest
+    for k, (phase, _) in enumerate(EXTRA_ARMS):
+        name = "xarm%d" % k
+        s.nodes.append({"name": name, "kind": "spline", "spline": {
+            "kind": "catmullRom", "generator": "spiral", "count": 32, "radius": 1.2, "radiusGrowth": 10.5,
+            "turns": 1.2, "startAngle": phase, "center": [0.0, 0.0, 0.0], "axis": [0.0, 1.0, 0.0],
+            "samplesPerSegment": 12}})
+        s.particles("xp%d" % k, capacity=7000, seed=71 + k, shape="spline", spline=name, position=[0, 0, 0],
+                    extent=[0.45, 0.45, 0.45], direction=[0.0, 0.12, -1.0], spawnRate=0.0, lifetimeMin=2.0,
+                    lifetimeMax=3.0, spread=0.12, speedMin=0.25, speedMax=0.6, gravity=[0, 0, 0], drag=0.15,
+                    turbulence=0.2, turbulenceScale=0.35, sizeStart=0.045, sizeEnd=0.02, sizeVariance=0.5,
+                    colorStart=hexrgb("#ff6ad5") + [1.0], colorEnd=hexrgb("#6a3cff") + [0.0], emissive=4.0,
+                    blend="additive", trailEnabled=True, trailLength=10, trailStride=2, trailWidth=0.8)
+        s.track("spline/%s/startAngle" % name, [
+            {"time": 0.0, "value": phase, "interp": "linear"},
+            {"time": ROT_PERIOD, "value": phase + 2.0 * math.pi, "interp": "linear"}], loop=ROT_PERIOD)
+    instrument(s)
+
     # ---- camera: a slow orbit at about 25 degrees; the core right of centre
     s.params_({"camera/lens/focalLength": 30.0, "post/bloom/intensity": 0.65, "post/bloom/threshold": 0.55,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.015,
@@ -158,6 +250,9 @@ def build():
                "temporal/feedback/hue": 0.0})
     s.arc_camera([0.0, 0.0, 0.0], radius=19.0, height=8.2, period=120.0, centre_deg=20.0, sweep_deg=60.0,
                  side=-2.4, lift=-0.8)
+    cu, cv, _ = s.project([0.0, 0.0, 0.0])
+    s.params_({"post/shock/radius": 1.0, "post/shock/width": 0.06, "post/shock/chroma": 0.6,
+               "post/shock/centerX": round(cu, 3), "post/shock/centerY": round(cv, 3)})
     s.region("core", centre=[0.0, 0.0, 0.0], radius=1.5)
     s.region_ring("disc", [0.0, 0.0, 0.0], 12.0)
     return s

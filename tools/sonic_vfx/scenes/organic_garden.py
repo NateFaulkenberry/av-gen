@@ -117,6 +117,75 @@ def at(x, y, z, rot=(0, 0, 0), sc=(1, 1, 1)):
             "scale": [float(v) for v in sc]}
 
 
+VOICES = 6
+BUDS = [(-2.9, 0.0, -1.9), (-2.1, 0.0, -2.6), (-1.2, 0.0, -2.9), (2.3, 0.0, -2.2), (3.0, 0.0, -1.3), (2.6, 0.0, -0.4)]
+BUD_COLS = [CORAL, ORCHID, PEACH, CYAN, LIME, ORCHID]
+
+
+def instrument(s):
+    """The modulation map (ABSTRACT-PLAN.md section 5)."""
+    P = "procedural/%s/"
+    # ---- BASS: the garden breathes -- the lantern swells, the jelly-trees' bells contract and inflate (swimming)
+    s.route(R("bass", P % "bell" + "transform/scale", 0.1, attackMs=40, decayMs=420),
+            R("bass", P % "heart" + "transform/scale", 0.35, attackMs=30, decayMs=300))
+    for k in range(4):
+        s.route(R("bass", P % ("jtBell%d" % k) + "transform/scale", -0.12, comp=0, attackMs=60, decayMs=500),
+                R("bass", P % ("jtBell%d" % k) + "transform/scale", -0.12, comp=2, attackMs=60, decayMs=500),
+                R("bass", P % ("jtBell%d" % k) + "transform/scale", 0.12, comp=1, attackMs=60, decayMs=500))
+    # ---- KICK: the lantern blooms open (its petals lift from a 52-degree droop) and closes on a spring; a spore puff
+    s.route(R("kick", P % "bell" + "source/rotation", -34.0, comp=0, attackMs=0, decayMs=300, springHz=1.8,
+              springDamping=0.4),
+            R("kick", P % "bell" + "distribution/radius", 0.08, attackMs=0, decayMs=300),
+            R("kick", "particles/puff/burst", 160.0, threshold="binary", thresholdLevel=0.05),
+            R("kick", "lights/heartLight/intensity", 10.0, attackMs=0, decayMs=300))
+    # ---- SNARE: the mushrooms puff spores and their dots flash
+    s.route(R("snare", "particles/mushSpores/burst", 220.0, threshold="binary", thresholdLevel=0.05),
+            R("snare", P % "caps" + "material/emissive", 2.0, attackMs=0, decayMs=240))
+    # ---- HIGHS: cilia shimmer on the vines; the spores sparkle
+    for k in range(5):
+        s.route(R("audio.treble", P % ("vine%d" % k) + "deform/2/amount", 0.025, attackMs=15, decayMs=150),
+                R("hat", P % ("vineTip%d" % k) + "material/emissive", 6.0, attackMs=0, decayMs=150))
+    s.route(R("audio.treble", "particles/spores/emissive", 5.0, attackMs=20, decayMs=250))
+    # ---- MIDS: the current -- the tentacles and the jelly-trees' tendrils sway harder
+    for k in range(5):
+        s.route(R("audio.mid", P % ("vine%d" % k) + "deform/1/amount", 0.14, attackMs=200, decayMs=900))
+    for k in range(4):
+        s.route(R("audio.mid", P % ("jtTendrils%d" % k) + "deform/1/amount", 0.25, attackMs=200, decayMs=900))
+    # ---- CENTROID: the glow's hue (coral for a dark timbre, mint and lime for a bright one); the petals sharpen
+    for node in ("bell", "heart"):
+        s.route(R("brightness", P % node + "material/emissiveColor", -0.7, comp=0, **SLOW),
+                R("brightness", P % node + "material/emissiveColor", 0.5, comp=1, **SLOW),
+                R("brightness", P % node + "material/emissiveColor", 0.25, comp=2, **SLOW))
+    s.route(R("brightness", P % "bell" + "source/scale", -0.14, comp=0, **SLOW))
+    # ---- SUSTAIN: growth -- the lantern rises on a longer stalk while sound is held, and sinks in silence
+    grow = 0.28
+    s.route(R("sustain", P % "stalk" + "transform/scale", grow, comp=1, **SLOW))
+    for node in ("bell", "heart"):
+        s.route(R("sustain", P % node + "transform/position", BELL[1] * grow, comp=1, **SLOW))
+    s.route(R("sustain", "lights/heartLight/position", BELL[1] * grow, comp=1, **SLOW))
+    # ---- TEMPO: the jelly-trees pulse on the beat
+    for k in range(4):
+        s.route(R("beat", P % ("jtBell%d" % k) + "material/emissive", 1.2, attackMs=0, decayMs=220))
+    # ---- INTENSITY: STRUCTURE -- more organisms: the mushroom cluster grows, the jelly-trees grow more tendrils
+    for node in ("stems", "caps"):
+        s.route(R("intensity", P % node + "distribution/count", 6.0, threshold="binary", thresholdLevel=0.5))
+    for k in range(4):
+        s.route(R("intensity", P % ("jtTendrils%d" % k) + "distribution/count", 8.0, threshold="binary",
+                  thresholdLevel=0.5))
+    # ---- MIDI: six flowers along the meadow are six voices: a held note opens its flower (velocity its glow);
+    # STRUCTURE: a chord multiplies the lantern's petals (12 to 24); a note's release drops petals (more for a long one)
+    for k in range(VOICES):
+        v = "notes.voice.%d." % k
+        s.route(R(v + "held", P % ("budPetals%d" % k) + "transform/scale", 1.0, attackMs=120, decayMs=700,
+                  springHz=2.0, springDamping=0.5),
+                R(v + "velocity", P % ("budPetals%d" % k) + "material/emissive", 3.0, attackMs=60, decayMs=600),
+                R(v + "held", P % ("budHeart%d" % k) + "material/emissive", 6.0, attackMs=60, decayMs=600))
+    s.route(R("polyphony", P % "bell" + "distribution/count", 24.0, attackMs=0, decayMs=900),
+            R("release", "particles/petalFall/burst", 60.0, attackMs=0, decayMs=0))
+    # ---- MOD WHEEL: the season (the whole garden's hue turns)
+    s.route(R(s.modwheel(), "post/grade/hueShift", 0.5, attackMs=80, decayMs=80))
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.4}
@@ -162,7 +231,9 @@ def build():
                material=jelly([LIME, MINT, LIME, CYAN, MINT][k], 1.3),
                deformers=[{"kind": "sine", "amount": 0.08, "frequency": 1.7, "speed": 0.9 + 0.13 * k, "phase": k,
                            "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.3], "falloff": 1.4,
-                           "center": [0.0, 0.0, 0.0], "space": "local"}])
+                           "center": [0.0, 0.0, 0.0], "space": "local"},
+                          {"kind": "noise", "amount": 0.0, "scale": 9.0, "speed": 4.0, "seed": 40 + k,
+                           "space": "local"}])
         tip = pts[-1]
         s.proc("vineTip%d" % k, {"kind": "sphere", "radius": 0.05, "segments": 10, "rings": 6},
                material=jelly(PEACH, 5.0), transform=at(*tip))
@@ -208,6 +279,37 @@ def build():
                 turbulenceSpeed=0.15, sizeStart=0.018, sizeEnd=0.012, sizeVariance=0.6, sizeSkew=2.0,
                 colorStart=hexrgb(PEACH) + [0.9], colorEnd=hexrgb(MINT) + [0.0], emissive=3.0, blend="additive",
                 pulseRate=0.6, pulseDepth=0.5)
+
+    # ---- six voice flowers along the meadow (closed at rest: their petals at scale 0)
+    for k, (x, y, z) in enumerate(BUDS):
+        h = 0.7 + 0.15 * (k % 3)
+        s.proc("budStalk%d" % k, tube([(x, 0.0, z), (x + 0.05, h * 0.5, z), (x - 0.04, h, z)], 0.025, taper=0.6,
+                                      sides=6, segments=12), material=jelly(MINT, 0.5))
+        s.proc("budPetals%d" % k, {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
+               distribution={"kind": "radial", "count": 5, "radius": 0.11, "plane": "xz", "orientation": "outward"},
+               material=jelly(BUD_COLS[k], 1.4), transform=at(x - 0.04, h + 0.03, z, sc=(0.001, 0.001, 0.001)),
+               extra={"sourceTransform": {"rotation": [-35.0, 0.0, 0.0], "scale": [0.45, 0.15, 1.0]}})
+        s.proc("budHeart%d" % k, {"kind": "sphere", "radius": 0.06, "segments": 10, "rings": 6},
+               material=jelly(PEACH, 1.0), transform=at(x - 0.04, h + 0.05, z))
+
+    # ---- the lantern's spore puff (the kick), the mushrooms' spores (the snare), falling petals (note releases)
+    s.particles("puff", capacity=2000, seed=31, shape="sphere", position=[BELL[0], BELL[1] - 0.1, BELL[2]],
+                extent=[0.12, 0.08, 0.12], direction=[0, -1, 0], spawnRate=0.0, lifetimeMin=1.5, lifetimeMax=3.0,
+                spread=0.8, speedMin=0.3, speedMax=0.9, gravity=[0, -0.05, 0], drag=1.2, turbulence=0.3,
+                turbulenceScale=1.5, sizeStart=0.02, sizeEnd=0.008, colorStart=hexrgb(PEACH) + [1.0],
+                colorEnd=hexrgb(CORAL) + [0.0], emissive=5.0, blend="additive")
+    s.particles("mushSpores", capacity=2500, seed=37, shape="sphere", position=[1.25, 0.8, 0.35],
+                extent=[0.6, 0.15, 0.6], direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=2.0, lifetimeMax=4.0,
+                spread=0.5, speedMin=0.3, speedMax=0.8, gravity=[0, -0.02, 0], drag=0.8, turbulence=0.35,
+                turbulenceScale=1.0, sizeStart=0.015, sizeEnd=0.006, colorStart=hexrgb(LIME) + [1.0],
+                colorEnd=hexrgb(MINT) + [0.0], emissive=4.0, blend="additive")
+    s.particles("petalFall", capacity=600, seed=43, shape="sphere", position=[BELL[0], BELL[1], BELL[2]],
+                extent=[0.3, 0.1, 0.3], direction=[0, -1, 0], spawnRate=0.0, lifetimeMin=3.0, lifetimeMax=4.5,
+                spread=0.6, speedMin=0.1, speedMax=0.3, gravity=[0, -0.25, 0], drag=1.5, turbulence=0.4,
+                turbulenceScale=1.2, sizeStart=0.07, sizeEnd=0.05, colorStart=hexrgb(CORAL) + [0.95],
+                colorEnd=hexrgb(ORCHID) + [0.0], emissive=1.6, blend="alpha", shape2d="leaf", tumbleRate=3.0,
+                leafAspect=0.45)
+    instrument(s)
 
     # ---- a cool rim light from behind and a little ambient
     s.light("rim", "directional", direction=[0.25, -0.35, 0.9], color=hexrgb("#7a8cff"), intensity=0.9,
