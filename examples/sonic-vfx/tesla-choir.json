@@ -1031,9 +1031,20 @@
    }
   },
   {
+   "source": "response.snare",
+   "target": "lights/coreGlow/intensity",
+   "amount": 220.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
    "source": "response.hat",
    "target": "particles/sparks/burst",
-   "amount": 34.0,
+   "amount": 60.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

@@ -188,7 +188,7 @@ def build():
     # ---- sparks from the core's crown (hat)
     s.particles("sparks", capacity=3000, seed=31, shape="sphere", position=list(CORE_TOP), extent=[1.4, 0.3, 1.4],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.4, lifetimeMax=1.1, spread=0.9, speedMin=2.0,
-                speedMax=5.0, gravity=[0, -9.0, 0], drag=0.4, turbulence=0.0, sizeStart=0.025, sizeEnd=0.0,
+                speedMax=5.0, gravity=[0, -9.0, 0], drag=0.4, turbulence=0.0, sizeStart=0.035, sizeEnd=0.0,
                 colorStart=hexrgb("#f4eeff") + [1.0], colorEnd=hexrgb("#ffb070") + [0.0], emissive=14.0,
                 blend="additive", velocityStretch=1.2, stretchMax=0.35, collision="bounce", collisionHeight=0.0,
                 collisionRestitution=0.25)
@@ -240,9 +240,11 @@ def build():
     # snare: crackle over the core
     s.route(R("snare", "fx/crackle/intensity", 60.0, attackMs=0, decayMs=240),
             R("snare", "fx/crackle/crackle", 14.0, attackMs=0, decayMs=240),
-            R("snare", "fx/crackle/glowIntensity", 3.0, attackMs=0, decayMs=240))
+            R("snare", "fx/crackle/glowIntensity", 3.0, attackMs=0, decayMs=240),
+            # (the crackle alone was lost on the glowing top-load: the core's light snaps with it, on the floor)
+            R("snare", "lights/coreGlow/intensity", 220.0, attackMs=0, decayMs=160))
     # hat: sparks from the crown
-    s.route(R("hat", "particles/sparks/burst", 34.0, attackMs=0, decayMs=30))
+    s.route(R("hat", "particles/sparks/burst", 60.0, attackMs=0, decayMs=30))
     # kick: the discharge fires on its own trigger; the hall answers with a cold flash in the haze and a lens tick
     s.route(R("kick", "lights/fill/intensity", 0.6, attackMs=0, decayMs=180),
             R("kick", "post/lens/chromaticAberration", 0.1, attackMs=0, decayMs=150))
