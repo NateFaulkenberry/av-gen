@@ -8,30 +8,29 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
 ## Resume here (cold)
 
 - **Done and committed:**
-  - research reports 1 and 3 (`research/01-vfx-scene-construction.md`, `research/03-authoredness.md`);
-  - `SCENE-CATALOG.md`: 16 scenes, tier A (8) first;
-  - the scene kit `tools/sonic_vfx/` (kit, signals, make, review, variant, test material);
-  - scenes 1-6 and 8: Event Horizon, The Breathing Deep, Tesla Choir, The Corrupted Cathedral, Ferrofluid Crown,
-    Cymatic Plate, Salt Flat Mirage. All are in `examples/index.json` under "Sonic VFX", in set-list order.
-  - **drafts, built and audited (0 warnings, every route live) but not yet looked at:** Storm Cell, Feedback Mirror,
-    Aurora Tundra, Silk Theatre, Lantern Lake, Datascape, Ember Forest, Abyssal Bloom, Stellar Nursery. Each has a
-    module in `scenes/` and is NOT in SCENES (so not in the index) until it passes look-dev.
-  - the tools:
-    - `matrix.py` (the test matrix and TEST-MATRIX.md);
-    - `capture.py` (stills, clips and the tour into the review folder);
-    - `perf.py` (GPU cost per scene);
-    - `live.py` (a live-editor run with the probe; it opens a window);
-    - `review.py eval` (a clip and the evaluator).
+  - research reports 1 and 3;
+  - `SCENE-CATALOG.md`;
+  - the kit and tools in `tools/sonic_vfx/`;
+  - **all 16 scenes**, listed in `examples/index.json` in set-list order (`scenes/__init__.py` SCENES).
 - **Next:**
-  1. Look-dev every draft from the batch stills (`$S/vfx/batch/<id>--0N/`, rendered at the realtime tier). Fix,
-     add the passing ones to SCENES in set-list position, and kill the weak ones.
-  2. Run the evaluator on each scene (`review.py eval <id> full`) and iterate on `vocabulary_silent`,
-     `uniform_motion` and `kick_hat_same_place`.
-  3. `matrix.py run <id>` for every scene, then `matrix.py report` writes `TEST-MATRIX.md`.
-  4. Live runs (`live.py <id> --scenario demo`) for at least each tier A scene.
-  5. `perf.py` and the captures (`capture.py still/clip` per scene, then `capture.py tour`).
-  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 before the hand-back (the engineer's
-     build).
+  1. The evaluator pass on every scene, then iterate on its findings. `$S/vfx/evalall.sh <out> <id>:<class> ...`
+     runs `review.py eval` for each and prints the scores and findings.
+  2. The test matrix: `matrix.py run <id>` for every scene (13 classes each), then `matrix.py report` writes
+     `TEST-MATRIX.md`. Its preamble (the material and the drum detector's limit) is
+     `~/Desktop/av-gen-review/25-sonic-vfx/matrix/preamble.md`.
+  3. Live runs (`live.py <id> --scenario demo`; it opens an editor window).
+  4. `perf.py`, then the captures (`capture.py still|clip <id>`, `capture.py tour`).
+  5. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 before the hand-back. That uses the
+     engineer's build.
+- **Open with the engineer:**
+  - **kick/snare under a mix:** `response.kick/snare` collapse under a bass or a pad (1 of 32 kicks in the full mix;
+    `drum_recall.py`). The engineer is fixing it. Until the sha arrives, the full and dense classes record kick
+    and snare as missing.
+  - `--sonic-live-log` lacks `response.*` columns.
+  - a probe scenario with program changes;
+  - a Voronoi edge op;
+  - the masked-program prepass.
+- **GPU etiquette:** one job per lock hold. The engineer runs only short targeted tests until its hand-back.
 - **The set list** is `scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher
   (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count. The planned full
   order, from the calm opening to the cosmic finale:
@@ -176,24 +175,44 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   tornado), it carries the media alone out to their farthest reach. A distant funnel gets coarse steps, so a
   tornado has to be near or the steps raised.
 - **Live (`--live`) needs the editor window:** there is no headless live mode. `live.py` opens one per run.
+- **Diagnose a look by bisecting the PROJECT too.** Ember Forest's orange trunks were not their material, a light
+  or the scene's fog. A route (`bass → scene/volumeDensity +0.02`) multiplied the fog six-fold whenever the bass
+  played. A stripped scene under a plain project rendered correctly. Sample the same pixels in every arm: one wrong
+  sample point sent me after the material for an hour.
+- **Particle trails are short ribbons:** at most 32 points, recorded per simulation step, so their length in
+  seconds depends on the frame rate. For a long ribbon, lay particles where the emitter moves and leave them
+  (Silk Theatre's stroke).
+- **Light direction is the direction of travel** (verified with primitives: `[1,0,0]` lights left-facing
+  surfaces).
 
-## Scenes built
+## Scenes built (set-list order)
 
-| # | id | state | look-dev | notes |
-|---|---|---|---|---|
-| 1 | event-horizon | built | `lookdev/01-event-horizon-lookdev.png` | The DF black-hole lens gives the *Interstellar* image. A polar-streak disk program; note-stars by pitch radius. |
-| 2 | breathing-deep | built | `lookdev/02-breathing-deep-lookdev.png` | SDF cavern; the gill ring is the only warm light. 11 threads, each with a travelling Pulse. |
-| 3 | tesla-choir | built | `lookdev/03-tesla-choir-lookdev.png` | 12 arcs (`fx/arc<i>`) on the circle of fifths, following `notes.class.<k>`. Seen from above, so a chord reads as a shape. |
-| 4 | corrupted-cathedral | built | `lookdev/04-corrupted-cathedral-lookdev.png` | The line-look SDF nave, a Voronoi fracture and a warp. Mosh and sweep on phrases. |
-| 5 | ferrofluid-crown | built | `lookdev/05-ferrofluid-crown-lookdev.png` | After Kodama. Graded polar rings of cones, 12 note spikes on springs, a twisted tower. |
-| 6 | cymatic-plate | built | `lookdev/06-cymatic-plate-lookdev.png` | A Chladni program (43 ops); the pitch sets the mode numbers. Sand leaps on hits. |
-| 8 | salt-flat-mirage | look close | (pending) | A monolith, with the sun peeking past its edge and a shadow wedge to the camera. Dusk palette states; meteors per note; a mirage line; the kick sends a ring out, the snare flares the outline. |
+All 16 are listed in `examples/index.json` and audit clean (0 warnings, every route live).
+
+| # | id | the image | notes |
+|---|---|---|---|
+| 1 | salt-flat-mirage | a black monolith at dusk, the sun past its edge, its shadow a wedge to the camera | The dusk palette states move with tension. A meteor (with an ignition flare) falls per note at the pitch's place. The kick lights the monolith's foot and sends a ring out; the snare flares its outline. |
+| 2 | lantern-lake | a dusk lake, a jetty, lanterns rising and mirrored | The mirror is the sky's gradient on an unlit plane below the reflected world, with twins of the hills, the jetty and the lanterns (the engine has no planar reflection). Each note releases a lantern at the pitch's place. |
+| 3 | aurora-tundra | an aurora band with rays over a spruce line and black Baikal ice | The aurora's own spectrum response is off; routes drive it. Tension and polyphony move the palette (green, teal, violet, rose). The snare lights the ice's fractures. |
+| 4 | breathing-deep | an SDF cavern, a glowing organism, threads | The gill ring is the only warm light. 11 threads with travelling Pulse. |
+| 5 | abyssal-bloom | a siphonophore diagonal in black water, jellyfish with tentacles | The light runs along the stem to the pitch's place (a gradient-op band by world position). The jellyfish at the pitch's depth answers. Marine snow; the kick sends a shock. |
+| 6 | cymatic-plate | Chladni figures in sand | A 43-op program; the pitch sets the mode numbers. |
+| 7 | silk-theatre | a red silk stroke drawn in the air under a spot, a velvet curtain | Silk is laid while notes sound (particles left where the hand was), pitch is height, a chord adds a gold stroke, the kick shudders it. |
+| 8 | ferrofluid-crown | black magnetic liquid, a crown of spikes | After Kodama; the field's copies are made unequal by a faint noise. |
+| 9 | feedback-mirror | a gold sigil whose echoes curl into a nautilus spiral | temporal/feedback with 24 taps. The interval turns the spiral; the bass deepens it; the kick punches the zoom. The hue walks gold, rose, magenta. |
+| 10 | tesla-choir | 12 Tesla towers on the circle of fifths, arcs per pitch class | A chord's arcs draw its shape. |
+| 11 | datascape | barcode lines to a vanishing point, red crests, numerals | Lines are summed cosines thresholded (exact, never organic). The glide is integrated level. The kick sends a shock; the snare tears. |
+| 12 | ember-forest | black trunks against a fire front, coal seams, one dancing ember | The ember's height is the melody. The snare makes the bark flare; the bass stirs the smoke (its structure only). |
+| 13 | corrupted-cathedral | the line-look SDF nave, the rose window | Mosh and sweep; the kick splits, the snare tears, roughness pixel-sorts (ADR-1065). |
+| 14 | storm-cell | a dark tornado on the clear slot, a wheat field, power poles, rain | The bass winds the funnel; the snare strikes (lightning, a live trigger); notes light the cloud base at their place. |
+| 15 | stellar-nursery | dust pillars with magenta rims against a teal-rust nebula | A chord lights as many embryonic stars as it has voices, coloured by its pitch. The kick sends a shock from the nest. |
+| 16 | event-horizon | the DF black-hole lens, the disk | The kick sends a shock ring from the hole. |
 
 ## Plan
 
 1. Research reports 1 and 3 (done).
 2. `SCENE-CATALOG.md` (done).
-3. Build the scenes as data (in progress: 7 of 16).
+3. Build the scenes as data (done: 16 of 16, all listed).
 4. `TEST-MATRIX.md` from the test material (file renders) and probe runs (live).
 5. Evaluate with the Critic and the engineer's evaluator, iterate, and kill weak scenes.
 6. Captures: a still and a short clip with audio per scene, and a tour.
