@@ -41,7 +41,9 @@ def tour_table(out, rows):
     cuts = [(int(e["hostNs"]), int(e["key"])) for e in events if e["kind"] == "program"]
     if not cuts:
         return None
-    end_ns = int(events[-1]["hostNs"])
+    # (the last row is the recording's start time, written after `end`: the tour ends at the `end` row)
+    ends = [int(e["hostNs"]) for e in events if e["kind"] == "end"]
+    end_ns = ends[-1] if ends else max(int(e["hostNs"]) for e in events)
     lines = ["| # | scene | frames | interval p50 / p99 ms | GPU p50 / p95 ms | notes | noteEnv max | kickEnv max |"
              " sustain max |", "|---|---|---|---|---|---|---|---|---|"]
     for i, (t0, k) in enumerate(cuts):

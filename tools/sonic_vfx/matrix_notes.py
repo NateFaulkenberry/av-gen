@@ -61,7 +61,12 @@ What the numbers cannot say:
 - A slow, sustained answer (a sky warming over a held chord) has little variance to correlate when the input holds
   still for the whole clip. *Silent* on `sustain` in the pads and sustained classes often means the input never
   moved it, not that the picture ignores it; the full class, where sustain comes and goes, is the fairer test.
-- *Late response* findings are the evaluator's lag search on slow signals; a SLOW chain is late by design.
+- *Late response* fires for every `response.*Env` whose answer peaks more than 100 ms after the hit, including
+  envelopes the scene never routes (`lowEnv`, `onsetEnv`). Each is a medium penalty on musical_synchronization
+  (`exp(-0.35 x penalties)`), so that dimension sits near 0 on most clips whatever the scene's own drums do. Read the
+  observed column for synchronisation, not that score.
+- *No dominant subject* is a 64x36 spectral-residual saliency map's top peak under 1.5x its second. It splits one
+  subject into several peaks (the black hole's two disk limbs, a plate's figure), so it fires on nearly every clip.
 - The verdicts below are the art agent's, from the clips and the sheets, with the numbers as evidence.
 """
 
@@ -100,6 +105,7 @@ settled at 0.5 within seven seconds and ran at a 17.1 ms median interval.
 | 13 | The Corrupted Cathedral | 286 | 59.2 / 63.9 | 58.5 / 61.1 | 24 | 0.89 | 0.80 | 0.86 |
 | 14 | Storm Cell | 789 | 21.7 / 23.4 | 21.2 / 22.3 | 24 | 0.95 | 1.00 | 0.98 |
 | 15 | Stellar Nursery | 1020 | 16.8 / 26.0 | 12.6 / 13.0 | 24 | 0.94 | 1.00 | 0.89 |
+| 16 | Event Horizon | 1017 | 16.8 / 25.9 | 13.0 / 13.3 | 24 | 0.93 | 1.00 | 0.97 |
 """.strip()
 
 # scene id -> the art agent's verdict, written from the clips and the sheets after the matrix run
