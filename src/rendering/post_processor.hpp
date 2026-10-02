@@ -61,6 +61,9 @@ struct PostFrameInputs {
     // paths without changing the image: `emission` weights bloom, `identifier` masks sharpening.
     wgpu::TextureView emission;
     wgpu::TextureView identifier;
+    // ADR-1072: the normal + roughness target (rg = octahedral normal), for the outline's crease
+    // test. Null drops that test; the depth and object edges still draw.
+    wgpu::TextureView normal;
     // ADR-040: the RG16F per-pixel screen motion. Null skips motion blur entirely - there is no
     // longer a camera-only fallback, because it disagreed with everything that moves on its own.
     wgpu::TextureView velocity;
@@ -250,6 +253,7 @@ private:
     wgpu::RenderPipeline lens_;
     wgpu::RenderPipeline glitch_;  // ADR-1065
     wgpu::RenderPipeline display_; // ADR-1065
+    wgpu::RenderPipeline outline_; // ADR-1072
     wgpu::RenderPipeline composite_;
     wgpu::RenderPipeline fxaa_;
     wgpu::RenderPipeline sharpen_;

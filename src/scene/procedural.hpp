@@ -23,6 +23,7 @@
 #include "core/wind.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/toon_shading.hpp"
 #include "spatial/effector.hpp"
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
@@ -684,6 +685,7 @@ struct ClampedAuthoredValue {
 struct ProceduralParameters {
     std::string prefix;
     std::vector<params::IParameter*> all; // everything registered (for unregister)
+    ToonParameters toon;                  // ADR-1071: toon/* (the material's cel lighting)
     // ADR-331: every authored value this table's ranges overruled, in registration order.
     // `registerProceduralParameters` fills it and warns once per entry.
     //

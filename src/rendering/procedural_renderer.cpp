@@ -1,4 +1,5 @@
 #include "rendering/procedural_renderer.hpp"
+#include "rendering/toon_pack.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -1946,6 +1947,12 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // ADR-903/905: the object's emission lane -- its node's boost, its part's gain, its scatter
         // layer's gain and hue -- applied after the program to every instance of this draw.
         obj.emission = glm::vec4(object.emissionGain, object.emissionHue, 0.0f, 0.0f);
+        {
+            const auto toon = packToon(m.toon); // ADR-1071
+            obj.toon0 = toon[0];
+            obj.toon1 = toon[1];
+            obj.toon2 = toon[2];
+        }
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < scene.textures.size() && !scene.textures[ref.texture].isHdr();

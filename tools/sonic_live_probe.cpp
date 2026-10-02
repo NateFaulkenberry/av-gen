@@ -757,7 +757,7 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: avgen_sonic_probe <latency|sweep|drive|demo|silence|low|high|chords|arp|"
                              "distorted|patches|play|tour> [--out f.csv] [--scenes n] "
-                             "[--wav f.wav] [--device BlackHole] [--lead-in s] [--period frames]\n");
+                             "[--wav f.wav] [--device BlackHole] [--lead-in s] [--period frames] [--record-seconds s]\n");
         return 2;
     }
     const std::string name = argv[1];
@@ -767,6 +767,7 @@ int main(int argc, char** argv) {
     std::string deviceName = "BlackHole";
     double leadIn = 0.0;
     ma_uint32 period = 128;
+    double recordSeconds = 0.0; // 0 = long enough for the scenario (see below)
     for (int i = 2; i + 1 < argc; i += 2) {
         const std::string a = argv[i];
         if (a == "--out") outPath = argv[i + 1];
@@ -775,6 +776,16 @@ int main(int argc, char** argv) {
         else if (a == "--lead-in") leadIn = std::atof(argv[i + 1]);
         else if (a == "--period") period = static_cast<ma_uint32>(std::atoi(argv[i + 1]));
         else if (a == "--scenes") scenes = std::max(1, std::atoi(argv[i + 1]));
+        else if (a == "--record-seconds") recordSeconds = std::max(1.0, std::atof(argv[i + 1]));
+    }
+    // The recording buffer (the --wav soundtrack). It was a fixed 180 s, shorter than a 17-scene tour (1 + 20 x 17
+    // = 341 s), so the tour's WAV stopped two thirds of the way through. The default now covers the tour plus the
+    // lead-in and a margin, and never less than the old 180 s; --record-seconds overrides it either way.
+    if (recordSeconds <= 0.0) {
+        recordSeconds = 180.0;
+        if (name == "tour") {
+            recordSeconds = std::max(recordSeconds, leadIn + 1.0 + 20.0 * scenes + 30.0);
+        }
     }
 
     avgen::control::MidiVirtualSource midi;
@@ -809,7 +820,7 @@ int main(int argc, char** argv) {
     }
     Synth synth;
     synth.sampleRate = 48000.0f;
-    synth.recording.assign(static_cast<std::size_t>(48000.0 * 180.0), 0.0f);
+    synth.recording.assign(static_cast<std::size_t>(48000.0 * recordSeconds), 0.0f);
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
     config.playback.channels = 2;

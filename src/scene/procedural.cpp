@@ -2868,6 +2868,9 @@ json ProceduralGeometry::toJson() const {
         if (!baseColorTexturePath.empty()) {
             s["baseColorTexture"] = baseColorTexturePath;
         }
+        if (!toonShadingIsDefault(material.toon)) {
+            s["toon"] = toonShadingToJson(material.toon); // ADR-1071
+        }
         if (!material.program.empty()) {
             s["program"] = material.program; // ADR-030 material program name
         }
@@ -3183,6 +3186,11 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(m.program, "program", readString);
         AVGEN_PROC_READ(m.alphaCutoff, "alphaCutoff", readFloat);
         AVGEN_PROC_READ(g.baseColorTexturePath, "baseColorTexture", readString);
+        if (j.contains("toon")) { // ADR-1071
+            if (auto toon = readToonShading(j.at("toon"), m.toon); !toon) {
+                return fail("material: {}", toon.error().message);
+            }
+        }
         if (j.contains("alphaMode")) {
             if (!j.at("alphaMode").is_string()) {
                 return fail("material 'alphaMode' must be a string");
@@ -3605,6 +3613,9 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
                      std::max(kAuthoredEmissiveCeiling, m.emissiveIntensity), 0.0f, 8.0f);
     p.roughness = r.f("material/roughness", m.roughness, 0.0f, 1.0f, 0.0f, 1.0f);
     p.metallic = r.f("material/metallic", m.metallic, 0.0f, 1.0f, 0.0f, 1.0f);
+    // ADR-1071: the material's cel lighting, toon/* (registered always, so the look can be switched on
+    // from the panel; `toon/bands` 0 is off).
+    p.toon = registerToonParameters(params, prefix, group, m.toon, &p.all);
 
     // Material variation
     const MaterialVariation& mv = rest.materialVariation;
@@ -3767,6 +3778,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     copyValue(p, "material/emissive", m.emissiveIntensity);
     copyValue(p, "material/roughness", m.roughness);
     copyValue(p, "material/metallic", m.metallic);
+    applyToonParameters(p.toon, m.toon); // ADR-1071
 
     MaterialVariation& mv = live.materialVariation;
     copyValue(p, "materialVariation/hueShift", mv.hueShift);

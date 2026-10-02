@@ -210,6 +210,11 @@ struct ObjectUniforms {
     // surface emits: a node's emissiveBoost, a part's emissiveGain, a scatter layer's emissionGain and
     // hueOffset. (1, 0) is the identity.
     emission: vec4<f32>,
+    // ADR-1071: the material's cel lighting (rendering/toon_pack.hpp). toon0.x is the gate: 0 and
+    // shadeSurface never enters the toon branch. The struct now fills its 512-byte slot.
+    toon0: vec4<f32>,          // x = lit bands, y = edge softness, z = terminator, w = highlight strength
+    toon1: vec4<f32>,          // rgb = shadow tone (shadowColor x ambient), w = rim width
+    toon2: vec4<f32>,          // rgb = rim colour x intensity, w = highlight size
 };
 
 // ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the

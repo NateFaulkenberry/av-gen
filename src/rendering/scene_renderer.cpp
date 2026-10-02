@@ -1,4 +1,5 @@
 #include "rendering/scene_renderer.hpp"
+#include "rendering/toon_pack.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
 #include "rendering/environment.hpp"
@@ -3519,6 +3520,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
         // ADR-903: the owning node's emissiveBoost, applied after the program. No hue lane here.
         obj.emission = glm::vec4(entity.emissionGain, 0.0f, 0.0f, 0.0f);
+        {
+            const auto toon = packToon(m.toon); // ADR-1071
+            obj.toon0 = toon[0];
+            obj.toon1 = toon[1];
+            obj.toon2 = toon[2];
+        }
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();
@@ -4478,6 +4485,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // always been written -- the debug view reads it -- and was never handed to the post chain,
         // so `post/bloom/emissionWeight` resolved, ran and changed nothing.
         postIn.emission = emission_.view;
+        postIn.normal = normalRough_.view; // ADR-1072: the outline's crease test
         // ADR-035's identifier target, wired for the same reason the emission target above was:
         // `post/output/sharpenId` was a registered, round-tripping parameter whose shader path
         // exists and is tested, and which could not affect any frame a user rendered, because

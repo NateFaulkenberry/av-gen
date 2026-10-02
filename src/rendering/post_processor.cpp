@@ -248,7 +248,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 20> slots{{
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 21> slots{{
         {"fs_exposure", &exposure_},
         {"fs_meter_prefilter", &meterPrefilter_},
         {"fs_meter_reduce", &meterReduce_},
@@ -273,6 +273,7 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_box_down", &boxDown_}, // ADR-917, appended
         {"fs_glitch", &glitch_},    // ADR-1065, appended
         {"fs_display", &display_},  // ADR-1065, appended
+        {"fs_outline", &outline_},  // ADR-1072, appended
     }};
     // The velocity-tile passes write RG16F, not the HDR format (ADR-040). ADR-917 appends the two
     // halves of the tile maximum it takes separably past 40 px.
@@ -574,6 +575,39 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         stage_ = "post/exposure";
         runPass(encoder, exposure_, target.view, current, nullptr, nullptr, u);
         captureStage("exposure", target);
+        current = target.view;
+    }
+
+    // ---- 1a. ADR-1072: the outline. After the exposure (its colour is in exposed units, like every
+    // threshold below) and before everything that resamples the image without the depth buffer, so a
+    // line hazes, defocuses, smears and blooms with the surface it is drawn round. Never encoded while
+    // the amount is 0. -------------------------------------------------------------------------------
+    if (s.outline.active() && in.depth) {
+        const scene::PostOutlineSettings& o = s.outline;
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(o.amount, 0.0f, 1.0f), std::max(o.width * pixelScale, 0.0f),
+                              std::max(o.depthThreshold, 1e-4f), std::max(o.normalThreshold, 1e-4f));
+        u.params1 = glm::vec4(glm::max(o.color, glm::vec3(0.0f)) * std::max(o.intensity, 0.0f),
+                              o.silhouette >= 0.5f ? 1.0f : 0.0f);
+        u.params2 = glm::vec4(std::max(o.fadeStart, 0.0f), std::max(o.fadeEnd, 0.0f),
+                              o.objectEdges >= 0.5f && in.identifier ? 1.0f : 0.0f, in.normal ? 1.0f : 0.0f);
+        // The camera's forward axis, for view depth (1 / view depth is linear across a plane on screen,
+        // which is what makes the depth test silent on a floor).
+        {
+            const glm::vec4 far = in.invViewProj * glm::vec4(0.0f, 0.0f, 0.5f, 1.0f);
+            const glm::vec3 ahead = glm::vec3(far) / far.w - in.cameraPos;
+            const float len = glm::length(ahead);
+            u.params3 = glm::vec4(len > 1e-6f ? ahead / len : glm::vec3(0.0f, 0.0f, -1.0f), 0.0f);
+        }
+        PassTextures textures;
+        textures.source = current;
+        textures.second = in.normal;
+        textures.depth = in.depth;
+        textures.identifier = in.identifier;
+        stage_ = "post/outline";
+        runPass(encoder, outline_, target.view, textures, u);
+        captureStage("outline", target);
         current = target.view;
     }
 

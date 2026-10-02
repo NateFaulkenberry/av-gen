@@ -1240,3 +1240,131 @@ fn fs_display(in: FsIn) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(colour, 1.0);
 }
+
+// ---- ADR-1072: the outline ------------------------------------------------------------------------
+//
+// params0 = (amount, width in this frame's pixels, depth threshold, normal threshold)
+// params1 = (line colour x intensity, silhouette only 1/0)
+// params2 = (fade start, fade end in metres, object edges 1/0, normal target bound 1/0)
+// params3 = (camera forward, 0)
+// `second` is the normal + roughness target (rg = octahedral normal) and `identifierTex` the object ids.
+//
+// Each pixel looks at four pairs of neighbours, opposite each other at half the width: an edge is drawn
+// on both sides of a discontinuity, so the line is `width` wide in all. Background is depth 1.
+
+fn outlineOctDecode(e: vec2<f32>) -> vec3<f32> {
+    var n = vec3<f32>(e.x, e.y, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0) {
+        let signs = vec2<f32>(select(-1.0, 1.0, n.x >= 0.0), select(-1.0, 1.0, n.y >= 0.0));
+        let xy = (vec2<f32>(1.0) - abs(vec2<f32>(n.y, n.x))) * signs;
+        n = vec3<f32>(xy, n.z);
+    }
+    return normalize(n);
+}
+
+struct OutlineTap {
+    inverseDepth: f32, // 1 / view depth; 0 for the background
+    distance: f32,     // metres from the camera; 1e6 for the background
+    normal: vec3<f32>,
+    id: u32,           // the object id (low 16 bits of the identifier word); 0xFFFFFFFF for none
+    background: bool,
+};
+
+fn outlineTap(texel: vec2<i32>, size: vec2<i32>) -> OutlineTap {
+    let c = clamp(texel, vec2<i32>(0), size - vec2<i32>(1));
+    var tap: OutlineTap;
+    let d = textureLoad(depthTex, c, 0);
+    tap.background = d >= 1.0;
+    tap.inverseDepth = 0.0;
+    tap.distance = 1e6;
+    if (!tap.background) {
+        let uv = (vec2<f32>(c) + vec2<f32>(0.5)) / vec2<f32>(size);
+        let world = worldFromDepth(uv, d);
+        let toPoint = world - post.cameraPos.xyz;
+        tap.distance = length(toPoint);
+        tap.inverseDepth = 1.0 / max(dot(toPoint, post.params3.xyz), 1e-4);
+    }
+    tap.normal = vec3<f32>(0.0, 0.0, 1.0);
+    if (post.params2.w > 0.5) {
+        let nsize = vec2<i32>(textureDimensions(second));
+        let nc = clamp(c * nsize / max(size, vec2<i32>(1)), vec2<i32>(0), nsize - vec2<i32>(1));
+        tap.normal = outlineOctDecode(textureLoad(second, nc, 0).rg);
+    }
+    tap.id = 0xFFFFFFFFu;
+    if (post.params2.z > 0.5) {
+        let isize = vec2<i32>(textureDimensions(identifierTex));
+        let ic = clamp(c * isize / max(size, vec2<i32>(1)), vec2<i32>(0), isize - vec2<i32>(1));
+        let word = textureLoad(identifierTex, ic, 0).r;
+        tap.id = select(word & 0xFFFFu, 0xFFFFFFFFu, word == 0u);
+    }
+    return tap;
+}
+
+// How much of an edge there is between the centre and one neighbour (0..1), and the opposite pair's
+// depth term, which needs both.
+fn outlineEdgePair(c: OutlineTap, a: OutlineTap, b: OutlineTap) -> f32 {
+    let depthThreshold = post.params0.z;
+    let normalThreshold = post.params0.w;
+    var edge = 0.0;
+    // The background against a surface, either way round: always an edge.
+    if (c.background != a.background || c.background != b.background) {
+        edge = 1.0;
+    }
+    if (!c.background) {
+        // The second difference of 1 / depth across the pixel, relative to the pixel's own: zero on
+        // any plane however steeply it is seen. A background neighbour is handled above.
+        if (!a.background && !b.background) {
+            let lap = abs(a.inverseDepth + b.inverseDepth - 2.0 * c.inverseDepth) / max(c.inverseDepth, 1e-6);
+            edge = max(edge, smoothstep(depthThreshold, depthThreshold * 1.5, lap));
+        }
+        if (post.params2.z > 0.5 && ((!a.background && a.id != c.id) || (!b.background && b.id != c.id))) {
+            edge = 1.0;
+        }
+        if (post.params1.w < 0.5 && post.params2.w > 0.5) {
+            var crease = 0.0;
+            if (!a.background) {
+                crease = max(crease, 1.0 - dot(a.normal, c.normal));
+            }
+            if (!b.background) {
+                crease = max(crease, 1.0 - dot(b.normal, c.normal));
+            }
+            edge = max(edge, smoothstep(normalThreshold, normalThreshold * 1.25, crease));
+        }
+    }
+    return edge;
+}
+
+@fragment
+fn fs_outline(in: FsIn) -> @location(0) vec4<f32> {
+    let size = vec2<i32>(textureDimensions(depthTex));
+    let src = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let texel = vec2<i32>(in.uv * vec2<f32>(size));
+    let width = post.params0.y;
+    if (width <= 0.0) {
+        return src;
+    }
+    // Below a pixel the taps are one pixel apart and the line's strength is its coverage.
+    let radius = max(width * 0.5, 1.0);
+    let coverage = clamp(width, 0.0, 1.0);
+    let c = outlineTap(texel, size);
+    var edge = 0.0;
+    var nearest = c.distance;
+    let r = i32(round(radius));
+    let rd = i32(round(radius * 0.70710678));
+    var dirs = array<vec2<i32>, 4>(vec2<i32>(r, 0), vec2<i32>(0, r), vec2<i32>(rd, rd), vec2<i32>(rd, -rd));
+    for (var k = 0; k < 4; k = k + 1) {
+        let a = outlineTap(texel + dirs[k], size);
+        let b = outlineTap(texel - dirs[k], size);
+        let e = outlineEdgePair(c, a, b);
+        if (e > 0.0) {
+            nearest = min(nearest, min(a.distance, b.distance));
+        }
+        edge = max(edge, e);
+    }
+    var fade = 1.0;
+    if (post.params2.y > post.params2.x) {
+        fade = 1.0 - smoothstep(post.params2.x, post.params2.y, nearest);
+    }
+    let alpha = clamp(edge * fade * coverage * post.params0.x, 0.0, 1.0);
+    return vec4<f32>(mix(src.rgb, post.params1.xyz, alpha), src.a);
+}

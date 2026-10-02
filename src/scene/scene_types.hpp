@@ -198,6 +198,26 @@ enum class SurfaceClass : std::uint8_t {
 [[nodiscard]] const char* surfaceClassName(SurfaceClass c);
 [[nodiscard]] std::optional<SurfaceClass> surfaceClassFromName(std::string_view name);
 
+// ADR-1071: cel ("toon") lighting for one material. `bands == 0` (the default) is off, and a material
+// that keeps it shades exactly as it did before this existed. Otherwise each light's N.L (times its
+// shadow) is cut into `bands` lit tones above a shadow tone, every edge `softness` wide; the shadow
+// tone is the albedo times `shadowColor` times `ambient`; a Fresnel rim and a hard highlight are
+// optional. Packed into ObjectUniforms::toon0..2 by rendering/toon_pack.hpp; the parameters and the
+// file block are scene/toon_shading.hpp.
+struct ToonShading {
+    float bands = 0.0f;         // lit tones above the shadow tone (0 = off; rounded by the shader)
+    float softness = 0.02f;     // width of every band edge, in N.L (0.001 = a hard cut)
+    float terminator = 0.0f;    // the N.L where the shadow side begins (-1 .. 1)
+    glm::vec3 shadowColor{0.45f, 0.4f, 0.7f}; // hue of the shadow side, times the albedo
+    float ambient = 0.3f;       // ambient floor: brightness of the shadow side (0 = black)
+    float rimWidth = 0.0f;      // Fresnel rim, as a share of a round object's radius (0 = off)
+    glm::vec3 rimColor{1.0f, 1.0f, 1.0f};
+    float rimIntensity = 1.0f;
+    float specular = 0.0f;      // hard highlight strength (0 = off)
+    float specularSize = 0.08f; // highlight size (0 = a point, 1 = the whole lit side)
+    [[nodiscard]] bool enabled() const { return bands >= 0.5f; }
+};
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -222,6 +242,7 @@ struct Material {
     TextureRef normalTexture;            // linear, tangent space
     TextureRef emissiveTexture;          // sRGB
     TextureRef occlusionTexture;         // linear, r
+    ToonShading toon;                    // ADR-1071: cel lighting (off by default)
 };
 
 // ---- geometry ------------------------------------------------------------------------------

@@ -848,6 +848,63 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         return result;
     }
 
+    // ---- ADR-1071: cel lighting ----
+    //
+    // Before the scene-wide styled path, so a toon material is toon whatever `environment.stylized`
+    // says. The gate is the object's uniform, so a draw takes this branch whole. Flat by design: no
+    // normal map, no IBL, no screen-space AO (its noise is exactly what a flat tone would print);
+    // the program's colour and emission, the effect lanes, the waves and the fog all still apply.
+    if (object.toon0.x > 0.5) {
+        let roughness = clamp(matRoughMetal.x, 0.15, 1.0);
+        var context: ShadeContext;
+        context.worldPos = worldPos;
+        context.normal = n;
+        context.geoNormal = geoNormal;
+        context.view = v;
+        context.diffuseColor = baseColor.rgb;
+        context.f0 = vec3<f32>(0.04);
+        context.roughness = roughness;
+        context.alpha = roughness * roughness;
+        context.nDotV = max(dot(n, v), 0.0);
+        context.screenUv = screenUv;
+        context.viewDepth = viewDepth;
+        context.rotation = gradientNoise(screenUv * frame.targetSize.xy) * 6.28318531;
+        context.jitter = 0.5;
+        context.maskable = alphaMode < 1.5;
+        context.tier = tier;
+        context.localLightBudget = tierLocalLights;
+        context.toon = object.toon0;
+        context.toonHighlight = object.toon2.w;
+        let lighting = directLighting(context);
+        // The shadow tone: the albedo times the shadow colour times the ambient floor.
+        let ambient = baseColor.rgb * object.toon1.rgb;
+        // The rim: a hard band round the silhouette, emitted (it blooms). `toon1.w` is its width as a
+        // share of a sphere's radius -- the outer w of the disc, where N.V < sqrt(1 - (1 - w)^2) -- so
+        // 0.25 reads as a quarter of the way in on a round thing, whatever its size on screen.
+        var rim = vec3<f32>(0.0);
+        if (object.toon1.w > 0.0) {
+            let s = max(object.toon0.y, 1e-3);
+            let inner = 1.0 - object.toon1.w;
+            let edge = sqrt(max(1.0 - inner * inner, 0.0));
+            rim = object.toon2.rgb * (1.0 - smoothstep(edge - s, edge + s, context.nDotV));
+        }
+        let fx = wavesAt(worldPos, n, emissive);
+        let radiance = lighting.diffuse + lighting.specular + ambient + emissive + rim + fx.radiance;
+        result.color = vec4<f32>(applyFog(radiance, worldPos), alpha);
+        result.normal = n;
+        result.roughness = roughness;
+        result.emission = emissive + rim + fx.radiance;
+        result.bloomWeight = max(result.bloomWeight, fx.bloom);
+        if ((fxFlags & 8u) != 0u) { // ADR-703: Bloom Source
+            result = fxBloomShare(result, radiance);
+        }
+        result.flags = select(1.0, 3.0, dot(result.emission, result.emission) > 1e-6);
+        if (alphaMode > 1.5) {
+            result.flags = result.flags + 4.0;
+        }
+        return result;
+    }
+
     if (frame.lightCounts.z > 0.5) {
         let roughness = clamp(matRoughMetal.x, 0.15, 1.0);
         var context: ShadeContext;

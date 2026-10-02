@@ -1,4 +1,5 @@
 #include "rendering/sdf_renderer.hpp"
+#include "rendering/toon_pack.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -73,6 +74,12 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
     obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
     // ADR-903: the owning node's emissiveBoost, applied after the program by the shared shading.
     obj.emission = glm::vec4(object.emissionGain, 0.0f, 0.0f, 0.0f);
+    {
+        const auto toon = packToon(m.toon); // ADR-1071
+        obj.toon0 = toon[0];
+        obj.toon1 = toon[1];
+        obj.toon2 = toon[2];
+    }
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);

@@ -447,8 +447,15 @@ struct ObjectUniforms {
     // while this is the node's own value and is always on. (1, 0) is the identity, so a draw that
     // keeps the default is the draw it was before this existed.
     glm::vec4 emission{1.0f, 0.0f, 0.0f, 0.0f};
+    // ADR-1071: the material's cel lighting, the last three padding vec4s (the struct now fills its
+    // 512-byte slot; the next lane anyone needs grows kObjectStride). toon0.x is the gate: 0 (every
+    // material that does not ask for it) and the lit shader never enters the toon branch. Packed by
+    // rendering/toon_pack.hpp; read by `shadeSurface` in pbr_shade.wgsl and `evaluateLight`.
+    glm::vec4 toon0{0.0f}; // x = lit bands (0 = off), y = edge softness, z = terminator, w = highlight strength
+    glm::vec4 toon1{0.0f}; // rgb = shadow tone (shadowColor x ambient), w = rim width
+    glm::vec4 toon2{0.0f}; // rgb = rim colour x intensity, w = highlight size
 };
-static_assert(sizeof(ObjectUniforms) == 464);
+static_assert(sizeof(ObjectUniforms) == 512);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -464,6 +471,8 @@ static_assert(offsetof(ObjectUniforms, energyB) == 400);
 static_assert(offsetof(ObjectUniforms, fxA) == 416);
 static_assert(offsetof(ObjectUniforms, fxB) == 432);
 static_assert(offsetof(ObjectUniforms, emission) == 448);
+static_assert(offsetof(ObjectUniforms, toon0) == 464);
+static_assert(offsetof(ObjectUniforms, toon2) == 496);
 
 struct TonemapUniforms {
     float exposure;

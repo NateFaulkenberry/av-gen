@@ -13,6 +13,7 @@
 
 #include "params/parameter_set.hpp"
 #include "scene/post_glitch.hpp"
+#include "scene/post_outline.hpp"
 #include "scene/scene_types.hpp"
 
 #include <nlohmann/json_fwd.hpp>
@@ -245,6 +246,8 @@ struct PostSettings {
     // ---- ADR-1065: post effects as instruments, the glitch vocabulary (post/{shock,glitch,split,sort,radial,
     // display}/*). Off and byte-identical at their defaults; see post_glitch.hpp. -------------------------------
     PostGlitchSettings glitch;
+    // ---- ADR-1072: the screen-space outline (post/outline/*). Off at amount 0; see post_outline.hpp. -----------
+    PostOutlineSettings outline;
 };
 
 struct PostParameters {
@@ -319,6 +322,7 @@ struct PostParameters {
     params::Parameter<float>* sweepHue = nullptr;
     params::Parameter<float>* sweepTrail = nullptr;
     PostGlitchParameters glitch; // ADR-1065
+    PostOutlineParameters outline; // ADR-1072
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);
