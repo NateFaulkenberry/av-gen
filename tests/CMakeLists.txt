@@ -12,6 +12,8 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
     # ADR-902: `avgen --audit-routes` -- an offline engine and a report, no GPU, so it is checked here.
     "${CMAKE_SOURCE_DIR}/src/app/route_audit_cli.cpp"
+    # ADR-1057: the spatial validator's film pass -- an offline engine and the CPU SDF, no GPU.
+    "${CMAKE_SOURCE_DIR}/src/app/film_validate.cpp"
     # ADR-927: `avgen --propose-reactivity` -- the same shape, checked here for the same reason.
     "${CMAKE_SOURCE_DIR}/src/app/reactivity_cli.cpp"
     # The transport (ADR-102): the playback state machine and the frame arithmetic. Deliberately

@@ -4,6 +4,100 @@
 PROGRESS-art.md. Governing documents: `00-brief.md`, `01-addendum-emotion.md` (wins where they differ).
 Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 
+## ART PASS 4 (2026-10-02): Resume here
+
+*Governing: `04-art-pass-4.md` (the owner's). Mine: PART 1 Phases 1-2 (validation tooling) and PART 7 (~2:15). ADRs
+1056-1059. Shared worktree: commit only my paths with `git commit -- <paths>`; never `tools/liminal/`,
+`examples/liminal/all-you-got*`, PROGRESS-art.md.*
+
+| # | item | status | ADR |
+|---|---|---|---|
+| 1 | Phase 1 investigation (what the scene/kit/engine know) | done (below) | - |
+| 2 | structural checks: window/door in its opening (per-edge offsets), sill offset, trim/decor crossing openings, roofs, stairs, railings | **landed** | 1056 |
+| 3 | containment: furniture in its room (per-wall overhang), room kinds (laundry, gym, kitchen), against-wall, chair spacing | **landed** | 1056 |
+| 4 | text: per-edge wall overshoot in metres, sunk text, text vs geometry (chapter- and time-aware), text vs text, self-overlap (tracking) | **landed** | 1056 |
+| 5 | film pass `--film`: camera inside solid, near-plane clipping, close-geometry distortion, crossing between frames, entering early; build-lock (twitch) on structural transforms | **landed** | 1057 |
+| 6 | tiers (critical/warning/info; expected overlaps are info), Markdown "Scene Validation Report" (`--md`) | **landed** | 1056 |
+| 7 | ~2:15: root cause found and the engine half fixed (`camera/near`, journey auto near 5 cm) | **engine fixed; data half is the art agent's** | 1058 |
+| 8 | tests (Catch2 `[adr1056]`, `[adr1057]`, `[adr1058]`), ADR text | in progress | - |
+
+### For the art agent (pass 4): the validator, now
+
+Build: `cmake --build --preset release -j 10` (or use the binary at `build/release/src/avgen`; it has everything below).
+
+```sh
+# static (about 5 s, no GPU): the scene as authored, with the project's journey keys and visibility tracks
+./build/release/src/avgen --validate-space examples/liminal/all-you-got-pass3.json \
+    --json report.json --md report.md --text report.txt
+# the film pass (about 3-4 min for the whole film at 30 fps, no GPU): the camera and the transforms as PLAYED
+./build/release/src/avgen --validate-space examples/liminal/all-you-got-pass3.json --film \
+    --json report.json --md report.md [--range a:b] [--fps 30] [--camera-trace cam.csv] [--no-motion]
+#   --strict: exit 1 on any critical.   --dump-rules: every tolerance and category (deep-merge your own with --rules r.json)
+```
+
+- **Tiers:** `severity` ERROR/WARNING/INFO = `tier` critical/warning/info. Expected overlaps (a category's `mayIntersect`,
+  a child within its anchor's allowance) are INFO and never errors.
+- **The Markdown report** (`--md`) is the owner's "Scene Validation Report": counts by tier and by rule, then every critical
+  and warning with its fix, the first 40 infos, and the film pass's statistics. Run it before and after the art pass.
+- **The film pass** plays the project through the engine (as `--trace-jumps` does) and, per frame, evaluates the LIVE SDF at
+  the real camera (journey, look-at, breath, guard all applied). Its items carry `time`, `timeEnd`, `frame`, `frameEnd`
+  (30 fps frame numbers), the eye and the point hit. `--camera-trace cam.csv` writes every sample (time, frame, eye, target,
+  fov, near plane, clearance, nearest object).
+- New rules (all reported with metres and a fix):
+  - `openingAlignment`: a window/door frame against the opening actually cut in its wall, per edge as seen from the room.
+  - `sill`: the sill's top against the opening's lower edge and the frame's.
+  - `opening`: a window/door with a solid wall behind it (mark a deliberate one `"blind": true`).
+  - `openingCrossed`: anything in an opening's passage that is not its own frame: trim (skirting, dado), decor, furniture.
+  - `stairs` (mark a deliberate dead end `"terminates": true`; tag a top `"landing"`), `roof` (tag `roof`/`building`),
+    `railing` (tag `railing`, anchor = the stairs).
+  - `containment`, `roomKind` (washer/dryer -> a laundry, treadmill/weightBench/weightRack/exerciseBike -> a gym,
+    counter/fridge/stove -> a kitchen; the room's id or `"kind"`), `againstWall` (`"freestanding": true` to opt out),
+    `chairSpacing`.
+  - text: `lyricPlacement` now says which edge and by how much ("exceeds the bounds of wall -z of kitchen by 0.21m on the
+    right edge"), sunk text; `textIntersection` (text inside any geometry shown with it, including untagged pieces),
+    `textOverlap` (two words in one place at once), `textSelfOverlap` (tracking below -0.05 em).
+  - film: `cameraInside`, `cameraCrossing`, `nearClip`, `closeGeometry`, `cameraClearance` (info), `cameraEarly` (rooms
+    with `"opensAt": s`), `buildLock` (a structural transform still moving after its construction keys: the twitch),
+    `structuralMotion` (info: large continuous motion, e.g. flying parts).
+- **Build-lock opt-outs:** an entity `"moves": true`; decor categories that may move (hanging lamps, fans, curtains, plants),
+  characters and text are not watched; `{"motion": {"allow": ["<path substring>"]}}` in a rules file.
+- **New categories to tag with:** landing, balcony, railing, roof, building, trim, sill, washer, dryer, treadmill,
+  weightBench, weightRack, exerciseBike, stove, dishwasher, bar, barStool. A window's parts `frame`/`sill` (`ls.part`)
+  make its measurement exact; without them the sill is found as the bottom rows wider than the frame.
+
+### PART 7: the ~2:15 artifact (root cause)
+
+**What it is:** from 134.8 s to 138.4 s (30 fps frames 4043-4152) the study's camera (chapter `v2stu`) swings past
+`StudyBookcase` (object `stuShelf`) and comes within **0.13 m** of it (closest at 135.6-136.1 s). The engine's near plane
+was **0.404 m**, and the SDF march starts at the near plane (`shaders/sdf_raymarch.wgsl`, `tStart = max(slab.x,
+tNearPlane)`), so every ray began INSIDE the bookcase: the bookcase was cut open by the near plane and its cross-section
+drew as jagged, broken lines. Measured by the film pass (`nearClip`, 49% of the view) and confirmed by rendering frame
+135.6 s before and after: `~/Desktop/av-gen-review/24-liminal-space/pass4/eng/2m15-near-plane-before-after.png`.
+
+**Why the near plane was 0.40 m:** `Composition` sets it to 0.5% of the whole scene's radius (`radius_ * 0.005`). The film is
+one composition holding the street, the landscape and the skyline (radius 81 m), so a camera walking through 3 m rooms got
+an orbit camera's near plane.
+
+**Engine fix (ADR-1058, mine, done):** a journey camera's automatic near plane is now at most 5 cm, and a new parameter
+`camera/near` (metres; 0 = automatic; scene JSON `camera.near`) sets it explicitly. Re-rendered, the bookcase draws whole.
+
+**Data half (the art agent's, in `tools/liminal/`):** even drawn correctly, a bookcase 13 cm from a 62-degree lens fills the
+frame (the film pass reports it as `closeGeometry`). The study camera path (chapter `v2stu`, path metres around 8002.9-8003.4,
+the look-at keys swinging from (-1.2, 3.9, -5.4) to (1.6, 3.6, -2.6)) should keep at least 0.5 m from `StudyBookcase`.
+Also: `StudyBookcase` stands across a third of `StudyDoor`'s opening (wall +x of study, z -3.52..-2.48 against the
+bookcase's -4.11..-3.09) and 5 cm into the wall (`openingCrossed`).
+
+### Findings on pass 3 (static, before the art pass)
+
+Static run (`all-you-got-pass3.json`): **24 critical, 34 warnings, 3 info**. The film pass's numbers are below once run.
+- **Trim runs across every doorway** (23 critical `openingCrossed`): `kit.wall_band` (the skirting at 0-0.10 m and the dado at
+  0.88-0.92 m) is a shell round the room clipped to a band, and the door cuts are subtracted from the walls only, so each band
+  crosses every door (and the dado crosses `FrontWindow`) as a floating strip. Fix in the kit: subtract the same cuts from the
+  bands (`D(band, *cuts)`), or pass the cuts to `wall_band`.
+- `StudyBookcase` in front of `StudyDoor` (above); `HallStair` ends at y 2.70 with no floor (deliberate, the cliff: mark
+  `"terminates": true`); five gallery plinths "off the wall" (mark `"freestanding": true`); 13 text/geometry intersections
+  (the `grow*` words cut the tree rooms' walls by 8-25%; `b3w86` inside `kitDisco`), 2 text/text overlaps.
+
 ## ART PASS 3 (2026-10-01): Resume here
 
 *Governing: `03-art-pass-3-addendum.md` (the owner's). My items, in the coordinator's order. ADRs 1051-1059.

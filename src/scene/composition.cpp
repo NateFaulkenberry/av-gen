@@ -4410,6 +4410,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         floatDesc(prefix_ + "camera/orbitSpeed", cameraOrbitSpeedSetting_, -3.0f, 3.0f, -1.0f, 1.0f));
     cameraFov_ =
         &params.add(floatDesc(prefix_ + "camera/fov", cameraFovSetting_, 5.0f, 120.0f, 20.0f, 90.0f));
+    // ADR-1058: the near plane. 0 = automatic (a share of the world's size; at most 5 cm for a journey,
+    // whose camera walks through rooms). The SDF march starts at the near plane, so a near plane larger
+    // than the camera's clearance cuts the nearest wall open.
+    cameraNear_ = &params.add(floatDesc(prefix_ + "camera/near", cameraNearSetting_, 0.0f, 10.0f, 0.0f, 0.5f));
     cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
                                                      .defaultValue = cameraModeSetting_,
                                                      .hardMin = 0,
@@ -5797,6 +5801,7 @@ void Composition::detach() {
     cameraSplineOffset_ = nullptr;
     materialParams_.clear();
     cameraFov_ = nullptr;
+    cameraNear_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
     cameraTarget_ = nullptr;
@@ -8763,7 +8768,15 @@ void Composition::applyParameters() {
         applyCameraBreath(breath, scene_.camera.position, scene_.camera.target, fov);
     }
     scene_.camera.fovYRadians = glm::radians(fov);
-    scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
+    {
+        // ADR-1058: the automatic near plane is 0.5% of the world's radius. That suits an object to orbit;
+        // a journey's camera walks through 3 m rooms inside an 80 m world, and a 0.4 m near plane there
+        // cuts open any wall the camera passes within 0.4 m of (the SDF march starts at the near plane).
+        float autoNear = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
+        if (journey_ && (cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_) == 3) autoNear = std::min(autoNear, 0.05f);
+        const float authored = cameraNear_ != nullptr ? cameraNear_->value() : cameraNearSetting_;
+        scene_.camera.nearPlane = authored > 0.0f ? std::max(authored, 0.001f) : autoNear;
+    }
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();
     // ADR-391, and the position in this function is the whole of its correctness. The film's camera
@@ -9738,6 +9751,9 @@ nlohmann::json Composition::toJson() const {
     camera["orbitSpeed"] =
         cameraOrbitSpeed_ != nullptr ? cameraOrbitSpeed_->base() : cameraOrbitSpeedSetting_;
     camera["fov"] = cameraFov_ != nullptr ? cameraFov_->base() : cameraFovSetting_;
+    if (const float nearPlane = cameraNear_ != nullptr ? cameraNear_->base() : cameraNearSetting_; nearPlane > 0.0f) {
+        camera["near"] = nearPlane; // ADR-1058
+    }
     camera["mode"] = cameraMode_ != nullptr ? cameraMode_->base() : cameraModeSetting_;
     if (!cameraSplineSetting_.empty()) {
         camera["spline"] = cameraSplineSetting_;
@@ -10687,6 +10703,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(fov.error());
         }
         comp->cameraFovSetting_ = *fov;
+        auto nearPlane = readFloat(c, "near", 0.0f); // ADR-1058
+        if (!nearPlane) {
+            return std::unexpected(nearPlane.error());
+        }
+        comp->cameraNearSetting_ = std::max(0.0f, *nearPlane);
     }
     if (j.contains("cameraDirection")) {
         auto direction = CameraDirection::fromJson(j.at("cameraDirection"));

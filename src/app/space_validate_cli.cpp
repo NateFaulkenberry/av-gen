@@ -1,5 +1,6 @@
 #include "app/space_validate_cli.hpp"
 
+#include "app/film_validate.hpp"
 #include "scene/space_validator.hpp"
 
 #include <nlohmann/json.hpp>
@@ -34,8 +35,9 @@ bool readJsonFile(const std::filesystem::path& p, nlohmann::json& out, std::stri
 } // namespace
 
 int runSpaceValidateCommand(int argc, char** argv) {
-    std::string input, jsonOut, textOut, rulesPath;
-    bool dumpRules = false, strict = false;
+    std::string input, jsonOut, textOut, rulesPath, mdOut;
+    bool dumpRules = false, strict = false, film = false;
+    FilmValidateOptions filmOptions;
     scene::SpaceValidateOptions options;
     for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
@@ -55,6 +57,18 @@ int runSpaceValidateCommand(int argc, char** argv) {
         else if (a == "--title") options.title = next("--title");
         else if (a == "--no-camera") options.cameraPath = false;
         else if (a == "--strict") strict = true;
+        else if (a == "--film") film = true;
+        else if (a == "--md") mdOut = next("--md");
+        else if (a == "--fps") filmOptions.fps = std::atof(next("--fps").c_str());
+        else if (a == "--no-motion") filmOptions.motion = false;
+        else if (a == "--camera-trace") filmOptions.cameraTrace = next("--camera-trace");
+        else if (a == "--no-film-camera") filmOptions.camera = false;
+        else if (a == "--range") {
+            const std::string r = next("--range");
+            const auto c = r.find(':');
+            filmOptions.from = std::atof(r.substr(0, c).c_str());
+            if (c != std::string::npos && c + 1 < r.size()) filmOptions.to = std::atof(r.substr(c + 1).c_str());
+        }
         else if (!a.empty() && a[0] != '-' && input.empty()) input = a;
         else {
             std::fprintf(stderr, "--validate-space: unknown argument '%s'\n", a.c_str());
@@ -83,6 +97,11 @@ int runSpaceValidateCommand(int argc, char** argv) {
         return 3;
     }
     std::filesystem::path scenePath = input;
+    const bool isProject = doc.is_object() && doc.value("format", std::string()) == "avgen-project";
+    if (film && !isProject) {
+        std::fprintf(stderr, "--validate-space: --film needs a project file (it plays the film)\n");
+        return 2;
+    }
     // A project: follow assets.scene.path (relative to the project file).
     if (doc.is_object() && doc.value("format", std::string()) == "avgen-project") {
         const auto& assets = doc.value("assets", nlohmann::json::object());
@@ -130,6 +149,31 @@ int runSpaceValidateCommand(int argc, char** argv) {
                 std::sort(options.journeyKeys.begin(), options.journeyKeys.end());
             }
         }
+        // When each object is shown: the step tracks on nodes/<n>/visible and sdf/<n>/visible.
+        if (doc.contains("timeline") && doc["timeline"].is_object() && doc["timeline"].contains("tracks")) {
+            for (const auto& t : doc["timeline"]["tracks"]) {
+                const std::string target = t.value("target", std::string());
+                const bool nodeVis = target.starts_with("nodes/") || target.starts_with("sdf/");
+                if (!nodeVis || !target.ends_with("/visible") || !t.contains("keys")) continue;
+                const std::string name = target.substr(target.find('/') + 1, target.rfind('/') - target.find('/') - 1);
+                if (name.find('/') != std::string::npos) continue;
+                std::vector<std::pair<double, double>> spans;
+                double openAt = -1.0;
+                for (const auto& k : t["keys"]) {
+                    const auto& v = k.value("value", nlohmann::json());
+                    const double x = v.is_array() && !v.empty() && v[0].is_number() ? v[0].get<double>()
+                                     : v.is_number() ? v.get<double>() : v.is_boolean() ? (v.get<bool>() ? 1.0 : 0.0) : 0.0;
+                    const double at = k.value("time", 0.0);
+                    if (x >= 0.5 && openAt < 0.0) openAt = at;
+                    if (x < 0.5 && openAt >= 0.0) {
+                        spans.emplace_back(openAt, at);
+                        openAt = -1.0;
+                    }
+                }
+                if (openAt >= 0.0) spans.emplace_back(openAt, 1e9);
+                options.visibleSpans[name] = spans;
+            }
+        }
         scenePath = std::filesystem::path(input).parent_path() / rel;
         if (!readJsonFile(scenePath, doc, error)) {
             std::fprintf(stderr, "--validate-space: %s\n", error.c_str());
@@ -142,7 +186,23 @@ int runSpaceValidateCommand(int argc, char** argv) {
         std::fprintf(stderr, "%s\n", report.error().message.c_str());
         return 3;
     }
+    if (film) {
+        auto filmReport = validateFilm(input, doc, *report, rules, filmOptions);
+        if (!filmReport) {
+            std::fprintf(stderr, "%s\n", filmReport.error().message.c_str());
+            return 3;
+        }
+        scene::mergeFilmReport(*report, *filmReport);
+    }
     const std::string text = scene::formatSpaceReport(*report);
+    if (!mdOut.empty()) {
+        std::ofstream f(mdOut);
+        f << scene::formatSceneValidationMarkdown(*report);
+        if (!f) {
+            std::fprintf(stderr, "--validate-space: cannot write '%s'\n", mdOut.c_str());
+            return 4;
+        }
+    }
     if (!jsonOut.empty()) {
         if (jsonOut == "-") {
             std::printf("%s\n", report->dump(2).c_str());

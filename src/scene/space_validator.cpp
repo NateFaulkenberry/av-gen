@@ -11,6 +11,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -61,14 +62,26 @@ const char* kDefaultRules = R"json({
     "searchStep": 0.05
   },
   "door": {"clearanceDepth": 0.7, "minWidth": 0.7, "height": 1.9},
+  "structure": {"alignWarn": 0.015, "alignError": 0.05, "sillWarn": 0.02, "wallGap": 0.15, "chairSpacing": 0.5},
   "window": {"clearanceDepth": 0.3},
   "camera": {"eyeHeight": 1.6, "clearance": 0.12, "step": 0.1},
+  "film": {"closeDistance": 0.3, "closeShare": 0.35, "clearance": 0.12, "cutDistance": 1.5, "raysX": 9, "raysY": 5},
+  "motion": {"settle": 0.25, "epsilon": 0.0015, "epsilonRelative": 0.003, "epsilonDegrees": 0.1, "twitchRange": 0.3,
+             "twitchRangeRelative": 0.15, "twitchRangeDegrees": 20.0, "minActiveSeconds": 0.5, "minReversals": 3,
+             "allow": []},
   "categories": {
     "room":        {"group": "architecture"},
     "door":        {"group": "architecture", "embeds": "wall", "opening": "door", "mayIntersect": ["room", "curtains"]},
     "doorway":     {"group": "architecture", "embeds": "wall", "opening": "door", "mayIntersect": ["room"]},
     "window":      {"group": "architecture", "embeds": "wall", "opening": "window", "mayIntersect": ["room", "curtains"]},
-    "stairs":      {"group": "architecture", "rests": "floor", "mayIntersect": ["room"]},
+    "stairs":      {"group": "architecture", "rests": "floor", "mayIntersect": ["room", "railing"]},
+    "landing":     {"group": "architecture", "mayIntersect": ["room", "stairs", "railing"]},
+    "balcony":     {"group": "architecture", "mayIntersect": ["room", "railing"]},
+    "railing":     {"group": "architecture", "mayIntersect": ["room", "stairs", "landing", "balcony"]},
+    "roof":        {"group": "architecture", "mayIntersect": ["building", "room"]},
+    "building":    {"group": "architecture", "mayIntersect": ["roof", "door", "window", "room"]},
+    "trim":        {"group": "architecture", "mayIntersect": ["room", "door", "window"]},
+    "sill":        {"group": "architecture", "mayIntersect": ["room", "window"]},
     "couch":       {"group": "furniture", "rests": "floor", "supports": ["sitting", "lying"], "seatHeight": 0.45,
                     "keepClear": {"min": [0.15, 0.55, 0.45], "max": [0.85, 1.25, 1.0]},
                     "expect": "nothing should occupy the couch's seating volume"},
@@ -80,33 +93,43 @@ const char* kDefaultRules = R"json({
     "coffeeTable": {"group": "furniture", "rests": "floor", "surface": true},
     "desk":        {"group": "furniture", "rests": "floor", "supports": ["working"], "surface": true},
     "bed":         {"group": "furniture", "rests": "floor", "supports": ["lying", "sitting"], "seatHeight": 0.5,
-                    "surfaceHeight": 0.55},
+                    "surfaceHeight": 0.55, "againstWall": true},
     "nightstand":  {"group": "furniture", "rests": "floor", "surface": true},
-    "cabinet":     {"group": "furniture", "rests": "floor", "surface": true},
-    "wardrobe":    {"group": "furniture", "rests": "floor"},
-    "shelf":       {"group": "furniture", "rests": "floor", "surface": true},
-    "counter":     {"group": "furniture", "rests": "floor", "surface": true},
-    "fridge":      {"group": "furniture", "rests": "floor"},
+    "cabinet":     {"group": "furniture", "rests": "floor", "surface": true, "againstWall": true},
+    "wardrobe":    {"group": "furniture", "rests": "floor", "againstWall": true},
+    "shelf":       {"group": "furniture", "rests": "floor", "surface": true, "againstWall": true},
+    "counter":     {"group": "furniture", "rests": "floor", "surface": true, "againstWall": true, "rooms": ["kitchen", "kit"]},
+    "fridge":      {"group": "furniture", "rests": "floor", "againstWall": true, "rooms": ["kitchen", "kit"]},
     "fireplace":   {"group": "furniture", "rests": "floor", "mayIntersect": ["room"]},
     "sink":        {"group": "furniture", "rests": ["floor", "wall"], "surface": true},
     "toilet":      {"group": "furniture", "rests": "floor", "supports": ["sitting"], "seatHeight": 0.42},
     "bathtub":     {"group": "furniture", "rests": "floor", "supports": ["lying"], "surfaceHeight": 0.2},
+    "stove":       {"group": "furniture", "rests": "floor", "surface": true, "againstWall": true, "rooms": ["kitchen", "kit"]},
+    "dishwasher":  {"group": "furniture", "rests": "floor", "rooms": ["kitchen", "kit"]},
+    "washer":      {"group": "furniture", "rests": "floor", "rooms": ["laundry", "lau", "utility"]},
+    "dryer":       {"group": "furniture", "rests": "floor", "rooms": ["laundry", "lau", "utility"]},
+    "treadmill":   {"group": "furniture", "rests": "floor", "rooms": ["gym", "workout", "fitness"]},
+    "weightBench": {"group": "furniture", "rests": "floor", "rooms": ["gym", "workout", "fitness"]},
+    "weightRack":  {"group": "furniture", "rests": "floor", "rooms": ["gym", "workout", "fitness"]},
+    "exerciseBike": {"group": "furniture", "rests": "floor", "rooms": ["gym", "workout", "fitness"]},
+    "bar":         {"group": "furniture", "rests": "floor", "surface": true},
+    "barStool":    {"group": "furniture", "rests": "floor", "supports": ["sitting"], "seatHeight": 0.75},
     "lamp":        {"group": "decor", "rests": "floor"},
     "tableLamp":   {"group": "decor", "rests": "surface"},
-    "hangingLamp": {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"]},
-    "ceilingFan":  {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"]},
+    "hangingLamp": {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"], "moves": true},
+    "ceilingFan":  {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"], "moves": true},
     "painting":    {"group": "decor", "mounts": "wall", "mayIntersect": ["room"]},
     "mirror":      {"group": "decor", "mounts": "wall", "mayIntersect": ["room"]},
     "clock":       {"group": "decor", "mounts": "wall", "mayIntersect": ["room"]},
     "wallDecoration": {"group": "decor", "mounts": "wall", "mayIntersect": ["room"]},
     "coatHooks":   {"group": "decor", "mounts": "wall", "mayIntersect": ["room"]},
-    "curtains":    {"group": "decor", "mounts": "wall", "mayIntersect": ["room", "window", "door"]},
+    "curtains":    {"group": "decor", "mounts": "wall", "mayIntersect": ["room", "window", "door"], "moves": true},
     "television":  {"group": "decor", "rests": ["floor", "surface", "wall"], "facesRoom": true},
     "monitor":     {"group": "decor", "rests": ["surface", "wall"], "facesRoom": true},
-    "plant":       {"group": "decor", "rests": ["floor", "surface"]},
+    "plant":       {"group": "decor", "rests": ["floor", "surface"], "moves": true},
     "rug":         {"group": "decor", "rests": "floor", "mayIntersect": ["*"]},
     "prop":        {"group": "decor", "rests": ["surface", "floor"]},
-    "hangingObject": {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"]},
+    "hangingObject": {"group": "decor", "mounts": "ceiling", "mayIntersect": ["room"], "moves": true},
     "mannequin":   {"group": "character", "requires": ["head", "body"]},
     "person":      {"group": "character", "requires": ["head", "body"]},
     "wallText":    {"group": "typography", "text": "wall"},
@@ -431,7 +454,7 @@ struct SpOverlap {
     glm::vec3 at{0.0f};
 };
 
-SpOverlap overlapOf(const SpGeom& a, const SpGeom& b, float minY = -kInf, float maxY = kInf) {
+SpOverlap overlapOf(const SpGeom& a, const SpGeom& b, float minY = -kInf, float maxY = kInf, int maxCells = 40) {
     SpOverlap o;
     if (!a.ok || !b.ok) return o;
     SpBox box = intersect(a.worldBox, b.worldBox);
@@ -441,7 +464,7 @@ SpOverlap overlapOf(const SpGeom& a, const SpGeom& b, float minY = -kInf, float 
     const glm::vec3 ext = box.size();
     const float step = std::clamp(std::max({ext.x, ext.y, ext.z}) / 24.0f, 0.008f, 0.06f);
     glm::ivec3 n = glm::max(glm::ivec3(glm::ceil(ext / step)), glm::ivec3(1));
-    n = glm::min(n, glm::ivec3(40));
+    n = glm::min(n, glm::ivec3(maxCells));
     const glm::vec3 cell = ext / glm::vec3(n);
     const float cellVolume = cell.x * cell.y * cell.z;
     for (int i = 0; i < n.x; ++i) {
@@ -732,6 +755,7 @@ void readTextNode(SpCtx& ctx, const json& node) {
     e.annotated = note.contains("category");
     if (!note.contains("category")) note["category"] = "wallText";
     if (!note.contains("id")) note["id"] = node.value("name", std::string("text"));
+    if (src.contains("textTracking") && src["textTracking"].is_number()) note["tracking"] = src["textTracking"];
     fillEntityBasics(e, note);
     e.node = node.value("name", std::string());
     e.text = true;
@@ -1088,10 +1112,22 @@ void checkIntersections(SpCtx& ctx, const SpGroup& g, const std::string& gname) 
             const SpEntity& b = ctx.entities[g.entities[jj]];
             if (!a.geom.ok || !b.geom.ok || !a.frameOk || !b.frameOk) continue;
             if (a.category == "room" && b.category == "room") continue;
-            if (mayIntersect(ctx, a, b)) continue;
             if (!coexist(a, b)) continue;
             if (!intersect(a.geom.worldBox, b.geom.worldBox).valid()) continue;
             const bool anchored = (!a.anchor.empty() && a.anchor == b.id) || (!b.anchor.empty() && b.anchor == a.id);
+            if (mayIntersect(ctx, a, b)) {
+                // ADR-1056: expected, so informational -- reported, never an error.
+                if (a.category == "room" || b.category == "room") continue; // a window in its wall, a lamp through a ceiling
+                const SpOverlap o = overlapOf(a.geom, b.geom, -kInf, kInf, 12);
+                if (o.depth > contact) {
+                    ctx.add({"INFO", "expectedIntersection", {a.id, b.id},
+                             fmt::format("{} overlaps {} by {} (expected: {} may intersect {})", a.id, b.id, fmtM(o.depth), a.category,
+                                         b.category),
+                             "intended", "", "", json{{"penetration", r3(o.depth)}}},
+                            gname);
+                }
+                continue;
+            }
             // Against a room, the floor is the floor check's business: sample above it.
             float minY = -kInf;
             const SpEntity* room = a.category == "room" ? &a : b.category == "room" ? &b : nullptr;
@@ -1099,6 +1135,15 @@ void checkIntersections(SpCtx& ctx, const SpGroup& g, const std::string& gname) 
             const SpOverlap o = overlapOf(a.geom, b.geom, minY);
             const float allowed = anchored ? ctx.tol("anchorPenetration") : contact;
             if (o.depth <= allowed) {
+                if (anchored && o.depth > contact) {
+                    const SpEntity& child = !a.anchor.empty() && a.anchor == b.id ? a : b;
+                    const SpEntity& parent = &child == &a ? b : a;
+                    ctx.add({"INFO", "expectedIntersection", {child.id, parent.id},
+                             fmt::format("{} overlaps its anchor {} by {} (within the {} allowed a child)", child.id, parent.id,
+                                         fmtM(o.depth), fmtM(allowed)),
+                             "anchored", "", "", json{{"penetration", r3(o.depth)}}},
+                            gname);
+                }
                 ctx.pass("placement");
                 continue;
             }
@@ -1742,6 +1787,8 @@ std::vector<SpObstacle> obstaclesOn(const SpCtx& ctx, const SpGroup& g, const Sp
     return out;
 }
 
+float rightSign(const SpWall& w);
+
 void checkLyrics(SpCtx& ctx) {
     const json& lr = ctx.rules["lyric"];
     const float margin = ctx.options.lyricMargin >= 0.0 ? static_cast<float>(ctx.options.lyricMargin) : lr.value("margin", 0.15f);
@@ -1852,12 +1899,36 @@ void checkLyrics(SpCtx& ctx) {
             const SpRect tr{b.lo[w.uAxis], b.hi[w.uAxis], b.lo.y, b.hi.y};
             const SpRect wallRect{w.u0, w.u1, w.v0, w.v1};
             const float inside = overlapArea(tr, wallRect) / std::max(1e-6f, tr.area());
+            const float rsign = rightSign(w);
+            // ADR-1056: per edge, as you face the wall: how far the text runs past it (+) or clears it (-).
+            const float overLeft = rsign > 0.0f ? w.u0 - tr.u0 : tr.u1 - w.u1;
+            const float overRight = rsign > 0.0f ? tr.u1 - w.u1 : w.u0 - tr.u0;
+            const float overTop = tr.v1 - w.v1;
+            const float overBottom = w.v0 - tr.v0;
             if (inside < 0.999f) {
+                std::string edges;
+                for (const auto& [name, over] : {std::pair<const char*, float>{"left", overLeft}, {"right", overRight},
+                                                 {"top", overTop}, {"bottom", overBottom}}) {
+                    if (over > 0.001f) edges += (edges.empty() ? "" : ", ") + fmt::format("{} on the {} edge", fmtM(over), name);
+                }
                 out.v.push_back({"ERROR", "lyricPlacement", {t.id, room.id},
-                                 fmt::format("{} runs off wall {} of {} ({:.0f}% outside)", t.id, w.side, room.id, (1.0f - inside) * 100.0f),
-                                 "", "", "", json{{"outside", r3(1.0f - inside)}}});
+                                 fmt::format("text {} exceeds the bounds of wall {} of {} by {} ({:.0f}% of it is off the wall)", t.id,
+                                             w.side, room.id, edges, (1.0f - inside) * 100.0f),
+                                 "", "inside its wall's rectangle", "",
+                                 json{{"outside", r3(1.0f - inside)}, {"left", r3(overLeft)}, {"right", r3(overRight)},
+                                      {"top", r3(overTop)}, {"bottom", r3(overBottom)}}});
+            }
+            if (f.depth < -0.01f) {
+                out.v.push_back({"WARNING", "lyricPlacement", {t.id, room.id},
+                                 fmt::format("text {} is sunk {} into wall {} of {} (its extrusion passes into the wall)", t.id,
+                                             fmtM(-f.depth), w.side, room.id),
+                                 "", "lying on the wall plane", "",
+                                 json{{"wallDistance", r3(f.depth)}},
+                                 json{{"id", t.id}, {"translate", vecJson(w.inward() * (-f.depth + 0.005f))}}});
             }
             const float edgeGap = std::min({tr.u0 - w.u0, w.u1 - tr.u1, tr.v0 - w.v0, w.v1 - tr.v1});
+            const char* nearEdge = -overLeft <= edgeGap + 1e-5f ? "left" : -overRight <= edgeGap + 1e-5f ? "right"
+                                   : -overTop <= edgeGap + 1e-5f ? "top" : "bottom";
             auto obstacles = obstaclesOn(ctx, g, w, t, depthLimit);
             // other lyrics on this wall at the same time
             for (std::size_t oj = 0; oj < ctx.entities.size(); ++oj) {
@@ -1917,7 +1988,7 @@ void checkLyrics(SpCtx& ctx) {
             }
             if (inside >= 0.999f && edgeGap < margin) {
                 out.v.push_back({"WARNING", "lyricClearance", {t.id, room.id},
-                                 fmt::format("{} is jammed against the edge of wall {} ({} of a {} margin)", t.id, w.side,
+                                 fmt::format("{} is jammed against the {} edge of wall {} ({} of a {} margin)", t.id, nearEdge, w.side,
                                              fmtM(std::max(0.0f, edgeGap)), fmtM(margin)),
                                  "", "", "", json{{"gap", r3(edgeGap)}, {"margin", r3(margin)}}});
                 clean = false;
@@ -2129,8 +2200,857 @@ void checkCameraPaths(SpCtx& ctx, const json& scene) {
     }
 }
 
+// ---- ADR-1056: text against geometry and against other text ------------------------------------------------
+
+void checkTextGeometry(SpCtx& ctx, const json& scene) {
+    std::map<std::string, std::set<std::string>> chaptersOf;
+    if (scene.contains("camera") && scene["camera"].is_object() && scene["camera"].contains("journey") &&
+        scene["camera"]["journey"].contains("chapters")) {
+        for (const auto& c : scene["camera"]["journey"]["chapters"]) {
+            for (const auto& n : c.value("nodes", json::array())) {
+                if (n.is_string()) chaptersOf[n.get<std::string>()].insert(c.value("name", std::string()));
+            }
+        }
+    }
+    // the chapter the film is in at a time (the journey keys give the distance; the chapters' starts the chapter)
+    std::vector<std::pair<double, std::string>> starts;
+    if (scene.contains("camera") && scene["camera"].is_object() && scene["camera"].contains("journey") &&
+        scene["camera"]["journey"].contains("chapters")) {
+        for (const auto& c : scene["camera"]["journey"]["chapters"]) starts.emplace_back(c.value("start", 0.0), c.value("name", std::string()));
+        std::sort(starts.begin(), starts.end());
+    }
+    const auto& keys = ctx.options.journeyKeys;
+    auto chapterAt = [&](double t) -> std::string {
+        if (keys.empty() || starts.empty()) return {};
+        double d = keys.front().second;
+        for (std::size_t k = 0; k + 1 < keys.size(); ++k) {
+            if (t >= keys[k].first && t <= keys[k + 1].first) {
+                const double span = keys[k + 1].first - keys[k].first;
+                const double u = span > 1e-9 ? (t - keys[k].first) / span : 0.0;
+                d = keys[k].second + u * (keys[k + 1].second - keys[k].second);
+                break;
+            }
+            if (t > keys[k + 1].first) d = keys[k + 1].second;
+        }
+        std::string name;
+        for (const auto& [s0, n] : starts) {
+            if (s0 <= d) name = n;
+        }
+        return name;
+    };
+    auto visibleDuring = [&](int oi, double t0, double t1) {
+        const auto it = ctx.options.visibleSpans.find(ctx.objects[oi].name);
+        if (it == ctx.options.visibleSpans.end() || t0 < 0.0) return true;
+        for (const auto& [a, b] : it->second) {
+            if (a < t1 && t0 < b) return true;
+        }
+        return false;
+    };
+    auto objectPresent = [&](int oi, const SpEntity& t) {
+        if (!visibleDuring(oi, t.t0, t.t1)) return false;
+        bool any = false;
+        for (const SpEntity& e : ctx.entities) {
+            if (e.object != oi) continue;
+            if (e.t0 < 0.0) return true;
+            any = true;
+            if (coexist(e, t)) return true;
+        }
+        return !any;
+    };
+    // sample points on a text's face: a grid over its rectangle at half its extrusion
+    auto facePoints = [](const SpEntity& t, int nu, int nv) {
+        std::vector<glm::vec3> pts;
+        const SpBox& l = t.geom.local;
+        for (int i = 0; i < nu; ++i) {
+            for (int j = 0; j < nv; ++j) {
+                const glm::vec3 lp{l.lo.x + (l.hi.x - l.lo.x) * (static_cast<float>(i) + 0.5f) / static_cast<float>(nu),
+                                   l.lo.y + (l.hi.y - l.lo.y) * (static_cast<float>(j) + 0.5f) / static_cast<float>(nv),
+                                   (l.lo.z + l.hi.z) * 0.5f};
+                pts.push_back(glm::vec3(t.geom.world * glm::vec4(lp, 1.0f)));
+            }
+        }
+        return pts;
+    };
+    const float tracking = ctx.rules.value("lyric", json::object()).value("minTracking", -0.05f);
+    for (std::size_t ti = 0; ti < ctx.entities.size(); ++ti) {
+        const SpEntity& t = ctx.entities[ti];
+        if (!t.text) continue;
+        if (t.note.contains("tracking") && t.note["tracking"].is_number() && t.note["tracking"].get<float>() < tracking) {
+            ctx.add({"WARNING", "textSelfOverlap", {t.id},
+                     fmt::format("text {} overlaps itself: tracking {} em packs its glyphs into each other", t.id,
+                                 t.note["tracking"].get<float>()),
+                     "", "glyphs side by side"},
+                    "");
+        }
+        // which objects it is shown with
+        // Which chapters it is shown in: listed in a chapter's nodes, or (with the project's journey keys) the
+        // chapters the film is in while its span lasts. Neither: only the objects every chapter shows.
+        std::set<std::string> shownIn;
+        if (const auto chs = chaptersOf.find(t.node); chs != chaptersOf.end()) shownIn = chs->second;
+        if (shownIn.empty() && t.t0 >= 0.0) {
+            for (double tt = t.t0; tt <= t.t1 + 1e-6; tt += std::max(0.05, (t.t1 - t.t0) / 20.0)) {
+                const std::string c = chapterAt(tt);
+                if (!c.empty()) shownIn.insert(c);
+            }
+        }
+        std::set<int> objs;
+        for (const SpGroup& g : ctx.groups) {
+            bool member = g.chapters.empty();
+            for (const auto& c : g.chapters) member = member || shownIn.count(c) > 0;
+            if (member) objs.insert(g.objects.begin(), g.objects.end());
+        }
+        if (shownIn.empty() && !starts.empty()) {
+            // every group's common objects only
+            std::set<int> common;
+            bool first = true;
+            for (const SpGroup& g : ctx.groups) {
+                if (first) common = g.objects;
+                else {
+                    std::set<int> keep;
+                    for (int o : common) {
+                        if (g.objects.count(o)) keep.insert(o);
+                    }
+                    common = keep;
+                }
+                first = false;
+            }
+            objs = common;
+        }
+        const auto pts = facePoints(t, 12, 4);
+        std::map<std::string, int> hits;
+        std::map<std::string, glm::vec3> where;
+        for (int oi : objs) {
+            const SpObject& o = ctx.objects[oi];
+            if (!intersect(o.geom.worldBox, t.geom.worldBox).valid() && o.geom.worldBox.valid()) continue;
+            if (!objectPresent(oi, t)) continue;
+            for (const glm::vec3& p : pts) {
+                const glm::vec3 tl = glm::vec3(glm::inverse(o.world) * glm::vec4(p, 1.0f));
+                if (o.hasMarch && !o.march.contains(tl)) continue;
+                if (o.geom.dist(p) >= -0.004f) continue;
+                std::string who;
+                float bestV = kInf;
+                for (const SpEntity& e : ctx.entities) {
+                    if (e.object != oi || !e.geom.ok || !coexist(e, t) || !e.geom.worldBox.contains(p, 0.01f)) continue;
+                    if (e.geom.dist(p) >= 0.0f) continue;
+                    const float v = e.category == "room" ? 1e9f : e.geom.worldBox.volume();
+                    if (v < bestV) {
+                        bestV = v;
+                        who = e.category == "room" ? e.id + " (walls)" : e.id;
+                    }
+                }
+                if (who.empty()) who = "'" + o.name + "'";
+                ++hits[who];
+                where.try_emplace(who, p);
+            }
+        }
+        for (const auto& [who, n] : hits) {
+            std::string bare = who;
+            if (const auto sp = bare.find(" (walls)"); sp != std::string::npos) bare = bare.substr(0, sp);
+            std::vector<std::string> ids{t.id, bare};
+            std::sort(ids.begin(), ids.end());
+            if (ctx.seen.count("lyricPlacement|" + ids[0] + "|" + ids[1])) continue; // already measured on its wall
+            const float share = static_cast<float>(n) / static_cast<float>(pts.size());
+            ctx.add({share > 0.25f ? "ERROR" : "WARNING", "textIntersection", {t.id, bare},
+                     fmt::format("text {} intersects {}: {:.0f}% of its face is inside it (at {})", t.id, who, share * 100.0f,
+                                 vecJson(where[who]).dump()),
+                     "", "text clear of the architecture and the furniture", "move or resize the text, or move it in front of the surface",
+                     json{{"share", r3(share)}}},
+                    "");
+        }
+        if (hits.empty()) ctx.pass("lyric");
+        // other text at the same time
+        for (std::size_t oj = ti + 1; oj < ctx.entities.size(); ++oj) {
+            const SpEntity& o = ctx.entities[oj];
+            if (!o.text || !coexist(t, o)) continue;
+            if (!intersect(t.geom.worldBox, o.geom.worldBox).valid()) continue;
+            std::vector<std::string> ids{t.id, o.id};
+            std::sort(ids.begin(), ids.end());
+            if (ctx.seen.count("lyricPlacement|" + ids[0] + "|" + ids[1])) continue;
+            const glm::mat4 inv = glm::inverse(o.geom.world);
+            int in = 0;
+            for (const glm::vec3& p : pts) {
+                const glm::vec3 l = glm::vec3(inv * glm::vec4(p, 1.0f));
+                const SpBox& ob = o.geom.local;
+                if (l.x > ob.lo.x && l.x < ob.hi.x && l.y > ob.lo.y && l.y < ob.hi.y && l.z > ob.lo.z - 0.01f && l.z < ob.hi.z + 0.01f) ++in;
+            }
+            if (in > 0) {
+                const float share = static_cast<float>(in) / static_cast<float>(pts.size());
+                ctx.add({"WARNING", "textOverlap", {t.id, o.id},
+                         fmt::format("text {} and text {} occupy the same space while both are shown ({:.0f}% of {})", t.id, o.id,
+                                     share * 100.0f, t.id),
+                         "", "one word per place at a time", "", json{{"share", r3(share)}}},
+                        "");
+            }
+        }
+    }
+}
+
+// ---- ADR-1056: structural relationships -----------------------------------------------------------------
+//
+// Architecture is checked against the geometry it is cut from: a window or a door is measured against the
+// actual opening in its room's wall (scanned from the room's SDF, cuts included), not against the numbers
+// the generator meant to use. That is what catches a cut made with one size and a frame made with another.
+
+struct SpRect2 {
+    float u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    [[nodiscard]] bool valid() const { return u1 > u0 && v1 > v0; }
+};
+
+// The wall of `room` an opening entity sits in (the nearest wall plane whose inward normal it faces).
+const SpWall* wallFor(const std::vector<SpWall>& walls, const SpEntity& e, float maxDepth) {
+    const glm::vec3 facing = e.normal.value_or(e.front);
+    const glm::vec3 ref = e.geom.worldBox.centre();
+    const SpWall* best = nullptr;
+    float bestD = kInf;
+    for (const SpWall& w : walls) {
+        const float d = std::abs(w.depth(ref));
+        const float a = angleBetween(facing, w.inward());
+        if ((a < 45.0f || a > 135.0f) && d < bestD && d < maxDepth) {
+            best = &w;
+            bestD = d;
+        }
+    }
+    return best;
+}
+
+// +1 when increasing u is to the right of someone inside the room facing the wall.
+float rightSign(const SpWall& w) {
+    const glm::vec3 view = -w.inward();
+    const glm::vec3 right = glm::cross(view, glm::vec3(0.0f, 1.0f, 0.0f));
+    return right[w.uAxis] >= 0.0f ? 1.0f : -1.0f;
+}
+
+// The opening in the wall around (u, v): scanned in the room's own geometry at mid-wall depth.
+// Returns an invalid rect when the wall is solid at (u, v).
+SpRect2 openingAt(const SpGeom& room, const SpWall& w, float wall, float u, float v) {
+    const float d = -wall * 0.5f;
+    auto solid = [&](float uu, float vv) { return room.dist(w.point(uu, vv, d)) < 0.0f; };
+    if (solid(u, v)) return {};
+    const float step = 0.005f;
+    SpRect2 r;
+    auto scan = [&](float du, float dv, float limit) {
+        float s = 0.0f;
+        while (s < limit && !solid(u + du * (s + step), v + dv * (s + step))) s += step;
+        return s;
+    };
+    r.u0 = u - scan(-1.0f, 0.0f, 4.0f);
+    r.u1 = u + scan(1.0f, 0.0f, 4.0f);
+    r.v0 = v - scan(0.0f, -1.0f, 4.0f);
+    r.v1 = v + scan(0.0f, 1.0f, 4.0f);
+    return r;
+}
+
+// Row profile of an entity's geometry on the wall: for each 1 cm row, the u extent the geometry occupies in the
+// depth slab [d0, d1] (wall coordinates). Rows with nothing have u0 > u1.
+struct SpRow {
+    float v = 0.0f, u0 = kInf, u1 = -kInf;
+    [[nodiscard]] bool any() const { return u0 <= u1; }
+    [[nodiscard]] float width() const { return any() ? u1 - u0 : 0.0f; }
+};
+
+std::vector<SpRow> rowProfile(const SpGeom& g, const SpWall& w, float d0, float d1, float step = 0.01f) {
+    std::vector<SpRow> rows;
+    const SpBox& b = g.worldBox;
+    const float uLo = b.lo[w.uAxis] - 0.02f, uHi = b.hi[w.uAxis] + 0.02f;
+    for (float v = b.lo.y + step * 0.5f; v < b.hi.y; v += step) {
+        SpRow r;
+        r.v = v;
+        for (float u = uLo; u <= uHi; u += step) {
+            for (int k = 0; k < 5; ++k) {
+                const float d = d0 + (d1 - d0) * static_cast<float>(k) / 4.0f;
+                if (g.dist(w.point(u, v, d)) < 0.0f) {
+                    r.u0 = std::min(r.u0, u);
+                    r.u1 = std::max(r.u1, u);
+                    break;
+                }
+            }
+        }
+        rows.push_back(r);
+    }
+    return rows;
+}
+
+std::string edgeList(const std::vector<std::pair<std::string, float>>& edges, float tol) {
+    std::string out;
+    for (const auto& [name, off] : edges) {
+        if (std::abs(off) <= tol) continue;
+        out += (out.empty() ? "" : ", ") +
+               fmt::format("{} edge {} {}", name, fmtM(std::abs(off)), off > 0.0f ? "past the opening (over the wall)" : "short of the opening (a gap)");
+    }
+    return out;
+}
+
+// The top-level pieces of an object (what `checkObjectPieces` walks), each with its own geometry: the thing to
+// name when something unannotated (a skirting, a dado band) is found where it should not be.
+struct SpPiece {
+    std::string label;
+    SpGeom geom;
+};
+
+std::vector<SpPiece> piecesOf(const SpObject& obj) {
+    std::vector<SpPiece> out;
+    std::vector<std::pair<const json*, glm::mat4>> stack{{&obj.treeJson, glm::mat4(1.0f)}};
+    int piece = 0;
+    while (!stack.empty()) {
+        auto [n, m] = stack.back();
+        stack.pop_back();
+        const std::string k = kindOf(*n);
+        if ((k == "union" || k == "translate" || k == "rotate") && n->contains("children") && !n->contains("entity")) {
+            glm::mat4 mm = m;
+            if (k == "translate") mm = m * glm::translate(glm::mat4(1.0f), vec3Of(n->value("translation", json()), glm::vec3(0.0f)));
+            if (k == "rotate") mm = m * eulerMatrix(vec3Of(n->value("rotation", json()), glm::vec3(0.0f)));
+            if (k == "union") {
+                for (const auto& c : (*n)["children"]) stack.emplace_back(&c, mm);
+                continue;
+            }
+            const json& c = (*n)["children"][0];
+            const std::string ck = kindOf(c);
+            if ((ck == "union" || ck == "translate" || ck == "rotate") && !c.contains("entity")) {
+                stack.emplace_back(&c, mm);
+                continue;
+            }
+        }
+        ++piece;
+        SpPiece p;
+        std::string label = n->value("name", std::string());
+        if (label.empty() && n->contains("entity")) label = (*n)["entity"].value("id", std::string());
+        p.label = label.empty() ? fmt::format("{}#{}", obj.name, piece) : obj.name + "/" + label;
+        const SpBox clip = transformBox(obj.march, glm::inverse(m));
+        if (!buildGeom(*n, obj.world * m, 1.0f, 12, p.geom, &clip) || !p.geom.ok) continue;
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
+std::string describePiece(const SpPiece& p) {
+    const glm::vec3 s = p.geom.worldBox.size();
+    const float along = std::max(s.x, s.z);
+    if (s.y < 0.25f && along > 1.5f) {
+        return fmt::format("{} (a band at y {:.2f}-{:.2f}m: trim)", p.label, p.geom.worldBox.lo.y, p.geom.worldBox.hi.y);
+    }
+    return p.label;
+}
+
+void checkStructure(SpCtx& ctx, const SpGroup& g, const std::string& gname,
+                    std::map<int, std::vector<SpPiece>>& pieceCache) {
+    const json& sr = ctx.rules.value("structure", json::object());
+    const float alignWarn = sr.value("alignWarn", 0.015f);
+    const float alignError = sr.value("alignError", 0.05f);
+    const float sillWarn = sr.value("sillWarn", 0.02f);
+    for (int i : g.entities) {
+        const SpEntity& e = ctx.entities[i];
+        const std::string opening = ctx.cat(e.category).value("opening", std::string());
+        if (opening.empty() || !e.geom.ok || !e.frameOk) continue;
+        // A leaf inside another opening's frame (a door in its doorway) is part of that opening.
+        bool leaf = false;
+        for (int j : g.entities) {
+            const SpEntity& x = ctx.entities[j];
+            if (&x == &e || !x.geom.ok || ctx.cat(x.category).value("opening", std::string()).empty()) continue;
+            if (x.geom.worldBox.contains(e.geom.worldBox.centre(), 0.02f) && x.geom.worldBox.volume() > e.geom.worldBox.volume() &&
+                std::max(x.geom.worldBox.size().x, x.geom.worldBox.size().z) >= std::max(e.geom.worldBox.size().x, e.geom.worldBox.size().z)) {
+                leaf = true;
+            }
+        }
+        if (leaf) continue;
+        const int r = roomFor(ctx, g, e);
+        if (r < 0) continue;
+        const SpEntity& room = ctx.entities[r];
+        if (!room.geom.ok) continue;
+        const float wall = room.note.value("wall", 0.15f);
+        const auto walls = wallsOf(*room.interior);
+        const SpWall* wp = wallFor(walls, e, ctx.tol("embedDepth"));
+        if (wp == nullptr) continue;
+        const SpWall& w = *wp;
+        const float rs = rightSign(w);
+        const SpBox& b = e.geom.worldBox;
+        const float cu = (b.lo[w.uAxis] + b.hi[w.uAxis]) * 0.5f;
+        const float cv = opening == "door" ? room.interior->lo.y + 1.0f : (b.lo.y + b.hi.y) * 0.5f;
+        const SpRect2 o = openingAt(room.geom, w, wall, cu, cv);
+        if (!o.valid()) {
+            if (e.note.value("blind", false)) continue;
+            ctx.add({"ERROR", "opening", {e.id, room.id},
+                     fmt::format("{} has no opening behind it: wall {} of {} is solid at its centre", e.id, w.side, room.id),
+                     opening == "door" ? "a door is contained by a wall opening" : "a window is contained by a wall opening",
+                     "cut the opening (the generator's cut list), or mark the entity \"blind\": true",
+                     fmt::format("cut an opening in wall {} at {} m along", w.side, r3(cu)), json{{"wall", w.side}}},
+                    gname);
+            continue;
+        }
+        // the frame's rectangle on the wall
+        SpRect2 frame;
+        float sillTop = -kInf;
+        bool haveSill = false;
+        const SpPart* framePart = nullptr;
+        const SpPart* sillPart = nullptr;
+        for (const SpPart& p : e.parts) {
+            if (p.name == "frame" && p.geom.ok) framePart = &p;
+            if (p.name == "sill" && p.geom.ok) sillPart = &p;
+        }
+        if (opening == "window") {
+            const float d0 = std::min(w.depth(b.lo), w.depth(b.hi));
+            const float d1 = std::max(w.depth(b.lo), w.depth(b.hi));
+            if (framePart != nullptr) {
+                const SpBox& fb = framePart->geom.worldBox;
+                frame = {fb.lo[w.uAxis], fb.hi[w.uAxis], fb.lo.y, fb.hi.y};
+            }
+            if (sillPart != nullptr) {
+                sillTop = sillPart->geom.worldBox.hi.y;
+                haveSill = true;
+            }
+            if (framePart == nullptr || sillPart == nullptr) {
+                // Untagged: the sill is the run of bottom rows wider than the frame above them.
+                const auto rows = rowProfile(e.geom, w, std::max(d0, -wall), d1);
+                std::vector<float> widths;
+                for (const SpRow& row : rows) {
+                    if (row.any()) widths.push_back(row.width());
+                }
+                if (widths.empty()) continue;
+                std::vector<float> sorted = widths;
+                std::sort(sorted.begin(), sorted.end());
+                const float median = sorted[sorted.size() / 2];
+                std::size_t k = 0;
+                while (k < rows.size() && !rows[k].any()) ++k;
+                std::size_t sillEnd = k;
+                while (sillEnd < rows.size() && rows[sillEnd].any() && rows[sillEnd].width() > median + 0.03f) ++sillEnd;
+                if (sillPart == nullptr && sillEnd > k) {
+                    sillTop = rows[sillEnd - 1].v + 0.005f;
+                    haveSill = true;
+                }
+                if (framePart == nullptr) {
+                    SpRect2 f{kInf, -kInf, kInf, -kInf};
+                    for (std::size_t q = sillEnd; q < rows.size(); ++q) {
+                        if (!rows[q].any()) continue;
+                        f.u0 = std::min(f.u0, rows[q].u0);
+                        f.u1 = std::max(f.u1, rows[q].u1 + 0.01f);
+                        f.v0 = std::min(f.v0, rows[q].v - 0.005f);
+                        f.v1 = std::max(f.v1, rows[q].v + 0.005f);
+                    }
+                    frame = f;
+                }
+            }
+        } else {
+            // a door: the architrave's hole, scanned outwards from the opening's centre in the frame's plane
+            const SpGeom& dg = framePart != nullptr ? framePart->geom : e.geom;
+            const float fd0 = std::min(w.depth(dg.worldBox.lo), w.depth(dg.worldBox.hi));
+            const float fd1 = std::max(w.depth(dg.worldBox.lo), w.depth(dg.worldBox.hi));
+            auto solid = [&](float u, float v) {
+                for (int k = 0; k < 7; ++k) {
+                    const float d = fd0 + (fd1 - fd0) * (static_cast<float>(k) + 0.5f) / 7.0f;
+                    if (dg.dist(w.point(u, v, d)) < 0.0f) return true;
+                }
+                return false;
+            };
+            const float u = (o.u0 + o.u1) * 0.5f;
+            auto scan = [&](float du, float dv) {
+                float s = 0.0f;
+                while (s < 3.0f && !solid(u + du * (s + 0.005f), cv + dv * (s + 0.005f))) s += 0.005f;
+                return s;
+            };
+            if (!solid(u, cv)) {
+                frame = {u - scan(-1.0f, 0.0f), u + scan(1.0f, 0.0f), room.interior->lo.y, cv + scan(0.0f, 1.0f)};
+            }
+        }
+        if (frame.valid()) {
+            // Per edge, as seen from the room: + = the frame edge lies past the opening (over the wall).
+            const float leftOff = rs > 0.0f ? o.u0 - frame.u0 : frame.u1 - o.u1;
+            const float rightOff = rs > 0.0f ? frame.u1 - o.u1 : o.u0 - frame.u0;
+            const float topOff = frame.v1 - o.v1;
+            const float bottomOff = o.v0 - frame.v0;
+            std::vector<std::pair<std::string, float>> edges{{"left", leftOff}, {"right", rightOff}, {"top", topOff}};
+            if (opening == "window") edges.emplace_back("bottom", bottomOff);
+            float worst = 0.0f;
+            for (const auto& [n, v] : edges) worst = std::max(worst, std::abs(v));
+            if (worst > alignWarn) {
+                SpViolation v{worst > alignError ? "ERROR" : "WARNING", "openingAlignment", {e.id, room.id},
+                              fmt::format("{} is misaligned with its opening in wall {} of {}: {}", e.id, w.side, room.id,
+                                          edgeList(edges, alignWarn)),
+                              "contained by its wall opening",
+                              "the frame and the cut should have the same rectangle"};
+                v.measured = json{{"left", r3(leftOff)}, {"right", r3(rightOff)}, {"top", r3(topOff)},
+                                  {"opening", json::array({r3(o.u0), r3(o.u1), r3(o.v0), r3(o.v1)})},
+                                  {"frame", json::array({r3(frame.u0), r3(frame.u1), r3(frame.v0), r3(frame.v1)})},
+                                  {"wall", w.side}};
+                if (opening == "window") v.measured["bottom"] = r3(bottomOff);
+                const float du = ((o.u0 + o.u1) - (frame.u0 + frame.u1)) * 0.5f;
+                const float dv = opening == "window" ? ((o.v0 + o.v1) - (frame.v0 + frame.v1)) * 0.5f : 0.0f;
+                glm::vec3 delta{0.0f};
+                delta[w.uAxis] = du;
+                delta.y = dv;
+                v.suggestion = fmt::format("move {} by {} to centre it on the opening, and size the frame and the cut alike "
+                                           "(opening {:.2f} x {:.2f}m, frame {:.2f} x {:.2f}m)",
+                                           e.id, vecJson(delta).dump(), o.u1 - o.u0, o.v1 - o.v0, frame.u1 - frame.u0,
+                                           frame.v1 - frame.v0);
+                if (glm::length(delta) > 0.005f) v.fix = json{{"id", e.id}, {"translate", vecJson(delta)}};
+                ctx.add(std::move(v), gname);
+            } else {
+                ctx.pass("architecture");
+            }
+        }
+        if (opening == "window") {
+            if (!haveSill) {
+                ctx.add({"INFO", "sill", {e.id}, fmt::format("{} has no sill (no ledge found below the frame)", e.id)}, gname);
+            } else {
+                const float toOpening = sillTop - o.v0;
+                const float toFrame = frame.valid() ? sillTop - frame.v0 : 0.0f;
+                const float worst = std::max(std::abs(toOpening), std::abs(toFrame));
+                if (worst > sillWarn) {
+                    SpViolation v{worst > alignError ? "ERROR" : "WARNING", "sill", {e.id, room.id},
+                                  fmt::format("window sill of {} is offset from the window: its top is {} {} the opening's lower edge{}",
+                                              e.id, fmtM(std::abs(toOpening)), toOpening > 0.0f ? "above" : "below",
+                                              frame.valid() && std::abs(toFrame) > sillWarn
+                                                  ? fmt::format(" and {} {} the frame's", fmtM(std::abs(toFrame)), toFrame > 0.0f ? "above" : "below")
+                                                  : std::string()),
+                                  "the sill's top on the window's lower edge"};
+                    v.measured = json{{"sillToOpening", r3(toOpening)}, {"sillToFrame", r3(toFrame)}, {"sillTop", r3(sillTop)},
+                                      {"openingBottom", r3(o.v0)}};
+                    v.suggestion = fmt::format("move the sill by {} (or the cut's sill height to {:.2f}m)", fmtM(-toOpening), sillTop);
+                    ctx.add(std::move(v), gname);
+                } else {
+                    ctx.pass("architecture");
+                }
+            }
+        }
+        // ---- the opening's passage must be clear of everything but its own frame (trim, decor, furniture)
+        const SpObject& obj = ctx.objects[room.object];
+        auto [it, fresh] = pieceCache.try_emplace(room.object);
+        if (fresh) it->second = piecesOf(obj);
+        const auto& pieces = it->second;
+        std::map<std::string, float> crossing; // culprit -> metres of the opening's width it spans
+        std::map<std::string, std::pair<float, float>> crossingSpan;
+        const float du = 0.03f, dv = 0.03f;
+        for (float u = o.u0 + 0.015f; u < o.u1 - 0.01f; u += du) {
+            std::set<std::string> here;
+            for (float v = o.v0 + 0.012f; v < o.v1 - 0.01f; v += dv) {
+                for (float d : {-wall * 0.5f, -0.01f, 0.0f, 0.012f}) {
+                    const glm::vec3 p = w.point(u, v, d);
+                    if (e.geom.dist(p) < 0.004f) continue; // its own frame, mullions and glass
+                    if (room.geom.dist(p) < 0.0f) continue; // the wall itself (the scan found its edge)
+                    std::string who;
+                    for (int j : g.entities) {
+                        const SpEntity& x = ctx.entities[j];
+                        if (&x == &e || &x == &room || !x.geom.ok || x.text || !coexist(e, x)) continue;
+                        if (mayIntersect(ctx, e, x) && ctx.groupOf(x.category) != "architecture") continue;
+                        if (!ctx.cat(x.category).value("opening", std::string()).empty()) continue; // a leaf in its frame
+                        if (!x.geom.worldBox.contains(p) || x.geom.dist(p) >= 0.0f) continue;
+                        who = x.id;
+                        break;
+                    }
+                    if (who.empty() && obj.geom.dist(p) < 0.0f) {
+                        for (const SpPiece& pc : pieces) {
+                            if (pc.geom.worldBox.contains(p, 0.01f) && pc.geom.dist(p) < 0.0f) {
+                                who = describePiece(pc);
+                                break;
+                            }
+                        }
+                        if (who.empty()) who = "'" + obj.name + "'";
+                    }
+                    if (!who.empty()) {
+                        here.insert(who);
+                        auto& span = crossingSpan.try_emplace(who, std::make_pair(kInf, -kInf)).first->second;
+                        span.first = std::min(span.first, v);
+                        span.second = std::max(span.second, v);
+                        break;
+                    }
+                }
+            }
+            for (const auto& h : here) crossing[h] += du;
+        }
+        for (const auto& [who, width] : crossing) {
+            const float share = width / std::max(1e-3f, o.u1 - o.u0);
+            const auto& span = crossingSpan[who];
+            ctx.add({share > 0.5f && opening == "door" ? "ERROR" : "WARNING", "openingCrossed", {who, e.id},
+                     fmt::format("{} crosses the {} opening of {} (wall {} of {}): across {} of its {} width, at y {:.2f}-{:.2f}m",
+                                 who, opening, e.id, w.side, room.id, fmtM(std::min(width, o.u1 - o.u0)), fmtM(o.u1 - o.u0),
+                                 span.first, span.second),
+                     "architectural trim and decoration stop at doors and windows",
+                     opening == "door" ? "nothing runs across a doorway" : "nothing runs across a window",
+                     "cut the trim at the opening (subtract the opening's cut from the band too), or move the piece",
+                     json{{"share", r3(share)}, {"yFrom", r3(span.first)}, {"yTo", r3(span.second)}}},
+                    gname);
+        }
+        if (crossing.empty()) ctx.pass("architecture");
+    }
+}
+
+// The highest solid point of a geometry in the vertical column at (x, z) between y1 (top) and y0 (bottom).
+std::optional<float> columnTop(const SpGeom& g, float x, float z, float y0, float y1) {
+    float y = y1;
+    for (int s = 0; s < 200 && y > y0; ++s) {
+        const float d = g.dist({x, y, z});
+        if (d < 1e-3f) return y;
+        y -= std::max(d, 1e-3f);
+    }
+    return std::nullopt;
+}
+
+// Roofs on their buildings, stairs between floors, railings along their stairs.
+void checkConnections(SpCtx& ctx, const SpGroup& g, const std::string& gname) {
+    std::vector<float> floors{0.0f};
+    for (int r : roomsIn(ctx, g)) floors.push_back(ctx.entities[r].interior->lo.y);
+    for (int i : g.entities) {
+        const SpEntity& e = ctx.entities[i];
+        if ((e.category == "landing" || e.category == "floor" || e.category == "balcony") && e.geom.ok) {
+            floors.push_back(e.geom.worldBox.hi.y);
+        }
+    }
+    auto nearestFloor = [&](float y) {
+        float best = kInf;
+        for (float f : floors) {
+            if (std::abs(f - y) < std::abs(best - y)) best = f;
+        }
+        return best;
+    };
+    auto byId = [&](const std::string& id) -> const SpEntity* {
+        for (int j : g.entities) {
+            if (ctx.entities[j].id == id) return &ctx.entities[j];
+        }
+        return nullptr;
+    };
+    for (int i : g.entities) {
+        const SpEntity& e = ctx.entities[i];
+        if (!e.geom.ok || !e.frameOk) continue;
+        if (e.category == "roof") {
+            const SpEntity* b = e.anchor.empty() ? nullptr : byId(e.anchor);
+            if (b == nullptr) {
+                // the building under it: the entity with the most footprint overlap below the roof
+                float bestShare = 0.0f;
+                for (int j : g.entities) {
+                    const SpEntity& x = ctx.entities[j];
+                    if (&x == &e || !x.geom.ok || (x.category != "building" && x.category != "room")) continue;
+                    const glm::vec3 xs = x.geom.worldBox.size();
+                    SpBox ov = intersect(x.geom.worldBox, e.geom.worldBox);
+                    const float share = ov.lo.x < ov.hi.x && ov.lo.z < ov.hi.z ? (ov.hi.x - ov.lo.x) * (ov.hi.z - ov.lo.z) / std::max(1e-4f, xs.x * xs.z) : 0.0f;
+                    if (share > bestShare && x.geom.worldBox.centre().y < e.geom.worldBox.centre().y) {
+                        bestShare = share;
+                        b = &x;
+                    }
+                }
+            }
+            if (b == nullptr) {
+                ctx.add({"WARNING", "roof", {e.id}, fmt::format("{} has no building under it", e.id), "a roof connects to its building",
+                         "", "set its \"anchor\" to the building entity"},
+                        gname);
+                continue;
+            }
+            const ColumnHit bottom = traceVertical(e.geom, +1);
+            const float top = b->geom.worldBox.hi.y;
+            const float gap = bottom.hit ? bottom.y - top : 0.0f;
+            const glm::vec3 bs = b->geom.worldBox.size();
+            SpBox ov = intersect(b->geom.worldBox, e.geom.worldBox);
+            const float cover = ov.lo.x < ov.hi.x && ov.lo.z < ov.hi.z ? (ov.hi.x - ov.lo.x) * (ov.hi.z - ov.lo.z) / std::max(1e-4f, bs.x * bs.z) : 0.0f;
+            if (gap > ctx.tol("supportGap")) {
+                ctx.add({gap > 0.15f ? "ERROR" : "WARNING", "roof", {e.id, b->id},
+                         fmt::format("{} floats {} above the top of {} (not connected)", e.id, fmtM(gap), b->id),
+                         "a roof rests on its building's walls", "", fmt::format("lower {} by {}", e.id, fmtM(gap)),
+                         json{{"gap", r3(gap)}}, json{{"id", e.id}, {"translate", json::array({0.0, r3(-gap), 0.0})}}},
+                        gname);
+            } else if (cover < 0.9f) {
+                ctx.add({"WARNING", "roof", {e.id, b->id},
+                         fmt::format("{} covers only {:.0f}% of {}'s footprint", e.id, cover * 100.0f, b->id), "", "", "",
+                         json{{"cover", r3(cover)}}},
+                        gname);
+            } else {
+                ctx.pass("architecture");
+            }
+        }
+        if (e.category == "stairs" && !e.note.value("terminates", false)) {
+            const ColumnHit top = traceVertical(e.geom, -1);
+            const ColumnHit bottom = traceVertical(e.geom, +1);
+            if (!top.hit || !bottom.hit) continue;
+            const float lowF = nearestFloor(bottom.y);
+            const float highF = nearestFloor(top.y);
+            const float riser = e.note.value("rise", 0.2f);
+            bool ok = true;
+            if (std::abs(bottom.y - lowF) > 0.05f) {
+                ctx.add({"WARNING", "stairs", {e.id},
+                         fmt::format("{} starts {} {} the nearest floor (y {:.2f})", e.id, fmtM(std::abs(bottom.y - lowF)),
+                                     bottom.y > lowF ? "above" : "below", lowF),
+                         "stairs connect floors"},
+                        gname);
+                ok = false;
+            }
+            if (std::abs(top.y - highF) > riser + 0.05f || highF <= lowF + 0.5f) {
+                ctx.add({"WARNING", "stairs", {e.id},
+                         fmt::format("{} ends at y {:.2f} with no floor there (nearest floor {:.2f}): it terminates in empty space", e.id,
+                                     top.y, highF),
+                         "stairs connect floors", "",
+                         "end it at a floor or a landing (tag a \"landing\"), or mark it \"terminates\": true if that is the image",
+                         json{{"top", r3(top.y)}, {"nearestFloor", r3(highF)}}},
+                        gname);
+                ok = false;
+            }
+            if (ok) ctx.pass("architecture");
+        }
+        if (e.category == "railing") {
+            const SpEntity* s = e.anchor.empty() ? nullptr : byId(e.anchor);
+            if (s == nullptr) {
+                for (int j : g.entities) {
+                    const SpEntity& x = ctx.entities[j];
+                    if (x.category == "stairs" && x.geom.ok && intersect(x.geom.worldBox, e.geom.worldBox).valid()) s = &x;
+                }
+            }
+            if (s == nullptr) {
+                ctx.add({"WARNING", "railing", {e.id}, fmt::format("{} follows no stairs or balcony", e.id), "railings follow stairs",
+                         "", "set its \"anchor\""},
+                        gname);
+                continue;
+            }
+            const SpBox& rb = e.geom.worldBox;
+            const bool alongX = rb.size().x >= rb.size().z;
+            std::vector<float> heights;
+            int off = 0;
+            for (int k = 0; k < 12; ++k) {
+                const float f = (static_cast<float>(k) + 0.5f) / 12.0f;
+                float x = alongX ? rb.lo.x + rb.size().x * f : (rb.lo.x + rb.hi.x) * 0.5f;
+                float z = alongX ? (rb.lo.z + rb.hi.z) * 0.5f : rb.lo.z + rb.size().z * f;
+                const auto railTop = columnTop(e.geom, x, z, rb.lo.y - 0.01f, rb.hi.y + 0.01f);
+                if (!railTop) continue;
+                std::optional<float> stairTop;
+                for (float side : {0.0f, 0.15f, -0.15f, 0.3f, -0.3f}) {
+                    const float sx = alongX ? x : x + side;
+                    const float sz = alongX ? z + side : z;
+                    stairTop = columnTop(s->geom, sx, sz, s->geom.worldBox.lo.y - 0.01f, *railTop - 0.05f);
+                    if (stairTop) break;
+                }
+                if (!stairTop) {
+                    ++off;
+                    continue;
+                }
+                heights.push_back(*railTop - *stairTop);
+            }
+            if (heights.size() < 3) continue;
+            const auto [mn, mx] = std::minmax_element(heights.begin(), heights.end());
+            if (off > 2) {
+                ctx.add({"WARNING", "railing", {e.id, s->id},
+                         fmt::format("{} runs off {}: {} of its 12 samples have no tread under them", e.id, s->id, off),
+                         "railings follow stairs"},
+                        gname);
+            } else if (*mx - *mn > 0.15f) {
+                ctx.add({"WARNING", "railing", {e.id, s->id},
+                         fmt::format("{} does not follow {}: its height above the treads varies {:.2f}-{:.2f}m", e.id, s->id, *mn, *mx),
+                         "a handrail parallel to the pitch line", "", "", json{{"min", r3(*mn)}, {"max", r3(*mx)}}},
+                        gname);
+            } else {
+                ctx.pass("architecture");
+            }
+        }
+    }
+}
+
+// ---- ADR-1056: containment ------------------------------------------------------------------------------
+
+bool roomIsKind(const SpEntity& room, const json& kinds) {
+    std::string id = room.id;
+    std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const std::string kind = room.note.value("kind", std::string());
+    for (const auto& k : kinds) {
+        if (!k.is_string()) continue;
+        const std::string s = k.get<std::string>();
+        if (s == kind || id.find(s) != std::string::npos) return true;
+    }
+    return false;
+}
+
+void checkContainment(SpCtx& ctx, const SpGroup& g, const std::string& gname) {
+    std::map<std::string, std::vector<const SpEntity*>> chairsByTable;
+    for (int i : g.entities) {
+        const SpEntity& e = ctx.entities[i];
+        if (e.text || !e.geom.ok || !e.frameOk || e.category == "room") continue;
+        const std::string group = ctx.groupOf(e.category);
+        if (group != "furniture" && group != "decor" && group != "character") continue;
+        const json& c = ctx.cat(e.category);
+        const auto mounts = supportsOf(c, "mounts");
+        int r = -1;
+        for (int rr : roomsIn(ctx, g)) {
+            if (!e.room.empty() && ctx.entities[rr].id == e.room) r = rr;
+        }
+        if (r < 0) r = roomFor(ctx, g, e);
+        if (r < 0) continue;
+        const SpEntity& room = ctx.entities[r];
+        const SpBox& in = *room.interior;
+        const SpBox& b = e.geom.worldBox;
+        const glm::vec3 ctr = b.centre();
+        if (!e.room.empty() && !in.contains(ctr, 0.0f)) {
+            ctx.add({"ERROR", "containment", {e.id, room.id},
+                     fmt::format("{} is outside its room {} (its centre is {} beyond the walls)", e.id, room.id,
+                                 fmtM(std::max({in.lo.x - ctr.x, ctr.x - in.hi.x, in.lo.z - ctr.z, ctr.z - in.hi.z, 0.0f}))),
+                     "inside the room it belongs to"},
+                    gname);
+            continue;
+        }
+        // overhang through a wall, per side (mounted things live on the wall: their depth is the wall's)
+        if (mounts.empty() && supportsOf(c, "embeds").empty()) {
+            const std::pair<const char*, float> sides[4] = {{"-x", in.lo.x - b.lo.x}, {"+x", b.hi.x - in.hi.x},
+                                                           {"-z", in.lo.z - b.lo.z}, {"+z", b.hi.z - in.hi.z}};
+            const auto worst = *std::max_element(std::begin(sides), std::end(sides),
+                                                 [](const auto& a, const auto& bb) { return a.second < bb.second; });
+            std::vector<std::string> sorted{e.id, room.id};
+            std::sort(sorted.begin(), sorted.end());
+            const bool already = ctx.seen.count("intersection|" + sorted[0] + "|" + sorted[1]) > 0;
+            if (worst.second > 0.05f && !already && group != "character") {
+                ctx.add({"WARNING", "containment", {e.id, room.id},
+                         fmt::format("{} extends {} outside {} through wall {}", e.id, fmtM(worst.second), room.id, worst.first),
+                         "inside the room it belongs to", "", fmt::format("move {} {} into the room", e.id, fmtM(worst.second))},
+                        gname);
+            }
+        }
+        // the right kind of room
+        if (c.contains("rooms") && c["rooms"].is_array() && !roomIsKind(room, c["rooms"])) {
+            ctx.add({"WARNING", "roomKind", {e.id, room.id},
+                     fmt::format("{} ({}) is in {}, expected a room of kind {}", e.id, e.category, room.id, c["rooms"].dump()),
+                     "", "", "move it, or give the room \"kind\""},
+                    gname);
+        }
+        // against a wall
+        if (c.value("againstWall", false) && !e.note.value("freestanding", false)) {
+            float gap = kInf;
+            std::string side;
+            for (const SpWall& w : wallsOf(in)) {
+                if (angleBetween(e.front, w.inward()) > 30.0f) continue;
+                const float d = std::min(w.depth(b.lo), w.depth(b.hi));
+                if (d < gap) {
+                    gap = d;
+                    side = w.side;
+                }
+            }
+            if (gap < kInf && gap > ctx.rules.value("structure", json::object()).value("wallGap", 0.15f)) {
+                ctx.add({"WARNING", "againstWall", {e.id, room.id},
+                         fmt::format("{} stands {} off wall {} of {} behind it", e.id, fmtM(gap), side, room.id),
+                         "a " + e.category + " stands against a wall", "",
+                         fmt::format("move it {} back, or mark it \"freestanding\": true", fmtM(gap))},
+                        gname);
+            }
+        }
+        if (e.category == "chair" && !e.anchor.empty()) chairsByTable[e.anchor].push_back(&e);
+    }
+    const float minSpacing = ctx.rules.value("structure", json::object()).value("chairSpacing", 0.5f);
+    for (const auto& [table, chairs] : chairsByTable) {
+        for (std::size_t a = 0; a < chairs.size(); ++a) {
+            for (std::size_t b = a + 1; b < chairs.size(); ++b) {
+                if (!coexist(*chairs[a], *chairs[b])) continue;
+                glm::vec3 d = chairs[a]->geom.worldBox.centre() - chairs[b]->geom.worldBox.centre();
+                d.y = 0.0f;
+                const float dist = glm::length(d);
+                if (dist < minSpacing) {
+                    ctx.add({"WARNING", "chairSpacing", {chairs[a]->id, chairs[b]->id},
+                             fmt::format("{} and {} at {} are {} apart (under {}: crowded)", chairs[a]->id, chairs[b]->id, table,
+                                         fmtM(dist), fmtM(minSpacing)),
+                             "chairs around a table have room for a person each"},
+                            gname);
+                }
+            }
+        }
+    }
+}
+
+// ADR-1056: the tiers the owner's report names. ERROR = critical, WARNING = warning, INFO = informational
+// (expected or intended: a child overlapping its parent, decoration in the floor, motion that is the effect).
+std::string tierOf(const std::string& severity) {
+    return severity == "ERROR" ? "critical" : severity == "WARNING" ? "warning" : "info";
+}
+
 json violationJson(const SpViolation& v) {
-    json j{{"severity", v.severity}, {"rule", v.rule}, {"entities", v.ids}, {"message", v.message}};
+    json j{{"severity", v.severity}, {"tier", tierOf(v.severity)}, {"rule", v.rule}, {"entities", v.ids}, {"message", v.message}};
     if (!v.relationship.empty()) j["relationship"] = v.relationship;
     if (!v.expected.empty()) j["expected"] = v.expected;
     if (!v.suggestion.empty()) j["suggestion"] = v.suggestion;
@@ -2215,14 +3135,19 @@ Result<json> validateSpace(const json& scene, const json& rules, const SpaceVali
 
     checkIntegrity(ctx);
     checkObjectPieces(ctx);
+    std::map<int, std::vector<SpPiece>> pieceCache;
     for (const SpGroup& g : ctx.groups) {
         checkIntersections(ctx, g, g.name);
         checkPlacement(ctx, g, g.name);
         checkRelationships(ctx, g, g.name);
         checkOpenings(ctx, g, g.name);
         checkPoses(ctx, g, g.name);
+        checkStructure(ctx, g, g.name, pieceCache);
+        checkConnections(ctx, g, g.name);
+        checkContainment(ctx, g, g.name);
     }
     checkLyrics(ctx);
+    if (options.text) checkTextGeometry(ctx, scene);
     if (options.cameraPath) checkCameraPaths(ctx, scene);
 
     // the report
@@ -2250,6 +3175,12 @@ Result<json> validateSpace(const json& scene, const json& rules, const SpaceVali
         }
         j["origin"] = vecJson(e.origin);
         j["front"] = vecJson(e.front);
+        if (e.interior) j["interior"] = json::array({vecJson(e.interior->lo), vecJson(e.interior->hi)});
+        if (e.note.contains("opensAt") && e.note["opensAt"].is_number()) j["opensAt"] = e.note["opensAt"];
+        if (e.t0 >= 0.0) {
+            j["t0"] = e.t0;
+            j["t1"] = e.t1;
+        }
         if (!e.parts.empty()) {
             json parts = json::array();
             for (const SpPart& p : e.parts) parts.push_back(p.name);
@@ -2274,6 +3205,96 @@ Result<json> validateSpace(const json& scene, const json& rules, const SpaceVali
                 {"groups", groups},
                 {"notes", ctx.notes}};
     return report;
+}
+
+void mergeFilmReport(json& report, const json& film) {
+    json all = report["violations"];
+    for (json v : film.value("violations", json::array())) {
+        v["tier"] = tierOf(v.value("severity", std::string("INFO")));
+        all.push_back(v);
+    }
+    std::vector<json> sorted(all.begin(), all.end());
+    auto rank = [](const json& v) {
+        const std::string s = v.value("severity", std::string());
+        return s == "ERROR" ? 0 : s == "WARNING" ? 1 : 2;
+    };
+    std::stable_sort(sorted.begin(), sorted.end(), [&](const json& a, const json& b) { return rank(a) < rank(b); });
+    int errors = 0, warnings = 0, infos = 0;
+    for (const json& v : sorted) {
+        const int r = rank(v);
+        (r == 0 ? errors : r == 1 ? warnings : infos)++;
+    }
+    report["violations"] = sorted;
+    report["summary"]["errors"] = errors;
+    report["summary"]["warnings"] = warnings;
+    report["summary"]["infos"] = infos;
+    json f = film;
+    f.erase("violations");
+    report["film"] = f;
+}
+
+std::string formatSceneValidationMarkdown(const json& report) {
+    std::string out = "# Scene Validation Report\n\n";
+    const json& s = report["summary"];
+    out += fmt::format("Source: `{}`\n\n", report.value("source", std::string()));
+    out += fmt::format("| tier | count |\n|---|---|\n| Critical | {} |\n| Warnings | {} |\n| Informational | {} |\n\n",
+                       s.value("errors", 0), s.value("warnings", 0), s.value("infos", 0));
+    // counts by rule and tier
+    std::map<std::string, std::array<int, 3>> byRule;
+    for (const auto& v : report["violations"]) {
+        const std::string sev = v.value("severity", std::string());
+        byRule[v.value("rule", std::string())][sev == "ERROR" ? 0 : sev == "WARNING" ? 1 : 2]++;
+    }
+    out += "| rule | critical | warning | info |\n|---|---|---|---|\n";
+    for (const auto& [rule, c] : byRule) out += fmt::format("| {} | {} | {} | {} |\n", rule, c[0], c[1], c[2]);
+    auto item = [](const json& v) {
+        std::string line = "- **" + v.value("rule", std::string()) + "**: " + v.value("message", std::string());
+        if (v.contains("groups") && !v["groups"].empty()) {
+            std::string g;
+            for (const auto& x : v["groups"]) g += (g.empty() ? "" : ", ") + x.get<std::string>();
+            line += " *(in: " + g + ")*";
+        }
+        if (v.contains("suggestion")) line += "\n  - fix: " + v["suggestion"].get<std::string>();
+        return line + "\n";
+    };
+    const char* heads[3] = {"Critical", "Warnings", "Informational"};
+    const char* sevs[3] = {"ERROR", "WARNING", "INFO"};
+    for (int t = 0; t < 3; ++t) {
+        out += fmt::format("\n## {}\n\n", heads[t]);
+        int n = 0, shown = 0;
+        const int limit = t == 2 ? 40 : 100000;
+        for (const auto& v : report["violations"]) {
+            if (v.value("severity", std::string()) != sevs[t]) continue;
+            ++n;
+            if (shown < limit) {
+                out += item(v);
+                ++shown;
+            }
+        }
+        if (n == 0) out += "None.\n";
+        if (n > shown) out += fmt::format("\n...and {} more (the JSON report has every item).\n", n - shown);
+    }
+    if (report.contains("film")) {
+        const json& f = report["film"];
+        out += "\n## Film pass\n\n";
+        if (f.contains("camera")) {
+            const json& c = f["camera"];
+            out += fmt::format("- camera: {} samples at {} fps; closest approach {} m at {} s\n", c.value("samples", 0),
+                               c.value("fps", 0.0), c.contains("minClearance") ? c["minClearance"].dump() : std::string("-"),
+                               c.value("minClearanceAt", 0.0));
+        }
+        if (f.contains("motion")) {
+            const json& m = f["motion"];
+            out += fmt::format("- structural transforms watched: {}; locked after construction: {}; twitching: {}; "
+                               "moving continuously: {}; allowed to move (decor, characters, text): {}\n",
+                               m.value("watched", 0), m.value("locked", 0), m.value("twitching", 0), m.value("animated", 0),
+                               m.value("mayMove", 0));
+        }
+    }
+    out += "\n## Passed\n\n";
+    for (const auto& [k, v] : s["pass"].items()) out += fmt::format("- {}: {}\n", k, v.dump());
+    for (const auto& n : report["notes"]) out += "\nnote: " + n.get<std::string>() + "\n";
+    return out;
 }
 
 std::string formatSpaceReport(const json& report) {

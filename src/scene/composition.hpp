@@ -1609,6 +1609,7 @@ private:
     std::optional<float> cameraHeightSetting_;
     float cameraOrbitSpeedSetting_ = 0.12f;
     float cameraFovSetting_ = 50.0f;
+    float cameraNearSetting_ = 0.0f; // ADR-1058: the near plane (m); 0 = automatic
     float envIntensitySetting_ = 1.0f;
     // HDRI sky (ADR-049): the scene-file values behind env/rotation and the background controls.
     // `envRotationSetting_` in particular used to have nowhere to come from -- the parameter
@@ -2385,6 +2386,7 @@ private:
     params::Parameter<float>* cameraHeight_ = nullptr;
     params::Parameter<float>* cameraOrbitSpeed_ = nullptr;
     params::Parameter<float>* cameraFov_ = nullptr;
+    params::Parameter<float>* cameraNear_ = nullptr; // ADR-1058
     params::Parameter<float>* envIntensity_ = nullptr;
     params::Parameter<float>* envRotation_ = nullptr;
     // env/sky/* (ADR-036)

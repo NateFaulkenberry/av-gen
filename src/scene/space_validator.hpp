@@ -31,6 +31,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,9 @@ struct SpaceValidateOptions {
     // is given the time the film reaches it, and is checked only against what is present then (entities with
     // `t0`/`t1` spans; an object whose entities all have spans is present only inside them).
     std::vector<std::pair<double, double>> journeyKeys;
+    // ADR-1056: when an object is shown, from the project's `nodes/<n>/visible` (or `sdf/<n>/visible`) step tracks:
+    // object name -> [from, to) spans. An object with no entry is shown throughout.
+    std::map<std::string, std::vector<std::pair<double, double>>> visibleSpans;
 };
 
 // The built-in rules: categories, poses, tolerances.
@@ -65,6 +69,13 @@ struct SpaceValidateOptions {
 // Fails only when the document is not a scene (no `nodes` array) or the rules are malformed.
 [[nodiscard]] Result<nlohmann::json> validateSpace(const nlohmann::json& scene, const nlohmann::json& rules,
                                                    const SpaceValidateOptions& options = {});
+
+// ADR-1057: merges a film pass (`app::validateFilm`) into a static report: its violations join the list (re-sorted
+// by severity, the summary recounted) and its camera/motion statistics go under "film".
+void mergeFilmReport(nlohmann::json& report, const nlohmann::json& film);
+
+// ADR-1056: the owner's "Scene Validation Report": Markdown, Critical / Warnings / Informational, counts by rule.
+[[nodiscard]] std::string formatSceneValidationMarkdown(const nlohmann::json& report);
 
 // The human-readable report (the addendum's section 14 form).
 [[nodiscard]] std::string formatSpaceReport(const nlohmann::json& report);

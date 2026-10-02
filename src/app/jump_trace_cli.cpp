@@ -1,6 +1,7 @@
 #include "app/jump_trace_cli.hpp"
 
 #include "app/engine.hpp"
+#include "app/transform_watch.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
 #include "params/parameter.hpp"
@@ -38,32 +39,11 @@ struct Watched {
     int filled = 0;
 };
 
-bool endsWith(const std::string& s, const char* suffix) {
-    const std::size_t n = std::char_traits<char>::length(suffix);
-    return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
-}
-
-// Which parameters are transforms, how a change in them is measured, and which node owns them.
+// Which parameters are transforms (shared with the film validator, app/transform_watch.hpp).
 std::optional<std::pair<Measure, std::string>> classify(const std::string& path) {
-    auto second = [&](const std::string& p) {
-        const auto a = p.find('/');
-        const auto b = p.find('/', a + 1);
-        return p.substr(a + 1, b - a - 1);
-    };
-    if (path.starts_with("sdf/")) {
-        if (endsWith(path, "/transform/position") || (path.find("/node/") != std::string::npos && endsWith(path, "/translation"))) {
-            return std::make_pair(Measure::Metres, second(path));
-        }
-        if (endsWith(path, "/transform/scale") ||
-            (path.find("/node/") != std::string::npos && (endsWith(path, "/scale") || endsWith(path, "/size")))) {
-            return std::make_pair(Measure::Relative, second(path));
-        }
-        return std::nullopt;
-    }
-    if (path.starts_with("nodes/") && (endsWith(path, "/position"))) return std::make_pair(Measure::Metres, second(path));
-    if (path.starts_with("nodes/") && endsWith(path, "/scale")) return std::make_pair(Measure::Relative, second(path));
-    if (path.starts_with("particles/") && endsWith(path, "/position")) return std::make_pair(Measure::Metres, second(path));
-    return std::nullopt;
+    const auto c = classifyTransform(path, false);
+    if (!c) return std::nullopt;
+    return std::make_pair(c->measure == TransformMeasure::Relative ? Measure::Relative : Measure::Metres, c->owner);
 }
 
 float change(const Watched& w, const std::array<float, 3>& a, const std::array<float, 3>& b) {
@@ -77,19 +57,8 @@ float change(const Watched& w, const std::array<float, 3>& a, const std::array<f
     return w.measure == Measure::Relative ? d / std::max(std::sqrt(m2), 1e-3f) : d;
 }
 
-// Why a route can step: its source jumps (a pulse, an event with no attack) and nothing smooths it.
 std::string routeCause(const json& r) {
-    const std::string src = r.value("source", std::string());
-    const json chain = r.value("chain", json::object());
-    const bool smoothed = chain.contains("springHz") || chain.contains("attackMs") || chain.contains("smoothMs") ||
-                          chain.contains("slewPerSecond") || chain.contains("lagMs");
-    const bool smoothSource = endsWith(src, ".wave") || endsWith(src, ".phase");
-    std::string why;
-    if (!smoothed && !smoothSource) {
-        why = src.starts_with("grid.") ? "a beat-grid pulse/event (instant rise) with no smoothing chain"
-                                       : "an unsmoothed signal";
-    }
-    return why;
+    return transformRouteCause(r);
 }
 
 } // namespace
