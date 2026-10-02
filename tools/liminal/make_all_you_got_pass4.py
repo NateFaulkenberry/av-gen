@@ -130,6 +130,12 @@ def build(end=END, validate=True):
         film.route(cl, "post/lens/chromaticAberration", 0.35)
     b.breath_forbidden()
     b.audit_structure()
+    # each room has opened (the camera may enter it) at the moment the film first takes us in: the living room on the
+    # downbeat of 17 through the window the intro built, the others through their doors as the camera walks in (the
+    # film validator's cameraEarly check: ADR-1057)
+    for rid, tt in (("livingRoom", t(17)), ("kitchen", t(33)), ("hall", t(38)), ("laundry", t(42)), ("gym", 95.0), ("lounge", 101.9),
+                    ("bedroom", t(49, 4)), ("bathroom", t(53, 4)), ("study", t(57, 4)), ("barRoom", t(77))):
+        b.opens(rid, tt)
     b.stamp_openings()
     b.span_objects({"faller": (0.0, t(3)), "heroRoof": (0.0, t(67) - 0.02), "stuCeil": (0.0, t(67) - 0.02)})
     b.write_keys()

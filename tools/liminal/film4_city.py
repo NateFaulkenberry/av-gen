@@ -177,6 +177,14 @@ def grow_keys(b):
             if i % 2 == 0:
                 c = b.clap(f"rise{nm_}{i:02d}", tt + 0.04, release=0.18)
                 f.route(c, f"sdf/{obj}/look/edge/intensity", 3.0)
+    # the inner city (built in the intro) is dark when we come out of the roof and switches on set by set on the first
+    # GROW beats, while the outer city builds: the city waking, not a second construction of what was already built
+    wake = {"Low": grow_beats[0], "Mid": grow_beats[1], "TowerA": grow_beats[2], "TowerB": grow_beats[2], "Sky": grow_beats[3]}
+    for nm_, tw in wake.items():
+        for k_, lit in ((K.CANVAS2, [0.45, 0.45, 0.45]), (K.CANVAS, [0.22, 0.22, 0.22]), (K.GLOW, [2.0, 1.4, 0.7])):
+            b.lock(f"sdf/cityIn{nm_}/surface/{k_}/emission", [(t(66), [v * 0.04 for v in lit]), (tw, lit)], lit, ease=0.04)
+        c = b.clap(f"wake{nm_}", tw, release=0.3)
+        f.route(c, f"sdf/cityIn{nm_}/look/edge/intensity", 4.0)
     for i, tb in enumerate(grow_beats):
         c = b.clap(f"grow{i:02d}", tb, release=0.35)
         f.route(c, "sdf/cityKerbs/look/edge/intensity", 6.0)
@@ -280,7 +288,7 @@ def add_walkers(b, key, specs, kerbs=None):
         xs = [at[0] - dx * back, at[0] + dx * (L + back)]
         zs = [at[2] - dz * back, at[2] + dz * (L + back)]
         objs.append((obj, tree, "furn", (min(xs) - 1.2, at[1] - 0.3, min(zs) - 1.2), (max(xs) + 1.2, at[1] + 2.2, max(zs) + 1.2),
-                     dict(FAR)))
+                     dict(FAR, edge_intensity=2.4)))     # the others' lines quieter than his: he is the one we see
     b.world(key, {"objects": objs, "lights": []})
     for (obj, rn, at, yaw, t0, t1, speed, phase, count, spacing) in specs:
         WK.walk(f, obj, rn, phase=phase, gate=b.gate(f"g{obj}", t0, t1, fade=0.02))
@@ -342,6 +350,17 @@ def isolation(b):
     man_tree, lo, hi = T4.placed("bench_sit", "benchMan", (bx, by, bz), C.BENCH_YAW, room=None, anchor_id="ParkBench")
     b.room_world("parkMan", {"objects": [("benchMan", man_tree, "figure", lo, hi, dict(FAR, figure=True))], "lights": []})
     pz = -88.0
+    # a pair talking on the next bench along (seated rigs: they turn to each other, gesture, nod)
+    pair = []
+    for obj, rn, dx, yaw, st in (("parkTalkA", "pa", -0.4, 20.0, {"elR": -50.0}), ("parkTalkB", "pb", 0.45, -20.0, {"elL": -45.0})):
+        at = (C.HX - 5.5 + dx, 0.14 - 0.38 + 0.03, -88.0 - 2.3 - 0.05)
+        stance = dict({"hipL": -88.0, "hipR": -88.0, "kneeL": 88.0, "kneeR": 88.0}, **st)
+        pair.append((obj, WK.person(K.T(list(at), K.R([0, yaw, 0], WK.walker(rn, stance))), obj), "furn",
+                     (at[0] - 1.0, at[1] - 0.2, at[2] - 1.0), (at[0] + 1.0, at[1] + 2.0, at[2] + 1.0), dict(FAR, edge_intensity=2.4)))
+    b.world("parkPair", {"objects": pair, "lights": []})
+    gp = b.gate("gParkPair", t(79) - 0.5, t(81))
+    WK.talk(f, "parkTalkA", "pa", arm="R", amount=30.0, gate=gp)
+    WK.talk(f, "parkTalkB", "pb", arm="L", amount=24.0, div="half", gate=gp)
     walkers_c = add_walkers(b, "walkC", [
         ("walkC1", "wc1", (C.HX - 9.0, 0.16, pz + 0.55), 90.0, t(79) - 1.0, t(81), 1.25, 1.0, 1, 3.4),
         ("walkC2", "wc2", (C.HX + 13.0, 0.16, pz - 0.55), -90.0, t(79) - 0.5, t(81), 1.3, -1.0, 0, 2.0),
@@ -378,7 +397,7 @@ def isolation(b):
     # C: the park bench (79-80)
     eyeC = [(t(79), (bx - 2.4, 1.42, pz - 3.8)), (176.0, (bx - 0.6, 1.38, pz - 3.6)), (t(81), (bx + 1.4, 1.35, pz - 3.3))]
     lookC = [(t(79), (bx, 0.85, bz)), (t(81), (bx + 0.2, 0.85, bz))]
-    b.glide("bench", eyeC, lookC, nodes_keys=base + ("parkMan", "walkC"), fov=50.0)
+    b.glide("bench", eyeC, lookC, nodes_keys=base + ("parkMan", "walkC", "parkPair"), fov=50.0)
     b.show("benchMan", t(79), t(81))
     # D: the crossing (81-82): from above, slowly rising; 82.3 the pulse stops and everything with it; 82.4 black
     eyeD = [(t(81), (C.XI - 3.2, 9.0, cz + 9.0)), (t(82, 3), (C.XI - 2.6, 14.0, cz + 7.5)), (t(83), (C.XI - 2.5, 14.5, cz + 7.3))]
@@ -518,10 +537,10 @@ def bar_room(b):
     objs = []
     for obj, rn, at, yaw, stance in others:
         objs.append((obj, WK.person(K.T(list(at), K.R([0, yaw, 0], WK.walker(rn, stance))), obj), "figure2", (at[0] - 1.2, at[1] - 0.2, at[2] - 1.2),
-                     (at[0] + 1.2, at[1] + 2.2, at[2] + 1.2), dict(FAR, own_line=True)))
+                     (at[0] + 1.2, at[1] + 2.2, at[2] + 1.2), dict(FAR, own_line=True, edge_intensity=2.4)))
     b.world("barPeople", {"objects": objs, "lights": []})
     for obj, rn, *_ in others:
-        f.bind("figure", f"sdf/{obj}/look/edge/color")
+        f.bind("furn", f"sdf/{obj}/look/edge/color")
     g = b.gate("gBarPeople", t(77) - 0.5, t(79))
     f.route("grid.song.half.wave", "sdf/barTender/node/btShRgest/rotation", 26.0, component=0, polarity="bipolar", depth=g)
     WK.talk(f, "barTalkA", "ta", arm="R", amount=34.0, gate=g)
