@@ -1373,6 +1373,15 @@
       "curve": "linear"
      },
      {
+      "channel": "gBarN",
+      "time": 101.0,
+      "units": "seconds",
+      "hold": 8.491284403669734,
+      "attack": 0.05,
+      "release": 0.05,
+      "curve": "linear"
+     },
+     {
       "channel": "c07",
       "time": 100.73394,
       "units": "seconds",
@@ -2177,6 +2186,15 @@
       "release": 0.3,
       "curve": "exp",
       "strength": 1.0
+     },
+     {
+      "channel": "gGrowCity",
+      "time": 147.52294,
+      "units": "seconds",
+      "hold": 17.01422018348624,
+      "attack": 0.05,
+      "release": 0.05,
+      "curve": "linear"
      },
      {
       "channel": "grow00",
@@ -8869,6 +8887,32 @@
    "depthMax": 1.0
   },
   {
+   "source": "grid.song.quarter",
+   "target": "sdf/gymShell/surface/5/emission",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gLig",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/lngBar/surface/1/emission",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gBarN",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
    "source": "grid.song.c07",
    "target": "post/bloom/intensity",
    "amount": 1.4,
@@ -11093,6 +11137,162 @@
    "chain": {}
   },
   {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityLamps/surface/2/emission",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityKerbs/look/edge/intensity",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityInLow/surface/5/emission",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityOutLow/surface/5/emission",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/cityInMid/surface/5/emission",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.eighth",
+   "target": "sdf/cityOutMid/surface/5/emission",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.half",
+   "target": "sdf/cityInTowerA/surface/5/emission",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.half",
+   "target": "sdf/cityOutTowerA/surface/5/emission",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityInTowerB/surface/5/emission",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.quarter",
+   "target": "sdf/cityOutTowerB/surface/5/emission",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.half",
+   "target": "sdf/cityInSky/surface/5/emission",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "grid.song.half",
+   "target": "sdf/cityOutSky/surface/5/emission",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {},
+   "depthSource": "grid.song.gGrowCity",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
    "source": "grid.song.grow00",
    "target": "sdf/cityKerbs/look/edge/intensity",
    "amount": 6.0,
@@ -13142,7 +13342,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityInLow/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13181,7 +13381,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityOutLow/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13220,7 +13420,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityInMid/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13259,7 +13459,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityOutMid/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13298,7 +13498,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityInTowerA/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13337,7 +13537,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityOutTowerA/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13376,7 +13576,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityInTowerB/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13415,7 +13615,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityOutTowerB/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13454,7 +13654,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityInSky/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -13493,7 +13693,7 @@
   {
    "source": "grid.song.quarter",
    "target": "sdf/cityOutSky/look/edge/intensity",
-   "amount": 1.2,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -73915,14 +74115,14 @@
      {
       "time": 151.92661,
       "value": [
-       0.007
+       0.009
       ],
       "interp": "step"
      },
      {
       "time": 164.58716,
       "value": [
-       0.007
+       0.009
       ],
       "interp": "smooth"
      },
@@ -73943,14 +74143,14 @@
      {
       "time": 182.43491,
       "value": [
-       0.008
+       0.0095
       ],
       "interp": "step"
      },
      {
       "time": 199.72221,
       "value": [
-       0.008
+       0.0095
       ],
       "interp": "step"
      },

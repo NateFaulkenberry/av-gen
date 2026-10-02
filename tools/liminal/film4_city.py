@@ -207,6 +207,15 @@ def grow_keys(b):
     # one white tile, the brightest thing over the city; its lines are dimmed until the descent brings us close)
     for o in ("cityPark", "cityParkTrees", "cityBenches"):
         f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 0.3, "step"), (t(73, 3), 0.3, "smooth"), (t(74, 4), 1.0, "step")], mode="multiply")
+    # the growing city's lights breathe on the quarter as it builds (the lamps, the windows): light, not structure
+    # (each set on its own division, as in bridge 3, so the response is layered rather than one flash of the frame)
+    g_grow = b.gate("gGrowCity", t(67), t(74, 4))
+    b.pulse("sdf/cityLamps/surface/2/emission", 1.6, "quarter", g_grow)
+    b.pulse("sdf/cityKerbs/look/edge/intensity", 1.5, "quarter", g_grow)
+    grow_div = {"Low": ("quarter", 1.2), "Mid": ("eighth", 1.0), "TowerA": ("half", 1.4), "TowerB": ("quarter", 1.0), "Sky": ("half", 1.4)}
+    for nm_, (div, amt) in grow_div.items():
+        for io in ("In", "Out"):
+            b.pulse(f"sdf/city{io}{nm_}/surface/{K.CANVAS2}/emission", amt, div, g_grow)
     for i, tb in enumerate(grow_beats):
         c = b.clap(f"grow{i:02d}", tb, release=0.35)
         f.route(c, "sdf/cityKerbs/look/edge/intensity", 6.0)
@@ -639,7 +648,7 @@ def alive(b):
         for io in ("In", "Out"):
             b.pulse(f"sdf/city{io}{nm_}/surface/{K.CANVAS2}/emission", amt, div, g3)
             b.pulse(f"sdf/city{io}{nm_}/surface/{K.GLOW}/emission", 2.5, "half", g3)
-            b.pulse(f"sdf/city{io}{nm_}/look/edge/intensity", 1.2, "quarter", g3)
+            b.pulse(f"sdf/city{io}{nm_}/look/edge/intensity", 2.0, "quarter", g3)
     b.pulse("sdf/cityLamps/surface/2/emission", 2.2, "quarter", g3)
     b.pulse("sdf/cityMarks/look/edge/intensity", 2.0, "eighth", g3)
     b.pulse("sdf/cityKerbs/look/edge/intensity", 1.6, "quarter", g3)
@@ -720,10 +729,10 @@ def build(b):
     # the city's fog thins for the wide shots (the air of the open city), and comes back for the street
     b.key("scene/volumeDensity", 0.0, 0.022)
     b.key("scene/volumeDensity", t(67), 0.022, "smooth")
-    b.key("scene/volumeDensity", t(69), 0.007, "step")
-    b.key("scene/volumeDensity", t(74, 4), 0.007, "smooth")
+    b.key("scene/volumeDensity", t(69), 0.009, "step")         # (take 1's critic: the far lines shimmered at 0.007)
+    b.key("scene/volumeDensity", t(74, 4), 0.009, "smooth")
     b.key("scene/volumeDensity", t(75), 0.016, "step")
     b.key("scene/volumeDensity", t(82, 4), 0.016, "smooth")
-    b.key("scene/volumeDensity", t(83), 0.008, "step")
-    b.key("scene/volumeDensity", t(91) - 0.01, 0.008, "step")
+    b.key("scene/volumeDensity", t(83), 0.0095, "step")
+    b.key("scene/volumeDensity", t(91) - 0.01, 0.0095, "step")
     b.key("scene/volumeDensity", t(91), 0.022, "step")

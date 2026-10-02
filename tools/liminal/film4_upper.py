@@ -106,6 +106,10 @@ def build(b):
         f.route("grid.song.eighth", f"sdf/lngBar/surface/{k_}/emission", 1.2, depth=b.gate("gBar", 101.0, t(49, 4)))
     f.route("grid.song.quarter", "lights/lngBarGlow/intensity", 2.0, depth=b.gate("gBarL", 101.0, t(49, 4)))
     f.route("grid.song.eighth", f"sdf/lngSit/surface/{K.SCREEN}/emission", 1.6, depth=b.gate("gLngTV", t(42), t(49, 4)))
+    # (pass 4: the basement's own lights carry the quarter, room by room, not the whole frame: the gym mirror's glints,
+    # the bar's neon tube)
+    f.route("grid.song.quarter", f"sdf/gymShell/surface/{K.CANVAS2}/emission", 1.4, depth=g_lig)
+    f.route("grid.song.quarter", f"sdf/lngBar/surface/{K.FLOOR}/emission", 1.2, depth=b.gate("gBarN", 101.0, t(49, 4)))
     # C07 (45.4): every word in the gym flashes and flies off its wall; the mirror flares
     c = b.clap("c07", t(45, 4), release=0.5)
     f.route(c, "post/bloom/intensity", 1.4)
