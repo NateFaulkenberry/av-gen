@@ -138,20 +138,21 @@ def build():
 
     # ---- glints (hat): points of the softbox's light catching the skin for an instant
     s.particles("skinGlints", capacity=1200, seed=9, shape="disc", position=[0.0, 0.02, 0.0], extent=[1.9, 0.0, 1.9],
-                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.05, lifetimeMax=0.14, spread=1.0, speedMin=0.0,
-                speedMax=0.01, gravity=[0, 0, 0], drag=0.0, sizeStart=0.012, sizeEnd=0.0,
-                colorStart=hexrgb("#fff2dc") + [1.0], colorEnd=hexrgb(WARM) + [0.0], emissive=14.0, blend="additive")
-    # ---- droplets (snare): black beads flung from the spike tips
-    s.particles("droplets", capacity=1500, seed=5, shape="disc", position=[0.0, 0.55, 0.0], extent=[1.25, 0.0, 1.25],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.08, lifetimeMax=0.2, spread=1.0, speedMin=0.0,
+                speedMax=0.01, gravity=[0, 0, 0], drag=0.0, sizeStart=0.02, sizeEnd=0.0,
+                colorStart=hexrgb("#fff2dc") + [1.0], colorEnd=hexrgb(WARM) + [0.0], emissive=18.0, blend="additive")
+    # ---- droplets (snare): beads flung from the spike tips, seen as the liquid is seen -- only by the softbox's
+    #      highlight on each (black beads on black read as nothing at all), streaked by their flight
+    s.particles("droplets", capacity=2000, seed=5, shape="disc", position=[0.0, 0.55, 0.0], extent=[1.25, 0.0, 1.25],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=0.9, spread=0.35, speedMin=1.2,
-                speedMax=2.6, gravity=[0, -9.8, 0], drag=0.1, sizeStart=0.022, sizeEnd=0.012,
-                colorStart=hexrgb("#0b0b0c") + [1.0], colorEnd=hexrgb("#0b0b0c") + [1.0], emissive=0.0,
-                blend="alpha", collision="kill", collisionHeight=0.0)
+                speedMax=2.6, gravity=[0, -9.8, 0], drag=0.1, sizeStart=0.013, sizeEnd=0.006,
+                colorStart=hexrgb("#ffe2bc") + [0.85], colorEnd=hexrgb(WARM) + [0.2], emissive=1.8,
+                blend="additive", collision="kill", collisionHeight=0.0, velocityStretch=1.0, stretchMax=0.08)
 
     # ---- the kick's ripple ring across the dish (a refracting membrane wave)
     s.effect("ripple", "ripple", ("world",), trigger={"source": "signal", "name": signals.S("kick"), "threshold": 0.25},
              parameters={"amplitude": 0.22, "radius": 2.2, "wavelength": 0.32, "speed": 2.6, "plane": 1,
-                         "crestColor": hexrgb("#d8e4ff"), "crestEmission": 0.15, "chroma": 0.06, "radialDecay": 1.2,
+                         "crestColor": hexrgb("#d8e4ff"), "crestEmission": 0.4, "chroma": 0.06, "radialDecay": 1.2,
                          "ageDecay": 2.4, "duration": 1.1, "maxConcurrent": 3, "offsetX": 0.0, "offsetY": 0.05,
                          "offsetZ": 0.0})
 
@@ -186,11 +187,11 @@ def build():
     # bass: the field strength (the small spikes lengthen together) and a heave
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
         s.route(R("bass", "sdf/fluid/node/ringCone%d/height" % j, ch * 0.9, attackMs=50 + 30 * j, decayMs=500))
-    s.route(R("bass", "sdf/fluid/node/swell/amount", 0.03, attackMs=50, decayMs=700))
+    s.route(R("bass", "sdf/fluid/node/swell/amount", 0.05, attackMs=50, decayMs=700))
     # hat: glints on the liquid's skin
-    s.route(R("hat", "particles/skinGlints/burst", 24.0, attackMs=0, decayMs=30))
+    s.route(R("hat", "particles/skinGlints/burst", 40.0, attackMs=0, decayMs=30))
     # snare: droplets
-    s.route(R("snare", "particles/droplets/burst", 90.0, attackMs=0, decayMs=30))
+    s.route(R("snare", "particles/droplets/burst", 55.0, attackMs=0, decayMs=30))
     # tension: a restless surface
     s.route(R("visual.unrest", "sdf/fluid/node/swell/amount", 0.012, **MEDIUM))
     # timbre: a bright sound cools the key toward white

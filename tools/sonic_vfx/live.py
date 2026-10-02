@@ -101,8 +101,8 @@ def main():
         # virtual source appears and connects, with a lead-in while the editor finishes starting.
         capture = "" if a.no_capture else ("--live-capture %s --live-capture-every 2 --live-capture-size %s "
                                            % (os.path.join(out, "frames"), a.size))
-        f.write("%s/avgen --project %s --live --input BlackHole %s--sonic-live-log %s --frames %d &\n"
-                % (b, project, capture, os.path.join(out, "live.csv"), frames))
+        f.write("%s/avgen --project %s --live --input BlackHole %s--sonic-live-log %s --frames %d > %s 2>&1 &\n"
+                % (b, project, capture, os.path.join(out, "live.csv"), frames, os.path.join(out, "editor.log")))
         f.write("APP=$!\nsleep 3\n")
         f.write("%s %s --out %s --device BlackHole --lead-in 2\n" % (probe, a.scenario,
                                                                      os.path.join(out, "probe.csv")))

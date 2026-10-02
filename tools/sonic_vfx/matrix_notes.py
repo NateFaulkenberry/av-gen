@@ -66,7 +66,41 @@ What the numbers cannot say:
 """
 
 # The live run (live.py --scenario tour): every scene through the switcher with live input, its table pasted here.
-LIVE = ""
+LIVE = """
+## Live, through the switcher
+
+`python3 tools/sonic_vfx/live.py salt-flat-mirage --scenario tour --no-capture` (2026-10-02, pin 96bc0214, an M2 Max
+driving a 60 Hz 5K display): the editor opened with live input on (BlackHole for audio, the probe's CoreMIDI source for
+notes), and the probe played the `tour` scenario. Every 20 s it sends a MIDI program change (program 0 is Sonic Live,
+then the sixteen scenes in set-list order), then plays a held chord, a 16-note arpeggio and a distorted low riff.
+Every scene opened through the switcher, received all 24 of its notes, and its response envelopes moved.
+
+The statistics skip each scene's first 3 s (the switch loads the scene). An interval under 16.7 ms means the editor
+presented faster than the display refreshes; the light scenes do. The editor's adaptive render scale
+(budget 16.67 ms of GPU, floor 0.5) moves between the full canvas (2732x1978) and half of it (1366x988). It
+steps down a rung at a time, so a heavy scene that follows a light one starts at the light one's resolution. The
+Cathedral's row shows exactly that. Opened alone (`live.py corrupted-cathedral --scenario demo --no-capture`), it
+settled at 0.5 within seven seconds and ran at a 17.1 ms median interval.
+
+| # | scene | frames | interval p50 / p99 ms | GPU p50 / p95 ms | notes | noteEnv max | kickEnv max | sustain max |
+|---|---|---|---|---|---|---|---|---|
+| 0 | Sonic Live | 610 | 33.3 / 33.8 | 27.5 / 30.9 | 24 | 0.92 | 1.00 | 0.92 |
+| 1 | Salt Flat Mirage | 1020 | 16.7 / 16.9 | 12.5 / 13.3 | 24 | 0.94 | 1.00 | 0.88 |
+| 2 | Lantern Lake | 1020 | 16.7 / 16.9 | 12.1 / 13.9 | 24 | 0.94 | 1.00 | 0.97 |
+| 3 | Aurora Tundra | 1020 | 16.7 / 17.2 | 12.1 / 14.2 | 24 | 0.94 | 1.00 | 0.89 |
+| 4 | The Breathing Deep | 1013 | 16.7 / 17.9 | 16.2 / 16.7 | 24 | 0.93 | 1.00 | 0.97 |
+| 5 | Abyssal Bloom | 1020 | 16.7 / 17.4 | 15.1 / 17.2 | 24 | 0.94 | 1.00 | 0.89 |
+| 6 | Cymatic Plate | 1019 | 16.7 / 17.5 | 13.2 / 15.4 | 24 | 0.94 | 1.00 | 0.96 |
+| 7 | Silk Theatre | 808 | 20.1 / 24.7 | 19.5 / 23.2 | 24 | 0.93 | 1.00 | 0.89 |
+| 8 | Ferrofluid Crown | 683 | 24.8 / 30.4 | 24.2 / 26.6 | 24 | 0.94 | 1.00 | 0.96 |
+| 9 | Feedback Mirror | 1023 | 9.3 / 26.0 | 8.9 / 11.7 | 24 | 0.93 | 1.00 | 0.88 |
+| 10 | Tesla Choir | 764 | 22.8 / 23.7 | 22.3 / 22.8 | 24 | 0.94 | 1.00 | 0.92 |
+| 11 | Datascape | 1020 | 9.4 / 26.1 | 10.9 / 13.5 | 24 | 0.94 | 1.00 | 0.86 |
+| 12 | Ember Forest | 762 | 22.3 / 23.5 | 21.6 / 22.3 | 24 | 0.94 | 1.00 | 0.97 |
+| 13 | The Corrupted Cathedral | 286 | 59.2 / 63.9 | 58.5 / 61.1 | 24 | 0.89 | 0.80 | 0.86 |
+| 14 | Storm Cell | 789 | 21.7 / 23.4 | 21.2 / 22.3 | 24 | 0.95 | 1.00 | 0.98 |
+| 15 | Stellar Nursery | 1020 | 16.8 / 26.0 | 12.6 / 13.0 | 24 | 0.94 | 1.00 | 0.89 |
+""".strip()
 
 # scene id -> the art agent's verdict, written from the clips and the sheets after the matrix run
 VERDICTS = {}

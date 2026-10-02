@@ -756,8 +756,8 @@
      0
     ],
     "spawnRate": 0.0,
-    "lifetimeMin": 0.05,
-    "lifetimeMax": 0.14,
+    "lifetimeMin": 0.08,
+    "lifetimeMax": 0.2,
     "spread": 1.0,
     "speedMin": 0.0,
     "speedMax": 0.01,
@@ -767,7 +767,7 @@
      0
     ],
     "drag": 0.0,
-    "sizeStart": 0.012,
+    "sizeStart": 0.02,
     "sizeEnd": 0.0,
     "colorStart": [
      1.0,
@@ -781,7 +781,7 @@
      0.10224,
      0.0
     ],
-    "emissive": 14.0,
+    "emissive": 18.0,
     "blend": "additive"
    }
   },
@@ -790,7 +790,7 @@
    "kind": "particles",
    "particles": {
     "enabled": true,
-    "capacity": 1500,
+    "capacity": 2000,
     "seed": 5,
     "shape": "disc",
     "position": [
@@ -820,24 +820,26 @@
      0
     ],
     "drag": 0.1,
-    "sizeStart": 0.022,
-    "sizeEnd": 0.012,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.006,
     "colorStart": [
-     0.00335,
-     0.00335,
-     0.00368,
-     1.0
+     1.0,
+     0.76052,
+     0.50289,
+     0.85
     ],
     "colorEnd": [
-     0.00335,
-     0.00335,
-     0.00368,
-     1.0
+     1.0,
+     0.42327,
+     0.10224,
+     0.2
     ],
-    "emissive": 0.0,
-    "blend": "alpha",
+    "emissive": 1.8,
+    "blend": "additive",
     "collision": "kill",
-    "collisionHeight": 0.0
+    "collisionHeight": 0.0,
+    "velocityStretch": 1.0,
+    "stretchMax": 0.08
    }
   }
  ],
