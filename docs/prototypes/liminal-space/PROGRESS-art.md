@@ -5,29 +5,33 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status (19:45): the final is rendered and the gate passes. Take 2 is queued.**
-- **Final take 1** (`e98fb52c`, pin `5dd835a4`):
+**Status (20:32): take 2 is the final. Take 3 (C10 and C14 only, approved by the coordinator) is rendering and
+replaces the final only if it measures no worse. After it: hand back. Nothing else is planned for pass 3.**
+- **The final now (take 2: `8f2c5e77`, pin `5dd835a4`):**
   - `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4`: 1920x1080, 30 fps, h264 q90, the
-    song, 258 s; 0 GPU errors. A copy is kept at `$S/liminal3/all-you-got-pass3-take1.mp4`.
-  - `pass2_av`: quarter lock +12 to +30 dB in most sections; 15 of 18 BIG CLAPs unmistakable (C10 visible; C12
-    and C14 not read); entry boundaries 2x to 41x, except the pause and the ending (by design).
-- **Gate:** `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exits 0 (41,918 assertions in
-  102 test cases). The coordinator was told at 19:39, so the engineer has the GPU back.
-- **Take 2** (`8f2c5e77`) is queued. `$S/liminal3/final.sh` renders to a temp file and replaces the final only on
-  success. Take 2 has:
-  - the wave band at half the light, so lines stay visible in the band;
-  - C12 and C14 readable;
-  - glides keyed with the engine's Catmull-Rom instead of straight lines. Piecewise-linear distance keys every
-    0.1 s stepped the camera's speed ten times a second: that is the Critic's "wobble".
-
-  When it lands:
-  1. Look at 198.3-199.9 (an `fps=15` tile).
-  2. Compare `$S/liminal3/av-final` with `$S/liminal3/av-take1`.
-  3. Run `python3 tools/liminal/critic_pass3.py --project $S/liminal3/p3-final/all-you-got-pass3.json --video
-     ~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4 --out $S/liminal3/critic-take2 --submit
-     --label pass3-final-take2 --track film`. The shots sidecar is now beside the snapshot, so it uses the 18 shots.
-- **The Critic on take 1** (job `job_1a0f9d8ab4daf52ba`, 64 timing-sheet shots): 0.93 overall; composition,
-  colour, pacing and creative intent 1.0; musical sync 0.99; technical 0.79; motion 0.68 (wobble: fixed in take 2).
+    song, 258 s; render exit 0, 0 GPU errors.
+  - Copies: `$S/liminal3/all-you-got-pass3-take2.mp4` and `$S/liminal3/all-you-got-pass3-take1.mp4`.
+  - `pass2_av` (`$S/liminal3/av-final`): equal or better than take 1 everywhere. 16 of 18 BIG CLAPs are
+    unmistakable: C12 is fixed, C10 is visible, C14 is not read.
+- **Gate:** `tools/gpu-lock.sh build/release/tests/avgen_tests "[sdf],[liminal]"` exited 0 after take 2 (41,918
+  assertions in 102 test cases). The test binary is unchanged since 18:46.
+- **The Critic, take 2** (job `job_1a0f9f83629cee479`, the same 64 shots as take 1, so like for like): 0.93 overall.
+  - Composition, colour, pacing and creative intent: 1.0. Musical sync 0.99. Motion 0.68. Technical 0.77.
+  - Take 2's "smooth travel" did not change the picture: the per-shot stability numbers match take 1's to three
+    digits. The remaining "wobble" is not the camera. Image shifts measured in clean windows hold 20-26% of their
+    shake energy at the quarter note: that is §20's geometry breathing (the walls' 0.6% swell). The 10 Hz band holds
+    only 1-2%.
+  - The two "high" findings are clipped highlights, both by design: the door's light fill at 198.7 and the dawn
+    white-out at 248.
+- **Take 3** (`3c8cd9eb`; `$S/liminal3/final3.sh`, log `$S/liminal3/final3.log`):
+  - C14: a cold flash light (`stuFlash`) on the beat, and the ceiling's lines flare. The camera is looking across
+    the black side of the study there, so the old dropout read as nothing.
+  - C10: the corruption carries across the cut. The bathroom arrives misregistered and with a flash, and the
+    pixels smear.
+  - The 112-140 s preview measures both unmistakable (C10: colour z 3.2; C14: lines z 6.1). The script renders,
+    measures into `$S/liminal3/av-take3`, and runs `$S/liminal3/compare_av.py` (no BIG CLAP verdict worse, no
+    section's lock more than 1 dB lower). Only then does it move take 3 into place. The log ends with "replaced the
+    final with take 3" or "kept take 2".
 
 **Generate, then check (CPU, about 80 s):**
 ```sh
