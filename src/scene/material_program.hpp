@@ -16,6 +16,7 @@
 //   Gradient  : out = vec4(saturate(dot(a.xyz, k.xyz) * f + k.w))          (axis gradient of a position)
 //   Noise     : out = vec4(fbm3(a.xyz * f + k.xyz, seed))                  (0..1)
 //   Voronoi   : out = vec4(voronoiF1(a.xyz * f + k.xyz, seed))
+//   VoronoiEdge: out = vec4(F2 - F1, F1, the nearest cell's hash, F2) of a.xyz * f + k.xyz (ADR-1069)
 //   Fresnel   : out = vec4(pow(1 - saturate(dot(normal, view)), f))         (uses the fragment's N/V)
 //   Ramp      : out = ramp(a.x) with 3 stops k0 (t=0), k1 (t=0.5), k2 (t=1)  (k0 = constant, k1 = constant2, k2 = constant3)
 //   Remap     : out = (a - k.x) / (k.y - k.x) * (k.w - k.z) + k.z, clamped when f > 0.5
@@ -75,6 +76,9 @@ enum class MaterialOpKind : std::uint8_t {
     // y of a normal, the y of a world position, the second half of a uv. Without this, a program
     // can carry exactly one maskable scalar, which is one fewer than terrain needs.
     Swizzle,
+    // ADR-1069, appended: Worley F2 - F1, the distance to a cell's edge -- polygons rather than blobs (salt crust,
+    // cracked mud, ice). out = vec4(F2 - F1, F1, cellHash, F2) of (a.xyz * value + constant.xyz).
+    VoronoiEdge,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);

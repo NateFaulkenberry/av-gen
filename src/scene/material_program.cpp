@@ -46,6 +46,38 @@ using nlohmann::json;
 
 namespace {
 
+// ADR-1069: Worley F1 and F2 and the nearest cell's hash -- the CPU twin of noise.wgsl's `worleyF1F2` (the same lattice,
+// jitter and hashes as `noise::voronoiF1`, and as `world::worleyF1F2`, which `scene/` does not include).
+glm::vec3 worleyF1F2(const glm::vec3& p, std::uint32_t seed) {
+    const glm::vec3 c(std::floor(p.x), std::floor(p.y), std::floor(p.z));
+    const glm::vec3 fr = p - c;
+    float best = 8.0f;
+    float second = 8.0f;
+    float nearestHash = 0.0f;
+    for (int z = -1; z <= 1; ++z) {
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                const auto ix = static_cast<std::int32_t>(c.x) + x;
+                const auto iy = static_cast<std::int32_t>(c.y) + y;
+                const auto iz = static_cast<std::int32_t>(c.z) + z;
+                const glm::vec3 jitter(noise::hash01(ix, iy, iz, seed), noise::hash01(ix, iy, iz, seed + 1u),
+                                       noise::hash01(ix, iy, iz, seed + 2u));
+                const glm::vec3 d =
+                    glm::vec3(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)) + jitter - fr;
+                const float dd = glm::dot(d, d);
+                if (dd < best) {
+                    second = best;
+                    best = dd;
+                    nearestHash = noise::hash01(ix, iy, iz, seed + 3u);
+                } else if (dd < second) {
+                    second = dd;
+                }
+            }
+        }
+    }
+    return {std::sqrt(best), std::sqrt(second), nearestHash};
+}
+
 // ---- names ---------------------------------------------------------------------------------------
 
 struct OpKindName {
@@ -84,6 +116,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::RoughnessFilter, "roughnessFilter"},
     {MaterialOpKind::MicroDetail, "microDetail"},
     {MaterialOpKind::Swizzle, "swizzle"},
+    {MaterialOpKind::VoronoiEdge, "voronoiEdge"},
 };
 
 struct InputName {
@@ -628,6 +661,10 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         };
         return {pick(k.x), pick(k.y), pick(k.z), pick(k.w)};
     }
+    case MaterialOpKind::VoronoiEdge: {
+        const glm::vec3 w = worleyF1F2(glm::vec3(a) * f + glm::vec3(k), op.seed);
+        return {w.y - w.x, w.x, w.z, w.y};
+    }
     }
     return glm::vec4(0.0f);
 }
@@ -769,6 +806,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::RoughnessFilter:
     case MaterialOpKind::MicroDetail:
     case MaterialOpKind::Swizzle:
+    case MaterialOpKind::VoronoiEdge:
         return {true, false, false};
     case MaterialOpKind::Multiply:
     case MaterialOpKind::Add:

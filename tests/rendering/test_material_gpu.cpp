@@ -760,6 +760,14 @@ TEST_CASE("ADR-036 ops match the CPU interpreter", "[material][gpu]") {
         o.constant = {0.1f, 0.2f, 0.3f, 0.0f};
         batch.push_back(probe("microDetail", {inputOp(MaterialInput::WorldPosition, 0), o}));
     }
+    {
+        // ADR-1069: Worley F2 - F1 (the cell edge), F1, the cell hash and F2, against the CPU twin.
+        MaterialOp o = op(MaterialOpKind::VoronoiEdge, 7, 0);
+        o.value = 3.0f;
+        o.seed = 11;
+        o.constant = {0.4f, -0.2f, 0.7f, 0.0f};
+        batch.push_back(probe("voronoiEdge", {inputOp(MaterialInput::WorldPosition, 0), o}));
+    }
     checkParity(harness, batch, noFields, 0.0, 1e-3f);
     CHECK(ctx->errorCount() == 0);
 }
