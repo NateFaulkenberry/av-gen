@@ -112,6 +112,8 @@ Report checkTemporal(const TemporalSettings& settings) {
         TemporalSettings all = settings;
         all.echo.enabled = true;
         all.mosh.enabled = true;
+        all.feedback.enabled = true; // ADR-1066
+        all.slit.enabled = true;
         const auto bounds = declaredBounds(all);
         for (auto& f : checkBounds(bounds).findings) {
             r.findings.push_back(std::move(f));

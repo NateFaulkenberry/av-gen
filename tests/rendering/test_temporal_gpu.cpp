@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <tuple>
 #include <memory>
 
 using namespace avgen;
@@ -501,5 +502,71 @@ TEST_CASE("the mosh at zero is the frame without it, and turned up corrupts it d
     const Shot again = play(*ctx, shaders, withMosh(plain, 0.5f, 3.0f), 10);
     const Shot twice = play(*ctx, shaders, withMosh(plain, 0.5f, 3.0f), 10);
     CHECK_IDENTICAL(again.image, twice.image);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- ADR-1066: feedback and slit-scan, FIR over the clean ring ------------------------------------------------
+
+namespace {
+
+// Frames [first, last) on one fresh renderer, the mover placed by its absolute frame: a renderer that starts late is a
+// seek that lands at `first`.
+Shot playRange(gpu::Context& ctx, gpu::ShaderLibrary& shaders, scene::Scene s, int first, int last) {
+    rendering::SceneRenderer renderer(ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FixedStepClock clock(60.0);
+    clock.restartAt(static_cast<double>(first) / 60.0);
+    Shot out;
+    for (int i = first; i < last; ++i) {
+        placeAt(s, i);
+        FrameTime t = clock.tick();
+        t.frameIndex = static_cast<std::uint64_t>(i);
+        auto img = renderer.renderToImage(s, t, 160, 160);
+        REQUIRE(img.has_value());
+        out.image = std::move(*img);
+    }
+    out.stats = renderer.stats().temporal;
+    return out;
+}
+
+scene::Scene withFeedback(scene::Scene s, float amount) {
+    s.temporal.feedback.enabled = true;
+    s.temporal.feedback.frames = 8;
+    s.temporal.feedback.amount = amount;
+    s.temporal.feedback.zoom = 1.05f;
+    s.temporal.feedback.rotate = 4.0f;
+    s.temporal.feedback.hue = 0.05f;
+    return s;
+}
+
+scene::Scene withSlit(scene::Scene s, float amount, float mode) {
+    s.temporal.slit.enabled = true;
+    s.temporal.slit.frames = 12;
+    s.temporal.slit.amount = amount;
+    s.temporal.slit.mode = mode;
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("feedback and slit-scan are off at zero, act when on, and a late start lands where a play does",
+          "[gpu][temporal][adr1066]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const scene::Scene plain = movingLight();
+    const Shot off = playRange(*ctx, shaders, plain, 0, 24);
+    for (const auto& [name, idleScene, onScene] :
+         {std::tuple{"feedback", withFeedback(plain, 0.0f), withFeedback(plain, 0.8f)},
+          std::tuple{"slit rows", withSlit(plain, 0.0f, 0.0f), withSlit(plain, 1.0f, 0.0f)},
+          std::tuple{"slit radial", withSlit(plain, 0.0f, 2.0f), withSlit(plain, 1.0f, 2.0f)}}) {
+        INFO(name);
+        const Shot idle = playRange(*ctx, shaders, idleScene, 0, 24);
+        CHECK_IDENTICAL(off.image, idle.image); // enabled at amount 0: the ring is warm, the picture untouched
+        const Shot played = playRange(*ctx, shaders, onScene, 0, 24);
+        CHECK_DIFFERS(off.image, played.image);
+        // FIR: a renderer that starts K frames before frame 23 has the same ring by then -- and the same frame.
+        const Shot late = playRange(*ctx, shaders, onScene, 23 - 12, 24);
+        CHECK_IDENTICAL(played.image, late.image);
+    }
     CHECK(ctx->errorCount() == 0);
 }

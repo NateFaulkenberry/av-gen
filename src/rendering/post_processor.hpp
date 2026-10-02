@@ -70,6 +70,8 @@ struct PostFrameInputs {
     glm::mat4 invViewProj{1.0f};
     glm::vec3 cameraPos{0.0f};
     std::uint64_t frameIndex = 0;
+    double renderTime = 0.0;    // ADR-1065: timeline seconds, what the glitch's hashed epochs are a function of
+    float tapScale = 1.0f;      // ADR-1065: QualitySettings::postEffectTapScale
     const scene::PostSettings* settings = nullptr;
     // ADR-038: the scene's depth layers grade contrast and saturation by distance (atmospheric
     // perspective). Null, or a scene with no layers, leaves the grade uniform across the frame.
@@ -246,6 +248,8 @@ private:
     wgpu::RenderPipeline upsample_;
     wgpu::RenderPipeline wide_;
     wgpu::RenderPipeline lens_;
+    wgpu::RenderPipeline glitch_;  // ADR-1065
+    wgpu::RenderPipeline display_; // ADR-1065
     wgpu::RenderPipeline composite_;
     wgpu::RenderPipeline fxaa_;
     wgpu::RenderPipeline sharpen_;

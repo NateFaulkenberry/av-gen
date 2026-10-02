@@ -233,6 +233,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.sweepSpan = &params.add(f("post/sweep/span", s.sweepSpan, 0.0f, 16.0f, 0.0f, 4.0f));
     p.sweepHue = &params.add(f("post/sweep/hue", s.sweepHue, -16.0f, 16.0f, 0.0f, 1.0f));
     p.sweepTrail = &params.add(f("post/sweep/trail", s.sweepTrail, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.glitch = registerPostGlitchParameters(params, s.glitch); // ADR-1065
     return p;
 }
 
@@ -307,6 +308,12 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
     };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;
+        if (applyPostGlitchJsonKey(p.glitch, key, value)) { // ADR-1065
+            if (!value.is_number()) {
+                return fail("post.{} must be a number", key);
+            }
+            continue;
+        }
         for (const auto& [name, param] : floats) {
             if (key == name && param != nullptr) {
                 if (!value.is_number()) {
@@ -459,6 +466,7 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
         s.sweepHue = p.sweepHue->value();
         s.sweepTrail = p.sweepTrail->value();
     }
+    applyPostGlitchParameters(p.glitch, s.glitch); // ADR-1065
 }
 
 float tiltShiftCoverage(const PostSettings& s, glm::vec2 uv, float aspect) {

@@ -263,3 +263,20 @@ Every effect can be disabled dynamically: its amount is a parameter, and 0 skips
 7. Performance measurements, and both suites.
 
 Each lands as a commit, with its usage sent to the coordinator for the art agent.
+
+## 6. As built (2026-10-02)
+
+The ADR numbers moved from section 5's plan:
+
+| ADR | what | commit |
+|---|---|---|
+| 1060 | causal onsets, live kick/snare/hat | `4bc1a762` |
+| 1061 | Signal triggers | `4bc1a762` |
+| 1062 | the response model, per-note MIDI, Live Response group | `67f74e6a` |
+| 1063 | the live scene switcher (added at the coordinator's request) | `c52d1768` |
+| 1064 | the publish source | `5c94b436` |
+| 1065 | the post glitch and display passes | this commit |
+| 1066 | temporal feedback and slit-scan, temporal timers | this commit |
+
+The sort's `length`, the shock's `radius`, and every pixel size are authored at 1080 lines. Measured costs are in
+ADR-1065 and ADR-1066 and in `PROGRESS-vfx-eng.md`.

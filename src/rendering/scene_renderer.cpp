@@ -572,6 +572,7 @@ Result<void> SceneRenderer::init() {
     shadowMask_->setTimeline(timeline_.get());
     postProcessor_->setTimeline(timeline_.get());
     distortion_->setTimeline(timeline_.get());
+    temporal_->setTimeline(timeline_.get()); // ADR-1066: the temporal passes were charged to post/meter
     initialised_ = true;
     return {};
 }
@@ -4422,6 +4423,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postIn.invViewProj = frame.invViewProj;
         postIn.cameraPos = scene.camera.position;
         postIn.frameIndex = time.frameIndex;
+        postIn.renderTime = time.renderTime;                         // ADR-1065
+        postIn.tapScale = qualitySettings_.postEffectTapScale;     // ADR-1065
         // ADR-037/040: the shutter that sets the motion-blur length belongs to the camera. The
         // engine already mirrors the whole lens into post settings; a scene driven through this
         // renderer directly may not have, so the shutter is taken from the camera either way.

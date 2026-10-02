@@ -35,6 +35,8 @@ namespace avgen::scene {
 enum class TemporalEffectKind : std::uint8_t {
     FrameEcho = 0, // §9
     Mosh = 1,      // ADR-1049: data-mosh blocks and channel shift (All You Got art pass 2)
+    Feedback = 2,  // ADR-1066: zoom/rotate/drift/hue feedback, unrolled over the clean ring (Sonic VFX)
+    Slit = 3,      // ADR-1066: slit-scan time displacement, each pixel a different age (Sonic VFX)
     Count,
 };
 
@@ -48,12 +50,16 @@ constexpr int kMaxTemporalFrames = 32;
 inline constexpr std::array<TemporalEffectKind, kTemporalEffectKindCount> kTemporalEffectKinds{
     TemporalEffectKind::FrameEcho,
     TemporalEffectKind::Mosh,
+    TemporalEffectKind::Feedback,
+    TemporalEffectKind::Slit,
 };
 
 [[nodiscard]] constexpr const char* temporalEffectKindName(TemporalEffectKind kind) {
     switch (kind) {
     case TemporalEffectKind::FrameEcho: return "echo";
     case TemporalEffectKind::Mosh: return "mosh";
+    case TemporalEffectKind::Feedback: return "feedback";
+    case TemporalEffectKind::Slit: return "slit";
     case TemporalEffectKind::Count: break;
     }
     return "unknown";
@@ -92,9 +98,40 @@ struct MoshSettings {
     float seed = 0.0f;     // added to the epoch: key it to pick a different pattern
 };
 
+// ADR-1066: video feedback (MilkDrop's zoom and turn, a hue that walks) as an FIR over the CLEAN ring, never an
+// accumulator. The loop F = C + d g(F_prev(T uv)) unrolled K = `frames` taps:
+//   out = C + amount x (1 - decay) x sum_k decay^(k-1) x hue^k(R_k(T^k uv)),  k = 1..K
+// where T zooms by `zoom` and turns by `rotate` degrees per frame about the centre, and drifts by (`driftX`, `driftY`)
+// of the frame per frame, and hue^k turns the colour k x `hue` turns in OKLab. Exact, bounded and rebuildable: a seek
+// refills it in K frames like the echo.
+struct FeedbackSettings {
+    bool enabled = false;
+    int frames = 8;          // taps, the bound
+    float amount = 0.0f;     // 0..2: how much of the tail is added (0 encodes nothing)
+    float decay = 0.75f;     // per tap
+    float zoom = 1.02f;      // per frame: > 1 pours outward, < 1 falls in
+    float rotate = 0.0f;     // degrees per frame
+    float driftX = 0.0f;     // frame widths per frame
+    float driftY = 0.0f;
+    float hue = 0.0f;        // turns per frame, OKLab
+};
+
+// ADR-1066: slit-scan time displacement. Each pixel shows the frame `d(uv) x frames` ago, blended between the two
+// nearest layers: mode 0 rows (top newest), 1 columns (left newest), 2 radial (centre newest), 3 luminance (bright
+// newest). `reverse` flips which end is newest. FIR over the ring.
+struct SlitSettings {
+    bool enabled = false;
+    int frames = 16;
+    float amount = 0.0f;     // 0..1: mix (0 encodes nothing)
+    float mode = 0.0f;       // 0 rows, 1 columns, 2 radial, 3 luminance
+    float reverse = 0.0f;    // 1 flips the gradient
+};
+
 struct TemporalSettings {
     FrameEchoSettings echo;
     MoshSettings mosh;
+    FeedbackSettings feedback; // ADR-1066
+    SlitSettings slit;         // ADR-1066
 
     // The bound. `max` over the live effects, zero when none is on -- and zero means the ring is
     // released, because holding history for a feature nobody has enabled is exactly what §8 says
@@ -142,6 +179,21 @@ struct TemporalParameters {
     params::Parameter<float>* moshShift = nullptr;
     params::Parameter<float>* moshRate = nullptr;
     params::Parameter<float>* moshSeed = nullptr;
+    // ADR-1066
+    params::Parameter<bool>* feedbackEnabled = nullptr;
+    params::Parameter<float>* feedbackFrames = nullptr;
+    params::Parameter<float>* feedbackAmount = nullptr;
+    params::Parameter<float>* feedbackDecay = nullptr;
+    params::Parameter<float>* feedbackZoom = nullptr;
+    params::Parameter<float>* feedbackRotate = nullptr;
+    params::Parameter<float>* feedbackDriftX = nullptr;
+    params::Parameter<float>* feedbackDriftY = nullptr;
+    params::Parameter<float>* feedbackHue = nullptr;
+    params::Parameter<bool>* slitEnabled = nullptr;
+    params::Parameter<float>* slitFrames = nullptr;
+    params::Parameter<float>* slitAmount = nullptr;
+    params::Parameter<float>* slitMode = nullptr;
+    params::Parameter<float>* slitReverse = nullptr;
 };
 
 [[nodiscard]] TemporalParameters registerTemporalParameters(params::ParameterSet& params,

@@ -12,6 +12,7 @@
 //   vignette, grain.
 
 #include "params/parameter_set.hpp"
+#include "scene/post_glitch.hpp"
 #include "scene/scene_types.hpp"
 
 #include <nlohmann/json_fwd.hpp>
@@ -240,6 +241,10 @@ struct PostSettings {
     float sweepSpan = 1.0f;      // hue cycles across the band (1 = one rainbow)
     float sweepHue = 0.0f;       // hue offset in turns
     float sweepTrail = 0.0f;     // 0..1: wash left behind the band once it has passed
+
+    // ---- ADR-1065: post effects as instruments, the glitch vocabulary (post/{shock,glitch,split,sort,radial,
+    // display}/*). Off and byte-identical at their defaults; see post_glitch.hpp. -------------------------------
+    PostGlitchSettings glitch;
 };
 
 struct PostParameters {
@@ -313,6 +318,7 @@ struct PostParameters {
     params::Parameter<float>* sweepSpan = nullptr;
     params::Parameter<float>* sweepHue = nullptr;
     params::Parameter<float>* sweepTrail = nullptr;
+    PostGlitchParameters glitch; // ADR-1065
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);
