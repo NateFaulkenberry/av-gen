@@ -32,7 +32,8 @@ agent keeps its own notes. Worktree `../av-gen-sonic`, branch `proto/sonic-garde
 - **Queue, in the coordinator's order:**
   1. items 1-4 of the previous queue are done (the evaluator biases, `response.*` in the live log, the probe tour,
      `voronoiEdge`); the cosmetic Mask prepass was skipped as not small, and the coordinator has been told;
-  2. the performance tiers: ADR-1070 (the live sky) is in; next, the remaining measurements for the table below;
+  2. the performance tiers: ADR-1070 (the live sky) is in, and the detector re-measured after its rebuild (65 us a
+     frame); the table below is current;
   3. FULL suites only at the final hand-back (the GPU rule: in between, targeted tags only, one job per lock).
 - **Measuring live frame pacing:** the scratch script used for ADR-1070 launches `build/release/src/avgen --project
   <p> --live --input BlackHole --sonic-live-log live.csv` plus `build/release/tools/avgen_sonic_probe demo --device
@@ -114,7 +115,7 @@ agent keeps its own notes. Worktree `../av-gen-sonic`, branch `proto/sonic-garde
 
 | item | cost | notes |
 |---|---|---|
-| causal onset detector | 14.4 us per analysis frame | about 1.3 ms per second of audio. On the analysis thread live, at load for a file |
+| causal onset detector (ADR-1067/1068 rebuild) | 65 us per analysis frame (64.7-65.7 over three runs; 14.4 us before the rebuild) | about 6.1 ms per second of audio, 0.6% of a core. The per-bin frequency medians (17 wide, about 1,250 a frame) are most of it. On the analysis thread live, at load for a file. `avgen_tests "[bench][adr1060]"` |
 | Sonic update (character, response model, per-note facts, publish) | 2.0 us per render frame | it was 1.3 us before ADR-1062 |
 | timbre pass | 121 us per analysis frame | unchanged |
 | Signal-trigger derivation | one Sonic walk per piece, at the first query | the timbre is precomputed, so it is about the publish cost x frames |
