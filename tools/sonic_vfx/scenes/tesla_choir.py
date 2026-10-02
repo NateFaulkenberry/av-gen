@@ -209,8 +209,8 @@ def build():
 
     # ---- camera: low and wide, the core on the right third
     s.camera["fov"] = 55.0
-    s.arc_camera((0.0, 3.4, 0.0), radius=25.0, height=4.2, period=110.0, centre_deg=28.0, sweep_deg=40.0,
-                 steps=16, side=5.0, lift=0.4, height_bob=0.2)
+    s.arc_camera((0.0, 3.0, 0.0), radius=23.0, height=7.6, period=110.0, centre_deg=28.0, sweep_deg=40.0,
+                 steps=16, side=4.6, lift=0.2, height_bob=0.2)
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     s.map(M("anyHeld", [("active", 1.0)], "mean"))
