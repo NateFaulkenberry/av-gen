@@ -3072,6 +3072,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         layers_.clear();
     }
     layers_.attach(params_);
+    syncResponseControls(); // ADR-1062: a scene load clears the parameters; the response's must exist for the file's values
 
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;

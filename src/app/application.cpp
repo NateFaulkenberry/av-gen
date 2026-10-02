@@ -1951,7 +1951,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                     liveDemoPath_ = ex.file;
                 }
             }
+            // ADR-1063: the scenes a performer steps through.
+            liveScenes_ = liveSceneList(*examples);
+            panel_->liveScenes.clear();
+            for (const ExampleInfo& scene : liveScenes_) {
+                panel_->liveScenes.push_back(liveSceneLabel(scene));
+            }
         }
+        panel_->onLiveScene = [this](int index) { switchLiveScene(index); };
         panel_->onOpenLiveDemo = [this] {
             if (liveDemoPath_.empty()) {
                 panel_->setStatus("the Sonic Live example was not found");
@@ -2323,6 +2330,42 @@ void Application::loadAny(const std::filesystem::path& path) {
     beginOpen(path);
 }
 
+// ---- ADR-1063: the live scene switcher ------------------------------------------------------------------------
+
+void Application::switchLiveScene(int index) {
+    if (engine_ == nullptr || index < 0 || index >= static_cast<int>(liveScenes_.size())) {
+        return;
+    }
+    const std::filesystem::path& target = liveScenes_[static_cast<std::size_t>(index)].file;
+    const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
+    if (current == index) {
+        return;
+    }
+    if (current >= 0 && panel_ != nullptr) {
+        // From one live scene to another: straight in, with the performer's response carried. A performer mid-set is
+        // not asked whether to save an example; anything else goes through the prompt, as every open does (ADR-440).
+        carryResponse_ = captureResponse(engine_->params());
+        beginOpen(target);
+        return;
+    }
+    loadAny(target);
+}
+
+void Application::serviceLiveScenes() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    if (panel_ != nullptr) {
+        panel_->liveSceneCurrent = liveSceneIndex(liveScenes_, engine_->projectPath());
+    }
+    if (const auto program = engine_->control().takeProgramChange()) {
+        const int index = liveSceneForProgram(*program, static_cast<int>(liveScenes_.size()));
+        if (index >= 0) {
+            switchLiveScene(index);
+        }
+    }
+}
+
 void Application::beginOpen(const std::filesystem::path& path) {
     pendingOpen_ = path;
     panel_->loading = ui::ControlPanel::Loading{
@@ -2532,6 +2575,14 @@ void Application::servicePendingOpen() {
 
 void Application::performOpen(const std::filesystem::path& path) {
     auto r = openAny(path);
+    // ADR-1063: a switch between live scenes keeps the performer's response, as offsets from the new scene's own
+    // defaults. Applied before the dirty baseline restarts, so it is part of what the scene opened as.
+    if (carryResponse_) {
+        if (r && engine_ != nullptr) {
+            applyResponse(*carryResponse_, engine_->params());
+        }
+        carryResponse_.reset();
+    }
     // Whatever happens below, the attribution window starts again here: a load resets the engine's
     // baseline, and the click that asked for the load is not an edit to what just arrived.
     dirtySchedule_.restart(dirtyClockMs());
@@ -3666,6 +3717,19 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
     case SDLK_DOWN:
         engine_->stepMarkers(1);
         return true;
+    case SDLK_PAGEUP:
+    case SDLK_PAGEDOWN: {
+        // ADR-1063: the previous / next live scene, while live input runs or a live scene is open.
+        const int count = static_cast<int>(liveScenes_.size());
+        const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
+        if (count == 0 || (current < 0 && !engine_->liveSonic())) {
+            return false;
+        }
+        if (!event.key.repeat) {
+            switchLiveScene(steppedLiveScene(current, event.key.key == SDLK_PAGEDOWN ? 1 : -1, count));
+        }
+        return true;
+    }
     case SDLK_L:
         if (!event.key.repeat) {
             const bool wanted = !transport.loop().enabled;
@@ -5318,6 +5382,7 @@ int Application::runLive() {
                                                                        presentStart).count());
         const auto outputsStart = std::chrono::steady_clock::now();
         serviceProjection();
+        serviceLiveScenes();
         if (outputs_.openCount() > 0) {
             if (auto r = outputs_.presentAll(*context_, finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("outputs: {}", r.error().message);

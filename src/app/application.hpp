@@ -20,6 +20,7 @@
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
+#include "app/live_scenes.hpp"
 #include "app/projection.hpp"
 #include "app/render_settings.hpp"
 #include "app/render_state.hpp"
@@ -478,6 +479,10 @@ private:
     [[nodiscard]] bool projectIsLive() const;
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
+    std::vector<ExampleInfo> liveScenes_;           // ADR-1063: Sonic Live and the Sonic VFX examples
+    std::optional<ResponseCarry> carryResponse_;    // ADR-1063: the performer's response, across a switch
+    void switchLiveScene(int index);
+    void serviceLiveScenes();
     std::vector<ProjectionDisplay> projectionDisplays_;
     std::chrono::steady_clock::time_point projectionLastScan_{};
     void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"

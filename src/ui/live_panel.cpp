@@ -207,6 +207,38 @@ void ControlPanel::drawLive(app::Engine& engine) {
     }
     ImGui::Separator();
 
+    // ---- ADR-1063: the scenes, stepped through while playing ----
+    if (!liveScenes.empty() && onLiveScene) {
+        ImGui::TextUnformatted("Scene");
+        if (ImGui::ArrowButton("##scene-prev", ImGuiDir_Left)) {
+            onLiveScene(liveSceneCurrent < 0 ? static_cast<int>(liveScenes.size()) - 1
+                                             : (liveSceneCurrent + static_cast<int>(liveScenes.size()) - 1) %
+                                                   static_cast<int>(liveScenes.size()));
+        }
+        ImGui::SameLine();
+        std::vector<const char*> names;
+        for (const std::string& n : liveScenes) {
+            names.push_back(n.c_str());
+        }
+        int current = liveSceneCurrent;
+        ImGui::SetNextItemWidth(-ImGui::GetFrameHeight() - ImGui::GetStyle().ItemSpacing.x);
+        const char* preview = current >= 0 ? names[static_cast<std::size_t>(current)] : "(not a live scene)";
+        if (ImGui::BeginCombo("##scene", preview)) {
+            for (int i = 0; i < static_cast<int>(names.size()); ++i) {
+                if (ImGui::Selectable(names[static_cast<std::size_t>(i)], i == current)) {
+                    onLiveScene(i);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if (ImGui::ArrowButton("##scene-next", ImGuiDir_Right)) {
+            onLiveScene(liveSceneCurrent < 0 ? 0 : (liveSceneCurrent + 1) % static_cast<int>(liveScenes.size()));
+        }
+        ImGui::TextDisabled("PageUp / PageDown, or a MIDI program change (program n = scene n)");
+        ImGui::Separator();
+    }
+
     // ---- audio ----
     {
         std::vector<const char*> names;

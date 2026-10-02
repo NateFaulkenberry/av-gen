@@ -126,7 +126,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/rendering/transform_history.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
     # ADR-1026: the Live panel's projection -- the display choice, the scaling and the state machine.
-    "${CMAKE_SOURCE_DIR}/src/app/projection.cpp")
+    "${CMAKE_SOURCE_DIR}/src/app/projection.cpp"
+    # ADR-1063: the live scene switcher's decisions -- the list, stepping, program change, the response carry.
+    "${CMAKE_SOURCE_DIR}/src/app/live_scenes.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)
 catch_discover_tests(avgen_tests
