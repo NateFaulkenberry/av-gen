@@ -6914,7 +6914,7 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
             const auto& info = bus.info(id);
             const std::string& name = info.name;
             if (name.starts_with("sonic.") || name.starts_with("timbre.") || name.starts_with("notes.") ||
-                name.starts_with("visual.")) {
+                name.starts_with("visual.") || name.starts_with("response.")) { // ADR-1062
                 liveLogColumns_.emplace_back(name, id);
             }
         }

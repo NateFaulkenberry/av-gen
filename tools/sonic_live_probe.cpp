@@ -267,6 +267,7 @@ struct Player {
     Synth& synth;
     avgen::control::MidiVirtualSource& midi;
     Log& log;
+    int tourScenes = 17; // `tour`: how many scenes to step through (--scenes)
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
     void waitUntil(double seconds) const {
@@ -299,6 +300,12 @@ struct Player {
         }
         static_cast<void>(midi.send(bytes));
         log.row("off", key, 0.0f, synth);
+    }
+    // ADR-1063: a program change (program n opens live scene n mod the list's length).
+    void program(int number) {
+        const std::array<std::uint8_t, 2> bytes{0xC0, static_cast<std::uint8_t>(number & 0x7F)};
+        static_cast<void>(midi.send(bytes));
+        log.row("program", number, 0.0f, synth);
     }
     void chordOn(std::initializer_list<int> keys, int velocity) {
         for (int k : keys) {
@@ -687,6 +694,29 @@ void scenario(const std::string& name, Player& p) {
         usePatch(p, "pad");
         p.note(t, 45, 50, 4.0);
         p.waitUntil(t + 8.0);
+    } else if (name == "tour") {
+        // ADR-1063: the whole set list in one live session. A program change every 20 s (program 0 is Sonic Live, then
+        // the Sonic VFX scenes in the index's order), each scene played a 16 s figure: a held chord, an arpeggio and
+        // a low riff, so every world shows its sustain, its melody and its low attacks.
+        const int scenes = p.tourScenes;
+        for (int k = 0; k < scenes; ++k) {
+            const double t = 1.0 + 20.0 * k;
+            p.waitUntil(t);
+            p.program(k);
+            usePatch(p, k % 2 == 0 ? "pad" : "pluck");
+            p.waitUntil(t + 3.0); // the scene loads
+            p.chordOn({48, 55, 60, 64}, 80);
+            p.waitUntil(t + 7.0);
+            p.chordOff({48, 55, 60, 64});
+            for (int i = 0; i < 16; ++i) {
+                p.note(t + 7.5 + 0.18 * i, 60 + (i * 7) % 24, 90 + (i % 4 == 0) * 30, 0.14);
+            }
+            usePatch(p, "distbass");
+            for (int i = 0; i < 8; ++i) {
+                p.note(t + 11.0 + 0.3 * i, i % 2 == 0 ? 33 : 40, 110, 0.2);
+            }
+        }
+        p.waitUntil(1.0 + 20.0 * scenes);
     } else if (name == "silence") {
         p.waitUntil(5.0);
     } else {
@@ -726,12 +756,13 @@ bool writeWav(const std::string& path, const std::vector<float>& samples, std::s
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: avgen_sonic_probe <latency|sweep|drive|demo|silence|low|high|chords|arp|"
-                             "distorted|patches|play> [--out f.csv] "
+                             "distorted|patches|play|tour> [--out f.csv] [--scenes n] "
                              "[--wav f.wav] [--device BlackHole] [--lead-in s] [--period frames]\n");
         return 2;
     }
     const std::string name = argv[1];
     std::string outPath = "probe-events.csv";
+    int scenes = 17;
     std::string wavPath;
     std::string deviceName = "BlackHole";
     double leadIn = 0.0;
@@ -743,6 +774,7 @@ int main(int argc, char** argv) {
         else if (a == "--device") deviceName = argv[i + 1];
         else if (a == "--lead-in") leadIn = std::atof(argv[i + 1]);
         else if (a == "--period") period = static_cast<ma_uint32>(std::atoi(argv[i + 1]));
+        else if (a == "--scenes") scenes = std::max(1, std::atoi(argv[i + 1]));
     }
 
     avgen::control::MidiVirtualSource midi;
@@ -800,6 +832,7 @@ int main(int argc, char** argv) {
     std::this_thread::sleep_for(std::chrono::duration<double>(leadIn));
     log.row("start", -1, 0.0f, synth);
     Player player{synth, midi, log};
+    player.tourScenes = scenes;
     scenario(name, player);
     log.row("end", -1, 0.0f, synth);
     log.out << synth.firstCallbackNs.load() << ",recording,-1,0,0,0\n";
