@@ -942,6 +942,16 @@
       "strength": 1.0
      },
      {
+      "channel": "c10echo",
+      "time": 118.34862,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.14,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "c11",
       "time": 122.75229,
       "units": "seconds",
@@ -7429,16 +7439,6 @@
    "chain": {}
   },
   {
-   "source": "grid.song.c10",
-   "target": "camera/exposure/compensation",
-   "amount": 1.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "enabled": true,
-   "chain": {}
-  },
-  {
    "source": "grid.song.c10in",
    "target": "temporal/mosh/amount",
    "amount": 0.6,
@@ -7472,6 +7472,52 @@
    "source": "grid.song.c10in",
    "target": "post/bloom/intensity",
    "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c10echo",
+   "target": "sdf/bathShell/transform/position",
+   "amount": 0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {
+    "attackMs": 5.0
+   }
+  },
+  {
+   "source": "grid.song.c10echo",
+   "target": "sdf/bathFurn/transform/position",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {
+    "attackMs": 5.0
+   }
+  },
+  {
+   "source": "grid.song.c10echo",
+   "target": "sdf/bathMirror/transform/position",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "enabled": true,
+   "chain": {
+    "attackMs": 5.0
+   }
+  },
+  {
+   "source": "grid.song.c10echo",
+   "target": "camera/exposure/compensation",
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,

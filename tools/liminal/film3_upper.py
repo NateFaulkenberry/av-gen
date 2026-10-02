@@ -217,14 +217,18 @@ def build(b):
         f.route(c, f"sdf/{o}/transform/position", off, component=0, attackMs=5.0)
     f.route(c, "post/lens/chromaticAberration", 0.7)
     f.route(c, "temporal/mosh/amount", 0.5)
-    f.route(c, "camera/exposure/compensation", 1.8)
-    # ... and on the beat the bedroom's pixels smear on into the bathroom (a datamosh across the cut): the jump alone
-    # was over before the beat it answers (take 2 measured C10 only "visible")
+    # ... and on the beat the corruption carries across the cut (the jump alone was over before the beat it answers:
+    # take 2 measured C10 only "visible"): the bathroom arrives with its layers misregistered, walls one way, the
+    # vanity and the figure at it the other, and snaps together over four frames while the pixels smear
     c = b.clap("c10in", t(53, 4), release=0.35)
     f.route(c, "temporal/mosh/amount", 0.6)
     f.route(c, "temporal/mosh/shift", 14.0)
     f.route(c, "post/lens/chromaticAberration", 0.6)
     f.route(c, "post/bloom/intensity", 0.8)
+    c = b.clap("c10echo", t(53, 4), release=0.14)
+    for o, off in (("bathShell", 0.14), ("bathFurn", -0.3), ("bathMirror", -0.3)):    # z: across this view
+        f.route(c, f"sdf/{o}/transform/position", off, component=2, attackMs=5.0)
+    f.route(c, "camera/exposure/compensation", 1.8)      # the flash on the beat, not before it
     # C11 (55.4) colour corruption: a 180-degree hue jump, the channels split, the lamp pumps like a heart
     c = b.clap("c11", t(55, 4), release=0.55)
     f.route(c, "post/grade/hueShift", 3.1)
