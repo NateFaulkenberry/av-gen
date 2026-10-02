@@ -315,6 +315,109 @@ def sd_count(node):
     return n
 
 
+# ================================================================================================ assets
+# Scene files live in examples/sonic-vfx/, two levels below the repo root. The asset folders are gitignored (CC0
+# downloads, restorable with tools/fetch_polyhaven.py and the Quaternius pack); a scene that names one loads without it
+# and simply lacks that node (the CPU suite's "every example loads" case runs without assets).
+ASSETS = "../../assets/"
+
+# Polyhaven photoscans (CC0): PBR textures (diffuse, ARM, normal), so they need PBR mode (never `stylized`). Each file
+# is ONE placement of every variant it holds (a row of ferns, a set of rocks). Sizes are the file's bounds in metres.
+SCAN = {
+    "cliff_long": "terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf",     # 41 x 10 x 9, 943k tris
+    "cliff_wide": "terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf",     # 87 x 11 x 24, 1.54M tris
+    "mountainside": "terrain/formations/mountainside/mountainside_1k.gltf",           # 10 x 10.5 x 5, 153k
+    "red_cliff": "terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf",  # 20 x 7 x 7, 194k
+    "rock_face": "terrain/formations/rock_face_01/rock_face_01_1k.gltf",              # 5 x 3.6 x 3.8, 20k
+    "boulder": "terrain/rocks/boulder_01/boulder_01_1k.gltf",                         # 1.3 x 1.0 x 1.8, 66k
+    "red_boulder": "terrain/rocks/namaqualand_boulder_03/namaqualand_boulder_03_1k.gltf",  # 2.4 x 1.5 x 3.1, 65k
+    "pebble": "terrain/rocks/rock_07/rock_07_1k.gltf",                                # 0.17 x 0.14 x 0.32
+    "pebble_flat": "terrain/rocks/rock_09/rock_09_1k.gltf",
+    "stone": "terrain/rocks/stone_01/stone_01_1k.gltf",
+    "moss_rocks": "terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf",          # 6 rocks, 8 x 1.8 x 7
+    "moss_rocks_b": "terrain/rocks/rock_moss_set_02/rock_moss_set_02_1k.gltf",        # 7 rocks, 8.3 x 1.4 x 3.4
+    "ferns": "nature/plants/fern_02/fern_02_1k.gltf",                                 # 4 ferns, 2 x 0.43 x 1.7
+    "grass_tufts": "nature/plants/grass_medium_02/grass_medium_02_1k.gltf",           # 5 tufts (dark fringes)
+    "shrub_low": "nature/plants/shrub_01/shrub_01_1k.gltf",
+    "shrubs": "nature/plants/shrub_02/shrub_02_1k.gltf",                              # 4 shrubs in a 6.6 m row
+    "shrub_c": "nature/plants/shrub_03/shrub_03_1k.gltf",
+    "shrub_d": "nature/plants/shrub_04/shrub_04_1k.gltf",
+    "pachira": "nature/plants/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",       # 4 small trees, 0.6-1.65 tall
+    "calathea": "nature/plants/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf",  # 5 plants
+    "anthurium": "nature/plants/anthurium_botany_01/anthurium_botany_01_1k.gltf",     # 6 plants
+    "nettle": "nature/plants/nettle_plant/nettle_plant_1k.gltf",
+    "bark_debris": "nature/plants/bark_debris_01/bark_debris_01_1k.gltf",
+    "pine_roots": "nature/roots/pine_roots/pine_roots_1k.gltf",                       # 1.8 x 0.15 x 1.9
+    "roots": "nature/roots/root_cluster_01/root_cluster_01_1k.gltf",                  # 4.1 x 1.5 x 2.7, 225k
+    "roots_flat": "nature/roots/root_cluster_02/root_cluster_02_1k.gltf",             # 8 pieces
+    "root": "nature/roots/single_root/single_root_1k.gltf",                           # 0.56 x 0.18 x 1.84
+    "log": "nature/trunks/dead_tree_trunk/dead_tree_trunk_1k.gltf",                   # 3 m lying log
+    "log_big": "nature/trunks/dead_tree_trunk_02/dead_tree_trunk_02_1k.gltf",         # 4 m lying log
+    "stump": "nature/trunks/tree_stump_01/tree_stump_01_1k.gltf",
+    "stump_b": "nature/trunks/tree_stump_02/tree_stump_02_1k.gltf",
+}
+# Quaternius Stylized Nature (CC0): low-poly, base-colour textures (bark has a normal map). Sizes in metres.
+STYL = {
+    "tree": "quaternius/glTF/CommonTree_%d.gltf",       # 1..5, 7-9.4 tall
+    "pine": "quaternius/glTF/Pine_%d.gltf",             # 1..5, 7.3-10.2 tall
+    "twisted": "quaternius/glTF/TwistedTree_%d.gltf",   # 1..5, 16-19 tall
+    "dead_tree": "quaternius/glTF/DeadTree_%d.gltf",    # 1..5, 9.5-16 tall
+    "mushroom": "quaternius/glTF/Mushroom_Common.gltf",  # 0.45 tall
+    "shelf_fungus": "quaternius/glTF/Mushroom_Laetiporus.gltf",
+    "rock_low": "quaternius/glTF/Rock_Medium_%d.gltf",  # 1..3, about 2 tall
+    "bush": "quaternius/glTF/Bush_Common.gltf",
+    "fern_low": "quaternius/glTF/Fern_1.gltf",
+    "petal": "quaternius/glTF/Petal_%d.gltf",
+    "lily": "quaternius/glTF/Plant_7.gltf",
+    "grass_low": "quaternius/glTF/Grass_Common_Tall.gltf",
+    "wispy": "quaternius/glTF/Grass_Wispy_Tall.gltf",
+}
+FIGURE = "quaternius/animations/UAL1_Standard.glb"   # a 1.83 m person for scale (Idle_Loop, Idle_Lantern_Loop, ...)
+
+
+def asset(key, variant=1):
+    """An asset's path from a scene file: a SCAN or STYL key (STYL keys with %d take `variant`), or a path below
+    assets/."""
+    if key in SCAN:
+        return ASSETS + SCAN[key]
+    if key in STYL:
+        p = STYL[key]
+        return ASSETS + (p % variant if "%d" in p else p)
+    if key == "figure":
+        return ASSETS + FIGURE
+    return key if key.startswith(("../", "/")) else ASSETS + key
+
+
+def terrain_heights(world, points):
+    """The ground height of a terrain `world` block (as Scene.terrain writes it, defaults filled in) at each (x, z),
+    from the engine's own WorldMap (tools/world_preview's probes, CPU only), so a camera, a rock or a tree can be put
+    ON the ground instead of guessed at. Cached by the world's content."""
+    import hashlib
+    import re
+    import subprocess
+    import tempfile
+    w = {"seed": 1, "erosion": 0.0, "seaLevel": -1000.0, "layers": [], "features": []}
+    w.update(world)
+    key = hashlib.sha1(json.dumps([w, points], sort_keys=True).encode()).hexdigest()
+    cache_dir = os.path.join(tempfile.gettempdir(), "sonic-art-heights")
+    os.makedirs(cache_dir, exist_ok=True)
+    cache = os.path.join(cache_dir, key + ".json")
+    if os.path.exists(cache):
+        return json.load(open(cache))
+    tool = os.path.join(REPO, "build", "release", "tools", "avgen_world_preview")
+    wp = os.path.join(cache_dir, key + ".world.json")
+    json.dump(w, open(wp, "w"))
+    args = [tool, wp, os.path.join(cache_dir, key + ".png"), "64"]
+    for x, z in points:
+        args += ["%.3f" % x, "%.3f" % z]
+    out = subprocess.run(args, capture_output=True, text=True).stdout
+    hs = [float(m) for m in re.findall(r"probe \([^)]*\): height (-?[0-9.]+)", out)]
+    if len(hs) != len(points):
+        raise SystemExit("terrain_heights: %d of %d probes answered (%s)" % (len(hs), len(points), out[-300:]))
+    json.dump(hs, open(cache, "w"))
+    return hs
+
+
 # ================================================================================================ camera composition
 def project_from(pos, tgt, focal, point, aspect=16.0 / 9.0):
     """A world point's screen position (u right, v down, 0..1) and depth, for a camera at `pos` looking at `tgt` with
@@ -441,6 +544,104 @@ class Scene:
              "position": [float(v) for v in position], "rotation": [float(v) for v in rotation]}
         self.nodes.append(n)
         return n
+
+    # ---------------------------------------------------------------- environment (the restart's building blocks)
+    def gltf(self, name, key, position, rotation=(0, 0, 0), scale=1.0, variant=1, tint=None, roughness=None,
+             emissive=None, lod=True, parent=None):
+        """One placed asset (a scan, a stylized model). `scale` is a number or [x, y, z]; rotation in degrees. A gltf
+        node takes no material block: only `tint` (multiplies the base colour), `roughness` (a scale) and `emissive`
+        (a boost). Two nodes on one file share its meshes and textures."""
+        sc = [float(scale)] * 3 if isinstance(scale, (int, float)) else [float(v) for v in scale]
+        n = {"name": name, "kind": "gltf", "asset": asset(key, variant),
+             "position": [float(v) for v in position], "rotation": [float(v) for v in rotation], "scale": sc}
+        if tint is not None:
+            n["tint"] = [float(v) for v in tint]
+        if roughness is not None:
+            n["roughnessScale"] = float(roughness)
+        if emissive is not None:
+            n["emissiveBoost"] = float(emissive)
+        if lod:
+            n["lod"] = {"enabled": True, "maxScreenError": 2.0 if lod is True else float(lod)}
+        if parent:
+            n["parent"] = parent
+        self.nodes.append(n)
+        return n
+
+    def figure(self, name, position, facing=0.0, state="Idle_Loop", tint=None, scale=1.0):
+        """A person for scale (the Quaternius animation-library mannequin, 1.83 m), standing and breathing in an idle
+        clip. `facing` is the yaw in degrees."""
+        n = self.gltf(name, "figure", position, rotation=(0.0, facing, 0.0), scale=scale, tint=tint, lod=False)
+        n["animation"] = {"state": state, "blend": 0.35, "updateHz": 30, "cullDistance": 200.0}
+        return n
+
+    def mesh(self, name, key, distribution=None, scale=1.0, variant=1, material=None, budget=0, variation=None,
+             ops=None, position=None, rotation=None, transform=None, lod=None, material_variation=None,
+             deformers=None):
+        """An asset instanced by a distribution (a grid, a ring, a line) in ONE draw: rocks along a shore, a row of
+        columns. `material` (optional) REPLACES the colour of every part and keeps the textures; give it a baseColor
+        (the default is purple). `budget` is a triangle budget (vertex clustering, a request)."""
+        sc = [float(scale)] * 3 if isinstance(scale, (int, float)) else [float(v) for v in scale]
+        src = {"kind": "mesh", "asset": asset(key, variant)}
+        if budget:
+            src["meshBudget"] = int(budget)
+        extra = {"sourceTransform": {"scale": sc}}
+        if ops:
+            extra["ops"] = ops
+        if lod:
+            extra["lod"] = lod
+        return self.proc(name, src, distribution=distribution, material=material, variation=variation,
+                         material_variation=material_variation, transform=transform, position=position,
+                         rotation=rotation, deformers=deformers, extra=extra)
+
+    def terrain(self, name, world, terrain=None, material=None, scatter=None, clearings=None, position=(0, 0, 0)):
+        """A heightfield world: noise `layers`, `features` (ridge, valley, river, flat; `water: true` fills them),
+        `biomes`, and `terrain.water` for the surface of every water body. The ONLY water the engine has. Write
+        `layers` and `features` out in full: an omitted key keeps the shipped Glowmere world's value."""
+        w = {"name": name, "seed": 1, "erosion": 0.0, "seaLevel": -1000.0, "layers": [], "features": []}
+        w.update(world)
+        t = {"chunkSize": 40.0, "resolution": 32, "lodLevels": 3, "viewDistance": 600.0, "skirtDepth": 1.0,
+             "groundMottle": False, "groundGlow": 0.0}
+        if terrain:
+            t.update(terrain)
+        n = {"name": name, "kind": "terrain", "position": [float(v) for v in position], "world": w, "terrain": t}
+        if material:
+            n["material"] = material
+        if scatter:
+            n["scatter"] = scatter
+        if clearings:
+            n["clearings"] = clearings
+        self.nodes.append(n)
+        return n
+
+    def beam(self, fid, position, tilt=0.0, yaw=0.0, color=(1, 0.95, 0.85), intensity=0.6, length=12.0, angle=12.0,
+             aperture=0.25, dust=0.5, light=0.0, toward=None, **more):
+        """A visible dusty cone of light (the Effect Library's lightBeam): the engine's only god ray, because the fog
+        march does not sample shadow maps. It points down at tilt 0 and toward the horizon at +-89; `yaw` 0 heads
+        toward +Z (fxHeading: across = (sin yaw, 0, cos yaw)). It cannot point up. `toward` (a world point) sets
+        tilt, yaw and length from the beam's position. `light` > 0 also lights the ground where it lands."""
+        if toward is not None:
+            d = [b - a for a, b in zip(position, toward)]
+            n = math.sqrt(sum(c * c for c in d)) or 1.0
+            yaw = math.degrees(math.atan2(d[0], d[2]))
+            tilt = math.degrees(math.acos(max(-1.0, min(1.0, -d[1] / n))))
+            length = n if length is None else length
+        p = {"color": [float(c) for c in color], "intensity": float(intensity), "length": float(length),
+             "angle": float(angle), "aperture": float(aperture), "dust": float(dust), "tilt": float(tilt),
+             "yaw": float(yaw), "offsetX": float(position[0]), "offsetY": float(position[1]),
+             "offsetZ": float(position[2]), "castLight": light > 0.0, "light": float(light)}
+        p.update(more)
+        return self.effect(fid, "lightBeam", ("world",), parameters=p)
+
+    def fogbank(self, fid, centre, shape="Bank", density=0.5, radius=100.0, height=20.0, color=(0.6, 0.65, 0.7),
+                **more):
+        """A placed fog medium (the Effect Library's fog): a bank, an ellipsoid, a box... lit by the scene's lights,
+        and the one medium whose self-shadow the march draws (`volumeShadowSteps`). The scene has ONE placed medium
+        slot (fog, tornado and vortex share it)."""
+        p = {"shape": shape, "fogDensity": float(density), "bankRadius": float(radius), "bankHeight": float(height),
+             "fogColor": [float(c) for c in color], "centerX": float(centre[0]), "centerY": float(centre[1]),
+             "centerZ": float(centre[2])}
+        p.update(more)
+        return self.effect(fid, "fog", ("world",), parameters=p)
 
     def particles(self, name, **fields):
         p = {"enabled": True}
@@ -731,8 +932,22 @@ class Scene:
         os.makedirs(out_dir, exist_ok=True)
         sp = os.path.join(out_dir, self.id + ".scene.json")
         pp = os.path.join(out_dir, self.id + ".json")
+        doc = self.scene_doc()
+        if os.path.abspath(out_dir) != os.path.abspath(OUT_DIR):
+            # look development elsewhere: the asset paths are relative to examples/sonic-vfx/, so make them absolute
+            absolute = os.path.join(REPO, "assets") + "/"
+
+            def fix(o):
+                if isinstance(o, dict):
+                    return {k: fix(v) for k, v in o.items()}
+                if isinstance(o, list):
+                    return [fix(v) for v in o]
+                if isinstance(o, str) and o.startswith(ASSETS):
+                    return absolute + o[len(ASSETS):]
+                return o
+            doc = fix(doc)
         with open(sp, "w") as f:
-            json.dump(self.scene_doc(), f, indent=1)
+            json.dump(doc, f, indent=1)
             f.write("\n")
         with open(pp, "w") as f:
             json.dump(self.project_doc(), f, indent=1)
