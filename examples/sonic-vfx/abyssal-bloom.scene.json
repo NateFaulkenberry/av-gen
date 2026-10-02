@@ -245,9 +245,9 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.17,
+     "tubeRadius": 0.3,
      "tubeTaper": 1.0,
-     "tubeSides": 10,
+     "tubeSides": 12,
      "tubeSegments": 10,
      "tubeTwist": 0.0,
      "tubeCaps": true,
@@ -261,22 +261,22 @@
          0.0,
          0.0
         ],
-        "scale": 0.11765,
+        "scale": 0.13333,
         "roll": 0.0
        },
        {
         "position": [
          0.0,
-         0.06,
+         0.1,
          0.0
         ],
-        "scale": 0.70588,
+        "scale": 0.73333,
         "roll": 0.0
        },
        {
         "position": [
          0.0,
-         0.16,
+         0.28,
          0.0
         ],
         "scale": 1.0,
@@ -285,19 +285,19 @@
        {
         "position": [
          0.0,
-         0.26,
+         0.46,
          0.0
         ],
-        "scale": 0.70588,
+        "scale": 0.73333,
         "roll": 0.0
        },
        {
         "position": [
          0.0,
-         0.34,
+         0.6,
          0.0
         ],
-        "scale": 0.17647,
+        "scale": 0.16667,
         "roll": 0.0
        }
       ],
@@ -307,7 +307,7 @@
     "distribution": {
      "kind": "spline",
      "spline": "chain",
-     "count": 40,
+     "count": 56,
      "alignToSpline": true
     },
     "material": {
@@ -338,12 +338,96 @@
    }
   },
   {
+   "name": "palps",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.007,
+     "tubeTaper": 0.15,
+     "tubeSides": 4,
+     "tubeSegments": 20,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 6,
+      "start": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       0.0,
+       -1.6,
+       0.0
+      ],
+      "noiseAmount": 0.25,
+      "noiseScale": 0.7,
+      "seed": 77,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "spline",
+     "spline": "chain",
+     "count": 56,
+     "alignToSpline": false
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.4,
+     "metallic": 0.0,
+     "program": "abZooid"
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.18,
+      "scale": 0.6,
+      "speed": 0.2,
+      "seed": 3,
+      "axisMask": [
+       1.0,
+       0.0,
+       1.0
+      ],
+      "space": "world"
+     }
+    ],
+    "variation": {
+     "seed": 5,
+     "rotation": [
+      0.25,
+      3.1,
+      0.25
+     ],
+     "scale": [
+      0.0,
+      0.45,
+      0.0
+     ]
+    }
+   }
+  },
+  {
    "name": "jelly0",
    "kind": "procedural",
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.561,
+     "tubeRadius": 1.02,
      "tubeTaper": 1.0,
      "tubeSides": 24,
      "tubeSegments": 14,
@@ -365,7 +449,7 @@
        {
         "position": [
          0.0,
-         0.027500000000000004,
+         0.05,
          0.0
         ],
         "scale": 1.0,
@@ -374,7 +458,7 @@
        {
         "position": [
          0.0,
-         0.1375,
+         0.25,
          0.0
         ],
         "scale": 0.93137,
@@ -383,7 +467,7 @@
        {
         "position": [
          0.0,
-         0.30250000000000005,
+         0.55,
          0.0
         ],
         "scale": 0.76471,
@@ -392,7 +476,7 @@
        {
         "position": [
          0.0,
-         0.44000000000000006,
+         0.8,
          0.0
         ],
         "scale": 0.4902,
@@ -401,7 +485,7 @@
        {
         "position": [
          0.0,
-         0.5225,
+         0.95,
          0.0
         ],
         "scale": 0.21569,
@@ -410,10 +494,10 @@
        {
         "position": [
          0.0,
-         0.55,
+         1.0,
          0.0
         ],
-        "scale": 0.03565,
+        "scale": 0.01961,
         "roll": 0.0
        }
       ],
@@ -425,9 +509,9 @@
     },
     "distributionTransform": {
      "position": [
-      -6.5,
-      -2.0,
-      -16.0
+      -5.0,
+      -1.2,
+      -10.0
      ],
      "rotation": [
       0.0,
@@ -453,12 +537,13 @@
      ],
      "emissiveIntensity": 0.25,
      "roughness": 0.2,
-     "metallic": 0.0
+     "metallic": 0.0,
+     "program": "abBell"
     },
     "deformers": [
      {
       "kind": "sine",
-      "amount": 0.033,
+      "amount": 0.06,
       "axis": [
        0,
        1,
@@ -482,7 +567,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.0082,
+     "tubeRadius": 0.011,
      "tubeTaper": 0.1,
      "tubeSides": 4,
      "tubeSegments": 24,
@@ -499,10 +584,10 @@
       ],
       "end": [
        0.0,
-       -3.3000000000000003,
+       -7.0,
        0.0
       ],
-      "noiseAmount": 0.1925,
+      "noiseAmount": 0.35,
       "noiseScale": 0.6,
       "seed": 40,
       "samplesPerSegment": 8
@@ -511,11 +596,11 @@
     "distribution": {
      "kind": "radial",
      "count": 9,
-     "radius": 0.451,
+     "radius": 0.82,
      "center": [
-      -6.5,
-      -2.0,
-      -16.0
+      -5.0,
+      -1.2,
+      -10.0
      ],
      "plane": "xz",
      "orientation": "none"
@@ -538,7 +623,7 @@
     "deformers": [
      {
       "kind": "noise",
-      "amount": 0.1375,
+      "amount": 0.25,
       "scale": 0.5,
       "speed": 0.25,
       "seed": 0,
@@ -571,7 +656,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.459,
+     "tubeRadius": 0.8160000000000001,
      "tubeTaper": 1.0,
      "tubeSides": 24,
      "tubeSegments": 14,
@@ -593,7 +678,7 @@
        {
         "position": [
          0.0,
-         0.022500000000000003,
+         0.04000000000000001,
          0.0
         ],
         "scale": 1.0,
@@ -602,7 +687,7 @@
        {
         "position": [
          0.0,
-         0.1125,
+         0.2,
          0.0
         ],
         "scale": 0.93137,
@@ -611,7 +696,7 @@
        {
         "position": [
          0.0,
-         0.24750000000000003,
+         0.44000000000000006,
          0.0
         ],
         "scale": 0.76471,
@@ -620,7 +705,7 @@
        {
         "position": [
          0.0,
-         0.36000000000000004,
+         0.6400000000000001,
          0.0
         ],
         "scale": 0.4902,
@@ -629,7 +714,7 @@
        {
         "position": [
          0.0,
-         0.4275,
+         0.76,
          0.0
         ],
         "scale": 0.21569,
@@ -638,10 +723,10 @@
        {
         "position": [
          0.0,
-         0.45,
+         0.8,
          0.0
         ],
-        "scale": 0.04357,
+        "scale": 0.02451,
         "roll": 0.0
        }
       ],
@@ -653,9 +738,9 @@
     },
     "distributionTransform": {
      "position": [
-      -2.5,
-      4.8,
-      -13.0
+      -3.0,
+      5.2,
+      -12.0
      ],
      "rotation": [
       0.0,
@@ -681,12 +766,13 @@
      ],
      "emissiveIntensity": 0.25,
      "roughness": 0.2,
-     "metallic": 0.0
+     "metallic": 0.0,
+     "program": "abBell"
     },
     "deformers": [
      {
       "kind": "sine",
-      "amount": 0.027,
+      "amount": 0.048,
       "axis": [
        0,
        1,
@@ -710,7 +796,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.0078000000000000005,
+     "tubeRadius": 0.01,
      "tubeTaper": 0.1,
      "tubeSides": 4,
      "tubeSegments": 24,
@@ -727,10 +813,10 @@
       ],
       "end": [
        0.0,
-       -2.7,
+       -5.6000000000000005,
        0.0
       ],
-      "noiseAmount": 0.1575,
+      "noiseAmount": 0.27999999999999997,
       "noiseScale": 0.6,
       "seed": 41,
       "samplesPerSegment": 8
@@ -739,11 +825,11 @@
     "distribution": {
      "kind": "radial",
      "count": 9,
-     "radius": 0.369,
+     "radius": 0.656,
      "center": [
-      -2.5,
-      4.8,
-      -13.0
+      -3.0,
+      5.2,
+      -12.0
      ],
      "plane": "xz",
      "orientation": "none"
@@ -766,7 +852,7 @@
     "deformers": [
      {
       "kind": "noise",
-      "amount": 0.1125,
+      "amount": 0.2,
       "scale": 0.5,
       "speed": 0.25,
       "seed": 1,
@@ -795,6 +881,235 @@
   },
   {
    "name": "jelly2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.275,
+     "tubeTaper": 1.0,
+     "tubeSides": 24,
+     "tubeSegments": 14,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 0.96078,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0625,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.3125,
+         0.0
+        ],
+        "scale": 0.93137,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.6875,
+         0.0
+        ],
+        "scale": 0.76471,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         1.0,
+         0.0
+        ],
+        "scale": 0.4902,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         1.1875,
+         0.0
+        ],
+        "scale": 0.21569,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         1.25,
+         0.0
+        ],
+        "scale": 0.01569,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.8,
+      3.4,
+      -12.5
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00152,
+      0.00518,
+      0.01033
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.25,
+     "roughness": 0.2,
+     "metallic": 0.0,
+     "program": "abBell"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.075,
+      "axis": [
+       0,
+       1,
+       0
+      ],
+      "displacementAxis": [
+       1,
+       0,
+       1
+      ],
+      "frequency": 3.0,
+      "phase": 2.6,
+      "speed": 1.6
+     }
+    ]
+   }
+  },
+  {
+   "name": "tentacles2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.01225,
+     "tubeTaper": 0.1,
+     "tubeSides": 4,
+     "tubeSegments": 24,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 6,
+      "start": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "end": [
+       0.0,
+       -8.75,
+       0.0
+      ],
+      "noiseAmount": 0.4375,
+      "noiseScale": 0.6,
+      "seed": 42,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 1.025,
+     "center": [
+      3.8,
+      3.4,
+      -12.5
+     ],
+     "plane": "xz",
+     "orientation": "none"
+    },
+    "material": {
+     "baseColor": [
+      0.00152,
+      0.00518,
+      0.01033
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 0.4,
+     "metallic": 0.0
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.3125,
+      "scale": 0.5,
+      "speed": 0.25,
+      "seed": 2,
+      "axisMask": [
+       1.0,
+       0.0,
+       1.0
+      ],
+      "space": "world"
+     }
+    ],
+    "variation": {
+     "seed": 62,
+     "rotation": [
+      0.15,
+      3.1,
+      0.15
+     ],
+     "scale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "jelly3",
    "kind": "procedural",
    "procedural": {
     "source": {
@@ -881,237 +1196,9 @@
     },
     "distributionTransform": {
      "position": [
-      2.5,
-      3.6,
-      -15.5
-     ],
-     "rotation": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "scale": [
-      1,
-      1,
-      1
-     ]
-    },
-    "material": {
-     "baseColor": [
-      0.00152,
-      0.00518,
-      0.01033
-     ],
-     "emissiveColor": [
-      0.07819,
-      0.92158,
-      1.0
-     ],
-     "emissiveIntensity": 0.25,
-     "roughness": 0.2,
-     "metallic": 0.0
-    },
-    "deformers": [
-     {
-      "kind": "sine",
-      "amount": 0.041999999999999996,
-      "axis": [
-       0,
-       1,
-       0
-      ],
-      "displacementAxis": [
-       1,
-       0,
-       1
-      ],
-      "frequency": 3.0,
-      "phase": 2.6,
-      "speed": 1.6
-     }
-    ]
-   }
-  },
-  {
-   "name": "tentacles2",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "tube",
-     "tubeRadius": 0.0088,
-     "tubeTaper": 0.1,
-     "tubeSides": 4,
-     "tubeSegments": 24,
-     "tubeTwist": 0.0,
-     "tubeCaps": true,
-     "curve": {
-      "kind": "catmullRom",
-      "generator": "noise",
-      "count": 6,
-      "start": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "end": [
-       0.0,
-       -4.199999999999999,
-       0.0
-      ],
-      "noiseAmount": 0.24499999999999997,
-      "noiseScale": 0.6,
-      "seed": 42,
-      "samplesPerSegment": 8
-     }
-    },
-    "distribution": {
-     "kind": "radial",
-     "count": 9,
-     "radius": 0.574,
-     "center": [
-      2.5,
-      3.6,
-      -15.5
-     ],
-     "plane": "xz",
-     "orientation": "none"
-    },
-    "material": {
-     "baseColor": [
-      0.00152,
-      0.00518,
-      0.01033
-     ],
-     "emissiveColor": [
-      0.07819,
-      0.92158,
-      1.0
-     ],
-     "emissiveIntensity": 0.12,
-     "roughness": 0.4,
-     "metallic": 0.0
-    },
-    "deformers": [
-     {
-      "kind": "noise",
-      "amount": 0.175,
-      "scale": 0.5,
-      "speed": 0.25,
-      "seed": 2,
-      "axisMask": [
-       1.0,
-       0.0,
-       1.0
-      ],
-      "space": "world"
-     }
-    ],
-    "variation": {
-     "seed": 62,
-     "rotation": [
-      0.15,
-      3.1,
-      0.15
-     ],
-     "scale": [
-      0.0,
-      0.35,
-      0.0
-     ]
-    }
-   }
-  },
-  {
-   "name": "jelly3",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "tube",
-     "tubeRadius": 0.40800000000000003,
-     "tubeTaper": 1.0,
-     "tubeSides": 24,
-     "tubeSegments": 14,
-     "tubeTwist": 0.0,
-     "tubeCaps": true,
-     "curve": {
-      "kind": "catmullRom",
-      "generator": "points",
-      "points": [
-       {
-        "position": [
-         0.0,
-         0.0,
-         0.0
-        ],
-        "scale": 0.96078,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.020000000000000004,
-         0.0
-        ],
-        "scale": 1.0,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.1,
-         0.0
-        ],
-        "scale": 0.93137,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.22000000000000003,
-         0.0
-        ],
-        "scale": 0.76471,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.32000000000000006,
-         0.0
-        ],
-        "scale": 0.4902,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.38,
-         0.0
-        ],
-        "scale": 0.21569,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         0.4,
-         0.0
-        ],
-        "scale": 0.04902,
-        "roll": 0.0
-       }
-      ],
-      "samplesPerSegment": 3
-     }
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "distributionTransform": {
-     "position": [
-      6.0,
-      1.8,
-      -12.0
+      6.5,
+      0.4,
+      -9.0
      ],
      "rotation": [
       0.0,
@@ -1137,12 +1224,13 @@
      ],
      "emissiveIntensity": 0.25,
      "roughness": 0.2,
-     "metallic": 0.0
+     "metallic": 0.0,
+     "program": "abBell"
     },
     "deformers": [
      {
       "kind": "sine",
-      "amount": 0.024,
+      "amount": 0.041999999999999996,
       "axis": [
        0,
        1,
@@ -1166,7 +1254,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.0076,
+     "tubeRadius": 0.0095,
      "tubeTaper": 0.1,
      "tubeSides": 4,
      "tubeSegments": 24,
@@ -1183,10 +1271,10 @@
       ],
       "end": [
        0.0,
-       -2.4000000000000004,
+       -4.8999999999999995,
        0.0
       ],
-      "noiseAmount": 0.13999999999999999,
+      "noiseAmount": 0.24499999999999997,
       "noiseScale": 0.6,
       "seed": 43,
       "samplesPerSegment": 8
@@ -1195,11 +1283,11 @@
     "distribution": {
      "kind": "radial",
      "count": 9,
-     "radius": 0.328,
+     "radius": 0.574,
      "center": [
-      6.0,
-      1.8,
-      -12.0
+      6.5,
+      0.4,
+      -9.0
      ],
      "plane": "xz",
      "orientation": "none"
@@ -1222,7 +1310,7 @@
     "deformers": [
      {
       "kind": "noise",
-      "amount": 0.1,
+      "amount": 0.175,
       "scale": 0.5,
       "speed": 0.25,
       "seed": 3,
@@ -1255,7 +1343,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.3264,
+     "tubeRadius": 0.51,
      "tubeTaper": 1.0,
      "tubeSides": 24,
      "tubeSegments": 14,
@@ -1277,7 +1365,7 @@
        {
         "position": [
          0.0,
-         0.016,
+         0.025,
          0.0
         ],
         "scale": 1.0,
@@ -1286,7 +1374,7 @@
        {
         "position": [
          0.0,
-         0.08,
+         0.125,
          0.0
         ],
         "scale": 0.93137,
@@ -1295,7 +1383,7 @@
        {
         "position": [
          0.0,
-         0.17600000000000002,
+         0.275,
          0.0
         ],
         "scale": 0.76471,
@@ -1304,7 +1392,7 @@
        {
         "position": [
          0.0,
-         0.256,
+         0.4,
          0.0
         ],
         "scale": 0.4902,
@@ -1313,7 +1401,7 @@
        {
         "position": [
          0.0,
-         0.304,
+         0.475,
          0.0
         ],
         "scale": 0.21569,
@@ -1322,10 +1410,10 @@
        {
         "position": [
          0.0,
-         0.32,
+         0.5,
          0.0
         ],
-        "scale": 0.06127,
+        "scale": 0.03922,
         "roll": 0.0
        }
       ],
@@ -1337,9 +1425,9 @@
     },
     "distributionTransform": {
      "position": [
-      -4.5,
-      0.6,
-      -7.0
+      1.0,
+      -2.7,
+      -8.5
      ],
      "rotation": [
       0.0,
@@ -1365,12 +1453,13 @@
      ],
      "emissiveIntensity": 0.25,
      "roughness": 0.2,
-     "metallic": 0.0
+     "metallic": 0.0,
+     "program": "abBell"
     },
     "deformers": [
      {
       "kind": "sine",
-      "amount": 0.0192,
+      "amount": 0.03,
       "axis": [
        0,
        1,
@@ -1394,7 +1483,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.00728,
+     "tubeRadius": 0.0085,
      "tubeTaper": 0.1,
      "tubeSides": 4,
      "tubeSegments": 24,
@@ -1411,10 +1500,10 @@
       ],
       "end": [
        0.0,
-       -1.92,
+       -3.5,
        0.0
       ],
-      "noiseAmount": 0.11199999999999999,
+      "noiseAmount": 0.175,
       "noiseScale": 0.6,
       "seed": 44,
       "samplesPerSegment": 8
@@ -1423,11 +1512,11 @@
     "distribution": {
      "kind": "radial",
      "count": 9,
-     "radius": 0.26239999999999997,
+     "radius": 0.41,
      "center": [
-      -4.5,
-      0.6,
-      -7.0
+      1.0,
+      -2.7,
+      -8.5
      ],
      "plane": "xz",
      "orientation": "none"
@@ -1450,7 +1539,7 @@
     "deformers": [
      {
       "kind": "noise",
-      "amount": 0.08,
+      "amount": 0.125,
       "scale": 0.5,
       "speed": 0.25,
       "seed": 4,
@@ -1514,13 +1603,13 @@
     "drag": 0.2,
     "turbulence": 0.12,
     "turbulenceScale": 0.4,
-    "sizeStart": 0.012,
-    "sizeEnd": 0.008,
+    "sizeStart": 0.016,
+    "sizeEnd": 0.01,
     "colorStart": [
      0.3467,
      0.57758,
      0.68669,
-     0.55
+     0.6
     ],
     "colorEnd": [
      0.3467,
@@ -1528,8 +1617,10 @@
      0.68669,
      0.0
     ],
-    "emissive": 0.35,
-    "blend": "additive"
+    "emissive": 0.7,
+    "blend": "additive",
+    "sizeVariance": 0.7,
+    "sizeSkew": 2.2
    }
   },
   {
@@ -1592,9 +1683,9 @@
    "name": "jellyLight0",
    "type": "point",
    "position": [
-    -6.5,
-    -2.165,
-    -16.0
+    -5.0,
+    -1.5,
+    -10.0
    ],
    "color": [
     0.07819,
@@ -1602,8 +1693,8 @@
     1.0
    ],
    "intensity": 0.6,
-   "range": 6.2,
-   "radius": 0.55,
+   "range": 8.0,
+   "radius": 1.0,
    "castsShadow": false,
    "volumetric": 1.0
   },
@@ -1612,48 +1703,8 @@
    "name": "jellyLight1",
    "type": "point",
    "position": [
-    -2.5,
-    4.665,
-    -13.0
-   ],
-   "color": [
-    1.0,
-    0.07819,
-    0.68669
-   ],
-   "intensity": 0.6,
-   "range": 5.8,
-   "radius": 0.45,
-   "castsShadow": false,
-   "volumetric": 1.0
-  },
-  {
-   "id": "jellyLight2",
-   "name": "jellyLight2",
-   "type": "point",
-   "position": [
-    2.5,
-    3.39,
-    -15.5
-   ],
-   "color": [
-    0.07819,
-    0.92158,
-    1.0
-   ],
-   "intensity": 0.6,
-   "range": 6.8,
-   "radius": 0.7,
-   "castsShadow": false,
-   "volumetric": 1.0
-  },
-  {
-   "id": "jellyLight3",
-   "name": "jellyLight3",
-   "type": "point",
-   "position": [
-    6.0,
-    1.6800000000000002,
+    -3.0,
+    4.96,
     -12.0
    ],
    "color": [
@@ -1662,8 +1713,48 @@
     0.68669
    ],
    "intensity": 0.6,
-   "range": 5.6,
-   "radius": 0.4,
+   "range": 7.2,
+   "radius": 0.8,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "jellyLight2",
+   "name": "jellyLight2",
+   "type": "point",
+   "position": [
+    3.8,
+    3.025,
+    -12.5
+   ],
+   "color": [
+    0.07819,
+    0.92158,
+    1.0
+   ],
+   "intensity": 0.6,
+   "range": 9.0,
+   "radius": 1.25,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "jellyLight3",
+   "name": "jellyLight3",
+   "type": "point",
+   "position": [
+    6.5,
+    0.19000000000000003,
+    -9.0
+   ],
+   "color": [
+    1.0,
+    0.07819,
+    0.68669
+   ],
+   "intensity": 0.6,
+   "range": 6.8,
+   "radius": 0.7,
    "castsShadow": false,
    "volumetric": 1.0
   },
@@ -1672,9 +1763,9 @@
    "name": "jellyLight4",
    "type": "point",
    "position": [
-    -4.5,
-    0.504,
-    -7.0
+    1.0,
+    -2.85,
+    -8.5
    ],
    "color": [
     0.07819,
@@ -1682,8 +1773,8 @@
     1.0
    ],
    "intensity": 0.6,
-   "range": 5.28,
-   "radius": 0.32,
+   "range": 6.0,
+   "radius": 0.5,
    "castsShadow": false,
    "volumetric": 1.0
   },
@@ -1896,6 +1987,55 @@
    "metallic": -1,
    "roughness": -1,
    "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "abBell",
+   "ops": [
+    {
+     "kind": "fresnel",
+     "dst": 0,
+     "value": 2.2
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.18,
+      1.7
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 0
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.00091,
+      0.00243,
+      0.00439,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 2,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 1,
    "emissionIntensity": 1.0,
    "opacity": -1
   }

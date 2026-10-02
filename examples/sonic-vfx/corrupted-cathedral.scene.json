@@ -58,120 +58,174 @@
  },
  "nodes": [
   {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      15.0,
+      0.5,
+      48.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.25,
+      -17.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00335,
+      0.00402,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "program": "ccFloor"
+    }
+   }
+  },
+  {
    "name": "nave",
    "kind": "sdf",
    "visible": true,
    "sdf": {
     "tree": {
      "root": {
-      "kind": "warp",
-      "amount": 0.0,
-      "frequency": 0.07,
-      "size": [
-       1.0,
-       0.25,
-       1.0
-      ],
+      "kind": "translate",
       "translation": [
        0.0,
        0.0,
-       0.0
+       -18.0
       ],
-      "seed": 3,
       "children": [
        {
-        "kind": "union",
+        "kind": "twist",
+        "amount": 0.0,
         "children": [
          {
-          "kind": "union",
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.0,
+           18.0
+          ],
           "children": [
            {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             0.0,
-             -21.0
-            ],
+            "kind": "union",
             "children": [
              {
-              "kind": "repeat",
-              "size": [
+              "kind": "translate",
+              "translation": [
                0.0,
                0.0,
-               6.0
+               -21.0
               ],
-              "count": 3,
               "children": [
                {
-                "kind": "mirror",
+                "kind": "repeat",
                 "size": [
-                 1.0,
                  0.0,
-                 0.0
+                 0.0,
+                 6.0
                 ],
+                "count": 3,
                 "children": [
                  {
-                  "kind": "translate",
-                  "translation": [
-                   6.0,
+                  "kind": "mirror",
+                  "size": [
+                   1.0,
                    0.0,
                    0.0
                   ],
                   "children": [
                    {
-                    "kind": "union",
+                    "kind": "translate",
+                    "translation": [
+                     6.0,
+                     0.0,
+                     0.0
+                    ],
                     "children": [
                      {
-                      "kind": "translate",
-                      "translation": [
-                       0.0,
-                       8.0,
-                       0.0
-                      ],
+                      "kind": "union",
                       "children": [
                        {
-                        "kind": "roundedBox",
-                        "size": [
-                         0.55,
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
                          8.0,
-                         0.55
+                         0.0
                         ],
-                        "rounding": 0.18
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.0,
-                       16.2,
-                       0.0
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         0.85,
-                         0.22,
-                         0.85
+                        "children": [
+                         {
+                          "kind": "roundedBox",
+                          "size": [
+                           0.55,
+                           8.0,
+                           0.55
+                          ],
+                          "rounding": 0.18
+                         }
                         ]
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       0.0,
-                       0.25,
-                       0.0
-                      ],
-                      "children": [
+                       },
                        {
-                        "kind": "box",
-                        "size": [
-                         0.85,
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         16.2,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.85,
+                           0.22,
+                           0.85
+                          ]
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
                          0.25,
-                         0.85
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           0.85,
+                           0.25,
+                           0.85
+                          ]
+                         }
                         ]
                        }
                       ]
@@ -182,63 +236,142 @@
                  }
                 ]
                }
-              ]
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             0.0,
-             -18.0
-            ],
-            "children": [
-             {
-              "kind": "repeat",
-              "size": [
-               0.0,
-               0.0,
-               6.0
               ],
-              "count": 3,
+              "name": "piers"
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.0,
+               -18.0
+              ],
               "children": [
                {
-                "kind": "mirror",
+                "kind": "repeat",
                 "size": [
-                 1.0,
                  0.0,
-                 0.0
+                 0.0,
+                 6.0
                 ],
+                "count": 3,
                 "children": [
                  {
-                  "kind": "translate",
-                  "translation": [
-                   6.0,
+                  "kind": "mirror",
+                  "size": [
+                   1.0,
                    0.0,
                    0.0
                   ],
                   "children": [
                    {
-                    "kind": "difference",
+                    "kind": "translate",
+                    "translation": [
+                     6.0,
+                     0.0,
+                     0.0
+                    ],
                     "children": [
                      {
                       "kind": "difference",
                       "children": [
                        {
-                        "kind": "translate",
-                        "translation": [
-                         0.0,
-                         9.6,
-                         0.0
-                        ],
+                        "kind": "difference",
                         "children": [
                          {
-                          "kind": "box",
-                          "size": [
-                           0.3,
+                          "kind": "translate",
+                          "translation": [
+                           0.0,
                            9.6,
-                           3.0
+                           0.0
+                          ],
+                          "children": [
+                           {
+                            "kind": "box",
+                            "size": [
+                             0.3,
+                             9.6,
+                             3.0
+                            ]
+                           }
+                          ]
+                         },
+                         {
+                          "kind": "union",
+                          "children": [
+                           {
+                            "kind": "intersection",
+                            "children": [
+                             {
+                              "kind": "translate",
+                              "translation": [
+                               0.0,
+                               8.6,
+                               1.35
+                              ],
+                              "children": [
+                               {
+                                "kind": "rotate",
+                                "rotation": [
+                                 0.0,
+                                 0.0,
+                                 90.0
+                                ],
+                                "children": [
+                                 {
+                                  "kind": "cylinder",
+                                  "radius": 4.1,
+                                  "height": 2.0
+                                 }
+                                ]
+                               }
+                              ]
+                             },
+                             {
+                              "kind": "translate",
+                              "translation": [
+                               0.0,
+                               8.6,
+                               -1.35
+                              ],
+                              "children": [
+                               {
+                                "kind": "rotate",
+                                "rotation": [
+                                 0.0,
+                                 0.0,
+                                 90.0
+                                ],
+                                "children": [
+                                 {
+                                  "kind": "cylinder",
+                                  "radius": 4.1,
+                                  "height": 2.0
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           },
+                           {
+                            "kind": "translate",
+                            "translation": [
+                             0.0,
+                             4.3,
+                             0.0
+                            ],
+                            "children": [
+                             {
+                              "kind": "box",
+                              "size": [
+                               1.2,
+                               4.3,
+                               2.75
+                              ]
+                             }
+                            ]
+                           }
                           ]
                          }
                         ]
@@ -253,8 +386,8 @@
                             "kind": "translate",
                             "translation": [
                              0.0,
-                             8.6,
-                             1.35
+                             15.2,
+                             0.45
                             ],
                             "children": [
                              {
@@ -267,7 +400,7 @@
                               "children": [
                                {
                                 "kind": "cylinder",
-                                "radius": 4.1,
+                                "radius": 1.5,
                                 "height": 2.0
                                }
                               ]
@@ -278,8 +411,8 @@
                             "kind": "translate",
                             "translation": [
                              0.0,
-                             8.6,
-                             -1.35
+                             15.2,
+                             -0.45
                             ],
                             "children": [
                              {
@@ -292,7 +425,7 @@
                               "children": [
                                {
                                 "kind": "cylinder",
-                                "radius": 4.1,
+                                "radius": 1.5,
                                 "height": 2.0
                                }
                               ]
@@ -305,7 +438,7 @@
                           "kind": "translate",
                           "translation": [
                            0.0,
-                           4.3,
+                           13.6,
                            0.0
                           ],
                           "children": [
@@ -313,88 +446,10 @@
                             "kind": "box",
                             "size": [
                              1.2,
-                             4.3,
-                             2.75
+                             1.6,
+                             0.8
                             ]
                            }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     },
-                     {
-                      "kind": "union",
-                      "children": [
-                       {
-                        "kind": "intersection",
-                        "children": [
-                         {
-                          "kind": "translate",
-                          "translation": [
-                           0.0,
-                           15.2,
-                           0.45
-                          ],
-                          "children": [
-                           {
-                            "kind": "rotate",
-                            "rotation": [
-                             0.0,
-                             0.0,
-                             90.0
-                            ],
-                            "children": [
-                             {
-                              "kind": "cylinder",
-                              "radius": 1.5,
-                              "height": 2.0
-                             }
-                            ]
-                           }
-                          ]
-                         },
-                         {
-                          "kind": "translate",
-                          "translation": [
-                           0.0,
-                           15.2,
-                           -0.45
-                          ],
-                          "children": [
-                           {
-                            "kind": "rotate",
-                            "rotation": [
-                             0.0,
-                             0.0,
-                             90.0
-                            ],
-                            "children": [
-                             {
-                              "kind": "cylinder",
-                              "radius": 1.5,
-                              "height": 2.0
-                             }
-                            ]
-                           }
-                          ]
-                         }
-                        ]
-                       },
-                       {
-                        "kind": "translate",
-                        "translation": [
-                         0.0,
-                         13.6,
-                         0.0
-                        ],
-                        "children": [
-                         {
-                          "kind": "box",
-                          "size": [
-                           1.2,
-                           1.6,
-                           0.8
                           ]
                          }
                         ]
@@ -407,189 +462,67 @@
                  }
                 ]
                }
-              ]
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             0.0,
-             -21.0
-            ],
-            "children": [
-             {
-              "kind": "repeat",
-              "size": [
-               0.0,
-               0.0,
-               6.0
               ],
-              "count": 3,
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 0.0,
-                 16.2,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "intersection",
-                  "children": [
-                   {
-                    "kind": "rotate",
-                    "rotation": [
-                     90.0,
-                     0.0,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "torus",
-                      "radius": 6.0,
-                      "rounding": 0.22
-                     }
-                    ]
-                   },
-                   {
-                    "kind": "translate",
-                    "translation": [
-                     0.0,
-                     3.5,
-                     0.0
-                    ],
-                    "children": [
-                     {
-                      "kind": "box",
-                      "size": [
-                       7.0,
-                       3.5,
-                       1.0
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
-            ]
-           },
-           {
-            "kind": "difference",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               11.0,
-               -40.5
-              ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 7.5,
-                 11.0,
-                 0.4
-                ]
-               }
-              ]
+              "name": "arcades"
              },
              {
               "kind": "translate",
               "translation": [
                0.0,
-               12.0,
-               -40.5
+               0.0,
+               -21.0
               ],
               "children": [
                {
-                "kind": "rotate",
-                "rotation": [
-                 90.0,
+                "kind": "repeat",
+                "size": [
                  0.0,
-                 0.0
+                 0.0,
+                 6.0
                 ],
+                "count": 3,
                 "children": [
                  {
-                  "kind": "cylinder",
-                  "radius": 5.0,
-                  "height": 2.0
-                 }
-                ]
-               }
-              ]
-             }
-            ]
-           },
-           {
-            "kind": "translate",
-            "translation": [
-             0.0,
-             12.0,
-             -40.5
-            ],
-            "children": [
-             {
-              "kind": "union",
-              "children": [
-               {
-                "kind": "rotate",
-                "rotation": [
-                 90.0,
-                 0.0,
-                 0.0
-                ],
-                "children": [
-                 {
-                  "kind": "union",
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   16.2,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "polarRepeat",
-                    "count": 12,
+                    "kind": "intersection",
                     "children": [
                      {
-                      "kind": "translate",
-                      "translation": [
-                       2.6,
-                       0.0,
-                       0.0
-                      ],
-                      "children": [
-                       {
-                        "kind": "box",
-                        "size": [
-                         2.3,
-                         0.07,
-                         0.07
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   },
-                   {
-                    "kind": "polarRepeat",
-                    "count": 12,
-                    "children": [
-                     {
-                      "kind": "translate",
-                      "translation": [
-                       3.55,
+                      "kind": "rotate",
+                      "rotation": [
+                       90.0,
                        0.0,
                        0.0
                       ],
                       "children": [
                        {
                         "kind": "torus",
-                        "radius": 0.95,
-                        "rounding": 0.06
+                        "radius": 6.0,
+                        "rounding": 0.22
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0.0,
+                       3.5,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "box",
+                        "size": [
+                         7.0,
+                         3.5,
+                         1.0
+                        ]
                        }
                       ]
                      }
@@ -598,144 +531,67 @@
                   ]
                  }
                 ]
-               },
-               {
-                "kind": "union",
-                "children": [
-                 {
-                  "kind": "rotate",
-                  "rotation": [
-                   90.0,
-                   0.0,
-                   0.0
-                  ],
-                  "children": [
-                   {
-                    "kind": "torus",
-                    "radius": 4.95,
-                    "rounding": 0.14
-                   }
-                  ]
-                 },
-                 {
-                  "kind": "rotate",
-                  "rotation": [
-                   90.0,
-                   0.0,
-                   0.0
-                  ],
-                  "children": [
-                   {
-                    "kind": "torus",
-                    "radius": 1.25,
-                    "rounding": 0.1
-                   }
-                  ]
-                 }
-                ]
                }
-              ]
-             }
-            ],
-            "name": "rose"
-           },
-           {
-            "kind": "difference",
-            "children": [
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               -0.25,
-               -17.0
               ],
-              "children": [
-               {
-                "kind": "box",
-                "size": [
-                 7.5,
-                 0.25,
-                 24.0
-                ]
-               }
-              ]
+              "name": "ribs"
              },
              {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.0,
-               0.0
-              ],
+              "kind": "difference",
               "children": [
                {
-                "kind": "repeat",
-                "size": [
-                 1.5,
+                "kind": "translate",
+                "translation": [
                  0.0,
-                 1.5
+                 11.0,
+                 -40.5
                 ],
-                "count": 0,
                 "children": [
                  {
-                  "kind": "union",
+                  "kind": "box",
+                  "size": [
+                   7.5,
+                   11.0,
+                   0.4
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 12.0,
+                 -40.5
+                ],
+                "children": [
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   90.0,
+                   0.0,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "box",
-                    "size": [
-                     0.025,
-                     0.05,
-                     0.8
-                    ]
-                   },
-                   {
-                    "kind": "box",
-                    "size": [
-                     0.8,
-                     0.05,
-                     0.025
-                    ]
+                    "kind": "cylinder",
+                    "radius": 5.0,
+                    "height": 2.0
                    }
                   ]
                  }
                 ]
                }
-              ]
+              ],
+              "name": "apse"
              }
             ]
            }
           ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           0.0,
-           12.0,
-           -40.8
-          ],
-          "children": [
-           {
-            "kind": "rotate",
-            "rotation": [
-             90.0,
-             0.0,
-             0.0
-            ],
-            "children": [
-             {
-              "kind": "cylinder",
-              "radius": 5.0,
-              "height": 0.04
-             }
-            ]
-           }
-          ],
-          "material": 1
          }
-        ]
+        ],
+        "name": "sway"
        }
-      ],
-      "name": "sway"
+      ]
      }
     },
     "renderMode": "raymarch",
@@ -757,7 +613,7 @@
     },
     "boundsMin": [
      -9.0,
-     -0.6,
+     0.0,
      -42.0
     ],
     "boundsMax": [
@@ -768,6 +624,273 @@
     "castShadows": false,
     "depthPrepass": false,
     "maxSteps": 100,
+    "epsilon": 0.0015,
+    "stepScale": 0.9,
+    "normalEpsilon": 0.002,
+    "maxDistance": 80.0,
+    "surfaces": [
+     {
+      "color": [
+       0.00335,
+       0.00402,
+       0.00605
+      ],
+      "edge": [
+       0.10074,
+       0.79913,
+       0.9
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       0.27246,
+       0.03526,
+       1.4
+      ],
+      "edge": [
+       0.521,
+       0.93869,
+       1.0
+      ]
+     }
+    ],
+    "look": {
+     "aoStrength": 0.3,
+     "aoDistance": 0.8,
+     "edgeIntensity": 2.6,
+     "edgeWidth": 0.02,
+     "edgeColor": [
+      0.11193,
+      0.88792,
+      1.0
+     ],
+     "edgePixels": 1.5,
+     "edgeSoftness": 0.25,
+     "edgeThreshold": 0.03
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "rose",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "translate",
+      "translation": [
+       0.0,
+       0.0,
+       -18.0
+      ],
+      "children": [
+       {
+        "kind": "twist",
+        "amount": 0.0,
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.0,
+           18.0
+          ],
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               12.0,
+               -40.5
+              ],
+              "children": [
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "rotate",
+                  "rotation": [
+                   90.0,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "polarRepeat",
+                      "count": 12,
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         2.6,
+                         0.0,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "box",
+                          "size": [
+                           2.3,
+                           0.07,
+                           0.07
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "polarRepeat",
+                      "count": 12,
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         3.55,
+                         0.0,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.95,
+                          "rounding": 0.06
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "torus",
+                      "radius": 4.95,
+                      "rounding": 0.14
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "torus",
+                      "radius": 1.25,
+                      "rounding": 0.1
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "name": "rose"
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               12.0,
+               -40.8
+              ],
+              "children": [
+               {
+                "kind": "rotate",
+                "rotation": [
+                 90.0,
+                 0.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "cylinder",
+                  "radius": 5.0,
+                  "height": 0.04
+                 }
+                ]
+               }
+              ],
+              "material": 1
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "name": "sway"
+       }
+      ]
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.7,
+     "metallic": 0.0
+    },
+    "boundsMin": [
+     -7.0,
+     5.5,
+     -41.6
+    ],
+    "boundsMax": [
+     7.0,
+     18.5,
+     -39.4
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 64,
     "epsilon": 0.0015,
     "stepScale": 0.9,
     "normalEpsilon": 0.002,
@@ -1118,6 +1241,182 @@
    ],
    "intensity": 0.03,
    "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "ccFloor",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "palette",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "constant3": [
+      0.6666666666666666,
+      0.6666666666666666,
+      0.6666666666666666,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "constant3": [
+      0.6666666666666666,
+      0.6666666666666666,
+      0.6666666666666666,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.985,
+      0.999,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.985,
+      0.999,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "cameraDistance"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 1,
+     "constant": [
+      6.0,
+      40.0,
+      1.0,
+      0.15
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      0.17909,
+      1.42068,
+      1.6,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 1
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.00335,
+      0.00402,
+      0.00605,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 5,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
   }
  ],
  "composition": {

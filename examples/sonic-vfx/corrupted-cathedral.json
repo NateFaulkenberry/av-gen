@@ -126,7 +126,7 @@
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 24.0,
-  "scene/volumeSteps": 24,
+  "scene/volumeSteps": 16,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": true,
@@ -750,6 +750,28 @@
   },
   {
    "source": "visual.heal",
+   "target": "sdf/rose/look/edge/intensity",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "sdf/rose/look/edge/softness",
+   "amount": -0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heal",
    "target": "lights/rose/intensity",
    "amount": 260.0,
    "op": "add",
@@ -761,7 +783,7 @@
   },
   {
    "source": "visual.heal",
-   "target": "sdf/nave/surface/1/emission",
+   "target": "sdf/rose/surface/1/emission",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
@@ -851,7 +873,7 @@
   {
    "source": "response.bass",
    "target": "sdf/nave/node/sway/amount",
-   "amount": 0.35,
+   "amount": 0.004,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -862,6 +884,28 @@
   {
    "source": "response.bass",
    "target": "sdf/nave/look/edge/pixels",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/rose/node/sway/amount",
+   "amount": 0.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/rose/look/edge/pixels",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",

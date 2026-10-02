@@ -251,7 +251,7 @@ def build():
             R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({
-        "scene/volumeSteps": 32, "scene/volumeJitter": 0.6,
+        "scene/volumeSteps": 16, "scene/volumeJitter": 0.6,   # (32: 15 ms; 16: 8, the same smoke)
         "post/bloom/intensity": 0.32, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
         "post/output/grain": 0.03, "post/grade/contrast": 1.08, "post/grade/temperature": 0.04,
         "post/lens/chromaticAberration": 0.002, "post/tonemap/operator": 3, "camera/lens/focalLength": 32.0,

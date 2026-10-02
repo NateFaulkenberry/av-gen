@@ -576,7 +576,7 @@
      "srcA": 5,
      "constant": [
       0.0,
-      0.0007,
+      0.00035,
       0.0,
       0.0
      ]
@@ -591,6 +591,81 @@
       1.0,
       1.0,
       0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 0,
+     "srcB": 2
+    },
+    {
+     "kind": "voronoiEdge",
+     "dst": 2,
+     "srcA": 2,
+     "value": 0.12,
+     "seed": 17
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      0.012,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.0
      ]
     },
     {
@@ -688,6 +763,124 @@
       0.03,
       0.6
      ]
+    },
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "viewDirection"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "value": 1,
+     "constant": [
+      0.0,
+      0.09,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 0,
+     "srcA": 0,
+     "value": 1.5
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      1.0,
+      0.0,
+      0.12,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 1
+    },
+    {
+     "kind": "noise",
+     "dst": 6,
+     "srcA": 6,
+     "value": 0.008,
+     "seed": 13
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1,
+     "constant": [
+      0.3,
+      0.72,
+      0.15,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      0.04667,
+      1.0,
+      0.27468,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      0.035,
+      0.035,
+      0.035,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 0
     }
    ],
    "baseColor": 2,

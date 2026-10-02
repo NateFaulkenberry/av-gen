@@ -126,7 +126,7 @@
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 28.0,
-  "scene/volumeSteps": 32,
+  "scene/volumeSteps": 16,
   "scene/volumeJitter": 0.5,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,

@@ -76,8 +76,17 @@ def ice_program():
             {"kind": "noise", "dst": 5, "srcA": 0, "value": 0.09, "seed": 5},               # the fracture network
             {"kind": "remap", "dst": 5, "srcA": 5, "value": 0, "constant": [0.5, 1.0, 0.0, 1.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 5},
-            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.0007, 0.0, 0.0]},  # 0 on a fracture
+            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.00035, 0.0, 0.0]},  # 0 on a fracture
             {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},  # 1 on a fracture
+            # ...and the long cracks between the ice's plates (ADR-1069's Worley F2 - F1 in the plane, ~8 m plates)
+            {"kind": "constant", "dst": 2, "constant": [1.0, 0.0, 1.0, 0.0]},
+            {"kind": "multiply", "dst": 2, "srcA": 0, "srcB": 2},
+            {"kind": "voronoiEdge", "dst": 2, "srcA": 2, "value": 0.12, "seed": 17},
+            {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [0.0, 0.0, 0.0, 0.0]},
+            {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.0, 0.012, 0.0, 0.0]},
+            {"kind": "remap", "dst": 2, "srcA": 2, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 2},
+            {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 0.0, 1.0]},
             {"kind": "input", "dst": 6, "input": "cameraDistance"},
             {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [4.0, 40.0, 1.0, 0.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                            # fade far
@@ -89,12 +98,42 @@ def ice_program():
             {"kind": "constant", "dst": 7, "constant": hexrgb("#7fe8ff", 0.0) + [0.0]},     # OP_CRACK
             {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 5},
             {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.0, 1.0, 0.03, 0.6]},  # glossy ice
+            # the aurora on the far ice: black ice is nearly a mirror, so in a band under the horizon it gives back
+            # the curtains' own colour (OP_REFL_COLOR, bound to the palette's low colour, so it follows the mood),
+            # broken into soft patches and brightened with the curtains (OP_REFL_GAIN, routed). Kept to the band:
+            # spread over all the ice it read as a lit green floor, since the reflection cannot follow the curtains
+            {"kind": "input", "dst": 0, "input": "viewDirection"},
+            {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},
+            {"kind": "remap", "dst": 0, "srcA": 0, "value": 1, "constant": [0.0, 0.09, 1.0, 0.0]},
+            {"kind": "power", "dst": 0, "srcA": 0, "value": 1.5},
+            # (patches that run away from the camera, as an uneven curtain's reflection does: x alone, slowly in z)
+            {"kind": "input", "dst": 6, "input": "worldPosition"},
+            {"kind": "constant", "dst": 1, "constant": [1.0, 0.0, 0.12, 0.0]},
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 1},
+            {"kind": "noise", "dst": 6, "srcA": 6, "value": 0.008, "seed": 13},
+            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [0.3, 0.72, 0.15, 1.0]},
+            {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 6},
+            {"kind": "constant", "dst": 1, "constant": hexrgb("#3dff8f") + [0.0]},           # OP_REFL_COLOR
+            {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
+            {"kind": "constant", "dst": 1, "constant": [0.035, 0.035, 0.035, 0.0]},            # OP_REFL_GAIN
+            {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
+            {"kind": "add", "dst": 7, "srcA": 7, "srcB": 0},
         ],
         "baseColor": 2, "metallic": -1, "roughness": 4, "emission": 7, "emissionIntensity": 1.0, "opacity": -1,
     }
 
 
-OP_CRACK = 17
+def _op_index(predicate):
+    """1-based index of the ice program's op that `predicate` picks (routes name ops by position)."""
+    ops = ice_program()["ops"]
+    hits = [i + 1 for i, op in enumerate(ops) if predicate(op)]
+    assert len(hits) == 1, hits
+    return hits[0]
+
+
+OP_CRACK = _op_index(lambda op: op["kind"] == "constant" and op["dst"] == 7)
+OP_REFL_COLOR = _op_index(lambda op: op["kind"] == "constant" and op["constant"] == hexrgb("#3dff8f") + [0.0])
+OP_REFL_GAIN = _op_index(lambda op: op["kind"] == "constant" and op["constant"] == [0.035, 0.035, 0.035, 0.0])
 
 
 def spruce(seed):
@@ -113,7 +152,8 @@ def palette():
                    st("rose", "#ff6b9a", "#c86bff", "#5a3cff")],
         "bindings": [{"role": "low", "target": "fx/aurora/lowColor"},
                      {"role": "mid", "target": "fx/aurora/midColor"},
-                     {"role": "top", "target": "fx/aurora/topColor"}],
+                     {"role": "top", "target": "fx/aurora/topColor"},
+                     {"role": "low", "target": "material/atIce/op/%d/constant/constant" % OP_REFL_COLOR}],
         "position": 0.15, "saturation": 1.0, "value": 1.0,
     }
 
@@ -215,6 +255,11 @@ def build():
     # kick: a surge through the curtains; the ridge glints
     s.route(R("kick", "fx/aurora/intensity", 2.4, attackMs=0, decayMs=420),
             R("kick", "fx/aurora/edgeBrightness", 1.6, attackMs=0, decayMs=500))
+    # ...and the ice gives the curtains back: held sound brightens the reflection, a kick flashes it
+    for c in range(3):
+        s.route(R("sustain", "material/atIce/op/%d/constant/constant" % OP_REFL_GAIN, 0.05, comp=c, **SLOW),
+                R("kick", "material/atIce/op/%d/constant/constant" % OP_REFL_GAIN, 0.07, comp=c, attackMs=0,
+                  decayMs=420))
     # snare: the ice cracks with light
     for c, w in enumerate(hexrgb("#7fe8ff", 1.0)):
         s.route(R("snare", "material/atIce/op/%d/constant/constant" % OP_CRACK, 2.5 * w, comp=c, attackMs=0,

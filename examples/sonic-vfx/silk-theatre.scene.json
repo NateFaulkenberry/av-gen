@@ -494,7 +494,7 @@
    "innerCone": 9.0,
    "outerCone": 13.0,
    "castsShadow": false,
-   "volumetric": 1.0
+   "volumetric": 0.45
   },
   {
    "id": "wash",

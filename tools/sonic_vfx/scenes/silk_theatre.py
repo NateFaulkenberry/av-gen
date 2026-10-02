@@ -98,7 +98,7 @@ def build():
 
     # ---- light: one top spot whose cone stands in the haze; a faint warm bounce from the floor's pool
     s.light("spot", "spot", position=[0.0, 9.5, 0.6], direction=[0.0, -1.0, -0.06], color=hexrgb("#ffe7c4"),
-            intensity=2400.0, range=22.0, innerCone=9.0, outerCone=13.0, castsShadow=False, volumetric=1.0)
+            intensity=2400.0, range=22.0, innerCone=9.0, outerCone=13.0, castsShadow=False, volumetric=0.45)
     # the curtain's wash: a spot from above the stage front, grazing the velvet so its folds stand out
     s.light("wash", "spot", position=[0.0, 10.5, -2.5], direction=[0.0, -0.72, -0.69], color=hexrgb("#ffd0c0"),
             intensity=150.0, range=18.0, innerCone=34.0, outerCone=56.0, castsShadow=False, volumetric=0.0)
@@ -189,7 +189,7 @@ def build():
             R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({
-        "scene/volumeSteps": 32, "scene/volumeJitter": 0.5,
+        "scene/volumeSteps": 16, "scene/volumeJitter": 0.5,   # (32: 16 ms; 16: 8)
         "post/bloom/intensity": 0.3, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
         "post/output/grain": 0.02, "post/grade/temperature": 0.05, "post/grade/contrast": 1.06,
         "post/lens/chromaticAberration": 0.002, "post/tonemap/operator": 3,

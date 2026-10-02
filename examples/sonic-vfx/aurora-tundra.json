@@ -272,8 +272,80 @@
    }
   },
   {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
    "source": "response.snare",
-   "target": "material/atIce/op/17/constant/constant",
+   "target": "material/atIce/op/25/constant/constant",
    "amount": 0.530575,
    "op": "add",
    "polarity": "unipolar",
@@ -285,7 +357,7 @@
   },
   {
    "source": "response.snare",
-   "target": "material/atIce/op/17/constant/constant",
+   "target": "material/atIce/op/25/constant/constant",
    "amount": 2.017375,
    "op": "add",
    "polarity": "unipolar",
@@ -297,7 +369,7 @@
   },
   {
    "source": "response.snare",
-   "target": "material/atIce/op/17/constant/constant",
+   "target": "material/atIce/op/25/constant/constant",
    "amount": 2.5,
    "op": "add",
    "polarity": "unipolar",
@@ -794,6 +866,10 @@
    {
     "role": "top",
     "target": "fx/aurora/topColor"
+   },
+   {
+    "role": "low",
+    "target": "material/atIce/op/38/constant/constant"
    }
   ],
   "position": 0.15,

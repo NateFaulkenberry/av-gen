@@ -20,7 +20,7 @@ TEAL = "#06323a"
 MAGENTA = "#ff4fd8"
 CYAN = "#4ff6ff"
 
-N_ZOOIDS = 40
+N_ZOOIDS = 56
 
 # the stem: an S from the upper left (far) to the lower right (near)
 CHAIN = [(-9.0, 5.5, -14.0), (-6.0, 4.4, -11.5), (-3.2, 3.0, -9.6), (-0.6, 2.2, -8.4), (1.8, 1.0, -7.6),
@@ -29,8 +29,9 @@ _D = [b - a for a, b in zip(CHAIN[0], CHAIN[-1])]
 AXIS_LEN = math.sqrt(sum(v * v for v in _D))
 AXIS_UNIT = [round(v / AXIS_LEN, 5) for v in _D]
 # the jellyfish: (position, pitch centre on notes.lastPitch, bell radius)
-JELLIES = [((-6.5, -2.0, -16.0), 0.32, 0.55), ((-2.5, 4.8, -13.0), 0.62, 0.45), ((2.5, 3.6, -15.5), 0.52, 0.7),
-           ((6.0, 1.8, -12.0), 0.44, 0.4), ((-4.5, 0.6, -7.0), 0.38, 0.32)]
+# (sized and placed so each reads as a bell at the live size: the big one upper right, a near one lower left)
+JELLIES = [((-5.0, -1.2, -10.0), 0.32, 1.0), ((-3.0, 5.2, -12.0), 0.62, 0.8), ((3.8, 3.4, -12.5), 0.52, 1.25),
+           ((6.5, 0.4, -9.0), 0.44, 0.7), ((1.0, -2.7, -8.5), 0.38, 0.5)]
 
 DESIGN = {
     "category": "underwater",
@@ -110,6 +111,22 @@ def zooid_program():
 OP_PLACE, OP_WIDTH, OP_GAIN, OP_BASE = 4, 7, 12, 14
 
 
+def bell_program():
+    """A jellyfish bell's light: its routed emission (colour and strength), strongest at the rim where the eye looks
+    through the most tissue, faint through the middle of the dome -- so a bell reads as translucent, not as a lamp."""
+    return {
+        "name": "abBell",
+        "ops": [
+            {"kind": "fresnel", "dst": 0, "value": 2.2},
+            {"kind": "remap", "dst": 0, "srcA": 0, "value": 1, "constant": [0.0, 1.0, 0.18, 1.7]},
+            {"kind": "input", "dst": 1, "input": "materialEmission"},
+            {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 0},
+            {"kind": "constant", "dst": 2, "constant": hexrgb("#03080e") + [1.0]},
+        ],
+        "baseColor": 2, "metallic": -1, "roughness": -1, "emission": 1, "emissionIntensity": 1.0, "opacity": -1,
+    }
+
+
 def bell(r):
     """A jellyfish bell: a dome with a frilled rim (a lathe), opening downward."""
     return lathe([(0.0, r * 0.98), (0.05 * r, r * 1.02), (0.25 * r, r * 0.95), (0.55 * r, r * 0.78),
@@ -131,6 +148,7 @@ def build():
                    {"name": "far", "start": 12.0, "end": 60.0, "contrast": 0.7, "saturation": 0.8}],
     }
     s.program(zooid_program())
+    s.program(bell_program())
 
     # ---- the colony: a spline, the stem along it, and the zooids distributed along it
     pts = [{"position": list(p), "scale": 1.0, "roll": 0.0} for p in CHAIN]
@@ -141,23 +159,33 @@ def build():
                     "curve": {"kind": "catmullRom", "generator": "points", "points": pts, "samplesPerSegment": 16}},
            material={"baseColor": hexrgb("#03121a"), "emissiveColor": hexrgb(CYAN), "emissiveIntensity": 0.35,
                      "roughness": 0.3, "metallic": 0.0})
-    zooid = lathe([(0.0, 0.02), (0.06, 0.12), (0.16, 0.17), (0.26, 0.12), (0.34, 0.03)], sides=10, samples=3)
+    # the zooids: translucent bells strung on the stem, each trailing a fan of fishing tentacles (a siphonophore reads
+    # as a creature by its dangling palps, not by its beads)
+    zooid = lathe([(0.0, 0.04), (0.1, 0.22), (0.28, 0.3), (0.46, 0.22), (0.6, 0.05)], sides=12, samples=3)
     s.proc("zooids", zooid, distribution={"kind": "spline", "spline": "chain", "count": N_ZOOIDS,
                                           "alignToSpline": True},
            material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 0.3,
                      "metallic": 0.0, "program": "abZooid"},
            variation={"seed": 3, "rotation": [0.5, 0.5, 0.5], "uniformScale": 0.35})
+    s.proc("palps", strand((0.0, 0.0, 0.0), (0.0, -1.6, 0.0), 0.007, taper=0.15, seed=77, noise=0.25,
+                           noise_scale=0.7, count=6, sides=4, segments=20),
+           distribution={"kind": "spline", "spline": "chain", "count": N_ZOOIDS, "alignToSpline": False},
+           material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 0.4,
+                     "metallic": 0.0, "program": "abZooid"},
+           variation={"seed": 5, "rotation": [0.25, 3.1, 0.25], "scale": [0.0, 0.45, 0.0]},
+           deformers=[{"kind": "noise", "amount": 0.18, "scale": 0.6, "speed": 0.2, "seed": 3,
+                       "axisMask": [1.0, 0.0, 1.0], "space": "world"}])
 
     # ---- the jellyfish: bells with a magenta-cyan rim, a light inside each (it answers its pitch)
     for k, (pos, _, r) in enumerate(JELLIES):
         s.proc("jelly%d" % k, bell(r),
                material={"baseColor": hexrgb("#05101a"), "emissiveColor": hexrgb(MAGENTA if k % 2 else CYAN),
-                         "emissiveIntensity": 0.25, "roughness": 0.2, "metallic": 0.0},
+                         "emissiveIntensity": 0.25, "roughness": 0.2, "metallic": 0.0, "program": "abBell"},
                deformers=[{"kind": "sine", "amount": 0.06 * r, "axis": [0, 1, 0], "displacementAxis": [1, 0, 1],
                            "frequency": 3.0, "phase": k * 1.3, "speed": 1.6}],
                transform={"position": list(pos), "rotation": [0.0, 0.0, 9.0 * (k - 2)], "scale": [1, 1, 1]})
         # its tentacles: faint strands hanging from round the rim, drifting
-        s.proc("tentacles%d" % k, strand((0.0, 0.0, 0.0), (0.0, -6.0 * r, 0.0), 0.006 + 0.004 * r, taper=0.1,
+        s.proc("tentacles%d" % k, strand((0.0, 0.0, 0.0), (0.0, -7.0 * r, 0.0), 0.006 + 0.005 * r, taper=0.1,
                                          seed=40 + k, noise=0.35 * r, noise_scale=0.6, count=6, sides=4,
                                          segments=24),
                distribution={"kind": "radial", "count": 9, "radius": r * 0.82, "center": [pos[0], pos[1], pos[2]],
@@ -177,8 +205,8 @@ def build():
     s.particles("snow", capacity=9000, seed=29, shape="box", position=[0.0, 7.0, -9.0], extent=[14.0, 1.0, 9.0],
                 direction=[0.05, -1.0, 0.0], spawnRate=220.0, lifetimeMin=14.0, lifetimeMax=22.0, spread=0.3,
                 speedMin=0.25, speedMax=0.5, gravity=[0, -0.02, 0], drag=0.2, turbulence=0.12, turbulenceScale=0.4,
-                sizeStart=0.012, sizeEnd=0.008, colorStart=hexrgb("#9fc8d8") + [0.55],
-                colorEnd=hexrgb("#9fc8d8") + [0.0], emissive=0.35, blend="additive")
+                sizeStart=0.016, sizeEnd=0.01, colorStart=hexrgb("#9fc8d8") + [0.6],
+                colorEnd=hexrgb("#9fc8d8") + [0.0], emissive=0.7, blend="additive", sizeVariance=0.7, sizeSkew=2.2)
     s.particles("glints", capacity=2000, seed=31, shape="box", position=[0.0, 1.0, -9.0], extent=[10.0, 5.0, 6.0],
                 direction=[0, -1, 0], spawnRate=0.0, lifetimeMin=0.15, lifetimeMax=0.5, spread=1.0, speedMin=0.0,
                 speedMax=0.05, gravity=[0, 0, 0], drag=0.5, sizeStart=0.016, sizeEnd=0.0,
@@ -201,17 +229,19 @@ def build():
     s.map(M("place", [("lastPitch", 1.0)], "mean", -0.28 / 0.44, 1.0 / 0.44))
     s.route(R("visual.place", prog % OP_PLACE, -1.0, comp=0, springHz=1.4, springDamping=0.8))
     # notes flare it; polyphony widens it; sustain is the colony's base glow; the snare flares it all
-    s.route(R("noteEnv", prog % OP_GAIN, 2.6, comp=0, depth="lastVelocity", attackMs=0, decayMs=600),
+    s.route(R("noteEnv", prog % OP_GAIN, 4.0, comp=0, depth="lastVelocity", attackMs=0, decayMs=600),
             R("polyphony", prog % OP_WIDTH, 0.03, comp=0, **MEDIUM),
             R("polyphony", "material/abZooid/op/10/constant/constant", 0.03, comp=0, **MEDIUM),
-            R("sustain", prog % OP_BASE, 0.5, comp=0, **SLOW),
+            R("sustain", prog % OP_BASE, 0.25, comp=0, **SLOW),
             R("snare", prog % OP_BASE, 2.5, comp=0, attackMs=0, decayMs=300),
-            R("noteEnv", "lights/colonyLight/intensity", 3.0, attackMs=0, decayMs=600))
+            R("noteEnv", "lights/colonyLight/intensity", 6.0, attackMs=0, decayMs=600))
     # the jellyfish at the pitch's depth answers
     s.places("jl", "lastPitch", [c for _, c, _ in JELLIES], 0.05, event="noteOn")
     for k in range(len(JELLIES)):
-        s.route(R("visual.jlHit%d" % k, "lights/jellyLight%d/intensity" % k, 14.0, attackMs=0, decayMs=1400),
-                R("visual.jlHit%d" % k, "procedural/jelly%d/material/emissive" % k, 2.5, attackMs=0, decayMs=1400))
+        s.route(R("visual.jlHit%d" % k, "lights/jellyLight%d/intensity" % k, 22.0, attackMs=0, decayMs=1400),
+                R("visual.jlHit%d" % k, "procedural/jelly%d/material/emissive" % k, 4.0, attackMs=0, decayMs=1400),
+                R("visual.jlHit%d" % k, "procedural/tentacles%d/material/emissive" % k, 1.2, attackMs=0,
+                  decayMs=1800))
     # bass: the current -- the snow streams sideways and the colony light swells
     s.route(R("bass", "particles/snow/gravity", 0.25, comp=0, attackMs=50, decayMs=1600),
             R("bass", "particles/snow/turbulence", 0.3, attackMs=50, decayMs=1200))
@@ -222,7 +252,7 @@ def build():
             R("sustain", "post/bloom/intensity", 0.1, **SLOW))
 
     s.params_({
-        "scene/volumeSteps": 24, "scene/volumeJitter": 0.5,
+        "scene/volumeSteps": 16, "scene/volumeJitter": 0.5,   # (24 steps: 17 ms; 16: 12)
         "post/bloom/intensity": 0.4, "post/bloom/threshold": 0.8, "post/output/vignette": 0.5,
         "post/output/grain": 0.02, "post/grade/temperature": -0.05, "post/tonemap/operator": 3,
         "post/shock/amount": 0.0, "post/shock/radius": 1.2, "post/shock/width": 0.12, "post/shock/chroma": 0.0,

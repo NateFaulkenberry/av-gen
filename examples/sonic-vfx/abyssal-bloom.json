@@ -126,7 +126,7 @@
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 30.0,
-  "scene/volumeSteps": 24,
+  "scene/volumeSteps": 16,
   "scene/volumeJitter": 0.5,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
@@ -538,7 +538,7 @@
   {
    "source": "response.noteEnv",
    "target": "material/abZooid/op/12/constant/constant",
-   "amount": 2.6,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -575,7 +575,7 @@
   {
    "source": "response.sustain",
    "target": "material/abZooid/op/14/constant/constant",
-   "amount": 0.5,
+   "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -599,7 +599,7 @@
   {
    "source": "response.noteEnv",
    "target": "lights/colonyLight/intensity",
-   "amount": 3.0,
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -610,7 +610,7 @@
   {
    "source": "visual.jlHit0",
    "target": "lights/jellyLight0/intensity",
-   "amount": 14.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -621,7 +621,7 @@
   {
    "source": "visual.jlHit0",
    "target": "procedural/jelly0/material/emissive",
-   "amount": 2.5,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -630,9 +630,20 @@
    }
   },
   {
+   "source": "visual.jlHit0",
+   "target": "procedural/tentacles0/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   }
+  },
+  {
    "source": "visual.jlHit1",
    "target": "lights/jellyLight1/intensity",
-   "amount": 14.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -643,7 +654,7 @@
   {
    "source": "visual.jlHit1",
    "target": "procedural/jelly1/material/emissive",
-   "amount": 2.5,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -652,9 +663,20 @@
    }
   },
   {
+   "source": "visual.jlHit1",
+   "target": "procedural/tentacles1/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   }
+  },
+  {
    "source": "visual.jlHit2",
    "target": "lights/jellyLight2/intensity",
-   "amount": 14.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -665,7 +687,7 @@
   {
    "source": "visual.jlHit2",
    "target": "procedural/jelly2/material/emissive",
-   "amount": 2.5,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -674,9 +696,20 @@
    }
   },
   {
+   "source": "visual.jlHit2",
+   "target": "procedural/tentacles2/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   }
+  },
+  {
    "source": "visual.jlHit3",
    "target": "lights/jellyLight3/intensity",
-   "amount": 14.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -687,7 +720,7 @@
   {
    "source": "visual.jlHit3",
    "target": "procedural/jelly3/material/emissive",
-   "amount": 2.5,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -696,9 +729,20 @@
    }
   },
   {
+   "source": "visual.jlHit3",
+   "target": "procedural/tentacles3/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   }
+  },
+  {
    "source": "visual.jlHit4",
    "target": "lights/jellyLight4/intensity",
-   "amount": 14.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -709,12 +753,23 @@
   {
    "source": "visual.jlHit4",
    "target": "procedural/jelly4/material/emissive",
-   "amount": 2.5,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
     "decayMs": 1400
+   }
+  },
+  {
+   "source": "visual.jlHit4",
+   "target": "procedural/tentacles4/material/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
    }
   },
   {

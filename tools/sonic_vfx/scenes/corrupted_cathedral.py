@@ -8,8 +8,8 @@ something breaks. Glitch is rationed to hits (Menkman: it must break something r
 """
 from .. import kit, signals
 from ..kit import (R, M, hexrgb, scale3, sd_union, sd_diff, sd_inter, sd_move, sd_rot, sd_box, sd_rbox, sd_cyl,
-                   sd_torus, sd_repeat, sd_polar, sd_mirror, sd_voronoi, sd_warp, sd_plane, SLOW, MEDIUM, FAST, HIT,
-                   SNAP)
+                   sd_torus, sd_repeat, sd_polar, sd_mirror, sd_voronoi, sd_warp, sd_twist, sd_plane, SLOW, MEDIUM,
+                   FAST, HIT, SNAP)
 
 ID = "corrupted-cathedral"
 TITLE = "The Corrupted Cathedral"
@@ -62,6 +62,13 @@ DESIGN = {
 
 BAY = 6.0
 N_BAYS = 7
+# The nave's cost at 1080p (realtime tier, GPU ms; measured with tools/sonic_vfx/perf.py on 96bc0214): the one tree
+# with a grooved SDF floor, a noise-warp sway and the rose inside it marched in 61 ms. The rose's twelve-fold polar
+# tracery, evaluated at every step of every ray, was half of it; the floor's grazing grooves and the warp a quarter.
+# All three switches on: 16 ms for both SDF objects together.
+FLOOR_MESH = True       # the floor as a lit plane with a tile-line program instead of SDF grooves
+SWAY_TWIST = True       # the bass's sway as a twist about the nave's axis instead of a noise warp
+ROSE_SPLIT = True       # the rose window as its own small SDF object instead of part of the nave's tree
 NAVE_MID_Z = -18.0       # bays at z = 0, -6, ..., -36
 APSE_Z = -40.5
 ROSE_Y = 12.0
@@ -74,7 +81,8 @@ def nave():
                     sd_move((0.0, 16.2, 0.0), sd_box((0.85, 0.22, 0.85))),
                     sd_move((0.0, 0.25, 0.0), sd_box((0.85, 0.25, 0.85))))
     piers = sd_move((0.0, 0.0, NAVE_MID_Z - BAY / 2.0),
-                    sd_repeat((0.0, 0.0, BAY), sd_mirror((1, 0, 0), sd_move((6.0, 0.0, 0.0), pier)), count=3))
+                    sd_repeat((0.0, 0.0, BAY), sd_mirror((1, 0, 0), sd_move((6.0, 0.0, 0.0), pier)), count=3),
+                    name="piers")
     # arcade walls: the wall above and between piers, pierced by a pointed arch
     arch_lens = sd_inter(sd_move((0.0, 8.6, 1.35), sd_rot((0, 0, 90), sd_cyl(4.1, 2.0))),
                          sd_move((0.0, 8.6, -1.35), sd_rot((0, 0, 90), sd_cyl(4.1, 2.0))))
@@ -84,17 +92,19 @@ def nave():
                           sd_move((0.0, 15.2, -0.45), sd_rot((0, 0, 90), sd_cyl(1.5, 2.0))))
     wall = sd_diff(wall, sd_union(clerestory, sd_move((0.0, 13.6, 0.0), sd_box((1.2, 1.6, 0.8)))))
     arcades = sd_move((0.0, 0.0, NAVE_MID_Z),
-                      sd_repeat((0.0, 0.0, BAY), sd_mirror((1, 0, 0), sd_move((6.0, 0.0, 0.0), wall)), count=3))
+                      sd_repeat((0.0, 0.0, BAY), sd_mirror((1, 0, 0), sd_move((6.0, 0.0, 0.0), wall)), count=3),
+                      name="arcades")
     # transverse ribs: a half ring across the nave at every pier
     rib = sd_move((0.0, 16.2, 0.0), sd_inter(sd_rot((90, 0, 0), sd_torus(6.0, 0.22)),
                                              sd_move((0.0, 3.5, 0.0), sd_box((7.0, 3.5, 1.0)))))
-    ribs = sd_move((0.0, 0.0, NAVE_MID_Z - BAY / 2.0), sd_repeat((0.0, 0.0, BAY), rib, count=3))
+    ribs = sd_move((0.0, 0.0, NAVE_MID_Z - BAY / 2.0), sd_repeat((0.0, 0.0, BAY), rib, count=3), name="ribs")
     # the floor: a slab with tile grooves (the line look draws the joints)
     grooves = sd_repeat((1.5, 0.0, 1.5), sd_union(sd_box((0.025, 0.05, 0.8)), sd_box((0.8, 0.05, 0.025))))
-    floor = sd_diff(sd_move((0.0, -0.25, -17.0), sd_box((7.5, 0.25, 24.0))), sd_move((0.0, 0.0, 0.0), grooves))
+    floor = sd_diff(sd_move((0.0, -0.25, -17.0), sd_box((7.5, 0.25, 24.0))), sd_move((0.0, 0.0, 0.0), grooves),
+                    name="floor")
     # the apse wall and the rose window's tracery
     end_wall = sd_diff(sd_move((0.0, 11.0, APSE_Z), sd_box((7.5, 11.0, 0.4))),
-                       sd_move((0.0, ROSE_Y, APSE_Z), sd_rot((90, 0, 0), sd_cyl(5.0, 2.0))))
+                       sd_move((0.0, ROSE_Y, APSE_Z), sd_rot((90, 0, 0), sd_cyl(5.0, 2.0))), name="apse")
     spokes = sd_polar(12, sd_move((2.6, 0.0, 0.0), sd_box((2.3, 0.07, 0.07))))
     petals = sd_polar(12, sd_move((3.55, 0.0, 0.0), sd_torus(0.95, 0.06)))
     rings = sd_union(sd_rot((90, 0, 0), sd_torus(4.95, 0.14)), sd_rot((90, 0, 0), sd_torus(1.25, 0.1)))
@@ -103,8 +113,59 @@ def nave():
     glass = sd_move((0.0, ROSE_Y, APSE_Z - 0.3), sd_rot((90, 0, 0), sd_cyl(5.0, 0.04)), m=1)
     # (no Voronoi fracture round the whole nave: evaluated at every march step it cost most of a 92 ms SDF pass at
     #  1080p; the kick breaks the image with post instruments instead)
-    stone = sd_union(piers, arcades, ribs, end_wall, tracery, floor)
-    return sd_warp(0.0, 0.07, sd_union(stone, glass), gain=(1.0, 0.25, 1.0), seed=3, name="sway")
+    parts = [piers, arcades, ribs, end_wall] + ([] if FLOOR_MESH else [floor]) + ([] if ROSE_SPLIT else [tracery])
+    body = sd_union(*parts) if ROSE_SPLIT else sd_union(sd_union(*parts), glass)
+    return sway(body)
+
+
+def sway(body):
+    """The bass's sway round a tree: a twist about the nave's vertical axis (the vault swings, the floor stays; one
+    rotation a step) or the original noise warp. The rose window's own object takes the same sway, so it stays in its
+    wall."""
+    if SWAY_TWIST:
+        return sd_move((0.0, 0.0, NAVE_MID_Z), sd_twist(0.0, sd_move((0.0, 0.0, -NAVE_MID_Z), body), name="sway"))
+    return sd_warp(0.0, 0.07, body, gain=(1.0, 0.25, 1.0), seed=3, name="sway")
+
+
+def rose_window():
+    """The rose window's tracery and glass alone, for its own SDF object: a march over a small rect instead of
+    every ray of the nave evaluating twelve-fold polar tracery at every step."""
+    spokes = sd_polar(12, sd_move((2.6, 0.0, 0.0), sd_box((2.3, 0.07, 0.07))))
+    petals = sd_polar(12, sd_move((3.55, 0.0, 0.0), sd_torus(0.95, 0.06)))
+    rings = sd_union(sd_rot((90, 0, 0), sd_torus(4.95, 0.14)), sd_rot((90, 0, 0), sd_torus(1.25, 0.1)))
+    tracery = sd_move((0.0, ROSE_Y, APSE_Z), sd_union(sd_rot((90, 0, 0), sd_union(spokes, petals)), rings),
+                      name="rose")
+    glass = sd_move((0.0, ROSE_Y, APSE_Z - 0.3), sd_rot((90, 0, 0), sd_cyl(5.0, 0.04)), m=1)
+    return sway(sd_union(tracery, glass))
+
+
+def floor_program():
+    """The nave's floor as a lit plane: dark stone, its tile joints drawn as thin cyan lines (cosines of x and z from
+    the palette op, thresholded), fading with distance before they could alias."""
+    def cos_lines(dst, src):
+        return {"kind": "palette", "dst": dst, "srcA": src, "constant": [0.0, 0.0, 0.0, 0.0],
+                "constant2": [1.0, 1.0, 1.0, 0.0], "constant3": [1.0 / 1.5, 1.0 / 1.5, 1.0 / 1.5, 0.0],
+                "constant4": [0.0, 0.0, 0.0, 0.0]}
+    return {
+        "name": "ccFloor",
+        "ops": [
+            {"kind": "input", "dst": 0, "input": "worldPosition"},
+            cos_lines(1, 0),                                                                  # cos(2 pi x / 1.5)
+            {"kind": "swizzle", "dst": 2, "srcA": 0, "constant": [2.0, 2.0, 2.0, 2.0]},
+            cos_lines(2, 2),                                                                  # cos(2 pi z / 1.5)
+            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.985, 0.999, 0.0, 0.0]},
+            {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.985, 0.999, 0.0, 0.0]},
+            {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+            {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 0.0, 1.0]},
+            {"kind": "input", "dst": 3, "input": "cameraDistance"},
+            {"kind": "remap", "dst": 3, "srcA": 3, "value": 1, "constant": [6.0, 40.0, 1.0, 0.15]},
+            {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 3},
+            {"kind": "constant", "dst": 4, "constant": hexrgb(CYAN, 1.6) + [0.0]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 1},
+            {"kind": "constant", "dst": 5, "constant": hexrgb("#0b0d12") + [1.0]},
+        ],
+        "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 4, "emissionIntensity": 1.0, "opacity": -1,
+    }
 
 
 def build():
@@ -128,12 +189,25 @@ def build():
         {"color": scale3(hexrgb("#0b0d12"), 1.0), "edge": hexrgb(CYAN, 0.9)},                      # stone
         {"color": [0.0, 0.0, 0.0], "emission": hexrgb("#7a2cff", 1.4), "edge": hexrgb(WHITE, 1.0)},  # rose glass
     ]
-    s.sdf("nave", nave(), (-9.0, -0.6, -42.0), (9.0, 23.5, 4.0), surfaces=surfaces,
+    if FLOOR_MESH:
+        s.program(floor_program())
+        s.proc("floor", {"kind": "box", "size": [15.0, 0.5, 48.0], "subdivisions": 1},
+               material={"baseColor": hexrgb("#0b0d12"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0,
+                         "roughness": 0.35, "metallic": 0.0, "program": "ccFloor"},
+               transform={"position": [0.0, -0.25, -17.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
+    s.sdf("nave", nave(), (-9.0, 0.0 if FLOOR_MESH else -0.6, -42.0), (9.0, 23.5, 4.0), surfaces=surfaces,
           material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                     "roughness": 0.7, "metallic": 0.0},
           look={"aoStrength": 0.3, "aoDistance": 0.8, "edgeIntensity": 2.6, "edgeWidth": 0.02,
                 "edgeColor": hexrgb(CYAN), "edgePixels": 1.5, "edgeSoftness": 0.25, "edgeThreshold": 0.03},
           max_steps=100, epsilon=0.0015, step_scale=0.9, max_distance=80.0)
+    if ROSE_SPLIT:
+        s.sdf("rose", rose_window(), (-7.0, 5.5, -41.6), (7.0, 18.5, -39.4), surfaces=surfaces,
+              material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
+                        "roughness": 0.7, "metallic": 0.0},
+              look={"aoStrength": 0.3, "aoDistance": 0.8, "edgeIntensity": 2.6, "edgeWidth": 0.02,
+                    "edgeColor": hexrgb(CYAN), "edgePixels": 1.5, "edgeSoftness": 0.25, "edgeThreshold": 0.03},
+              max_steps=64, epsilon=0.0015, step_scale=0.9, max_distance=80.0)
 
     # the bay lights: one per bay, high in the arcade, dark until a note lands there
     for k in range(N_BAYS):
@@ -181,16 +255,21 @@ def build():
     s.map(M("grit", [("roughness", 1.0), ("energy", 0.4), ("inharmonicity", 2.0, True)], "product", -0.3, 6.5))
 
     # sustained: reconstruction -- sharper, brighter lines; the corruption heals
-    s.route(R("visual.heal", "sdf/nave/look/edge/intensity", 2.4, **SLOW),
-            R("visual.heal", "sdf/nave/look/edge/softness", -0.15, **SLOW),
-            R("visual.heal", "lights/rose/intensity", 260.0, **SLOW),
-            R("visual.heal", "sdf/nave/surface/1/emission", 0.8, comp=2, **SLOW))
+    objs = ("nave", "rose") if ROSE_SPLIT else ("nave",)
+    for obj in objs:
+        s.route(R("visual.heal", "sdf/%s/look/edge/intensity" % obj, 2.4, **SLOW),
+                R("visual.heal", "sdf/%s/look/edge/softness" % obj, -0.15, **SLOW))
+    s.route(R("visual.heal", "lights/rose/intensity", 260.0, **SLOW),
+            R("visual.heal", "sdf/%s/surface/1/emission" % objs[-1], 0.8, comp=2, **SLOW))
     # melodic: the note's bay flares
     for k in range(N_BAYS):
         s.route(R("visual.bayHit%d" % k, "lights/bay%d/intensity" % k, 900.0, attackMs=0, decayMs=650))
     # bass: the nave sways and the lines thicken
-    s.route(R("bass", "sdf/nave/node/sway/amount", 0.35, attackMs=50, decayMs=900),
-            R("bass", "sdf/nave/look/edge/pixels", 1.2, attackMs=50, decayMs=600))
+    # (the twist's amount is radians per metre of height: 0.004 swings the vault's crown ~5 degrees)
+    for obj in objs:
+        s.route(R("bass", "sdf/%s/node/sway/amount" % obj, 0.004 if SWAY_TWIST else 0.35, attackMs=50,
+                  decayMs=900),
+                R("bass", "sdf/%s/look/edge/pixels" % obj, 1.2, attackMs=50, decayMs=600))
     # kick: the image breaks for a moment -- it splits along the nave's axis and a shock runs out from the rose
     s.route(R("kickEnv", "post/split/amount", 14.0, attackMs=0, decayMs=0),
             R("kickEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
@@ -219,6 +298,7 @@ def build():
 
     rose_uv = [round(v, 3) for v in s.project([0.0, ROSE_Y, APSE_Z])[:2]]
     s.params_({
+        "scene/volumeSteps": 16,          # (24 cost 15.7 ms of the frame; the thin haze holds at 16)
         "post/shock/amount": 0.0, "post/shock/radius": 1.3, "post/shock/width": 0.09, "post/shock/chroma": 0.6,
         "post/shock/centerX": rose_uv[0], "post/shock/centerY": rose_uv[1],
         "temporal/mosh/enabled": True, "temporal/mosh/amount": 0.0, "temporal/mosh/shift": 0.0,
