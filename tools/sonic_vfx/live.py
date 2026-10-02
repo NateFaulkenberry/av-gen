@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--size", default="960x540")
     ap.add_argument("--no-capture", action="store_true",
                     help="measure the live frame rate only (the capture re-renders every 2nd frame and costs time)")
+    ap.add_argument("--probe", default="", help="a probe binary other than the pin's (e.g. one with a longer recording)")
     a = ap.parse_args()
     out = os.path.join(a.out, "%s--%s%s" % (a.scene, a.scenario, "--nocap" if a.no_capture else ""))
     subprocess.run(["rm", "-rf", out])
@@ -91,7 +92,7 @@ def main():
     length = PROBE_LEN.get(a.scenario, 30.0) + 4.0
     frames = int(length * 120)
     b = pin_bin()
-    probe = os.path.join(b, "avgen_sonic_probe")
+    probe = a.probe or os.path.join(b, "avgen_sonic_probe")
     script = os.path.join(out, "run.sh")
     with open(script, "w") as f:
         f.write("set -e\n")
@@ -104,8 +105,8 @@ def main():
         f.write("%s/avgen --project %s --live --input BlackHole %s--sonic-live-log %s --frames %d > %s 2>&1 &\n"
                 % (b, project, capture, os.path.join(out, "live.csv"), frames, os.path.join(out, "editor.log")))
         f.write("APP=$!\nsleep 3\n")
-        f.write("%s %s --out %s --device BlackHole --lead-in 2\n" % (probe, a.scenario,
-                                                                     os.path.join(out, "probe.csv")))
+        f.write("%s %s --out %s --wav %s --device BlackHole --lead-in 2\n"
+                % (probe, a.scenario, os.path.join(out, "probe.csv"), os.path.join(out, "probe.wav")))
         # the scenario is over: let the last notes ring out, then close the editor (--frames is only a bound)
         f.write("sleep 2\nkill -TERM $APP 2>/dev/null || true\nwait $APP 2>/dev/null || true\n")
     subprocess.run([review.LOCK, "bash", script])
@@ -129,6 +130,15 @@ def main():
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-framerate", "%.3f" % fps, "-pattern_type", "glob", "-i",
                     os.path.join(out, "frames", "*.ppm"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
                     os.path.join(out, "live.mp4")], check=True)
+    # the probe's own recording of what it played, aligned on the host clock: its sample 0 is the `recording` row
+    wav = os.path.join(out, "probe.wav")
+    rec = [int(e["hostNs"]) for e in csv.DictReader(open(os.path.join(out, "probe.csv"))) if e["kind"] == "recording"]
+    if os.path.exists(wav) and rec and rec[0] > 0:
+        offset = (int(idx[0]["frameNs"]) - rec[0]) / 1e9
+        audio_in = (["-ss", "%.3f" % offset, "-i", wav] if offset >= 0 else ["-itsoffset", "%.3f" % -offset, "-i", wav])
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", os.path.join(out, "live.mp4")] + audio_in +
+                       ["-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                        os.path.join(out, "live-audio.mp4")], check=False)
     keys = [k for k in rows[0].keys() if k.startswith(("response.", "notes.", "visual.", "sonic."))]
     with open(os.path.join(out, "trace.csv"), "w", newline="") as f:
         w = csv.writer(f)

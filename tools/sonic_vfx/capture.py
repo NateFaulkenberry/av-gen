@@ -23,14 +23,11 @@ from tools.sonic_vfx import review  # noqa: E402
 from tools.sonic_vfx.scenes import SCENES  # noqa: E402
 
 OUT = os.path.expanduser("~/Desktop/av-gen-review/25-sonic-vfx")
-# the class each scene is shown with in its clip and in the tour (the input it was designed round)
-# The class each scene is shown with: the full mix (pads, bass, lead and drums) wherever the scene answers drums --
-# since ADR-1067/1068 the live detector hears them under a mix -- and the input it was designed round otherwise.
-SHOWCASE = {"salt-flat-mirage": "full", "lantern-lake": "full", "aurora-tundra": "pads",
-            "breathing-deep": "pads", "abyssal-bloom": "lead", "cymatic-plate": "lead", "silk-theatre": "lead",
-            "ferrofluid-crown": "chords", "feedback-mirror": "arp", "tesla-choir": "chords",
-            "datascape": "full", "ember-forest": "full", "corrupted-cathedral": "full",
-            "storm-cell": "full", "stellar-nursery": "chords", "event-horizon": "full"}
+# The class each scene is shown with: the full mix (pads, bass, lead and drums) for every scene, so its clip has the
+# whole instrument and music worth listening to, and the tour cut from the clips plays one piece of music through
+# sixteen worlds (since ADR-1067/1068 the live detector hears the drums under the mix). The single-input classes are
+# the test matrix's.
+SHOWCASE = {}
 
 
 def scene_ids():
@@ -52,15 +49,22 @@ def still(a):
     os.makedirs(work, exist_ok=True)
     proj, dur = review.variant(a.scene, cls, work, a.projects or None)
     t = a.at if a.at is not None else min(dur * 0.6, dur - 0.5)
-    d = os.path.join(work, a.scene + "-still")
-    subprocess.run(["rm", "-rf", d])
-    review.run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
-                "%.3f:%.3f" % (t, t + 0.04), "--size", a.size, "--fps", "25", "--particle-warmup", "240",
-                "--tier", a.tier])
-    frames = sorted(f for f in os.listdir(d) if f.endswith(".png")) if os.path.isdir(d) else []
-    if frames:
-        dst = os.path.join(OUT, numbered(a.scene) + ".png")
-        os.replace(os.path.join(d, frames[0]), dst)
+    # Played from the start, not seeked: a render that starts at t has none of the history the music left before it
+    # (no lantern a note released, no silk a phrase laid), so the still is the last frame of a near-lossless clip.
+    # The scene's capture clip already plays it from the start at this size: take the frame from it when it exists.
+    dst = os.path.join(OUT, numbered(a.scene) + ".png")
+    clip_path = os.path.join(OUT, numbered(a.scene) + ".mp4")
+    if os.path.exists(clip_path) and not a.cls:
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", "%.3f" % t, "-i", clip_path, "-frames:v", "1",
+                        "-update", "1", dst], check=False)
+        print(dst)
+        return
+    tmp = os.path.join(work, a.scene + "-still.mp4")
+    review.run(["--headless", "--project", proj, "--render", tmp, "--range", "0:%.3f" % (t + 0.04), "--size", a.size,
+                "--fps", "25", "--codec", "h264", "--quality", "97", "--particle-warmup", "120", "--tier", a.tier])
+    if os.path.exists(tmp):
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-sseof", "-0.05", "-i", tmp, "-frames:v", "1", "-update", "1",
+                        dst], check=False)
         print(dst)
 
 
@@ -72,7 +76,7 @@ def clip(a, seconds=None, size=None, dst=None, cls=None):
     end = min(dur, seconds) if seconds else dur
     dst = dst or os.path.join(OUT, numbered(a.scene) + ".mp4")
     review.run(["--headless", "--project", proj, "--render", dst, "--range", "0:%.2f" % end, "--size",
-                size or a.size, "--fps", "30", "--codec", "h264", "--quality", "85", "--particle-warmup", "120",
+                size or a.size, "--fps", "30", "--codec", "h264", "--quality", "92", "--particle-warmup", "120",
                 "--tier", a.tier])
     print(dst)
     return dst
