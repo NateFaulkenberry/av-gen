@@ -118,529 +118,380 @@
       "kind": "union",
       "children": [
        {
-        "kind": "union",
+        "kind": "displaceNoise",
+        "amount": 2.2800000000000002,
+        "frequency": 0.1,
+        "speed": 0.0,
+        "seed": 3,
         "children": [
          {
-          "kind": "displaceNoise",
-          "amount": 0.72,
-          "frequency": 0.3,
-          "speed": 0.0,
-          "seed": 4,
+          "kind": "smoothUnion",
           "children": [
            {
-            "kind": "displaceNoise",
-            "amount": 2.2800000000000002,
-            "frequency": 0.1,
-            "speed": 0.0,
-            "seed": 3,
+            "kind": "translate",
+            "translation": [
+             -15.0,
+             -17.240000000000002,
+             -60.0
+            ],
             "children": [
              {
-              "kind": "smoothUnion",
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 -15.0,
-                 -17.240000000000002,
-                 -60.0
-                ],
-                "children": [
-                 {
-                  "kind": "sphere",
-                  "radius": 9.0
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -14.746653321243533,
-                 -10.186666666666667,
-                 -60.60581532551983
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 5.7,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -16.333218219679484,
-                 -4.053333333333333,
-                 -60.368799443974105
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 5.1000000000000005,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -14.45017619272426,
-                 2.080000000000002,
-                 -58.902740222117615
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 4.5,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -12.878498617065704,
-                 8.213333333333331,
-                 -61.09335631426161
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.900000000000001,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -14.508052027211226,
-                 14.346666666666671,
-                 -59.640305588067584
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.3000000000000003,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -14.813178262032643,
-                 20.479999999999997,
-                 -59.38595520905622
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 2.7,
-                  "height": 8.28
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 -14.0,
-                 25.0,
-                 -60.0
-                ],
-                "children": [
-                 {
-                  "kind": "sphere",
-                  "radius": 3.4799999999999995
-                 }
-                ]
-               }
-              ],
-              "smooth": 3.3000000000000003
+              "kind": "sphere",
+              "radius": 9.0
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.746653321243533,
+             -10.186666666666667,
+             -60.60581532551983
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 5.7,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -16.333218219679484,
+             -4.053333333333333,
+             -60.368799443974105
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 5.1000000000000005,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.45017619272426,
+             2.080000000000002,
+             -58.902740222117615
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.5,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -12.878498617065704,
+             8.213333333333331,
+             -61.09335631426161
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.900000000000001,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.508052027211226,
+             14.346666666666671,
+             -59.640305588067584
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.3000000000000003,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.813178262032643,
+             20.479999999999997,
+             -59.38595520905622
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.7,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.0,
+             25.0,
+             -60.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 3.4799999999999995
              }
             ]
            }
-          ]
-         },
-         {
-          "kind": "displaceNoise",
-          "amount": 0.6,
-          "frequency": 0.36,
-          "speed": 0.0,
-          "seed": 8,
-          "children": [
-           {
-            "kind": "displaceNoise",
-            "amount": 1.9,
-            "frequency": 0.12,
-            "speed": 0.0,
-            "seed": 7,
-            "children": [
-             {
-              "kind": "smoothUnion",
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 14.0,
-                 -21.84,
-                 -92.0
-                ],
-                "children": [
-                 {
-                  "kind": "sphere",
-                  "radius": 7.5
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 14.751788803954042,
-                 -16.32,
-                 -91.81348763057743
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 4.75,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 14.550933759824952,
-                 -11.52,
-                 -91.39164868546774
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 4.25,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 12.340216913642934,
-                 -6.719999999999999,
-                 -92.99717215619638
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.75,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 12.326829558220638,
-                 -1.9200000000000017,
-                 -91.27956752100916
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.250000000000001,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 13.443508475694019,
-                 2.8800000000000026,
-                 -91.96284161520917
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 2.75,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 11.758084352422246,
-                 7.68,
-                 -92.76994796054207
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 2.2500000000000004,
-                  "height": 6.4799999999999995
-                 }
-                ]
-               }
-              ],
-              "smooth": 2.75
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "displaceNoise",
-          "amount": 0.504,
-          "frequency": 0.42857142857142855,
-          "speed": 0.0,
-          "seed": 12,
-          "children": [
-           {
-            "kind": "displaceNoise",
-            "amount": 1.596,
-            "frequency": 0.14285714285714285,
-            "speed": 0.0,
-            "seed": 11,
-            "children": [
-             {
-              "kind": "smoothUnion",
-              "children": [
-               {
-                "kind": "translate",
-                "translation": [
-                 34.0,
-                 -24.2,
-                 -130.0
-                ],
-                "children": [
-                 {
-                  "kind": "sphere",
-                  "radius": 6.300000000000001
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 32.97778806089954,
-                 -19.6,
-                 -129.8711659558882
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.9900000000000007,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 34.25100475460205,
-                 -15.6,
-                 -130.70482008442423
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.5700000000000007,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 35.263940665376744,
-                 -11.6,
-                 -129.18962460097524
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 3.1500000000000004,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 34.043269456401234,
-                 -7.600000000000001,
-                 -130.3750473087863
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 2.730000000000001,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 33.783882155984585,
-                 -3.599999999999998,
-                 -130.31060534164507
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 2.3100000000000005,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               },
-               {
-                "kind": "translate",
-                "translation": [
-                 35.635816863205584,
-                 0.3999999999999986,
-                 -129.21105490877463
-                ],
-                "children": [
-                 {
-                  "kind": "capsule",
-                  "radius": 1.8900000000000003,
-                  "height": 5.3999999999999995
-                 }
-                ]
-               }
-              ],
-              "smooth": 2.3100000000000005
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -17.38289343482927,
-           26.424304607605862,
-           -58.16872748402759
           ],
-          "children": [
-           {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star0",
-            "material": 1
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -16.618545109662975,
-           27.496151876871544,
-           -56.929530103672555
-          ],
-          "children": [
-           {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star1",
-            "material": 2
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -15.425887157740965,
-           28.431633671794188,
-           -56.09442201523101
-          ],
-          "children": [
-           {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star2",
-            "material": 3
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -14.0,
-           28.8,
-           -55.8
-          ],
-          "children": [
-           {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star3",
-            "material": 4
-           }
-          ]
-         },
-         {
-          "kind": "translate",
-          "translation": [
-           -12.574112842259035,
-           28.431633671794188,
-           -56.09442201523101
-          ],
-          "children": [
-           {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star4",
-            "material": 5
-           }
-          ]
+          "smooth": 3.3000000000000003
          }
         ]
        },
        {
-        "kind": "union",
+        "kind": "displaceNoise",
+        "amount": 1.9,
+        "frequency": 0.12,
+        "speed": 0.0,
+        "seed": 7,
         "children": [
          {
-          "kind": "translate",
-          "translation": [
-           -11.381454890337025,
-           27.496151876871544,
-           -56.929530103672555
-          ],
+          "kind": "smoothUnion",
           "children": [
            {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star5",
-            "material": 6
+            "kind": "translate",
+            "translation": [
+             14.0,
+             -21.84,
+             -92.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 7.5
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             14.751788803954042,
+             -16.32,
+             -91.81348763057743
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             14.550933759824952,
+             -11.52,
+             -91.39164868546774
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.25,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             12.340216913642934,
+             -6.719999999999999,
+             -92.99717215619638
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             12.326829558220638,
+             -1.9200000000000017,
+             -91.27956752100916
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.250000000000001,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             13.443508475694019,
+             2.8800000000000026,
+             -91.96284161520917
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             11.758084352422246,
+             7.68,
+             -92.76994796054207
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.2500000000000004,
+              "height": 6.4799999999999995
+             }
+            ]
            }
-          ]
-         },
+          ],
+          "smooth": 2.75
+         }
+        ]
+       },
+       {
+        "kind": "displaceNoise",
+        "amount": 1.596,
+        "frequency": 0.14285714285714285,
+        "speed": 0.0,
+        "seed": 11,
+        "children": [
          {
-          "kind": "translate",
-          "translation": [
-           -10.61710656517073,
-           26.424304607605862,
-           -58.16872748402759
-          ],
+          "kind": "smoothUnion",
           "children": [
            {
-            "kind": "sphere",
-            "radius": 0.75,
-            "name": "star6",
-            "material": 7
+            "kind": "translate",
+            "translation": [
+             34.0,
+             -24.2,
+             -130.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 6.300000000000001
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             32.97778806089954,
+             -19.6,
+             -129.8711659558882
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.9900000000000007,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             34.25100475460205,
+             -15.6,
+             -130.70482008442423
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.5700000000000007,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             35.263940665376744,
+             -11.6,
+             -129.18962460097524
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.1500000000000004,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             34.043269456401234,
+             -7.600000000000001,
+             -130.3750473087863
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.730000000000001,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             33.783882155984585,
+             -3.599999999999998,
+             -130.31060534164507
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.3100000000000005,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             35.635816863205584,
+             0.3999999999999986,
+             -129.21105490877463
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 1.8900000000000003,
+              "height": 5.3999999999999995
+             }
+            ]
            }
-          ]
+          ],
+          "smooth": 2.3100000000000005
          }
         ]
        }
       ]
      }
     },
-    "renderMode": "raymarch",
+    "renderMode": "mesh",
     "compile": true,
     "material": {
      "baseColor": [
@@ -669,104 +520,12 @@
     ],
     "castShadows": false,
     "depthPrepass": false,
-    "maxSteps": 160,
+    "maxSteps": 96,
     "epsilon": 0.002,
-    "stepScale": 0.75,
+    "stepScale": 0.9,
     "normalEpsilon": 0.002,
     "maxDistance": 400.0,
-    "surfaces": [
-     {
-      "color": [
-       0.02315,
-       0.00802,
-       0.00402
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "color": [
-       0.0,
-       0.0,
-       0.0
-      ],
-      "emission": [
-       0.0,
-       0.0,
-       0.0
-      ]
-     }
-    ],
+    "resolution": 128,
     "look": {
      "aoStrength": 0.6,
      "aoDistance": 3.0
@@ -782,6 +541,342 @@
     0.0,
     0.0
    ]
+  },
+  {
+   "name": "star0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -17.38289343482927,
+      26.424304607605862,
+      -58.16872748402759
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -16.618545109662975,
+      27.496151876871544,
+      -56.929530103672555
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -15.425887157740965,
+      28.431633671794188,
+      -56.09442201523101
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -14.0,
+      28.8,
+      -55.8
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.574112842259035,
+      28.431633671794188,
+      -56.09442201523101
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.381454890337025,
+      27.496151876871544,
+      -56.929530103672555
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.61710656517073,
+      26.424304607605862,
+      -58.16872748402759
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
   }
  ],
  "lights": [

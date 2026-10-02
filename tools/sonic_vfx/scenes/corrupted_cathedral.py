@@ -42,20 +42,20 @@ DESIGN = {
         "very_slow": ["the walk", "the rose window turning"],
         "medium": ["the nave swaying (bass)", "reconstruction after a hit"],
         "fast": ["bay lights by pitch"],
-        "extremely_fast": ["mosh blocks (snare)", "fracture (kick)", "mote flicker (hat)"],
+        "extremely_fast": ["mosh blocks (snare)", "split and shock (kick)", "mote flicker (hat)"],
     },
     "vocabulary": [
         ["sustained", "response.sustain", "reconstruction: the lines sharpen and brighten, the corruption heals"],
         ["melodic", "response.note", "the bay at the pitch's place flares (low notes near the "
          "door, high notes near the apse)"],
         ["bass", "response.bass", "the structure sways (an SDF warp) and the lines thicken"],
-        ["kick", "response.kick", "a structural fracture: the stone breaks into Voronoi cells for a moment"],
+        ["kick", "response.kick", "the image breaks for a moment: it splits along the nave, a shock runs from the rose"],
         ["snare", "response.snare", "frame corruption: mosh blocks and a magenta channel shift"],
         ["hat", "response.hat", "data motes flicker"],
         ["phrase", "notes.phrase", "a scan sweep crosses the frame and rebuilds it"],
         ["velocity", "notes.lastVelocity", "how hard a note flares its bay"],
         ["density", "notes.density", "fragmentation: more, smaller mosh blocks"],
-        ["roughness", "sonic.roughness", "a rough sound leaves the stone permanently fractured"],
+        ["roughness", "sonic.roughness", "a rough sound leaves the frame corrupted: mosh blocks and sorted light"],
     ],
     "tier": "medium: one compiled SDF (the nave), haze march at 24 steps, mosh",
 }
@@ -101,7 +101,9 @@ def nave():
     tracery = sd_move((0.0, ROSE_Y, APSE_Z), sd_union(sd_rot((90, 0, 0), sd_union(spokes, petals)), rings),
                       name="rose")
     glass = sd_move((0.0, ROSE_Y, APSE_Z - 0.3), sd_rot((90, 0, 0), sd_cyl(5.0, 0.04)), m=1)
-    stone = sd_voronoi(0.0, 0.9, sd_union(piers, arcades, ribs, end_wall, tracery, floor), seed=7, name="fracture")
+    # (no Voronoi fracture round the whole nave: evaluated at every march step it cost most of a 92 ms SDF pass at
+    #  1080p; the kick breaks the image with post instruments instead)
+    stone = sd_union(piers, arcades, ribs, end_wall, tracery, floor)
     return sd_warp(0.0, 0.07, sd_union(stone, glass), gain=(1.0, 0.25, 1.0), seed=3, name="sway")
 
 
@@ -131,7 +133,7 @@ def build():
                     "roughness": 0.7, "metallic": 0.0},
           look={"aoStrength": 0.3, "aoDistance": 0.8, "edgeIntensity": 2.6, "edgeWidth": 0.02,
                 "edgeColor": hexrgb(CYAN), "edgePixels": 1.5, "edgeSoftness": 0.25, "edgeThreshold": 0.03},
-          max_steps=150, epsilon=0.0012, step_scale=0.8, max_distance=80.0)
+          max_steps=100, epsilon=0.0015, step_scale=0.9, max_distance=80.0)
 
     # the bay lights: one per bay, high in the arcade, dark until a note lands there
     for k in range(N_BAYS):
@@ -189,9 +191,10 @@ def build():
     # bass: the nave sways and the lines thicken
     s.route(R("bass", "sdf/nave/node/sway/amount", 0.35, attackMs=50, decayMs=900),
             R("bass", "sdf/nave/look/edge/pixels", 1.2, attackMs=50, decayMs=600))
-    # kick: a structural fracture for a moment, and the image splits along the nave's axis (ADR-1065)
-    s.route(R("kick", "sdf/nave/node/fracture/amount", 0.18, attackMs=0, decayMs=260),
-            R("kickEnv", "post/split/amount", 9.0, attackMs=0, decayMs=0),
+    # kick: the image breaks for a moment -- it splits along the nave's axis and a shock runs out from the rose
+    s.route(R("kickEnv", "post/split/amount", 14.0, attackMs=0, decayMs=0),
+            R("kickEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
+            R("kickEnv", "post/shock/radius", -1.3, op="replace", offset=-1.0, attackMs=0, decayMs=0),
             R("kick", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=140))
     # snare: frame corruption -- mosh blocks and a channel shift; denser playing breaks it into smaller blocks
     s.route(R("snare", "temporal/mosh/amount", 0.42, attackMs=0, decayMs=240),
@@ -209,13 +212,15 @@ def build():
               remapEnabled=True, remapInMin=0.0, remapInMax=1.0, remapOutMin=1.0, remapOutMax=0.0),
             R("phrase", "post/sweep/intensity", 0.6, attackMs=0, decayMs=1100))
     # roughness: permanent decay -- and the glass's light drips down the frame as sorted pixels; healing stops it
-    s.route(R("visual.grit", "sdf/nave/node/fracture/amount", 0.02, **FAST),
-            R("visual.grit", "temporal/mosh/amount", 0.12, **FAST),
+    s.route(R("visual.grit", "temporal/mosh/amount", 0.12, **FAST),
             R("visual.grit", "post/sort/amount", 0.75, **MEDIUM),
             R("visual.heal", "post/sort/amount", -0.5, **SLOW))
     s.route(R("visual.heal", "post/bloom/intensity", 0.1, **SLOW))
 
+    rose_uv = [round(v, 3) for v in s.project([0.0, ROSE_Y, APSE_Z])[:2]]
     s.params_({
+        "post/shock/amount": 0.0, "post/shock/radius": 1.3, "post/shock/width": 0.09, "post/shock/chroma": 0.6,
+        "post/shock/centerX": rose_uv[0], "post/shock/centerY": rose_uv[1],
         "temporal/mosh/enabled": True, "temporal/mosh/amount": 0.0, "temporal/mosh/shift": 0.0,
         "temporal/mosh/block": 36.0, "temporal/mosh/smear": 26.0, "temporal/mosh/frames": 10.0,
         "temporal/mosh/rate": 14.0,

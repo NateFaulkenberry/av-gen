@@ -142,7 +142,7 @@ def build():
           material={"baseColor": [1, 1, 1], "emissiveColor": hexrgb(BIO), "emissiveIntensity": 0.3,
                     "roughness": 0.32, "metallic": 0.0, "program": "bdLichen"},
           look={"aoStrength": 0.45, "aoDistance": 1.6}, max_steps=110, epsilon=0.002, step_scale=0.75,
-          max_distance=90.0)
+          max_distance=90.0, mesh=128)   # static rock: meshed once at load (raymarched it cost 24 ms at 1080p)
 
     # ---- the pool: black, still, a faint sheen of the cavern's air
     s.proc("pool", {"kind": "box", "size": [140.0, 0.2, 140.0], "subdivisions": 1},
@@ -211,13 +211,13 @@ def build():
                   "curve": {"kind": "catmullRom", "generator": "line", "count": 3, "start": [0, -0.32, 0],
                             "end": [0, 0.0, 0], "samplesPerSegment": 4}}
     # a colony, not a scatter: one larger cap and a tail of smaller ones (heavy-tailed sizes)
-    for name, src, emi in (("lipCaps", small_cap, 0.16), ("lipStems", small_stem, 0.04)):
+    for name, src, emi in (("lipCaps", small_cap, 0.03), ("lipStems", small_stem, 0.01)):
         s.proc(name, src, position=(-7.6, 1.15, 4.6),
                distribution={"kind": "spiral", "count": 12, "radius": 0.3, "radiusGrowth": 0.28, "turns": 1.25,
                              "spiralHeight": 0.0},
                variation={"seed": 12, "scale": [0.55, 0.55, 0.55], "position": [0.12, 0.05, 0.12]},
-               material={"baseColor": [0.02, 0.02, 0.02], "emissiveColor": hexrgb(BIO), "emissiveIntensity": emi,
-                         "roughness": 0.5, "metallic": 0.0},
+               material={"baseColor": [0.008, 0.01, 0.01], "emissiveColor": hexrgb(BIO), "emissiveIntensity": emi,
+                         "roughness": 0.35, "metallic": 0.0},
                material_variation={"emissiveRandom": 0.6})
 
     # ---- particles: spores falling from the gills; a burst on a snare; glints on hats
@@ -311,7 +311,7 @@ def build():
         "camera/lens/focalLength": 26.0, "camera/exposure/compensation": 0.1,
         "post/dof/enabled": True, "post/dof/physical": True, "camera/lens/aperture": 2.4,
         "camera/focus/mode": 0, "camera/lens/focusDistance": 19.0,
-        "scene/volumeAnisotropy": 0.45, "scene/volumeScattering": 1.0,
+        "scene/volumeAnisotropy": 0.45, "scene/volumeScattering": 1.0, "scene/volumeSteps": 16,
     })
     # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
     s.region("organism", centre=list(ORG), radius=3.5)

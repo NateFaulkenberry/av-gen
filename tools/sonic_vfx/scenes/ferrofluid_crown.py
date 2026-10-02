@@ -42,7 +42,7 @@ DESIGN = {
         "very_slow": ["the camera's drift", "the tower turning"],
         "medium": ["the surface's swell and the spike field (bass)"],
         "fast": ["note spikes rising and melting"],
-        "extremely_fast": ["surface shimmer (hat)", "the ripple ring (kick)", "droplets (snare)"],
+        "extremely_fast": ["glints on the skin (hat)", "the ripple ring (kick)", "droplets (snare)"],
     },
     "vocabulary": [
         ["melodic", "response.note", "a spike rises from the liquid at its pitch's place round the "
@@ -52,7 +52,7 @@ DESIGN = {
         ["bass", "response.bass", "the magnetic field: the surface heaves, the small spikes lengthen together"],
         ["kick", "response.kick", "a ripple ring crosses the dish"],
         ["snare", "response.snare", "spike tips throw black droplets"],
-        ["hat", "response.hat", "fine shimmer on the surface"],
+        ["hat", "response.hat", "glints flicker on the liquid's skin"],
         ["tension", "notes.tension", "dissonance makes the surface restless (noise)"],
         ["brightness", "sonic.brightness", "the warm key cools toward white"],
     ],
@@ -80,7 +80,7 @@ def fluid():
                              name="ringLift%d" % j))
     # the field's spikes are as regular as the physics makes them, but not machine-identical: a faint noise bends
     # and nicks each copy differently (a polar repeat alone would draw the same cone forty times)
-    field = sd_noise(0.014, 7.0, sd_union(*rings), seed=17)
+    field = sd_union(*rings)   # (a noise round the field to unequalise its copies cost too much per step)
     # the twelve note spikes: each hides below the surface (y -0.62) until its note pulls it up
     spikes = []
     for k in range(N_SPIKES):
@@ -94,7 +94,9 @@ def fluid():
     tower = sd_move((0.0, 0.5, 0.0), sd_smooth(0.05, sd_cone(0.26, 1.0), fins), name="tower")
     body = sd_smooth(0.08, pool, field, ring, tower)
     body = sd_wave(0.0, 2.2, body, axis=(1.0, 0.0, 0.3), speed=1.1, name="swell")
-    return sd_noise(0.0, 9.0, body, speed=1.8, seed=4, name="shimmer")
+    # (no noise "shimmer" round the whole liquid: evaluated at every march step it cost a tenth of the frame; the
+    #  hats glint on the skin instead)
+    return body
 
 
 def dish():
@@ -119,7 +121,7 @@ def build():
           surfaces=[{"color": scale3(hexrgb("#050506"), 1.0)}],
           material={"baseColor": hexrgb("#030304"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                     "roughness": 0.07, "metallic": 0.35},
-          look={"aoStrength": 0.35, "aoDistance": 0.25}, max_steps=160, epsilon=0.0006, step_scale=0.7,
+          look={"aoStrength": 0.0, "aoDistance": 0.25}, max_steps=72, epsilon=0.0018, step_scale=1.0,
           max_distance=20.0)
     s.sdf("dish", dish(), (-2.7, -0.45, -2.7), (2.7, 0.3, 2.7),
           material={"baseColor": hexrgb("#0a0a0b"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
@@ -133,6 +135,11 @@ def build():
     s.light("top", "rect", position=[0.0, 4.0, 0.0], direction=[0.0, -1.0, 0.0], up=[0, 0, 1],
             color=hexrgb("#d8d4cc"), intensity=6.0, width=2.0, height=2.0, castsShadow=False)
 
+    # ---- glints (hat): points of the softbox's light catching the skin for an instant
+    s.particles("skinGlints", capacity=1200, seed=9, shape="disc", position=[0.0, 0.02, 0.0], extent=[1.9, 0.0, 1.9],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.05, lifetimeMax=0.14, spread=1.0, speedMin=0.0,
+                speedMax=0.01, gravity=[0, 0, 0], drag=0.0, sizeStart=0.012, sizeEnd=0.0,
+                colorStart=hexrgb("#fff2dc") + [1.0], colorEnd=hexrgb(WARM) + [0.0], emissive=14.0, blend="additive")
     # ---- droplets (snare): black beads flung from the spike tips
     s.particles("droplets", capacity=1500, seed=5, shape="disc", position=[0.0, 0.55, 0.0], extent=[1.25, 0.0, 1.25],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=0.9, spread=0.35, speedMin=1.2,
@@ -179,12 +186,12 @@ def build():
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
         s.route(R("bass", "sdf/fluid/node/ringCone%d/height" % j, ch * 0.9, attackMs=50 + 30 * j, decayMs=500))
     s.route(R("bass", "sdf/fluid/node/swell/amount", 0.03, attackMs=50, decayMs=700))
-    # hat: shimmer
-    s.route(R("hat", "sdf/fluid/node/shimmer/amount", 0.008, attackMs=0, decayMs=90))
+    # hat: glints on the liquid's skin
+    s.route(R("hat", "particles/skinGlints/burst", 24.0, attackMs=0, decayMs=30))
     # snare: droplets
     s.route(R("snare", "particles/droplets/burst", 90.0, attackMs=0, decayMs=30))
     # tension: a restless surface
-    s.route(R("visual.unrest", "sdf/fluid/node/shimmer/amount", 0.006, **MEDIUM))
+    s.route(R("visual.unrest", "sdf/fluid/node/swell/amount", 0.012, **MEDIUM))
     # timbre: a bright sound cools the key toward white
     s.route(R("brightness", "lights/softbox/color", -0.15, comp=0, **MEDIUM),
             R("brightness", "lights/softbox/color", 0.25, comp=2, **MEDIUM))

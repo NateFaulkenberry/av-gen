@@ -166,7 +166,7 @@
       ]
      }
     },
-    "renderMode": "raymarch",
+    "renderMode": "mesh",
     "compile": true,
     "material": {
      "baseColor": [
@@ -201,6 +201,7 @@
     "stepScale": 0.75,
     "normalEpsilon": 0.002,
     "maxDistance": 90.0,
+    "resolution": 128,
     "look": {
      "aoStrength": 0.45,
      "aoDistance": 1.6
@@ -1619,17 +1620,17 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.02
+      0.008,
+      0.01,
+      0.01
      ],
      "emissiveColor": [
       0.06125,
       0.87137,
       0.52712
      ],
-     "emissiveIntensity": 0.16,
-     "roughness": 0.5,
+     "emissiveIntensity": 0.03,
+     "roughness": 0.35,
      "metallic": 0.0
     },
     "variation": {
@@ -1694,17 +1695,17 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.02
+      0.008,
+      0.01,
+      0.01
      ],
      "emissiveColor": [
       0.06125,
       0.87137,
       0.52712
      ],
-     "emissiveIntensity": 0.04,
-     "roughness": 0.5,
+     "emissiveIntensity": 0.01,
+     "roughness": 0.35,
      "metallic": 0.0
     },
     "variation": {

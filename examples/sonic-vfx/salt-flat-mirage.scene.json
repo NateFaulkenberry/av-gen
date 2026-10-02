@@ -30,7 +30,7 @@
    0.2705
   ],
   "volumeDensity": 0.00028,
-  "volumeMaxDistance": 60.0,
+  "volumeMaxDistance": 0.0,
   "volumeAnisotropy": 0.2,
   "volumeShadowStrength": 0.0,
   "volumeNoise": 0.0,

@@ -376,10 +376,13 @@ class Scene:
 
     def sdf(self, name, root, bounds_min, bounds_max, surfaces=None, look=None, material=None, position=(0, 0, 0),
             rotation=(0, 0, 0), max_steps=128, epsilon=0.001, step_scale=0.9, max_distance=0.0, shadows=False,
-            prepass=False, normal_epsilon=0.002, visible=True):
+            prepass=False, normal_epsilon=0.002, visible=True, mesh=0):
+        """An SDF node. `mesh` > 0 renders it as a surface-nets mesh of that many cells per axis instead of a raymarch:
+        for a STATIC tree (no routed node parameters -- a routed node re-meshes it every frame), at a fraction of the
+        cost of marching it at full resolution every frame."""
         if sd_count(root) > 96:
             raise SystemExit(f"{self.id}: sdf '{name}' has {sd_count(root)} nodes (limit 96)")
-        s = {"tree": {"root": root}, "renderMode": "raymarch", "compile": True,
+        s = {"tree": {"root": root}, "renderMode": "mesh" if mesh else "raymarch", "compile": True,
              "material": material or {"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                                       "roughness": 0.6, "metallic": 0.0},
              "boundsMin": [float(v) for v in bounds_min], "boundsMax": [float(v) for v in bounds_max],
@@ -387,6 +390,8 @@ class Scene:
              "epsilon": float(epsilon), "stepScale": float(step_scale), "normalEpsilon": float(normal_epsilon)}
         if max_distance:
             s["maxDistance"] = float(max_distance)
+        if mesh:
+            s["resolution"] = int(mesh)
         if surfaces:
             s["surfaces"] = surfaces
         if look:

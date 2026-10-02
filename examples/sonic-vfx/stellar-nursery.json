@@ -130,6 +130,41 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
+  "procedural/star0/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star1/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star2/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star3/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star4/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star5/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
+  "procedural/star6/material/emissiveColor": [
+   1.0,
+   0.14413,
+   0.04231
+  ],
   "post/halation/enabled": true,
   "post/halation/intensity": 0.06,
   "post/grade/contrast": 1.08,
@@ -255,9 +290,9 @@
  ],
  "routes": [
   {
-   "source": "visual.lit0",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": 9.0,
+   "source": "visual.pc",
+   "target": "procedural/star0/material/emissiveColor",
+   "amount": -0.60843,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -268,21 +303,8 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit0",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit0",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": 1.2971700000000002,
+   "target": "procedural/star0/material/emissiveColor",
+   "amount": 0.51424,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -293,12 +315,11 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": 4.62816,
+   "target": "procedural/star0/material/emissiveColor",
+   "amount": 0.95769,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit0",
+   "component": 2,
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -306,24 +327,10 @@
   },
   {
    "source": "visual.lit0",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": 0.38079,
+   "target": "procedural/star0/material/emissive",
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/1/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit0",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -331,7 +338,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/1/emission",
+   "target": "procedural/star0/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -343,8 +350,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star0/radius",
-   "amount": 0.45,
+   "target": "procedural/star0/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -353,9 +360,9 @@
    }
   },
   {
-   "source": "visual.lit1",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": 9.0,
+   "source": "visual.pc",
+   "target": "procedural/star1/material/emissiveColor",
+   "amount": -0.60843,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -366,21 +373,8 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit1",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit1",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": 1.2971700000000002,
+   "target": "procedural/star1/material/emissiveColor",
+   "amount": 0.51424,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -391,12 +385,11 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": 4.62816,
+   "target": "procedural/star1/material/emissiveColor",
+   "amount": 0.95769,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit1",
+   "component": 2,
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -404,24 +397,10 @@
   },
   {
    "source": "visual.lit1",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": 0.38079,
+   "target": "procedural/star1/material/emissive",
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/2/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit1",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -429,7 +408,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/2/emission",
+   "target": "procedural/star1/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -441,8 +420,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star1/radius",
-   "amount": 0.45,
+   "target": "procedural/star1/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -451,9 +430,9 @@
    }
   },
   {
-   "source": "visual.lit2",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": 9.0,
+   "source": "visual.pc",
+   "target": "procedural/star2/material/emissiveColor",
+   "amount": -0.60843,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -464,21 +443,8 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit2",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit2",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": 1.2971700000000002,
+   "target": "procedural/star2/material/emissiveColor",
+   "amount": 0.51424,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -489,12 +455,11 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": 4.62816,
+   "target": "procedural/star2/material/emissiveColor",
+   "amount": 0.95769,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit2",
+   "component": 2,
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -502,24 +467,10 @@
   },
   {
    "source": "visual.lit2",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": 0.38079,
+   "target": "procedural/star2/material/emissive",
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/3/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit2",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -527,7 +478,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/3/emission",
+   "target": "procedural/star2/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -539,8 +490,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star2/radius",
-   "amount": 0.45,
+   "target": "procedural/star2/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -549,9 +500,9 @@
    }
   },
   {
-   "source": "visual.lit3",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": 9.0,
+   "source": "visual.pc",
+   "target": "procedural/star3/material/emissiveColor",
+   "amount": -0.60843,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -562,21 +513,8 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit3",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit3",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": 1.2971700000000002,
+   "target": "procedural/star3/material/emissiveColor",
+   "amount": 0.51424,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -587,12 +525,11 @@
   },
   {
    "source": "visual.pc",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": 4.62816,
+   "target": "procedural/star3/material/emissiveColor",
+   "amount": 0.95769,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit3",
+   "component": 2,
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -600,24 +537,10 @@
   },
   {
    "source": "visual.lit3",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": 0.38079,
+   "target": "procedural/star3/material/emissive",
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/4/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit3",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -625,7 +548,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/4/emission",
+   "target": "procedural/star3/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -637,8 +560,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star3/radius",
-   "amount": 0.45,
+   "target": "procedural/star3/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -647,75 +570,47 @@
    }
   },
   {
+   "source": "visual.pc",
+   "target": "procedural/star4/material/emissiveColor",
+   "amount": -0.60843,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star4/material/emissiveColor",
+   "amount": 0.51424,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star4/material/emissiveColor",
+   "amount": 0.95769,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "visual.lit4",
-   "target": "sdf/pillars/surface/5/emission",
+   "target": "procedural/star4/material/emissive",
    "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/5/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit4",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit4",
-   "target": "sdf/pillars/surface/5/emission",
-   "amount": 1.2971700000000002,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/5/emission",
-   "amount": 4.62816,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit4",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit4",
-   "target": "sdf/pillars/surface/5/emission",
-   "amount": 0.38079,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/5/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit4",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -723,7 +618,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/5/emission",
+   "target": "procedural/star4/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -735,8 +630,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star4/radius",
-   "amount": 0.45,
+   "target": "procedural/star4/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -745,75 +640,47 @@
    }
   },
   {
+   "source": "visual.pc",
+   "target": "procedural/star5/material/emissiveColor",
+   "amount": -0.60843,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star5/material/emissiveColor",
+   "amount": 0.51424,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star5/material/emissiveColor",
+   "amount": 0.95769,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "visual.lit5",
-   "target": "sdf/pillars/surface/6/emission",
+   "target": "procedural/star5/material/emissive",
    "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/6/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit5",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit5",
-   "target": "sdf/pillars/surface/6/emission",
-   "amount": 1.2971700000000002,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/6/emission",
-   "amount": 4.62816,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit5",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit5",
-   "target": "sdf/pillars/surface/6/emission",
-   "amount": 0.38079,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/6/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit5",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -821,7 +688,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/6/emission",
+   "target": "procedural/star5/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -833,8 +700,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star5/radius",
-   "amount": 0.45,
+   "target": "procedural/star5/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -843,75 +710,47 @@
    }
   },
   {
+   "source": "visual.pc",
+   "target": "procedural/star6/material/emissiveColor",
+   "amount": -0.60843,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star6/material/emissiveColor",
+   "amount": 0.51424,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.pc",
+   "target": "procedural/star6/material/emissiveColor",
+   "amount": 0.95769,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "visual.lit6",
-   "target": "sdf/pillars/surface/7/emission",
+   "target": "procedural/star6/material/emissive",
    "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/7/emission",
-   "amount": -5.4758700000000005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.lit6",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit6",
-   "target": "sdf/pillars/surface/7/emission",
-   "amount": 1.2971700000000002,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/7/emission",
-   "amount": 4.62816,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.lit6",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.lit6",
-   "target": "sdf/pillars/surface/7/emission",
-   "amount": 0.38079,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "visual.pc",
-   "target": "sdf/pillars/surface/7/emission",
-   "amount": 8.61921,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.lit6",
    "chain": {
     "attackMs": 30,
     "decayMs": 900
@@ -919,7 +758,7 @@
   },
   {
    "source": "response.noteEnv",
-   "target": "sdf/pillars/surface/7/emission",
+   "target": "procedural/star6/material/emissive",
    "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
@@ -931,8 +770,8 @@
   },
   {
    "source": "notes.held",
-   "target": "sdf/pillars/node/star6/radius",
-   "amount": 0.45,
+   "target": "procedural/star6/transform/scale",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

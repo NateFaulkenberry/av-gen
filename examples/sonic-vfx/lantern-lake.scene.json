@@ -30,7 +30,7 @@
    0.06848
   ],
   "volumeDensity": 0.00035,
-  "volumeMaxDistance": 40.0,
+  "volumeMaxDistance": 0.0,
   "volumeNoise": 0.0,
   "fogSky": 1.0,
   "fogSkyDistance": 900.0,

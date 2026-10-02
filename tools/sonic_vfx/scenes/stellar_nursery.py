@@ -110,7 +110,7 @@ def pillar(base, height, r0, lean, seed, head=None):
     if head:
         parts.append(sd_move(head, sd_sphere(r0 * 0.58)))
     body = sd_smooth(r0 * 0.55, *parts)
-    return sd_noise(r0 * 0.12, 0.6 / r0 * 3.0, sd_noise(r0 * 0.38, 0.2 / r0 * 3.0, body, seed=seed), seed=seed + 1)
+    return sd_noise(r0 * 0.38, 0.2 / r0 * 3.0, body, seed=seed)   # one octave: the second doubled the march cost
 
 
 def build():
@@ -144,20 +144,22 @@ def build():
     tall = pillar((-15.0, -20.0, -60.0), 46.0, 6.0, 1.5, 3, head=(HEAD[0], HEAD[1] - 1.0, HEAD[2]))
     mid = pillar((14.0, -24.0, -92.0), 36.0, 5.0, -2.5, 7)
     far = pillar((34.0, -26.0, -130.0), 30.0, 4.2, 1.0, 11)
-    # the embryonic stars: seven small spheres at the head's skin, one surface each (1..7)
-    stars = []
+    # The pillars are static, so they are a surface-nets MESH (raymarched at full resolution every frame they cost
+    # 40 ms at 1080p; meshed once at load they are a few hundred thousand triangles). The embryonic stars, which the
+    # music moves, are separate spheres at the head's skin.
+    root = sd_union(tall, mid, far)
+    s.sdf("pillars", root, (-30.0, -30.0, -140.0), (44.0, 40.0, -50.0),
+          material={"baseColor": hexrgb("#2a160d"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
+                    "roughness": 0.95, "metallic": 0.0},
+          look={"aoStrength": 0.6, "aoDistance": 3.0}, max_steps=96, epsilon=0.002, step_scale=0.9,
+          max_distance=400.0, mesh=128)
     for k in range(N_STARS):
         a = math.radians(-70.0 + 140.0 * k / (N_STARS - 1))
         p = (HEAD[0] + 3.6 * math.sin(a), HEAD[1] + 1.2 + 1.6 * math.cos(a * 1.7), HEAD[2] + 3.6 * math.cos(a) + 0.6)
-        stars.append(sd_move(p, sd_sphere(0.75, name="star%d" % k, m=k + 1)))
-    root = sd_union(tall, mid, far, *stars)
-    surfaces = [{"color": hexrgb("#2a160d", 1.0)}] + \
-               [{"color": [0.0, 0.0, 0.0], "emission": [0.0, 0.0, 0.0]} for _ in range(N_STARS)]
-    s.sdf("pillars", root, (-30.0, -30.0, -140.0), (44.0, 40.0, -50.0), surfaces=surfaces,
-          material={"baseColor": hexrgb("#2a160d"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
-                    "roughness": 0.95, "metallic": 0.0},
-          look={"aoStrength": 0.6, "aoDistance": 3.0}, max_steps=160, epsilon=0.002, step_scale=0.75,
-          max_distance=400.0)
+        s.proc("star%d" % k, {"kind": "sphere", "radius": 0.75, "segments": 24, "rings": 12},
+               material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0,
+                         "roughness": 1.0, "metallic": 0.0, "unlit": True},
+               transform={"position": list(p), "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
     # ---- light: hot stars above and behind (the rims), a dim teal fill from the nebula, a light in the nest
     # two hot stars above and behind, left and right: the pillars' tops and edges catch them as magenta rims
@@ -184,21 +186,22 @@ def build():
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # chords: star k is lit when the polyphony reaches it; pitch colours them (red low, blue-white high)
     s.map(M("pc", [("lastPitch", 1.0)], "mean", -0.3 / 0.4, 1.0 / 0.4))
+    red, blue = hexrgb("#ff6a3a", 1.0), hexrgb("#a8d4ff", 1.0)
     lit = []
     for k in range(N_STARS):
         thr = (k + 0.5) / (N_STARS + 1.0)
         s.map(M("lit%d" % k, [("polyphony", 1.0)], "mean", -thr * 14.0 + 0.5, 14.0))
         lit.append("visual.lit%d" % k)
-    red, blue = hexrgb("#ff6a3a", 1.0), hexrgb("#a8d4ff", 1.0)
     for k in range(N_STARS):
+        # the star's colour: red for low pitches, blue-white for high (an emissive colour in 0..1 per channel);
+        # its brightness: lit by the chord's voice count, flaring on each note; a held note swells it
         for c in range(3):
-            s.route(R(lit[k], "sdf/pillars/surface/%d/emission" % (k + 1), 9.0 * red[c], comp=c, attackMs=30,
-                      decayMs=900),
-                    R("visual.pc", "sdf/pillars/surface/%d/emission" % (k + 1), 9.0 * (blue[c] - red[c]), comp=c,
-                      depth=lit[k], attackMs=30, decayMs=900))
-        s.route(R("noteEnv", "sdf/pillars/surface/%d/emission" % (k + 1), 6.0, depth=lit[k], attackMs=0,
-                  decayMs=350))
-        s.route(R("held", "sdf/pillars/node/star%d/radius" % k, 0.45, springHz=0.8, springDamping=0.8))
+            s.route(R("visual.pc", "procedural/star%d/material/emissiveColor" % k, blue[c] - red[c], comp=c,
+                      op="add", attackMs=30, decayMs=900))
+        s.param("procedural/star%d/material/emissiveColor" % k, red)
+        s.route(R(lit[k], "procedural/star%d/material/emissive" % k, 9.0, attackMs=30, decayMs=900),
+                R("noteEnv", "procedural/star%d/material/emissive" % k, 6.0, depth=lit[k], attackMs=0, decayMs=350),
+                R("held", "procedural/star%d/transform/scale" % k, 0.6, springHz=0.8, springDamping=0.8))
     s.route(R("polyphony", "lights/nest/intensity", 400.0, attackMs=30, decayMs=900))
     # bass: the cloud's density and glow; sustain: ionisation (the rims); tension: the cloud churns (a phase)
     s.route(R("bass", "procedural/nebula/material/emissive", 1.2, attackMs=50, decayMs=1400),

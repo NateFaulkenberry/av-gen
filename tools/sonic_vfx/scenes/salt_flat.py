@@ -168,7 +168,7 @@ def build():
     # (fogSky), so the range melts into the horizon behind it.
     s.environment = {
         "intensity": 1.0, "background": hexrgb("#2b3a78"), "fogColor": hexrgb("#d0928e"),
-        "volumeDensity": 0.00028, "volumeMaxDistance": 60.0, "volumeAnisotropy": 0.2, "volumeShadowStrength": 0.0,
+        "volumeDensity": 0.00028, "volumeMaxDistance": 0.0, "volumeAnisotropy": 0.2, "volumeShadowStrength": 0.0,
         "volumeNoise": 0.0, "fogSky": 1.0, "fogSkyDistance": 2500.0, "skyIntensity": 1.0, "shadowRange": 120.0,
         "sky": {"enabled": True, "zenithColor": hexrgb("#2b3a78"), "horizonColor": hexrgb("#f2a08a"),
                 "groundColor": hexrgb("#2a2632"), "haze": 0.17, "sunColor": hexrgb("#ffa070"), "sunIntensity": 30.0,

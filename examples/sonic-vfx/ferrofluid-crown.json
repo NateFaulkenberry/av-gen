@@ -1605,13 +1605,13 @@
   },
   {
    "source": "response.hat",
-   "target": "sdf/fluid/node/shimmer/amount",
-   "amount": 0.008,
+   "target": "particles/skinGlints/burst",
+   "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 90
+    "decayMs": 30
    }
   },
   {
@@ -1627,8 +1627,8 @@
   },
   {
    "source": "visual.unrest",
-   "target": "sdf/fluid/node/shimmer/amount",
-   "amount": 0.006,
+   "target": "sdf/fluid/node/swell/amount",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1915,7 +1915,7 @@
     "note spikes rising and melting"
    ],
    "extremely_fast": [
-    "surface shimmer (hat)",
+    "glints on the skin (hat)",
     "the ripple ring (kick)",
     "droplets (snare)"
    ]
@@ -1954,7 +1954,7 @@
    [
     "hat",
     "response.hat",
-    "fine shimmer on the surface"
+    "glints flicker on the liquid's skin"
    ],
    [
     "tension",

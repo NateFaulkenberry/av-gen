@@ -138,7 +138,7 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.45, "sustain": 0.6, "attack": 1.3, "release": 1.7}
     s.environment = {
         "intensity": 0.6, "background": hexrgb(INDIGO), "fogColor": hexrgb("#2a2c4a"),
-        "volumeDensity": 0.00035, "volumeMaxDistance": 40.0, "volumeNoise": 0.0, "fogSky": 1.0,
+        "volumeDensity": 0.00035, "volumeMaxDistance": 0.0, "volumeNoise": 0.0, "fogSky": 1.0,
         "fogSkyDistance": 900.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb("#0a0e26"), "horizonColor": hexrgb("#c76a5a"),
                 "groundColor": hexrgb("#8a4a48"), "haze": 0.12, "sunIntensity": 0.0, "intensity": 1.0,

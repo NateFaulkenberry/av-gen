@@ -130,6 +130,12 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": true,
+  "post/shock/amount": 0.0,
+  "post/shock/radius": 1.3,
+  "post/shock/width": 0.09,
+  "post/shock/chroma": 0.6,
+  "post/shock/centerX": 0.5,
+  "post/shock/centerY": 0.444,
   "temporal/mosh/amount": 0.0,
   "temporal/mosh/shift": 0.0,
   "temporal/mosh/block": 36.0,
@@ -865,23 +871,35 @@
    }
   },
   {
-   "source": "response.kick",
-   "target": "sdf/nave/node/fracture/amount",
-   "amount": 0.18,
+   "source": "response.kickEnv",
+   "target": "post/split/amount",
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 260
+    "decayMs": 0
    }
   },
   {
    "source": "response.kickEnv",
-   "target": "post/split/amount",
-   "amount": 9.0,
+   "target": "post/shock/amount",
+   "amount": 40.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "post/shock/radius",
+   "amount": -1.3,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "offset": -1.0,
     "attackMs": 0,
     "decayMs": 0
    }
@@ -1010,17 +1028,6 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 1100
-   }
-  },
-  {
-   "source": "visual.grit",
-   "target": "sdf/nave/node/fracture/amount",
-   "amount": 0.02,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 30,
-    "decayMs": 350
    }
   },
   {
@@ -1303,7 +1310,7 @@
    ],
    "extremely_fast": [
     "mosh blocks (snare)",
-    "fracture (kick)",
+    "split and shock (kick)",
     "mote flicker (hat)"
    ]
   },
@@ -1326,7 +1333,7 @@
    [
     "kick",
     "response.kick",
-    "a structural fracture: the stone breaks into Voronoi cells for a moment"
+    "the image breaks for a moment: it splits along the nave, a shock runs from the rose"
    ],
    [
     "snare",
@@ -1356,7 +1363,7 @@
    [
     "roughness",
     "sonic.roughness",
-    "a rough sound leaves the stone permanently fractured"
+    "a rough sound leaves the frame corrupted: mosh blocks and sorted light"
    ]
   ],
   "tier": "medium: one compiled SDF (the nave), haze march at 24 steps, mosh",
