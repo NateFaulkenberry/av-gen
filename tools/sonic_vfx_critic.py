@@ -39,7 +39,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AVGEN = os.path.join(ROOT, "build", "release", "src", "avgen")
-W, H = 192, 108          # analysis resolution
+W, H = 384, 216          # analysis resolution (small responders: a glint, a meteor streak)
 GW, GH = 8, 6            # region grid
 LAGS_MS = list(range(-100, 401, 33))
 SEVERITY = {"high": 3, "medium": 2, "low": 1, "info": 0}
@@ -282,27 +282,44 @@ def measure_frames(frames, F, meta):
     declared = None
     pal = (meta.get("sonicScene") or {}).get("palette") or {}
     if pal:
+        # Dominant and secondary are large areas: they must be clusters of the frame. An accent stays under a tenth
+        # of the frame and a highlight may appear only on hits, so those are looked for among the 5% most chromatic
+        # and the 5% brightest pixels of every analysed frame instead.
+        allp = np.concatenate([frames[i].reshape(-1, 3) for i in range(0, len(frames), max(1, len(frames) // 24))])
+        lab_all = oklab(allp[::3])
+        chroma_all = np.hypot(lab_all[:, 1], lab_all[:, 2])
+        vivid = lab_all[chroma_all >= np.percentile(chroma_all, 95)]
+        bright = lab_all[lab_all[:, 0] >= np.percentile(lab_all[:, 0], 95)]
+        rare = np.concatenate([vivid, bright])
         declared = {}
         for k, hx in pal.items():
             try:
                 target = oklab(hex_to_rgb(hx)[None])[0]
             except (ValueError, IndexError, AttributeError):
                 continue
-            dist = np.sqrt(((centres - target) ** 2).sum(1))
-            declared[k] = {"hex": hx, "nearest": round(float(dist.min()), 4)}
+            if k in ("dominant", "secondary"):
+                dist = float(np.sqrt(((centres - target) ** 2).sum(1)).min())
+                where = "clusters"
+            else:
+                dist = float(np.sqrt(((rare - target) ** 2).sum(1)).min()) if len(rare) else 9.0
+                where = "the most chromatic and brightest 5%"
+            declared[k] = {"hex": hx, "nearest": round(dist, 4), "searched": where}
     return {"composition": comp, "palette": palette, "hueSpread": hue_spread, "colourfulness": colourfulness,
             "clip": clip, "muddiness": mud, "valueRange": value_range, "notanShapes": len(big),
             "declaredPalette": declared}
 
 
 def cell_series(frames):
-    """Per cell of the grid: mean luma, and motion energy (frame difference less the frame's global change)."""
+    """Per cell of the grid: mean luma, the 95th-percentile luma (so a small bright responder -- a glint, a streak --
+    counts), and motion energy (frame difference)."""
     n = len(frames)
     L = luma(frames)
-    cells = L.reshape(n, GH, H // GH, GW, W // GW).mean(axis=(2, 4))
+    blocks = L.reshape(n, GH, H // GH, GW, W // GW).transpose(0, 1, 3, 2, 4).reshape(n, GH * GW, -1)
+    cells = blocks.mean(2)
+    peaks = np.percentile(blocks, 95, axis=2)
     diff = np.abs(np.diff(L, axis=0, prepend=L[:1]))
-    dcells = diff.reshape(n, GH, H // GH, GW, W // GW).mean(axis=(2, 4))
-    return L, cells.reshape(n, -1), dcells.reshape(n, -1)
+    dcells = diff.reshape(n, GH, H // GH, GW, W // GW).mean(axis=(2, 4)).reshape(n, -1)
+    return L, cells, dcells, peaks
 
 
 def hp(x, win):
@@ -319,9 +336,9 @@ def corr(a, b):
     return float((a * b).sum() / d) if d > 1e-12 else 0.0
 
 
-def lagged(sig, vis, F):
+def lagged(sig, vis, F, lags=None):
     best = (0.0, 0)
-    for ms in LAGS_MS:
+    for ms in (lags or LAGS_MS):
         k = int(round(ms / 1000.0 * F))
         if k >= 0:
             a, b = sig[: len(sig) - k], vis[k:]
@@ -335,15 +352,69 @@ def lagged(sig, vis, F):
     return best
 
 
-def null_z(sig, vis, F, r, shifts=24):
-    """z of r against the same correlation with the signal circularly shifted (keeps both autocorrelations)."""
+def surrogate(sig, rng):
+    """A phase-randomised copy: the same power spectrum (so the same rhythm, the same autocorrelation), every
+    alignment with the picture broken. A circular shift of a four-on-the-floor envelope lands on the other kicks and
+    keeps the alignment; this does not."""
+    X = np.fft.rfft(sig - sig.mean())
+    ph = rng.uniform(0, 2 * np.pi, len(X))
+    ph[0] = 0.0
+    if len(sig) % 2 == 0:
+        ph[-1] = 0.0
+    return np.fft.irfft(np.abs(X) * np.exp(1j * ph), len(sig))
+
+
+def lagged_all(sig, V, F, lags):
+    """The best correlation of `sig` with every column of V over the lags: (r per column, lag ms per column)."""
+    n, m = V.shape
+    best_r = np.full(m, -1.0)
+    best_lag = np.zeros(m, int)
+    for ms in lags:
+        k = int(round(ms / 1000.0 * F))
+        if k >= 0:
+            a, B = sig[: n - k], V[k:]
+        else:
+            a, B = sig[-k:], V[: n + k]
+        if len(a) < 10:
+            continue
+        a = a - a.mean()
+        B = B - B.mean(0)
+        den = np.sqrt((a * a).sum() * (B * B).sum(0))
+        r = np.where(den > 1e-12, (a[:, None] * B).sum(0) / np.maximum(den, 1e-12), 0.0)
+        better = r > best_r
+        best_r = np.where(better, r, best_r)
+        best_lag = np.where(better, ms, best_lag)
+    return best_r, best_lag
+
+
+def null_z(sig, vis, F, r, shifts=24, lags=None, events=None, lag_ms=None):
+    """z of the observed best correlation against the same search -- every cell, every feature, every lag -- over
+    phase-randomised surrogates of the signal. The search has to be repeated: the best of 144 series and 16 lags is
+    high by chance alone, and a null that searched only the chosen cell called an unrelated envelope significant."""
     rng = np.random.default_rng(1)
-    n = len(sig)
     vals = []
-    for s in rng.integers(int(F), max(int(F) + 1, n - int(F)), shifts):
-        vals.append(lagged(np.roll(sig, int(s)), vis, F)[0])
-    v = np.array(vals)
-    return float((r - v.mean()) / max(v.std(), 1e-6))
+    n = len(sig)
+    ioi = float(np.median(np.diff(events))) if events is not None and len(events) >= 4 else 0.0
+    lags = lags or LAGS_MS
+    span = (max(lags) - min(lags)) / 1000.0 * F
+    regular = ioi >= 2 and float(np.std(np.diff(events)) / ioi) < 0.15
+    if regular and ioi <= 1.1 * span and lag_ms is not None:
+        # The lag search spans a whole period: it would realign any moved copy of a regular pulse train, so for this
+        # material the null is judged at the lag the picture was found at (the event-locked latency says which).
+        lags = [lag_ms]
+    for _ in range(shifts):
+        if ioi >= 2:
+            # A hit envelope keeps its pulses and is moved between multiples of its own inter-onset interval: off the
+            # beat for four-on-the-floor (a plain circular shift lands on the other kicks), at random for irregular hits.
+            m = int(rng.integers(1, max(2, int((n - ioi) // ioi))))
+            sur = np.roll(sig, int(round((m + rng.uniform(0.25, 0.75)) * ioi)))
+        else:
+            sur = surrogate(sig, rng)
+        vals.append(max(float(lagged_all(sur, V, F, lags)[0].max()) for V in vis.values()))
+    # On Fisher's z (atanh r), where a correlation's sampling spread no longer shrinks toward 1: smooth series give
+    # surrogates near the top of the range, and a raw-r z would compress a real 0.99 against a chance 0.7.
+    v = np.arctanh(np.clip(np.array(vals), -0.999, 0.999))
+    return float((np.arctanh(min(r, 0.999)) - v.mean()) / max(v.std(), 1e-6))
 
 
 def events_of(env, F, rise=0.15):
@@ -391,17 +462,30 @@ def mod_centroid(x, F):
     return float((p[m] * f[m]).sum() / p[m].sum())
 
 
+SLOW_LAGS_MS = list(range(0, 3001, 100))
+
+
+def is_slow(name):
+    return name in SLOW_SIGNALS or name in ("response.level",) or name.endswith(".slow")
+
+
 def correspondence(trace, frames, F, video_start, skip=1.5):
     n = len(frames)
     t = video_start + np.arange(n) / F
-    L, cells, motion = cell_series(frames)
-    glob = cells.mean(1)
+    L, cells, motion, peaks = cell_series(frames)
     win = max(3, int(F))
-    # Prewhitened (high-passed, then differenced): two slowly drifting series correlate whatever drives them, and a
-    # scene growing in while the music swells would read as every slow signal "answered" with the picture leading.
+    slow_win = max(3, int(8 * F))
+    # Fast signals: prewhitened (high-passed over 1 s, then differenced): two slowly drifting series correlate
+    # whatever drives them. Slow signals (a sustain that brightens the sky over two seconds) are judged on series
+    # high-passed over 8 s and not differenced, at lags up to 3 s: whitening would remove the very response they make.
     white = lambda x: np.diff(hp(x, win), prepend=0.0)
-    vis = {"luma": np.stack([white(cells[:, j]) for j in range(cells.shape[1])], 1),
-           "motion": np.stack([white(motion[:, j]) for j in range(motion.shape[1])], 1)}
+    # ...whitened at their own scale: the change over a third of a second, which keeps the 1-3 s lags and removes the
+    # drift that makes any two slow series correlate.
+    step = max(1, int(F / 3))
+    calm = lambda x: (lambda y: np.concatenate([np.zeros(step), y[step:] - y[:-step]]))(hp(x, slow_win))
+    series = {"luma": cells, "motion": motion, "peak": peaks}
+    fast = {k: np.stack([white(v[:, j]) for j in range(v.shape[1])], 1) for k, v in series.items()}
+    slow = {k: np.stack([calm(v[:, j]) for j in range(v.shape[1])], 1) for k, v in series.items() if k != "motion"}
     out = {}
     tt = trace.get("time")
     if tt is None:
@@ -409,36 +493,42 @@ def correspondence(trace, frames, F, video_start, skip=1.5):
     # The lead-in is left out: a world growing in from silence while every signal rises from zero is one shared
     # event, and a single coincidence dominates a correlation.
     k0 = min(int(skip * F), max(n - 32, 0))
-    vis = {k: v[k0:] for k, v in vis.items()}
-    cells, motion, t = cells[k0:], motion[k0:], t[k0:]
+    fast = {k: v[k0:] for k, v in fast.items()}
+    slow = {k: v[k0:] for k, v in slow.items()}
+    series = {k: v[k0:] for k, v in series.items()}
+    t = t[k0:]
     names = [k for k in trace if k != "time" and k.startswith(("response.", "notes.", "visual.", "sonic.")) and
              not k.startswith("notes.voice.") and not k.startswith("notes.class")]
     for name in names:
         raw = np.interp(t, tt, trace[name])
         if raw.std() < 1e-6:
             continue
-        sig = white(raw)
+        slowly = is_slow(name)
+        sig = calm(raw) if slowly else white(raw)
+        vis = slow if slowly else fast
+        lags = SLOW_LAGS_MS if slowly else LAGS_MS
         best = {"r": 0.0}
         for kind, V in vis.items():
-            rs = [lagged(sig, V[:, j], F) for j in range(V.shape[1])]
-            j = int(np.argmax([r for r, _ in rs]))
-            if rs[j][0] > best["r"]:
-                best = {"r": rs[j][0], "lag_ms": rs[j][1], "cell": j, "feature": kind,
-                        "map": [round(r, 3) for r, _ in rs]}
+            rs, ls = lagged_all(sig, V, F, lags)
+            j = int(np.argmax(rs))
+            if rs[j] > best["r"]:
+                best = {"r": float(rs[j]), "lag_ms": int(ls[j]), "cell": j, "feature": kind,
+                        "map": [round(float(x), 3) for x in rs]}
         if best["r"] <= 0:
-            out[name] = {"r": 0.0}
+            out[name] = {"r": 0.0, "slow": slowly}
             continue
-        best["z"] = round(null_z(sig, vis[best["feature"]][:, best["cell"]], F, best["r"]), 2)
+        best["slow"] = slowly
+        events = events_of(raw, F) if name.endswith("Env") else None
+        best["z"] = round(null_z(sig, vis, F, best["r"], lags=lags, events=events, lag_ms=best["lag_ms"]), 2)
         best["r"] = round(best["r"], 3)
         # The share of the frame answering it (cells within 70% of the best): whole-frame or local?
         m = np.array(best["map"])
         best["spread"] = round(float((m >= 0.7 * best["r"]).mean()), 3)
+        cell_series_ = series[best["feature"]][:, best["cell"]]
         if name.endswith("Env"):
-            ev = events_of(raw, F)
-            series = (motion if best["feature"] == "motion" else cells)[:, best["cell"]]
-            best["erp"] = erp(series, ev, F)
+            best["erp"] = erp(cell_series_, events_of(raw, F), F)
         cs = mod_centroid(raw, F)
-        cv = mod_centroid((motion if best["feature"] == "motion" else cells)[:, best["cell"]], F)
+        cv = mod_centroid(cell_series_, F)
         if cs and cv:
             best["modulationRatio"] = round(cv / cs, 2)
         out[name] = best
@@ -518,7 +608,7 @@ def measure(args):
             fx.add("flicker", "temporal_coherence", "medium", "Whole-frame flicker",
                    "%.0f%% of the mean-luma modulation is 3-30 Hz." % (100 * share), {"share": share})
     # ---- motion hierarchy ----
-    _, _, motion = cell_series(frames)
+    _, _, motion, _ = cell_series(frames)
     speed = motion.mean(0)
     moving = speed[speed > 1e-4]
     tiers = {}
@@ -571,7 +661,11 @@ def measure(args):
                 key = s if s in av else (s + "Env" if (s + "Env") in av else None)
                 r = av.get(key) if key else None
                 if key and r is not None and r.get("z", 0) < 2.0:
-                    fx.add("vocabulary_silent", "musical_synchronization", "medium", "No visible answer to " + s,
+                    # A slow signal's answer is judged on its own timescale (correspondence), but a two-second swell
+                    # is harder to prove than a hit: an observation, not an issue.
+                    slowly = r.get("slow", is_slow(key))
+                    fx.add("vocabulary_silent", "musical_synchronization", "low" if slowly else "medium",
+                           "No visible answer to " + s,
                            "The scene says '%s' answers %s; nothing on screen follows it (z %.1f)."
                            % (row[-1] if row else "", s, r.get("z", 0)), r, region=s)
     score = {}
@@ -667,44 +761,108 @@ def trace_cmd(args):
 # ---------------------------------------------------------------------------------------------------- selftest
 
 
+def _clip(tmp, name, frames, columns, F=30.0):
+    """Writes a synthetic clip and its trace; returns (video, trace)."""
+    vid = os.path.join(tmp, name + ".mp4")
+    n, h, w = frames.shape[:3]
+    p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (w, h),
+                          "-r", "%g" % F, "-i", "-", "-pix_fmt", "yuv420p", "-crf", "12", vid], stdin=subprocess.PIPE)
+    p.communicate(frames.tobytes())
+    tr = os.path.join(tmp, name + ".csv")
+    with open(tr, "w") as f:
+        f.write("time," + ",".join(columns) + "\n")
+        for i in range(n):
+            f.write("%.4f," % (i / F) + ",".join("%.4f" % columns[c][i] for c in columns) + "\n")
+    return vid, tr
+
+
+def _measure_clip(tmp, name, frames, columns):
+    vid, tr = _clip(tmp, name, frames, columns)
+    a = argparse.Namespace(video=vid, trace=tr, project=None, video_start=0.0, fps=30.0,
+                           out=os.path.join(tmp, name + ".json"), md=None, skip=0.0)
+    return measure(a)["measures"]["audioVisual"]
+
+
 def selftest(_args):
-    """A synthetic clip where one region flashes on 'kicks' and the rest drifts slowly with a 'pad': the tool must
-    find the kick in that region, near zero lag, local rather than whole-frame, and must call a static clip empty of
-    response."""
+    """Synthetic clips with known answers:
+       local    one region flashes on irregular 'kicks', the rest drifts with a 'pad': found there, near zero lag,
+                local, early in its event-locked response
+       periodic the same on a strict four-on-the-floor grid: a circularly shifted null lands on the other kicks; the
+                phase-randomised one must still call it significant
+       small    a 6x6 px glint flashing on the kicks, nothing else moving: found in its cell, by its peak luma
+       slow     a region that brightens with a sustain signal 1.5 s late and smoothly: significant on the slow tier
+       control  an unrelated envelope against the glint clip: not significant"""
     tmp = tempfile.mkdtemp(prefix="svc-")
     F, n = 30.0, 300
     t = np.arange(n) / F
-    kicks = [int(F * (0.5 + 0.5 * k)) for k in range(18)]
-    env = np.zeros(n)
-    for k in kicks:
-        env[k:] = np.maximum(env[k:], np.exp(-(np.arange(n - k)) / (0.15 * F)))
+    rng = np.random.default_rng(7)
+    ok = True
+
+    def envelope(kicks):
+        env = np.zeros(n)
+        for k in kicks:
+            env[k:] = np.maximum(env[k:], np.exp(-(np.arange(n - k)) / (0.15 * F)))
+        return env
+
+    def check(label, passed):
+        nonlocal ok
+        print("  %-52s %s" % (label, "ok" if passed else "FAIL"))
+        ok = ok and passed
+
+    # local, with irregular kicks
+    kicks = sorted(set(int(F * x) for x in np.cumsum(rng.uniform(0.3, 0.8, 30)) if x * F < n - 1))
+    env = envelope(kicks)
     pad = 0.5 + 0.5 * np.sin(2 * math.pi * 0.1 * t)
     frames = np.zeros((n, 216, 384, 3), np.uint8)
     for i in range(n):
         frames[i, :, :, 2] = int(40 + 60 * pad[i])
         frames[i, 30:90, 40:120, :] = int(30 + 220 * env[i])
-    vid = os.path.join(tmp, "v.mp4")
-    p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "384x216", "-r",
-                          "30", "-i", "-", "-pix_fmt", "yuv420p", "-crf", "12", vid], stdin=subprocess.PIPE)
-    p.communicate(frames.tobytes())
-    tr = os.path.join(tmp, "t.csv")
-    with open(tr, "w") as f:
-        f.write("time,response.kickEnv,response.sustain\n")
-        for i in range(n):
-            f.write("%.4f,%.4f,%.4f\n" % (t[i], env[i], pad[i]))
-    a = argparse.Namespace(video=vid, trace=tr, project=None, video_start=0.0, fps=30.0,
-                           out=os.path.join(tmp, "r.json"), md=None, skip=0.0)
-    r = measure(a)
-    k = r["measures"]["audioVisual"]["response.kickEnv"]
-    ok = True
+    k = _measure_clip(tmp, "local", frames, {"response.kickEnv": env, "response.sustain": pad})["response.kickEnv"]
     cell = (k["cell"] % GW, k["cell"] // GW)
-    checks = [("kick z >= 3", k["z"] >= 3), ("kick lag within 70 ms", abs(k["lag_ms"]) <= 70),
-              ("kick found top-left (cell x<=2, y<=2)", cell[0] <= 2 and cell[1] <= 2),
-              ("kick is local (spread < 0.4)", k["spread"] < 0.4),
-              ("kick event-locked latency < 0.1 s", (k.get("erp") or {}).get("latency", 9) < 0.1)]
-    for name, passed in checks:
-        print("  %-40s %s" % (name, "ok" if passed else "FAIL"))
-        ok = ok and passed
+    check("local: kick z >= 3", k["z"] >= 3)
+    check("local: kick lag within 70 ms", abs(k["lag_ms"]) <= 70)
+    check("local: kick found top-left (cell x<=2, y<=2)", cell[0] <= 2 and cell[1] <= 2)
+    check("local: kick is local (spread < 0.4)", k["spread"] < 0.4)
+    check("local: event-locked latency < 0.1 s", (k.get("erp") or {}).get("latency", 9) < 0.1)
+
+    # periodic: every 15 frames exactly
+    env = envelope(list(range(10, n, 15)))
+    frames = np.full((n, 216, 384, 3), 40, np.uint8)
+    for i in range(n):
+        frames[i, 120:200, 250:360, :] = int(30 + 220 * env[i])
+    k = _measure_clip(tmp, "periodic", frames, {"response.kickEnv": env})["response.kickEnv"]
+    check("periodic: four-on-the-floor kick z >= 3", k["z"] >= 3)
+
+    # small: a 6x6 glint
+    env = envelope(kicks)
+    frames = np.full((n, 216, 384, 3), 25, np.uint8)
+    for i in range(n):
+        frames[i, 170:176, 330:336, :] = int(25 + 230 * env[i])
+    k = _measure_clip(tmp, "small", frames, {"response.kickEnv": env})["response.kickEnv"]
+    cell = (k["cell"] % GW, k["cell"] // GW)
+    check("small: glint z >= 3", k["z"] >= 3)
+    check("small: glint found in its cell (x 6, y 4)", cell == (6, 4))
+    # the control: an envelope of other, unrelated kicks against the same clip
+    other = envelope(sorted(set(int(F * x) for x in np.cumsum(rng.uniform(0.3, 0.8, 30)) if x * F < n - 1)))
+    k = _measure_clip(tmp, "control", frames, {"response.kickEnv": other})["response.kickEnv"]
+    check("control: an unrelated envelope is not significant (z %.1f)" % k.get("z", 0), k.get("z", 0) < 3)
+
+    # slow: 20 s of a smoothed random sustain, the picture following 1.5 s late and smoothed over a second
+    n2 = 600
+    t2 = np.arange(n2) / F
+    walk = np.cumsum(rng.normal(0, 1, n2))
+    sus = np.convolve(np.pad(walk, (30, 29), mode="edge"), np.ones(60) / 60, mode="valid")
+    sus = (sus - sus.min()) / max(sus.max() - sus.min(), 1e-9)
+    late = np.interp(t2 - 1.5, t2, sus)
+    late = np.convolve(np.pad(late, (15, 14), mode="edge"), np.ones(30) / 30, mode="valid")
+    frames = np.full((n2, 216, 384, 3), 30, np.uint8)
+    for i in range(n2):
+        frames[i, 0:80, :, :] = int(40 + 180 * late[i])
+    k = _measure_clip(tmp, "slow", frames, {"response.sustain": sus})["response.sustain"]
+    check("slow: sustain judged on the slow tier", bool(k.get("slow")))
+    check("slow: sustain z >= 3 (z %.1f)" % k.get("z", 0), k.get("z", 0) >= 3)
+    check("slow: lag found near 1.5 s (0.9-2.2 s; %d ms)" % k.get("lag_ms", 0), 900 <= k.get("lag_ms", 0) <= 2200)
+
     print("selftest", "passed" if ok else "FAILED")
     return 0 if ok else 1
 
