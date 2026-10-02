@@ -51,7 +51,7 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how many stars and how bright"],
         ["polyphony", "notes.polyphony", "a chord releases a cluster: the birthplace spreads"],
         ["bass", "response.bass", "the hole's mass: the Einstein radius and the shadow swell, the sky bends more"],
-        ["kick", "response.kick", "the photon ring flashes and the jets pulse"],
+        ["kick", "response.kick", "the photon ring flashes, the jets pulse and a ripple races out from the hole"],
         ["snare", "response.snare", "a flare erupts from the hot spot on the approaching side"],
         ["hat", "response.hat", "sparks across the disk"],
         ["density", "notes.density", "busy playing churns the gas (turbulence)"],
@@ -301,7 +301,11 @@ def build():
             R("kick", "particles/jetDown/burst", 70.0, attackMs=0, decayMs=90),
             R("kick", "particles/jetUp/emissive", 1.2, attackMs=0, decayMs=500),
             R("kick", "particles/jetDown/emissive", 1.2, attackMs=0, decayMs=500),
-            R("kick", "post/lens/chromaticAberration", 0.12, attackMs=0, decayMs=160))
+            R("kick", "post/lens/chromaticAberration", 0.06, attackMs=0, decayMs=160),
+            # a gravitational ripple: a shock ring racing out from the hole (ADR-1065), centred where the arc
+            # camera keeps the hole on screen
+            R("kickEnv", "post/shock/amount", 34.0, attackMs=0, decayMs=0),
+            R("kickEnv", "post/shock/radius", -1.4, op="replace", offset=-1.0, attackMs=0, decayMs=0))
     # snare: a flare from the hot spot
     s.route(R("snare", "particles/flare/burst", 260.0, attackMs=0, decayMs=40),
             R("snare", "post/bloom/intensity", 0.22, attackMs=0, decayMs=260))
@@ -310,6 +314,7 @@ def build():
     # tension: dissonance splits the lens's colours
     s.route(R("tension", "fx/bh/chroma", 0.03, **MEDIUM))
 
+    SHOCK_UV = [round(v, 3) for v in s.project(list(BH))[:2]]
     s.params_({
         "post/bloom/intensity": 0.45, "post/bloom/threshold": 0.9, "post/bloom/emissionWeight": 0.8,
         "post/halation/enabled": True, "post/halation/intensity": 0.25, "post/halation/warmth": 0.6,
@@ -319,6 +324,8 @@ def build():
         "camera/lens/focalLength": 38.0, "camera/exposure/compensation": -0.4,
         "post/dof/enabled": True, "post/dof/physical": True, "camera/lens/aperture": 2.8,
         "camera/focus/mode": 0, "camera/lens/focusDistance": 34.0,
+        "post/shock/amount": 0.0, "post/shock/radius": 1.4, "post/shock/width": 0.07, "post/shock/chroma": 0.5,
+        "post/shock/centerX": SHOCK_UV[0], "post/shock/centerY": SHOCK_UV[1],
     })
     # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
     s.region("horizon", centre=list(BH), radius=4.5)

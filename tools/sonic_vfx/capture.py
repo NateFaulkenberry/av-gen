@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Review captures for the Sonic VFX scenes (deliverable: a still and a short clip with audio per scene, and a tour).
+
+    python3 tools/sonic_vfx/capture.py still <scene-id> [--class full] [--at 9.0] [--size 1920x1080]
+    python3 tools/sonic_vfx/capture.py clip  <scene-id> [--class full] [--size 1920x1080]
+    python3 tools/sonic_vfx/capture.py tour  [--seconds 10] [--size 1280x720]
+
+Files go to ~/Desktop/av-gen-review/25-sonic-vfx/, named by set-list position (`01-salt-flat-mirage.png`, ...). The
+tour plays the set list in order, a few seconds of each scene with its test audio, cross-faded. Every render goes
+through tools/gpu-lock.sh with the pinned engine (review.py's).
+"""
+import argparse
+import importlib
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, REPO)
+from tools.sonic_vfx import review  # noqa: E402
+from tools.sonic_vfx.scenes import SCENES  # noqa: E402
+
+OUT = os.path.expanduser("~/Desktop/av-gen-review/25-sonic-vfx")
+# the class each scene is shown with in its clip and in the tour (the input it was designed round)
+SHOWCASE = {"salt-flat-mirage": "full", "breathing-deep": "pads", "cymatic-plate": "lead",
+            "ferrofluid-crown": "chords", "tesla-choir": "chords", "corrupted-cathedral": "full",
+            "event-horizon": "full", "storm-cell": "full", "feedback-mirror": "arp", "aurora-tundra": "pads",
+            "silk-theatre": "lead", "lantern-lake": "sparse", "datascape": "drumloop", "ember-forest": "full",
+            "abyssal-bloom": "lead"}
+
+
+def scene_ids():
+    ids = []
+    for name in SCENES:
+        ids.append(importlib.import_module("tools.sonic_vfx.scenes." + name).ID)
+    return ids
+
+
+def numbered(sid):
+    ids = scene_ids()
+    n = ids.index(sid) + 1 if sid in ids else 99
+    return "%02d-%s" % (n, sid)
+
+
+def still(a):
+    cls = a.cls or SHOWCASE.get(a.scene, "full")
+    work = os.path.join(OUT, "work")
+    os.makedirs(work, exist_ok=True)
+    proj, dur = review.variant(a.scene, cls, work, a.projects or None)
+    t = a.at if a.at is not None else min(dur * 0.6, dur - 0.5)
+    d = os.path.join(work, a.scene + "-still")
+    subprocess.run(["rm", "-rf", d])
+    review.run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
+                "%.3f:%.3f" % (t, t + 0.04), "--size", a.size, "--fps", "25", "--particle-warmup", "240",
+                "--tier", a.tier])
+    frames = sorted(f for f in os.listdir(d) if f.endswith(".png")) if os.path.isdir(d) else []
+    if frames:
+        dst = os.path.join(OUT, numbered(a.scene) + ".png")
+        os.replace(os.path.join(d, frames[0]), dst)
+        print(dst)
+
+
+def clip(a, seconds=None, size=None, dst=None, cls=None):
+    cls = cls or a.cls or SHOWCASE.get(a.scene, "full")
+    work = os.path.join(OUT, "work")
+    os.makedirs(work, exist_ok=True)
+    proj, dur = review.variant(a.scene, cls, work, a.projects or None)
+    end = min(dur, seconds) if seconds else dur
+    dst = dst or os.path.join(OUT, numbered(a.scene) + ".mp4")
+    review.run(["--headless", "--project", proj, "--render", dst, "--range", "0:%.2f" % end, "--size",
+                size or a.size, "--fps", "30", "--codec", "h264", "--quality", "85", "--particle-warmup", "120",
+                "--tier", a.tier])
+    print(dst)
+    return dst
+
+
+def tour(a):
+    parts = []
+    work = os.path.join(OUT, "work", "tour")
+    os.makedirs(work, exist_ok=True)
+    for sid in scene_ids():
+        a.scene = sid
+        parts.append(clip(a, seconds=a.seconds, size=a.size, dst=os.path.join(work, sid + ".mp4"),
+                          cls=SHOWCASE.get(sid, "full")))
+    # cross-fade the parts (video xfade, audio acrossfade), 0.6 s each
+    fade, n = 0.6, len(parts)
+    inputs = sum((["-i", p] for p in parts), [])
+    vf, af, off = [], [], 0.0
+    prev_v, prev_a = "[0:v]", "[0:a]"
+    for i in range(1, n):
+        off += a.seconds - fade
+        vf.append("%s[%d:v]xfade=transition=fade:duration=%g:offset=%g[v%d]" % (prev_v, i, fade, off, i))
+        af.append("%s[%d:a]acrossfade=d=%g[a%d]" % (prev_a, i, fade, i))
+        prev_v, prev_a = "[v%d]" % i, "[a%d]" % i
+    dst = os.path.join(OUT, "00-tour.mp4")
+    cmd = ["ffmpeg", "-y", "-v", "error"] + inputs + ["-filter_complex", ";".join(vf + af), "-map", prev_v, "-map",
+                                                       prev_a, "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
+                                                       "-c:a", "aac", "-b:a", "192k", dst]
+    subprocess.run(cmd, check=True)
+    print(dst)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("mode", choices=["still", "clip", "tour"])
+    ap.add_argument("scene", nargs="?")
+    ap.add_argument("--class", dest="cls", default="")
+    ap.add_argument("--at", type=float, default=None)
+    ap.add_argument("--size", default="1920x1080")
+    ap.add_argument("--seconds", type=float, default=10.0)
+    ap.add_argument("--projects", default="")
+    ap.add_argument("--tier", default="realtime", help="the live tier, so a capture shows what the live demo shows")
+    a = ap.parse_args()
+    {"still": still, "clip": clip, "tour": tour}[a.mode](a)
+
+
+if __name__ == "__main__":
+    main()

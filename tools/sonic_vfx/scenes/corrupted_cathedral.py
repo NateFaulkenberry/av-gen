@@ -189,24 +189,30 @@ def build():
     # bass: the nave sways and the lines thicken
     s.route(R("bass", "sdf/nave/node/sway/amount", 0.35, attackMs=120, decayMs=900),
             R("bass", "sdf/nave/look/edge/pixels", 1.2, attackMs=60, decayMs=600))
-    # kick: a structural fracture for a moment
+    # kick: a structural fracture for a moment, and the image splits along the nave's axis (ADR-1065)
     s.route(R("kick", "sdf/nave/node/fracture/amount", 0.18, attackMs=0, decayMs=260),
-            R("kick", "post/lens/chromaticAberration", 0.14, attackMs=0, decayMs=140))
+            R("kickEnv", "post/split/amount", 9.0, attackMs=0, decayMs=0),
+            R("kick", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=140))
     # snare: frame corruption -- mosh blocks and a channel shift; denser playing breaks it into smaller blocks
     s.route(R("snare", "temporal/mosh/amount", 0.42, attackMs=0, decayMs=240),
             R("snare", "temporal/mosh/shift", 6.0, attackMs=0, decayMs=200),
             R("snare", "particles/shards/burst", 60.0, attackMs=0, decayMs=40),
             R("visual.frag", "temporal/mosh/block", -18.0, **MEDIUM),
-            R("visual.frag", "temporal/mosh/amount", 0.06, **MEDIUM))
+            R("visual.frag", "temporal/mosh/amount", 0.06, **MEDIUM),
+            # ...and the frame tears: row bands torn sideways, a few blocks swapped (ADR-1065)
+            R("snareEnv", "post/glitch/tear", 0.5, attackMs=0, decayMs=0),
+            R("snareEnv", "post/glitch/amount", 0.14, attackMs=0, decayMs=0))
     # hat: the motes flicker
     s.route(R("hat", "particles/motes/emissive", 7.0, attackMs=0, decayMs=70))
     # phrase: a scan sweeps the frame (progress 0 -> 1 as the envelope falls), in the accent colour
     s.route(R("phrase", "post/sweep/progress", 1.0, op="replace", envelope="linearfall", envelopeFallPerSecond=0.9,
               remapEnabled=True, remapInMin=0.0, remapInMax=1.0, remapOutMin=1.0, remapOutMax=0.0),
             R("phrase", "post/sweep/intensity", 0.6, attackMs=0, decayMs=1100))
-    # roughness: permanent decay
+    # roughness: permanent decay -- and the glass's light drips down the frame as sorted pixels; healing stops it
     s.route(R("visual.grit", "sdf/nave/node/fracture/amount", 0.02, **FAST),
-            R("visual.grit", "temporal/mosh/amount", 0.12, **FAST))
+            R("visual.grit", "temporal/mosh/amount", 0.12, **FAST),
+            R("visual.grit", "post/sort/amount", 0.75, **MEDIUM),
+            R("visual.heal", "post/sort/amount", -0.5, **SLOW))
     s.route(R("visual.heal", "post/bloom/intensity", 0.1, **SLOW))
 
     s.params_({
@@ -218,6 +224,10 @@ def build():
         "post/bloom/intensity": 0.5, "post/bloom/threshold": 0.8, "post/bloom/emissionWeight": 0.9,
         "post/lens/chromaticAberration": 0.02, "post/output/vignette": 0.45, "post/output/grain": 0.02,
         "post/grade/contrast": 1.12, "camera/lens/focalLength": 24.0, "camera/exposure/compensation": 0.0,
+        "post/split/amount": 0.0, "post/split/angle": 90.0, "post/split/spectral": 0.6,
+        "post/glitch/amount": 0.0, "post/glitch/tear": 0.0, "post/glitch/tearShift": 70.0,
+        "post/glitch/block": 40.0, "post/glitch/rate": 14.0, "post/glitch/swap": 0.5, "post/glitch/drift": 30.0,
+        "post/sort/amount": 0.0, "post/sort/threshold": 0.9, "post/sort/length": 140.0, "post/sort/angle": 90.0,
     })
     # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
     s.region("rose", centre=[0.0, ROSE_Y, APSE_Z], radius=4.5)

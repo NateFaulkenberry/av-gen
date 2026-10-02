@@ -89,6 +89,7 @@ def main():
     ap.add_argument("--out", default="")
     ap.add_argument("--fps", default="30")
     ap.add_argument("--projects", default="", help="directory holding the scene projects (default examples)")
+    ap.add_argument("--tier", default="realtime", help="quality tier (the live look is realtime; offline for finals)")
     a = ap.parse_args()
     work = a.out or os.path.join("/tmp", "sonic-vfx-review")
     if a.mode == "stills":
@@ -102,7 +103,7 @@ def main():
             subprocess.run(["rm", "-rf", d])
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
                  "%.3f:%.3f" % (t, t + 0.05), "--size", a.size or "960x540", "--fps", "20",
-                 "--particle-warmup", "240"])
+                 "--particle-warmup", "240", "--tier", a.tier])
             got = sorted(glob.glob(os.path.join(d, "*.png")))
             if got:
                 frames.append(got[0])
@@ -117,7 +118,7 @@ def main():
         out = a.out or os.path.join(work, "%s--%s.mp4" % (a.scene, cls))
         rng = a.range or "0:%.2f" % dur
         run(["--headless", "--project", proj, "--render", out, "--range", rng, "--size", a.size or "960x540",
-             "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120"])
+             "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120", "--tier", a.tier])
         print(out)
     elif a.mode == "eval":
         cls = a.classes[0] if a.classes else "full"
@@ -125,7 +126,8 @@ def main():
         proj, dur = variant(a.scene, cls, work, a.projects or None)
         base = os.path.join(work, "%s--%s" % (a.scene, cls))
         run(["--headless", "--project", proj, "--render", base + ".mp4", "--range", "0:%.2f" % dur, "--size",
-             a.size or "960x540", "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120"])
+             a.size or "960x540", "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120",
+             "--tier", a.tier])
         subprocess.run([AVGEN, "--project", proj, "--sonic-trace", base + ".trace.csv"], capture_output=True)
         subprocess.run([sys.executable, os.path.join(REPO, "tools", "sonic_vfx_critic.py"), "measure", "--video",
                         base + ".mp4", "--trace", base + ".trace.csv", "--project", proj, "--out",
@@ -139,7 +141,7 @@ def main():
             out = os.path.join(work, "%s--%s.mp4" % (a.scene, cls))
             run(["--headless", "--project", proj, "--render", out, "--range", "0:%.2f" % dur, "--size",
                  a.size or "640x360", "--fps", a.fps, "--codec", "h264", "--quality", "70",
-                 "--particle-warmup", "120"])
+                 "--particle-warmup", "120", "--tier", a.tier])
             print(out)
 
 

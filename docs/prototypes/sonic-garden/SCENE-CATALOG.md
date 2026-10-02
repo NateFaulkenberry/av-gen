@@ -468,6 +468,20 @@ meteors, and the bass makes the horizon shimmer.
 
 **Kill if** the frame is empty rather than lonely, with nothing to look at between events.
 
+**As built** (`tools/sonic_vfx/scenes/salt_flat.py`). The departures, most of them forced by something the engine
+cannot do:
+- **The sun stands behind the monolith's right edge.** The monolith is the silhouette against the brightest sky, and
+  its shadow runs at the camera as a dark wedge from the frame's foot: the long shadow became the composition's
+  leading line.
+- **The snare flares the monolith's outline instead of distant lightning.** A bolt from a clear dusk sky reads
+  wrong, and the scene had no cloud. The monolith is the one made thing on the ground, so it answers the drums:
+  the snare flares its outline, and the kick sends a ring of light out from its base.
+- **No moon.** A masked program's crescent still writes its whole disc to the depth prepass, so the clear colour
+  showed through.
+- **No salt polygons.** The material Voronoi is a 3D F1, so a slice gives soft blobs; there is no edge op.
+- **The mirage:** puddles and a far sheet of standing water mirror the sky, which makes the range float on a line
+  of light, and the heat shimmer wobbles that line.
+
 ## Tier B
 
 ### 9. Stellar Nursery (cosmic)

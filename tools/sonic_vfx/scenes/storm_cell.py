@@ -24,7 +24,7 @@ SODIUM = "#ffa24a"
 BOLT = "#dfe9ff"
 SLOT = "#93a27a"         # the clear slot under the cloud
 
-CAM = (0.0, 1.05, 8.0)
+CAM = (0.0, 1.65, 8.0)
 
 
 def bearing(yaw_deg, dist, y=0.0):
@@ -208,7 +208,7 @@ def build():
     # ---- the wheat: ears on stalks, a field before the camera, bending in the wind
     stalk = lathe([(0.0, 0.007), (0.78, 0.006), (0.84, 0.017), (0.93, 0.016), (0.99, 0.004)], sides=5, samples=2)
     s.proc("wheat", stalk,
-           distribution={"kind": "grid", "gridCount": [96, 1, 22], "gridSpacing": [0.21, 1.0, 0.24]},
+           distribution={"kind": "grid", "gridCount": [100, 1, 44], "gridSpacing": [0.22, 1.0, 0.24]},
            material={"baseColor": hexrgb("#3a3626"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                      "roughness": 0.85, "metallic": 0.0},
            variation={"seed": 11, "position": [0.1, 0.0, 0.11], "rotation": [0.12, 3.14, 0.12],
@@ -218,7 +218,7 @@ def build():
                       {"kind": "noise", "amount": 0.14, "scale": 0.35, "speed": 0.7, "seed": 3,
                        "axisMask": [1.0, 0.0, 0.6], "axis": [0, 1, 0], "center": [0, 0, 0], "falloff": 1.0,
                        "space": "world"}],
-           transform={"position": [CAM[0] + 0.4, 0.0, CAM[2] - 5.2], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
+           transform={"position": [CAM[0] + 0.4, 0.0, CAM[2] - 7.8], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
     # ---- rain: long thin streaks round the camera, slanting with the wind
     s.particles("rain", capacity=24000, seed=31, shape="box", position=[CAM[0] + 2.0, 9.0, CAM[2] - 12.0],
