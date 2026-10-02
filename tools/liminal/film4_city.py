@@ -123,6 +123,8 @@ def roof_flight(b):
     b.key("nodes/stuCeil/visible", t(67) - 0.02, 0.0)
     b.key("nodes/heroRoof/visible", t(67) - 0.02, 0.0)
     b.key("nodes/faller/visible", t(3), 0.0)
+    # the house's lid (the top of its walls' box) goes with the roof, so the camera can rise out of the open house
+    b.lock("sdf/heroShell/node/heroLid/size", [(t(66, 3), [4.2, 0.1, 4.7])], [0.0, 0.0, 0.0], ease=0.0)
     by = {p[0]: p for p in IN.HERO_PARTS}
     t_split, t_fly = t(66, 3), t(66, 4)
     for nm_ in ("roofL", "roofR", "chimney"):
@@ -270,7 +272,7 @@ def add_walkers(b, key, specs, kerbs=None):
     f = b.f
     objs = []
     for (obj, rn, at, yaw, t0, t1, speed, phase, count, spacing) in specs:
-        tree = K.T(list(at), K.R([0.0, yaw, 0.0], walker_group(rn, WK.walk_base(phase), count, spacing)))
+        tree = WK.person(K.T(list(at), K.R([0.0, yaw, 0.0], walker_group(rn, WK.walk_base(phase), count, spacing))), obj)
         a = math.radians(yaw)
         dx, dz = math.sin(a), math.cos(a)        # the rig walks +Z in its own frame; turned by yaw
         L = speed * (t1 - t0)
@@ -515,7 +517,7 @@ def bar_room(b):
               ("barSitB", "sb", (x0 + 3.05, y0 - 0.38, z0 + 1.6), -90.0, {"hipL": -88.0, "hipR": -88.0, "kneeL": 88.0, "kneeR": 88.0, "elL": -45.0})]
     objs = []
     for obj, rn, at, yaw, stance in others:
-        objs.append((obj, K.T(list(at), K.R([0, yaw, 0], WK.walker(rn, stance))), "figure2", (at[0] - 1.2, at[1] - 0.2, at[2] - 1.2),
+        objs.append((obj, WK.person(K.T(list(at), K.R([0, yaw, 0], WK.walker(rn, stance))), obj), "figure2", (at[0] - 1.2, at[1] - 0.2, at[2] - 1.2),
                      (at[0] + 1.2, at[1] + 2.2, at[2] + 1.2), dict(FAR, own_line=True)))
     b.world("barPeople", {"objects": objs, "lights": []})
     for obj, rn, *_ in others:

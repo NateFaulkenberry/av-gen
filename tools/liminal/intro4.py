@@ -173,7 +173,8 @@ def hero_shell():
             X(((2.95, 3.95), (0.0, 2.05), (z1 - 0.5, z1 + 0.5))),         # the front door
             X(((-1.2, 0.0), (3.75, 5.05), (z1 - 0.5, z1 + 0.5))),         # the bedroom window
             X(((3.9, 4.5), (4.35, 4.95), (z1 - 0.5, z1 + 0.5))),          # the bathroom window
-            X(((x0 - 0.5, x0 + 0.5), (1.0, 2.2), (-4.4, -3.2)))]          # a side window (the kitchen)
+            X(((x0 - 0.5, x0 + 0.5), (1.0, 2.2), (-4.4, -3.2))),          # a side window (the kitchen)
+            T([HERO_X, h - 0.075, -2.1], box([0.0, 0.0, 0.0], name="heroLid"))]   # pass 4: the lid comes off with the roof (66.3)
     walls = K.D(body, hollow, *cuts)
     band = K.D(X(((x0 - 0.05, x1 + 0.05), (2.78, 2.92), (z0 - 0.05, z1 + 0.05))), X(((x0 + 0.1, x1 - 0.1), (2.0, 3.5), (z0 + 0.1, z1 - 0.1))))
     sill = X(((-1.4, 0.2), (0.74, 0.8), (z1, z1 + 0.12)))

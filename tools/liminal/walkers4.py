@@ -47,7 +47,7 @@ def rig(n, stance=None, k=FILL, joint=ACCENT, head=GLASS):
     st.update(stance or {})
 
     def leg(side, sgn):
-        foot = T([0.0, -F.SHIN - 0.035, 0.06], box(list(F.FOOT_H)))
+        foot = T([0.0, -F.SHIN - 0.018, 0.06], box(list(F.FOOT_H)))     # the sole on the floor
         shin = T([0.0, -F.SHIN / 2, 0.0], box([0.047, F.SHIN / 2 + 0.015, 0.047]))
         knee = T([0.0, -F.THIGH, 0.0], R([st[f"knee{side}"], 0.0, 0.0], U(_cube(0.048, joint), S(U(shin, foot), k)), name=f"{n}Knee{side}walk"))
         thigh = S(T([0.0, -F.THIGH / 2, 0.0], box([0.058, F.THIGH / 2 + 0.02, 0.058])), k)
@@ -72,6 +72,8 @@ def rig(n, stance=None, k=FILL, joint=ACCENT, head=GLASS):
               S(T(F.add(lumbar, F.mul(up, 0.47)), R([-st["lean"], 0.0, 0.0], box([0.036, 0.06, 0.036]))), k))
     head_node = T(F.add(n1, [0.0, F.HEAD_OVER_NECK, 0.0]),
                   R([st["headPitch"], st["headYaw"], 0.0], S(_gem(n), head), name=f"{n}Headgest"))
+    head_node["part"] = "head"          # the validator's integrity check: a person has a head and a body
+    torso["part"] = "body"
     sh_y = chest[1] + F.SH_UP
     body = U(torso, head_node, leg("L", 1.0), leg("R", -1.0), arm("L", 1.0, sh_y, chest[2]), arm("R", -1.0, sh_y, chest[2]))
     return body
@@ -80,6 +82,13 @@ def rig(n, stance=None, k=FILL, joint=ACCENT, head=GLASS):
 def walker(n, stance=None):
     """The rig under its placement translate `<n>walk` (key its translation along the path)."""
     return T([0.0, 0.0, 0.0], rig(n, stance), name=f"{n}walk")
+
+
+def person(tree, pid):
+    """Tag a walker group or a talker as a person (the validator's character group: not watched for build-lock, its
+    joints are alive; checked for its head and body)."""
+    import liminal_space as ls
+    return ls.tag(tree, "person", id=pid, moves=True)
 
 
 # ---- driving them ----------------------------------------------------------------------------------------------

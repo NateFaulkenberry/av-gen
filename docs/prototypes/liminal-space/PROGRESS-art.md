@@ -41,21 +41,28 @@ and owner bar):**
 - 4:08: the crash 247.30-248.4 is good; then 1 s of the summit at night and 1 s of a dark hill: the dawn only shows
   from about 250.5.
 
-**The pass 4 film (owner bars; `t()` from `pass2_grid.py`):**
+**The pass 4 film (owner bars; `t()` from `pass2_grid.py`; the chapters are `examples/liminal/all-you-got-pass4.shots.json`):**
 
-| bars | seconds | place | what |
+| bars | seconds | shot | what |
 |---|---|---|---|
-| 0-16 | 0-37.43 | the street | the intro, build -> lock: houses land (1-2), roofs slam once (4), lamps (5-6), driveway cars on the eighths (7), the city's first blocks rise a storey a beat behind the houses (7-12), towers (9-16); no flips, no shudder, no stutter |
-| 17-32 | 37.43-72.66 | the living room | as pass 3 (no wall swell) |
-| 33-37 | 72.66-83.67 | the kitchen | the table empty; the pan lands on him at the stove on 34.4 (76.51), steam; then at the table for C05 (36.4) |
-| 38-41 | 83.67-92.48 | the hall, the climb, the fall | the cut to the hall on 38.1 (pass 2's timing); the climb 86.4-90.25; the fall kept |
-| 42-49 | 92.48-110.09 | the basement | laundry (folding), gym (standing with a dumbbell), the lounge's bar (sitting), the sofa (alone); no tool bench |
-| 50-65 | 110.09-145.32 | upstairs | verse 2 as pass 3; the study camera kept 0.6 m+ from the bookcase |
-| 66-74 | 145.32-165.14 | out of the roof: the city | house -> neighbourhood -> city: roads, lamps, traffic, blocks ring by ring, storeys on the beat |
-| 75-82 | 165.14-182.43 | the city, alone | the red light (75-76), the bar (77-78, GOT? C17), the park bench (79-80), the crosswalk (81-82); C18 freeze and black |
-| 83-90 | 182.43-199.73 | the breathing city | the camera soars; the colour wave through the city at 90.3 |
-| 91-112 | 199.73-247.30 | the open, the stair, the summit | pass 3's, with him standing at the top (`triumph`), the city far below |
-| 113- | 247.30- | the crash, then dawn at once | the digital transition, then dawn on the summit as it clears (no night summit, no dark hill), the coda |
+| 0-16 | 0-37.43 | street | build -> lock: houses land (1-2), every roof slams down once on 4.1 (the houses landed without them), trees 4.3, lamps 5-6 on the eighths, driveway cars 7 on the eighths, behind the houses the city's inner blocks rise a storey a beat (podiums 7.1-7.3, slabs 7.1-9.1, towers 3.1-3.4 and 9.1-11.3, the core 9.1-14.2 on quarters then eighths), the hero house 9-12; no flips, shudder or stutter |
+| 17-32 | 37.43-72.66 | liv | as pass 3; no wall swell |
+| 33-37 | 72.66-83.67 | kit | in at the living-room door looking left (the fridge, the window), the pan lands on him at the stove ON 34.4 (76.51): a puff of steam, the burner flares, the hood light comes up; the table set for one; C05 lifts the plate, the kettle, the empty chair; out at the hall door |
+| 38-41 | 83.67-92.48 | hall | into the hall on 38.1, past him at the stair's foot, the climb 86.4-90.25 (the words on the risers 87.5-89.6), the cliff, the fall (pass 3's) |
+| 42-49 | 92.48-109.54 | lig | the laundry (he folds a towel on the dryer), a look at the wall (swap), the gym (he stands by the bench, a dumbbell in his hand, facing the mirror), C07, a look at the wall (swap), the lounge's bar (he sits on the middle stool), a look at the wall (swap), the sofa at the rebuild (48-49), C08 |
+| 49.4-65 | 109.54-145.32 | v2bed, v2bath, v2stu | verse 2 as pass 3; the study camera 1.2 m+ from the bookcase |
+| 66 | 145.32-147.52 | v2stu | the ceiling splits and flies, the house's roof and lid with it |
+| 67-74 | 147.52-165.14 | rise | out of the roofless house, up over the street, the neighbourhood and the city as it grows ring by ring (roads on the GROW beats, lamps an eighth later, traffic, blocks a storey a beat, the far towers last); FEEL IT GROW on the roads; 73-74 descending towards downtown |
+| 75-76 | 165.14-169.46 | redlight | alone in his car at the red light; the cross traffic, people crossing in front, the bar's window lit beside him; IS THAT ALL YOU on the podium across the junction |
+| 77-78 | 169.46-173.78 | bar | alone at the bar while the others talk; GOT? (C17) the bar's lights burst |
+| 79-80 | 173.78-178.11 | bench | on the park bench; people walk past both ways |
+| 81-82 | 178.11-182.43 | crossing | still in the middle of the crossing while the crowd flows round him; 82.3 they stop; C18 (82.4) black |
+| 83-90 | 182.43-199.73 | alive | down the avenue, round the downtown tower, a dive into a junction, low along the x-road z = -268, pulled up high; the city breathes; 90.3 the colour wave from the north; 91.1 the cut |
+| 91-98 | 199.73-217.03 | chorusA | the open; LET IT GO standing on the hills; the far city on the western horizon |
+| 99-106 | 217.03-234.33 | stair | the climb towards him: he stands at the top (triumph), his back to us |
+| 107-113.3 | 234.33-248.38 | summit | up beside him, a look back down at the world below, round to his front; the crash 113.1 |
+| 113.3-115 | 248.38-255 | dawn | dawn at once on the summit: behind him, the sun over the eastern peaks; the wash-out with the chord's end |
+| coda | 255-258 | coda | the road's four dashes go out one by one |
 
 **Modules (`tools/liminal/`, all new; pass 3's are imported, never edited):** `make_all_you_got_pass4.py` (entry),
 `film4.py` (Builder4: `lock()`, `audit_structure()` refusing beat/wave routes into structural transforms, `opens()`),
