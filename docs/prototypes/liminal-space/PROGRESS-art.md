@@ -32,7 +32,7 @@ these are the art side's. Newest state first.*
 **Generate, then check (CPU, about 80 s):**
 ```sh
 S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad
-export AVGEN=$S/liminal3/bin-validate/avgen        # a copy of the pinned binary (dd5c0fe1: the time-aware validator, rim, static)
+export AVGEN=$S/liminal3/bin-validate/avgen        # a copy of the pinned binary (5dd835a4: the validator, rim, static, world wave)
 python3 tools/liminal/make_all_you_got_pass3.py    # writes examples/liminal/all-you-got-pass3{,.scene,.rig,.shots}.json
                                                    # and all-you-got-pass3.validation.txt
 ./build/release/src/avgen --project examples/liminal/all-you-got-pass3.json --audit-routes /tmp/a.json 2>&1 | grep -i "warn\|error"
@@ -40,8 +40,11 @@ $AVGEN --trace-jumps examples/liminal/all-you-got-pass3.json --json $S/liminal3/
 ```
 - **Must print:** "words not seen when they appear: 0", an empty "words placed without a clear wall" list, and 8
   "swap ... (both off screen)" lines.
-- **Validator:** 5 errors. 4 are false positives, sent to the coordinator: lyric obstacles seen through walls, and
-  a stair read as its bounding box. The fifth, `v1w03`, overlaps a door opening by 1%.
+- **Validator:** 0 errors, 12 warnings, 2 notes (`examples/liminal/all-you-got-pass3.validation.txt`). The
+  warnings are accepted. Five are on four words: a few cm inside the 0.15 m edge margin, and one tree word 0.11 m off
+  its wall. Seven are camera paths passing a shell at 3-12 cm where they go through a door, a window or the stairwell
+  on purpose. The two notes are the tree's
+  mirrored rooms, which it does not check.
 - **Route audit:** 0 warnings.
 - **Jump trace:** only authored moves remain (the riser's sideways tremor, the falling houses, the split ceiling).
 
@@ -66,14 +69,14 @@ tools/gpu-lock.sh $S/liminal3/avgen.sh --headless --project examples/liminal/all
 - `make_all_you_got_pass3.py`: the entry point. `space-rules3.json` holds the pass 3 validator rules.
 - `preview3.py tableaux|rooms`: stills projects.
 
-**Waiting on the engineer:**
-- the rim (ADR-1052, built): `sdf/<o>/look/rim/intensity|color|power`, and `surface/<k>/rim`;
-- the screen static (ADR-1054, in test);
-- the spatial colour wave (not started; `film3_late.colour_wave()` is a stand-in with moving coloured lights).
+**The engine (all delivered; the art side is pinned to `5dd835a4`):**
+- the spatial validator (ADR-1051), used through `tools/liminal_space.py` (`instrument_kit`, `tag`, `validate`);
+- the rim (ADR-1052): `sdf/<o>/look/rim/intensity|color|power`, and `surface/<k>/rim` (the mannequin's head);
+- the screen static (ADR-1054): `surface/<k>/static`, `look/static/cell|rate|roll` (every SCREEN surface);
+- the world wave (ADR-1055): `post/wave/*`, driven by `film3_late.colour_wave()` at 198.3-199.9.
 
-The rim and the static change the SDF uniform block. Re-pin when the coordinator sends the sha:
-`B=$S/liminal2/bin-<sha>`, copy `build/release/src/avgen` into it, run `git archive <sha> shaders | tar -x -C $B`,
-then point `$S/liminal3/avgen.sh` at it.
+To re-pin to a newer engine: `B=$S/liminal2/bin-<sha>`, copy `build/release/src/avgen` into it, run
+`git archive <sha> shaders | tar -x -C $B`, then point `$S/liminal3/avgen.sh` at it (or set `AVGEN_PIN=$B`).
 
 ### The pass 3 film (owner bars; `t()` from `pass2_grid.py`)
 

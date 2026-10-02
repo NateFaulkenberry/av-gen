@@ -61573,6 +61573,24 @@
    "volumetric": 0.0
   },
   {
+   "name": "stuFlash",
+   "type": "point",
+   "position": [
+    0.2,
+    4.6,
+    -3.3
+   ],
+   "color": [
+    0.85,
+    0.92,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 3.5,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
    "name": "galKey",
    "type": "point",
    "position": [

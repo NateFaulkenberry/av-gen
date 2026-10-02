@@ -218,6 +218,13 @@ def build(b):
     f.route(c, "post/lens/chromaticAberration", 0.7)
     f.route(c, "temporal/mosh/amount", 0.5)
     f.route(c, "camera/exposure/compensation", 1.8)
+    # ... and on the beat the bedroom's pixels smear on into the bathroom (a datamosh across the cut): the jump alone
+    # was over before the beat it answers (take 2 measured C10 only "visible")
+    c = b.clap("c10in", t(53, 4), release=0.35)
+    f.route(c, "temporal/mosh/amount", 0.6)
+    f.route(c, "temporal/mosh/shift", 14.0)
+    f.route(c, "post/lens/chromaticAberration", 0.6)
+    f.route(c, "post/bloom/intensity", 0.8)
     # C11 (55.4) colour corruption: a 180-degree hue jump, the channels split, the lamp pumps like a heart
     c = b.clap("c11", t(55, 4), release=0.55)
     f.route(c, "post/grade/hueShift", 3.1)
@@ -244,18 +251,24 @@ def build(b):
     f.route(c, "camera/exposure/compensation", 1.6)
     for o in ("stuShell", "stuFurn", "stuShelf"):
         f.route(c, f"sdf/{o}/look/edge/intensity", 8.0)
-    # C14 (61.4) a lurch: the whole room jumps a hand's width sideways for two frames, twice
+    # C14 (61.4) a lurch: the whole room jumps a hand's width sideways for two frames, twice, in a flash. The camera is
+    # looking away across the dark side of the study here (the desk figure becomes the floor figure behind it), so a
+    # dropout of an already black frame read as nothing (take 2: "not read"): the room's own light stutters instead,
+    # a cold flash from beside the camera that lights the walls the lurch moves
+    flash = f.point_light("stuFlash", (0.2, R3.UP + 1.75, -3.3), (0.85, 0.92, 1.0), 0.0, 3.5)
     c = b.clap("c14", t(61, 4), release=0.08, attack=0.0)
     for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil", "stuDesk", "stuFloor"):
         f.route(c, f"sdf/{o}/transform/position", 0.22, component=0, attackMs=5.0)
-    f.route(c, "camera/exposure/compensation", -6.0)      # the frame drops out for an instant
+    c = b.clap("c14f", t(61, 4), release=0.3)
+    f.route(c, f"lights/{flash}/intensity", 16.0)
+    f.route(c, "post/bloom/intensity", 1.0)
     c = b.clap("c14b", t(61, 4) + 0.14, release=0.06)
     for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil", "stuDesk", "stuFloor"):
         f.route(c, f"sdf/{o}/transform/position", -0.16, component=0, attackMs=5.0)
     f.route(c, "temporal/mosh/amount", 0.5)
     c = b.clap("c14c", t(61, 4) + 0.07, release=0.25)   # between the two jumps, the lines flare
     f.route(c, "camera/exposure/compensation", 1.8)
-    for o in ("stuShell", "stuFurn", "stuShelf"):
+    for o in ("stuShell", "stuFurn", "stuShelf", "stuCeil"):
         f.route(c, f"sdf/{o}/look/edge/intensity", 9.0)
     # C15 (63.4) the floor drops: the room falls a metre under the camera and every line flares white
     c = b.clap("c15", t(63, 4), release=0.6)

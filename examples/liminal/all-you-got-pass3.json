@@ -932,6 +932,16 @@
       "strength": 1.0
      },
      {
+      "channel": "c10in",
+      "time": 118.34862,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.35,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
       "channel": "c11",
       "time": 122.75229,
       "units": "seconds",
@@ -978,6 +988,16 @@
       "attack": 0.0,
       "hold": 0.0,
       "release": 0.08,
+      "curve": "exp",
+      "strength": 1.0
+     },
+     {
+      "channel": "c14f",
+      "time": 135.9633,
+      "units": "seconds",
+      "attack": 0.0,
+      "hold": 0.0,
+      "release": 0.3,
       "curve": "exp",
       "strength": 1.0
      },
@@ -7419,6 +7439,46 @@
    "chain": {}
   },
   {
+   "source": "grid.song.c10in",
+   "target": "temporal/mosh/amount",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c10in",
+   "target": "temporal/mosh/shift",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c10in",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c10in",
+   "target": "post/bloom/intensity",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
    "source": "grid.song.c11",
    "target": "post/grade/hueShift",
    "amount": 3.1,
@@ -7701,9 +7761,19 @@
    }
   },
   {
-   "source": "grid.song.c14",
-   "target": "camera/exposure/compensation",
-   "amount": -6.0,
+   "source": "grid.song.c14f",
+   "target": "lights/stuFlash/intensity",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14f",
+   "target": "post/bloom/intensity",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -7825,6 +7895,16 @@
   {
    "source": "grid.song.c14c",
    "target": "sdf/stuShelf/look/edge/intensity",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "enabled": true,
+   "chain": {}
+  },
+  {
+   "source": "grid.song.c14c",
+   "target": "sdf/stuCeil/look/edge/intensity",
    "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
