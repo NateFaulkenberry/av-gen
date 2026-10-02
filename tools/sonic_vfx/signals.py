@@ -8,10 +8,13 @@ Two vocabularies:
 
   ENGINE = "response"  the engineer's response model (ADR-1060..1062): live kick/snare/hat, conditioned levels, the
                        per-note MIDI signals, and the live Effect Library trigger source `signal`.
+  ENGINE = "adr1061"   4bc1a762: live kick/snare/hat (`audio.onsetLow/Mid/High`, ADR-1061) and the Effect Library's
+                       live `signal` trigger source (ADR-1060), before the response model: levels and per-note facts
+                       still fall back to the Sonic Character and the context.
   ENGINE = "legacy"    what fc99580d (the art agent's first pin) publishes: the Sonic Character, `notes.*` context,
                        `audio.*`. Hits fall back to the broadband onset, so drums read as generic attacks.
 
-Set SONIC_VFX_ENGINE=legacy in the environment to build for the old pin (look development only).
+Set SONIC_VFX_ENGINE=adr1061 or legacy in the environment to build for an older pin (look development only).
 """
 import os
 
@@ -86,6 +89,14 @@ LEGACY_OVERRIDES = {
     "velocitySpread": "notes.velocity",
 }
 
+# 4bc1a762 (ADR-1060/1061): the drum classes are real and live; everything else as legacy.
+ADR1061_OVERRIDES = dict(LEGACY_OVERRIDES)
+ADR1061_OVERRIDES.update({
+    "kick": "audio.onsetLow", "kickEnv": "audio.onsetLow",
+    "snare": "audio.onsetMid", "snareEnv": "audio.onsetMid",
+    "hat": "audio.onsetHigh", "hatEnv": "audio.onsetHigh",
+})
+
 # Events: route them through an envelope stage (or an attack/decay chain with attack 0).
 EVENTS = {"kick", "snare", "hat", "low", "onset", "note", "noteOn", "noteOff", "release", "noteLow", "noteHigh",
           "phrase", "beat", "transientT"}
@@ -95,6 +106,8 @@ def S(name):
     """The bus id for a signal class or MIDI fact."""
     if ENGINE == "legacy" and name in LEGACY_OVERRIDES:
         return LEGACY_OVERRIDES[name]
+    if ENGINE == "adr1061" and name in ADR1061_OVERRIDES:
+        return ADR1061_OVERRIDES[name]
     if name in RESPONSE:
         return RESPONSE[name]
     if "." in name:  # already a bus id (visual.*, fx.*, macro.*)
@@ -108,4 +121,4 @@ def is_event(name):
 
 def live_triggers_available():
     """The Effect Library's `signal` trigger source (VFX-ARCHITECTURE.md §1.3) exists only in the response engine."""
-    return ENGINE == "response"
+    return ENGINE in ("response", "adr1061")

@@ -2,4 +2,5 @@
 
 SCENES = [
     "event_horizon",
+    "breathing_deep",
 ]

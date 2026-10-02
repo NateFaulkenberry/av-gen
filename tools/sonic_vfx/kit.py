@@ -102,6 +102,46 @@ def bump(name, signal, centre, width, invert_ok=True):
     return [up, dn], [both]
 
 
+def place_bumps(prefix, signal, centres, width, event=None):
+    """One responder per place. visual.<prefix><k> is 1 where `signal` (usually notes.lastPitch) sits at centres[k],
+    falling to 0 at +- width. With `event` (e.g. "noteOn"), visual.<prefix>Hit<k> is that event's strength on the
+    frame it fires, but only at its place: min(rising edge, falling edge, event).
+
+    Route the Hit signal, not the place, when a note should leave a decaying mark: a route's depth scales its output
+    every frame, so a flash routed through a place depth is cut off the moment the next note moves the pitch; a Hit
+    carries the place into the chain's input, so each place decays on its own. Returns (first-source mappings,
+    second-source mappings): the edges are computed first, and the mins read them in the same frame."""
+    first, second = [], []
+    for k, c in enumerate(centres):
+        f, s = bump("%s%d" % (prefix, k), signal, c, width)
+        first += f
+        second += s
+        if event:
+            second.append(M("%sHit%d" % (prefix, k), [("visual.%s%d_up" % (prefix, k), 1.0),
+                                                      ("visual.%s%d_dn" % (prefix, k), 1.0), (event, 1.0)], "min"))
+    return first, second
+
+
+def lathe(profile, sides=32, samples=6, twist=0.0):
+    """A radially symmetric form (a cap, a bowl, a coil, a vase): `profile` is [(height, radius), ...] from bottom to
+    top. A tube along +Y whose cross-section radius follows the profile (the curve points' `scale`)."""
+    r0 = max(r for _, r in profile) or 1.0
+    pts = [{"position": [0.0, float(h), 0.0], "scale": round(float(r) / r0, 5), "roll": 0.0} for h, r in profile]
+    return {"kind": "tube", "tubeRadius": float(r0), "tubeTaper": 1.0, "tubeSides": int(sides),
+            "tubeSegments": max(2, len(profile) * 2), "tubeTwist": float(twist), "tubeCaps": True,
+            "curve": {"kind": "catmullRom", "generator": "points", "points": pts, "samplesPerSegment": int(samples)}}
+
+
+def strand(start, end, radius, taper=0.15, seed=1, noise=0.3, noise_scale=0.9, count=8, sides=8, segments=30):
+    """A hanging or rising organic strand: a tube along a noisy Catmull-Rom curve from start to end."""
+    return {"kind": "tube", "tubeRadius": float(radius), "tubeTaper": float(taper), "tubeSides": int(sides),
+            "tubeSegments": int(segments), "tubeTwist": 0.0, "tubeCaps": True,
+            "curve": {"kind": "catmullRom", "generator": "noise", "count": int(count),
+                      "start": [float(v) for v in start], "end": [float(v) for v in end],
+                      "noiseAmount": float(noise), "noiseScale": float(noise_scale), "seed": int(seed),
+                      "samplesPerSegment": 8}}
+
+
 # Chain presets, by the motion tier they serve (the brief's §13). Each is attack/decay in ms.
 VERY_SLOW = {"attackMs": 2500, "decayMs": 5000}
 SLOW = {"attackMs": 900, "decayMs": 2400}
