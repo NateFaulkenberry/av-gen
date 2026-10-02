@@ -5,9 +5,27 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 4 (2026-10-02, the owner's `04-art-pass-4.md` governs; my parts: 2-6 and 8-16)
 
-**State (13:40):** the scaffold is committed; the stills of the city, the new tableaux and the new rooms are queued on
-the GPU (`$S/liminal4/stills.sh city tableaux rooms`, results in `$S/liminal4/stills/<what>/`, log `done.log`).
-Next: look at the stills, then write the film modules' changes (below), generate, validate, preview.
+**State (15:10):** the whole pass 4 film generates (`make_all_you_got_pass4.py`, about 95 s) and the pass 4 validator
+(ADR-1056) reports **0 critical, 8 warnings** on it (static): the lounge's television faces its sofa, not the room's
+centre (correct), and seven camera passes through doors and windows at the CSG bound (pass 3 had the same seven). The
+film pass (`--film`, ADR-1057) is running (`$S/liminal4/val/film.*`); the first preview `prev-v1` is queued on the GPU
+(`$S/liminal4/preview.sh v1`, log `$S/liminal4/prev-v1.log`). **Re-pinned** to `47ad4c73` (`$S/liminal4/avgen.sh`,
+`$S/liminal2/bin-47ad4c73`): the journey near plane is 5 cm there (ADR-1058; the 2:15 cut-open bookcase).
+Next: look at prev-v1 section by section, fix, render the 1080p final, the critic, the gate.
+
+Validator fixes made in the scene data (the engineer's findings on pass 3 and mine on pass 4):
+- trim (skirting, dado) stops at every door and window: `rooms4.shell_with` puts the bands inside the openings'
+  difference, and the room entity on the difference's first child (the validator gives a difference's cuts to it);
+  `rooms3.shell_with` is patched with it when pass 4 imports rooms4 (pass 3's own generator never does);
+- the front door's leaf is part of its frame's entity (`rooms4.hall`); the stair's cliff is `terminates`;
+- the study's bookcase is off the study door (`rooms4.study`), the camera keeps 1.2 m from it (the 2:15 artifact);
+- floor words keep off mats (`Builder4._surface_mask`), standing chorus words keep out of trees, no two words overlap
+  in time and place (bridge 2's layout by measured width; FEEL IT GROW a half bar each), the validator's lyric
+  fixes are applied automatically (`fix_words`);
+- the faller waits under the street (its rest pose was the hero house), the flown roof (now `heroRoof`) and ceiling
+  carry entity spans (`Builder4.span_objects`), bounds grown where the validator found pieces outside them;
+- the BIG CLAPs' deliberate moves (C02, C05, C10, C12, C14, C15, the roof flight, the crash) are listed in
+  `space-rules4.json`'s `motion.allow`.
 
 **What the owner saw (frame-grabbed from pass 3 take 3, `$S/liminal4/p3grab/*.png`, `sheet4.py` labels film time
 and owner bar):**
