@@ -207,3 +207,18 @@ TEST_CASE("The live latch fires a carried event once", "[analysis][adr1060]") {
     CHECK(r.lowOnset);
 }
 
+
+#include <chrono>
+TEST_CASE("Causal onset detector cost per frame (benchmark, hidden)", "[.][bench][adr1060]") {
+    const testsupport::Kit kit = testsupport::makeKit(32);
+    const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
+    std::vector<analysis::AnalysisFrame> frames = track.frames();
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int rep = 0; rep < 5; ++rep) {
+        analysis::detectCausalOnsets(frames, 48000.0f / 2048.0f, 512.0 / 48000.0);
+    }
+    const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() /
+                      (5.0 * static_cast<double>(frames.size()));
+    WARN("causal onsets: " << us << " us per analysis frame over " << frames.size() << " frames");
+    CHECK(us < 200.0);
+}
