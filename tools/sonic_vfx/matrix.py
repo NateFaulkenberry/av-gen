@@ -32,7 +32,7 @@ CLASS_EXPECTS = {
     "arp": ["response.note", "notes.lastPitch"],
     "edrums": ["response.kick", "response.snare", "response.hat"],
     "drumloop": ["response.kick", "response.snare", "response.hat"],
-    "dense": ["response.note", "notes.polyphony", "notes.density", "response.kick", "response.hat"],
+    "dense": ["response.note", "notes.polyphony", "notes.density"],          # (no drums in this class)
     "sparse": ["response.note", "notes.lastPitch"],
     "velocity": ["notes.lastVelocity", "response.note"],
     "rapid": ["response.note", "notes.lastPitch"],
@@ -149,8 +149,40 @@ def sheet(scene_dir, out_png, title):
     return out_png
 
 
+def short(text, n=70):
+    """A vocabulary row's description for a table cell: up to its first parenthesis, cut at a word."""
+    t = text.split(" (")[0].strip()
+    if len(t) <= n:
+        return t
+    return t[:n].rsplit(" ", 1)[0] + "..."
+
+
+def set_list():
+    """The scene ids in set-list order (tools/sonic_vfx/scenes SCENES), then anything else found."""
+    import importlib
+    from tools.sonic_vfx.scenes import SCENES
+    return [importlib.import_module("tools.sonic_vfx.scenes." + n).ID for n in SCENES]
+
+
+def tally(rep, trace_csv, sigs):
+    """(answered, played) over the expected signals of one clip."""
+    n_ans = n_play = 0
+    for o in observed(rep, trace_csv, sigs):
+        if "not played" in o:
+            continue
+        n_play += 1
+        n_ans += ": answered" in o
+    return n_ans, n_play
+
+
 def report(a):
-    scenes = sorted(d for d in os.listdir(a.out) if os.path.isdir(os.path.join(a.out, d)))
+    found = {d for d in os.listdir(a.out) if os.path.isdir(os.path.join(a.out, d))}
+    order = set_list()
+    scenes = [s for s in order if s in found] + sorted(found - set(order))
+    try:
+        from tools.sonic_vfx import matrix_notes
+    except ImportError:  # pragma: no cover
+        matrix_notes = None
     lines = ["# Sonic VFX test matrix", "",
              "Every scene through the thirteen input classes of the synthesized test material",
              "(`tools/sonic_vfx/make_test_material.py`), rendered from the file path (the same response, character and",
@@ -162,9 +194,30 @@ def report(a):
              "event latency for hits.",
              "- **Quality:** the evaluator's mean dimension score (0..1) and its lowest dimension.",
              "- **Problems:** the evaluator's findings for that clip (severity medium and up).", ""]
-    pre = os.path.join(a.out, "preamble.md")
-    if os.path.exists(pre):        # notes written beside the reports (the material, the detector's limits)
-        lines += [open(pre).read().rstrip(), ""]
+    if matrix_notes is not None:   # the material, the detector on it, how to read a row (tools/sonic_vfx)
+        lines += [matrix_notes.PREAMBLE.rstrip(), ""]
+    # the overview: per scene and input, expected signals answered / expected signals the input played
+    grid = ["## The matrix at a glance", "",
+            "Each cell is *answered/played*: of the vocabulary signals that input exercises and actually played, "
+            "how many the picture measurably answers (z >= 3). A dash: the input exercises no row of the scene's "
+            "vocabulary.", "",
+            "| scene | " + " | ".join(review.CLASSES) + " |", "|---|" + "---|" * len(review.CLASSES)]
+    for sc in scenes:
+        cells = []
+        proj = None
+        for cls in review.CLASSES:
+            rp = os.path.join(a.out, sc, cls + ".critic.json")
+            if not os.path.exists(rp):
+                cells.append(" ")
+                continue
+            proj = proj or os.path.join(a.out, sc, "%s--%s.json" % (sc, cls))
+            doc = json.load(open(proj)) if os.path.exists(proj) else {}
+            vocab = vocab_for(doc)
+            sigs = [x for x in CLASS_EXPECTS.get(cls, []) if x in vocab][:4]
+            n_ans, n_play = tally(json.load(open(rp)), os.path.join(a.out, sc, cls + ".trace.csv"), sigs)
+            cells.append("%d/%d" % (n_ans, n_play) if n_play else "-")
+        grid.append("| %s | %s |" % (sc, " | ".join(cells)))
+    lines += grid + [""]
     for sc in scenes:
         reps = {}
         for p in sorted(glob.glob(os.path.join(a.out, sc, "*.critic.json"))):
@@ -178,6 +231,9 @@ def report(a):
         lines += ["## %s" % ((doc.get("sonicScene") or {}).get("title") or sc), ""]
         if (doc.get("sonicScene") or {}).get("thesis"):
             lines += ["*%s*" % doc["sonicScene"]["thesis"], ""]
+        verdict = (getattr(matrix_notes, "VERDICTS", {}) or {}).get(sc)
+        if verdict:
+            lines += ["**Verdict.** " + verdict.strip(), ""]
         png = sheet(os.path.join(a.out, sc), os.path.join(a.out, "%s-sheet.png" % sc),
                     (doc.get("sonicScene") or {}).get("title") or sc)
         if png:
@@ -187,9 +243,9 @@ def report(a):
             r = reps.get(cls)
             if r is None:
                 continue
-            sigs = [x for x in CLASS_EXPECTS.get(cls, []) if x in vocab]
-            exp_txt = "; ".join(vocab[x][2][:64] for x in sigs[:3]) or "(no row of the vocabulary)"
-            obs = observed(r, os.path.join(a.out, sc, cls + ".trace.csv"), sigs[:4])
+            sigs = [x for x in CLASS_EXPECTS.get(cls, []) if x in vocab][:4]
+            exp_txt = "; ".join(short(vocab[x][2]) for x in sigs) or "(no row of the vocabulary)"
+            obs = observed(r, os.path.join(a.out, sc, cls + ".trace.csv"), sigs)
             sc_ = r.get("scores", {})
             mean = sum(sc_.values()) / max(1, len(sc_))
             low = min(sc_.items(), key=lambda kv: kv[1]) if sc_ else ("-", 0)

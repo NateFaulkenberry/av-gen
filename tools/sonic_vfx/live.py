@@ -22,7 +22,49 @@ from tools.sonic_vfx import review  # noqa: E402
 
 PIN_DIR = os.path.dirname(os.path.realpath(review.PIN))
 PROBE_LEN = {"demo": 27.5, "patches": 40.0, "play": 82.0, "latency": 21.0, "chords": 20.0, "arp": 16.0,
-             "low": 16.0, "high": 16.0, "distorted": 20.0}
+             "low": 16.0, "high": 16.0, "distorted": 20.0,
+             "tour": 1.0 + 20.0 * 17}     # program 0 (Sonic Live), then the 16 scenes, 20 s each (ADR-1063)
+
+
+def pct(xs, q):
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(len(xs) * q))] if xs else float("nan")
+
+
+def tour_table(out, rows):
+    """Split a tour's live log at the probe's program changes (both stamp the host clock in ns): per scene, the
+    frame interval and GPU time, the notes that arrived, and how high the response's envelopes went."""
+    import importlib
+    from tools.sonic_vfx.scenes import SCENES
+    names = ["Sonic Live"] + [importlib.import_module("tools.sonic_vfx.scenes." + n).TITLE for n in SCENES]
+    events = list(csv.DictReader(open(os.path.join(out, "probe.csv"))))
+    cuts = [(int(e["hostNs"]), int(e["key"])) for e in events if e["kind"] == "program"]
+    if not cuts:
+        return None
+    end_ns = int(events[-1]["hostNs"])
+    lines = ["| # | scene | frames | interval p50 / p99 ms | GPU p50 / p95 ms | notes | noteEnv max | kickEnv max |"
+             " sustain max |", "|---|---|---|---|---|---|---|---|---|"]
+    for i, (t0, k) in enumerate(cuts):
+        t1 = cuts[i + 1][0] if i + 1 < len(cuts) else end_ns
+        # skip the first 3 s: the switch loads the scene (that hitch is the switch's, not the scene's)
+        seg = [r for r in rows if t0 + 3_000_000_000 <= int(r["frameNs"]) < t1]
+        if len(seg) < 3:
+            continue
+        ns = [int(r["frameNs"]) for r in seg]
+        dt = [(ns[j] - ns[j - 1]) / 1e6 for j in range(1, len(ns))]
+        gpu = [float(r["gpuMs"]) for r in seg if r.get("gpuMs") not in (None, "", "-1")]
+
+        def mx(col):
+            vals = [float(r[col]) for r in seg if r.get(col) not in (None, "")]
+            return max(vals) if vals else float("nan")
+        notes = int(seg[-1].get("notesReceived") or 0) - int(seg[0].get("notesReceived") or 0)
+        lines.append("| %d | %s | %d | %.1f / %.1f | %.1f / %.1f | %d | %.2f | %.2f | %.2f |" % (
+            k, names[k % len(names)], len(seg), pct(dt, 0.5), pct(dt, 0.99), pct(gpu, 0.5), pct(gpu, 0.95), notes,
+            mx("response.noteEnv"), mx("response.kickEnv"), mx("response.sustain")))
+    md = os.path.join(out, "tour.md")
+    open(md, "w").write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return md
 
 
 def pin_bin():
@@ -73,6 +115,8 @@ def main():
     if dt:
         print("live frame interval p50 %.1f ms, p95 %.1f ms, p99 %.1f ms; notes received %s"
               % (dt[len(dt) // 2], dt[int(len(dt) * 0.95)], dt[int(len(dt) * 0.99)], rows[-1].get("notesReceived")))
+    if a.scenario == "tour":
+        tour_table(out, rows)
     if a.no_capture:
         return
     # the capture as a clip, and the live log as a trace (time = seconds since the first captured frame)
