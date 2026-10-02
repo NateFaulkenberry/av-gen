@@ -1,0 +1,70 @@
+ROOM VALIDATION
+
+Errors: 0
+Warnings: 8
+Notes: 4
+
+WARNING
+LoungeTV faces away from the room (178 degrees from its centre)
+(in: lig)
+
+WARNING
+camera path of chapter 'liv' grazes 'livShell' (0.05m away at path metres 2.1-14.0)
+distance: 0.05
+(in: liv)
+
+WARNING
+camera path of chapter 'kit' grazes 'livShell' (0.10m away at path metres 2.1-2.1)
+distance: 0.1
+(in: kit)
+
+WARNING
+camera path of chapter 'kit' grazes 'kitShell' (0.09m away at path metres 2.3-2.3)
+distance: 0.095
+(in: kit)
+
+WARNING
+camera path of chapter 'hall' grazes 'hallShell' (0.05m away at path metres 2.2-6.7)
+distance: 0.046
+(in: hall)
+
+WARNING
+camera path of chapter 'lig' grazes 'lauShell' (0.11m away at path metres 4.8-4.8)
+distance: 0.109
+(in: lig)
+
+WARNING
+camera path of chapter 'lig' grazes 'gymShell' (0.09m away at path metres 4.7-8.0)
+distance: 0.09
+(in: lig)
+
+WARNING
+camera path of chapter 'rise' grazes 'stuShell' (0.05m away at path metres 3.0-3.1)
+distance: 0.05
+(in: rise)
+
+INFO
+Room_01 sits under a repeat/mirror/fold; its placement is not checked
+
+INFO
+Room_02 sits under a repeat/mirror/fold; its placement is not checked
+
+INFO
+barMan overlaps its anchor BarStool1 by 0.02m (within the 0.08m allowed a child)
+penetration: 0.023
+(in: lig)
+
+INFO
+barMan2 overlaps its anchor BarRoomStool1 by 0.02m (within the 0.08m allowed a child)
+penetration: 0.023
+(in: bar)
+
+PASS
+154 architectural relationships
+320 entity placements
+8 furniture relationships
+16 character poses
+183 entities complete
+212 lyric placements
+274 texts clear of geometry
+14 camera paths clear

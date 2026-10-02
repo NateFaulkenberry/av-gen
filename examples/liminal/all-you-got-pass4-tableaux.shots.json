@@ -1,0 +1,110 @@
+[
+ {
+  "id": "s01",
+  "name": "stove0",
+  "start": 0.0,
+  "end": 1.0
+ },
+ {
+  "id": "s02",
+  "name": "stove1",
+  "start": 1.0,
+  "end": 2.0
+ },
+ {
+  "id": "s03",
+  "name": "fold0",
+  "start": 2.0,
+  "end": 3.0
+ },
+ {
+  "id": "s04",
+  "name": "fold1",
+  "start": 3.0,
+  "end": 4.0
+ },
+ {
+  "id": "s05",
+  "name": "gym_stand0",
+  "start": 4.0,
+  "end": 5.0
+ },
+ {
+  "id": "s06",
+  "name": "gym_stand1",
+  "start": 5.0,
+  "end": 6.0
+ },
+ {
+  "id": "s07",
+  "name": "bar_sit0",
+  "start": 6.0,
+  "end": 7.0
+ },
+ {
+  "id": "s08",
+  "name": "bar_sit1",
+  "start": 7.0,
+  "end": 8.0
+ },
+ {
+  "id": "s09",
+  "name": "lounge_sit0",
+  "start": 8.0,
+  "end": 9.0
+ },
+ {
+  "id": "s10",
+  "name": "lounge_sit1",
+  "start": 9.0,
+  "end": 10.0
+ },
+ {
+  "id": "s11",
+  "name": "car_sit0",
+  "start": 10.0,
+  "end": 11.0
+ },
+ {
+  "id": "s12",
+  "name": "car_sit1",
+  "start": 11.0,
+  "end": 12.0
+ },
+ {
+  "id": "s13",
+  "name": "bench_sit0",
+  "start": 12.0,
+  "end": 13.0
+ },
+ {
+  "id": "s14",
+  "name": "bench_sit1",
+  "start": 13.0,
+  "end": 14.0
+ },
+ {
+  "id": "s15",
+  "name": "crowd_stand0",
+  "start": 14.0,
+  "end": 15.0
+ },
+ {
+  "id": "s16",
+  "name": "crowd_stand1",
+  "start": 15.0,
+  "end": 16.0
+ },
+ {
+  "id": "s17",
+  "name": "triumph0",
+  "start": 16.0,
+  "end": 17.0
+ },
+ {
+  "id": "s18",
+  "name": "triumph1",
+  "start": 17.0,
+  "end": 18.0
+ }
+]

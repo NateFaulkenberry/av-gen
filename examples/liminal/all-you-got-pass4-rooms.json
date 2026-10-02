@@ -1,0 +1,4090 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "~/Desktop/All You Got.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "all-you-got-pass4-rooms.scene.json"
+  }
+ },
+ "parameters": {
+  "temporal/mosh/enabled": true,
+  "temporal/mosh/amount": 0.0,
+  "temporal/mosh/shift": 0.0,
+  "temporal/mosh/block": 40.0,
+  "temporal/mosh/smear": 30.0,
+  "temporal/mosh/frames": 10.0,
+  "temporal/mosh/rate": 12.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.35,
+  "post/bloom/threshold": 0.9,
+  "post/grade/contrast": 1.08,
+  "post/grade/saturation": 1.1,
+  "post/output/vignette": 0.25,
+  "post/output/grain": 0.0,
+  "post/motionBlur/amount": 0.0
+ },
+ "sources": [
+  {
+   "kind": "beatgrid",
+   "name": "song",
+   "settings": {
+    "origin": 2.2018348623853212,
+    "beatsPerBar": 4,
+    "tempo": [
+     {
+      "bar": 1,
+      "bpm": 109
+     },
+     {
+      "bar": 75,
+      "bpm": 111
+     }
+    ],
+    "sections": {
+     "intro": 1,
+     "release": 17,
+     "verse1": 25,
+     "pause": 41,
+     "letgo": 42,
+     "verse2": 50,
+     "bridgein": 66,
+     "bridge1": 67,
+     "bridge2": 75,
+     "bridge3": 83,
+     "chorus": 91,
+     "ending": 115
+    },
+    "events": []
+   }
+  }
+ ],
+ "routes": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/journey/distance",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.1,
+      "value": [
+       1002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.2,
+      "value": [
+       1002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.3,
+      "value": [
+       1002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.4,
+      "value": [
+       1002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.5,
+      "value": [
+       1002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.6,
+      "value": [
+       1002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.7,
+      "value": [
+       1002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.8,
+      "value": [
+       1002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 0.9,
+      "value": [
+       1002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       1002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       2002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.1,
+      "value": [
+       2002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.2,
+      "value": [
+       2002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.3,
+      "value": [
+       2002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.4,
+      "value": [
+       2002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.5,
+      "value": [
+       2002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.6,
+      "value": [
+       2002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.7,
+      "value": [
+       2002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.8,
+      "value": [
+       2002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 1.9,
+      "value": [
+       2002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       3002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.1,
+      "value": [
+       3002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.2,
+      "value": [
+       3002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.3,
+      "value": [
+       3002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.4,
+      "value": [
+       3002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.5,
+      "value": [
+       3002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.6,
+      "value": [
+       3002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.7,
+      "value": [
+       3002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.8,
+      "value": [
+       3002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.9,
+      "value": [
+       3002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       3002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       4002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.1,
+      "value": [
+       4002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.2,
+      "value": [
+       4002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.3,
+      "value": [
+       4002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.4,
+      "value": [
+       4002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.5,
+      "value": [
+       4002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.6,
+      "value": [
+       4002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.7,
+      "value": [
+       4002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.8,
+      "value": [
+       4002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 3.9,
+      "value": [
+       4002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       4002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       5002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.1,
+      "value": [
+       5002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.2,
+      "value": [
+       5002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.3,
+      "value": [
+       5002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.4,
+      "value": [
+       5002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.5,
+      "value": [
+       5002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.6,
+      "value": [
+       5002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.7,
+      "value": [
+       5002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.8,
+      "value": [
+       5002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 4.9,
+      "value": [
+       5002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       5002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       6002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.1,
+      "value": [
+       6002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.2,
+      "value": [
+       6002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.3,
+      "value": [
+       6002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.4,
+      "value": [
+       6002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.5,
+      "value": [
+       6002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.6,
+      "value": [
+       6002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.7,
+      "value": [
+       6002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.8,
+      "value": [
+       6002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 5.9,
+      "value": [
+       6002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       6002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       7002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.1,
+      "value": [
+       7002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.2,
+      "value": [
+       7002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.3,
+      "value": [
+       7002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.4,
+      "value": [
+       7002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.5,
+      "value": [
+       7002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.6,
+      "value": [
+       7002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.7,
+      "value": [
+       7002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.8,
+      "value": [
+       7002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 6.9,
+      "value": [
+       7002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       7002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       8002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.1,
+      "value": [
+       8002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.2,
+      "value": [
+       8002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.3,
+      "value": [
+       8002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.4,
+      "value": [
+       8002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       8002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.6,
+      "value": [
+       8002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.7,
+      "value": [
+       8002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.8,
+      "value": [
+       8002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 7.9,
+      "value": [
+       8002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       8002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       9002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.1,
+      "value": [
+       9002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.2,
+      "value": [
+       9002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.3,
+      "value": [
+       9002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.4,
+      "value": [
+       9002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.5,
+      "value": [
+       9002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.6,
+      "value": [
+       9002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.7,
+      "value": [
+       9002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.8,
+      "value": [
+       9002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 8.9,
+      "value": [
+       9002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       9002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       10002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.1,
+      "value": [
+       10002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.2,
+      "value": [
+       10002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.3,
+      "value": [
+       10002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.4,
+      "value": [
+       10002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.5,
+      "value": [
+       10002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.6,
+      "value": [
+       10002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.7,
+      "value": [
+       10002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.8,
+      "value": [
+       10002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 9.9,
+      "value": [
+       10002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       10002.06872
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       11002.05458
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.1,
+      "value": [
+       11002.05497
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.2,
+      "value": [
+       11002.05605
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.3,
+      "value": [
+       11002.05763
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.4,
+      "value": [
+       11002.05956
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.5,
+      "value": [
+       11002.06165
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.6,
+      "value": [
+       11002.06374
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.7,
+      "value": [
+       11002.06567
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.8,
+      "value": [
+       11002.06725
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 10.9,
+      "value": [
+       11002.06832
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       11002.06872
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAt",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -2.0,
+       1.1,
+       -5.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       -2.0,
+       1.1,
+       -5.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       -2.0,
+       1.0,
+       -5.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       -2.0,
+       1.0,
+       -5.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       0.0,
+       0.9,
+       -4.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       0.0,
+       0.9,
+       -4.9
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       -2.0,
+       -2.0,
+       0.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       -2.0,
+       -2.0,
+       0.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       -2.1,
+       -2.0,
+       0.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       -2.1,
+       -2.0,
+       0.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       4.0,
+       -1.9,
+       -0.8
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       4.0,
+       -1.9,
+       -0.8
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       4.4,
+       -1.9,
+       0.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       4.4,
+       -1.9,
+       0.4
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       3.6,
+       -1.9,
+       -4.5
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       3.6,
+       -1.9,
+       -4.5
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       3.3,
+       -1.9,
+       -4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       3.3,
+       -1.9,
+       -4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       -2.1,
+       -2.1,
+       -4.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       -2.1,
+       -2.1,
+       -4.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       -2.2,
+       -2.1,
+       -4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       -2.2,
+       -2.1,
+       -4.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/fov",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       62.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/sway",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 0.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 1.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 2.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 3.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 4.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 5.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 6.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 7.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 8.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 9.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 10.9999,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "palette/position",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       6.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAtWeight",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       1.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/height",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/bob",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/pitch",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/yaw",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/radius",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/lookAhead",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       2.0
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "camera/journey/swayRate",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 11.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     }
+    ]
+   }
+  ]
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "P0boot",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "furn2": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.00518,
+      0.00518,
+      0.02956
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "jewel1": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel2": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      0.04374,
+      0.10462,
+      1.0
+     ],
+     "jewel5": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel6": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "zenith": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "horizon": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P1compile",
+    "colors": {
+     "wall": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "furn": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "fill": [
+      0.00152,
+      0.00152,
+      0.00212
+     ],
+     "glow": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "screen": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00518,
+      0.05127
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel1": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.53948,
+      0.04667
+     ],
+     "jewel3": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel5": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "jewel6": [
+      0.016,
+      0.7913,
+      1.0
+     ],
+     "zenith": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "horizon": [
+      0.00152,
+      0.00091,
+      0.00368
+     ],
+     "sun": [
+      1.0,
+      0.53948,
+      0.04667
+     ]
+    }
+   },
+   {
+    "name": "P2allyougot",
+    "colors": {
+     "wall": [
+      0.21223,
+      0.89627,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "furn2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "figure": [
+      0.80695,
+      0.80695,
+      1.0
+     ],
+     "fog": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "fill": [
+      0.00121,
+      0.00152,
+      0.00368
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "screen": [
+      0.3467,
+      0.80695,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "canvas2": [
+      0.21223,
+      0.10462,
+      1.0
+     ],
+     "glass": [
+      0.01033,
+      0.02315,
+      0.14413
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel1": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "jewel3": [
+      0.21223,
+      0.89627,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel5": [
+      1.0,
+      0.04971,
+      0.37124
+     ],
+     "jewel6": [
+      0.3467,
+      0.80695,
+      1.0
+     ],
+     "zenith": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "horizon": [
+      0.00121,
+      0.00182,
+      0.01033
+     ],
+     "sun": [
+      1.0,
+      0.45079,
+      0.06301
+     ]
+    }
+   },
+   {
+    "name": "P3night",
+    "colors": {
+     "wall": [
+      0.33245,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      0.57758,
+      0.76052,
+      1.0
+     ],
+     "furn2": [
+      0.21223,
+      0.43415,
+      1.0
+     ],
+     "figure": [
+      0.80695,
+      0.85499,
+      1.0
+     ],
+     "fog": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "fill": [
+      0.00091,
+      0.00121,
+      0.00304
+     ],
+     "glow": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "screen": [
+      0.27468,
+      0.63076,
+      1.0
+     ],
+     "canvas": [
+      0.04231,
+      0.10462,
+      0.52712
+     ],
+     "canvas2": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "glass": [
+      0.00605,
+      0.01938,
+      0.07619
+     ],
+     "word": [
+      0.72306,
+      0.83077,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "jewel1": [
+      0.57758,
+      0.76052,
+      1.0
+     ],
+     "jewel2": [
+      0.21223,
+      0.43415,
+      1.0
+     ],
+     "jewel3": [
+      0.33245,
+      0.57758,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.43966,
+      0.10702
+     ],
+     "jewel5": [
+      0.04231,
+      0.10462,
+      0.52712
+     ],
+     "jewel6": [
+      0.27468,
+      0.63076,
+      1.0
+     ],
+     "zenith": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "horizon": [
+      0.00061,
+      0.00152,
+      0.00605
+     ],
+     "sun": [
+      1.0,
+      0.43966,
+      0.10702
+     ]
+    }
+   },
+   {
+    "name": "P4ember",
+    "colors": {
+     "wall": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "furn": [
+      1.0,
+      0.25415,
+      0.04667
+     ],
+     "furn2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.7913,
+      0.63076
+     ],
+     "fog": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "fill": [
+      0.00273,
+      0.00061,
+      0.00091
+     ],
+     "glow": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "screen": [
+      1.0,
+      0.14413,
+      0.04667
+     ],
+     "canvas": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "canvas2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "glass": [
+      0.04231,
+      0.00304,
+      0.00304
+     ],
+     "word": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "accent": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel1": [
+      1.0,
+      0.25415,
+      0.04667
+     ],
+     "jewel2": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel3": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "jewel4": [
+      1.0,
+      0.7454,
+      0.25415
+     ],
+     "jewel5": [
+      1.0,
+      0.04374,
+      0.04374
+     ],
+     "jewel6": [
+      1.0,
+      0.14413,
+      0.04667
+     ],
+     "zenith": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "horizon": [
+      0.00439,
+      0.00061,
+      0.00121
+     ],
+     "sun": [
+      1.0,
+      0.7454,
+      0.25415
+     ]
+    }
+   },
+   {
+    "name": "P5void",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "fill": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "glass": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel1": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel6": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "zenith": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "horizon": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P6violet",
+    "colors": {
+     "wall": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "furn": [
+      0.69387,
+      0.53948,
+      1.0
+     ],
+     "furn2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "figure": [
+      0.87137,
+      0.7913,
+      1.0
+     ],
+     "fog": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "fill": [
+      0.00182,
+      0.00091,
+      0.00335
+     ],
+     "glow": [
+      1.0,
+      0.27468,
+      0.7913
+     ],
+     "screen": [
+      0.58408,
+      0.39157,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "canvas2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "glass": [
+      0.01298,
+      0.00439,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "accent": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel1": [
+      0.69387,
+      0.53948,
+      1.0
+     ],
+     "jewel2": [
+      0.25415,
+      0.10702,
+      1.0
+     ],
+     "jewel3": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.68669
+     ],
+     "jewel6": [
+      0.58408,
+      0.39157,
+      1.0
+     ],
+     "zenith": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "horizon": [
+      0.00212,
+      0.00061,
+      0.00478
+     ],
+     "sun": [
+      1.0,
+      0.27468,
+      0.7913
+     ]
+    }
+   },
+   {
+    "name": "P7tension",
+    "colors": {
+     "wall": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "furn": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "furn2": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00091,
+      0.00091,
+      0.00152
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "screen": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "canvas": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "canvas2": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "glass": [
+      0.00152,
+      0.02956,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "jewel1": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "jewel2": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "jewel3": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "jewel4": [
+      0.80695,
+      1.0,
+      0.04231
+     ],
+     "jewel5": [
+      1.0,
+      0.02732,
+      0.32314
+     ],
+     "jewel6": [
+      0.016,
+      0.87137,
+      0.63076
+     ],
+     "zenith": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "horizon": [
+      0.0003,
+      0.00121,
+      0.00182
+     ],
+     "sun": [
+      1.0,
+      0.45079,
+      0.06301
+     ]
+    }
+   },
+   {
+    "name": "P8growth",
+    "colors": {
+     "wall": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "furn": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn2": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "figure": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "fog": [
+      0.00304,
+      0.00243,
+      0.02956
+     ],
+     "fill": [
+      0.00182,
+      0.00121,
+      0.00913
+     ],
+     "glow": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "screen": [
+      1.0,
+      0.7913,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "canvas2": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "glass": [
+      0.02315,
+      0.01161,
+      0.08022
+     ],
+     "word": [
+      1.0,
+      0.88792,
+      0.63076
+     ],
+     "accent": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel1": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel2": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel3": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "jewel4": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel5": [
+      1.0,
+      0.43415,
+      0.25415
+     ],
+     "jewel6": [
+      1.0,
+      0.7913,
+      0.43415
+     ],
+     "zenith": [
+      0.00182,
+      0.00152,
+      0.01161
+     ],
+     "horizon": [
+      0.04231,
+      0.01033,
+      0.06848
+     ],
+     "sun": [
+      1.0,
+      0.64448,
+      0.19462
+     ]
+    }
+   },
+   {
+    "name": "P9jewels",
+    "colors": {
+     "wall": [
+      0.521,
+      0.47932,
+      0.68669
+     ],
+     "furn": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "furn2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "fill": [
+      0.00121,
+      0.00061,
+      0.00273
+     ],
+     "glow": [
+      1.0,
+      0.45079,
+      0.04667
+     ],
+     "screen": [
+      0.10702,
+      0.87137,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "canvas2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "glass": [
+      0.007,
+      0.00243,
+      0.02315
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.19462,
+      0.47932
+     ],
+     "jewel1": [
+      1.0,
+      0.0331,
+      0.09084
+     ],
+     "jewel2": [
+      0.04667,
+      0.19807,
+      1.0
+     ],
+     "jewel3": [
+      1.0,
+      0.45079,
+      0.04667
+     ],
+     "jewel4": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel5": [
+      1.0,
+      0.19462,
+      0.47932
+     ],
+     "jewel6": [
+      0.10702,
+      0.87137,
+      1.0
+     ],
+     "zenith": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "horizon": [
+      0.00152,
+      0.00061,
+      0.00304
+     ],
+     "sun": [
+      1.0,
+      0.45079,
+      0.04667
+     ]
+    }
+   },
+   {
+    "name": "P10dance",
+    "colors": {
+     "wall": [
+      1.0,
+      0.19462,
+      0.02732
+     ],
+     "furn": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "furn2": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "figure": [
+      1.0,
+      0.80695,
+      0.63076
+     ],
+     "fog": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "fill": [
+      0.00368,
+      0.00091,
+      0.00121
+     ],
+     "glow": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "screen": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "canvas": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "canvas2": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "glass": [
+      0.04231,
+      0.00439,
+      0.00518
+     ],
+     "word": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "accent": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "jewel1": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "jewel2": [
+      1.0,
+      0.58408,
+      0.06848
+     ],
+     "jewel3": [
+      1.0,
+      0.19462,
+      0.02732
+     ],
+     "jewel4": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "jewel5": [
+      1.0,
+      0.07819,
+      0.25818
+     ],
+     "jewel6": [
+      0.02732,
+      0.7913,
+      0.67244
+     ],
+     "zenith": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "horizon": [
+      0.007,
+      0.00121,
+      0.00182
+     ],
+     "sun": [
+      1.0,
+      0.58408,
+      0.06848
+     ]
+    }
+   },
+   {
+    "name": "P11open",
+    "colors": {
+     "wall": [
+      0.10702,
+      0.57758,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "furn2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00091,
+      0.00243,
+      0.01444
+     ],
+     "fill": [
+      0.00061,
+      0.00121,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "screen": [
+      0.21223,
+      0.7991,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "canvas2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "glass": [
+      0.00304,
+      0.01033,
+      0.06848
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel1": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "jewel2": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel3": [
+      0.10702,
+      0.57758,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.57758,
+      0.14703
+     ],
+     "jewel5": [
+      1.0,
+      0.11444,
+      0.36131
+     ],
+     "jewel6": [
+      0.21223,
+      0.7991,
+      1.0
+     ],
+     "zenith": [
+      0.00061,
+      0.00121,
+      0.00439
+     ],
+     "horizon": [
+      0.02956,
+      0.01444,
+      0.15593
+     ],
+     "sun": [
+      1.0,
+      0.57758,
+      0.14703
+     ]
+    }
+   },
+   {
+    "name": "P12summit",
+    "colors": {
+     "wall": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "furn": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "furn2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "figure": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "fog": [
+      0.00243,
+      0.00121,
+      0.01033
+     ],
+     "fill": [
+      0.00152,
+      0.00091,
+      0.00439
+     ],
+     "glow": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "screen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canvas": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "canvas2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "glass": [
+      0.01033,
+      0.00304,
+      0.04231
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.10702
+     ],
+     "jewel1": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "jewel2": [
+      0.10702,
+      1.0,
+      0.7454
+     ],
+     "jewel3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "jewel4": [
+      1.0,
+      0.76815,
+      0.10702
+     ],
+     "jewel5": [
+      1.0,
+      0.11444,
+      0.63076
+     ],
+     "jewel6": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "zenith": [
+      0.00121,
+      0.00061,
+      0.00368
+     ],
+     "horizon": [
+      0.14413,
+      0.01033,
+      0.14413
+     ],
+     "sun": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "P13dawn",
+    "colors": {
+     "wall": [
+      1.0,
+      0.76815,
+      0.52712
+     ],
+     "furn": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "furn2": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "figure": [
+      1.0,
+      0.90466,
+      0.80695
+     ],
+     "fog": [
+      0.10224,
+      0.016,
+      0.03689
+     ],
+     "fill": [
+      0.00439,
+      0.00243,
+      0.00518
+     ],
+     "glow": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "screen": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "canvas": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "canvas2": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "glass": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "word": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "accent": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "jewel1": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "jewel2": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "jewel3": [
+      1.0,
+      0.76815,
+      0.52712
+     ],
+     "jewel4": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "jewel5": [
+      1.0,
+      0.47932,
+      0.32314
+     ],
+     "jewel6": [
+      1.0,
+      0.76815,
+      0.43415
+     ],
+     "zenith": [
+      0.00304,
+      0.00518,
+      0.03955
+     ],
+     "horizon": [
+      1.0,
+      0.25415,
+      0.10702
+     ],
+     "sun": [
+      1.0,
+      0.80695,
+      0.52712
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "fog",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "zenith",
+    "target": "env/sky/zenithColor"
+   },
+   {
+    "role": "horizon",
+    "target": "env/sky/horizonColor"
+   },
+   {
+    "role": "fog",
+    "target": "env/sky/groundColor"
+   },
+   {
+    "role": "sun",
+    "target": "env/sky/sunColor"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/kitShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/kitCounter/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitCounter/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitCounter/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitCounter/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitCounter/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitCounter/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitCounter/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/kitRange/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitRange/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitRange/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitRange/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitRange/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitRange/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitRange/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitRange/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitRange/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/kitTable/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitTable/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitTable/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitTable/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitTable/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitTable/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/kitTable/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitMan/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitMan/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitStove/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitStove/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitStove/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/kitStove/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/kitStove/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/kitStove/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/kitStove/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/kitStove/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/kitStove/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/kitPend/color"
+   },
+   {
+    "role": "glow",
+    "target": "lights/kitHood/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/lauShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lauShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lauShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lauShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lauShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lauShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/lauFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lauFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lauFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lauFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lauFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lauFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/lauFold/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/lauFold/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauFold/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lauFold/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lauFold/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lauFold/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lauFold/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lauFold/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/lauFold/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/lauBulb/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/gymShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/gymShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/gymShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/gymShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/gymShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/gymShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/gymFurn/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymFurn/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymFurn/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymFurn/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/gymFurn/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/gymFurn/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/gymFurn/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/gymFurn/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/gymFurn/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/gymMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/gymMan/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/gymMan/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/gymMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/gymMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/gymMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/gymMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/gymMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/gymBulb/color"
+   },
+   {
+    "role": "wall",
+    "target": "sdf/lngShell/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngShell/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngShell/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngShell/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lngShell/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lngShell/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lngShell/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lngShell/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lngShell/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/lngSit/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngSit/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngSit/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngSit/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lngSit/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lngSit/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lngSit/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lngSit/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lngSit/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn2",
+    "target": "sdf/lngBar/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngBar/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngBar/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngBar/surface/6/color"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lngBar/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lngBar/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "furn",
+    "target": "sdf/lngStools/look/edge/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngStools/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngStools/surface/1/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/lngStools/surface/6/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/lngStools/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/lngStools/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/lngStools/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/lngStools/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glass",
+    "target": "sdf/lngStools/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/barMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/barMan/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/barMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/barMan/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/barMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/barMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/barMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/barMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/barMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/loungeMan/look/edge/color"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/loungeMan/look/rim/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/loungeMan/surface/0/color"
+   },
+   {
+    "role": "fill",
+    "target": "sdf/loungeMan/surface/1/color"
+   },
+   {
+    "role": "glow",
+    "target": "sdf/loungeMan/surface/2/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "screen",
+    "target": "sdf/loungeMan/surface/3/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas",
+    "target": "sdf/loungeMan/surface/4/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "canvas2",
+    "target": "sdf/loungeMan/surface/5/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "figure",
+    "target": "sdf/loungeMan/surface/7/emission",
+    "mode": "multiply"
+   },
+   {
+    "role": "glow",
+    "target": "lights/lngBarGlow/color"
+   },
+   {
+    "role": "glow",
+    "target": "lights/lngPend/color"
+   },
+   {
+    "role": "glow",
+    "target": "lights/lngLamp/color"
+   },
+   {
+    "role": "screen",
+    "target": "lights/lngTV/color"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 11.0
+ }
+}
