@@ -61,6 +61,7 @@ struct ResponseSettings {
     float hatRateSeconds = 1.5f; // the hat-rate's leaky window
     float hatRateFull = 12.0f;   // hats a second that read 1
     float melodicFull = 6.0f;    // pitch moves a second that read 1
+    float midiDrumness = 0.9f;   // ADR-1068: a snare or hat on a MIDI note-on must be at least this percussive
 
     [[nodiscard]] Result<void> applyJson(const nlohmann::json& j);
     [[nodiscard]] nlohmann::json toJson() const;
@@ -99,12 +100,16 @@ public:
     // Read-outs (tests, the panel's hit lights).
     [[nodiscard]] float envelope(ResponseHit h) const { return env_[static_cast<std::size_t>(h)]; }
     [[nodiscard]] std::uint64_t hits(ResponseHit h) const { return count_[static_cast<std::size_t>(h)]; }
+    [[nodiscard]] std::uint64_t demoted(ResponseHit h) const { return demoted_[static_cast<std::size_t>(h)]; }
 
 private:
     ResponseSignals ids_;
     std::array<float, kResponseHitCount> env_{};
     std::array<bool, kResponseHitCount> pending_{};
     std::array<float, kResponseHitCount> pendingStrength_{};
+    std::array<float, kResponseHitCount> pendingDrumness_{}; // ADR-1068
+    std::array<float, kResponseHitCount> envBefore_{};
+    std::array<std::uint64_t, kResponseHitCount> demoted_{};
     std::array<std::uint64_t, kResponseHitCount> count_{};
     float bass_ = 0.0f, level_ = 0.0f, sustain_ = 0.0f, flux_ = 0.0f, intensity_ = 0.0f;
     float fastDb_ = -120.0f, slowDb_ = -120.0f, transient_ = 0.0f, percussive_ = 0.0f;

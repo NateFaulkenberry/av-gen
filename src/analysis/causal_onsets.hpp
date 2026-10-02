@@ -59,6 +59,8 @@ struct CausalOnsets {
     std::array<bool, kHitClassCount> hit{};       // decided on this frame
     std::array<bool, kHitClassCount> deferred{};  // ...about an attack some hops before (kick 1, snare kDeferFrames)
     std::array<float, kHitClassCount> strength{}; // 0..1 when hit
+    std::array<float, kHitClassCount> drumness{}; // ADR-1068: when hit, the share of its band's flux at the attack that
+                                                  // was percussive (1 a drum; kick and low read 1)
     std::array<float, kHitClassCount> odf{};      // each class's detection function
     float flux = 0.0f;         // the broadband ODF
     float lowRise = 0.0f;      // dB: the low band over its minimum of the previous three hops (the kick's evidence)
@@ -66,6 +68,9 @@ struct CausalOnsets {
     float kickScore = 0.0f;    // the kick decision's score on the frame it was decided
     float kickPeriod = 0.0f;   // seconds: the period the recent kicks keep (0 none yet)
     float noiseDb = -120.0f;   // the 1.5-5 kHz noise floor N, dB
+    float snareNoise = 0.0f;   // ADR-1068: the share of the 1.5-5 kHz flux that is percussive (a drum ~1, a note less)
+    float hatNoise = 0.0f;     // ...and of the 7-16 kHz flux
+    float hatTilt = 0.0f;      // 7-16 kHz percussive flux over 1.5-5 kHz (a hat > 1, a click or a pluck < 1)
     float bassDb = -120.0f;    // 30-150 Hz power in dBFS (a full-scale sine in the band is 0 dB)
     float levelDb = -120.0f;   // 30 Hz-16 kHz power in dBFS
     float snareDb = -120.0f;   // 1.5-5 kHz power in dBFS
@@ -114,6 +119,9 @@ struct CausalOnsetConfig {
     float kickCandidateRise = 2.5f; // dB: the least rise that is a candidate
     // The snare's confirmation.
     float snareNoiseRise = 4.5f;  // dB the noise floor must stand over its level before the attack
+    // ADR-1068: timbre gates on the snare and the hat.
+    float noiseShare = 0.8f;      // the snare's least share of its band's flux that is percussive
+    float hatTilt = 0.6f;         // the hat's band over the snare's
 };
 
 class CausalOnsetDetector {
@@ -168,6 +176,7 @@ private:
         float before = 0.0f;
         float strength = 0.0f;
         float peak = -120.0f; // the noise floor's peak over the attack's first two hops
+        float share = 1.0f;   // the attack's percussive share
     };
     std::vector<Pending> pending_;
 };

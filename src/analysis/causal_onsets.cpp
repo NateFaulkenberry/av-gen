@@ -209,6 +209,7 @@ void CausalOnsetDetector::decideKick(CausalOnsets& out, double hop) {
     }
     out.hit[kKick] = true;
     out.deferred[kKick] = true;
+    out.drumness[kKick] = 1.0f;
     out.kickScore = score;
     float strength = std::clamp(0.35f + 0.65f * (score - config_.kickThreshold) / 1.5f, 0.35f, 1.0f);
     if (strong) {
@@ -305,10 +306,25 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
         const float ratio = ratioOf(c, out.odf[c]);
         out.ratio[c] = first ? 0.0f : ratio;
     }
+    // Timbre (ADR-1068): a drum's attack is noise, so nearly all of its band's flux survives the frequency median; a
+    // pluck's or a stab's attack is mostly its partials. And a hat lives above 7 kHz, where a click or a pluck's
+    // attack spreads evenly or falls off.
+    const float rawSnare = meanOf(flux_, snare_);
+    const float rawHat = meanOf(flux_, hat_);
+    out.snareNoise = rawSnare > 1e-9f ? out.odf[kSnare] / rawSnare : 0.0f;
+    out.hatNoise = rawHat > 1e-9f ? out.odf[kHat] / rawHat : 0.0f;
+    out.hatTilt = out.odf[kHat] / std::max(out.odf[kSnare], 1e-6f);
+    if (out.hatTilt < config_.hatTilt) {
+        out.ratio[kHat] = std::min(out.ratio[kHat], 0.0f);
+    }
+    if (out.snareNoise < config_.noiseShare) {
+        out.ratio[kSnare] = std::min(out.ratio[kSnare], 0.0f);
+    }
     for (const std::size_t c : {kLow, kHat, kOnset}) {
         const float s = pickers_[c].step(out.ratio[c], hopSeconds);
         out.hit[c] = s > 0.0f;
         out.strength[c] = s;
+        out.drumness[c] = c == kHat ? out.hatNoise : 1.0f;
     }
 
     // ---- the kick: the low band's rise over its own floor (the minimum of the previous three hops), the click,
@@ -356,12 +372,13 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
             out.hit[kSnare] = true;
             out.deferred[kSnare] = true;
             out.strength[kSnare] = p.strength;
+            out.drumness[kSnare] = p.share;
         }
     }
     {
         const float s = pickers_[kSnare].step(out.ratio[kSnare], hopSeconds);
         if (s > 0.0f && pending_.size() < 8) {
-            pending_.push_back(Pending{0, noiseHistory_.back(), s, out.noiseDb});
+            pending_.push_back(Pending{0, noiseHistory_.back(), s, out.noiseDb, out.snareNoise});
         }
     }
     for (std::size_t i = 0; i + 1 < noiseHistory_.size(); ++i) {

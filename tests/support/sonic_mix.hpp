@@ -15,6 +15,7 @@
 
 #include "audio/audio_file.hpp"
 #include "core/rng.hpp"
+#include "sonic/notes.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -350,6 +351,116 @@ inline SonicMix makeSonicMix(bool lead, bool bass, bool pads, bool drums = true)
     }
     mix.file = audio::AudioFile::fromInterleaved(std::move(interleaved), 2, 48000);
     return mix;
+}
+
+// ADR-1068: the melodic material the art agent found drums firing on -- a 16th-note pluck arpeggio (88 notes, 11 s)
+// and four-note keys stabs (6 bars of five stabs) -- as audio and the MIDI that played it.
+struct Melodic {
+    audio::AudioFile file = audio::AudioFile::fromInterleaved(std::vector<float>{0.0f, 0.0f}, 2, 48000);
+    sonic::NoteTrack notes;
+    std::size_t attacks = 0; // distinct note-on instants
+};
+
+inline Melodic makeMelodic(bool arp) {
+    using namespace sonicmix;
+    struct N {
+        double beat, length;
+        int pitch, velocity;
+    };
+    std::vector<N> notes;
+    if (arp) {
+        const int up[8] = {57, 60, 64, 69, 72, 76, 81, 84};
+        std::vector<int> pattern(up, up + 8);
+        for (int i = 6; i >= 1; --i) {
+            pattern.push_back(up[i]);
+        }
+        for (int i = 0; i < 88; ++i) {
+            const int p = pattern[static_cast<std::size_t>(i) % pattern.size()] + ((i / 28) % 2 == 0 ? 0 : -4);
+            notes.push_back({i * 0.25, 0.2, p, 70 + 30 * ((i % 4) == 0)});
+        }
+    } else {
+        const int prog[4][4] = {{57, 60, 64, 67}, {53, 57, 60, 64}, {55, 59, 62, 67}, {52, 55, 59, 64}};
+        for (int bar = 0; bar < 6; ++bar) {
+            for (const double r : {0.0, 1.0, 1.5, 2.5, 3.0}) {
+                for (const int p : prog[bar % 4]) {
+                    notes.push_back({bar * 4.0 + r, 0.4, p, 78 + 20 * (r == 0.0)});
+                }
+            }
+        }
+    }
+    const double beats = arp ? 22.0 : 24.0;
+    const auto count = static_cast<std::size_t>((beats * kBeat + 2.0) * kRate);
+    std::vector<double> mono(count, 0.0);
+    Rng rng(20261003);
+    Melodic m;
+    std::vector<double> starts;
+    for (const N& n : notes) {
+        const auto start = static_cast<std::size_t>(std::llround(n.beat * kBeat * kRate));
+        const auto hold = static_cast<std::size_t>(std::llround(n.length * kBeat * kRate));
+        const std::size_t len = std::min(hold + static_cast<std::size_t>((arp ? 1.2 : 1.0) * kRate), count - start);
+        const double f0 = midiHz(n.pitch);
+        const double vel = n.velocity / 127.0;
+        std::vector<double> sig(len, 0.0);
+        if (arp) { // voice_pluck: decaying 1/k partials, a 1 ms attack
+            for (int k = 1; k < 30 && f0 * k <= kRate * 0.45; ++k) {
+                const double phase = static_cast<double>(rng.nextFloat()) * kTwoPi;
+                for (std::size_t i = 0; i < len; ++i) {
+                    const double t = static_cast<double>(i) / kRate;
+                    sig[i] += (1.0 / k) * std::exp(-t * (2.5 + 0.9 * k)) * std::sin(kTwoPi * f0 * k * t + phase);
+                }
+            }
+            const auto env = adsr(len, 0.001, 2.0, 1.0, 0.08, hold);
+            for (std::size_t i = 0; i < len; ++i) {
+                sig[i] *= env[i] * (0.3 + 0.7 * vel);
+            }
+        } else { // voice_keys: a few harmonics, a 3 ms attack, velocity-dependent brightness
+            std::vector<double> amps(23), amps2(8);
+            for (std::size_t k = 1; k <= 23; ++k) {
+                amps[k - 1] = std::pow(static_cast<double>(k), -1.2) * std::exp(-static_cast<double>(k) * f0 / (2200.0 + 2600.0 * vel));
+            }
+            for (std::size_t k = 0; k < 8; ++k) {
+                amps2[k] = amps[k] * 0.4;
+            }
+            additive(sig, f0, amps, 0.0, rng);
+            additive(sig, f0 * 2.0, amps2, 3.0, rng, 0.5);
+            const auto env = adsr(len, 0.003, 0.5, 0.35, 0.25, hold);
+            for (std::size_t i = 0; i < len; ++i) {
+                sig[i] *= env[i] * (0.25 + 0.75 * vel);
+            }
+        }
+        for (std::size_t i = 0; i < len; ++i) {
+            mono[start + i] += 0.5 * sig[i];
+        }
+        sonic::NoteEvent e;
+        e.start = n.beat * kBeat;
+        e.duration = n.length * kBeat;
+        e.pitch = static_cast<float>(n.pitch);
+        e.key = static_cast<std::uint8_t>(n.pitch);
+        e.velocity = static_cast<float>(vel);
+        m.notes.notes.push_back(e);
+        if (starts.empty() || std::abs(starts.back() - e.start) > 1e-6) {
+            starts.push_back(e.start);
+        }
+    }
+    m.notes.finish();
+    m.attacks = starts.size();
+    double sum = 0.0, peak = 0.0;
+    std::size_t active = 0;
+    for (const double v : mono) {
+        if (std::abs(v) > 1e-4) {
+            sum += v * v;
+            ++active;
+        }
+        peak = std::max(peak, std::abs(v));
+    }
+    double gain = std::pow(10.0, -17.0 / 20.0) / std::max(std::sqrt(sum / std::max<std::size_t>(active, 1)), 1e-9);
+    gain = std::min(gain, std::pow(10.0, -1.0 / 20.0) / std::max(peak, 1e-9));
+    std::vector<float> interleaved(2 * count);
+    for (std::size_t i = 0; i < count; ++i) {
+        interleaved[2 * i] = interleaved[2 * i + 1] = static_cast<float>(mono[i] * gain);
+    }
+    m.file = audio::AudioFile::fromInterleaved(std::move(interleaved), 2, 48000);
+    return m;
 }
 
 } // namespace avgen::testsupport

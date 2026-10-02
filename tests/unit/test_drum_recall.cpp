@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -123,3 +124,48 @@ TEST_CASE("A pad bed, a bass line and a lead with no drums fire almost no drum",
     print("parts", full);
 }
 
+
+#include "signals/signal_bus.hpp"
+#include "sonic/sonic_runtime.hpp"
+
+namespace {
+
+// The response model's drum events over a piece with its MIDI, published at 60 fps as the engine does.
+std::array<int, 3> responseDrums(const testsupport::Melodic& m) {
+    const auto track = analysis::AnalysisTrack::analyze(m.file, analysis::AnalyzerConfig{});
+    sonic::SonicSetup setup;
+    setup.notes = m.notes;
+    setup.analyse(track);
+    signals::SignalBus bus;
+    sonic::SonicRuntime rt;
+    rt.declare(bus);
+    const auto kick = *bus.find("response.kick"), snare = *bus.find("response.snare"), hat = *bus.find("response.hat");
+    std::array<int, 3> n{};
+    const double end = track.frames().back().timeSeconds;
+    for (int f = 0; f <= static_cast<int>(end * 60.0); ++f) {
+        rt.advance(setup, track, f / 60.0);
+        rt.publish(&setup, bus, f / 60.0);
+        n[0] += bus.event(kick) ? 1 : 0;
+        n[1] += bus.event(snare) ? 1 : 0;
+        n[2] += bus.event(hat) ? 1 : 0;
+        bus.clearEvents();
+    }
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("A pluck arpeggio and keys stabs played over MIDI fire almost no drums", "[sonic][adr1068]") {
+    for (const bool arp : {true, false}) {
+        const testsupport::Melodic m = testsupport::makeMelodic(arp);
+        const auto n = responseDrums(m);
+        INFO((arp ? "arp" : "chords") << ": " << m.attacks << " note attacks; kicks " << n[0] << " snares " << n[1]
+                                      << " hats " << n[2]);
+        std::printf("%s: %zu attacks -> kicks %d, snares %d, hats %d\n", arp ? "arp" : "chords", m.attacks, n[0],
+                    n[1], n[2]);
+        // The art agent's target: drum false positives at 10% or fewer of the note attacks, per class.
+        CHECK(n[0] <= static_cast<int>(m.attacks) / 10);
+        CHECK(n[1] <= static_cast<int>(m.attacks) / 10);
+        CHECK(n[2] <= static_cast<int>(m.attacks) / 10);
+    }
+}

@@ -153,8 +153,13 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
         if (strength > 0.0f) {
             const float shaped = curve(strength, hitS) * presence(hitS);
             const std::size_t h = i; // kAudioHits are in ResponseHit order
+            if (!pending_[h]) {
+                envBefore_[h] = env_[h];
+                pendingDrumness_[h] = 1.0f;
+            }
             pending_[h] = true;
             pendingStrength_[h] = std::max(pendingStrength_[h], shaped);
+            pendingDrumness_[h] = std::min(pendingDrumness_[h], o.drumness[k]);
             env_[h] = std::max(env_[h], shaped);
             ++count_[h];
             if (h == static_cast<std::size_t>(ResponseHit::Hat)) {
@@ -235,6 +240,34 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
             env = std::max(env, curve(it->velocity, hitS) * presence(hitS) * static_cast<float>(std::exp(-age / tau)));
         }
         env_[kNote] = env;
+    }
+    // ADR-1068: a snare or a hat that lands on a MIDI note-on (a note begun in the last 120 ms: the snare is decided
+    // 43 ms after its attack, and a frame is up to one render frame late) is that note's attack unless it is clearly
+    // noise: a pluck's or a stab's attack is broadband enough to pass the detector, and the note says what it was.
+    {
+        bool noteNear = false;
+        const auto& n = notes.notes;
+        for (auto it = std::upper_bound(n.begin(), n.end(), seconds,
+                                        [](double t, const NoteEvent& e) { return t < e.start; });
+             it != n.begin();) {
+            --it;
+            if (seconds - it->start > 0.12) {
+                break;
+            }
+            noteNear = true;
+            break;
+        }
+        if (noteNear) {
+            for (const ResponseHit h : {ResponseHit::Snare, ResponseHit::Hat}) {
+                const auto i = static_cast<std::size_t>(h);
+                if (pending_[i] && pendingDrumness_[i] < s.midiDrumness) {
+                    pending_[i] = false;
+                    pendingStrength_[i] = 0.0f;
+                    env_[i] = envBefore_[i];
+                    ++demoted_[i];
+                }
+            }
+        }
     }
     for (std::size_t h = 0; h < kResponseHitCount; ++h) {
         bus.setEvent(ids_.hit[h], pending_[h], pendingStrength_[h]);
