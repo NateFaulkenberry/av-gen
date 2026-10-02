@@ -336,17 +336,6 @@
    }
   },
   {
-   "source": "response.sustain",
-   "target": "env/sky/intensity",
-   "amount": 0.6,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2400
-   }
-  },
-  {
    "source": "response.kick",
    "target": "post/lens/chromaticAberration",
    "amount": 0.008,

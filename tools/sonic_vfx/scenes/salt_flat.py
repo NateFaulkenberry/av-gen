@@ -144,10 +144,10 @@ def palette():
                                          "fog": hexrgb(fog), "light": hexrgb(rim)}}
     return {
         "states": [
-            st("gold", "#46679e", "#ffb878", "#ffd090", "#e0aa86", "#ffcf96"),
-            st("rose", "#2b3a78", "#f2a08a", "#ffa070", "#d0928e", "#ffb08a"),
-            st("violet", "#1d1b50", "#b070a2", "#ff8462", "#9a6e98", "#ff9a86"),
-            st("indigo", "#090d27", "#3c3c78", "#a888ff", "#3c3c70", "#b49aff"),
+            st("gold", "#2c4a86", "#ffad66", "#ffcf8a", "#e0a07a", "#ffcf96"),
+            st("rose", "#1a2462", "#f69580", "#ffa070", "#c8848a", "#ffb08a"),
+            st("violet", "#120f3c", "#b45f9c", "#ff8462", "#8c5e8e", "#ff9a86"),
+            st("indigo", "#05081c", "#34346e", "#a888ff", "#30305e", "#b49aff"),
         ],
         "bindings": [
             {"role": "zenith", "target": "env/sky/zenithColor"},
@@ -156,7 +156,7 @@ def palette():
             {"role": "light", "target": "lights/sun/color"},
             {"role": "fog", "target": "scene/fogColor"},
         ],
-        "position": 1.0, "saturation": 1.0, "value": 1.0,
+        "position": 1.0, "saturation": 1.15, "value": 1.0,
     }
 
 

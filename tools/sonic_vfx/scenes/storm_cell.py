@@ -275,7 +275,8 @@ def build():
             R("kick", "procedural/wheat/deform/2/amount", 0.12, attackMs=40, decayMs=900),
             R("kick", "post/lens/chromaticAberration", 0.01, attackMs=0, decayMs=150))
     # snare: the strike (its own trigger) lights the sky, the rain and the exposure for a flicker
-    s.route(R("snare", "env/sky/intensity", 1.6, attackMs=0, decayMs=220),
+    # (not the sky's intensity: every change of the procedural sky rebuilds its lighting cube, 7-8 ms a time)
+    s.route(R("snare", "lights/slot/intensity", 6.0, attackMs=0, decayMs=220),
             R("snare", "particles/rain/emissive", 4.0, attackMs=0, decayMs=200),
             R("snare", "camera/exposure/compensation", 0.6, attackMs=0, decayMs=260))
     # hat: rain -- density and streak length

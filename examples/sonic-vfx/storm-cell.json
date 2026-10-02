@@ -781,8 +781,8 @@
   },
   {
    "source": "response.snare",
-   "target": "env/sky/intensity",
-   "amount": 1.6,
+   "target": "lights/slot/intensity",
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

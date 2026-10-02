@@ -115,7 +115,7 @@ def observed(rep, trace_csv, sigs):
     return out
 
 
-KNOWN = ("Declared palette not on screen",)   # an evaluator limit on rare accents and highlights (reported)
+KNOWN = ()   # findings left out of the problems column (none since the evaluator's 28347601 palette search)
 
 
 def sheet(scene_dir, out_png, title):

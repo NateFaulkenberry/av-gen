@@ -242,7 +242,7 @@ def build():
             R("hat", "particles/sparks/burst", 40.0, attackMs=0, decayMs=40),
             R("sustain", "lights/fire/intensity", 1.6, **SLOW),
             R("sustain", "procedural/fireline/material/emissive", 6.0, **SLOW),
-            R("sustain", "env/sky/intensity", 0.6, **SLOW),
+
             R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({

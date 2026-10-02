@@ -420,6 +420,12 @@ crawls as light inside the cloud.
 
 **Kill if** the funnel cannot be made to read as a funnel at the live tier.
 
+**As built** (`scenes/storm_cell.py`):
+- The funnel reads. It is the Effect Library tornado, dense and mostly absorbing (scattering 0.18), so it stands
+  dark on the clear slot. The march carries the medium alone (`volumeMaxDistance` 0).
+- The snare's strike lights the slot, not the sky: any change to the procedural sky rebuilds its lighting cube.
+- The wheat is 4,400 instanced lathed stalks with a wind deformer.
+
 ### 8. Salt Flat Mirage (atmospheric, lonely)
 
 **Thesis.** On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as
@@ -511,6 +517,14 @@ pitch, and the bass is the density of the cloud.
   - sustained: ionisation glow spreads;
   - tension: the cloud churns.
 - **Build.** `volumetricFog` banks, Cosmic Ocean, `plasma`, `shockwave`. **Cost class: heavy.**
+- **As built** (`scenes/stellar_nursery.py`):
+  - The pillars are one SDF of lobed, noise-skinned capsules, and the nebula is a matte emissive wall: the Cosmic
+    Ocean was removed (ADR-441), and fog banks are one medium slot each.
+  - Two magenta rim lights from above and behind replace the ionization glow.
+  - A chord lights embryonic stars, each its own SDF surface: as many as the chord has voices, red for low pitches
+    and blue-white for high.
+  - The kick's shock is the post `shock` instrument (ADR-1065), centred on the nest.
+  - **Cost class: medium.**
 
 ### 10. Abyssal Bloom (underwater)
 
@@ -537,6 +551,13 @@ snow falls through the hats.
   - hat: marine snow sparkles;
   - polyphony: colony size.
 - **Build.** Tubes with `pulsingVeins`, `bubble`, `plasma`, particles, dense absorbing fog. **Cost class: medium.**
+- **As built** (`scenes/abyssal_bloom.py`):
+  - The colony is 40 lathed zooids distributed along a spline, with a stem tube.
+  - Their light is a band placed by world position along the stem: a program's gradient op, since
+    `instanceIndex` was not reliable there.
+  - The jellyfish are lathed bells with radial strand tentacles. The one at the pitch's depth answers (pitch
+    places).
+  - The kick's pressure wave is the post `shock` instrument.
 
 ### 11. Silk Theatre (abstract)
 
@@ -561,6 +582,12 @@ stroke, and the kick cracks the ribbons like whips.
   - hat: glitter along the ribbons;
   - chord: parallel ribbons.
 - **Build.** Particle ribbons, `trail`, `orbit`, `spiral`, a spot light. **Cost class: light.**
+- **As built** (`scenes/silk_theatre.py`):
+  - The ribbons are not particle trails. Those are capped at 32 points and their length depends on the frame rate,
+    so they drew short angular sticks.
+  - Instead, the silk is a stroke laid in the air: particles born where the hand is while a note sounds, left
+    there, overlapping into one band that sags and fades over five seconds.
+  - The kick throws red shreds and shudders the stroke; the snare throws gold shreds.
 
 ### 12. Aurora Tundra (atmospheric, cold)
 
@@ -585,6 +612,11 @@ the hats are diamond dust glittering in the air.
   - snare: the ice cracks with light;
   - hat: diamond dust.
 - **Build.** `aurora`, `stars`, `meteorShower`, ice with a crack program, particles. **Cost class: light.**
+- **As built** (`scenes/aurora_tundra.py`):
+  - The aurora's own spectrum response is off (driven by the spectrum it would be a visualizer); routes drive it.
+  - Tension and polyphony move a four-state palette.
+  - The pressure ridge was cut: box slabs read as boards. The foreground is black ice crazed with white fractures,
+    which the snare lights, as on Baikal.
 
 ### 13. Ember Forest (organic, after the fire)
 
@@ -609,6 +641,10 @@ black trunks, the melody one ember dancing through the smoke.
   - kick: a trunk cracks and throws embers;
   - velocity: flame brightness.
 - **Build.** Procedural trunks with a seam program, smoke fog banks, particles, `heatShimmer`. **Cost class: medium.**
+- **As built** (`scenes/ember_forest.py`):
+  - Three instanced trunk planes, ash with glowing coal seams (a program), and thin smoke with shafts.
+  - The fire front is an emissive, noise-topped band behind the last trees.
+  - The bass stirs the smoke's structure, never its density: a density route drowned the trunks.
 
 ### 14. Lantern Lake (atmospheric, warm)
 
@@ -633,6 +669,14 @@ constellation, and the bass a slow swell beneath it.
   - hat: fireflies;
   - release: a long note's lantern climbs higher.
 - **Build.** Particles with collision and pulse, `halo`, water. **Cost class: medium.**
+- **As built** (`scenes/lantern_lake.py`):
+  - The engine has no planar reflection, so the reflection is built:
+    - twins of the hills (turned 180 degrees about X: a procedural cannot be scaled negative), the jetty and the
+      lanterns below the waterline;
+    - under them, an unlit plane painted with the sky's gradient flipped (view direction, a Fresnel falloff,
+      ripple bands).
+  - A heat-shimmer column under the waterline wobbles the mirror world: the bass swells it and the kick ripples
+    it.
 
 ### 15. Feedback Mirror (digital, feedback-driven)
 
@@ -653,6 +697,12 @@ the world is the instrument's own echo.
   - hat: grain;
   - chord: the hue step.
 - **Build.** The engineer's `temporal/feedback` (ADR-1065), SDF, text. **Cost class: light.** Waits on ADR-1065.
+- **As built** (`scenes/feedback_mirror.py`):
+  - A sigil in SDF (a ring, a triangle with beads, an inner ring, a core) on the right third.
+  - `temporal/feedback` (ADR-1066) with 24 taps, zoom 0.972 and a slow turn, so its echoes curl into a nautilus
+    spiral toward the frame's centre.
+  - The interval turns the spiral, the bass deepens it, the kick punches it, and chords walk its hue from gold
+    toward magenta.
 
 ### 16. Datascape (digital, data)
 
@@ -671,6 +721,12 @@ music.
   - bass: the ridges heave;
   - sustained: the strips settle into order.
 - **Build.** SDF strips with the line look, text, `post/display`. **Cost class: light.**
+- **As built** (`scenes/datascape.py`):
+  - The strips are a material program on a heaving plane: three cosines of incommensurate periods, summed and
+    thresholded high, give exact barcode lines that are never organic, and two more cosines give the dashes.
+  - A note writes a bright strip at its place. Red appears only on high crests.
+  - The glide is the integrated level.
+  - The kick's shock and the snare's tear are post instruments (ADR-1065).
 
 **Kill if** it reads as a user interface or a spectrum display. It is the riskiest concept in the catalog.
 
