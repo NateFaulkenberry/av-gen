@@ -75,6 +75,8 @@ enum class TriggerSource : std::uint8_t {
     TimelineMarker, // a marker of the sequence (a cue, a section label, a beat marker) by `name`
     Repeat,         // `phase`, `phase + period`, `phase + 2 period`, ... on the transport clock
     Proximity,      // the owner coming within `radius` metres of the entity `entity` (HIST-recorded)
+    Signal,         // ADR-1061: an EVENT signal of the bus, `name`, whose strength reaches `threshold`: derived
+                    // from the piece where the signal is a function of it, recorded from the bus live
 };
 [[nodiscard]] const char* triggerSourceName(TriggerSource s);
 [[nodiscard]] std::optional<TriggerSource> triggerSourceFromName(std::string_view name);
@@ -84,8 +86,10 @@ struct Trigger {
     int everyN = 1;          // Beat: fire on every Nth beat...
     int offset = 0;          // ...counting from this musical beat (0 = beat 1 of bar 1, ADR-896:
                              // the beat `beat.count` reads 0 on and `music.downbeat` fires on)
-    float threshold = 1.0f;  // Onset: the onset strength (flux over its adaptive threshold) to reach
-    std::string name;        // MusicEvent: the event's name; TimelineMarker: the marker's name
+    float threshold = 1.0f;  // Onset: the onset strength (flux over its adaptive threshold) to reach;
+                             // Signal: the event's strength to reach (0 when the file leaves it out)
+    std::string name;        // MusicEvent: the event's name; TimelineMarker: the marker's name; Signal: the
+                             // bus signal's name (`response.kick`, `notes.noteOn`, `audio.onsetLow`, ...)
     double period = 2.0;     // Repeat: seconds between firings
     double phase = 0.0;      // Repeat: the first firing
     std::string entity;      // Proximity: the other entity

@@ -15,12 +15,15 @@
 #include "sonic/sonic_runtime.hpp"
 #include "sonic/timbre.hpp"
 #include "support/temp_dir.hpp"
+#include "world/effects/effect_instance.hpp"
+#include "world/effects/effect_trigger.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <functional>
@@ -688,4 +691,44 @@ TEST_CASE("Without a sonic block the subsystem does nothing: no timbre pass, all
     CHECK(engine.sonicSetup() == nullptr);
     playTo(engine, 0.5);
     CHECK(value(engine, "sonic.energy") == 0.0f);
+}
+
+TEST_CASE("A Signal-triggered effect fires on the piece's note-ons, and a seek finds the same fronts",
+          "[sonic][adr1061]") {
+    const auto paths = writeSonicProject();
+    const auto shock = world::EffectInstance::fromJson(nlohmann::json::parse(R"({
+        "id": "noteShock", "type": "shockwave", "owner": {"kind": "world"}, "activation": "trigger",
+        "trigger": {"source": "signal", "name": "notes.noteOn", "threshold": 0.7}, "timing": {"lifetime": 1.0}})"));
+    REQUIRE(shock.has_value());
+    const auto fronts = [](const app::Engine& e, double t) {
+        std::array<double, 8> out{};
+        const std::size_t n = e.triggerClock().lastTriggers(e.effects().front().timing.trigger, {}, t, out);
+        return std::vector<double>(out.begin(), out.begin() + static_cast<std::ptrdiff_t>(n));
+    };
+    app::Engine a(app::EngineMode::Offline);
+    a.setLiveControl(false);
+    REQUIRE(a.loadProject(paths.project).has_value());
+    REQUIRE(a.setEffects({*shock}).has_value());
+    playTo(a, 3.0);
+    // The arpeggio's eight notes (velocity 100/127 = 0.79) from 2 s, every quarter second; the chord's (80/127 =
+    // 0.63) are under the threshold. A note is stamped on the first analysis frame at or after it (the bus's own
+    // timing, up to one 10.7 ms hop late), so the one at exactly 3 s is not yet out at 3 s.
+    const std::vector<double> played = fronts(a, 3.0);
+    REQUIRE(played.size() == 4);
+    CHECK(played[0] == Approx(2.75).margin(0.011));
+    CHECK(played[3] == Approx(2.0).margin(0.011));
+    CHECK(played[0] >= 2.75);
+    // A fresh engine that seeks straight to 3 s answers the same, before it has played a frame of the piece.
+    app::Engine c(app::EngineMode::Offline);
+    c.setLiveControl(false);
+    REQUIRE(c.loadProject(paths.project).has_value());
+    REQUIRE(c.setEffects({*shock}).has_value());
+    c.seekSeconds(3.0);
+    FrameTime t;
+    t.renderTime = 3.0;
+    t.deltaTime = 1.0 / 30.0;
+    t.frameIndex = 90;
+    c.update(t);
+    c.update(t); // the first frame registers the name; the host derives it before the next question
+    CHECK(fronts(c, 3.0) == played);
 }

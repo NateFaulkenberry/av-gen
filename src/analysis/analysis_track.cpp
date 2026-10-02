@@ -248,6 +248,9 @@ AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfi
     const BandOnsets onsets =
         detectBandOnsets(track.frames_, binHz, track.beats_.beatTimes, track.beatSeconds());
     stampBandOnsets(track.frames_, onsets, track.config_);
+    // ADR-1060: the causal detector the live runner runs, over the file in the same order (file == live).
+    detectCausalOnsets(track.frames_, binHz,
+                       static_cast<double>(track.config_.hopSize) / static_cast<double>(track.config_.sampleRate));
     return track;
 }
 

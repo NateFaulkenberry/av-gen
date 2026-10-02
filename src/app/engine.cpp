@@ -4870,6 +4870,8 @@ FrameTime Engine::tick(FrameClock& clock) {
 
 void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const {
     clock.latest = frame;
+    // ADR-1060: an event the runner carried onto several frames fires once.
+    liveLatch_.apply(clock.latest);
     // ADR-896/898: live playback of a loaded file takes the whole-track analysis's beat and band
     // onsets at the same position, so the editor hears what a render of the same second hears. Live
     // INPUT has no track and keeps the causal tracker's answers.
@@ -5700,6 +5702,32 @@ std::span<const world::ShotSpan> Engine::effectShots() const {
 
 bool Engine::effectShotsFromAuthoredCut() const { return shotSpans_.empty() && !effectShots().empty(); }
 
+void Engine::serviceSignalTriggers() {
+    // ADR-1061. A file's events are a function of the piece and are derived once; live input's (and any signal
+    // that is not a function of the piece) are recorded from the bus as they fire. Changing what is analysed, or
+    // turning live input on or off, starts both again.
+    const bool live = liveSonic_.running() || input_ != nullptr;
+    std::uint64_t key = sonic_ ? sonic_->key() : 0;
+    key ^= reinterpret_cast<std::uintptr_t>(track_.get()) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    key ^= (track_ ? track_->frames().size() : 0) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    key ^= (live ? 1u : 2u) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    if (key != signalTriggerKey_) {
+        triggerClock_.resetSignals();
+        signalDeriver_.clear();
+        signalTriggerKey_ = key;
+    }
+    for (const std::string& name : triggerClock_.pendingSignals()) {
+        if (!live) {
+            if (auto events = signalDeriver_.derive(name, track_.get(), sonic_.get())) {
+                triggerClock_.setDerivedSignal(name, std::move(*events));
+                continue;
+            }
+        }
+        triggerClock_.setRecordedSignal(name);
+    }
+    triggerClock_.recordSignals(bus_, timelineClock_.seconds);
+}
+
 world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene) const {
     const scene::Scene& live = controller_->scene();
     world::EffectContext ctx;
@@ -6096,6 +6124,7 @@ void Engine::update(const FrameTime& time) {
     // counts every triggered field's clock from it. Binding it again later in the frame is the same
     // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
     triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    serviceSignalTriggers(); // ADR-1061: derive or record the bus events Signal triggers fire on
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
     }
