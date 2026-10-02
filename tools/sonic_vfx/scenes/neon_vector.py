@@ -67,15 +67,48 @@ DESIGN = {
         ["highs", "audio.highMid", "the far rows swell"],
         ["note", "notes.lastPitch", "a peak rises at the pitch's place across the plain"],
         ["intensity", "response.intensity", "the peaks grow taller as the piece builds"],
+        ["beat", "beat.phase", "the beat sweep: a band of light runs down the plain to the camera once per beat"],
         ["silence", "(no input)", "the plain glides slowly under a still circle"],
     ],
     "tier": "light: six tube nodes (about 70 rows), a few rings and slabs, unlit",
 }
 
 
-def line_mat(intensity):
-    return {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb(WHITE), "emissiveIntensity": float(intensity),
-            "roughness": 1.0, "metallic": 0.0, "unlit": True}
+def line_mat(intensity, program=None):
+    m = {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb(WHITE), "emissiveIntensity": float(intensity),
+         "roughness": 1.0, "metallic": 0.0, "unlit": True}
+    if program:
+        m["program"] = program
+    return m
+
+
+SWEEP_FAR = 2.0 - 67 * SPACING      # the plain's far edge
+SWEEP_NEAR = 2.0
+SWEEP_WIDTH = 6.0
+
+
+def sweep_program():
+    """THE BEAT SWEEP: a band of light that travels down the plain toward the camera once per beat. The lines' own
+    emission (materialEmission, so every route on their brightness still works) plus a band round the depth in op 3's
+    constant (minus z of the band; `beat.phase` carries it from the far edge to the near), as wide as SWEEP_WIDTH,
+    as bright as op 7's constant."""
+    return {
+        "name": "beatSweep",
+        "ops": [
+            {"kind": "input", "dst": 0, "input": "worldPosition"},
+            {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [2.0, 2.0, 2.0, 2.0]},
+            {"kind": "constant", "dst": 2, "constant": [-SWEEP_FAR] * 4},                       # op 3: -z of the band
+            {"kind": "add", "dst": 3, "srcA": 1, "srcB": 2},
+            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 3},
+            {"kind": "gradient", "dst": 4, "srcA": 3, "constant": [1.0, 0.0, 0.0, 1.0],
+             "value": -1.0 / (SWEEP_WIDTH * SWEEP_WIDTH)},
+            {"kind": "constant", "dst": 6, "constant": hexrgb(WHITE, 1.8) + [1.0]},             # op 7: band brightness
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 4},
+            {"kind": "input", "dst": 5, "input": "materialEmission"},
+            {"kind": "add", "dst": 7, "srcA": 5, "srcB": 6},
+        ],
+        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 1.0, "opacity": -1,
+    }
 
 
 BLACK_MAT = {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
@@ -147,9 +180,10 @@ def instrument(s):
                   comp=1, integrate=True, attackMs=200, decayMs=900))
     # ---- CENTROID: the section's accent colour (the whole image's hue turns; the white lines stay white)
     s.route(R("brightnessSlow", "post/grade/hueShift", 0.42, **VERY_SLOW))
-    # ---- TEMPO: the lines pulse on the beat
-    for g in ("near", "mid", "far"):
-        s.route(R("beat", "procedural/lines_%s/material/emissive" % g, 0.8, attackMs=0, decayMs=150))
+    # ---- TEMPO: the beat sweep -- a band of light runs down the plain to the camera once per beat, brighter when the
+    # music is louder
+    s.route(R("beat.phase", "material/beatSweep/op/3/constant/constant", -(SWEEP_NEAR - SWEEP_FAR)),
+            R("level", "material/beatSweep/op/7/constant/constant", 2.0, attackMs=60, decayMs=400))
     # ---- INTENSITY: STRUCTURE -- the plain grows denser (more rows) and the peaks taller as the piece builds
     for g, extra in (("near", 8.0), ("mid", 10.0)):
         both(g, "distribution/count", "intensity", extra, threshold="binary", thresholdLevel=0.55)
@@ -180,6 +214,7 @@ def build():
                 "haze": 0.0, "sunIntensity": 0.0, "intensity": 0.0, "background": True, "useKeyLight": False},
     }
 
+    s.program(sweep_program())
     # ---- the terrain's fields: a travelling noise (the plain), its central stripe (the peaks), the note's peak
     s.nodes.append({"name": "plainNoise", "kind": "field", "field": {
         "kind": "noise", "frequency": 0.11, "seed": 21, "strength": 1.0, "position": [0.0, 0.0, 0.0]}})
@@ -200,7 +235,7 @@ def build():
     for name, z_near, rows, radius, inten in GROUPS:
         z_far = z_near - (rows - 1) * SPACING
         dist = {"kind": "linear", "count": rows, "start": [0.0, 0.0, z_far], "end": [0.0, 0.0, z_near]}
-        s.proc("lines_" + name, line_source(radius), distribution=dist, material=line_mat(inten),
+        s.proc("lines_" + name, line_source(radius), distribution=dist, material=line_mat(inten, "beatSweep"),
                material_variation={"emissiveGradient": 0.6}, deformers=terrain_deformers())
         s.proc("fins_" + name, line_source(1.0), distribution=dist, material=BLACK_MAT,
                deformers=terrain_deformers(),

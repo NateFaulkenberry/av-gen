@@ -155,8 +155,9 @@ def build():
 
     # ---- the arms: two, opposite; each three segments emitting along themselves, flowing inward
     for arm, phase in ((0, 0.0), (1, math.pi)):
-        for (name, ang0), (suffix, r0, r1, turns, c0, c1, jitter, rate) in zip(arm_splines(s, arm, phase), SEGMENTS):
-            s.particles("p_" + name, capacity=9000, seed=11 + arm * 7 + len(suffix), shape="spline", spline=name,
+        for k, ((name, ang0), (suffix, r0, r1, turns, c0, c1, jitter, rate)) in enumerate(
+                zip(arm_splines(s, arm, phase), SEGMENTS)):
+            s.particles("p_" + name, capacity=9000, seed=11 + arm * 7 + k * 3, shape="spline", spline=name,
                         position=[0, 0, 0], extent=[jitter, jitter, jitter], direction=[0.0, 0.12, -1.0],
                         spawnRate=rate, lifetimeMin=2.4, lifetimeMax=3.6, spread=0.12, speedMin=0.25,
                         speedMax=0.6, gravity=[0, 0, 0], drag=0.15, turbulence=0.18, turbulenceScale=0.35,

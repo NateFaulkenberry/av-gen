@@ -134,7 +134,7 @@
    "particles": {
     "enabled": true,
     "capacity": 9000,
-    "seed": 13,
+    "seed": 11,
     "shape": "spline",
     "spline": "arm0_in",
     "position": [
@@ -280,7 +280,7 @@
    "particles": {
     "enabled": true,
     "capacity": 9000,
-    "seed": 14,
+    "seed": 17,
     "shape": "spline",
     "spline": "arm0_out",
     "position": [
@@ -425,7 +425,7 @@
    "particles": {
     "enabled": true,
     "capacity": 9000,
-    "seed": 20,
+    "seed": 18,
     "shape": "spline",
     "spline": "arm1_in",
     "position": [
@@ -571,7 +571,7 @@
    "particles": {
     "enabled": true,
     "capacity": 9000,
-    "seed": 21,
+    "seed": 24,
     "shape": "spline",
     "spline": "arm1_out",
     "position": [

@@ -82,7 +82,7 @@ def corridor():
     slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge), name="slab"))
     portal = sd_polar(SIDES, slab, name="polygon")
     # a floating card in each bay, tilted, off-axis: the slabs that cross the space
-    card = sd_move((1.9, SPACING * 0.5, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((1.25, 0.035, 0.7)), name="card"),
+    card = sd_move((1.9, SPACING * 0.28, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((1.25, 0.035, 0.7)), name="card"),
                    m=0)
     cell = sd_union(portal, card)
     rep = sd_repeat((0.0, SPACING, 0.0), cell, count=0, name="accordion")

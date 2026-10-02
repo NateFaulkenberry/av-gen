@@ -222,7 +222,8 @@
      "emissiveIntensity": 2.2,
      "roughness": 1.0,
      "metallic": 0.0,
-     "unlit": true
+     "unlit": true,
+     "program": "beatSweep"
     },
     "deformers": [
      {
@@ -512,7 +513,8 @@
      "emissiveIntensity": 1.9,
      "roughness": 1.0,
      "metallic": 0.0,
-     "unlit": true
+     "unlit": true,
+     "program": "beatSweep"
     },
     "deformers": [
      {
@@ -802,7 +804,8 @@
      "emissiveIntensity": 1.5,
      "roughness": 1.0,
      "metallic": 0.0,
-     "unlit": true
+     "unlit": true,
+     "program": "beatSweep"
     },
     "deformers": [
      {
@@ -1672,6 +1675,96 @@
      "unlit": true
     }
    }
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "beatSweep",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      145.4,
+      145.4,
+      145.4,
+      145.4
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "value": -0.027777777777777776
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.62839,
+      1.62839,
+      1.56846,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "input",
+     "dst": 5,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 5,
+     "srcB": 6
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 7,
+   "emissionIntensity": 1.0,
+   "opacity": -1
   }
  ]
 }

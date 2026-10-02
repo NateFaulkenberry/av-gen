@@ -741,36 +741,21 @@
    }
   },
   {
-   "source": "beat.pulse",
-   "target": "procedural/lines_near/material/emissive",
-   "amount": 0.8,
+   "source": "beat.phase",
+   "target": "material/beatSweep/op/3/constant/constant",
+   "amount": -147.4,
    "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 150
-   }
+   "polarity": "unipolar"
   },
   {
-   "source": "beat.pulse",
-   "target": "procedural/lines_mid/material/emissive",
-   "amount": 0.8,
+   "source": "response.level",
+   "target": "material/beatSweep/op/7/constant/constant",
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "beat.pulse",
-   "target": "procedural/lines_far/material/emissive",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 150
+    "attackMs": 60,
+    "decayMs": 400
    }
   },
   {
@@ -1470,6 +1455,11 @@
     "intensity",
     "response.intensity",
     "the peaks grow taller as the piece builds"
+   ],
+   [
+    "beat",
+    "beat.phase",
+    "the beat sweep: a band of light runs down the plain to the camera once per beat"
    ],
    [
     "silence",
