@@ -5,7 +5,7 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
 
-**Status (20:32): take 2 is the final. Take 3 (C10 and C14 only, approved by the coordinator) is rendering and
+**Status (2026-10-02, coordinator): TAKE 3 IS THE FINAL.** `final3.log` ends "replaced the final with take 3": C10 visible -> unmistakable, C14 not read -> unmistakable, no section worse, so all 18 BIG CLAPs are unmistakable. The art agent hit the old account's usage limit before handing back; pass 3 is complete. *(Earlier status, 20:32: take 2 is the final.)* Take 3 (C10 and C14 only, approved by the coordinator) is rendering and
 replaces the final only if it measures no worse. After it: hand back. Nothing else is planned for pass 3.**
 - **The final now (take 2: `8f2c5e77`, pin `5dd835a4`):**
   - `~/Desktop/av-gen-review/24-liminal-space/pass3/all-you-got-pass3.mp4`: 1920x1080, 30 fps, h264 q90, the
