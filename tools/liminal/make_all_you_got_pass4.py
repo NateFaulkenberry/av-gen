@@ -37,13 +37,14 @@ import liminal_space as ls  # noqa: E402
 ls.instrument_kit(K)
 
 import film4 as F4  # noqa: E402
+import film4_city  # noqa: E402
 import film4_house  # noqa: E402
 import film4_intro  # noqa: E402
 import film4_late  # noqa: E402
 import film4_upper  # noqa: E402
 import make_all_you_got_pass2 as P2  # noqa: E402
 import pass2_grid as G  # noqa: E402
-import world3 as W  # noqa: E402
+import world4 as W  # noqa: E402
 from film2 import Film  # noqa: E402
 
 OUT = os.path.join(ROOT, "examples", "liminal")
@@ -55,6 +56,18 @@ BEAT1 = G.BAR1 / 4.0
 
 PARAMS = dict(P2.PARAMS)
 PARAMS.update({"camera/breath/amount": 0.0})
+
+# pass 4's palettes, appended after pass 2's (their indices unchanged): the lonely city of the 'is that all you'
+# bridge (a cool night, sodium lamps, the red of the signal and the tail lights) and the city alive (bridge 3)
+PALETTES4 = [
+    P2.P("P9lonely", "#8FA8D8", "#C8D6F0", "#6F86C0", "#FFFFFF", "#030614", "#FFB25C", "#5CF0FF", "#FF3B3B", "#FFD27A",
+         "#1A2440", "#FFFFFF", "#FFB25C", fill="#030409"),
+    P2.P("P10alive", "#5CE1FF", "#FF4FD8", "#FFC94A", "#FFFFFF", "#070318", "#FFC94A", "#2EE6D6", "#FF4F8B", "#2EE6D6",
+         "#2A0E40", "#FFFFFF", "#FFC94A", fill="#050210"),
+]
+PALETTE_INDEX = dict(P2.PALETTE_INDEX)
+for _i, (_n, _) in enumerate(PALETTES4):
+    PALETTE_INDEX[_n] = len(P2.PALETTES) + _i
 
 
 def merge_replace_tracks(film):
@@ -82,28 +95,32 @@ def merge_replace_tracks(film):
 def build(end=END, validate=True):
     film = Film(end=end)
     P2.palettes(film)
+    for name, roles in PALETTES4:
+        film.palette(name, **roles)
     base = [("post/bloom/intensity", 0.35), ("camera/exposure/compensation", 0.0), ("post/grade/hueShift", 0.0),
             ("post/lens/chromaticAberration", 0.0), ("post/lens/distortion", 0.0), ("temporal/mosh/amount", 0.0),
             ("temporal/mosh/shift", 0.0), ("post/sweep/intensity", 0.0), ("post/sweep/wash", 0.0), ("palette/saturation", 1.0),
             ("camera/breath/amount", 0.0)]
     for target, v in base:
         film.track(target, [(0.0, v), (end, v)])
-    b = F4.Builder4(film, W.add_world, P2.PALETTE_INDEX)
+    b = F4.Builder4(film, W.add_world, PALETTE_INDEX)
     # the palette's slow voice
     for tt, name, ramp in ((0.0, "P0boot", 0.0), (t(9), "P1compile", 0.0), (t(17), "P2allyougot", 0.0), (t(25), "P3night", 0.0),
                            (t(32, 4), "P4ember", BEAT1), (t(41), "P5void", 0.0), (t(41, 4.5), "P6violet", BEAT1 * 0.5),
-                           (t(49, 4), "P7tension", 0.0), (t(66), "P8growth", BEAT1), (t(75), "P9jewels", 0.0), (t(83), "P10dance", 0.0)):
+                           (t(49, 4), "P7tension", 0.0), (t(66), "P8growth", BEAT1), (t(75), "P9lonely", 0.0), (t(83), "P10alive", 0.0)):
         b.palette_at(tt, name, ramp=ramp)
     film4_intro.build(b)
     film4_house.build(b)
     film4_upper.build(b)
-    # the late section's palette (after 90.3 the wave sets P11; then the summit, the dawn)
+    film4_city.build(b)
+    # the late section's palette (after 90.3 the wave sets P11; then the summit; the dawn comes in under the crash's
+    # white, so the sky is already dawn when it clears)
     film4_late.build(b)
     b.palette_at(t(91), "P11open")
     b.palette_at(t(107), "P12summit", ramp=G.BAR2)
-    b.palette_at(t(114), "P13dawn", ramp=G.BAR2 * 2.0)
+    b.palette_at(t(113, 2), "P13dawn", ramp=film4_late.DAWN - t(113, 2))
     # a tear at every scene change that has no corruption of its own (section 21: transitions, scene changes)
-    covered = (t(17), t(42), t(49, 4), t(53, 4), t(57, 4), 255.0)
+    covered = (t(17), t(42), t(49, 4), t(53, 4), t(57, 4), t(83), film4_late.DAWN, 255.0)
     for i, tc in enumerate(sorted(set(b.cuts))):
         if tc <= 0.0 or any(abs(tc - c) < 0.2 for c in covered):
             continue
@@ -114,6 +131,7 @@ def build(end=END, validate=True):
     b.breath_forbidden()
     b.audit_structure()
     b.stamp_openings()
+    b.span_objects({"faller": (0.0, t(3)), "heroRoof": (0.0, t(67) - 0.02), "stuCeil": (0.0, t(67) - 0.02)})
     b.write_keys()
     b.write_figures(end)
     b.stamp_figure_spans()
@@ -145,12 +163,44 @@ def build(end=END, validate=True):
           f"{len(film.events)} grid events, {len(b.words)} words, {len(film.lights)} lights")
     if validate:
         rep = ls.validate(path, rules=json.load(open(RULES)))
+        # section 15's workflow: apply the validator's deterministic lyric fixes (a word jammed against a trim or
+        # another word moves to the clear spot it names, at rest: a rising word's start is the spot minus its rise),
+        # then validate again
+        moved = fix_words(path, rep)
+        if moved:
+            print(f"moved {len(moved)} words to the validator's clear spots: {', '.join(moved)}")
+            rep = ls.validate(path, rules=json.load(open(RULES)))
         with open(os.path.join(OUT, f"{STEM}.validation.txt"), "w") as fh:
             fh.write(ls.text(rep))
         s = rep["summary"]
         print(f"spatial validator: {s['errors']} errors, {s['warnings']} warnings; pass {s['pass']}")
         print(f"  the report: examples/liminal/{STEM}.validation.txt")
     return path, b
+
+
+def fix_words(path, rep):
+    scene_path = path.replace(".json", ".scene.json")
+    scene = json.load(open(scene_path))
+    by_name = {n.get("name"): n for n in scene["nodes"]}
+    moved = []
+    for v in rep.get("violations", []):
+        fix = v.get("fix") or {}
+        if not str(v.get("rule", "")).startswith("lyric") or "position" not in fix or v.get("severity") == "info":
+            continue
+        name = fix.get("id") or (v.get("entities") or [None])[0]
+        node = by_name.get(name)
+        if node is None or node.get("kind") != "procedural" or name in moved:
+            continue
+        off = (node.get("entity") or {}).get("offset", [0.0, 0.0, 0.0])
+        node["position"] = [round(a - b, 5) for a, b in zip(fix["position"], off)]
+        if isinstance(node.get("entity"), dict):
+            node["entity"].pop("_moved", None)
+        moved.append(name)
+    if moved:
+        with open(scene_path, "w") as fh:
+            json.dump(scene, fh, indent=1)
+            fh.write("\n")
+    return moved
 
 
 def main():

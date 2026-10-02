@@ -1,10 +1,13 @@
-"""All You Got, art pass 3: below and above. Owner bars 42-66 (92.48-147.52 s), on Builder3.
+"""All You Got, art pass 4: below and above. Owner bars 42-66 (92.48-147.52 s), on Builder4 (pass 3's film3_upper.py,
+revised: 04-art-pass-4.md PARTS 6, 7 and 15).
 
-  42-49  LET IT GO in the basement. We fell off the top of the stair; on 42.1, when the kick comes back, we land in
-         the laundry, and the camera walks on through the storage room into the boiler room, where the house keeps
-         what it cannot let go of. LET, IT and GO land on its surfaces twice a bar, on their eighths; C07 throws every
-         word in the storage room off its wall; 48-49 the room drains to outline and the hats flicker faster; C08
-         whips up and out.
+  42-49  LET IT GO in the basement, now a lived-in floor (PART 6). We fell off the top of the stair; on 42.1, when the
+         kick comes back, we land in the laundry where he is folding a towel on the dryer; through the door into his
+         gym, where he stands by the bench with a dumbbell hanging from his hand, not lifting it; through to the
+         lounge, where he sits alone at his own colourful bar; and at the rebuild (48-49), as the room drains to
+         outline, he is on the sofa in the light of the television's static. Present, emotionally inactive. LET, IT and
+         GO land on the surfaces twice a bar; C07 throws the gym's words off its walls; C08 whips up and out. The tool
+         bench and the boiler room are gone.
   50-65  verse 2, upstairs, the house breaking: the bedroom (in bed, a forearm over his eyes; then sitting on its edge),
          the bathroom (at the mirror, his hands on the sink; then the toilet, deadpan), the study (at the desk in the
          monitor's static; then on the floor against the wall, knees up). Each BIG CLAP corrupts the world in its own
@@ -18,6 +21,7 @@ from __future__ import annotations
 import kit as K
 import pass2_grid as G
 import rooms3 as R3
+import rooms4 as R4
 from film3_house import lyric_glitch
 
 t = G.t
@@ -27,23 +31,34 @@ BEAT1 = G.BAR1 / 4.0
 def build(b):
     f = b.f
     end = f.end
-    low, up = R3.basement(), R3.upstairs()
+    low, up = R4.basement(), R3.upstairs()
     for key, room in {**low, **up}.items():
         b.room_world(key, room)
-    lau, sto, boi = low["lau"], low["sto"], low["boi"]
+    lau, gym, lng = low["lau"], low["gym"], low["lng"]
     bed, bath, stu = up["bed"], up["bath"], up["stu"]
 
     # =========================================================================================================
-    # LET IT GO (42-49): the basement
+    # LET IT GO (42-49): the basement -- the laundry, the gym, the lounge and its bar, the sofa
     # =========================================================================================================
-    eye = [(t(42), (-1.15, -0.55, 1.35)), (t(42) + 0.42, (-1.0, -1.35, 1.0)), (95.0, (-0.6, -1.4, 0.55)),
-           (t(44), (0.2, -1.42, 0.05)), (98.4, (2.0, -1.42, 0.0)), (t(45, 4), (3.5, -1.42, 0.5)), (t(46), (3.4, -1.42, -0.6)),
-           (102.6, (3.0, -1.42, -2.3)), (104.1, (2.4, -1.42, -3.5)), (t(48), (0.9, -1.42, -4.15)), (t(49, 4), (0.1, -1.45, -4.6))]
-    look = [(t(42), (-1.6, -2.6, -0.4)), (t(42) + 0.42, (-2.0, -1.9, -0.6)), (95.0, (-1.6, -1.8, -2.2)),
-            (t(44), (1.2, -1.6, 0.0)), (98.4, (4.6, -1.7, 0.8)), (t(45, 4), (2.2, -1.6, 2.2)), (t(46), (3.0, -1.6, -2.3)),
-            (102.6, (2.0, -1.6, -5.0)), (104.1, (-0.5, -1.7, -6.2)), (t(48), (-0.6, -1.8, -6.4)), (t(49, 4), (-0.5, -1.9, -6.4))]
-    b.glide("lig", eye, look, nodes_keys=("lau", "sto", "boi"), fov=64.0)
+    # each change of room has a moment where the camera looks at a blank wall, neither figure in view: the swap
+    eye = [(t(42), (-0.45, -0.65, 1.45)), (t(42) + 0.42, (-0.38, -1.4, 1.28)), (94.3, (0.12, -1.42, 0.8)), (95.05, (0.42, -1.42, 0.52)),
+           (95.7, (0.85, -1.42, 0.08)), (96.6, (1.5, -1.44, -0.25)), (98.2, (1.9, -1.46, -0.55)), (100.0, (2.2, -1.45, -0.75)),
+           (101.2, (2.45, -1.45, -1.05)), (101.95, (2.6, -1.45, -1.25)), (102.6, (2.95, -1.45, -1.95)), (103.2, (3.0, -1.44, -2.85)),
+           (104.2, (2.2, -1.46, -3.35)), (105.3, (1.95, -1.48, -4.95)), (106.1, (2.15, -1.5, -5.75)), (107.6, (1.35, -1.5, -5.75)),
+           (t(49, 4), (1.0, -1.5, -5.55))]
+    look = [(t(42), (-1.7, -2.4, 0.2)), (t(42) + 0.42, (-1.75, -2.05, 0.3)), (94.3, (-1.7, -2.0, 0.1)), (95.05, (0.9, -1.55, 1.75)),
+            (95.6, (2.8, -1.7, 0.2)), (96.5, (3.9, -1.85, 0.9)), (99.5, (3.9, -1.85, 0.85)), (t(45, 4), (4.9, -1.5, 0.0)),
+            (101.3, (3.6, -1.7, -0.4)), (101.95, (1.1, -1.6, -1.6)), (102.5, (3.0, -1.75, -3.6)), (103.4, (2.95, -1.95, -4.4)),
+            (105.3, (3.1, -1.85, -4.35)), (106.15, (1.5, -1.6, -6.4)), (106.9, (-2.0, -2.1, -4.4)), (t(49, 4), (-2.0, -2.15, -4.4))]
+    b.glide("lig", eye, look, nodes_keys=("lau", "gym", "lng"), fov=64.0)
     f.shots[-1]["fov"] = [(t(42), 64.0), (t(49, 3.5), 58.0), (t(49, 4) - 0.02, 40.0)]
+    s1 = b.swap("lauFold", "gymMan", 95.05)
+    s2 = b.swap("gymMan", "barMan", 101.95)
+    s3 = b.swap("barMan", "loungeMan", 106.15)
+    b.show("lauFold", t(42), s1)
+    b.show("gymMan", s1, s2)
+    b.show("barMan", s2, s3)
+    b.show("loungeMan", s3, t(49, 4))
     c = b.clap("landing", t(42), release=0.5)
     f.route(c, "camera/exposure/compensation", 1.4)
     f.route(c, "post/bloom/intensity", 1.2)
@@ -53,45 +68,55 @@ def build(b):
                [(0.5, 0.45, 0.07, 6), (-0.5, -0.2, 0.06, 0), (0.1, 0.05, 0.13, -8)],
                [(-0.3, 0.6, 0.08, 0), (-0.3, 0.3, 0.08, 0), (-0.3, -0.05, 0.11, 0)],
                [(0.62, -0.35, 0.1, 12), (0.0, 0.45, 0.05, 0), (-0.6, -0.3, 0.12, -10)]]
-    rooms_at = [("lau", lau), ("lau", lau), ("lau", lau), ("lau", lau), ("sto", sto), ("sto", sto), ("sto", sto), ("sto", sto),
-                ("boi", boi), ("boi", boi), ("boi", boi), ("boi", boi)]
+
+    def room_at(tt):
+        e = f.camera_at(tt)[0]
+        if e[2] < -2.3:
+            return "lng", lng
+        return ("gym", gym) if e[0] > 0.95 else ("lau", lau)
     k = 0
-    storage_words = []
+    gym_words = []
     for half in range(12):
         bar = 42 + half // 2
         b0 = 1.0 if half % 2 == 0 else 3.0
         lay = layouts[half % 4]
-        key, room = rooms_at[half]
         for j, wd in enumerate(("LET", "IT", "GO")):
             sx, sy, kk, tilt = lay[j]
             tw = t(bar, b0 + 0.5 * j)
             t1 = t(bar, b0 + 2.0) if half % 2 == 0 else t(bar + 1, 1.0)
+            key, room = room_at(tw + 0.12)
             name = f"lig{k:02d}"
             b.word_at(wd, tw, t1, ("box", room["interior"]), sx, sy, k=kk, tilt=tilt, style=["flash", "pop", "flash"][j],
                       role="word" if j != 1 else "accent", name=name, intensity=4.2, tin=0.08, tout=0.18, room=room["id"])
-            if key == "sto":
-                storage_words.append(name)
+            if key == "gym":
+                gym_words.append(name)
             k += 1
     g_lig = b.gate("gLig", t(42), t(48))
-    for o in ("lauShell", "stoShell", "boiShell"):
+    for o in ("lauShell", "gymShell", "lngShell"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.5, "quarter", g_lig)
-    for o in ("lauFurn", "stoFurn", "boiFurn"):
+    for o in ("lauFurn", "gymFurn", "lngSit", "lngStools"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "eighth", g_lig)
-    for bulb in ("lauBulb", "stoBulb", "boiBulb"):
+    for bulb in ("lauBulb", "gymBulb", "lngPend"):
         f.route("grid.song.quarter", f"lights/{bulb}/intensity", 3.0, depth=g_lig)
-    # C07 (45.4): every word in the storage room flashes and flies off its wall
+    # the bar's coloured strips breathe on the eighths (light, not structure); its lamp glows on the quarter
+    for k_ in (K.CANVAS, K.CANVAS2):
+        f.route("grid.song.eighth", f"sdf/lngBar/surface/{k_}/emission", 1.2, depth=b.gate("gBar", 101.0, t(49, 4)))
+    f.route("grid.song.quarter", "lights/lngBarGlow/intensity", 2.0, depth=b.gate("gBarL", 101.0, t(49, 4)))
+    f.route("grid.song.eighth", f"sdf/lngSit/surface/{K.SCREEN}/emission", 1.6, depth=b.gate("gLngTV", t(42), t(49, 4)))
+    # C07 (45.4): every word in the gym flashes and flies off its wall; the mirror flares
     c = b.clap("c07", t(45, 4), release=0.5)
     f.route(c, "post/bloom/intensity", 1.4)
     f.route(c, "camera/exposure/compensation", 1.2)
     f.route(c, "post/grade/hueShift", -1.6)
     f.route(c, "temporal/mosh/amount", 0.5)
     f.route(c, "temporal/mosh/shift", 14.0)
-    for name in storage_words:
+    f.route(c, f"sdf/gymShell/surface/{K.GLASS}/emission", 6.0)
+    for name in gym_words:
         f.route(c, f"nodes/{name}/emissiveBoost", 14.0)
         f.route(c, f"nodes/{name}/scale", 1.4)
-    # the rebuild (48-49): the boiler room drains to outline; the hats flicker faster into C08
+    # the rebuild (48-49): the lounge drains to outline; the hats flicker faster into C08
     g_rb = b.gate("gRebuild", t(48), t(49, 4))
-    for o in ("boiShell", "boiFurn"):
+    for o in ("lngShell", "lngSit"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 3.0, "sixteenth", g_rb)
     b.val += [(t(48), 1.0, "smooth"), (t(48, 2), 0.55, "smooth"), (t(49, 3.9), 0.55, "step"), (t(49, 4), 1.0, "step")]
     # C08 (49.4): a whip-zoom, a one-frame negative, and up into verse 2
@@ -127,11 +152,14 @@ def build(b):
     b.show("bathMirror", v2b, s2)
     # ---- the study: at the desk in the monitor's static; then on the floor against the wall ------------------
     v2c = t(57, 4)
-    eye = [(v2c, (0.65, 4.45, -3.0)), (130.0, (0.2, 4.4, -4.2)), (t(59, 4), (-0.2, 4.35, -4.7)), (134.0, (0.6, 4.4, -4.9)),
-           (t(61, 4), (0.75, 4.42, -3.9)), (138.6, (0.5, 4.4, -2.9)), (t(63, 4), (0.2, 4.38, -3.4)), (t(65, 4), (-0.2, 4.3, -3.9)),
+    # (pass 4, PART 7: at 134-136 pass 3's camera ran along the bookcase 15-35 cm from it and looked into it -- the
+    # jagged lines at ~2:15 were its shelves a hand's width from the lens. The path now keeps the middle of the room,
+    # 1.2 m or more from the bookcase, and looks across the dark side of the study from there)
+    eye = [(v2c, (0.45, 4.45, -3.0)), (130.0, (0.0, 4.4, -4.2)), (t(59, 4), (-0.3, 4.35, -4.7)), (134.0, (-0.3, 4.4, -4.75)),
+           (t(61, 4), (-0.45, 4.42, -3.85)), (138.6, (-0.35, 4.4, -2.95)), (t(63, 4), (-0.15, 4.38, -3.4)), (t(65, 4), (-0.3, 4.3, -3.9)),
            (t(66, 3), (-0.45, 4.15, -4.3)), (t(67), (-0.6, 4.6, -4.4))]
     look = [(v2c, (-1.15, 3.95, -5.6)), (130.0, (-1.1, 3.95, -5.75)), (t(59, 4), (-1.2, 3.95, -5.9)), (134.0, (-1.35, 3.9, -5.6)),
-            (135.3, (1.2, 4.0, -3.4)), (t(61, 4), (1.2, 4.1, -2.6)), (138.0, (0.3, 4.1, -2.4)), (139.3, (-2.2, 3.4, -4.2)),
+            (135.3, (1.25, 4.05, -3.0)), (t(61, 4), (1.25, 4.1, -2.5)), (138.0, (0.3, 4.1, -2.4)), (139.3, (-2.2, 3.4, -4.2)),
             (t(63, 4), (-2.2, 3.4, -4.2)), (t(65, 4), (-2.1, 3.5, -4.2)), (t(66), (-1.2, 4.8, -4.4)), (t(66, 3), (-0.8, 7.0, -4.4)),
             (t(67), (-0.6, 12.0, -4.4))]
     b.glide("v2stu", eye, look, nodes_keys=("stu",), extra=["stars"], fov=62.0)

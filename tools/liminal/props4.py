@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import kit as K
 from kit import ACCENT, CANVAS, CANVAS2, FILL, GLASS, GLOW, R, S, SCREEN, T, U, X, box
+from kit import FLOOR as FLOOR_
 
 
 # =============================================================================================================
@@ -133,9 +134,9 @@ def bar_stool(seat=0.76, k=FILL, cushion=ACCENT):
              S(T([0, 0.28, 0], K.tor(0.15, 0.012)), ACCENT), S(K.CY([0, 0.02, 0], 0.2, 0.04), k))
 
 
-def back_bar(L=2.4, h=1.9, k=FILL, bottles=CANVAS, strip=CANVAS2):
-    """The bar's back wall (its back on z = 0, facing +Z): a low cabinet, two glass shelves of bottles over strips of
-    coloured light, a mirror panel behind them (about 16 nodes)."""
+def back_bar(L=2.4, h=1.9, k=FILL, bottles=CANVAS, bottles2=SCREEN, strip=CANVAS2, neon=FLOOR_):
+    """The bar's back wall (its back on z = 0, facing +Z): a low cabinet, two glass shelves of bottles (two colours)
+    over strips of coloured light, a mirror panel behind them, a neon tube across the top (about 20 nodes)."""
     cab = X(((-L / 2, L / 2), (0.0, 0.92), (0.0, 0.45)))
     shelves = U(X(((-L / 2, L / 2), (1.25, 1.27), (0.0, 0.22))), X(((-L / 2, L / 2), (1.6, 1.62), (0.0, 0.22))))
     bottle = U(K.CY([0, 0.11, 0], 0.035, 0.22), K.CY([0, 0.26, 0], 0.012, 0.09))
@@ -144,7 +145,8 @@ def back_bar(L=2.4, h=1.9, k=FILL, bottles=CANVAS, strip=CANVAS2):
     lights = U(X(((-L / 2, L / 2), (1.23, 1.25), (0.02, 0.2))), X(((-L / 2, L / 2), (1.58, 1.6), (0.02, 0.2))),
                X(((-L / 2, L / 2), (0.92, 0.94), (0.05, 0.42))))
     panel = X(((-L / 2, L / 2), (0.92, h), (0.0, 0.02)))
-    return U(S(cab, k), S(shelves, ACCENT), S(U(row1, row2), bottles), S(lights, strip), S(panel, GLASS))
+    tube = K.D(X(((-L / 2 + 0.2, L / 2 - 0.2), (h + 0.12, h + 0.4), (0.03, 0.06))), X(((-L / 2 + 0.24, L / 2 - 0.24), (h + 0.16, h + 0.36), (0.0, 0.1))))
+    return U(S(cab, k), S(shelves, ACCENT), S(row1, bottles), S(row2, bottles2), S(lights, strip), S(panel, GLASS), S(tube, neon))
 
 
 def neon_sign(w=0.9, h=0.32, k=GLOW):
@@ -173,7 +175,8 @@ def tv_stand(w=1.2, k=FILL, screen=SCREEN):
 def car(L=4.3, w=1.8, k=FILL, cabin=ACCENT, head=GLOW, tail=CANVAS, open_cabin=False, roof=1.45, seat=0.4):
     """A small sedan facing +Z: the body, the cabin, four wheels, headlights and tail lights (about 14 nodes solid).
     `open_cabin`: the cabin is a shell with its windows open (a driver inside can be seen), with seats and a
-    steering wheel (about 30 nodes). Left-hand drive: the driver's seat centre is (-0.38, seat, -0.25)."""
+    steering wheel (about 30 nodes). Left-hand drive (facing +Z the driver's left is +X): the driver's seat centre is
+    (0.38, seat, -0.25)."""
     hl, hw = L / 2, w / 2
     front = {"kind": "plane", "axis": [0.0, 0.8, 0.6], "offset": 0.8 * roof + 0.6 * (hl - 1.6)}
     rear = {"kind": "plane", "axis": [0.0, 0.8, -0.6], "offset": 0.8 * roof + 0.6 * (hl - 1.25)}
@@ -195,7 +198,7 @@ def car(L=4.3, w=1.8, k=FILL, cabin=ACCENT, head=GLOW, tail=CANVAS, open_cabin=F
     seats = U(X(((-hw + 0.18, -0.1), (0.3, seat), (-0.6, 0.05))), X(((-hw + 0.18, -0.1), (seat, 1.1), (-0.7, -0.58))),
               X(((0.1, hw - 0.18), (0.3, seat), (-0.6, 0.05))), X(((0.1, hw - 0.18), (seat, 1.1), (-0.7, -0.58))))
     dash = X(((-hw + 0.1, hw - 0.1), (0.75, 0.95), (hl - 1.45, hl - 1.25)))
-    wheel = T([-0.38, 0.92, hl - 1.6], R([-60, 0, 0], K.tor(0.17, 0.016)))
+    wheel = T([0.38, 0.92, hl - 1.6], R([-60, 0, 0], K.tor(0.17, 0.016)))
     return U(S(body, k), S(shell, cabin), S(wheels, FILL), S(lights, head), S(tails, tail), S(U(seats, dash), k), S(wheel, ACCENT))
 
 

@@ -1,10 +1,81 @@
 {
  "categories": {
-  "wallCupboard": {"group": "furniture", "mayIntersect": ["room"], "mounts": "wall"},
-  "appliance": {"group": "furniture", "rests": "floor"},
-  "waterHeater": {"group": "furniture", "rests": "floor"}
+  "wallCupboard": {
+   "group": "furniture",
+   "mayIntersect": [
+    "room"
+   ],
+   "mounts": "wall"
+  },
+  "appliance": {
+   "group": "furniture",
+   "rests": "floor"
+  },
+  "waterHeater": {
+   "group": "furniture",
+   "rests": "floor"
+  },
+  "stove": {
+   "group": "furniture",
+   "rests": "floor",
+   "surface": true
+  },
+  "barCounter": {
+   "group": "furniture",
+   "rests": "floor",
+   "surface": true
+  },
+  "barStool": {
+   "group": "furniture",
+   "rests": "floor",
+   "seatHeight": 0.76,
+   "supports": [
+    "sitting"
+   ]
+  },
+  "parkBench": {
+   "group": "furniture",
+   "rests": "floor",
+   "seatHeight": 0.47,
+   "supports": [
+    "sitting"
+   ]
+  },
+  "carSeat": {
+   "group": "furniture",
+   "rests": "floor",
+   "seatHeight": 0.4,
+   "supports": [
+    "sitting"
+   ]
+  },
+  "gymRack": {
+   "group": "furniture",
+   "rests": "floor"
+  },
+  "gymBench": {
+   "group": "furniture",
+   "rests": "floor",
+   "seatHeight": 0.44,
+   "supports": [
+    "sitting",
+    "lying"
+   ]
+  },
+  "gymBike": {
+   "group": "furniture",
+   "rests": "floor"
+  },
+  "structure": {
+   "group": "architecture",
+   "mayIntersect": [
+    "*"
+   ]
+  }
  },
  "poses": {
-  "floorSit": {"support": "floor"}
+  "floorSit": {
+   "support": "floor"
+  }
  }
 }

@@ -76,6 +76,26 @@ class Builder4(F3.Builder3):
             raise RuntimeError("continuous modulation on structural transforms (PART 15):\n  " + "\n  ".join(bad))
         return bad
 
+    def span_objects(self, spans):
+        """{object name: (t0, t1)}: the object exists for the validator only in that span (its root is tagged a
+        `structure` entity with the span, and every entity inside it gets the same span). For pieces that leave the
+        film for good -- the faller after the intro, the roof and the ceiling that fly off at bar 66 -- which the
+        static camera check would otherwise see at rest where the camera later passes."""
+        def walk(n, t0, t1):
+            if isinstance(n, dict):
+                e = n.get("entity")
+                if isinstance(e, dict):
+                    e["t0"], e["t1"] = round(t0, 3), round(t1, 3)
+                for c in n.get("children", []):
+                    walk(c, t0, t1)
+        for node in self.f.nodes:
+            if node.get("kind") == "sdf" and node["name"] in spans:
+                t0, t1 = spans[node["name"]]
+                root = node["sdf"]["tree"]["root"]
+                walk(root, t0, t1)
+                if not isinstance(root.get("entity"), dict):
+                    root["entity"] = {"category": "structure", "id": node["name"], "t0": round(t0, 3), "t1": round(t1, 3)}
+
     def stamp_openings(self):
         """Write each room's `opensAt` into its entity (the film validator: entering a room before it has opened)."""
         def walk(n):

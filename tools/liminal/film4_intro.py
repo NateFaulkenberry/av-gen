@@ -1,4 +1,6 @@
-"""All You Got, art pass 3: the intro, owner bars 0-16 (0-37.43 s), on Builder3 (03-art-pass-3-addendum.md, sections
+"""All You Got, art pass 4: the intro, owner bars 0-16 (0-37.43 s), on Builder4 (04-art-pass-4.md PART 3: more growth,
+rhythmically, and BUILD -> LOCK: nothing structural moves after its construction event; pass 3's roof flips and
+twists, the row's shudder and the towers' stutter are gone). Pass 3's design otherwise (film3_intro.py, 03 sections
 23-26). One continuous camera: down the road in the count-in, rising over the street as it builds, gliding along it,
 then turning on the house and accelerating at its lit front window. The window fills the frame at the end of the
 one-beat gap (16.4) and the cut inside lands exactly on the downbeat of bar 17 (37.4312 s on the grid: the audio's
@@ -9,19 +11,22 @@ The music, beat by beat:
   1.1         SPLASH: the street's grid bursts outward from the house's lot, the kerbs light, the first houses land
   1.2-2.3     a pair of houses on both sides of the street lands on every quarter note, lot after lot outward
   3.1-3.4     the stab: the far city shoots up, in steps
-  4.1-4.4     the trees sprout; the roofs flip once
-  5-8         the bass: street lamps pop up along the pavements on the eighths, alternating sides; the towers keep
-              rising through the sustained note; the windows flicker on the off-beats
-  9-12        the riser: the house we will enter rises out of the ground (9.1-10.1) and its parts fly in on the eighths,
-              faster each bar; the neighbours mutate (roofs flip and twist, the whole row shudders)
+  4.1         every roof slams down onto its house at once (they land without them) and stays; 4.3 the trees sprout
+  5-6         the bass: street lamps pop up along the pavements on the eighths, alternating sides
+  7           a car lands in every driveway on the eighths, outward from the hero lot
+  7-9         behind the houses the city's first blocks rise a storey a beat (the podiums in three, the slabs in nine)
+  9-12        the riser: the house we will enter rises out of the ground (9.1-10.1) and its parts fly in, faster each
+              bar; the towers climb a storey a beat, the downtown core a storey an eighth from 13 (build -> lock)
   13-16       the 'all you got' chop: every window flashes on each bar's downbeat; corruption builds on the sixteenths
+              (in the picture, never in the geometry)
   16.4        the gap: the world freezes and goes dark but for the lit window, and the camera keeps rushing at it
   17.1        through the window: the cut on the downbeat
 """
 
 from __future__ import annotations
 
-import intro3 as IN
+import city4 as C
+import intro4 as IN
 import pass2_grid as G
 from film2 import srgb
 
@@ -36,6 +41,8 @@ def build(b):
     world = {"objects": IN.objects(), "lights": []}
     b.world("street", world)
     names = b.worlds["street"]["names"]
+    inner = [o for o in C.objects() if o[0].startswith("cityIn")]
+    b.world("cityIn", {"objects": inner, "lights": []})
 
     # ---- the camera: one continuous glide, accelerating into the window --------------------------------------
     keys = [(0.0, (-46.0, 2.0, 12.6)), (t(1), (-45.6, 2.2, 12.8)), (t(5), (-36.0, 6.8, 18.0)), (t(9), (-22.0, 8.6, 18.4)),
@@ -44,7 +51,7 @@ def build(b):
     look = [(0.0, (-20.0, 0.8, 12.0)), (t(1), (-20.0, 1.0, 12.0)), (t(2), (-12.0, 2.5, 9.0)), (t(5), (-2.0, 3.5, 6.0)),
             (t(9), (0.8, 3.4, 1.5)), (t(13), (0.2, 2.6, 2.0)), (t(15), (-0.5, 1.9, 2.0)), (t(16, 3), (-0.6, 1.6, 2.0)),
             (ENTRY, (-0.6, 1.53, 0.0))]
-    b.glide("street", keys, look, nodes_keys=("street",), fov=58.0)
+    b.glide("street", keys, look, nodes_keys=("street", "cityIn"), fov=58.0)
     f.shots[-1]["fov"] = [(0.0, 54.0), (t(9), 58.0), (t(16, 2), 60.0), (ENTRY, 66.0)]
 
     # ---- bar 0: the dashes, one a beat ------------------------------------------------------------------------
@@ -74,8 +81,9 @@ def build(b):
     fall = [(0.0, [IN.LOT, 60.0, 0.0], "step")]
     for k, tl in enumerate(lands, start=1):
         x = IN.LOT * k
-        fall += [(tl - 0.2, [x, 34.0, 0.0], "step"), (tl - 0.001, [x, 0.0, 0.0], "easeIn"), (tl + 0.07, [x, -0.25, 0.0], "smooth"),
-                 (tl + 0.16, [x, 0.0, 0.0], "step")]
+        # a fall from 34 m accelerating into the lot, landing ON the beat, no bounce (build -> lock). (A key's interp
+        # shapes the span after it: pass 3's step key held the house in the air and dropped it in a frame.)
+        fall += [(tl - 0.2, [x, 34.0, 0.0], "easeIn"), (tl, [x, 0.0, 0.0], "step")]
         # the row takes the lot over the instant before the faller leaves it (the next drop starts 0.2 s early)
         nxt = lands[k] - 0.2 if k < len(lands) else tl + 0.6
         clip.append((nxt - 0.005, [x + 3.8, 8.0, 30.0], "step"))
@@ -107,31 +115,50 @@ def build(b):
     b.key("nodes/faller/visible", 0.0, 0.0)
     b.key("nodes/faller/visible", t(1) - 0.25, 1.0)
 
-    # ---- 3.1-3.4: the far city shoots up; it keeps rising through the bass's sustained note (bars 5-8) ----------
-    tower = [(0.0, 0.0), (t(3) - 0.001, 0.0, "easeOut"), (t(3) + 0.22, 19.0, "smooth"), (t(3, 2), 17.0, "easeOut"),
-             (t(3, 2) + 0.15, 22.0, "smooth"), (t(3, 3), 22.0, "easeOut"), (t(3, 3) + 0.15, 26.0, "smooth"),
-             (t(3, 4), 26.0, "easeOut"), (t(3, 4) + 0.15, 30.0, "smooth"), (t(5), 30.0, "smooth"), (t(9), 46.0, "smooth"),
-             (t(13), 52.0, "smooth"), (t(16, 4), 60.0, "step")]
-    towerb = [(0.0, 0.0), (t(3, 2) - 0.001, 0.0, "easeOut"), (t(3, 2) + 0.2, 12.0, "smooth"), (t(3, 4), 12.0, "easeOut"),
-              (t(3, 4) + 0.15, 18.0, "smooth"), (t(5), 18.0, "smooth"), (t(9), 30.0, "smooth"), (t(16, 4), 38.0, "step")]
-    for nm_, ks, w in (("towerA", tower, 3.0), ("towerB", towerb, 2.4)):
-        f.track(f"sdf/skyline/node/{nm_}/size", [(k[0], [w, k[1] / 2, w], k[2] if len(k) > 2 else "smooth") for k in ks])
-        f.track(f"sdf/skyline/node/{nm_}t/translation", [(k[0], [0.0, k[1] / 2, 0.0], k[2] if len(k) > 2 else "smooth") for k in ks])
-    f.track("sdf/skyline/node/towerAw/size", [(k[0], [3.1, k[1] / 2 - 0.4 if k[1] > 1 else 0.0, 3.1], k[2] if len(k) > 2 else "smooth") for k in tower])
-    f.track("sdf/skyline/node/towerAwt/translation", [(k[0], [0.0, k[1] / 2, 0.0], k[2] if len(k) > 2 else "smooth") for k in tower])
-    # the riser: the towers stutter on the sixteenths, harder each bar (a city that cannot hold its shape)
-    for nm_ in ("towerA", "towerB"):
-        f.route("grid.song.sixteenth", f"sdf/skyline/node/{nm_}/size", 4.0, component=1, depth="grid.song.riserBar")
+    # ---- 3.1-3.4: the far city shoots up, a step a beat, and holds -----------------------------------------------
+    # every set of the city's inner blocks rises out of the ground through its `<set>Rise` clip: one storey (3.2 m) a
+    # beat, each step a fast ease into the new height and then a hold (build -> lock); the rings are open
+    for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky"):
+        f.track(f"sdf/cityIn{nm_}/node/{nm_}Ring/size", [(0.0, [600.0, 500.0, 600.0], "step"), (f.end, [600.0, 500.0, 600.0], "step")])
+    S_ = C.STOREY
+    steps = {nm_: [] for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky")}
+    for j, n_st in enumerate((4, 6, 8, 10)):                        # 3.1-3.4: the towers' first storeys
+        for nm_ in ("TowerA", "TowerB", "Sky"):
+            steps[nm_].append((t(3, 1 + j), n_st))
+    for j in range(3):                                              # 7.1-7.3: the podiums
+        steps["Low"].append((t(7, 1 + j), j + 1))
+    for j in range(9):                                              # 7.1-9.1: the slabs, a storey a quarter
+        steps["Mid"].append((t(7, 1 + j), j + 1))
+    for j in range(11):                                             # 9.1-11.3: the towers to 21 storeys
+        for nm_ in ("TowerA", "TowerB"):
+            steps[nm_].append((t(9, 1 + j), 11 + j))
+    for j in range(16):                                             # 9.1-12.4: the core to 26
+        steps["Sky"].append((t(9, 1 + j), 11 + j))
+    for j in range(12):                                             # 13.1-14.2.5: the core on the eighths to 38
+        steps["Sky"].append((t(13, 1 + 0.5 * j), 27 + j))
+    for nm_, ev in steps.items():
+        h_final = C.SETS[nm_][2]
+        ev = [(tt, [2000.0, C.rise_size(min(n * S_, h_final + 0.6)), 2000.0]) for tt, n in ev]
+        b.lock(f"sdf/cityIn{nm_}/node/{nm_}Rise/size", ev, [2000.0, C.rise_size(0.0), 2000.0], ease=0.07)
+    for i, tt in enumerate(sorted({tt for ev in steps.values() for tt, _ in ev})):
+        c = b.clap(f"storey{i:03d}", tt + 0.05, release=0.22)
+        for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky"):
+            if any(abs(tt - t2) < 1e-6 for t2, _ in steps[nm_]):
+                f.route(c, f"sdf/cityIn{nm_}/look/edge/intensity", 4.0)
     c = b.clap("city", t(3), release=0.8)
     f.route(c, "post/bloom/intensity", 1.2)
     f.route(c, "temporal/mosh/amount", 0.35)
-    f.route(c, "sdf/skyline/look/edge/intensity", 8.0)
 
-    # ---- 4.1-4.4: the trees sprout; the roofs flip once -----------------------------------------------------------
-    f.track("sdf/lamps/node/treeGrow/scale", [(0.0, 0.0, "step"), (t(4) - 0.001, 0.0, "easeOut"), (t(4) + 0.2, 1.15, "smooth"),
-                                              (t(4) + 0.45, 1.0, "step")])
-    roof = [(0.0, [0.0, 0.0, 0.0], "step"), (t(4, 3) - 0.001, [0.0, 0.0, 0.0], "easeOut"), (t(4, 3) + 0.12, [0.0, 0.0, 180.0], "smooth"),
-            (t(4, 4) - 0.001, [0.0, 0.0, 180.0], "easeOut"), (t(4, 4) + 0.12, [0.0, 0.0, 360.0], "step")]
+    # ---- 4.1: every roof slams down (the houses landed without them) and stays; 4.3: the trees ------------------------
+    f.track("sdf/row/node/rowRoof/translation", [(0.0, [0.0, 200.0, 0.0], "step"), (t(4) - 0.14, [0.0, 3.2, 0.0], "easeIn"),
+                                               (t(4), [0.0, 0.0, 0.0], "step")])
+    f.track("sdf/faller/node/fallRoof/translation", [(0.0, [0.0, 200.0, 0.0], "step"), (f.end, [0.0, 200.0, 0.0], "step")])
+    c = b.clap("roofs", t(4), release=0.45)
+    f.route(c, "sdf/row/look/edge/intensity", 8.0)
+    f.route(c, "post/bloom/intensity", 0.9)
+    f.route(c, "camera/exposure/compensation", 0.8)
+    f.route(c, "temporal/mosh/amount", 0.25)
+    f.track("sdf/lamps/node/treeGrow/scale", [(0.0, 0.0, "step"), (t(4, 3) - 0.001, 0.0, "easeOut"), (t(4, 3) + 0.16, 1.0, "step")])
 
     # ---- 5-8: the lamps on the eighths, alternating sides ---------------------------------------------------------
     lamp = [(0.0, [0.0, 0.0, 0.0], "step")]
@@ -146,7 +173,18 @@ def build(b):
     g_bass = b.gate("iBass", t(5), t(16, 4))
     b.pulse("sdf/lamps/surface/2/emission", 2.5, "eighth", g_bass)
     b.pulse("sdf/row/surface/4/emission", 1.5, "eighth", g_bass)
-    b.pulse("sdf/skyline/surface/5/emission", 2.0, "eighth", g_bass)
+    for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky"):
+        b.pulse(f"sdf/cityIn{nm_}/surface/5/emission", 1.6, "eighth", g_bass)
+
+    # ---- 7: a car lands in every driveway on the eighths, outward from the hero lot -----------------------------------
+    cars = [(0.0, [0.0, 0.0, 0.0], "step")]
+    for k in range(1, IN.LOTS + 1):
+        tk = t(7, 1 + 0.5 * (k - 1))
+        cars.append((tk, [IN.LOT * k + 2.0, 3.0, 30.0], "step"))
+        c = b.clap(f"carLand{k}", tk, release=0.25)
+        f.route(c, "sdf/parked/look/edge/intensity", 6.0)
+        f.route(c, "sdf/parked/surface/2/emission", 5.0)
+    f.track("sdf/parked/node/carClip/size", cars)
     b.pulse("sdf/street/look/edge/intensity", 2.0, "quarter", b.gate("iQuarter", t(1), t(16, 4)))
 
     # ---- 9-12: the hero house rises, then its parts fly in, faster each bar; the neighbours mutate --------------
@@ -160,35 +198,21 @@ def build(b):
     order = ["path", "fence", "mailbox", "porch", "frontDoor", "livWin", "bedWin", "roofL", "roofR", "chimney"]
     slots = [t(10, 1), t(10, 3), t(11, 1), t(11, 2), t(11, 3), t(11, 4), t(12, 1), t(12, 1.5), t(12, 2), t(12, 3)]
     by = {p[0]: p for p in IN.HERO_PARTS}
-    b.key("nodes/heroParts/visible", 0.0, 0.0)
-    b.key("nodes/heroParts/visible", t(10) - 0.35, 1.0)
+    for o in ("heroParts", "heroRoof"):
+        b.key(f"nodes/{o}/visible", 0.0, 0.0)
+        b.key(f"nodes/{o}/visible", t(10) - 0.35, 1.0)
     for nm_, tt in zip(order, slots):
         off = list(by[nm_][2])
-        f.track(f"sdf/heroParts/node/hp_{nm_}/translation", [(0.0, off, "step"), (tt - 0.001, off, "easeOut"),
-                                                              (tt + 0.22, [0.0, 0.0, 0.0], "step")])
+        obj = "heroRoof" if nm_ in IN.ROOF_PARTS else "heroParts"
+        f.track(f"sdf/{obj}/node/hp_{nm_}/translation", [(0.0, off, "step"), (tt - 0.001, off, "easeOut"),
+                                                          (tt + 0.22, [0.0, 0.0, 0.0], "step")])
         c = b.clap(f"part_{nm_}", tt + 0.2, release=0.25)
-        f.route(c, "sdf/heroParts/look/edge/intensity", 6.0)
-    f.track("sdf/heroTree/node/heroTree/scale", [(0.0, 0.0, "step"), (t(12, 3) - 0.001, 0.0, "easeOut"), (t(12, 4) + 0.1, 1.12, "smooth"),
-                                                (t(13), 1.0, "step")])
-    # the neighbours mutate: their roofs twist on the off-beats of bars 9-12 and flip on each bar's 4
-    for bar in range(9, 13):
-        for j, ang in enumerate((25.0, -25.0)):
-            tt = t(bar, 2.5 + 2 * j)
-            prev = roof[-1][1]
-            roof += [(tt - 0.001, prev, "easeOut"), (tt + 0.09, [0.0, prev[1] + ang, prev[2]], "step")]
-        tt = t(bar, 4)
-        prev = roof[-1][1]
-        roof += [(tt - 0.001, prev, "easeOut"), (tt + 0.12, [0.0, prev[1], prev[2] + 180.0], "step")]
-    prev = roof[-1][1]
-    roof += [(t(13) - 0.001, prev, "easeOut"), (t(13) + 0.15, [0.0, 0.0, 720.0], "step")]
-    f.track("sdf/row/node/rowRoof/rotation", roof)
-    # the whole row shudders sideways on the sixteenths of the riser's last bars (a digital tremor, not a bounce)
+        f.route(c, f"sdf/{obj}/look/edge/intensity", 6.0)
+    f.track("sdf/heroTree/node/heroTree/scale", [(0.0, 0.0, "step"), (t(12, 3) - 0.001, 0.0, "easeOut"), (t(12, 3) + 0.2, 1.0, "step")])
     g_riser = b.gate("iRiser", t(9), t(16, 4))
-    f.track("sdf/row/transform/position", [(0.0, [0.0, 0.0, 0.0], "step"), (t(13), [0.0, 0.0, 0.0], "step")] +
-            [(t(13) + i * EIGHTH / 2, [(0.18 if i % 3 == 0 else -0.11 if i % 3 == 1 else 0.0) * (1 + i / 24), 0.0, 0.0], "step")
-             for i in range(1, 28)] + [(t(16, 4), [0.0, 0.0, 0.0], "step")])
     b.pulse("sdf/heroShell/look/edge/intensity", 4.0, "eighth", g_riser)
     b.pulse("sdf/heroParts/look/edge/intensity", 3.0, "eighth", g_riser)
+    b.pulse("sdf/heroRoof/look/edge/intensity", 3.0, "eighth", g_riser)
     b.pulse("sdf/row/look/edge/intensity", 2.5, "quarter", g_riser)
 
     # ---- 13-16: the chop flashes every window; corruption builds on the sixteenths ---------------------------------
@@ -196,7 +220,8 @@ def build(b):
         c = b.clap(f"chop{bar}", t(bar), release=0.9)
         f.route(c, "sdf/row/surface/4/emission", 8.0)
         f.route(c, "sdf/heroShell/surface/4/emission", 8.0)
-        f.route(c, "sdf/skyline/surface/5/emission", 6.0)
+        for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky"):
+            f.route(c, f"sdf/cityIn{nm_}/surface/5/emission", 5.0)
         f.route(c, "post/lens/chromaticAberration", 0.4)
     for k_, bar in enumerate(range(13, 17)):
         f.event("riserBar", time=t(bar), hold=G.BAR1 - 0.06 if bar < 16 else G.BAR1 * 0.75 - 0.06, attack=0.03, release=0.03,
@@ -207,7 +232,7 @@ def build(b):
 
     # ---- 16.4, the gap: the world freezes and goes dark but for the lit front window; the camera keeps rushing ----
     gap = t(16, 4)
-    for o in ("street", "row", "faller", "lamps", "skyline", "heroParts", "heroTree"):
+    for o in ("street", "row", "faller", "lamps", "parked", "heroParts", "heroRoof", "heroTree") + tuple(f"cityIn{nm_}" for nm_ in ("Low", "Mid", "TowerA", "TowerB", "Sky")):
         f.track(f"sdf/{o}/look/edge/intensity", [(0.0, 1.0, "step"), (gap - 0.001, 1.0, "step"), (gap + 0.03, 0.12, "smooth"),
                                                  (ENTRY, 0.12, "step")], mode="multiply")
     f.track("sdf/heroShell/look/edge/intensity", [(0.0, 1.0, "step"), (gap, 1.0, "smooth"), (ENTRY - 0.12, 0.35, "step")], mode="multiply")

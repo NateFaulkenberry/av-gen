@@ -63,12 +63,13 @@ def figures(rid, placements):
 # =============================================================================================================
 # THE KITCHEN
 # =============================================================================================================
-STOVE = (-1.85, 0.0, -6.4 + 0.31)
+STOVE = (1.75, 0.0, -6.4 + 0.31)
 
 
 def kitchen():
-    """Verse 1, bars 33-37. The back wall: the range (with the pot on its lit front-left burner, under a hood),
-    the counter with its sink under the window, the fridge; the table set for one in the middle with its chair
+    """Verse 1, bars 33-37. The back wall, left to right: the fridge, the counter with its sink under the window and
+    the kettle, the range (the pot on its lit front-left burner, under a hood) in the right-hand corner, so a camera
+    coming in at the living-room door sees the fridge and the window first and has to turn to find him; the table set for one in the middle with its chair
     facing the living-room door and a second chair; a pendant; a clock. Doors: the living room (front wall), the
     hall (right wall). Tableaux: stove (dinner), table."""
     rid = "kitchen"
@@ -78,16 +79,16 @@ def kitchen():
     shell = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.4, 1.0, 0.9, 1.15)], tiled=True, dado=False),
               window_on("-z", ext, -0.4, 1.0, 0.9, 1.15, eid="KitchenWindow", room=rid),
               on_wall(K.wall_clock(0.18, name="kitClock", entity={"id": "KitchenClock", "room": rid}), "+x", ext, -3.4, 1.9),
-              on_wall(tag(PR.wall_cupboard(0.9, 0.6, 0.32), "wallCupboard", "WallCupboard", rid), "-z", ext, 0.78, 1.85),
+              on_wall(tag(PR.wall_cupboard(0.8, 0.6, 0.32), "wallCupboard", "WallCupboard", rid), "-z", ext, -1.35, 1.85),
               on_wall(K.painting(0.5, 0.65, motif="grid", entity={"id": "KitchenPicture", "room": rid}), "-x", ext, -4.4, 1.55))
     pot_at = (STOVE[0] - 0.17, 0.9, STOVE[2] + 0.12)
     range_ = U(place(tag(P4.stove(name_ring="kitBurner"), "stove", "Stove", rid), STOVE),
                place(tag(P4.pot(), "prop", "Pot", rid, anchor="Stove"), pot_at, name="kitPot"),
                on_wall(tag(P4.range_hood(0.8, 0.5), "wallCupboard", "RangeHood", rid), "-z", ext, STOVE[0], 1.62))
-    counter = U(place(tag(PR.counter3(2.2, 0.9, 0.6, sink_x=-0.05), "counter", "Counter", rid), (-0.35, 0.0, z0 + 0.3)),
-                place(R([0, 0, 0], K.kettle(entity={"id": "Kettle", "room": rid}), name="kitKettleRock"), (-1.0, 0.9, z0 + 0.3), name="kitKettle"),
-                place(K.fridge(0.7, 1.75, 0.62, entity={"id": "Fridge", "room": rid}), (1.75, 0.0, z0 + 0.33)),
-                place(K.stack_of_books(entity={"id": "CookBooks", "room": rid}), (0.5, 0.9, z0 + 0.22)))
+    counter = U(place(tag(PR.counter3(3.1, 0.9, 0.6, sink_x=-0.2), "counter", "Counter", rid), (-0.2, 0.0, z0 + 0.3)),
+                place(R([0, 0, 0], K.kettle(entity={"id": "Kettle", "room": rid}), name="kitKettleRock"), (0.85, 0.9, z0 + 0.3), name="kitKettle"),
+                place(K.fridge(0.7, 1.75, 0.62, entity={"id": "Fridge", "room": rid}), (-2.15, 0.0, z0 + 0.33)),
+                place(K.stack_of_books(entity={"id": "CookBooks", "room": rid}), (-1.45, 0.9, z0 + 0.22)))
     chair_at = (0.0, 0.0, -5.125)
     fig_at, fig_yaw = R3.fig_from_anchor("table", chair_at, 0.0)
     table = U(place(K.table(1.1, 0.75, 0.75, entity={"id": "KitchenTable", "room": rid}), (0.0, 0.0, -4.4), name="kitTableAt"),
@@ -97,12 +98,11 @@ def kitchen():
               place(K.plate_and_cup(entity={"id": "PlateAndCup", "room": rid}), (0.0, 0.75, -4.65), 180.0, name="kitPlate"),
               place(PR.pendant(0.85, name="kitPendant", eid="Pendant", room=rid), (0.0, y1, -4.4)))
     stove_fig, stove_yaw = fig_facing(T4.STOVE_AT, 180.0, STOVE, 0.0)
-    figs = R3.figure_objects(rid, [("kitMan", "table", fig_at, fig_yaw, "KitchenChair")]) + \
-        figures(rid, [("kitStove", "stove", stove_fig, stove_yaw, "Stove")])
+    figs = figures(rid, [("kitStove", "stove", stove_fig, stove_yaw, "Stove")])
     return {"id": rid, "interior": ext,
             "objects": [("kitShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("kitCounter", counter, "furn2", (x0 - 0.05, -0.05, z0 - 0.05), (x1 + 0.05, 2.2, z0 + 0.8)),
-                        ("kitRange", range_, "furn2", (x0 - 0.05, -0.05, z0 - 0.05), (-1.3, 2.6, z0 + 0.8)),
+                        ("kitRange", range_, "furn2", (1.25, -0.05, z0 - 0.05), (x1 + 0.05, 2.6, z0 + 0.8)),
                         ("kitTable", table, "furn", (-0.8, -0.05, -5.5), (0.8, y1 + 0.05, -3.3))] + figs,
             "lights": [("kitPend", (0.0, 1.6, -4.4), "lamp"), ("kitHood", (STOVE[0], 1.5, STOVE[2] + 0.15), "lamp")],
             "anchors": {"table": (0.0, 0.85, -4.4), "counter": (-0.35, 1.0, z0 + 0.3), "window": (-0.4, 1.6, z0),
@@ -153,13 +153,13 @@ def gym():
              place(tag(P4.dumbbell_rack(1.1), "gymRack", "DumbbellRack", rid), (x1 - 0.25, y0, -0.2), -90.0),
              place(tag(P4.exercise_mat(), "rug", "GymMat", rid), (1.75, y0, -1.0)),
              place(tag(P4.exercise_bike(), "gymBike", "ExerciseBike", rid), (4.2, y0, 1.55), -90.0))
-    figs = figures(rid, [("gymMan", "gym_stand", (3.75, y0, -1.2), 75.0, None)])
+    figs = figures(rid, [("gymMan", "gym_stand", (3.85, y0, 0.9), 90.0, None)])
     return {"id": rid, "interior": ext,
             "objects": [("gymShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("gymFurn", furn, "furn2", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.3, z1 + 0.05))] + figs,
             "lights": [("gymBulb", (3.0, y1 - 0.55, 0.0), "lamp")],
             "anchors": {"mirror": (x1, y0 + 1.45, -0.2), "bench": (3.15, y0 + 0.5, 0.15), "rack": (2.2, y0 + 1.2, z1),
-                        "man": (3.75, y0 + 1.0, -1.2)}}
+                        "man": (3.85, y0 + 1.0, 0.9)}}
 
 
 BAR_COUNTER = (3.6, DOWN, -4.4)
@@ -199,9 +199,10 @@ def lounge():
     return {"id": rid, "interior": ext,
             "objects": [("lngShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
                         ("lngSit", sitting, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (1.2, y0 + 1.8, z1 + 0.05)),
-                        ("lngBar", bar, "furn2", (2.0, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05),
-                         {"emission": {CANVAS: [1.4, 0.3, 0.9], CANVAS2: [0.25, 1.3, 1.5], GLOW: [1.6, 0.9, 0.35]}}),
-                        ("lngStools", U(stools, glass), "furn", (2.0, y0 - 0.05, -5.6), (3.4, y0 + 1.3, -3.2))] + figs,
+                        ("lngBar", bar, "furn2", (2.0, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.5, z1 + 0.05),
+                         {"emission": {CANVAS: [1.5, 0.25, 0.85], SCREEN: [1.6, 0.85, 0.25], CANVAS2: [0.25, 1.3, 1.5],
+                                       GLOW: [1.6, 0.9, 0.35], FLOOR: [0.3, 1.6, 1.9]}}),
+                        ("lngStools", U(stools, glass), "furn", (2.0, y0 - 0.05, -5.6), (3.7, y0 + 1.35, -3.2))] + figs,
             "lights": [("lngBarGlow", (4.2, y0 + 1.3, -4.4), "lamp"), ("lngPend", (3.6, y1 - 0.85, -4.4), "lamp"),
                        ("lngLamp", (x0 + 0.32, y0 + 1.4, -5.95), "lamp"), ("lngTV", (0.0, y0 + 0.9, -4.4), "screen")],
             "anchors": {"bar": (BAR_COUNTER[0], y0 + 1.1, -4.4), "barMan": bar_fig, "sofa": sofa_at, "tv": (0.5, y0 + 0.86, -4.4),

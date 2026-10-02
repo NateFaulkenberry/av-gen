@@ -45,6 +45,7 @@ NEIGH = ((-92.8, 95.2), (-22.0, 46.0))     # the neighbourhood superblock (x, z)
 INNER = ((-100.0, 140.0), (-235.0, -22.0))  # the blocks the intro's camera sees (x, z)
 SET_PIECE_BLOCKS = [(HX, -88.0), (HX + 40.0, -88.0)]   # the park (SW of the intersection), the bar's block (SE)
 STOREY = 3.2
+CROSS_OFF = ROAD_HALF - 0.75     # a crossing's centre from its junction's centre: on the line of the pavement
 
 
 def block_centre(i, k):
@@ -76,7 +77,8 @@ def building(w, d, h, floor=STOREY, k=FILL, bands=CANVAS2, shop=None, crown=None
         parts.append(S(K.D(X(((-w / 2 - 0.06, w / 2 + 0.06), (0.4, 2.9), (-d / 2 - 0.06, d / 2 + 0.06))),
                            X(((-w / 2 + 0.3, w / 2 - 0.3), (0.0, 3.5), (-d / 2 + 0.3, d / 2 - 0.3)))), shop))
     if crown is not None:
-        parts.append(S(X(((-w / 2 + 0.6, w / 2 - 0.6), (h, h + 0.6), (-d / 2 + 0.6, d / 2 - 0.6))), crown))
+        # a thin lit parapet round the roof's edge (pass 4 stills: a full lit plate read as an orange tile)
+        parts.append(S(K.D(X(((-w / 2, w / 2), (h, h + 0.5), (-d / 2, d / 2))), X(((-w / 2 + 0.35, w / 2 - 0.35), (h - 1.0, h + 1.0), (-d / 2 + 0.35, d / 2 - 0.35)))), crown))
     return U(*parts)
 
 
@@ -127,10 +129,11 @@ def markings(region):
     dash_z = T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, 5.0], 0, box([0.07, 0.012, 1.1])))
     # keep dashes off the junctions: only where the other road is not
     junction = T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, PITCH], 0, box([ROAD_HALF + 1.0, 1.0, ROAD_HALF + 1.0])))
+    # the crossings line up with the pavements: each is 2 m wide, centred CROSS_OFF from the junction's centre
     stripes_x = K.I(T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, 0.9], 0, box([0.5, 0.012, 0.22]))),
-                    T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, PITCH], 0, K.mirror([1, 0, 0], T([ROAD_HALF + 1.2, 0, 0], box([1.0, 0.1, 4.4]))))))
+                    T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, PITCH], 0, K.mirror([1, 0, 0], T([CROSS_OFF, 0, 0], box([1.0, 0.1, 4.4]))))))
     stripes_z = K.I(T([XI, 0.0, MAIN_Z], K.repeat([0.9, 0.0, PITCH], 0, box([0.22, 0.012, 0.5]))),
-                    T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, PITCH], 0, K.mirror([0, 0, 1], T([0, 0, ROAD_HALF + 1.2], box([4.4, 0.1, 1.0]))))))
+                    T([XI, 0.0, MAIN_Z], K.repeat([PITCH, 0.0, PITCH], 0, K.mirror([0, 0, 1], T([0, 0, CROSS_OFF], box([4.4, 0.1, 1.0]))))))
     lines = U(K.D(U(dash_x, dash_z), junction), stripes_x, stripes_z)
     ring = T([HX, 0.0, 2.0], box([0.0, 5.0, 0.0], name="marksRing"))
     return K.I(K.D(lines, zone(NEIGH)), zone(region), ring)
@@ -152,9 +155,9 @@ def traffic(axis, region, gap=24.0, name="traffic", cut=None):
     translate (`<name>Fwd`, `<name>Back`) the film keys at a steady speed. Clipped to `region`, minus the
     neighbourhood's houses' gardens (the main street keeps its own lanes) and `cut` (about 50 nodes)."""
     car = P4.car()
-    if axis == "x":
-        fwd = T([0.0, 0.0, 0.0], T([HX, 0.0, MAIN_Z - LANE], K.repeat([gap, 0.0, PITCH], 0, R([0, 90, 0], car))), name=f"{name}Fwd")
-        back = T([0.0, 0.0, 0.0], T([HX + gap / 2, 0.0, MAIN_Z + LANE], K.repeat([gap, 0.0, PITCH], 0, R([0, -90, 0], car))), name=f"{name}Back")
+    if axis == "x":    # right-hand traffic: heading +x the right is +z
+        fwd = T([0.0, 0.0, 0.0], T([HX, 0.0, MAIN_Z + LANE], K.repeat([gap, 0.0, PITCH], 0, R([0, 90, 0], car))), name=f"{name}Fwd")
+        back = T([0.0, 0.0, 0.0], T([HX + gap / 2, 0.0, MAIN_Z - LANE], K.repeat([gap, 0.0, PITCH], 0, R([0, -90, 0], car))), name=f"{name}Back")
     else:
         fwd = T([0.0, 0.0, 0.0], T([XI + LANE, 0.0, 0.0], K.repeat([PITCH, 0.0, gap], 0, R([0, 180, 0], car))), name=f"{name}Fwd")
         back = T([0.0, 0.0, 0.0], T([XI - LANE, 0.0, gap / 2], K.repeat([PITCH, 0.0, gap], 0, car)), name=f"{name}Back")
@@ -218,13 +221,15 @@ BENCH_YAW = 180.0
 
 
 def benches():
-    return U(K.place(P4.park_bench(), BENCH_AT, BENCH_YAW),
+    import liminal_space as ls
+    return U(K.place(ls.tag(P4.park_bench(), "parkBench", id="ParkBench", seatHeight=0.47), BENCH_AT, BENCH_YAW),
              K.place(P4.park_bench(), (HX - 5.5, 0.14, -88.0 - 2.3), 0.0),
              K.place(P4.park_bench(), (HX + 2.3, 0.14, -88.0 - 6.5), -90.0))
 
 
 # the bar: the corner unit of the block south-east of the intersection
-BAR = {"x0": XI + 6.0 + 0.4, "x1": XI + 6.0 + 11.0, "z0": ZK + 6.0 + 0.4, "z1": ZK + 6.0 + 8.6, "h": 3.6}
+BAR = {"x0": HX + 40.0 - 13.0 + 0.3, "x1": HX + 40.0 - 13.0 + 0.3 + 10.6, "z0": -88.0 - 13.0 + 0.3, "z1": -88.0 - 13.0 + 0.3 + 8.2,
+       "h": 3.6}      # the interior: the building's walls are 0.3 m thick
 
 
 def bar_building():

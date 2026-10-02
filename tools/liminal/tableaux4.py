@@ -152,7 +152,7 @@ def lounge_sit():
 
 
 # ---- the city ------------------------------------------------------------------------------------------------------
-CAR_AT = (0.38, 0.0, 0.25)         # the car's centre in the figure's frame: the driver's seat is the figure's origin
+CAR_AT = (-0.38, 0.0, 0.25)        # the car's centre in the figure's frame: the driver's seat (car x +0.38) is his origin
 
 
 def car_anchor():
@@ -195,10 +195,12 @@ def crowd_stand():
 
 @new
 def triumph():
-    pose = {"P": [0.0, 0.945, 0.0], "U": pitch(-5), "Up": pitch(-2), "head": {"pitch": -16.0},
-            "hands": {"R": {"wrist": [-0.38, 0.8, 0.07], "pole": [-0.4, 0.2, -1.0], "dir": [-0.35, -1.0, 0.15], "palm": [0.0, 0.0, 1.0]},
-                      "L": {"wrist": [0.38, 0.8, 0.07], "pole": [0.4, 0.2, -1.0], "dir": [0.35, -1.0, 0.15], "palm": [0.0, 0.0, 1.0]}},
-            "feet": {"R": {"ankle": [-0.17, 0.05, 0.01]}, "L": {"ankle": [0.17, 0.05, -0.02]}}}
+    # upright, the chest lifted, the head raised to the open sky, the arms opened a little from the body with the palms
+    # forward: someone who has finally reached somewhere (not a victory pose)
+    pose = {"P": [0.0, 0.945, 0.0], "U": pitch(-7), "Up": pitch(-2), "head": {"pitch": -22.0},
+            "hands": {"R": {"wrist": [-0.47, 0.84, 0.1], "pole": [-0.5, 0.1, -1.0], "dir": [-0.45, -1.0, 0.2], "palm": [0.0, 0.0, 1.0]},
+                      "L": {"wrist": [0.47, 0.84, 0.1], "pole": [0.5, 0.1, -1.0], "dir": [0.45, -1.0, 0.2], "palm": [0.0, 0.0, 1.0]}},
+            "feet": {"R": {"ankle": [-0.18, 0.05, 0.03]}, "L": {"ankle": [0.18, 0.05, -0.04]}}}
     return {"pose": pose, "anchor": (lambda: FLOOR, (0.0, 0.0, 0.0), 0.0), "category": "floor", "posture": "stand",
             "groups": {"feet": ["foot"]}}
 

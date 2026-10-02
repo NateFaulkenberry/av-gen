@@ -183,6 +183,9 @@ def hero_shell():
     return K.I(house, T([HERO_X, 0, -2.1], box([6.0, 0.0, 6.0], name="heroRise"), name="heroRiseAt"))
 
 
+ROOF_PARTS = ("roofL", "roofR", "chimney")     # their own object (heroRoof): it flies off at bar 66
+
+
 def hero_parts(names):
     parts = []
     for name, builder, _off in HERO_PARTS:
@@ -206,7 +209,9 @@ def objects():
         ("lamps", lamps(), "furn", (HERO_X - LOT * LOTS - 8, -0.1, 4.0), (HERO_X + LOT * LOTS + 8, 9.0, 20.0), far),
         ("parked", parked(), "furn", (HERO_X - LOT * LOTS - 5, -0.1, -2.0), (HERO_X + LOT * LOTS + 12, 2.0, 26.0), far),
         ("heroShell", hero_shell(), "wall", (HERO["x0"] - 0.3, -0.1, HERO["z0"] - 0.3), (HERO["x1"] + 0.3, 6.2, HERO["z1"] + 0.6), far),
-        ("heroParts", hero_parts([p[0] for p in HERO_PARTS]), "furn",
+        ("heroParts", hero_parts([p[0] for p in HERO_PARTS if p[0] not in ROOF_PARTS]), "furn",
+         (HERO["x0"] - 20.0, -6.0, HERO["z0"] - 1.0), (HERO["x1"] + 20.0, 25.0, 14.0), far),
+        ("heroRoof", hero_parts(list(ROOF_PARTS)), "furn",
          (HERO["x0"] - 20.0, -6.0, HERO["z0"] - 1.0), (HERO["x1"] + 20.0, 25.0, 14.0), far),
         ("heroTree", hero_tree(), "furn", (-5.8, -0.1, 3.6), (-0.4, 6.5, 9.0), far),
     ]

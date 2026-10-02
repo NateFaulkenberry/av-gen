@@ -1,4 +1,7 @@
-"""All You Got, art pass 3: the house, owner bars 17-41 (37.43-92.48 s), on Builder3.
+"""All You Got, art pass 4: the house, owner bars 17-41 (37.43-92.48 s), on Builder4 (pass 3's film3_house.py, revised:
+04-art-pass-4.md PARTS 4, 5 and 15). Pass 4: the walls no longer swell on the quarter; the kitchen runs to the
+downbeat of bar 38 and its clap (34.4, 76.51 s) finds him at the stove looking into a steaming pot; the hall and the
+climb start on 38.1 (pass 2's timing), the climb, the top and the fall are pass 3's.
 
   17-32  the living room (the release and verse 1's first half): ONE continuous camera that sweeps the room. The
          mannequin is always somewhere in it and never moves while seen: in the armchair as the Thinker when we come
@@ -21,6 +24,7 @@ from __future__ import annotations
 import kit as K
 import pass2_grid as G
 import rooms3 as R3
+import rooms4 as R4
 
 t = G.t
 BEAT1 = G.BAR1 / 4.0
@@ -37,7 +41,7 @@ def lyric_glitch(b, name, tt, amount=0.3, shift=8.0, release=0.12):
 
 def build(b):
     f = b.f
-    house = R3.ground_floor()
+    house = {"liv": R3.living_room(), "kit": R4.kitchen(), "hall": R3.hall()}
     for key, room in house.items():
         b.room_world(key, room)
     liv, kit, hall = house["liv"], house["kit"], house["hall"]
@@ -54,7 +58,7 @@ def build(b):
             (45.7, (-0.6, 1.4, 2.2)), (47.6, (-2.1, 0.62, 0.15)), (50.6, (-2.1, 0.62, 0.2)), (52.5, (-1.0, 1.2, -2.2)),
             (t(24, 4), (0.3, 1.3, -2.2)), (55.6, (0.0, 1.3, -2.2)), (57.2, (-1.95, 0.85, 0.35)), (60.6, (-1.95, 0.85, 0.35)),
             (62.2, (-1.5, 1.4, -2.2)), (t(28, 4), (1.6, 1.3, -2.2)), (64.9, (-0.6, 1.25, 2.0)), (70.5, (-0.6, 1.25, 2.0)),
-            (t(32, 4), (-1.6, 1.15, -2.6)), (t(33), (-1.75, 1.15, -3.6))]
+            (t(32, 4), (-2.0, 1.15, -2.7)), (t(33), (-2.3, 1.1, -3.6))]
     b.glide("liv", eye, look, nodes_keys=ground, fov=62.0)
     f.shots[-1]["fov"] = [(ENTRY, 70.0), (ENTRY + 0.5, 62.0), (t(33), 62.0)]
     # the tableaux, each change while the camera looks away
@@ -79,8 +83,7 @@ def build(b):
         base = _node_translation(liv, obj, node)
         up = [base[0], base[1] + h, base[2]]
         f.track(f"sdf/{obj}/node/{node}/translation", [(0.0, up, "step"), (ENTRY - 0.001, up, "easeIn"),
-                                                       (ENTRY + 0.16, [base[0], base[1] - 0.03, base[2]], "easeOut"),
-                                                       (ENTRY + 0.3, base, "step")])
+                                                       (ENTRY + 0.16, base, "step")])
     # (the sofa he will lie on lands; the armchair he sits in is already there)
 
     # ---- the world breathes on the quarter: lines, lamps, shades, the room's walls; the figure stays still ---
@@ -162,31 +165,44 @@ def build(b):
     f.route(c, "temporal/mosh/shift", 12.0)
 
     # =========================================================================================================
-    # THE KITCHEN (33.1-37.1): at the table
+    # THE KITCHEN (33.1-38.1): dinner. The camera comes in looking left (the fridge, the window), pans right along
+    # the counter and arrives on him at the stove ON the clap (34.4, 76.51 s); the steam puffs up into the hood's
+    # light. Then the table set for one; C05 (36.4) lifts its plate, the kettle and the empty chair; out to the hall.
     # =========================================================================================================
-    eye = [(t(33), (-1.75, 1.5, -2.2)), (73.6, (-1.6, 1.5, -2.95)), (76.0, (-0.6, 1.5, -3.0)), (78.5, (0.85, 1.48, -3.3)),
-           (t(36, 4), (1.6, 1.45, -4.2)), (t(37), (2.35, 1.45, -4.6))]
-    look = [(t(33), (-1.75, 1.15, -3.6)), (73.6, (-0.3, 0.95, -4.9)), (76.0, (0.0, 0.95, -5.0)), (78.5, (-0.3, 1.1, -5.3)),
-            (t(36, 4), (-0.2, 1.0, -4.6)), (t(37), (3.6, 1.4, -4.6))]
+    CLAP = t(34, 4)
+    eye = [(t(33), (-1.75, 1.5, -2.3)), (74.4, (-1.4, 1.52, -3.15)), (75.7, (-0.95, 1.55, -3.65)), (CLAP, (-0.8, 1.55, -3.78)),
+           (79.4, (-0.45, 1.5, -4.05)), (80.7, (0.15, 1.48, -3.55)), (82.2, (0.95, 1.48, -3.65)), (83.1, (1.85, 1.47, -4.35)),
+           (t(38), (2.45, 1.46, -4.6))]
+    look = [(t(33), (-2.45, 1.0, -4.7)), (74.0, (-2.35, 1.0, -6.3)), (75.35, (-0.95, 0.98, -6.4)), (CLAP, (1.58, 1.08, -5.8)),
+            (79.2, (1.55, 1.12, -5.9)), (80.6, (0.0, 0.85, -4.6)), (t(36, 4) + 0.6, (0.1, 1.0, -4.6)), (82.4, (1.6, 1.2, -5.0)),
+            (t(38), (3.7, 1.4, -4.6))]
     b.glide("kit", eye, look, nodes_keys=ground, fov=62.0)
-    s4 = b.swap("livWindow", "kitMan", t(32, 4) + 0.3)
+    s4 = b.swap("livWindow", "kitStove", t(32, 4) + 0.3)
     b.show("livWindow", s3, s4)
-    kw = [("COME ON, TELL ME", 74.5, t(36, 4), -0.35, 0.5, 0.05, "pop", "word"),
-          ("WHAT YOU WANNA", 75.6, t(36, 4), 0.35, 0.45, 0.05, "flicker", "accent"),
-          ("MAYBE CAUSE A LITTLE DRAMA", 76.3, t(36, 4), 0.0, 0.55, 0.035, "pop", "word"),
-          ("IF YOU FEEL IT, SAY IT", 78.5, t(37), -0.4, 0.45, 0.04, "rise", "accent"),
-          ("LET IT SHOW", 79.6, t(37), 0.35, 0.3, 0.06, "rise", "word"),
-          ("CAN YOU TELL ME", 81.1, t(37) + 0.2, 0.1, 0.4, 0.035, "flicker", "word")]
-    for i, (text, t0, t1, sx, sy, kk, style, role) in enumerate(kw):
-        b.word_at(text, t0, t1, ("box", kit["interior"]), sx, sy, k=kk, style=style, role=role, name=f"v1k{i:02d}", room="kitchen")
-        if i in (0, 3):
-            lyric_glitch(b, f"lgk{i}", t0)
-    g_k = b.gate("gV1k", t(33), t(37))
+    b.show("kitStove", s4, t(38))
+    kitchen_words(b, kit)
+    g_k = b.gate("gV1k", t(33), t(38))
     f.route("grid.song.quarter", "lights/kitPend/intensity", 3.0, depth=g_k)
-    for o in ("kitCounter", "kitTable"):
+    for o in ("kitCounter", "kitTable", "kitRange"):
         b.pulse(f"sdf/{o}/look/edge/intensity", 2.0, "quarter", g_k)
     b.pulse("sdf/kitShell/look/edge/intensity", 2.5, "bar", g_k)
     f.route("grid.song.bar.phase", "sdf/kitShell/node/kitClockM/rotation", -360.0, component=2)
+    # the steam: always rising from the pot into the hood's light (PART 15: atmosphere may keep moving); the burner
+    # glows; on the clap a puff of steam, the burner flares, the hood light comes up -- no flash, no corruption
+    pot = kit["anchors"]["pot"]
+    f.nodes.append({"name": "kitSteam", "kind": "particles", "particles": {
+        "capacity": 1500, "spawnRate": 55.0, "burst": 0.0, "shape": "box", "position": [pot[0], pot[1] + 0.14, pot[2]],
+        "extent": [0.09, 0.02, 0.09], "lifetimeMin": 1.6, "lifetimeMax": 2.6, "direction": [0.0, 1.0, 0.0], "spread": 0.22,
+        "speedMin": 0.18, "speedMax": 0.42, "gravity": [0.0, 0.12, 0.0], "drag": 0.5, "sizeStart": 0.035, "sizeEnd": 0.2,
+        "blend": "additive", "colorStart": [0.85, 0.85, 0.9, 0.22], "colorEnd": [0.7, 0.7, 0.8, 0.0], "emissive": 0.6}})
+    f.shots[-1]["nodes"].append("kitSteam")
+    c = b.clap("kitClap", CLAP, release=0.9)
+    cb = b.clap("kitPuff", CLAP, release=0.05)
+    f.route(cb, "particles/kitSteam/burst", 260.0)
+    f.route(c, f"sdf/kitRange/surface/{K.GLOW}/emission", 4.0)
+    f.route(c, "lights/kitHood/intensity", 6.0)
+    f.route(c, "sdf/kitRange/look/edge/intensity", 5.0)
+    f.track("lights/kitHood/intensity", [(0.0, 0.6), (CLAP - 0.02, 0.6, "step"), (CLAP, 2.4, "smooth"), (t(38), 2.4, "step")])
     # C05 (36.4): levitation -- the plate and cup, the kettle and the empty chair jump and hang, then drift down
     c = b.clap("c05", t(36, 4), release=0.4)
     f.route(c, "post/bloom/intensity", 1.0)
@@ -196,31 +212,29 @@ def build(b):
         base = _node_translation(kit, obj, node)
         upk = [base[0], base[1] + h, base[2]]
         f.track(f"sdf/{obj}/node/{node}/translation", [(0.0, base, "step"), (t(36, 4) - 0.001, base, "easeOut"),
-                                                       (t(36, 4) + 0.12, upk, "smooth"), (t(37, 3), upk, "easeIn"),
-                                                       (t(37, 4) + 0.3, base, "step")])
+                                                       (t(36, 4) + 0.12, upk, "step"), (t(37, 3), upk, "easeIn"),
+                                                       (t(37, 4), base, "step")])
 
     # =========================================================================================================
-    # THE HALL AND THE CLIMB (37.1-41.1), then over the edge (41)
+    # THE HALL AND THE CLIMB (38.1-41.1), then over the edge (41)
     # =========================================================================================================
     s = R3.STAIR
     top_z = s["foot_z"] + s["steps"] * s["run"]
 
     def climb_y(z):      # the eye 1.5 m above the treads (1.52 at the foot)
         return 1.52 + max(0.0, min(z - (-4.95), 4.5)) / 4.5 * 2.68
-    zs = {86.0: -4.95, 87.5: -3.64, 89.6: -1.95, 90.25: top_z - 0.08}
-    eye = [(t(37), (2.35, 1.45, -4.6)), (82.0, (3.2, 1.5, -4.78)), (83.6, (4.05, 1.5, -5.3)), (85.0, (4.42, 1.5, -5.2))] + \
+    zs = {86.4: -4.95, 87.75: -3.64, 89.6: -1.95, 90.25: top_z - 0.08}
+    eye = [(t(38), (2.45, 1.46, -4.6)), (84.6, (3.3, 1.5, -4.92)), (85.6, (4.1, 1.5, -5.25))] + \
           [(tt, (4.42, climb_y(z), z)) for tt, z in sorted(zs.items())] + \
           [(90.6, (4.42, 4.15, 0.25)), (91.0, (4.42, 3.6, 1.4)), (91.6, (4.42, 3.05, 2.6)), (t(42), (4.42, 1.0, 3.6))]
 
     def ahead(tt, z):    # looking 15 degrees down, as a climber watches the next steps (they fill the lower frame)
         return (tt, (4.42, climb_y(z) - 3.0 * 0.268, z + 3.0))
-    look = [(t(37), (3.6, 1.4, -4.6)), (82.3, (4.3, 1.1, -3.2)), (83.6, (4.4, 1.3, -3.0)), (85.0, (4.42, 1.7, -2.6)),
-            ahead(86.0, -4.95), ahead(87.5, -3.64), ahead(89.6, -1.95), (89.85, (4.42, climb_y(-1.4) - 1.1, 1.6)), (90.05, (4.42, 3.5, 2.0)),
+    look = [(t(38), (3.7, 1.4, -4.6)), (84.4, (4.3, 1.15, -3.3)), (85.4, (4.4, 1.4, -3.0)), (86.0, (4.42, 1.7, -2.6)),
+            ahead(86.4, -4.95), ahead(87.75, -3.64), ahead(89.6, -1.95), (89.85, (4.42, climb_y(-1.4) - 1.1, 1.6)), (90.05, (4.42, 3.5, 2.0)),
             (t(41), (4.42, 1.6, 2.2)), (90.75, (4.42, 0.4, 2.4)), (t(42), (4.42, -3.0, 4.6))]
     b.glide("hall", eye, look, nodes_keys=("hall",), fov=64.0)
-    s5 = b.swap("kitMan", "hallMan", t(37) - 0.3)
-    b.show("kitMan", s4, s5)
-    b.show("hallMan", s5, t(41))
+    b.show("hallMan", t(38), t(41))
     # IT'S STEPS IN A PROCESS, LET IT GO: one word a riser, risers 8-15, each 1.1 m ahead of the camera as it lands
     words8 = ["IT'S", "STEPS", "IN", "A", "PROCESS,", "LET", "IT", "GO"]
     for i, wd in enumerate(words8):
@@ -228,15 +242,13 @@ def build(b):
         pos, nrm, h = R3.riser(8 + i)
         b.word(wd, tw, t(41, 3), pos, nrm, min(0.11, h * 0.62), style="pop", role="word", room="hall", category="stairText",
                intensity=4.5, name=f"steps{i}")
-    b.word_at("IT'S FINE THOUGH?", 81.9, 84.6, ("box", hall["interior"]), -0.2, 0.4, k=0.04, style="flicker", role="accent",
-              room="hall")
-    b.word_at("I KNOW, GET A LITTLE PEACE OF MIND THOUGH", 85.1, 87.8, ("box", hall["interior"]), 0.1, 0.45, k=0.028,
+    b.word_at("I KNOW, GET A LITTLE PEACE OF MIND THOUGH", 85.1, 87.6, ("box", hall["interior"]), 0.1, 0.45, k=0.028,
               style="rise", role="accent", room="hall")
     lyric_glitch(b, "lgh0", 85.1)
-    g_h = b.gate("gV1h", t(37), t(40, 4))
+    g_h = b.gate("gV1h", t(38), t(40, 4))
     f.route("grid.song.quarter", "lights/hallLamp/intensity", 2.5, depth=g_h)
     f.route("grid.song.quarter", "lights/hallLamp2/intensity", 2.5, depth=g_h)
-    b.pulse("sdf/hallStair/look/edge/intensity", 3.0, "quarter", b.gate("gStair", t(37), t(41)))
+    b.pulse("sdf/hallStair/look/edge/intensity", 3.0, "quarter", b.gate("gStair", t(38), t(41)))
     # C06 (40.4): the house flares white and dissolves; only the stair's top and its words remain
     c = b.clap("c06", t(40, 4), release=0.55)
     f.route(c, "post/bloom/intensity", 2.0)
@@ -280,3 +292,18 @@ def _node_translation(room, obj_name, node_name):
     n = find(tree)
     assert n is not None, (obj_name, node_name)
     return list(n.get("translation", [0.0, 0.0, 0.0]))
+
+
+def kitchen_words(b, kit):
+    """The verse's lines in the kitchen, one at a time where they can be read (pass 3 stacked three on one wall at
+    77 s): each leaves as the next arrives, and none is placed while he is being revealed at the stove."""
+    kw = [("COME ON, TELL ME", 72.9, 74.6, -0.35, 0.5, 0.05, "pop", "word"),
+          ("WHAT YOU WANNA", 74.7, 76.1, 0.35, 0.45, 0.05, "flicker", "accent"),
+          ("MAYBE CAUSE A LITTLE DRAMA", 77.2, 78.4, -0.45, 0.6, 0.032, "pop", "word"),
+          ("IF YOU FEEL IT, SAY IT", 78.5, 79.6, -0.45, 0.55, 0.04, "rise", "accent"),
+          ("LET IT SHOW", 79.7, 81.0, 0.35, 0.4, 0.06, "rise", "word"),
+          ("CAN YOU TELL ME IT'S FINE THOUGH?", 81.1, 83.5, 0.0, 0.5, 0.03, "flicker", "word")]
+    for i, (text, t0, t1, sx, sy, kk, style, role) in enumerate(kw):
+        b.word_at(text, t0, t1, ("box", kit["interior"]), sx, sy, k=kk, style=style, role=role, name=f"v1k{i:02d}", room="kitchen")
+        if i in (0, 5):
+            lyric_glitch(b, f"lgk{i}", t0)
