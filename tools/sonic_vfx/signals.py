@@ -49,6 +49,7 @@ RESPONSE = {
     "lastPitch": "notes.lastPitch", "lastVelocity": "notes.lastVelocity",
     "interval": "notes.interval", "step": "notes.interval",  # signed: an octave = 1 (ADR-1062 has no notes.step)
     "held": "notes.held",                 # how long the longest sounding note has been held (log 0.05-4 s)
+    "lowest": "notes.lowest", "highest": "notes.highest",  # the sounding range's bounds, 0..1
     "channel": "notes.channel",
     # ---- MIDI: the playing (context, 0..1)
     "pitch": "notes.pitch",               # pitch centre of the sounding / recent notes
@@ -86,7 +87,7 @@ LEGACY_OVERRIDES = {
     "noteLow": "notes.noteOn", "noteHigh": "notes.noteOn",
     "lastPitch": "notes.pitch", "lastVelocity": "notes.velocity", "interval": "notes.motion",
     "step": "notes.direction", "held": "notes.duration", "channel": "notes.velocity",
-    "velocitySpread": "notes.velocity",
+    "velocitySpread": "notes.velocity", "lowest": "notes.pitch", "highest": "notes.pitch",
 }
 
 # 4bc1a762 (ADR-1060/1061): the drum classes are real and live; everything else as legacy.

@@ -6,4 +6,5 @@ SCENES = [
     "tesla_choir",
     "corrupted_cathedral",
     "ferrofluid_crown",
+    "cymatic_plate",
 ]

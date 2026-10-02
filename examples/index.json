@@ -359,6 +359,12 @@
       "description": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - Ferrofluid Crown",
       "project": "sonic-vfx/ferrofluid-crown.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a chord is two figures at war. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Cymatic Plate",
+      "project": "sonic-vfx/cymatic-plate.json"
     }
   ]
 }
