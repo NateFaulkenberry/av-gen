@@ -1,0 +1,976 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "ember-forest",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -4.0,
+   1.7,
+   6.0
+  ],
+  "target": [
+   -2.0,
+   2.6,
+   -20.0
+  ],
+  "fov": 45.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.15,
+  "background": [
+   0.00304,
+   0.00152,
+   0.00121
+  ],
+  "fogColor": [
+   0.02315,
+   0.01161,
+   0.00802
+  ],
+  "volumeDensity": 0.0035,
+  "volumeMaxDistance": 90.0,
+  "volumeAnisotropy": 0.72,
+  "volumeNoise": 0.5,
+  "volumeNoiseScale": 0.08,
+  "volumeNoiseSpeed": 0.04,
+  "fogHeight": 2.5,
+  "fogHeightFalloff": 0.35,
+  "fogHeightAmount": 1.0,
+  "volumeShadowStrength": 0.8,
+  "volumeShadowSteps": 4,
+  "volumeLocalLights": 1.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00061,
+    0.0003,
+    0.0003
+   ],
+   "horizonColor": [
+    0.32314,
+    0.04231,
+    0.00304
+   ],
+   "groundColor": [
+    0.00152,
+    0.00091,
+    0.00091
+   ],
+   "haze": 0.06,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      400.0,
+      0.4,
+      400.0
+     ],
+     "subdivisions": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.2,
+      -120.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.95,
+     "metallic": 0.0,
+     "program": "efAsh"
+    }
+   }
+  },
+  {
+   "name": "trunks_near",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.42,
+     "height": 16.0,
+     "segments": 10
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      7,
+      1,
+      1
+     ],
+     "gridSpacing": [
+      7.0,
+      1.0,
+      3.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.0,
+      -9.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "program": "efBark"
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.25,
+      "scale": 0.12,
+      "speed": 0.0,
+      "seed": 3,
+      "axisMask": [
+       1.0,
+       0.0,
+       1.0
+      ]
+     }
+    ],
+    "variation": {
+     "seed": 3,
+     "position": [
+      2.94,
+      0.0,
+      1.2000000000000002
+     ],
+     "rotation": [
+      0.05,
+      3.1,
+      0.05
+     ],
+     "scale": [
+      0.35,
+      0.25,
+      0.35
+     ]
+    }
+   }
+  },
+  {
+   "name": "trunks_mid",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.3,
+     "height": 18.0,
+     "segments": 10
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      11,
+      1,
+      2
+     ],
+     "gridSpacing": [
+      5.5,
+      1.0,
+      6.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      9.0,
+      -30.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "program": "efBark"
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.25,
+      "scale": 0.12,
+      "speed": 0.0,
+      "seed": 5,
+      "axisMask": [
+       1.0,
+       0.0,
+       1.0
+      ]
+     }
+    ],
+    "variation": {
+     "seed": 5,
+     "position": [
+      2.31,
+      0.0,
+      2.4000000000000004
+     ],
+     "rotation": [
+      0.05,
+      3.1,
+      0.05
+     ],
+     "scale": [
+      0.35,
+      0.25,
+      0.35
+     ]
+    }
+   }
+  },
+  {
+   "name": "trunks_far",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.22,
+     "height": 20.0,
+     "segments": 10
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      18,
+      1,
+      3
+     ],
+     "gridSpacing": [
+      4.5,
+      1.0,
+      12.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      10.0,
+      -70.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "program": "efBark"
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.25,
+      "scale": 0.12,
+      "speed": 0.0,
+      "seed": 7,
+      "axisMask": [
+       1.0,
+       0.0,
+       1.0
+      ]
+     }
+    ],
+    "variation": {
+     "seed": 7,
+     "position": [
+      1.89,
+      0.0,
+      4.800000000000001
+     ],
+     "rotation": [
+      0.05,
+      3.1,
+      0.05
+     ],
+     "scale": [
+      0.35,
+      0.25,
+      0.35
+     ]
+    }
+   }
+  },
+  {
+   "name": "fireline",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      600.0,
+      6.0,
+      4.0
+     ],
+     "subdivisions": 64
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      1.0,
+      -150.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.02315
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 3.5,
+      "scale": 0.08,
+      "speed": 0.6,
+      "seed": 21,
+      "axisMask": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "ember",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 60,
+    "seed": 5,
+    "shape": "sphere",
+    "position": [
+     1.6,
+     1.4,
+     -5.0
+    ],
+    "extent": [
+     0.05,
+     0.05,
+     0.05
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 1.2,
+    "lifetimeMin": 4.0,
+    "lifetimeMax": 6.0,
+    "spread": 1.0,
+    "speedMin": 0.3,
+    "speedMax": 0.6,
+    "gravity": [
+     0,
+     0.05,
+     0
+    ],
+    "drag": 0.3,
+    "turbulence": 0.25,
+    "turbulenceScale": 0.5,
+    "attractorPosition": [
+     1.6,
+     1.4,
+     -5.0
+    ],
+    "attractorStrength": 2.2,
+    "attractorRadius": 2.0,
+    "orbit": 2.6,
+    "sizeStart": 0.03,
+    "sizeEnd": 0.012,
+    "colorStart": [
+     1.0,
+     0.7913,
+     0.35153,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.14413,
+     0.0,
+     0.0
+    ],
+    "emissive": 26.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 32,
+    "trailStride": 2,
+    "trailWidth": 0.6,
+    "trailTaper": 0.0,
+    "trailFade": 0.0,
+    "trailTint": [
+     1.0,
+     0.10224,
+     0.00518
+    ]
+   }
+  },
+  {
+   "name": "sparks",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4000,
+    "seed": 9,
+    "shape": "box",
+    "position": [
+     0.0,
+     0.1,
+     -9.0
+    ],
+    "extent": [
+     14.0,
+     0.1,
+     3.0
+    ],
+    "direction": [
+     0.1,
+     1,
+     0
+    ],
+    "spawnRate": 8.0,
+    "lifetimeMin": 0.6,
+    "lifetimeMax": 2.2,
+    "spread": 0.5,
+    "speedMin": 0.6,
+    "speedMax": 2.4,
+    "gravity": [
+     0.15,
+     0.4,
+     0
+    ],
+    "drag": 0.4,
+    "turbulence": 0.6,
+    "turbulenceScale": 0.7,
+    "sizeStart": 0.012,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.7913,
+     0.35153,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.14413,
+     0.0,
+     0.0
+    ],
+    "emissive": 18.0,
+    "blend": "additive",
+    "velocityStretch": 0.6,
+    "stretchMax": 0.08
+   }
+  },
+  {
+   "name": "thrown",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 11,
+    "shape": "sphere",
+    "position": [
+     -3.5,
+     0.6,
+     -9.0
+    ],
+    "extent": [
+     0.4,
+     0.4,
+     0.4
+    ],
+    "direction": [
+     0.4,
+     1,
+     0.2
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 1.0,
+    "lifetimeMax": 2.5,
+    "spread": 0.6,
+    "speedMin": 2.0,
+    "speedMax": 5.0,
+    "gravity": [
+     0,
+     -3.0,
+     0
+    ],
+    "drag": 0.2,
+    "turbulence": 0.3,
+    "sizeStart": 0.02,
+    "sizeEnd": 0.004,
+    "colorStart": [
+     1.0,
+     0.7913,
+     0.35153,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.14413,
+     0.0,
+     0.0
+    ],
+    "emissive": 22.0,
+    "blend": "additive",
+    "trailEnabled": true,
+    "trailLength": 10,
+    "trailStride": 1,
+    "trailWidth": 0.5,
+    "trailTaper": 0.0,
+    "trailFade": 0.0
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "fire",
+   "name": "fire",
+   "type": "directional",
+   "direction": [
+    0.12,
+    -0.08,
+    0.99
+   ],
+   "color": [
+    1.0,
+    0.19462,
+    0.02315
+   ],
+   "intensity": 1.0,
+   "castsShadow": true,
+   "contactShadow": false,
+   "shadowStrength": 1.0,
+   "softness": 0.4,
+   "volumetric": 1.0
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "direction": [
+    -0.3,
+    -1.0,
+    -0.2
+   ],
+   "color": [
+    0.04231,
+    0.05127,
+    0.08022
+   ],
+   "intensity": 0.03,
+   "castsShadow": false
+  },
+  {
+   "id": "emberLight",
+   "name": "emberLight",
+   "type": "point",
+   "position": [
+    1.6,
+    1.4,
+    -5.0
+   ],
+   "color": [
+    1.0,
+    0.14413,
+    0.0
+   ],
+   "intensity": 6.0,
+   "range": 6.0,
+   "radius": 0.3,
+   "castsShadow": false,
+   "volumetric": 0.6
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "efAsh",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 0,
+     "value": 0.22,
+     "seed": 6
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 0,
+     "constant": [
+      0.5,
+      1.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 1
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      0.0012,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "noise",
+     "dst": 2,
+     "srcA": 0,
+     "value": 0.9,
+     "seed": 8
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      1.0,
+      0.14413,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
+    },
+    {
+     "kind": "microDetail",
+     "dst": 4,
+     "srcA": 0,
+     "value": 2.0,
+     "seed": 9
+    },
+    {
+     "kind": "ramp",
+     "dst": 5,
+     "srcA": 4,
+     "constant": [
+      0.00304,
+      0.00243,
+      0.00212,
+      1.0
+     ],
+     "constant2": [
+      0.01161,
+      0.00913,
+      0.00802,
+      1.0
+     ],
+     "constant3": [
+      0.04231,
+      0.03434,
+      0.02956,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 5,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 3,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "efBark",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      3.0,
+      0.35,
+      3.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 0,
+     "srcB": 6
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 6,
+     "value": 1.0,
+     "seed": 12
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.6,
+      0.68,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "value": 1,
+     "constant": [
+      0.0,
+      4.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.05,
+      0.00721,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      0.00335,
+      0.00273,
+      0.00243,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 3,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "ember",
+    "position": [
+     1.6,
+     2.2,
+     -5.0
+    ],
+    "radius": 1.2,
+    "weight": 1.0
+   }
+  ],
+  "layers": [
+   {
+    "name": "near",
+    "start": 0.0,
+    "end": 16.0,
+    "contrast": 1.0,
+    "saturation": 1.0
+   },
+   {
+    "name": "mid",
+    "start": 16.0,
+    "end": 50.0,
+    "contrast": 0.8,
+    "saturation": 0.8
+   },
+   {
+    "name": "far",
+    "start": 50.0,
+    "end": 400.0,
+    "contrast": 0.6,
+    "saturation": 0.7
+   }
+  ]
+ }
+}

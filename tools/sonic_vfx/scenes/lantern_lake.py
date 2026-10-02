@@ -21,7 +21,8 @@ SLATE = "#20283f"
 AMBER = "#ffb050"
 
 CAM = (1.2, 1.1, 7.0)
-RELEASE_Z = -70.0          # where lanterns are released (the middle of the lake)
+RELEASE_Z = -36.0          # where lanterns are released (out on the lake)
+ZENITH, HORIZON = "#0a0e26", "#c76a5a"
 SHORE_Z = -640.0
 
 DESIGN = {
@@ -106,6 +107,32 @@ def jetty(mirror):
     return parts
 
 
+def mirror_program():
+    """The lake's mirror of the sky, painted on an unlit plane below the reflected world: the sky's own gradient,
+    flipped (the horizon colour at grazing, the zenith's when looking down), weighted by water's Fresnel (a mirror
+    at grazing, dark underfoot), broken into long horizontal ripple bands."""
+    return {
+        "name": "llMirror",
+        "ops": [
+            {"kind": "input", "dst": 0, "input": "viewDirection"},
+            {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},             # its y
+            {"kind": "remap", "dst": 1, "srcA": 0, "value": 1, "constant": [0.0, 0.3, 0.0, 1.0]},    # 0 grazing
+            {"kind": "ramp", "dst": 2, "srcA": 1, "constant": hexrgb(HORIZON, 0.95) + [1.0],
+             "constant2": hexrgb("#4a3050", 0.6) + [1.0], "constant3": hexrgb(ZENITH, 0.5) + [1.0]},
+            {"kind": "remap", "dst": 3, "srcA": 0, "value": 1, "constant": [0.0, 0.45, 1.0, 0.08]},  # Fresnel
+            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
+            {"kind": "input", "dst": 4, "input": "worldPosition"},
+            {"kind": "constant", "dst": 5, "constant": [0.03, 0.0, 1.3, 0.0]},                     # long bands
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+            {"kind": "noise", "dst": 4, "srcA": 4, "value": 1.0, "seed": 5},
+            {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.3, 0.7, 0.82, 1.12]},
+            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+            {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 1.0]},
+        ],
+        "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": -1,
+    }
+
+
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.45, "sustain": 0.6, "attack": 1.3, "release": 1.7}
@@ -114,7 +141,7 @@ def build():
         "volumeDensity": 0.00035, "volumeMaxDistance": 40.0, "volumeNoise": 0.0, "fogSky": 1.0,
         "fogSkyDistance": 900.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb("#0a0e26"), "horizonColor": hexrgb("#c76a5a"),
-                "groundColor": hexrgb("#141a33"), "haze": 0.12, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": hexrgb("#8a4a48"), "haze": 0.12, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     s.composition = {
@@ -125,6 +152,12 @@ def build():
             {"name": "shore", "start": 400.0, "end": 9000.0, "contrast": 0.7, "saturation": 0.7},
         ],
     }
+    # the mirror: the sky's gradient on an unlit plane below everything the lake reflects
+    s.program(mirror_program())
+    s.proc("mirror", {"kind": "box", "size": [1000.0, 0.2, 1000.0], "subdivisions": 1},
+           material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 1.0,
+                     "metallic": 0.0, "unlit": True, "program": "llMirror"},
+           transform={"position": [0.0, -40.0, -3400.0], "rotation": [0, 0, 0], "scale": [8.0, 1.0, 8.0]})
     for mirror in (False, True):
         h = hills(mirror)
         s.proc(h["name"], h["source"], material=h["material"], deformers=h["deformers"], transform=h["transform"])
@@ -135,12 +168,12 @@ def build():
 
     # ---- the lanterns and their twins (same seed, same bursts; the twin falls where the lantern rises)
     common = dict(capacity=2400, seed=19, shape="box", extent=[1.5, 0.0, 6.0], spawnRate=0.0, lifetimeMin=24.0,
-                  lifetimeMax=34.0, spread=0.18, speedMin=0.35, speedMax=0.6, drag=0.04, turbulence=0.04,
+                  lifetimeMax=34.0, spread=0.18, speedMin=0.9, speedMax=1.4, drag=0.04, turbulence=0.04,
                   turbulenceScale=0.15, sizeStart=0.45, sizeEnd=0.36, blend="additive")
     s.particles("lanterns", position=[0.0, 0.3, RELEASE_Z], direction=[0.12, 1.0, 0.0], gravity=[0.06, 0.02, 0.0],
                 colorStart=hexrgb("#ffb050") + [1.0], colorEnd=hexrgb("#ff7a2a") + [0.0], emissive=2.6, **common)
     s.particles("twins", position=[0.0, -0.3, RELEASE_Z], direction=[0.12, -1.0, 0.0], gravity=[0.06, -0.02, 0.0],
-                colorStart=hexrgb("#ff9a50") + [0.5], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=1.2, **common)
+                colorStart=hexrgb("#ff9a50") + [0.7], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=1.8, **common)
     # fireflies at the jetty (hats)
     s.particles("fireflies", capacity=400, seed=23, shape="box", position=[-1.0, 1.4, 6.0], extent=[3.0, 0.8, 5.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.4, lifetimeMax=1.0, spread=1.0, speedMin=0.05,
@@ -165,21 +198,21 @@ def build():
     s.track("camera/position", [{"time": 0.0, "value": list(CAM), "interp": "smooth"},
                                 {"time": 60.0, "value": [CAM[0], CAM[1] + 0.05, CAM[2] - 2.5], "interp": "smooth"},
                                 {"time": 120.0, "value": list(CAM), "interp": "smooth"}], loop=120.0)
-    s.track("camera/target", [{"time": 0.0, "value": [4.0, 12.0, -80.0], "interp": "smooth"},
-                              {"time": 60.0, "value": [5.0, 12.2, -80.0], "interp": "smooth"},
-                              {"time": 120.0, "value": [4.0, 12.0, -80.0], "interp": "smooth"}], loop=120.0)
-    s.camera = {"mode": 1, "position": list(CAM), "target": [4.0, 12.0, -80.0], "fov": 45.0, "orbitSpeed": 0.0}
+    s.track("camera/target", [{"time": 0.0, "value": [4.0, 8.0, -80.0], "interp": "smooth"},
+                              {"time": 60.0, "value": [5.0, 8.2, -80.0], "interp": "smooth"},
+                              {"time": 120.0, "value": [4.0, 8.0, -80.0], "interp": "smooth"}], loop=120.0)
+    s.camera = {"mode": 1, "position": list(CAM), "target": [4.0, 8.0, -80.0], "fov": 45.0, "orbitSpeed": 0.0}
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # notes: a lantern (and its twin) at the pitch's place across the lake; a chord releases a cluster
     s.map(M("lakeX", [("lastPitch", 1.0)], "mean", -0.3 / 0.4, 1.0 / 0.4),
           M("cluster", [("noteOn", 1.0), ("polyphony", 1.0)], "min"))
     for sysname in ("lanterns", "twins"):
-        s.route(R("visual.lakeX", "particles/%s/position" % sysname, 60.0, comp=0, offset=-0.5, attackMs=0,
+        s.route(R("visual.lakeX", "particles/%s/position" % sysname, 36.0, comp=0, offset=-0.5, attackMs=0,
                   decayMs=0),
                 R("noteOn", "particles/%s/burst" % sysname, 1.0, threshold="binary", thresholdLevel=0.01),
                 R("visual.cluster", "particles/%s/burst" % sysname, 8.0, attackMs=0, decayMs=0),
-                R("lastVelocity", "particles/%s/emissive" % sysname, 2.0 if sysname == "lanterns" else 0.9,
+                R("lastVelocity", "particles/%s/emissive" % sysname, 2.0 if sysname == "lanterns" else 1.3,
                   **MEDIUM),
                 R("sustain", "particles/%s/emissive" % sysname, 1.6 if sysname == "lanterns" else 0.7, **SLOW))
     s.route(R("noteEnv", "lights/glow/intensity", 260.0, attackMs=0, decayMs=900),
@@ -202,9 +235,9 @@ def build():
     })
 
     # ---- the evaluator's screen regions, projected through the camera at t = 0
-    s.region_points("lanterns", [[-30.0, 0.0, RELEASE_Z], [30.0, 0.0, RELEASE_Z], [-30.0, 30.0, RELEASE_Z],
-                                 [30.0, 30.0, RELEASE_Z]])
-    s.region_points("reflection", [[-30.0, 0.0, RELEASE_Z], [30.0, 0.0, RELEASE_Z], [-30.0, -30.0, RELEASE_Z],
-                                   [30.0, -30.0, RELEASE_Z]])
+    s.region_points("lanterns", [[-18.0, 0.0, RELEASE_Z], [18.0, 0.0, RELEASE_Z], [-18.0, 14.0, RELEASE_Z],
+                                 [18.0, 14.0, RELEASE_Z]])
+    s.region_points("reflection", [[-18.0, 0.0, RELEASE_Z], [18.0, 0.0, RELEASE_Z], [-18.0, -14.0, RELEASE_Z],
+                                   [18.0, -14.0, RELEASE_Z]])
     s.region("jetty", box=[0.0, 0.62, 0.35, 1.0])
     return s

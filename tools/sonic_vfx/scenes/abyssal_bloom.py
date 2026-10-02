@@ -25,6 +25,9 @@ N_ZOOIDS = 40
 # the stem: an S from the upper left (far) to the lower right (near)
 CHAIN = [(-9.0, 5.5, -14.0), (-6.0, 4.4, -11.5), (-3.2, 3.0, -9.6), (-0.6, 2.2, -8.4), (1.8, 1.0, -7.6),
          (4.0, -0.4, -6.4), (5.8, -1.6, -5.0), (7.4, -2.8, -3.6)]
+_D = [b - a for a, b in zip(CHAIN[0], CHAIN[-1])]
+AXIS_LEN = math.sqrt(sum(v * v for v in _D))
+AXIS_UNIT = [round(v / AXIS_LEN, 5) for v in _D]
 # the jellyfish: (position, pitch centre on notes.lastPitch, bell radius)
 JELLIES = [((-6.5, -2.0, -16.0), 0.32, 0.55), ((-2.5, 4.8, -13.0), 0.62, 0.45), ((2.5, 3.6, -15.5), 0.52, 0.7),
            ((6.0, 1.8, -12.0), 0.44, 0.4), ((-4.5, 0.6, -7.0), 0.38, 0.32)]
@@ -74,9 +77,12 @@ def zooid_program():
     return {
         "name": "abZooid",
         "ops": [
-            {"kind": "input", "dst": 0, "input": "instanceIndex"},
-            {"kind": "constant", "dst": 1, "constant": [1.0 / (N_ZOOIDS - 1), 0.0, 0.0, 0.0]},
-            {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},                         # u along the colony
+            # u along the colony: the world position projected on the stem's axis, first zooid to last (the stem is
+            # near enough to straight that this is its arc length; it needs no per-instance index)
+            {"kind": "input", "dst": 0, "input": "worldPosition"},
+            {"kind": "gradient", "dst": 0, "srcA": 0, "value": 1.0 / AXIS_LEN,
+             "constant": AXIS_UNIT + [-sum(a * b for a, b in zip(AXIS_UNIT, CHAIN[0])) / AXIS_LEN]},
+            {"kind": "constant", "dst": 1, "constant": [0.0, 0.0, 0.0, 0.0]},             # (kept: op numbering)
             {"kind": "constant", "dst": 1, "constant": [0.0, 0.0, 0.0, 0.0]},             # OP_PLACE: -place
             {"kind": "add", "dst": 0, "srcA": 0, "srcB": 1},
             {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 0},                         # (u - place)^2

@@ -1,0 +1,1432 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "storm-cell.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.55,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 0.9,
+   "release": 1.2
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.12,
+  "post/bloom/threshold": 1.2,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.42,
+  "post/output/grain": 0.035,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 40,
+  "scene/volumeJitter": 0.5,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/saturation": 0.78,
+  "post/grade/contrast": 1.08,
+  "post/grade/temperature": -0.04,
+  "post/grade/tint": -0.05,
+  "post/lens/chromaticAberration": 0.002,
+  "post/tonemap/operator": 3
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "cl0_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.5,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl1_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.9,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl2_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.3,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl3_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.7,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl4_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.1000000000000005,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl5_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.5,
+      "gain": 6.666666666666667
+     },
+     {
+      "name": "cl6_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.9000000000000004,
+      "gain": 6.666666666666667
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "cl0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl3_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl3_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl3_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl3_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl4_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl4_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl4_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl4_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl5_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl5_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl5_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl5_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl6_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl6_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     },
+     {
+      "name": "cl6_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.cl6_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.6666666666666667,
+      "gain": 3.3333333333333335
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
+   "settings": {
+    "mappings": [
+     {
+      "name": "cl0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl0_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl0_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl1_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl1_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl2_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl2_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl3_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl3_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl4_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl4_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl5_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl5_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "cl6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl6_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "clHit6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.cl6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.cl6_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "fx/storm/circulation",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 1400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/storm/radiusBottom",
+   "amount": 22.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/storm/skirtDensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/wheat/deform/1/amount",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.density",
+   "target": "fx/storm/wobbleAmount",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "notes.density",
+   "target": "particles/rain/turbulence",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "fx/storm/emission",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "lights/thunder/intensity",
+   "amount": 400000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/thunder/intensity",
+   "amount": 3000000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/wheat/deform/1/amount",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/wheat/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.01,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "env/sky/intensity",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/rain/emissive",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "camera/exposure/compensation",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "particles/rain/spawnRate",
+   "amount": 5000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/rain/burst",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "particles/rain/stretch",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.clHit0",
+   "target": "lights/cloud0/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit1",
+   "target": "lights/cloud1/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit2",
+   "target": "lights/cloud2/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit3",
+   "target": "lights/cloud3/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit4",
+   "target": "lights/cloud4/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit5",
+   "target": "lights/cloud5/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.clHit6",
+   "target": "lights/cloud6/intensity",
+   "amount": 2200000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "post/bloom/intensity",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.65,
+       7.975
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.0566,
+       1.67,
+       7.9896
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.08,
+       1.65,
+       8.025
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       0.0566,
+       1.63,
+       8.0604
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.0,
+       1.65,
+       8.075
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       -0.0566,
+       1.67,
+       8.0604
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -0.08,
+       1.65,
+       8.025
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -0.0566,
+       1.63,
+       7.9896
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -0.0,
+       1.65,
+       7.975
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.1129,
+       16.9173,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.1966,
+       16.8932,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.1651,
+       16.7827,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       0.0369,
+       16.8068,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       -0.1129,
+       16.9173,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       -0.1966,
+       16.8932,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -0.1651,
+       16.7827,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -0.0369,
+       16.8068,
+       -82.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.1129,
+       16.9173,
+       -82.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-storm-cell.mp4"
+ },
+ "sonicScene": {
+  "category": "atmospheric",
+  "thesis": "A supercell walks across the night prairie: the bass winds its funnel, the snare strikes, and the melody crawls as light inside the cloud.",
+  "composition": {
+   "background": "the wall cloud filling the top of the frame; the storm's clear slot, a pale green band, under it",
+   "midground": "the tornado on the right third, a dark column on the band, its debris skirt; power poles receding toward its foot",
+   "foreground": "wheat ears in silhouette along the bottom of the frame, bending in the gusts",
+   "focal": "the funnel where it meets the ground",
+   "secondary": [
+    "a farm's sodium light on the left third",
+    "strikes",
+    "light crawling in the cloud",
+    "rain"
+   ],
+   "atmosphere": "rain streaks and haze; the sodium light's halo in the rain",
+   "post": "grain, a desaturated green-grey grade, exposure kicks on strikes",
+   "camera": "low in the field, nearly still; a thunder nudge"
+  },
+  "palette": {
+   "dominant": "#2c372f",
+   "secondary": "#3b3046",
+   "accent": "#ffa24a",
+   "highlight": "#dfe9ff",
+   "background_value": "dark, over a pale band",
+   "saturation": "desaturated; the sodium light is the only warm colour"
+  },
+  "motion": {
+   "very_slow": [
+    "the funnel's drift",
+    "the cloud's turning"
+   ],
+   "medium": [
+    "the wheat",
+    "the rain",
+    "the funnel's rotation (bass)"
+   ],
+   "fast": [
+    "light crawling in the cloud (notes)"
+   ],
+   "extremely_fast": [
+    "strikes (snare)",
+    "thunder (kick)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the funnel winds: rotation, width and the debris skirt; the wind in the wheat"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a lightning strike under the cloud that lights the whole prairie and the rain"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "rain: its density and streak length"
+   ],
+   [
+    "melodic",
+    "response.note",
+    "light crawls inside the cloud base at the pitch's place, low notes left, high notes right"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how bright a note's light and a strike are"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the cloud glows from within; the storm feeds"
+   ],
+   [
+    "density",
+    "notes.density",
+    "the storm's chaos: the funnel wobbles and the rain churns"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a dark, still storm on its pale band: the funnel turns slowly, the farm light burns"
+   ]
+  ],
+  "tier": "heavy: the haze march (40 steps live) and one tornado medium; a few thousand wheat instances",
+  "id": "storm-cell",
+  "title": "Storm Cell",
+  "regions": [
+   {
+    "id": "funnel",
+    "box": [
+     0.609,
+     0.304,
+     0.709,
+     0.671
+    ]
+   },
+   {
+    "id": "cloud",
+    "box": [
+     0.078,
+     0.0,
+     0.92,
+     0.0
+    ]
+   },
+   {
+    "id": "farm",
+    "box": [
+     0.262,
+     0.596,
+     0.333,
+     0.721
+    ]
+   },
+   {
+    "id": "field",
+    "box": [
+     0.0,
+     0.78,
+     1.0,
+     1.0
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "storm",
+   "name": "storm",
+   "type": "tornado",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "base": [
+     316.983,
+     0.0,
+     -1097.451
+    ],
+    "height": 780.0,
+    "radiusBottom": 36.0,
+    "radiusMid": 50.0,
+    "radiusTop": 85.0,
+    "taper": 1.5,
+    "shellWidth": 0.24,
+    "shellGain": 1.0,
+    "coreRadius": 0.55,
+    "coreDensity": 0.4,
+    "edgeSoft": 0.35,
+    "wallCloudGain": 0.9,
+    "cloudWidth": 5.0,
+    "cloudHeight": 0.16,
+    "cloudDensity": 1.1,
+    "touchdown": 1.0,
+    "footSoft": 0.04,
+    "skirtWidth": 2.6,
+    "skirtHeight": 0.09,
+    "skirtDensity": 0.9,
+    "skirtFlare": 0.7,
+    "stripeCount": 4.0,
+    "stripePitch": 3.4,
+    "stripeDepth": 0.35,
+    "stripeHarmonic": 0.4,
+    "suctionCount": 0.0,
+    "suctionStrength": 0.0,
+    "suctionRadius": 1.0,
+    "suctionWidth": 0.35,
+    "suctionSpeed": 0.9,
+    "cloudAmount": 0.65,
+    "macroAmp": 1.0,
+    "mesoAmp": 0.5,
+    "microAmp": 0.25,
+    "detailContrast": 1.6,
+    "detailScale": 2.4,
+    "climbRate": 0.07,
+    "erosion": 1.2,
+    "edgeWidth": 0.6,
+    "circulation": 700.0,
+    "coreRadiusMetres": 0.0,
+    "inflow": 0.25,
+    "lift": 1.0,
+    "rotationBottom": 1.0,
+    "rotationTop": 0.55,
+    "rotationCurve": 1.0,
+    "wobbleAmount": 22.0,
+    "wobbleSpeed": 0.12,
+    "lean": [
+     -60.0,
+     0.0
+    ],
+    "density": 0.09,
+    "emission": 0.0,
+    "scattering": 0.18,
+    "colorThin": [
+     0.02315,
+     0.02956,
+     0.02315
+    ],
+    "colorThick": [
+     0.00152,
+     0.00182,
+     0.00152
+    ]
+   }
+  },
+  {
+   "id": "strike",
+   "name": "strike",
+   "type": "lightning",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "jaggedness": 0.3,
+    "branchProbability": 0.55,
+    "branchDecay": 0.5,
+    "depth": 7,
+    "height": 750.0,
+    "lean": 120.0,
+    "scatter": 650.0,
+    "coreColor": [
+     0.73791,
+     0.81485,
+     1.0
+    ],
+    "coreIntensity": 90.0,
+    "coreWidth": 1.6,
+    "glowColor": [
+     0.27468,
+     0.39157,
+     1.0
+    ],
+    "glowIntensity": 2.0,
+    "glowWidth": 22.0,
+    "flashIntensity": 4000000.0,
+    "flashRange": 2600.0,
+    "flashFog": 0.9,
+    "leader": 0.05,
+    "restrikes": 2.0,
+    "strokeDuration": 0.3,
+    "afterglow": 0.3,
+    "seed": 7.0,
+    "source": {
+     "kind": "world",
+     "position": [
+      96.983,
+      0.0,
+      -977.451
+     ]
+    }
+   },
+   "trigger": {
+    "source": "signal",
+    "name": "response.snare",
+    "threshold": 0.25
+   }
+  }
+ ]
+}

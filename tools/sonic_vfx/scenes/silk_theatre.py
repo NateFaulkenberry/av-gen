@@ -104,37 +104,33 @@ def build():
     s.light("rim", "spot", position=[0.0, 7.5, -6.8], direction=[0.0, -0.4, 1.0], color=hexrgb("#ff3040"),
             intensity=60.0, range=16.0, innerCone=30.0, outerCone=55.0, castsShadow=False, volumetric=0.0)
 
-    # ---- the silk: particles orbit the leader's hand; their trails are the ribbons
-    silk = dict(shape="sphere", position=list(LEAD), extent=[0.04, 0.04, 0.04], direction=[0, 1, 0],
-                spawnRate=0.0, spread=1.0, gravity=[0, -0.12, 0], drag=0.25, turbulence=0.04, turbulenceScale=0.6,
-                attractorPosition=list(LEAD), attractorStrength=1.8, attractorRadius=2.2, orbit=2.0,
-                blend="alpha", trailEnabled=True, trailStride=4, trailTaper=0.0, trailFade=0.0)
-    s.particles("silk", capacity=200, seed=7, lifetimeMin=6.0, lifetimeMax=8.0, speedMin=0.6, speedMax=1.0,
-                sizeStart=0.12, sizeEnd=0.08, colorStart=hexrgb(SCARLET) + [0.95],
-                colorEnd=hexrgb("#7a0610") + [0.0], emissive=1.2, trailLength=32, trailWidth=1.0,
-                trailTint=hexrgb("#ff5a4a"), **silk)
-    s.particles("gold", capacity=300, seed=13, lifetimeMin=4.0, lifetimeMax=6.0, speedMin=0.8, speedMax=1.2,
-                sizeStart=0.06, sizeEnd=0.04, colorStart=hexrgb(GOLD) + [0.9],
-                colorEnd=hexrgb("#a86a1a") + [0.0], emissive=1.8, trailLength=32, trailWidth=1.0,
-                trailTint=hexrgb("#ffdf9a"), **silk)
+    # ---- the silk: a brush stroke in the air. While a note sounds, the hand lays silk continuously -- particles born
+    # where the hand is and left there, overlapping into one unbroken band (a trail is capped at 32 points, too
+    # short and too frame-rate-dependent for a ribbon; a laid stroke is neither). The stroke sags and fades over
+    # five seconds, like silk settling; a chord lays a second, gold stroke beside the red one.
+    silk = dict(shape="sphere", position=list(LEAD), extent=[0.015, 0.015, 0.015], direction=[0, 1, 0],
+                spawnRate=0.0, spread=1.0, speedMin=0.0, speedMax=0.02, gravity=[0, -0.06, 0], drag=1.5,
+                turbulence=0.02, turbulenceScale=0.4, blend="alpha")
+    s.particles("silk", capacity=5000, seed=7, lifetimeMin=4.5, lifetimeMax=5.5, sizeStart=0.15, sizeEnd=0.09,
+                colorStart=hexrgb("#ff3a3a") + [0.85], colorEnd=hexrgb("#5a0410") + [0.0], emissive=1.0, **silk)
+    s.particles("gold", capacity=3000, seed=13, lifetimeMin=3.5, lifetimeMax=4.5, sizeStart=0.07, sizeEnd=0.04,
+                colorStart=hexrgb(GOLD) + [0.85], colorEnd=hexrgb("#a86a1a") + [0.0], emissive=1.5, **silk)
     s.particles("glitter", capacity=1500, seed=17, shape="sphere", position=list(LEAD), extent=[0.6, 0.6, 0.6],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.25, lifetimeMax=0.7, spread=1.0, speedMin=0.05,
                 speedMax=0.3, gravity=[0, -0.4, 0], drag=0.6, sizeStart=0.012, sizeEnd=0.0,
                 colorStart=hexrgb("#fff2c8") + [1.0], colorEnd=hexrgb(GOLD) + [0.0], emissive=8.0,
                 blend="additive")
 
-    # the leader walks a figure of eight across the stage (16 s), the emitters and attractors ride it
+    # the leader walks a figure of eight across the stage (9 s), the emitters and attractors ride it
     keys = []
     for i in range(17):
         u = i / 16.0
         a = 2.0 * math.pi * u
-        keys.append({"time": round(16.0 * u, 4),
-                     "value": [round(LEAD[0] + 2.8 * math.sin(a), 4), LEAD[1],
-                               round(LEAD[2] + 1.2 * math.sin(2.0 * a), 4)], "interp": "smooth"})
+        keys.append({"time": round(9.0 * u, 4),
+                     "value": [round(LEAD[0] + 3.4 * math.sin(a), 4), LEAD[1],
+                               round(LEAD[2] + 1.6 * math.sin(2.0 * a), 4)], "interp": "smooth"})
     for sysname in ("silk", "gold", "glitter"):
-        s.track("particles/%s/position" % sysname, keys, loop=16.0)
-        if sysname != "glitter":
-            s.track("particles/%s/attractorPosition" % sysname, keys, loop=16.0)
+        s.track("particles/%s/position" % sysname, keys, loop=9.0)
 
     # ---- camera: a slow orbit at stage height, the hand off centre
     s.camera["fov"] = 45.0
@@ -142,26 +138,21 @@ def build():
                  side=1.2, lift=0.6, height_bob=0.15)
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
-    # melody: the leader's height (low notes at the floor, high notes overhead); a spring, so it swings to each note
-    for sysname in ("silk", "gold", "glitter"):
-        s.route(R("lastPitch", "particles/%s/position" % sysname, 5.0, comp=1, springHz=1.6, springDamping=0.6,
-                  offset=-0.3))
-        if sysname != "glitter":
-            s.route(R("lastPitch", "particles/%s/attractorPosition" % sysname, 5.0, comp=1, springHz=1.6,
-                      springDamping=0.6, offset=-0.3))
-    # each note throws a flick; a held line keeps spinning silk (one unbroken stroke)
-    s.route(R("noteOn", "particles/silk/burst", 1.0, threshold="binary", thresholdLevel=0.01),
-            R("held", "particles/silk/spawnRate", 3.0, **MEDIUM),
-            R("lastVelocity", "particles/silk/trailWidth", 1.4, **FAST))
-    # chord: a sheaf of gold ribbons
-    s.map(M("chordOn", [("noteOn", 1.0), ("polyphony", 1.0)], "min"))
-    s.route(R("visual.chordOn", "particles/gold/burst", 10.0, attackMs=0, decayMs=0),
-            R("polyphony", "particles/gold/spawnRate", 2.0, **MEDIUM))
-    # bass: the dance sways; kick: the whip-crack (the ribbons snap tight round the hand)
+    # melody: the hand's height (low notes at the floor, high notes overhead), on a slow spring, so the stroke curves
+    # from note to note instead of stepping
+    for sysname, dy in (("silk", 0.0), ("gold", 0.18), ("glitter", 0.0)):
+        s.route(R("lastPitch", "particles/%s/position" % sysname, 5.0, comp=1, springHz=0.7, springDamping=0.85,
+                  offset=-0.3 + dy / 5.0))
+    # a sounding note lays silk (legato: one unbroken stroke; staccato: short strokes); each note-on a small knot
+    s.route(R("active", "particles/silk/spawnRate", 700.0, attackMs=20, decayMs=60),
+            R("noteOn", "particles/silk/burst", 12.0, threshold="binary", thresholdLevel=0.01),
+            R("lastVelocity", "particles/silk/size", 0.6, **FAST))
+    # chord: a second, gold stroke beside the red
+    s.route(R("polyphony", "particles/gold/spawnRate", 600.0, attackMs=20, decayMs=80))
+    # bass: the dance sways; kick: the whip-crack -- the laid silk shudders all along its length
     for sysname in ("silk", "gold"):
-        s.route(R("bass", "particles/%s/attractorPosition" % sysname, 0.6, comp=0, attackMs=300, decayMs=900),
-                R("kick", "particles/%s/attractorStrength" % sysname, 9.0, attackMs=0, decayMs=180),
-                R("kick", "particles/%s/orbit" % sysname, 6.0, attackMs=0, decayMs=220))
+        s.route(R("bass", "particles/%s/position" % sysname, 0.5, comp=0, attackMs=300, decayMs=900),
+                R("kick", "particles/%s/turbulence" % sysname, 2.4, attackMs=0, decayMs=180))
     # hat: glitter; sustain: the spot breathes
     s.route(R("hat", "particles/glitter/burst", 60.0, attackMs=0, decayMs=40),
             R("sustain", "lights/spot/intensity", 500.0, **SLOW),

@@ -1,0 +1,601 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "feedback-mirror.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.2
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.45,
+  "post/bloom/threshold": 0.8,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.5,
+  "post/output/grain": 0.012,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 50.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "temporal/feedback/enabled": true,
+  "temporal/feedback/frames": 24,
+  "temporal/feedback/amount": 1.0,
+  "temporal/feedback/decay": 0.84,
+  "temporal/feedback/zoom": 0.972,
+  "temporal/feedback/rotate": 3.0,
+  "temporal/feedback/hue": -0.004,
+  "temporal/feedback/driftX": 0.0,
+  "temporal/feedback/driftY": 0.0,
+  "post/tonemap/operator": 3,
+  "post/split/amount": 0.0,
+  "post/split/angle": 0.0,
+  "post/split/spectral": 1.0
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "hueStep",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.tension",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "notes.lastPitch",
+   "target": "sdf/glyph/node/tri/rotation",
+   "amount": 540.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "springHz": 2.2,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "sdf/glyph/node/inner/rotation",
+   "amount": -300.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "springHz": 1.4,
+    "springDamping": 0.7
+   }
+  },
+  {
+   "source": "notes.interval",
+   "target": "temporal/feedback/rotate",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "temporal/feedback/decay",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "temporal/feedback/zoom",
+   "amount": -0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "temporal/feedback/zoom",
+   "amount": -0.035,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "sdf/glyph/surface/2/emission",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "sdf/glyph/node/core/radius",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "visual.hueStep",
+   "target": "temporal/feedback/hue",
+   "amount": -0.018,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/0/emission",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/1/emission",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/0/emission",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/1/emission",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/0/emission",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "sdf/glyph/surface/1/emission",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "post/split/amount",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "post/output/grain",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 60
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "post/bloom/intensity",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "sdf/glyph/node/glyph/translation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.14,
+       0.12,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       1.0599999999999998,
+       0.18,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.14,
+       0.12,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "sdf/glyph/node/inner/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       0.0,
+       0.0,
+       360.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-feedback-mirror.mp4"
+ },
+ "sonicScene": {
+  "category": "digital",
+  "thesis": "A single glyph of light inside a video feedback loop: the music turns, zooms and recolours the loop, so the world is the instrument's own echo.",
+  "composition": {
+   "background": "a deep violet void, darker at the edges",
+   "midground": "the spiral of the glyph's echoes, falling to the vanishing point at the frame's centre",
+   "foreground": "(none: negative space)",
+   "focal": "the gold glyph on the right third",
+   "secondary": [
+    "the echo spiral",
+    "the vanishing point"
+   ],
+   "atmosphere": "(none)",
+   "post": "bloom; grain on the hats; an RGB split on the snare",
+   "camera": "locked off"
+  },
+  "palette": {
+   "dominant": "#140726",
+   "secondary": "#ff4f9a",
+   "accent": "#2a0f4f",
+   "highlight": "#ffbf5a",
+   "background_value": "near black (violet)",
+   "saturation": "the glyph is gold; its echoes walk round the hue circle by the feedback's own step"
+  },
+  "motion": {
+   "very_slow": [
+    "the hue's walk",
+    "the glyph's drift"
+   ],
+   "medium": [
+    "the spiral's turn (melody)",
+    "the tunnel's depth (bass)"
+   ],
+   "fast": [
+    "the triangle's turn per note"
+   ],
+   "extremely_fast": [
+    "the kick's zoom punch",
+    "the snare's split"
+   ]
+  },
+  "vocabulary": [
+   [
+    "melodic",
+    "notes.lastPitch",
+    "the triangle turns to the pitch, so a melody draws its contour into the echoes"
+   ],
+   [
+    "interval",
+    "notes.interval",
+    "a rising step winds the spiral clockwise, a falling one back"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the echoes last longer: the tunnel deepens"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the tunnel deepens: the echoes pour farther in"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a zoom punch: the echoes jump inward; the core flares"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "an RGB split across the frame"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "grain"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "the hue step: a chord colours the echoes faster, dissonance more"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "the glyph's brightness on each note"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the glyph turns slowly; a short gold tunnel"
+   ]
+  ],
+  "tier": "light: one SDF glyph, the feedback FIR (24 taps, about 1 ms at 1080p)",
+  "id": "feedback-mirror",
+  "title": "Feedback Mirror",
+  "regions": [
+   {
+    "id": "glyph",
+    "box": [
+     0.535,
+     0.234,
+     0.799,
+     0.704
+    ]
+   },
+   {
+    "id": "tunnel",
+    "box": [
+     0.35,
+     0.3,
+     0.65,
+     0.7
+    ]
+   },
+   {
+    "id": "void",
+    "box": [
+     0.0,
+     0.0,
+     0.3,
+     1.0
+    ]
+   }
+  ]
+ }
+}

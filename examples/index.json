@@ -338,9 +338,27 @@
     },
     {
       "category": "Sonic VFX",
+      "description": "Each note releases a paper lantern from the surface of a still lake at dusk; the melody becomes a drifting constellation, and the bass a slow swell beneath it. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Lantern Lake",
+      "project": "sonic-vfx/lantern-lake.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Over a frozen lake the aurora is the pad: chords hang curtains of light, the melody ripples them, the hats are diamond dust glittering in the air, and the snare cracks the ice with light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Aurora Tundra",
+      "project": "sonic-vfx/aurora-tundra.json"
+    },
+    {
+      "category": "Sonic VFX",
       "description": "A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies climb its hanging threads as light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - The Breathing Deep",
       "project": "sonic-vfx/breathing-deep.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Two kilometres down, a colony of siphonophores answers the melody in pulses of cold light while marine snow falls through the hats. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Abyssal Bloom",
+      "project": "sonic-vfx/abyssal-bloom.json"
     },
     {
       "category": "Sonic VFX",
@@ -350,9 +368,21 @@
     },
     {
       "category": "Sonic VFX",
+      "description": "Silk ribbons draw the melody in the air of an empty theatre: pitch is height, legato is one unbroken stroke, and the kick cracks the ribbons like whips. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Silk Theatre",
+      "project": "sonic-vfx/silk-theatre.json"
+    },
+    {
+      "category": "Sonic VFX",
       "description": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - Ferrofluid Crown",
       "project": "sonic-vfx/ferrofluid-crown.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "A single glyph of light inside a video feedback loop: the music turns, zooms and recolours the loop, so the world is the instrument's own echo. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Feedback Mirror",
+      "project": "sonic-vfx/feedback-mirror.json"
     },
     {
       "category": "Sonic VFX",
@@ -362,9 +392,33 @@
     },
     {
       "category": "Sonic VFX",
+      "description": "A landscape of pure measurement, barcode ridges and numerals to the horizon, written and erased by the music. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Datascape",
+      "project": "sonic-vfx/datascape.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "The morning after the fire: the bass is the wind breathing on the embers, the snare a flare-up in the black trunks, the melody one ember dancing through the smoke. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Ember Forest",
+      "project": "sonic-vfx/ember-forest.json"
+    },
+    {
+      "category": "Sonic VFX",
       "description": "A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held chords. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - The Corrupted Cathedral",
       "project": "sonic-vfx/corrupted-cathedral.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "A supercell walks across the night prairie: the bass winds its funnel, the snare strikes, and the melody crawls as light inside the cloud. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Storm Cell",
+      "project": "sonic-vfx/storm-cell.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Inside a pillar of gas, chords ignite newborn stars: their number is the polyphony, their colour the pitch, and the bass is the density of the cloud. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Stellar Nursery",
+      "project": "sonic-vfx/stellar-nursery.json"
     },
     {
       "category": "Sonic VFX",

@@ -2,9 +2,9 @@
 melody ripples them, the hats are diamond dust glittering in the air, and the snare cracks the ice with light.
 
 Composition (SCENE-CATALOG.md #12): the camera stands on the lake ice and looks up. The horizon is a black spruce
-line on the lower quarter; the aurora fills the sky above it. A pressure ridge of broken ice slabs runs from the
-left foreground toward the centre of the far shore, catching the aurora's green; the clear ice between reflects
-nothing but the sky's glow, and the snare draws light along its cracks.
+line on the lower quarter; the aurora hangs in the sky above it. The lake is black ice, as on Baikal: clear and
+nearly a mirror, crazed with white fracture planes that lead the eye to the shore, and the snare draws light along
+them.
 
 The aurora's own spectrum response (`audio/sensitivity`) is OFF: driven by the spectrum it would be a visualizer.
 It answers through the routes below, so each class has one visible job.
@@ -31,9 +31,9 @@ DESIGN = {
     "composition": {
         "background": "the aurora filling the sky over a black spruce line; stars",
         "midground": "the far shore's spruce silhouettes on the lower quarter",
-        "foreground": "lake ice with frost and cracks; a pressure ridge of broken slabs running toward the shore",
-        "focal": "the aurora's brightest fold, above the ridge's end",
-        "secondary": ["the pressure ridge catching the green", "the cracks lighting on the snare", "diamond dust"],
+        "foreground": "black lake ice crazed with white fractures, leading to the shore",
+        "focal": "the aurora's brightest fold",
+        "secondary": ["the fractures lighting on the snare", "diamond dust", "the treeline"],
         "atmosphere": "cold clear air; diamond dust near the camera",
         "post": "bloom on the curtains, fine grain, a cold grade",
         "camera": "low on the ice, looking up; a slow pan along the shore",
@@ -53,7 +53,7 @@ DESIGN = {
          "(consonant), teal, violet, rose (dissonant)"],
         ["melodic", "response.note", "a ripple runs through the curtains and their edges flare"],
         ["bass", "response.bass", "the curtains reach lower and taller"],
-        ["kick", "response.kick", "a surge of brightness through the curtains; the ridge glints"],
+        ["kick", "response.kick", "a surge of brightness through the curtains"],
         ["snare", "response.snare", "the ice cracks with light"],
         ["hat", "response.hat", "diamond dust glitters in the air"],
         ["velocity", "notes.lastVelocity", "how big a note's ripple is"],
@@ -64,34 +64,37 @@ DESIGN = {
 
 
 def ice_program():
-    """Black lake ice: clear dark ice with frost patches, and a network of cracks whose light the snare raises
-    (op OP_CRACK's constant is the cracks' emission)."""
+    """Black lake ice, as on Baikal: clear ice so dark it is nearly a mirror, crazed with white fracture planes (a
+    network of thin contours on fBm, two scales), a few soft patches of frost. The snare lights the fractures from
+    within (OP_CRACK's constant is their emission); far off the fractures fade so they never alias."""
     return {
         "name": "atIce",
         "ops": [
             {"kind": "input", "dst": 0, "input": "worldPosition"},
             {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.05, "seed": 21},              # frost patches
-            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.5, 0.64, 0.0, 0.0]},
-            {"kind": "constant", "dst": 2, "constant": hexrgb("#070d18", 0.5) + [1.0]},    # clear ice
-            {"kind": "constant", "dst": 3, "constant": hexrgb("#a9bccb", 0.35) + [1.0]},   # frost
-            {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 3, "srcC": 1},
-            {"kind": "remap", "dst": 4, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 0.06, 0.7]},  # roughness
-            {"kind": "noise", "dst": 5, "srcA": 0, "value": 0.11, "seed": 5},               # the crack network
+            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.6, 0.72, 0.0, 0.0]},
+            {"kind": "noise", "dst": 5, "srcA": 0, "value": 0.09, "seed": 5},               # the fracture network
             {"kind": "remap", "dst": 5, "srcA": 5, "value": 0, "constant": [0.5, 1.0, 0.0, 1.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 5},
-            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.0009, 0.0, 0.0]},  # 0 on a crack
-            {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},  # 1 on a crack
+            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.0025, 0.0, 0.0]},  # 0 on a fracture
+            {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},  # 1 on a fracture
             {"kind": "input", "dst": 6, "input": "cameraDistance"},
-            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [10.0, 70.0, 1.0, 0.0]},
+            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [8.0, 60.0, 1.0, 0.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                            # fade far
+            {"kind": "add", "dst": 4, "srcA": 5, "srcB": 1},                                 # white: fracture/frost
+            {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.0, 1.0, 0.0, 1.0]},
+            {"kind": "constant", "dst": 2, "constant": hexrgb("#02050a", 1.0) + [1.0]},    # black ice
+            {"kind": "constant", "dst": 3, "constant": hexrgb("#b8d0e0", 0.55) + [1.0]},   # fracture white
+            {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 3, "srcC": 4},
             {"kind": "constant", "dst": 7, "constant": hexrgb("#7fe8ff", 0.0) + [0.0]},     # OP_CRACK
             {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 5},
+            {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.0, 1.0, 0.03, 0.6]},  # glossy ice
         ],
         "baseColor": 2, "metallic": -1, "roughness": 4, "emission": 7, "emissionIntensity": 1.0, "opacity": -1,
     }
 
 
-OP_CRACK = 16
+OP_CRACK = 17
 
 
 def spruce(seed):
@@ -137,15 +140,15 @@ def build():
 
     # ---- the aurora (its own spectrum response off: the routes are its instrument)
     s.effect("aurora", "aurora", ("world",), parameters={
-        "appearance": {"edgeBrightness": 2.2, "emission": 1.0, "filaments": 1.1, "horizonGlow": 0.25,
-                       "intensity": 2.2, "lowColor": hexrgb("#3dff8f"), "midColor": hexrgb("#3ce0c8"),
+        "appearance": {"edgeBrightness": 3.6, "emission": 1.0, "filaments": 2.2, "horizonGlow": 0.2,
+                       "intensity": 2.0, "lowColor": hexrgb("#3dff8f"), "midColor": hexrgb("#3ce0c8"),
                        "topColor": hexrgb("#7d6bff"), "opacity": 0.85, "sparkle": 0.2},
         "audio": {"bass": 0.0, "beat": 0.0, "glints": 0.0, "high": 0.0, "lowMid": 0.0, "mid": 0.0,
                   "sensitivity": 0.0, "spectrumShape": 0.0},
         "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
                     "speed": 0.0},
-        "shape": {"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": 60.0, "complexity": 30.0,
-                  "curtainCount": 2.0, "curtainHeight": 2400.0, "driftSpeed": 0.08, "flowSpeed": 0.04,
+        "shape": {"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": 260.0, "complexity": 58.0,
+                  "curtainCount": 2.0, "curtainHeight": 1500.0, "driftSpeed": 0.08, "flowSpeed": 0.04,
                   "layerSpacing": 0.32, "radius": 5200.0, "turbulence": 0.4, "verticalSpeed": 0.05,
                   "waveAmplitude": 0.32, "waveScale": 2.2}},
         extra={"ground": {"color": hexrgb("#3dff8f"), "falloff": 2.0, "intensity": 0.12, "mode": "subtle",
@@ -162,18 +165,6 @@ def build():
            material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 0.1,
                      "metallic": 0.0, "program": "atIce"},
            transform={"position": [0.0, -0.2, -400.0], "rotation": [0, 0, 0], "scale": [4.0, 1.0, 4.0]})
-
-    # ---- the pressure ridge: three runs of broken slabs, graded large (near) to small (far)
-    slab = {"baseColor": hexrgb("#9ab8cf", 0.8), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
-            "roughness": 0.18, "metallic": 0.0}
-    runs = [((-6.5, 0.2, 2.0), (1.5, 0.2, -24.0), 16, 1.0, 3), ((1.5, 0.2, -24.0), (14.0, 0.2, -90.0), 24, 0.55, 7),
-            ((14.0, 0.2, -90.0), (30.0, 0.2, -260.0), 28, 0.3, 9)]
-    for k, (a, b, n, sc, seed) in enumerate(runs):
-        s.proc("ridge%d" % k, {"kind": "box", "size": [2.6 * sc, 1.5 * sc, 0.32 * sc], "subdivisions": 1},
-               distribution={"kind": "linear", "count": n, "start": list(a), "end": list(b), "orientAlong": True},
-               material=slab,
-               variation={"seed": seed, "position": [0.7 * sc, 0.3 * sc, 0.7 * sc], "rotation": [0.75, 1.0, 0.6],
-                          "scale": [0.5, 0.6, 0.4], "uniformScale": 0.35})
 
     # ---- the far shore: a band of spruce silhouettes
     tree = {"baseColor": hexrgb("#020304"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 1.0,
@@ -195,7 +186,7 @@ def build():
     # ---- light: the aurora's own green on the ice is the effect's ground light; a faint navy skylight
     s.light("sky", "directional", direction=[0.15, -1.0, -0.2], color=hexrgb("#3a5a8a"), intensity=0.05,
             castsShadow=False)
-    s.light("auroraKey", "directional", direction=[-0.1, -0.35, 0.93], color=hexrgb("#4cffa0"), intensity=0.5,
+    s.light("auroraKey", "directional", direction=[-0.1, -0.35, 0.93], color=hexrgb("#4cffa0"), intensity=0.12,
             castsShadow=False)
 
     # ---- camera: low on the ice looking up; a slow pan along the shore
@@ -209,10 +200,10 @@ def build():
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # sustain: brighter, longer curtains; bass: they reach lower and taller
-    s.route(R("sustain", "fx/aurora/intensity", 3.2, **SLOW),
-            R("sustain", "fx/aurora/curtainHeight", 900.0, **SLOW),
-            R("bass", "fx/aurora/baseHeight", -45.0, attackMs=200, decayMs=1200),
-            R("bass", "fx/aurora/curtainHeight", 700.0, attackMs=200, decayMs=1200))
+    s.route(R("sustain", "fx/aurora/intensity", 1.6, **SLOW),
+            R("sustain", "fx/aurora/curtainHeight", 600.0, **SLOW),
+            R("bass", "fx/aurora/baseHeight", -140.0, attackMs=200, decayMs=1200),
+            R("bass", "fx/aurora/curtainHeight", 500.0, attackMs=200, decayMs=1200))
     # chords: tension and polyphony move the palette (green -> teal -> violet -> rose)
     s.map(M("mood", [("tension", 1.0), ("polyphony", 0.4)], "mean"))
     s.route(R("visual.mood", "palette/position", 3.0, attackMs=1600, decayMs=4000))
@@ -243,7 +234,6 @@ def build():
 
     # ---- the evaluator's screen regions, projected through the camera at t = 0
     s.region("sky", box=[0.0, 0.0, 1.0, 0.62])
-    s.region("ridge", box=[0.0, 0.72, 0.6, 1.0])
     s.region("ice", box=[0.4, 0.78, 1.0, 1.0])
     s.region("shore", box=[0.0, 0.62, 1.0, 0.76])
     return s

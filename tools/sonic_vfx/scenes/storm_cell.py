@@ -118,7 +118,7 @@ def build():
     s.environment = {
         "intensity": 0.6, "background": hexrgb("#0b0e0c"), "fogColor": hexrgb("#3d4636"),
         # the march carries the tornado alone (volumeMaxDistance 0, ADR-705); the air's haze is the surface pass's
-        "volumeDensity": 0.00045, "volumeMaxDistance": 0.0, "volumeAnisotropy": 0.35, "volumeNoise": 0.0,
+        "volumeDensity": 0.00045, "volumeMaxDistance": 0.0, "volumeAnisotropy": 0.05, "volumeNoise": 0.0,
         "volumeLocalLights": 1.0, "volumeShadowStrength": 0.0, "fogSky": 1.0, "fogSkyDistance": 1800.0,
         "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb("#050706"), "horizonColor": hexrgb("#a8b48a"),
@@ -147,7 +147,7 @@ def build():
     s.effect("storm", "tornado", ("world",), parameters={
         "base": list(TORNADO), "height": CLOUD_Y, "radiusBottom": 36.0, "radiusMid": 50.0, "radiusTop": 85.0,
         "taper": 1.5, "shellWidth": 0.24, "shellGain": 1.0, "coreRadius": 0.55, "coreDensity": 0.4,
-        "edgeSoft": 0.35, "wallCloudGain": 1.2, "cloudWidth": 14.0, "cloudHeight": 0.25, "cloudDensity": 1.4,
+        "edgeSoft": 0.35, "wallCloudGain": 0.9, "cloudWidth": 5.0, "cloudHeight": 0.16, "cloudDensity": 1.1,
         "touchdown": 1.0, "footSoft": 0.04, "skirtWidth": 2.6, "skirtHeight": 0.09, "skirtDensity": 0.9,
         "skirtFlare": 0.7, "stripeCount": 4.0, "stripePitch": 3.4, "stripeDepth": 0.35, "stripeHarmonic": 0.4,
         "suctionCount": 0.0, "suctionStrength": 0.0, "suctionRadius": 1.0, "suctionWidth": 0.35,
@@ -155,7 +155,8 @@ def build():
         "detailContrast": 1.6, "detailScale": 2.4, "climbRate": 0.07, "erosion": 1.2, "edgeWidth": 0.6,
         "circulation": 700.0, "coreRadiusMetres": 0.0, "inflow": 0.25, "lift": 1.0, "rotationBottom": 1.0,
         "rotationTop": 0.55, "rotationCurve": 1.0, "wobbleAmount": 22.0, "wobbleSpeed": 0.12, "lean": [-60.0, 0.0],
-        "density": 0.05, "emission": 0.0, "scattering": 0.8,
+        # dense and dark: mostly absorbing (a low scattering), so the funnel is a silhouette on the clear slot
+        "density": 0.09, "emission": 0.0, "scattering": 0.18,
         "colorThin": hexrgb("#2a302a"), "colorThick": hexrgb("#050605")})
 
     # ---- the power line: poles receding toward the funnel's foot, three wires sagging between the nearest
@@ -230,7 +231,7 @@ def build():
                 stretchMax=0.9)
 
     # ---- light: a cold back light from the clear slot (it rims the funnel and the cloud's underside)
-    s.light("slot", "directional", direction=_toward(16.0, 4.0), color=hexrgb("#b8c8a0"), intensity=2.5,
+    s.light("slot", "directional", direction=_toward(16.0, 4.0), color=hexrgb("#b8c8a0"), intensity=1.1,
             castsShadow=False)
     # the cloud's inner lights, one per place (notes), plus the kick's thunder glow
     for k, (yaw_deg, _) in enumerate(CLOUD_LIGHTS):

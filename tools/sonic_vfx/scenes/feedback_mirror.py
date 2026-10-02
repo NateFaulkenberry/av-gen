@@ -52,7 +52,7 @@ DESIGN = {
         ["melodic", "notes.lastPitch", "the triangle turns to the pitch, so a melody draws its contour into the echoes"],
         ["interval", "notes.interval", "a rising step winds the spiral clockwise, a falling one back"],
         ["sustained", "response.sustain", "the echoes last longer: the tunnel deepens"],
-        ["bass", "response.bass", "the tunnel stretches (the zoom eases toward 1)"],
+        ["bass", "response.bass", "the tunnel deepens: the echoes pour farther in"],
         ["kick", "response.kick", "a zoom punch: the echoes jump inward; the core flares"],
         ["snare", "response.snare", "an RGB split across the frame"],
         ["hat", "response.hat", "grain"],
@@ -120,8 +120,8 @@ def build():
     # ---- the loop's resting state: 24 taps falling inward, a slow turn, a slow hue walk
     s.params_({
         "temporal/feedback/enabled": True, "temporal/feedback/frames": 24, "temporal/feedback/amount": 1.0,
-        "temporal/feedback/decay": 0.84, "temporal/feedback/zoom": 0.972, "temporal/feedback/rotate": 1.2,
-        "temporal/feedback/hue": 0.004, "temporal/feedback/driftX": 0.0, "temporal/feedback/driftY": 0.0,
+        "temporal/feedback/decay": 0.84, "temporal/feedback/zoom": 0.972, "temporal/feedback/rotate": 3.0,
+        "temporal/feedback/hue": -0.004, "temporal/feedback/driftX": 0.0, "temporal/feedback/driftY": 0.0,
         "post/bloom/intensity": 0.45, "post/bloom/threshold": 0.8, "post/output/vignette": 0.5,
         "post/output/grain": 0.012, "camera/lens/focalLength": 50.0, "post/tonemap/operator": 3,
         "post/split/amount": 0.0, "post/split/angle": 0.0, "post/split/spectral": 1.0,
@@ -140,13 +140,13 @@ def build():
     s.route(R("interval", "temporal/feedback/rotate", 9.0, attackMs=350, decayMs=350))
     # sustain: the echoes last; bass: the tunnel stretches; kick: a zoom punch and the core flares
     s.route(R("sustain", "temporal/feedback/decay", 0.1, **SLOW),
-            R("bass", "temporal/feedback/zoom", 0.016, attackMs=120, decayMs=700),
+            R("bass", "temporal/feedback/zoom", -0.012, attackMs=120, decayMs=700),
             R("kick", "temporal/feedback/zoom", -0.035, attackMs=0, decayMs=200),
             R("kick", "sdf/glyph/surface/2/emission", 8.0, attackMs=0, decayMs=240),
             R("kick", "sdf/glyph/node/core/radius", 0.05, attackMs=0, decayMs=260))
     # chord: the hue step (polyphony colours faster, tension more)
     s.map(M("hueStep", [("polyphony", 1.0), ("tension", 1.0)], "max"))
-    s.route(R("visual.hueStep", "temporal/feedback/hue", 0.018, **MEDIUM))
+    s.route(R("visual.hueStep", "temporal/feedback/hue", -0.018, **MEDIUM))   # gold -> rose -> magenta -> violet
     # notes: the glyph flares with each note's velocity
     for c in range(3):
         s.route(R("noteEnv", "sdf/glyph/surface/0/emission", 5.0, comp=c, depth="lastVelocity", attackMs=0,

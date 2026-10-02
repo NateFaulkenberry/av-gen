@@ -1,0 +1,597 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "datascape.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 0.8,
+   "release": 0.9
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.25,
+  "post/output/grain": 0.02,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 32.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.15,
+  "post/grade/saturation": 1.0,
+  "post/display/scanlines": 0.08,
+  "post/display/lines": 540.0,
+  "post/shock/amount": 0.0,
+  "post/shock/radius": 1.2,
+  "post/shock/width": 0.08,
+  "post/shock/chroma": 0.4,
+  "post/shock/centerX": 0.5,
+  "post/shock/centerY": 0.48,
+  "post/glitch/amount": 0.0,
+  "post/glitch/tear": 0.0,
+  "post/glitch/block": 24.0,
+  "post/glitch/rate": 12.0,
+  "post/tonemap/operator": 3
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "noteX",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.7499999999999999,
+      "gain": 2.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.level",
+   "target": "camera/position",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 900,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 3.0,
+    "remapOutMax": 10.0,
+    "integrate": true
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "camera/target",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 900,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 3.0,
+    "remapOutMax": 10.0,
+    "integrate": true
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "procedural/plain/transform/position",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 900,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 3.0,
+    "remapOutMax": 10.0,
+    "integrate": true
+   }
+  },
+  {
+   "source": "visual.noteX",
+   "target": "material/dsData/op/12/constant/constant",
+   "amount": -24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "offset": -0.5,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "material/dsData/op/16/constant/constant",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/plain/deform/1/amount",
+   "amount": 0.36,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/plain/deform/2/amount",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/dsData/op/9/smoothstep/constant",
+   "amount": -0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/dsData/op/9/smoothstep/constant",
+   "amount": -0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "post/shock/amount",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "post/shock/radius",
+   "amount": -1.2,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "offset": -1.0,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "post/glitch/tear",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "post/glitch/amount",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/num0/material/emissive",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/num1/material/emissive",
+   "amount": -1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/num2/material/emissive",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/num3/material/emissive",
+   "amount": -1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       2.2,
+       10.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       1.2,
+       2.5,
+       10.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.0,
+       2.2,
+       10.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       -14.0,
+       -200.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       3.0,
+       -14.5,
+       -200.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.0,
+       -14.0,
+       -200.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-datascape.mp4"
+ },
+ "sonicScene": {
+  "category": "digital",
+  "thesis": "A landscape of pure measurement, barcode ridges and numerals to the horizon, written and erased by the music.",
+  "composition": {
+   "background": "black sky; the plain's ridges converging to the vanishing point",
+   "midground": "numerals standing on the plain like monoliths, receding",
+   "foreground": "the ridged plain's white data strips streaming under the camera",
+   "focal": "the vanishing point, where the strips converge, and the newest bright strip",
+   "secondary": [
+    "the red crests",
+    "the numerals",
+    "the strips a note writes"
+   ],
+   "atmosphere": "(none: pure black, no haze)",
+   "post": "scanlines faint, grain, a hard contrast; a shock on the kick",
+   "camera": "a low forward glide whose pace is the music's level"
+  },
+  "palette": {
+   "dominant": "#000000",
+   "secondary": "#f2f2f2",
+   "accent": "#5a5a5a",
+   "highlight": "#ff2a1a",
+   "background_value": "black",
+   "saturation": "monochrome; red only on the highest crests"
+  },
+  "motion": {
+   "very_slow": [
+    "the numerals passing"
+   ],
+   "medium": [
+    "the ridges' heave (bass)",
+    "the glide (level)"
+   ],
+   "fast": [
+    "strips written per note"
+   ],
+   "extremely_fast": [
+    "the kick's shock",
+    "digit flicker (hat)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "level",
+    "response.level",
+    "the glide's pace (integrated: louder is faster, silence a slow drift)"
+   ],
+   [
+    "note",
+    "response.note",
+    "a bright strip is written at the pitch's place across the plain"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "the strip's brightness"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the ridges heave"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a shock ring across the frame"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a tear through the data"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "the numerals flicker"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the strips settle into order (the dashes lengthen)"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a dark plain drifting forward; the strips dim to a faint grid"
+   ]
+  ],
+  "tier": "light: one subdivided plane with a 30-op program, a few text procedurals",
+  "id": "datascape",
+  "title": "Datascape",
+  "regions": [
+   {
+    "id": "vanishing",
+    "box": [
+     0.4,
+     0.38,
+     0.6,
+     0.56
+    ]
+   },
+   {
+    "id": "plain",
+    "box": [
+     0.0,
+     0.56,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "id": "numerals",
+    "box": [
+     0.0,
+     0.2,
+     1.0,
+     0.56
+    ]
+   }
+  ]
+ }
+}

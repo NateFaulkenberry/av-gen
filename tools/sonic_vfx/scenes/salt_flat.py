@@ -235,7 +235,7 @@ def build():
     s.particles("ignition", capacity=60, seed=22, shape="sphere", position=[-1000.0, 400.0, -1200.0],
                 extent=[0.0, 0.0, 0.0], direction=[-0.78, -0.6, 0.08], spawnRate=0.0, lifetimeMin=0.12,
                 lifetimeMax=0.2, spread=0.0, speedMin=200.0, speedMax=200.0, gravity=[0, 0, 0], drag=0.0,
-                sizeStart=34.0, sizeEnd=6.0, colorStart=hexrgb("#f6fff8") + [1.0],
+                sizeStart=14.0, sizeEnd=4.0, colorStart=hexrgb("#f6fff8") + [1.0],
                 colorEnd=hexrgb("#ffd2a8") + [0.0], emissive=10.0, blend="additive")
     # ---- blowing salt (hat): grains streaming low across the flat
     s.particles("salt", capacity=3000, seed=23, shape="box", position=[-2.0, 0.12, -10.0], extent=[16.0, 0.1, 9.0],

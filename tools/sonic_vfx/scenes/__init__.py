@@ -2,15 +2,25 @@
 
 SCENES is the SET LIST: the Examples menu lists the scenes in this order, and the live scene switcher (ADR-1063: the
 Live panel's Scene row, PageUp/PageDown, MIDI program change n -> scene n mod count) steps through Sonic Live and then
-these, in this order. It runs from the quiet and atmospheric to the cosmic finale.
+these, in this order. It runs from the quiet and atmospheric, through the organic and the precise, into energy and
+glitch, to the cosmic finale -- and no two neighbours share a palette family.
 """
 
 SCENES = [
     "salt_flat",            # 1  dusk, the sky as the instrument: a calm opening
-    "breathing_deep",       # 2  organic, slow
-    "cymatic_plate",        # 3  precise, scientific
-    "ferrofluid_crown",     # 4  sculptural
-    "tesla_choir",          # 5  electric: energy rising
-    "corrupted_cathedral",  # 6  glitch, intense
-    "event_horizon",        # 7  the cosmic finale
+    "lantern_lake",         # 2  dusk on water, warm lanterns
+    "aurora_tundra",        # 3  night, cold light overhead
+    "breathing_deep",       # 4  organic, slow: the living cavern
+    "abyssal_bloom",        # 5  the deep sea
+    "cymatic_plate",        # 6  precise, scientific
+    "silk_theatre",         # 7  a dancer's line in the air
+    "ferrofluid_crown",     # 8  sculptural, magnetic
+    "feedback_mirror",      # 9  the loop: digital and hypnotic
+    "tesla_choir",          # 10 electric: harmony as lightning
+    "datascape",            # 11 data, monochrome and red
+    "ember_forest",         # 12 after the fire
+    "corrupted_cathedral",  # 13 glitch, intense
+    "storm_cell",           # 14 violent weather
+    "stellar_nursery",      # 15 cosmic: stars igniting
+    "event_horizon",        # 16 the cosmic finale
 ]

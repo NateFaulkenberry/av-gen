@@ -67,49 +67,52 @@ OP_NOTE_X, OP_NOTE_GAIN, OP_DASH = 0, 0, 0
 
 
 def data_program():
-    """The plain's surface: barcode strips along Z (widths from a thresholded 1-D noise across X), broken into dashes
-    along Z, brighter where a note was written (a band round x = OP_NOTE_X's value), and red on the crests."""
+    """The plain's surface, as measurement: thin lines across it at irregular, exact spacings (the sum of three
+    cosines of incommensurate periods, thresholded high: a barcode, crisp at every distance and never organic),
+    broken into dashes along the glide (two more cosines), a bright strip where a note was written (a band round
+    x = OP_NOTE_X's value), and red where a crest rises above 0.35 m. Everything else is black."""
     ops = [
         {"kind": "input", "dst": 0, "input": "worldPosition"},
-        # barcode across x: noise of (x, 0, 0) thresholded hard
-        {"kind": "constant", "dst": 1, "constant": [1.0, 0.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 1, "srcA": 0, "srcB": 1},
-        {"kind": "noise", "dst": 2, "srcA": 1, "value": 2.6, "seed": 3},
-        {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.6, 0.607, 0.0, 0.0]},
-        # dashes along z: noise of (0, 0, z)
-        {"kind": "constant", "dst": 3, "constant": [0.0, 0.0, 1.0, 0.0]},
-        {"kind": "multiply", "dst": 3, "srcA": 0, "srcB": 3},
-        {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
-        {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.9, "seed": 8},
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.5, 0.52, 0.0, 0.0]},        # OP_DASH: edge
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},                                   # strip x dash
-        # the note band: 1 within 0.35 m of x = note
-        {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [0.0, 0.0, 0.0, 0.0]},             # x
-        {"kind": "constant", "dst": 5, "constant": [0.0, 0.0, 0.0, 0.0]},                       # OP_NOTE_X: -x
-        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},
-        {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 4},
-        {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.12, 0.0, 0.0, 0.0]},         # 1 at the band
-        {"kind": "constant", "dst": 5, "constant": [0.0, 0.0, 0.0, 0.0]},                       # OP_NOTE_GAIN
-        {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
-        {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [0.0, 0.0, 0.0, 0.0]},             # broadcast
-        {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
-        # fade with distance (the vanishing point stays clean) and a faint base grid everywhere
+        # the barcode across x
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "palette", "dst": 2, "srcA": 1, "value": 0.0, "constant": [0.0, 0.0, 0.0, 0.0],
+         "constant2": [1.0, 1.0, 1.0, 0.0], "constant3": [2.31, 4.43, 1.07, 0.0], "constant4": [0.0, 0.37, 0.71, 0.0]},
+        {"kind": "gradient", "dst": 3, "srcA": 2, "value": 0.227, "constant": [1.0, 0.7, 0.5, 0.5]},
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.845, 0.86, 0.0, 0.0]},
+        # dashes along z
+        {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [2.0, 2.0, 2.0, 2.0]},
+        {"kind": "palette", "dst": 5, "srcA": 4, "value": 0.0, "constant": [0.0, 0.0, 0.0, 0.0],
+         "constant2": [1.0, 1.0, 1.0, 0.0], "constant3": [0.27, 0.77, 0.0, 0.0], "constant4": [0.0, 0.3, 0.0, 0.0]},
+        {"kind": "gradient", "dst": 5, "srcA": 5, "value": 0.3125, "constant": [1.0, 0.6, 0.0, 0.5]},
+        {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.3, 0.32, 0.0, 0.0]},          # OP_DASH: edge
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},                                     # dashed lines
+        # the note band: 1 within ~0.35 m of x = note
+        {"kind": "swizzle", "dst": 6, "srcA": 0, "constant": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 0.0]},                         # OP_NOTE_X: -x
+        {"kind": "add", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 6},
+        {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.12, 0.0, 0.0, 0.0]},
+        {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 0.0]},                         # OP_NOTE_GAIN
+        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "add", "dst": 3, "srcA": 3, "srcB": 6},
+        # fade with distance, so the vanishing point stays clean and nothing aliases
         {"kind": "input", "dst": 6, "input": "cameraDistance"},
-        {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [40.0, 270.0, 1.0, 0.0]},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 6},
-        # the crests are red: height above 2.2 m
-        {"kind": "swizzle", "dst": 7, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},             # y
-        {"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [2.0, 2.8, 0.0, 0.0]},
+        {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [15.0, 150.0, 1.0, 0.0]},
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 6},
+        # the crests are red
+        {"kind": "swizzle", "dst": 7, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},
+        {"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [0.42, 0.62, 0.0, 0.0]},
         {"kind": "constant", "dst": 1, "constant": hexrgb(WHITE, 1.6) + [0.0]},
-        {"kind": "constant", "dst": 3, "constant": hexrgb(RED, 3.0) + [0.0]},
-        {"kind": "mixBy", "dst": 1, "srcA": 1, "srcB": 3, "srcC": 7},
-        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},                                   # emission
-        {"kind": "constant", "dst": 0, "constant": [0.0, 0.0, 0.0, 1.0]},                       # black body
+        {"kind": "constant", "dst": 2, "constant": hexrgb(RED, 2.6) + [0.0]},
+        {"kind": "mixBy", "dst": 1, "srcA": 1, "srcB": 2, "srcC": 7},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 3},                                     # emission
+        {"kind": "constant", "dst": 0, "constant": [0.0, 0.0, 0.0, 1.0]},                         # black body
     ]
     global OP_NOTE_X, OP_NOTE_GAIN, OP_DASH
-    OP_DASH = 10
-    OP_NOTE_X = 13
-    OP_NOTE_GAIN = 17
+    OP_DASH = 9
+    OP_NOTE_X = 12
+    OP_NOTE_GAIN = 16
     assert ops[OP_DASH - 1]["kind"] == "smoothstep" and ops[OP_NOTE_X - 1]["kind"] == "constant"
     assert ops[OP_NOTE_GAIN - 1]["kind"] == "constant" and len(ops) <= 48
     return {"name": "dsData", "ops": ops, "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 1,
@@ -131,16 +134,16 @@ def build():
     s.proc("plain", {"kind": "box", "size": [160.0, 0.1, 300.0], "subdivisions": 64},   # rides the glide
            material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 1.0,
                      "metallic": 0.0, "program": "dsData"},
-           deformers=[{"kind": "sine", "amount": 1.1, "axis": [0, 0, 1], "displacementAxis": [0, 1, 0],
+           deformers=[{"kind": "sine", "amount": 0.18, "axis": [0, 0, 1], "displacementAxis": [0, 1, 0],
                        "frequency": 0.21, "phase": 0.0, "speed": 0.0, "space": "world"},
-                      {"kind": "noise", "amount": 1.6, "scale": 0.05, "speed": 0.0, "seed": 4,
-                       "axisMask": [0, 1, 0], "space": "world"}],
+                      {"kind": "sine", "amount": 0.08, "axis": [1, 0, 0.3], "displacementAxis": [0, 1, 0],
+                       "frequency": 0.37, "phase": 1.1, "speed": 0.0, "space": "world"}],
            transform={"position": [0.0, 0.0, -138.0], "rotation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]})
 
     # ---- numerals standing on the plain, receding (white, emissive): four digits, each a long receding row
-    num = {"baseColor": [0, 0, 0], "emissiveColor": hexrgb(WHITE), "emissiveIntensity": 1.4, "roughness": 1.0,
+    num = {"baseColor": [0, 0, 0], "emissiveColor": hexrgb(WHITE), "emissiveIntensity": 0.5, "roughness": 1.0,
            "metallic": 0.0}
-    rows = [("0", -15.0, -40.0, 9.0), ("1", 13.0, -75.0, 7.0), ("7", -21.0, -110.0, 11.0), ("9", 19.0, -145.0, 8.0)]
+    rows = [("0", -24.0, -60.0, 6.0), ("1", 21.0, -95.0, 5.0), ("7", -30.0, -130.0, 7.0), ("9", 27.0, -165.0, 5.5)]
     for k, (d, x, z0, size) in enumerate(rows):
         src = {"kind": "text", "text": d, "textSize": size, "textDepth": 0.6,
                "font": {"family": "Helvetica Neue", "weight": 0.25, "italic": False}}
@@ -150,19 +153,19 @@ def build():
                material=num)
 
     # ---- camera: low, looking down the plain; the glide is routed (integrated level), the drift keyed
-    s.camera = {"mode": 1, "position": list(CAM), "target": [0.0, 1.2, -200.0], "fov": 40.0, "orbitSpeed": 0.0}
+    s.camera = {"mode": 1, "position": list(CAM), "target": [0.0, -14.0, -200.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.track("camera/position", [{"time": 0.0, "value": list(CAM), "interp": "smooth"},
                                 {"time": 40.0, "value": [1.2, CAM[1] + 0.3, CAM[2]], "interp": "smooth"},
                                 {"time": 80.0, "value": list(CAM), "interp": "smooth"}], loop=80.0)
-    s.track("camera/target", [{"time": 0.0, "value": [0.0, 1.2, -200.0], "interp": "smooth"},
-                              {"time": 40.0, "value": [3.0, 1.0, -200.0], "interp": "smooth"},
-                              {"time": 80.0, "value": [0.0, 1.2, -200.0], "interp": "smooth"}], loop=80.0)
+    s.track("camera/target", [{"time": 0.0, "value": [0.0, -14.0, -200.0], "interp": "smooth"},
+                              {"time": 40.0, "value": [3.0, -14.5, -200.0], "interp": "smooth"},
+                              {"time": 80.0, "value": [0.0, -14.0, -200.0], "interp": "smooth"}], loop=80.0)
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # level: the glide (a pace integrated into a distance; silence still drifts at 2 m/s)
     for target in ("camera/position", "camera/target", "procedural/plain/transform/position"):
         s.route(R("level", target, -1.0, comp=2, attackMs=300, decayMs=900, remapEnabled=True, remapInMin=0.0,
-                  remapInMax=1.0, remapOutMin=2.0, remapOutMax=16.0, integrate=True))
+                  remapInMax=1.0, remapOutMin=3.0, remapOutMax=10.0, integrate=True))
     # notes: a bright strip written at the pitch's place across the plain (x = -12..12 m), its brightness the velocity
     s.map(M("noteX", [("lastPitch", 1.0)], "mean", -0.3 / 0.4, 1.0 / 0.4))
     s.route(R("visual.noteX", "material/dsData/op/%d/constant/constant" % OP_NOTE_X, -24.0, comp=0, offset=-0.5,
@@ -170,11 +173,11 @@ def build():
             R("noteEnv", "material/dsData/op/%d/constant/constant" % OP_NOTE_GAIN, 2.4, comp=0,
               depth="lastVelocity", attackMs=0, decayMs=700))
     # bass: the ridges heave
-    s.route(R("bass", "procedural/plain/deform/1/amount", 1.8, attackMs=150, decayMs=900),
-            R("bass", "procedural/plain/deform/2/amount", 1.2, attackMs=200, decayMs=1200))
+    s.route(R("bass", "procedural/plain/deform/1/amount", 0.36, attackMs=150, decayMs=900),
+            R("bass", "procedural/plain/deform/2/amount", 0.25, attackMs=200, decayMs=1200))
     # sustain: order -- the dashes lengthen (the dash threshold falls)
-    s.route(R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.18, comp=0, **SLOW),
-            R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.18, comp=1, **SLOW))
+    s.route(R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=0, **SLOW),
+            R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=1, **SLOW))
     # kick: a shock ring; snare: a tear through the data; hat: the numerals flicker
     s.route(R("kickEnv", "post/shock/amount", 70.0, attackMs=0, decayMs=0),
             R("kickEnv", "post/shock/radius", -1.2, op="replace", offset=-1.0, attackMs=0, decayMs=0),

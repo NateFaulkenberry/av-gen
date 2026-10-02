@@ -160,9 +160,12 @@ def build():
           max_distance=400.0)
 
     # ---- light: hot stars above and behind (the rims), a dim teal fill from the nebula, a light in the nest
-    s.light("rim", "directional", direction=[0.12, -0.45, 0.885], color=hexrgb(MAGENTA), intensity=6.0,
+    # two hot stars above and behind, left and right: the pillars' tops and edges catch them as magenta rims
+    s.light("rim", "directional", direction=[0.12, -0.45, 0.885], color=hexrgb(MAGENTA), intensity=14.0,
             castsShadow=False)
-    s.light("nebulaFill", "directional", direction=[0.0, 0.1, 1.0], color=hexrgb(TEAL), intensity=0.25,
+    s.light("rim2", "directional", direction=[-0.55, -0.3, 0.78], color=hexrgb("#ff7ab8"), intensity=6.0,
+            castsShadow=False)
+    s.light("nebulaFill", "directional", direction=[0.0, 0.1, 1.0], color=hexrgb(TEAL), intensity=0.6,
             castsShadow=False)
     s.light("nest", "point", position=[HEAD[0], HEAD[1] + 1.5, HEAD[2] + 4.5], color=hexrgb(STAR), intensity=0.0,
             range=24.0, radius=2.0, castsShadow=False, volumetric=0.0)
@@ -198,7 +201,7 @@ def build():
     s.route(R("polyphony", "lights/nest/intensity", 400.0, **MEDIUM))
     # bass: the cloud's density and glow; sustain: ionisation (the rims); tension: the cloud churns (a phase)
     s.route(R("bass", "procedural/nebula/material/emissive", 1.2, attackMs=300, decayMs=1400),
-            R("sustain", "lights/rim/intensity", 3.0, **SLOW),
+            R("sustain", "lights/rim/intensity", 8.0, **SLOW),
             R("tension", "material/snNebula/op/%d/noise/constant" % OP_CHURN, 0.12, comp=0, integrate=True,
               attackMs=500, decayMs=500))
     # kick: a shock front from the nest; hat: twinkle

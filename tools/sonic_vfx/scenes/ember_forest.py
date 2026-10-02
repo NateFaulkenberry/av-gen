@@ -100,7 +100,7 @@ def bark_program():
             {"kind": "swizzle", "dst": 2, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},           # height
             {"kind": "remap", "dst": 2, "srcA": 2, "value": 1, "constant": [0.0, 4.0, 1.0, 0.0]},  # low on the trunk
             {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
-            {"kind": "constant", "dst": 3, "constant": hexrgb(EMBER, 0.25) + [0.0]},               # OP_FLARE
+            {"kind": "constant", "dst": 3, "constant": hexrgb(EMBER, 0.05) + [0.0]},               # OP_FLARE
             {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 1},
             {"kind": "constant", "dst": 4, "constant": hexrgb("#0b0908") + [1.0]},
         ],
@@ -116,11 +116,12 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.1, "release": 1.4}
     s.environment = {
         "intensity": 0.15, "background": hexrgb("#0a0504"), "fogColor": hexrgb("#2a1c16"),
-        "volumeDensity": 0.012, "volumeMaxDistance": 60.0, "volumeAnisotropy": 0.6, "volumeNoise": 0.5,
+        # thin smoke: the near trunks stay black silhouettes; the shafts and the glow are far
+        "volumeDensity": 0.0035, "volumeMaxDistance": 90.0, "volumeAnisotropy": 0.72, "volumeNoise": 0.5,
         "volumeNoiseScale": 0.08, "volumeNoiseSpeed": 0.04, "fogHeight": 2.5, "fogHeightFalloff": 0.35,
         "fogHeightAmount": 1.0, "volumeShadowStrength": 0.8, "volumeShadowSteps": 4, "volumeLocalLights": 1.0,
         "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb("#030202"), "horizonColor": hexrgb("#4a1806"),
+        "sky": {"enabled": True, "zenithColor": hexrgb("#020101"), "horizonColor": hexrgb("#9a3a0a"),
                 "groundColor": hexrgb("#050303"), "haze": 0.06, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
@@ -157,7 +158,14 @@ def build():
                transform={"position": [0.0, h * 0.5, z], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
     # ---- light: the fire's glow low behind the last plane (it lights the smoke into shafts); a dim cold fill
-    s.light("fire", "directional", direction=[0.12, -0.08, 0.99], color=hexrgb("#ff7a2a"), intensity=1.4,
+    # the fire front: a band of flame far behind the last trees, the glow everything is silhouetted on
+    s.proc("fireline", {"kind": "box", "size": [600.0, 6.0, 4.0], "subdivisions": 64},
+           material={"baseColor": [0, 0, 0], "emissiveColor": hexrgb("#ff8a2a"), "emissiveIntensity": 7.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True},
+           deformers=[{"kind": "noise", "amount": 3.5, "scale": 0.08, "speed": 0.6, "seed": 21,
+                       "axisMask": [0.0, 1.0, 0.0], "space": "world"}],
+           transform={"position": [0.0, 1.0, -150.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
+    s.light("fire", "directional", direction=[0.12, -0.08, 0.99], color=hexrgb("#ff7a2a"), intensity=1.0,
             castsShadow=True, contactShadow=False, shadowStrength=1.0, softness=0.4, volumetric=1.0)
     s.light("fill", "directional", direction=[-0.3, -1.0, -0.2], color=hexrgb("#3a4050"), intensity=0.03,
             castsShadow=False)
@@ -219,7 +227,10 @@ def build():
         if w > 1e-4:
             s.route(R("bass", "material/efAsh/op/%d/constant/constant" % OP_SEAM, 5.0 * w, comp=c, attackMs=300,
                       decayMs=1400))
-    s.route(R("bass", "scene/volumeDensity", 0.02, attackMs=400, decayMs=1500),
+    # (the smoke stirs: its structure, never much more of it -- a density route six times the base drowned the
+    #  trunks in lit smoke)
+    s.route(R("bass", "scene/volumeNoise", 0.35, attackMs=400, decayMs=1500),
+            R("bass", "scene/volumeDensity", 0.0012, attackMs=400, decayMs=1500),
             R("bass", "particles/sparks/spawnRate", 120.0, attackMs=200, decayMs=900))
     # snare: a flare-up runs up the trunks
     for c, w in enumerate(hexrgb(EMBER, 1.0)):
@@ -229,8 +240,9 @@ def build():
     # kick: a crack and a throw of embers; hat: sparks; sustain: the fire's glow builds
     s.route(R("kick", "particles/thrown/burst", 70.0, attackMs=0, decayMs=40),
             R("hat", "particles/sparks/burst", 40.0, attackMs=0, decayMs=40),
-            R("sustain", "lights/fire/intensity", 2.6, **SLOW),
-            R("sustain", "env/sky/intensity", 1.2, **SLOW),
+            R("sustain", "lights/fire/intensity", 1.6, **SLOW),
+            R("sustain", "procedural/fireline/material/emissive", 6.0, **SLOW),
+            R("sustain", "env/sky/intensity", 0.6, **SLOW),
             R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({
