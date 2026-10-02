@@ -254,9 +254,7 @@ def build():
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # the threads, low to high (pitch 0.30 ~ D3 .. 0.66 ~ A5 across the eleven)
     centres = [0.30 + 0.036 * k for k in range(N_THREADS)]
-    first, second = place_bumps("th", "lastPitch", centres, 0.05, event="noteOn")
-    s.map(*first)
-    s.map2(*second)
+    s.places("th", "lastPitch", centres, 0.036, event="noteOn")
     s.map(M("heat", [("sustain", 1.0), ("held", 0.5)], "max"))
     s.map(M("accent", [("density", 1.0, True)], "mean"))
     s.map(M("grit", [("roughness", 1.0), ("energy", 0.4), ("inharmonicity", 2.0, True)], "product", -0.3, 6.5))

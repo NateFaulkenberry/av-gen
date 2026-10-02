@@ -154,7 +154,7 @@
    "settings": {
     "mappings": [
      {
-      "name": "th0_up",
+      "name": "th0_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -162,24 +162,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -5.0,
-      "gain": 20.0
+      "bias": -1.5000000000000004,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th0_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -12.999999999999998,
-      "gain": 20.0
-     },
-     {
-      "name": "th1_up",
+      "name": "th1_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -187,24 +174,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -5.72,
-      "gain": 20.0
+      "bias": -1.7400000000000002,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th1_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -12.28,
-      "gain": 20.0
-     },
-     {
-      "name": "th2_up",
+      "name": "th2_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -212,24 +186,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -6.44,
-      "gain": 20.0
+      "bias": -1.9800000000000004,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th2_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -11.559999999999999,
-      "gain": 20.0
-     },
-     {
-      "name": "th3_up",
+      "name": "th3_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -237,24 +198,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -7.16,
-      "gain": 20.0
+      "bias": -2.22,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th3_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -10.84,
-      "gain": 20.0
-     },
-     {
-      "name": "th4_up",
+      "name": "th4_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -262,24 +210,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -7.879999999999999,
-      "gain": 20.0
+      "bias": -2.4600000000000004,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th4_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -10.120000000000001,
-      "gain": 20.0
-     },
-     {
-      "name": "th5_up",
+      "name": "th5_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -287,24 +222,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -8.6,
-      "gain": 20.0
+      "bias": -2.7000000000000006,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th5_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -9.4,
-      "gain": 20.0
-     },
-     {
-      "name": "th6_up",
+      "name": "th6_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -312,24 +234,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -9.32,
-      "gain": 20.0
+      "bias": -2.940000000000001,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th6_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -8.68,
-      "gain": 20.0
-     },
-     {
-      "name": "th7_up",
+      "name": "th7_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -337,24 +246,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -10.04,
-      "gain": 20.0
+      "bias": -3.180000000000001,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th7_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -7.959999999999999,
-      "gain": 20.0
-     },
-     {
-      "name": "th8_up",
+      "name": "th8_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -362,24 +258,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -10.759999999999998,
-      "gain": 20.0
+      "bias": -3.4200000000000004,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th8_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -7.240000000000001,
-      "gain": 20.0
-     },
-     {
-      "name": "th9_up",
+      "name": "th9_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -387,24 +270,11 @@
         "weight": 1.0
        }
       ],
-      "bias": -11.479999999999997,
-      "gain": 20.0
+      "bias": -3.66,
+      "gain": 6.666666666666668
      },
      {
-      "name": "th9_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -6.520000000000002,
-      "gain": 20.0
-     },
-     {
-      "name": "th10_up",
+      "name": "th10_loc",
       "combine": "mean",
       "inputs": [
        {
@@ -412,21 +282,8 @@
         "weight": 1.0
        }
       ],
-      "bias": -12.199999999999998,
-      "gain": 20.0
-     },
-     {
-      "name": "th10_dn",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "notes.lastPitch",
-        "weight": 1.0,
-        "invert": true
-       }
-      ],
-      "bias": -5.800000000000002,
-      "gain": 20.0
+      "bias": -3.9000000000000004,
+      "gain": 6.666666666666668
      },
      {
       "name": "heat",
@@ -480,6 +337,314 @@
   {
    "kind": "interpret",
    "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "th0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th3_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th3_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th3_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th3_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th4_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th4_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th4_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th4_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th5_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th5_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th5_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th5_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th6_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th6_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th6_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th6_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th7_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th7_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th7_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th7_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th8_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th8_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th8_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th8_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th9_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th9_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th9_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th9_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th10_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th10_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "th10_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.th10_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.0833333333333333,
+      "gain": 4.166666666666666
+     },
+     {
+      "name": "chordShimmer",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "accentPlus",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.accent",
+        "weight": 0.6
+       }
+      ],
+      "bias": 0.4
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
    "settings": {
     "mappings": [
      {
@@ -833,31 +998,6 @@
         "weight": 1.0
        }
       ]
-     },
-     {
-      "name": "chordShimmer",
-      "combine": "min",
-      "inputs": [
-       {
-        "signal": "notes.noteOn",
-        "weight": 1.0
-       },
-       {
-        "signal": "notes.polyphony",
-        "weight": 1.0
-       }
-      ]
-     },
-     {
-      "name": "accentPlus",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "visual.accent",
-        "weight": 0.6
-       }
-      ],
-      "bias": 0.4
      }
     ]
    }

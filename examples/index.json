@@ -341,6 +341,12 @@
       "description": "A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies climb its hanging threads as light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - The Breathing Deep",
       "project": "sonic-vfx/breathing-deep.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn in lightning, so harmony has a shape. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Tesla Choir",
+      "project": "sonic-vfx/tesla-choir.json"
     }
   ]
 }

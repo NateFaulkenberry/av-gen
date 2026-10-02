@@ -1,0 +1,1037 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "tesla-choir",
+ "camera": {
+  "mode": 1,
+  "position": [
+   11.7368,
+   4.2,
+   22.0737
+  ],
+  "target": [
+   -4.4147,
+   3.8,
+   2.3474
+  ],
+  "fov": 55.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.0003,
+   0.00061,
+   0.00091
+  ],
+  "fogColor": [
+   0.0028,
+   0.00413,
+   0.00706
+  ],
+  "volumeDensity": 0.0045,
+  "volumeMaxDistance": 70.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00067,
+    0.00096,
+    0.0016
+   ],
+   "horizonColor": [
+    0.00151,
+    0.00228,
+    0.004
+   ],
+   "groundColor": [
+    0.00042,
+    0.00055,
+    0.00074
+   ],
+   "haze": 0.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "hall",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "translate",
+      "translation": [
+       0.0,
+       17.0,
+       0.0
+      ],
+      "children": [
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "difference",
+          "children": [
+           {
+            "kind": "cylinder",
+            "radius": 30.0,
+            "height": 34.0
+           },
+           {
+            "kind": "cylinder",
+            "radius": 28.6,
+            "height": 36.0
+           }
+          ]
+         },
+         {
+          "kind": "polarRepeat",
+          "count": 28,
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             28.2,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.9,
+               17.0,
+               0.7
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      0.00802,
+      0.00913,
+      0.01096
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "boundsMin": [
+     -32.0,
+     -1.0,
+     -32.0
+    ],
+    "boundsMax": [
+     32.0,
+     36.0,
+     32.0
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 96,
+    "epsilon": 0.002,
+    "stepScale": 0.9,
+    "normalEpsilon": 0.002,
+    "maxDistance": 80.0,
+    "look": {
+     "aoStrength": 0.5,
+     "aoDistance": 1.2
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "windows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.0,
+      5.5,
+      0.4
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 28.3,
+     "orientation": "inward",
+     "startAngle": 0.11
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      15.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.32314,
+      0.04519
+     ],
+     "emissiveIntensity": 3.2,
+     "roughness": 1.0,
+     "metallic": 0.0
+    },
+    "variation": {
+     "seed": 3,
+     "scale": [
+      0.0,
+      0.25,
+      0.0
+     ]
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.85
+    }
+   }
+  },
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      64.0,
+      0.2,
+      64.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.1,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00243,
+      0.00273,
+      0.00304
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "corePlinth",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.5,
+     "height": 1.0,
+     "radialSegments": 48,
+     "caps": true,
+     "bevel": 0.06
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.5,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02315,
+      0.02416,
+      0.02519
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "coreCoil",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.035,
+     "tubeTaper": 1.0,
+     "tubeSides": 6,
+     "tubeSegments": 476,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "helix",
+      "radius": 0.85,
+      "height": 4.6,
+      "turns": 34.0,
+      "count": 408,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "samplesPerSegment": 6
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      1.05,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.19462,
+      0.05951,
+      0.02122
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.08022
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.35,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "coreColumn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.78,
+     "height": 4.7,
+     "radialSegments": 40,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.35,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00439,
+      0.00478,
+      0.00518
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "coreLoad",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 1.5,
+     "minorRadius": 0.48,
+     "majorSegments": 96,
+     "minorSegments": 24
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      6.7,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.32314,
+      0.36131,
+      0.40198
+     ],
+     "emissiveColor": [
+      0.67244,
+      0.57758,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.25,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "towerPlinths",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.8,
+     "height": 0.6,
+     "radialSegments": 32,
+     "caps": true,
+     "bevel": 0.04
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 10.0,
+     "orientation": "outward",
+     "startAngle": 1.5707963267948966
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.3,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02315,
+      0.02416,
+      0.02519
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "towerCoils",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.022,
+     "tubeTaper": 1.0,
+     "tubeSides": 6,
+     "tubeSegments": 336,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "helix",
+      "radius": 0.42,
+      "height": 3.1,
+      "turns": 24.0,
+      "count": 288,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "samplesPerSegment": 6
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 10.0,
+     "orientation": "outward",
+     "startAngle": 1.5707963267948966
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.62,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.19462,
+      0.05951,
+      0.02122
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.08022
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.35,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "towerColumns",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.36,
+     "height": 3.15,
+     "radialSegments": 24,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 10.0,
+     "orientation": "outward",
+     "startAngle": 1.5707963267948966
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      2.2,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00439,
+      0.00478,
+      0.00518
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "towerLoads",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.72,
+     "minorRadius": 0.22,
+     "majorSegments": 48,
+     "minorSegments": 16
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 10.0,
+     "orientation": "outward",
+     "startAngle": 1.5707963267948966
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.25,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.32314,
+      0.36131,
+      0.40198
+     ],
+     "emissiveColor": [
+      0.67244,
+      0.57758,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.25,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "cables",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.06,
+     "tubeTaper": 1.0,
+     "tubeSides": 8,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 7,
+      "start": [
+       0,
+       0.06,
+       1.6
+      ],
+      "end": [
+       0,
+       0.06,
+       9.2
+      ],
+      "noiseAmount": 0.45,
+      "noiseScale": 0.5,
+      "seed": 3,
+      "samplesPerSegment": 6
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 0.0,
+     "orientation": "outward",
+     "startAngle": 1.5707963267948966
+    },
+    "material": {
+     "baseColor": [
+      0.00243,
+      0.00273,
+      0.00304
+     ],
+     "emissiveColor": [
+      0.67244,
+      0.57758,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.4,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "sparks",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 31,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     6.7,
+     0.0
+    ],
+    "extent": [
+     1.4,
+     0.3,
+     1.4
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.4,
+    "lifetimeMax": 1.1,
+    "spread": 0.9,
+    "speedMin": 2.0,
+    "speedMax": 5.0,
+    "gravity": [
+     0,
+     -9.0,
+     0
+    ],
+    "drag": 0.4,
+    "turbulence": 0.0,
+    "sizeStart": 0.025,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     0.90466,
+     0.85499,
+     1.0,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.43415,
+     0.16203,
+     0.0
+    ],
+    "emissive": 14.0,
+    "blend": "additive",
+    "velocityStretch": 1.2,
+    "stretchMax": 0.35,
+    "collision": "bounce",
+    "collisionHeight": 0.0,
+    "collisionRestitution": 0.25
+   }
+  },
+  {
+   "name": "dust",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 37,
+    "shape": "box",
+    "position": [
+     0.0,
+     6.0,
+     0.0
+    ],
+    "extent": [
+     14.0,
+     6.0,
+     14.0
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 120.0,
+    "lifetimeMin": 8.0,
+    "lifetimeMax": 14.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.05,
+    "gravity": [
+     0,
+     0.01,
+     0
+    ],
+    "drag": 0.5,
+    "turbulence": 0.15,
+    "turbulenceScale": 0.3,
+    "sizeStart": 0.012,
+    "sizeEnd": 0.012,
+    "colorStart": [
+     0.21586,
+     0.27889,
+     0.35153,
+     0.5
+    ],
+    "colorEnd": [
+     0.21586,
+     0.27889,
+     0.35153,
+     0.0
+    ],
+    "emissive": 0.35,
+    "blend": "additive"
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "coreGlow",
+   "name": "coreGlow",
+   "type": "point",
+   "position": [
+    0.0,
+    6.7,
+    0.0
+   ],
+   "color": [
+    0.47932,
+    0.39157,
+    1.0
+   ],
+   "intensity": 20.0,
+   "range": 22.0,
+   "radius": 1.0,
+   "castsShadow": false,
+   "volumetric": 0.7
+  },
+  {
+   "id": "sodium0",
+   "name": "sodium0",
+   "type": "point",
+   "position": [
+    -17.0,
+    14.0,
+    -21.0
+   ],
+   "color": [
+    1.0,
+    0.32314,
+    0.04519
+   ],
+   "intensity": 140.0,
+   "range": 24.0,
+   "radius": 2.0,
+   "castsShadow": false,
+   "volumetric": 0.55
+  },
+  {
+   "id": "sodium1",
+   "name": "sodium1",
+   "type": "point",
+   "position": [
+    19.0,
+    14.0,
+    -19.0
+   ],
+   "color": [
+    1.0,
+    0.32314,
+    0.04519
+   ],
+   "intensity": 140.0,
+   "range": 24.0,
+   "radius": 2.0,
+   "castsShadow": false,
+   "volumetric": 0.55
+  },
+  {
+   "id": "sodium2",
+   "name": "sodium2",
+   "type": "point",
+   "position": [
+    -24.0,
+    14.0,
+    6.0
+   ],
+   "color": [
+    1.0,
+    0.32314,
+    0.04519
+   ],
+   "intensity": 140.0,
+   "range": 24.0,
+   "radius": 2.0,
+   "castsShadow": false,
+   "volumetric": 0.55
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "direction": [
+    0.3,
+    -1.0,
+    0.2
+   ],
+   "color": [
+    0.10224,
+    0.14413,
+    0.21586
+   ],
+   "intensity": 0.03,
+   "castsShadow": false
+  }
+ ],
+ "entities": [
+  {
+   "name": "coreLoad",
+   "node": "coreLoad",
+   "seed": 399932,
+   "tags": [
+    "core"
+   ]
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "core",
+    "position": [
+     0.0,
+     6.7,
+     0.0
+    ],
+    "radius": 3.0,
+    "weight": 1.0
+   }
+  ],
+  "layers": [
+   {
+    "name": "floor",
+    "start": 0.0,
+    "end": 12.0,
+    "contrast": 1.0,
+    "saturation": 1.0
+   },
+   {
+    "name": "ring",
+    "start": 12.0,
+    "end": 34.0,
+    "contrast": 1.08,
+    "saturation": 1.0
+   },
+   {
+    "name": "hall",
+    "start": 34.0,
+    "end": 200.0,
+    "contrast": 0.8,
+    "saturation": 0.75
+   }
+  ]
+ }
+}

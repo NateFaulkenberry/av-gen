@@ -103,23 +103,37 @@ def bump(name, signal, centre, width, invert_ok=True):
 
 
 def place_bumps(prefix, signal, centres, width, event=None):
-    """One responder per place. visual.<prefix><k> is 1 where `signal` (usually notes.lastPitch) sits at centres[k],
-    falling to 0 at +- width. With `event` (e.g. "noteOn"), visual.<prefix>Hit<k> is that event's strength on the
-    frame it fires, but only at its place: min(rising edge, falling edge, event).
+    """One responder per place. Returns (stage-1, stage-2, stage-3) mappings for three interpret sources (each source
+    reads the earlier sources' outputs of the same frame):
 
-    Route the Hit signal, not the place, when a note should leave a decaying mark: a route's depth scales its output
-    every frame, so a flash routed through a place depth is cut off the moment the next note moves the pitch; a Hit
-    carries the place into the chain's input, so each place decays on its own. Returns (first-source mappings,
-    second-source mappings): the edges are computed first, and the mins read them in the same frame."""
-    first, second = [], []
+      visual.<prefix><k>     1 where `signal` (usually notes.lastPitch) sits at centres[k], 0 at +- width;
+      visual.<prefix>Hit<k>  with `event` (e.g. "noteOn"): that event's strength on the frame it fires, but only at
+                             its place -- route this, not the place, when a note should leave a decaying mark (a
+                             route's depth scales its output every frame, so a flash routed through a place depth is
+                             cut off when the next note moves the pitch).
+
+    Built within the interpret source's hard ranges (bias +-4, gain +-16): stage 1 maps the signal to a local
+    coordinate that is 0.5 at the place (slope S), stage 2 cuts the rising and falling edges round 0.5, stage 3 takes
+    their min. Peaks are 1."""
+    S = min(16.0, min(4.4 / max(c, 1e-3) for c in centres), 3.4 / max(width, 1e-3) * 0.5 * 2)
+    S = min(S, 0.45 / max(width, 1e-3))     # the edges' half-width is width, in signal units: 0.45 local
+    stage1, stage2, stage3 = [], [], []
+    edge_gain = 1.0 / (width * S)            # local units -> 0..1 over one width
     for k, c in enumerate(centres):
-        f, s = bump("%s%d" % (prefix, k), signal, c, width)
-        first += f
-        second += s
+        loc = "%s%d_loc" % (prefix, k)
+        stage1.append(M(loc, [(signal, 1.0)], "mean", 0.5 - S * c, S))
+        # rising edge: 0 at local 0.5 - width*S, 1 at 0.5; falling edge mirrored
+        b = -(0.5 - width * S) * edge_gain
+        stage2.append(M("%s%d_up" % (prefix, k), [("visual." + loc, 1.0)], "mean", b, edge_gain))
+        stage2.append(M("%s%d_dn" % (prefix, k), [("visual." + loc, 1.0, True)], "mean", b, edge_gain))
+        stage3.append(M("%s%d" % (prefix, k), [("visual.%s%d_up" % (prefix, k), 1.0),
+                                               ("visual.%s%d_dn" % (prefix, k), 1.0)], "min"))
         if event:
-            second.append(M("%sHit%d" % (prefix, k), [("visual.%s%d_up" % (prefix, k), 1.0),
+            stage3.append(M("%sHit%d" % (prefix, k), [("visual.%s%d_up" % (prefix, k), 1.0),
                                                       ("visual.%s%d_dn" % (prefix, k), 1.0), (event, 1.0)], "min"))
-    return first, second
+    for m in stage1 + stage2:
+        assert -4.0 <= m.get("bias", 0.0) <= 4.0 and -16.0 <= m.get("gain", 1.0) <= 16.0, m
+    return stage1, stage2, stage3
 
 
 def lathe(profile, sides=32, samples=6, twist=0.0):
@@ -315,6 +329,7 @@ class Scene:
         self.effects = []
         self.mappings = []        # source "scene"
         self.mappings2 = []       # source "scene2": reads this frame's visual.* from the first
+        self.mappings3 = []       # source "scene3": reads both
         self.routes = []
         self.params = {}
         self.tracks = []
@@ -428,7 +443,7 @@ class Scene:
              "activation": activation, "style": style, "timing": t, "parameters": parameters or {}}
         if trigger is not None:
             e["activation"] = "trigger"
-            e["timing"]["trigger"] = trigger
+            e["trigger"] = trigger
         self.effects.append(e)
         return e
 
@@ -446,6 +461,19 @@ class Scene:
                 self.mappings2.extend(m)
             else:
                 self.mappings2.append(m)
+
+    def map3(self, *maps):
+        for m in maps:
+            if isinstance(m, list):
+                self.mappings3.extend(m)
+            else:
+                self.mappings3.append(m)
+
+    def places(self, prefix, signal, centres, width, event=None):
+        a, b, c = place_bumps(prefix, signal, centres, width, event)
+        self.map(*a)
+        self.map2(*b)
+        self.map3(*c)
 
     def route(self, *routes):
         for r in routes:
@@ -551,6 +579,8 @@ class Scene:
             sources.append({"kind": "interpret", "name": "scene", "settings": {"mappings": self.mappings}})
         if self.mappings2:
             sources.append({"kind": "interpret", "name": "scene2", "settings": {"mappings": self.mappings2}})
+        if self.mappings3:
+            sources.append({"kind": "interpret", "name": "scene3", "settings": {"mappings": self.mappings3}})
         params = dict(BASE_PARAMS)
         params.update(self.params)
         doc = {"format": "avgen-project", "version": 4, "app": {"name": "Sonic VFX"},
