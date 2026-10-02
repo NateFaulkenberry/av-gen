@@ -11,29 +11,53 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   - research reports 1 and 3 (`research/01-vfx-scene-construction.md`, `research/03-authoredness.md`);
   - `SCENE-CATALOG.md`: 16 scenes, tier A (8) first;
   - the scene kit `tools/sonic_vfx/` (kit, signals, make, review, variant, test material);
-  - scenes 1-6: Event Horizon, The Breathing Deep, Tesla Choir, The Corrupted Cathedral, Ferrofluid Crown, Cymatic
-    Plate. All are in `examples/index.json` under "Sonic VFX".
-- **In progress:** scene 8, Salt Flat Mirage (`scenes/salt_flat.py`): the look is close. Still to do: a clip and the
-  evaluator (`review.py eval`), then the look-dev still and the commit.
+  - scenes 1-6 and 8: Event Horizon, The Breathing Deep, Tesla Choir, The Corrupted Cathedral, Ferrofluid Crown,
+    Cymatic Plate, Salt Flat Mirage. All are in `examples/index.json` under "Sonic VFX", in set-list order.
+  - **drafts, built and audited (0 warnings, every route live) but not yet looked at:** Storm Cell, Feedback Mirror,
+    Aurora Tundra, Silk Theatre, Lantern Lake, Datascape, Ember Forest, Abyssal Bloom, Stellar Nursery. Each has a
+    module in `scenes/` and is NOT in SCENES (so not in the index) until it passes look-dev.
+  - the tools:
+    - `matrix.py` (the test matrix and TEST-MATRIX.md);
+    - `capture.py` (stills, clips and the tour into the review folder);
+    - `perf.py` (GPU cost per scene);
+    - `live.py` (a live-editor run with the probe; it opens a window);
+    - `review.py eval` (a clip and the evaluator).
 - **Next:**
-  - Storm Cell (7);
-  - tier B, now unblocked: Feedback Mirror needs `temporal/feedback`, Datascape `post/glitch|sort|display`
-    (ADR-1065/1066);
-  - adopting the post instruments on the Cathedral (glitch, tear) and Event Horizon (shock on the kick);
-  - `TEST-MATRIX.md`, the evaluator pass on every scene, the captures.
+  1. Look-dev every draft from the batch stills (`$S/vfx/batch/<id>--0N/`, rendered at the realtime tier). Fix,
+     add the passing ones to SCENES in set-list position, and kill the weak ones.
+  2. Run the evaluator on each scene (`review.py eval <id> full`) and iterate on `vocabulary_silent`,
+     `uniform_motion` and `kick_hat_same_place`.
+  3. `matrix.py run <id>` for every scene, then `matrix.py report` writes `TEST-MATRIX.md`.
+  4. Live runs (`live.py <id> --scenario demo`) for at least each tier A scene.
+  5. `perf.py` and the captures (`capture.py still/clip` per scene, then `capture.py tour`).
+  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 before the hand-back (the engineer's
+     build).
 - **The set list** is `scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher
-  (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count. The order runs:
+  (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count. The planned full
+  order, from the calm opening to the cosmic finale:
   1. Salt Flat
-  2. Breathing Deep
-  3. Cymatic Plate
-  4. Ferrofluid Crown
-  5. Tesla Choir
-  6. Cathedral
-  7. Event Horizon
+  2. Lantern Lake
+  3. Aurora Tundra
+  4. Breathing Deep
+  5. Abyssal Bloom
+  6. Cymatic Plate
+  7. Silk Theatre
+  8. Ferrofluid Crown
+  9. Feedback Mirror
+  10. Tesla Choir
+  11. Datascape
+  12. Ember Forest
+  13. Cathedral
+  14. Storm Cell
+  15. Stellar Nursery
+  16. Event Horizon
 - **Each scene carries:**
   - `sonic.response`: the performer's baseline (sensitivity, transient, sustain, attack, release). The switcher carries
     the performer's offsets from it across a switch.
   - `sonicScene.regions`: screen boxes for the evaluator, projected through the camera at t = 0 (`kit.region*`).
+  - `sonicScene.vocabulary`: rows whose second entry is exactly one bus id the trace carries. The evaluator checks
+    the first id in a row: hits are named by their `response.*` event (it reads the `...Env`), notes by
+    `response.note`. A combined string is skipped silently.
 - **The pinned engine:** `$S/vfx/bin-337903f0` (binary, probe and shaders), used through the wrapper
   `$S/vfx/avgen.sh`. `S` is the scratchpad:
   `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
@@ -133,6 +157,25 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   - Judge thirds on the full-size frame, not a scaled sheet: I misread one.
 - **Palette** (ADR-1043): `palette/position` in a project's `parameters` is ignored at load (the palette registers
   later). Set the palette block's own `position`. Routes onto it bind.
+
+- **Rates are hazards:**
+  - A route on a rate whose phase is time x rate jumps the pattern by t x d. The auditor flags it as
+    `phase-rate`. Examples: an aurora's `driftSpeed` and `flowSpeed`, `scene/volumeNoiseSpeed`.
+  - Route a phase instead: the chain's `integrate` stage turns a pace into a distance (Datascape's glide) or a
+    phase (Stellar Nursery's nebula churn, on a noise op's constant).
+- **A procedural's scale cannot be negative** (clamped to 0.001). To mirror a shape (Lantern Lake's reflection),
+  turn it 180 degrees about X with its deformers in LOCAL space: that flips height and depth and keeps the
+  left-to-right shape.
+- **Procedural limits:**
+  - box size at most 1000 m (scale the transform instead);
+  - box subdivisions at most 64;
+  - no negative scale.
+- **A colour route per component with a zero weight is a dead route** (the auditor's `zero-amount`). Skip the
+  component.
+- **The volume march** runs uniformly from the camera to `volumeMaxDistance`. With 0 and a placed medium (a
+  tornado), it carries the media alone out to their farthest reach. A distant funnel gets coarse steps, so a
+  tornado has to be near or the steps raised.
+- **Live (`--live`) needs the editor window:** there is no headless live mode. `live.py` opens one per run.
 
 ## Scenes built
 
