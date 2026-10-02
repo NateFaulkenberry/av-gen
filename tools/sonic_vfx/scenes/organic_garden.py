@@ -188,7 +188,8 @@ def instrument(s):
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.4}
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.4,
+                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
         "intensity": 0.15, "background": hexrgb(DARK), "fogColor": hexrgb("#0a2f33"), "volumeDensity": 0.05,
         "volumeMaxDistance": 0.0, "skyIntensity": 1.0,

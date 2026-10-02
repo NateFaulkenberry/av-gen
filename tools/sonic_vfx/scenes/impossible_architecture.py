@@ -150,7 +150,8 @@ def instrument(s, sun_dir):
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
+                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
         "intensity": 0.35, "background": hexrgb(SKY), "fogColor": hexrgb(HAZE), "volumeDensity": 0.03,
         "volumeMaxDistance": 0.0, "skyIntensity": 1.0,

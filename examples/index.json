@@ -425,6 +425,54 @@
       "description": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - Event Horizon",
       "project": "sonic-vfx/event-horizon.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "The Armillary: a giant living geometric diagram in gold light. Its rings turn at harmonic rates, open into a sphere on the music and close back into a flat mandala; chords draw their own polygons. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Sacred Geometry Garden",
+      "project": "sonic-abstract/sacred-geometry.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Pulsar Plain: a poster you can fly through. Hidden-line ridgelines ripple to the horizon under a colossal outline circle; the drums build flat blocks of one bold colour. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Neon Vector World",
+      "project": "sonic-abstract/neon-vector.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Candy Archipelago: a toy island floating in a candy sky, inked and cel-shaded, where three round creatures sing the notes, hop on the kick and the giant flower blooms when the sound is held. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Cel-Shaded Dream World",
+      "project": "sonic-abstract/cel-dream.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Chromatic Corridor: monumental portals of pure colour flow toward you forever through coloured haze, each a step further round the colour wheel, toward a blinding light. The music breathes the corridor's spacing, winds its twist and recolours the space itself. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Infinite Color Geometry",
+      "project": "sonic-abstract/color-geometry.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Lantern Reef: a macro view into a twilight meadow of translucent organisms that breathe, bloom and sway with the music; the notes open flowers, the kick blooms the lantern, held sound makes it grow. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Organic Digital Garden",
+      "project": "sonic-abstract/organic-garden.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Galaxy Engine: a spiral of light made only of points. Its arms are rivers flowing into a white-hot core; the bass pulls it in and lets it bloom, the kick explodes it and it reforms, chords grow arms. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Particle / VFX World",
+      "project": "sonic-abstract/particle-world.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Relativity Court: a staircase module in three gravities, repeated forever in every direction, rooms inside rooms at its heart, in a low golden light. The music breathes the lattice, folds the stairs into new gravities and turns the whole world. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Impossible Architecture",
+      "project": "sonic-abstract/impossible-architecture.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "The Gate: a colossal segmented ring on the horizon of a mirror plane, a low sun burning inside it, amber haze, one tiny figure. The music breathes the haze and the light, parts the ring's segments as it builds and lights the segment at the pitch's angle. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Abstract Cinematic Void",
+      "project": "sonic-abstract/cinematic-void.json"
     }
   ]
 }

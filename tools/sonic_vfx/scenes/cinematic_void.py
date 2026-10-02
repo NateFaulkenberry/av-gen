@@ -131,7 +131,8 @@ def instrument(s):
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.5}
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.6, "attack": 1.2, "release": 1.5,
+                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     elev = math.atan2(RING_C[1] - CAM1[1], -(RING_C[2] - CAM1[2]))
     sun_dir = [0.0, -math.sin(elev), math.cos(elev)]          # travelling toward the camera, slightly down
     s.environment = {

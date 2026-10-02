@@ -49,6 +49,19 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   cut by `abstract.py music` into `assets/audio/sonic-abstract-{allyougot,rebuild}.wav`. Classes `allyougot` and
   `rebuild` in `review.REAL_MUSIC`.
 
+## Engine needs (for the coordinator)
+
+1. **An output letterbox** (`post/output/letterbox`, an aspect such as 2.39): the Cinematic Void draws its bars as
+   black geometry riding a straight camera push on the same track, which breaks under any turn, shake or zoom.
+2. **A camera roll parameter** (`camera/roll`): the Impossible Architecture rolls the world by turning the SDF object,
+   which also turns its light relationship; a true roll would keep the light fixed to the world.
+3. **Translucent procedurals** (Blend draws opaque): lines cannot fade out against what is behind them, only into a
+   matching colour (the Sacred Geometry lattice takes the halo's colour to fade).
+4. **A per-instance phase for deformers** (a wave travelling across a distribution's instances): a field of slabs
+   flipping in a stadium wave needs one node per row today.
+5. **The liveness audit for live projects**: a `sonic.live` project hears its input, but `--audit-routes` calls every
+   `audio.*` and `beat.*` route dead because the project has no audio file.
+
 ## Engine facts learned this pass
 
 - A field deformer (`"kind": "field"`) defaults to `alongNormal: true`: a scalar field then inflates a mesh along its

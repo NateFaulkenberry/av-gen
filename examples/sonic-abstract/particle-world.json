@@ -111,7 +111,9 @@
    "transient": 0.6,
    "sustain": 0.5,
    "attack": 1.0,
-   "release": 1.0
+   "release": 1.0,
+   "floorDb": -44.0,
+   "rangeDb": 42.0
   }
  },
  "parameters": {
