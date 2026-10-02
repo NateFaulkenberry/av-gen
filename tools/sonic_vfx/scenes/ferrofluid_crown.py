@@ -127,9 +127,9 @@ def build():
           look={"aoStrength": 0.5, "aoDistance": 0.2}, max_steps=96, epsilon=0.0008, max_distance=20.0)
     # ---- light: a long warm softbox high on the left, a thin cool strip behind on the right, a dim top fill
     s.light("softbox", "rect", position=[-3.4, 2.6, 1.6], direction=[0.72, -0.52, -0.38], up=[0, 1, 0],
-            color=hexrgb(WARM), intensity=55.0, width=3.6, height=1.0, castsShadow=False)
+            color=hexrgb(WARM), intensity=95.0, width=3.6, height=1.0, castsShadow=False)
     s.light("strip", "rect", position=[2.6, 1.6, -3.2], direction=[-0.5, -0.28, 0.82], up=[0, 1, 0],
-            color=hexrgb(COOL), intensity=40.0, width=0.25, height=3.2, castsShadow=False)
+            color=hexrgb(COOL), intensity=70.0, width=0.25, height=3.2, castsShadow=False)
     s.light("top", "rect", position=[0.0, 4.0, 0.0], direction=[0.0, -1.0, 0.0], up=[0, 0, 1],
             color=hexrgb("#d8d4cc"), intensity=6.0, width=2.0, height=2.0, castsShadow=False)
 
@@ -162,15 +162,15 @@ def build():
 
     # melodic: a spike rises at the note's place (fast, with a little overshoot) and melts when the note ends
     for k in range(N_SPIKES):
-        s.route(R("visual.spHeld%d" % k, "sdf/fluid/node/spike%d/translation" % k, 1.05, comp=1, attackMs=40,
+        s.route(R("visual.spHeld%d" % k, "sdf/fluid/node/spike%d/translation" % k, 1.3, comp=1, attackMs=40,
                   decayMs=700, springHz=3.2, springDamping=0.45))
     # ...and a glint runs up it: a small warm light just above each spike, flashing as the note lands, so the black
     # liquid shows the new spike as a highlight
     for k in range(N_SPIKES):
         a = math.radians(200.0 - k * (220.0 / (N_SPIKES - 1)))
         s.light("glint%d" % k, "point", position=[RING_R * math.cos(a) * 1.12, 0.75, RING_R * math.sin(a) * 1.12],
-                color=hexrgb(WARM), intensity=0.0, range=1.2, radius=0.05, castsShadow=False, volumetric=0.0)
-        s.route(R("visual.spHit%d" % k, "lights/glint%d/intensity" % k, 6.0, attackMs=0, decayMs=500))
+                color=hexrgb(WARM), intensity=0.0, range=2.0, radius=0.05, castsShadow=False, volumetric=0.0)
+        s.route(R("visual.spHit%d" % k, "lights/glint%d/intensity" % k, 28.0, attackMs=0, decayMs=500))
     # chord: the crown forms (the spike field rises round the tower)
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
         s.route(R("visual.crown", "sdf/fluid/node/ringLift%d/translation" % j, 0.06 + 0.04 * (3 - j), comp=1,

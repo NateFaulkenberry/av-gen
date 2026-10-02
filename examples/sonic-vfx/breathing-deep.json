@@ -1014,7 +1014,7 @@
   {
    "source": "visual.heat",
    "target": "procedural/hymenium/material/emissive",
-   "amount": 6.0,
+   "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1094,7 +1094,7 @@
   {
    "source": "visual.thHit0",
    "target": "procedural/thread0/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1139,7 +1139,7 @@
   {
    "source": "visual.thHit1",
    "target": "procedural/thread1/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1184,7 +1184,7 @@
   {
    "source": "visual.thHit2",
    "target": "procedural/thread2/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1229,7 +1229,7 @@
   {
    "source": "visual.thHit3",
    "target": "procedural/thread3/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1274,7 +1274,7 @@
   {
    "source": "visual.thHit4",
    "target": "procedural/thread4/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1319,7 +1319,7 @@
   {
    "source": "visual.thHit5",
    "target": "procedural/thread5/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1364,7 +1364,7 @@
   {
    "source": "visual.thHit6",
    "target": "procedural/thread6/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1409,7 +1409,7 @@
   {
    "source": "visual.thHit7",
    "target": "procedural/thread7/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1454,7 +1454,7 @@
   {
    "source": "visual.thHit8",
    "target": "procedural/thread8/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1499,7 +1499,7 @@
   {
    "source": "visual.thHit9",
    "target": "procedural/thread9/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1544,7 +1544,7 @@
   {
    "source": "visual.thHit10",
    "target": "procedural/thread10/material/emissive",
-   "amount": 1.6,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

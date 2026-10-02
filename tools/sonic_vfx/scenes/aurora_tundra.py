@@ -76,10 +76,10 @@ def ice_program():
             {"kind": "noise", "dst": 5, "srcA": 0, "value": 0.09, "seed": 5},               # the fracture network
             {"kind": "remap", "dst": 5, "srcA": 5, "value": 0, "constant": [0.5, 1.0, 0.0, 1.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 5},
-            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.0025, 0.0, 0.0]},  # 0 on a fracture
+            {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.0007, 0.0, 0.0]},  # 0 on a fracture
             {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},  # 1 on a fracture
             {"kind": "input", "dst": 6, "input": "cameraDistance"},
-            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [8.0, 60.0, 1.0, 0.0]},
+            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [4.0, 40.0, 1.0, 0.0]},
             {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                            # fade far
             {"kind": "add", "dst": 4, "srcA": 5, "srcB": 1},                                 # white: fracture/frost
             {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.0, 1.0, 0.0, 1.0]},
@@ -217,7 +217,7 @@ def build():
             R("kick", "fx/aurora/edgeBrightness", 1.6, attackMs=0, decayMs=500))
     # snare: the ice cracks with light
     for c, w in enumerate(hexrgb("#7fe8ff", 1.0)):
-        s.route(R("snare", "material/atIce/op/%d/constant/constant" % OP_CRACK, 7.0 * w, comp=c, attackMs=0,
+        s.route(R("snare", "material/atIce/op/%d/constant/constant" % OP_CRACK, 2.5 * w, comp=c, attackMs=0,
                   decayMs=320))
     # hat: diamond dust
     s.route(R("hat", "particles/dust/burst", 70.0, attackMs=0, decayMs=40),

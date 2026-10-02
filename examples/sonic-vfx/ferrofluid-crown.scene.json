@@ -832,7 +832,7 @@
     0.42327,
     0.10224
    ],
-   "intensity": 55.0,
+   "intensity": 95.0,
    "width": 3.6,
    "height": 1.0,
    "castsShadow": false
@@ -861,7 +861,7 @@
     0.46778,
     1.0
    ],
-   "intensity": 40.0,
+   "intensity": 70.0,
    "width": 0.25,
    "height": 3.2,
    "castsShadow": false
@@ -910,7 +910,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -930,7 +930,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -950,7 +950,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -970,7 +970,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -990,7 +990,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1010,7 +1010,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1030,7 +1030,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1050,7 +1050,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1070,7 +1070,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1090,7 +1090,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1110,7 +1110,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0
@@ -1130,7 +1130,7 @@
     0.10224
    ],
    "intensity": 0.0,
-   "range": 1.2,
+   "range": 2.0,
    "radius": 0.05,
    "castsShadow": false,
    "volumetric": 0.0

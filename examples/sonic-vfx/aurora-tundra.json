@@ -274,7 +274,7 @@
   {
    "source": "response.snare",
    "target": "material/atIce/op/17/constant/constant",
-   "amount": 1.48561,
+   "amount": 0.530575,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -286,7 +286,7 @@
   {
    "source": "response.snare",
    "target": "material/atIce/op/17/constant/constant",
-   "amount": 5.64865,
+   "amount": 2.017375,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -298,7 +298,7 @@
   {
    "source": "response.snare",
    "target": "material/atIce/op/17/constant/constant",
-   "amount": 7.0,
+   "amount": 2.5,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,

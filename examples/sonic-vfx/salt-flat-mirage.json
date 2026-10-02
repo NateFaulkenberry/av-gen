@@ -144,16 +144,27 @@
    "settings": {
     "mappings": [
      {
-      "name": "mood",
+      "name": "dissonance",
       "combine": "mean",
       "inputs": [
        {
         "signal": "notes.tension",
         "weight": 1.0
+       }
+      ],
+      "gain": 2.0
+     },
+     {
+      "name": "consonance",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
        },
        {
-        "signal": "sonic.brightness",
-        "weight": 0.6,
+        "signal": "notes.tension",
+        "weight": 1.0,
         "invert": true
        }
       ]
@@ -190,14 +201,36 @@
  ],
  "routes": [
   {
-   "source": "visual.mood",
+   "source": "visual.dissonance",
    "target": "palette/position",
-   "amount": 2.6,
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 1800,
-    "decayMs": 4500
+    "attackMs": 1200,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "visual.consonance",
+   "target": "palette/position",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "palette/value",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1600
    }
   },
   {
@@ -682,7 +715,7 @@
    [
     "sustained / chords",
     "notes.tension",
-    "the chord paints the sky: the palette moves from gold (consonant, bright) through rose and violet to indigo (dissonant, dark), and held sound brightens the whole sky"
+    "the chord paints the sky: a consonant chord warms the dusk to gold, dissonance darkens it through violet to indigo; a bright sound brightens it, held sound lifts the sun"
    ],
    [
     "melodic",
@@ -1049,7 +1082,7 @@
     "target": "scene/fogColor"
    }
   ],
-  "position": 0.4,
+  "position": 1.0,
   "saturation": 1.0,
   "value": 1.0
  }

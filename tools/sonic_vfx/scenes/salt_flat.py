@@ -70,9 +70,8 @@ DESIGN = {
         "extremely_fast": ["the monolith's outline (snare)", "the ring of light (kick)"],
     },
     "vocabulary": [
-        ["sustained / chords", "notes.tension", "the chord paints the sky: the "
-         "palette moves from gold (consonant, bright) through rose and violet to indigo (dissonant, dark), and held "
-         "sound brightens the whole sky"],
+        ["sustained / chords", "notes.tension", "the chord paints the sky: a consonant chord warms the dusk to "
+         "gold, dissonance darkens it through violet to indigo; a bright sound brightens it, held sound lifts the sun"],
         ["melodic", "response.note", "a meteor falls at the pitch's place across the sky (low notes "
          "low and left, high notes high and right), all from one radiant"],
         ["velocity", "notes.lastVelocity", "the meteor's brightness"],
@@ -157,7 +156,7 @@ def palette():
             {"role": "light", "target": "lights/sun/color"},
             {"role": "fog", "target": "scene/fogColor"},
         ],
-        "position": 0.4, "saturation": 1.0, "value": 1.0,
+        "position": 1.0, "saturation": 1.0, "value": 1.0,
     }
 
 
@@ -277,11 +276,14 @@ def build():
                    tamp=(0.05, 0.02, 0.0))
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
-    # the sky: dissonance and darkness move the palette from gold (0) through rose (1) and violet (2) to indigo (3);
-    # held sound brightens it all. At rest (silence) mood is 0.375: between rose and violet.
-    s.map(M("mood", [("tension", 1.0), ("brightness", 0.6, True)], "mean"))
+    # the sky: the palette rests at rose (1). A consonant chord warms it toward gold (0); dissonance darkens it
+    # through violet (2) to indigo (3). A bright sound brightens the whole sky; held sound lifts the sun.
+    s.map(M("dissonance", [("tension", 1.0)], "mean", 0.0, 2.0))
+    s.map(M("consonance", [("polyphony", 1.0), ("tension", 1.0, True)], "min"))
     s.map(M("glow", [("sustain", 1.0), ("held", 0.5)], "max"))
-    s.route(R("visual.mood", "palette/position", 2.6, attackMs=1800, decayMs=4500),
+    s.route(R("visual.dissonance", "palette/position", 2.0, attackMs=1200, decayMs=4000),
+            R("visual.consonance", "palette/position", -1.0, attackMs=1200, decayMs=4000),
+            R("brightness", "palette/value", 0.25, attackMs=400, decayMs=1600),
             R("visual.glow", "env/sky/sunIntensity", 8.0, **SLOW),
             R("visual.glow", "env/sky/sunGlow", 0.12, **SLOW))
     # melodic: the meteor's birthplace follows the latest note across the sky; velocity sets its brightness

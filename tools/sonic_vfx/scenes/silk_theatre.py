@@ -51,7 +51,8 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how wide the ribbon is"],
         ["chord", "notes.polyphony", "a sheaf of parallel gold ribbons"],
         ["bass", "response.bass", "the whole dance sways"],
-        ["kick", "response.kick", "a whip-crack: the ribbons snap tight round the hand"],
+        ["kick", "response.kick", "a whip-crack: the silk shudders and shreds fly from the hand"],
+        ["snare", "response.snare", "gold shreds fly; the rim light flashes"],
         ["hat", "response.hat", "glitter sparks along the ribbons"],
         ["sustained", "response.sustain", "the spot breathes brighter"],
         ["silence", "(no input)", "the empty stage: the cone of light, the curtain, the last ribbons falling"],
@@ -111,10 +112,17 @@ def build():
     silk = dict(shape="sphere", position=list(LEAD), extent=[0.015, 0.015, 0.015], direction=[0, 1, 0],
                 spawnRate=0.0, spread=1.0, speedMin=0.0, speedMax=0.02, gravity=[0, -0.06, 0], drag=1.5,
                 turbulence=0.02, turbulenceScale=0.4, blend="alpha")
-    s.particles("silk", capacity=5000, seed=7, lifetimeMin=4.5, lifetimeMax=5.5, sizeStart=0.15, sizeEnd=0.09,
-                colorStart=hexrgb("#ff3a3a") + [0.85], colorEnd=hexrgb("#5a0410") + [0.0], emissive=1.0, **silk)
+    s.particles("silk", capacity=5000, seed=7, lifetimeMin=4.5, lifetimeMax=5.5, sizeStart=0.11, sizeEnd=0.07,
+                colorStart=hexrgb("#ff3a3a") + [0.6], colorEnd=hexrgb("#5a0410") + [0.0], emissive=1.0, **silk)
     s.particles("gold", capacity=3000, seed=13, lifetimeMin=3.5, lifetimeMax=4.5, sizeStart=0.07, sizeEnd=0.04,
                 colorStart=hexrgb(GOLD) + [0.85], colorEnd=hexrgb("#a86a1a") + [0.0], emissive=1.5, **silk)
+    # the whip-crack: a flick of silk shreds thrown from the hand (kick red, snare gold), stopped by the air
+    for name, colour, seed in (("shreds", "#ff3a3a", 19), ("goldShreds", GOLD, 23)):
+        s.particles(name, capacity=1500, seed=seed, shape="sphere", position=list(LEAD), extent=[0.05, 0.05, 0.05],
+                    direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.8, lifetimeMax=1.4, spread=1.0, speedMin=2.0,
+                    speedMax=4.5, gravity=[0, -1.2, 0], drag=2.6, sizeStart=0.045, sizeEnd=0.0,
+                    colorStart=hexrgb(colour) + [0.9], colorEnd=hexrgb(colour) + [0.0], emissive=1.4,
+                    blend="alpha", velocityStretch=1.0, stretchMax=0.25)
     s.particles("glitter", capacity=1500, seed=17, shape="sphere", position=list(LEAD), extent=[0.6, 0.6, 0.6],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.25, lifetimeMax=0.7, spread=1.0, speedMin=0.05,
                 speedMax=0.3, gravity=[0, -0.4, 0], drag=0.6, sizeStart=0.012, sizeEnd=0.0,
@@ -129,7 +137,7 @@ def build():
         keys.append({"time": round(9.0 * u, 4),
                      "value": [round(LEAD[0] + 3.4 * math.sin(a), 4), LEAD[1],
                                round(LEAD[2] + 1.6 * math.sin(2.0 * a), 4)], "interp": "smooth"})
-    for sysname in ("silk", "gold", "glitter"):
+    for sysname in ("silk", "gold", "glitter", "shreds", "goldShreds"):
         s.track("particles/%s/position" % sysname, keys, loop=9.0)
 
     # ---- camera: a slow orbit at stage height, the hand off centre
@@ -140,7 +148,7 @@ def build():
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # melody: the hand's height (low notes at the floor, high notes overhead), on a slow spring, so the stroke curves
     # from note to note instead of stepping
-    for sysname, dy in (("silk", 0.0), ("gold", 0.18), ("glitter", 0.0)):
+    for sysname, dy in (("silk", 0.0), ("gold", 0.18), ("glitter", 0.0), ("shreds", 0.0), ("goldShreds", 0.0)):
         s.route(R("lastPitch", "particles/%s/position" % sysname, 5.0, comp=1, springHz=0.7, springDamping=0.85,
                   offset=-0.3 + dy / 5.0))
     # a sounding note lays silk (legato: one unbroken stroke; staccato: short strokes); each note-on a small knot
@@ -155,6 +163,8 @@ def build():
     for sysname in ("silk", "gold"):
         s.route(R("bass", "particles/%s/position" % sysname, 0.5, comp=0, attackMs=50, decayMs=900),
                 R("kick", "particles/%s/turbulence" % sysname, 2.4, attackMs=0, decayMs=180))
+    s.route(R("kick", "particles/shreds/burst", 70.0, attackMs=0, decayMs=40),
+            R("snare", "particles/goldShreds/burst", 50.0, attackMs=0, decayMs=40))
     # hat: glitter; sustain: the spot breathes
     s.route(R("hat", "particles/glitter/burst", 60.0, attackMs=0, decayMs=40),
             R("sustain", "lights/spot/intensity", 500.0, **SLOW),

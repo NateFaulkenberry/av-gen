@@ -533,7 +533,7 @@
       0.47932,
       0.10702
      ],
-     "emissiveIntensity": 2.2,
+     "emissiveIntensity": 0.9,
      "roughness": 1.0,
      "metallic": 0.0
     }
@@ -603,7 +603,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -682,7 +682,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -761,7 +761,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -840,7 +840,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -919,7 +919,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -998,7 +998,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1077,7 +1077,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1156,7 +1156,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1235,7 +1235,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1314,7 +1314,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1393,7 +1393,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.032,
+     "tubeRadius": 0.05,
      "tubeTaper": 0.3,
      "tubeSides": 8,
      "tubeSegments": 40,
@@ -1628,7 +1628,7 @@
       0.87137,
       0.52712
      ],
-     "emissiveIntensity": 0.55,
+     "emissiveIntensity": 0.16,
      "roughness": 0.5,
      "metallic": 0.0
     },
@@ -1703,7 +1703,7 @@
       0.87137,
       0.52712
      ],
-     "emissiveIntensity": 0.12,
+     "emissiveIntensity": 0.04,
      "roughness": 0.5,
      "metallic": 0.0
     },

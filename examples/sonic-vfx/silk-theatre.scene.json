@@ -200,13 +200,13 @@
     "seed": 7,
     "lifetimeMin": 4.5,
     "lifetimeMax": 5.5,
-    "sizeStart": 0.15,
-    "sizeEnd": 0.09,
+    "sizeStart": 0.11,
+    "sizeEnd": 0.07,
     "colorStart": [
      1.0,
      0.04231,
      0.04231,
-     0.85
+     0.6
     ],
     "colorEnd": [
      0.10224,
@@ -299,6 +299,116 @@
     "turbulence": 0.02,
     "turbulenceScale": 0.4,
     "blend": "alpha"
+   }
+  },
+  {
+   "name": "shreds",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 1500,
+    "seed": 19,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     1.2,
+     0.0
+    ],
+    "extent": [
+     0.05,
+     0.05,
+     0.05
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.8,
+    "lifetimeMax": 1.4,
+    "spread": 1.0,
+    "speedMin": 2.0,
+    "speedMax": 4.5,
+    "gravity": [
+     0,
+     -1.2,
+     0
+    ],
+    "drag": 2.6,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.04231,
+     0.04231,
+     0.9
+    ],
+    "colorEnd": [
+     1.0,
+     0.04231,
+     0.04231,
+     0.0
+    ],
+    "emissive": 1.4,
+    "blend": "alpha",
+    "velocityStretch": 1.0,
+    "stretchMax": 0.25
+   }
+  },
+  {
+   "name": "goldShreds",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 1500,
+    "seed": 23,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     1.2,
+     0.0
+    ],
+    "extent": [
+     0.05,
+     0.05,
+     0.05
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.8,
+    "lifetimeMax": 1.4,
+    "spread": 1.0,
+    "speedMin": 2.0,
+    "speedMax": 4.5,
+    "gravity": [
+     0,
+     -1.2,
+     0
+    ],
+    "drag": 2.6,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.521,
+     0.10224,
+     0.9
+    ],
+    "colorEnd": [
+     1.0,
+     0.521,
+     0.10224,
+     0.0
+    ],
+    "emissive": 1.4,
+    "blend": "alpha",
+    "velocityStretch": 1.0,
+    "stretchMax": 0.25
    }
   },
   {

@@ -177,6 +177,32 @@
    }
   },
   {
+   "source": "notes.lastPitch",
+   "target": "particles/shreds/position",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "springHz": 0.7,
+    "springDamping": 0.85,
+    "offset": -0.3
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "particles/goldShreds/position",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "springHz": 0.7,
+    "springDamping": 0.85,
+    "offset": -0.3
+   }
+  },
+  {
    "source": "notes.active",
    "target": "particles/silk/spawnRate",
    "amount": 700.0,
@@ -286,6 +312,28 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 180
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/shreds/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/goldShreds/burst",
+   "amount": 50.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
    }
   },
   {
@@ -677,6 +725,332 @@
    },
    {
     "target": "particles/glitter/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 9.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.5625,
+      "value": [
+       1.3011,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.125,
+      "value": [
+       2.4042,
+       1.2,
+       1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.6875,
+      "value": [
+       3.1412,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.25,
+      "value": [
+       3.4,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.8125,
+      "value": [
+       3.1412,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.375,
+      "value": [
+       2.4042,
+       1.2,
+       -1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.9375,
+      "value": [
+       1.3011,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.5,
+      "value": [
+       0.0,
+       1.2,
+       -0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0625,
+      "value": [
+       -1.3011,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       -2.4042,
+       1.2,
+       1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.1875,
+      "value": [
+       -3.1412,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.75,
+      "value": [
+       -3.4,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.3125,
+      "value": [
+       -3.1412,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.875,
+      "value": [
+       -2.4042,
+       1.2,
+       -1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.4375,
+      "value": [
+       -1.3011,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       -0.0,
+       1.2,
+       -0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/shreds/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 9.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.5625,
+      "value": [
+       1.3011,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.125,
+      "value": [
+       2.4042,
+       1.2,
+       1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.6875,
+      "value": [
+       3.1412,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.25,
+      "value": [
+       3.4,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.8125,
+      "value": [
+       3.1412,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.375,
+      "value": [
+       2.4042,
+       1.2,
+       -1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.9375,
+      "value": [
+       1.3011,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.5,
+      "value": [
+       0.0,
+       1.2,
+       -0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0625,
+      "value": [
+       -1.3011,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       -2.4042,
+       1.2,
+       1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.1875,
+      "value": [
+       -3.1412,
+       1.2,
+       1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.75,
+      "value": [
+       -3.4,
+       1.2,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.3125,
+      "value": [
+       -3.1412,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.875,
+      "value": [
+       -2.4042,
+       1.2,
+       -1.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.4375,
+      "value": [
+       -1.3011,
+       1.2,
+       -1.1314
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.0,
+      "value": [
+       -0.0,
+       1.2,
+       -0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/goldShreds/position",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -1249,7 +1623,12 @@
    [
     "kick",
     "response.kick",
-    "a whip-crack: the ribbons snap tight round the hand"
+    "a whip-crack: the silk shudders and shreds fly from the hand"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "gold shreds fly; the rim light flashes"
    ],
    [
     "hat",

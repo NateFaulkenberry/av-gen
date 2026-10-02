@@ -1203,7 +1203,7 @@
   {
    "source": "visual.spHeld0",
    "target": "sdf/fluid/node/spike0/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1217,7 +1217,7 @@
   {
    "source": "visual.spHeld1",
    "target": "sdf/fluid/node/spike1/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1231,7 +1231,7 @@
   {
    "source": "visual.spHeld2",
    "target": "sdf/fluid/node/spike2/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1245,7 +1245,7 @@
   {
    "source": "visual.spHeld3",
    "target": "sdf/fluid/node/spike3/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1259,7 +1259,7 @@
   {
    "source": "visual.spHeld4",
    "target": "sdf/fluid/node/spike4/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1273,7 +1273,7 @@
   {
    "source": "visual.spHeld5",
    "target": "sdf/fluid/node/spike5/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1287,7 +1287,7 @@
   {
    "source": "visual.spHeld6",
    "target": "sdf/fluid/node/spike6/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1301,7 +1301,7 @@
   {
    "source": "visual.spHeld7",
    "target": "sdf/fluid/node/spike7/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1315,7 +1315,7 @@
   {
    "source": "visual.spHeld8",
    "target": "sdf/fluid/node/spike8/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1329,7 +1329,7 @@
   {
    "source": "visual.spHeld9",
    "target": "sdf/fluid/node/spike9/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1343,7 +1343,7 @@
   {
    "source": "visual.spHeld10",
    "target": "sdf/fluid/node/spike10/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1357,7 +1357,7 @@
   {
    "source": "visual.spHeld11",
    "target": "sdf/fluid/node/spike11/translation",
-   "amount": 1.05,
+   "amount": 1.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1371,7 +1371,7 @@
   {
    "source": "visual.spHit0",
    "target": "lights/glint0/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1382,7 +1382,7 @@
   {
    "source": "visual.spHit1",
    "target": "lights/glint1/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1393,7 +1393,7 @@
   {
    "source": "visual.spHit2",
    "target": "lights/glint2/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1404,7 +1404,7 @@
   {
    "source": "visual.spHit3",
    "target": "lights/glint3/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1415,7 +1415,7 @@
   {
    "source": "visual.spHit4",
    "target": "lights/glint4/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1426,7 +1426,7 @@
   {
    "source": "visual.spHit5",
    "target": "lights/glint5/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1437,7 +1437,7 @@
   {
    "source": "visual.spHit6",
    "target": "lights/glint6/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1448,7 +1448,7 @@
   {
    "source": "visual.spHit7",
    "target": "lights/glint7/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1459,7 +1459,7 @@
   {
    "source": "visual.spHit8",
    "target": "lights/glint8/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1470,7 +1470,7 @@
   {
    "source": "visual.spHit9",
    "target": "lights/glint9/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1481,7 +1481,7 @@
   {
    "source": "visual.spHit10",
    "target": "lights/glint10/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1492,7 +1492,7 @@
   {
    "source": "visual.spHit11",
    "target": "lights/glint11/intensity",
-   "amount": 6.0,
+   "amount": 28.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

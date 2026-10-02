@@ -168,7 +168,7 @@ def build():
            deformers=[{"kind": "noise", "amount": 0.0, "scale": 1.3, "speed": 2.2, "seed": 61}])
     s.proc("hymenium", {"kind": "cylinder", "radius": 5.0, "height": 0.04, "radialSegments": 96, "caps": True},
            position=ORG, transform={"position": [0.0, 0.0, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
-           material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb(AMBER), "emissiveIntensity": 2.2,
+           material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb(AMBER), "emissiveIntensity": 0.9,
                      "roughness": 1.0, "metallic": 0.0})
     s.proc("stalk", strand((ORG[0], ORG[1] + 2.6, ORG[2]), (ORG[0] + 0.8, 25.0, ORG[2] - 1.2), 0.85, taper=2.2,
                            seed=31, noise=0.5, noise_scale=0.4, sides=16, segments=20),
@@ -181,7 +181,7 @@ def build():
         length = 7.4 + 1.6 * ((k * 37) % 5) / 4.0
         end = (a[0] + 0.35 * ((k % 3) - 1), a[1] - length, a[2] + 0.4 * ((k % 2) - 0.5))
         name = "thread%d" % k
-        s.proc(name, strand(a, end, 0.032, taper=0.3, seed=100 + k, noise=0.28, noise_scale=0.7, sides=8,
+        s.proc(name, strand(a, end, 0.05, taper=0.3, seed=100 + k, noise=0.28, noise_scale=0.7, sides=8,
                             segments=40),
                material={"baseColor": [0.01, 0.02, 0.02], "emissiveColor": hexrgb(BIO), "emissiveIntensity": 0.07,
                          "roughness": 0.5, "metallic": 0.0},
@@ -211,7 +211,7 @@ def build():
                   "curve": {"kind": "catmullRom", "generator": "line", "count": 3, "start": [0, -0.32, 0],
                             "end": [0, 0.0, 0], "samplesPerSegment": 4}}
     # a colony, not a scatter: one larger cap and a tail of smaller ones (heavy-tailed sizes)
-    for name, src, emi in (("lipCaps", small_cap, 0.55), ("lipStems", small_stem, 0.12)):
+    for name, src, emi in (("lipCaps", small_cap, 0.16), ("lipStems", small_stem, 0.04)):
         s.proc(name, src, position=(-7.6, 1.15, 4.6),
                distribution={"kind": "spiral", "count": 12, "radius": 0.3, "radiusGrowth": 0.28, "turns": 1.25,
                              "spiralHeight": 0.0},
@@ -261,7 +261,7 @@ def build():
     s.map2(M("chordShimmer", [("noteOn", 1.0), ("polyphony", 1.0)], "min"))
 
     # sustained: the gill ring blooms, the light under the organism warms, spores thicken
-    s.route(R("visual.heat", "procedural/hymenium/material/emissive", 6.0, **SLOW),
+    s.route(R("visual.heat", "procedural/hymenium/material/emissive", 2.2, **SLOW),
             R("visual.heat", "lights/hymenium/intensity", 900.0, **SLOW),
             R("visual.heat", "procedural/gills/material/emissive", 1.6, **SLOW),
             R("visual.heat", "particles/spores/spawnRate", 160.0, **SLOW),
@@ -271,7 +271,7 @@ def build():
     for k in range(N_THREADS):
         s.route(R("visual.thHit%d" % k, "fx/pulse%d/peak" % k, 16.0, depth="visual.accentPlus", attackMs=0,
                   decayMs=1400),
-                R("visual.thHit%d" % k, "procedural/thread%d/material/emissive" % k, 1.6, attackMs=0, decayMs=900))
+                R("visual.thHit%d" % k, "procedural/thread%d/material/emissive" % k, 5.0, attackMs=0, decayMs=900))
         # a chord shimmers through every thread at once, faintly
         s.route(R("visual.chordShimmer", "fx/pulse%d/peak" % k, 3.0, attackMs=0, decayMs=1100))
         # roughness kinks the threads
