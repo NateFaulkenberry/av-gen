@@ -26,6 +26,7 @@ shortcuts: file.save-project, transport.play, file.open-audio, file.open-scene, 
 | `Return` | return to the start of the play range |
 | `End` | go to the end of it |
 | `L` | turn the loop on or off |
+| `PageUp`, `PageDown` | the previous or next live scene, while live input runs or a live scene is open (ADR-1063) |
 | `Cmd+S` | save the project (Save As when it has no path yet) |
 | `O` | open audio |
 | `S` | open a glTF scene |
