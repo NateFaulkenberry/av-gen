@@ -347,6 +347,12 @@
       "description": "Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn in lightning, so harmony has a shape. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - Tesla Choir",
       "project": "sonic-vfx/tesla-choir.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held chords. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - The Corrupted Cathedral",
+      "project": "sonic-vfx/corrupted-cathedral.json"
     }
   ]
 }

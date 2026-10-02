@@ -1,0 +1,1290 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "corrupted-cathedral.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 0.8,
+  "post/bloom/emissionWeight": 0.9,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.02,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": true,
+  "temporal/mosh/amount": 0.0,
+  "temporal/mosh/shift": 0.0,
+  "temporal/mosh/block": 36.0,
+  "temporal/mosh/smear": 26.0,
+  "temporal/mosh/frames": 10.0,
+  "temporal/mosh/rate": 14.0,
+  "post/sweep/angle": 0.35,
+  "post/sweep/width": 0.12,
+  "post/sweep/span": 0.4,
+  "post/sweep/hue": 0.85,
+  "post/sweep/wash": 0.25,
+  "post/sweep/trail": 0.4,
+  "post/sweep/intensity": 0.0,
+  "post/sweep/progress": 1.0,
+  "post/lens/chromaticAberration": 0.02,
+  "post/grade/contrast": 1.12
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "bay0_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.8864406779661018,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay1_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.2220338983050847,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay2_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.557627118644068,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay3_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.893220338983051,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay4_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.2288135593220337,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay5_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.5644067796610166,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "bay6_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.9000000000000004,
+      "gain": 7.4576271186440675
+     },
+     {
+      "name": "heal",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "response.sustain",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.held",
+        "weight": 0.6
+       }
+      ]
+     },
+     {
+      "name": "frag",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.density",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.rhythm",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "grit",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "sonic.roughness",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.energy",
+        "weight": 0.4
+       },
+       {
+        "signal": "sonic.inharmonicity",
+        "weight": 2.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.3,
+      "gain": 6.5
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "bay0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay3_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay3_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay3_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay3_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay4_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay4_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay4_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay4_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay5_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay5_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay5_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay5_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay6_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay6_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     },
+     {
+      "name": "bay6_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.bay6_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.48989898989899,
+      "gain": 2.97979797979798
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
+   "settings": {
+    "mappings": [
+     {
+      "name": "bay0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay0_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay0_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay1_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay1_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay2_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay2_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay3_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay3_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay4_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay4_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay5_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay5_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bay6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay6_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bayHit6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.bay6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.bay6_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.heal",
+   "target": "sdf/nave/look/edge/intensity",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "sdf/nave/look/edge/softness",
+   "amount": -0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "lights/rose/intensity",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "sdf/nave/surface/1/emission",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.bayHit0",
+   "target": "lights/bay0/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit1",
+   "target": "lights/bay1/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit2",
+   "target": "lights/bay2/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit3",
+   "target": "lights/bay3/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit4",
+   "target": "lights/bay4/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit5",
+   "target": "lights/bay5/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "visual.bayHit6",
+   "target": "lights/bay6/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/nave/node/sway/amount",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/nave/look/edge/pixels",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "sdf/nave/node/fracture/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "temporal/mosh/amount",
+   "amount": 0.42,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "temporal/mosh/shift",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/shards/burst",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "visual.frag",
+   "target": "temporal/mosh/block",
+   "amount": -18.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.frag",
+   "target": "temporal/mosh/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/motes/emissive",
+   "amount": 7.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 70
+   }
+  },
+  {
+   "source": "notes.phraseStart",
+   "target": "post/sweep/progress",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.9,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.0
+   }
+  },
+  {
+   "source": "notes.phraseStart",
+   "target": "post/sweep/intensity",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1100
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "sdf/nave/node/fracture/amount",
+   "amount": 0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "temporal/mosh/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "post/bloom/intensity",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 100.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.354,
+       4.4,
+       5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.5,
+      "value": [
+       0.548,
+       4.4,
+       3.975
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.0,
+      "value": [
+       0.421,
+       4.4,
+       1.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       0.047,
+       4.4,
+       -0.975
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       -0.354,
+       4.4,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 62.5,
+      "value": [
+       -0.548,
+       4.4,
+       -0.975
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       -0.421,
+       4.4,
+       1.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 87.5,
+      "value": [
+       -0.047,
+       4.4,
+       3.975
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       0.354,
+       4.4,
+       5.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 100.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.5,
+      "value": [
+       0.141,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.0,
+      "value": [
+       0.2,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       0.141,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       0.0,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 62.5,
+      "value": [
+       -0.141,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       -0.2,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 87.5,
+      "value": [
+       -0.141,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       -0.0,
+       10.2,
+       -40.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-corrupted-cathedral.mp4"
+ },
+ "sonicScene": {
+  "category": "digital",
+  "thesis": "A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held chords.",
+  "composition": {
+   "background": "the apse wall and its rose window far down the nave, the lines dimmed by distance and haze",
+   "midground": "seven bays of piers, pointed arcades and transverse ribs, drawn in light",
+   "foreground": "the first pair of piers framing the view, close and bright",
+   "focal": "the rose window: the brightest thing in the frame, high on the axis",
+   "secondary": [
+    "the bay lights that flare by pitch",
+    "floating data motes",
+    "the floor's tile lines"
+   ],
+   "atmosphere": "thin cold violet haze that swallows the far lines",
+   "post": "data mosh, channel shift and lens fringing, rationed to hits; a scan sweep on phrases; bloom",
+   "camera": "a slow walk up and back the axis (one-point perspective), 100 s"
+  },
+  "palette": {
+   "dominant": "#000000",
+   "secondary": "#120a24",
+   "accent": "#ff2fd0",
+   "highlight": "#bff8ff",
+   "background_value": "black",
+   "saturation": "cyan lines everywhere at low value; the rose window and the corruption carry the chroma"
+  },
+  "motion": {
+   "very_slow": [
+    "the walk",
+    "the rose window turning"
+   ],
+   "medium": [
+    "the nave swaying (bass)",
+    "reconstruction after a hit"
+   ],
+   "fast": [
+    "bay lights by pitch"
+   ],
+   "extremely_fast": [
+    "mosh blocks (snare)",
+    "fracture (kick)",
+    "mote flicker (hat)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "sustained",
+    "response.sustain",
+    "reconstruction: the lines sharpen and brighten, the corruption heals"
+   ],
+   [
+    "melodic",
+    "notes.noteOn + notes.lastPitch",
+    "the bay at the pitch's place flares (low notes near the door, high notes near the apse)"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the structure sways (an SDF warp) and the lines thicken"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a structural fracture: the stone breaks into Voronoi cells for a moment"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "frame corruption: mosh blocks and a magenta channel shift"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "data motes flicker"
+   ],
+   [
+    "phrase",
+    "notes.phraseStart",
+    "a scan sweep crosses the frame and rebuilds it"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how hard a note flares its bay"
+   ],
+   [
+    "density",
+    "notes.density",
+    "fragmentation: more, smaller mosh blocks"
+   ],
+   [
+    "roughness",
+    "sonic.roughness",
+    "a rough sound leaves the stone permanently fractured"
+   ]
+  ],
+  "tier": "medium: one compiled SDF (the nave), haze march at 24 steps, mosh",
+  "id": "corrupted-cathedral",
+  "title": "The Corrupted Cathedral"
+ }
+}
