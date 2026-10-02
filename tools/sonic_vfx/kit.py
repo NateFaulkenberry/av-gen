@@ -569,9 +569,10 @@ def write_index(scenes, category="Sonic VFX"):
         idx = json.load(f)
     keep = [e for e in idx["examples"] if e.get("category") != category]
     for sc in scenes:
-        keep.append({"category": category, "name": "Sonic VFX - " + sc.title,
+        keep.append({"category": category,
                      "description": sc.design.get("thesis", "") + " Live: opening it turns live input on "
                      "(View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+                     "name": "Sonic VFX - " + sc.title,
                      "project": "sonic-vfx/" + sc.id + ".json"})
     idx["examples"] = keep
     with open(path, "w") as f:

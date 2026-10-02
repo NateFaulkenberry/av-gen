@@ -329,6 +329,12 @@
       "description": "Play the Sonic Garden live (ADR-1025): a MIDI keyboard and a synth's audio input drive the same Sonic Character, musical context and worlds as the file version. Opening it turns live input on; pick the devices in the Live panel (View > Live). See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
       "name": "Sonic Live",
       "project": "sonic-garden/sonic-live.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Event Horizon",
+      "project": "sonic-vfx/event-horizon.json"
     }
   ]
 }
