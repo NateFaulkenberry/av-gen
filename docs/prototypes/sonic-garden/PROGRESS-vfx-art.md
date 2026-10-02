@@ -1,5 +1,7 @@
 # Sonic Garden VFX expansion: art progress (sonic-art)
 
+**STOPPED 2026-10-02: art pass rejected by the owner, restart under 03-brief-art-restart.md**
+
 Brief: `02-brief-vfx-expansion.md` (the owner's words govern). The engineer's notes are `PROGRESS-vfx-eng.md`, their
 architecture `VFX-ARCHITECTURE.md`. Worktree `../av-gen-sonic`, branch `proto/sonic-garden`. Commit only my own
 paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic-vfx/` (look-dev stills in
