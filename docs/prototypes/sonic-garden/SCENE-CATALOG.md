@@ -479,6 +479,10 @@ crawls as light inside the cloud.
   dark on the clear slot. The march carries the medium alone (`volumeMaxDistance` 0).
 - The snare's strike lights the slot, not the sky: any change to the procedural sky rebuilds its lighting cube.
 - The wheat is 4,400 instanced lathed stalks with a wind deformer.
+- The lightning's flash is ranged short of the camera (900 m for a strike ~1 km off). With a range that held the
+  camera, its light lit the funnel's medium in hard screen-tile rectangles: an engine defect, reported.
+- A cloud-base ceiling (a lit plane at the cloud base) was tried and dropped: `fogSky` melts every surface past
+  1.8 km into the sky behind it, so it never showed.
 
 ### 8. Salt Flat Mirage (atmospheric, lonely)
 
@@ -538,7 +542,10 @@ cannot do:
   the snare flares its outline, and the kick sends a ring of light out from its base.
 - **No moon.** A masked program's crescent still writes its whole disc to the depth prepass, so the clear colour
   showed through.
-- **No salt polygons.** The material Voronoi is a 3D F1, so a slice gives soft blobs; there is no edge op.
+- **The salt polygons** came with ADR-1069's `voronoiEdge` (Worley F2 - F1): white ridges between cells about 1.3 m
+  across, flattened onto the ground and fading out by 65 m before they could alias. The crust underfoot is darkened
+  by camera distance, so the frame reads dark foreground, bright horizon band, deep zenith (the evaluator had
+  measured muddy midtones).
 - **The mirage:** puddles and a far sheet of standing water mirror the sky, which makes the range float on a line
   of light, and the heat shimmer wobbles that line.
 
@@ -612,6 +619,10 @@ snow falls through the hats.
   - The jellyfish are lathed bells with radial strand tentacles. The one at the pitch's depth answers (pitch
     places).
   - The kick's pressure wave is the post `shock` instrument.
+  - Second pass, after the matrix (the first read as dots in black water): 56 bigger zooids, each trailing hanging
+    palps lit by the same band program; the jellyfish larger and nearer, their bells translucent (a Fresnel rim
+    program on the routed emission); brighter snow; a stronger note band and jelly answer, so the magenta accent
+    is on screen when a jelly answers.
 
 ### 11. Silk Theatre (abstract)
 
@@ -642,6 +653,11 @@ stroke, and the kick cracks the ribbons like whips.
   - Instead, the silk is a stroke laid in the air: particles born where the hand is while a note sounds, left
     there, overlapping into one band that sags and fades over five seconds.
   - The kick throws red shreds and shudders the stroke; the snare throws gold shreds.
+  - Second pass: the stroke read as a thick tube. The hand is now a short vertical bar (a box emitter), so the laid
+    particles weave a band a hand's breadth wide, and a keyed track narrows the bar to its edge and back, so the
+    band twists along its length like a ribbon. The stage went dark (thinner haze, a dimmer wash), the spot leaves
+    a pool on the floor, and the rim light's source left the frame (it showed as a red dot). No note brightens the
+    whole stage any more (the evaluator's "whole frame answers").
 
 ### 12. Aurora Tundra (atmospheric, cold)
 
@@ -671,6 +687,10 @@ the hats are diamond dust glittering in the air.
   - Tension and polyphony move a four-state palette.
   - The pressure ridge was cut: box slabs read as boards. The foreground is black ice crazed with white fractures,
     which the snare lights, as on Baikal.
+  - Second pass: long cracks between the ice's plates (`voronoiEdge`, ~8 m plates) join the fine crazing, and a band
+    of the curtains' own colour lies on the far ice (its colour bound to the palette's low role, its gain routed by
+    sustain and the kick). Spread over all the ice, that reflection read as a lit green floor: a fake reflection
+    cannot follow the curtains, so it is kept to a band under the horizon.
 
 ### 13. Ember Forest (organic, after the fire)
 
@@ -699,6 +719,8 @@ black trunks, the melody one ember dancing through the smoke.
   - Three instanced trunk planes, ash with glowing coal seams (a program), and thin smoke with shafts.
   - The fire front is an emissive, noise-topped band behind the last trees.
   - The bass stirs the smoke's structure, never its density: a density route drowned the trunks.
+  - The coal seams are broken into live lengths and dead ones (an unbroken contour read as a map's line), and the
+    sustained glow lifts the sky again: ADR-1070 made a slow sky route cheap live.
 
 ### 14. Lantern Lake (atmospheric, warm)
 
@@ -731,6 +753,11 @@ constellation, and the bass a slow swell beneath it.
       ripple bands).
   - A heat-shimmer column under the waterline wobbles the mirror world: the bass swells it and the kick ripples
     it.
+  - Second pass: the shimmer alone was invisible on a smooth gradient (the matrix measured the kick silent). The
+    kick now sends a ripple ring across the water from the jetty's end: the mirror program finds where the view ray
+    crosses the waterline (the plane's point lifted back up the ray by the mirror's depth) and draws a band at a
+    radius the kick's linear-fall envelope moves outward, fading as it spreads. The bass deepens the reflection's
+    long bands; fireflies blink along the jetty instead of beside the lens.
 
 ### 15. Feedback Mirror (digital, feedback-driven)
 
