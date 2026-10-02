@@ -105,6 +105,13 @@
      "slow": 2.0
     }
    }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 0.8,
+   "release": 0.9
   }
  },
  "parameters": {
@@ -1285,6 +1292,35 @@
   ],
   "tier": "medium: one compiled SDF (the nave), haze march at 24 steps, mosh",
   "id": "corrupted-cathedral",
-  "title": "The Corrupted Cathedral"
+  "title": "The Corrupted Cathedral",
+  "regions": [
+   {
+    "id": "rose",
+    "box": [
+     0.445,
+     0.364,
+     0.555,
+     0.559
+    ]
+   },
+   {
+    "id": "nave",
+    "box": [
+     0.161,
+     0.0,
+     0.813,
+     1.0
+    ]
+   },
+   {
+    "id": "floor",
+    "box": [
+     0.1,
+     0.72,
+     0.9,
+     1.0
+    ]
+   }
+  ]
  }
 }

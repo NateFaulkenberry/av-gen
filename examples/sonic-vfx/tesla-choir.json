@@ -105,6 +105,13 @@
      "slow": 2.0
     }
    }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.65,
+   "sustain": 0.45,
+   "attack": 0.7,
+   "release": 0.8
   }
  },
  "parameters": {
@@ -1644,7 +1651,36 @@
   ],
   "tier": "medium: haze march (24 steps live), twelve ribbon arcs, one SDF hall",
   "id": "tesla-choir",
-  "title": "Tesla Choir"
+  "title": "Tesla Choir",
+  "regions": [
+   {
+    "id": "core",
+    "box": [
+     0.563,
+     0.177,
+     0.721,
+     0.457
+    ]
+   },
+   {
+    "id": "towers",
+    "box": [
+     0.325,
+     0.396,
+     1.0,
+     0.593
+    ]
+   },
+   {
+    "id": "background",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.22
+    ]
+   }
+  ]
  },
  "effects": [
   {

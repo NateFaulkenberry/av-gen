@@ -5,6 +5,8 @@ and context as live, ADR-1025). Every render goes through tools/gpu-lock.sh with
     python3 tools/sonic_vfx/review.py stills <scene-id> <class> [--at 4,8,12] [--size 960x540] [--out DIR]
     python3 tools/sonic_vfx/review.py clip   <scene-id> <class> [--range a:b] [--size 960x540] [--out FILE]
     python3 tools/sonic_vfx/review.py matrix <scene-id> [class ...] [--size 640x360] [--out DIR]
+    python3 tools/sonic_vfx/review.py eval   <scene-id> <class> [--size 960x540] [--out DIR]
+             a clip, the engine's signal trace and tools/sonic_vfx_critic.py's measure report (r.json, r.md)
 
 `AVGEN` names the engine (default: the pinned wrapper in the session scratchpad, else build/release/src/avgen).
 """
@@ -78,7 +80,7 @@ def sheet(paths, out, cols=2):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["stills", "clip", "matrix"])
+    ap.add_argument("mode", choices=["stills", "clip", "matrix", "eval"])
     ap.add_argument("scene")
     ap.add_argument("classes", nargs="*")
     ap.add_argument("--at", default="")
@@ -117,6 +119,18 @@ def main():
         run(["--headless", "--project", proj, "--render", out, "--range", rng, "--size", a.size or "960x540",
              "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120"])
         print(out)
+    elif a.mode == "eval":
+        cls = a.classes[0] if a.classes else "full"
+        os.makedirs(work, exist_ok=True)
+        proj, dur = variant(a.scene, cls, work, a.projects or None)
+        base = os.path.join(work, "%s--%s" % (a.scene, cls))
+        run(["--headless", "--project", proj, "--render", base + ".mp4", "--range", "0:%.2f" % dur, "--size",
+             a.size or "960x540", "--fps", a.fps, "--codec", "h264", "--quality", "80", "--particle-warmup", "120"])
+        subprocess.run([AVGEN, "--project", proj, "--sonic-trace", base + ".trace.csv"], capture_output=True)
+        subprocess.run([sys.executable, os.path.join(REPO, "tools", "sonic_vfx_critic.py"), "measure", "--video",
+                        base + ".mp4", "--trace", base + ".trace.csv", "--project", proj, "--out",
+                        base + ".critic.json", "--md", base + ".critic.md"])
+        print(base + ".critic.md")
     else:
         classes = a.classes or CLASSES
         os.makedirs(work, exist_ok=True)

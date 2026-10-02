@@ -340,6 +340,7 @@ class Scene:
         self.composition = {}
         self.character = None
         self.response = None
+        self.regions = []         # the evaluator's screen-space regions (sonicScene.regions), see region()
 
     # ---------------------------------------------------------------- world
     def proc(self, name, source, distribution=None, material=None, deformers=None, variation=None,
@@ -553,6 +554,82 @@ class Scene:
         self.camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"],
                        "fov": self.camera.get("fov", 40.0), "orbitSpeed": 0.0}
 
+    # ---------------------------------------------------------------- screen-space regions (the evaluator's)
+    def _camera_at(self, t=0.0):
+        """The camera's position and target at time t from its tracks (else the scene camera block)."""
+        def at(target, fallback):
+            for tr in self.tracks:
+                if tr["target"] == target and tr["keys"]:
+                    keys = tr["keys"]
+                    if tr.get("loopLength"):
+                        t2 = t % tr["loopLength"]
+                    else:
+                        t2 = t
+                    prev = keys[0]
+                    for k in keys:
+                        if k["time"] > t2:
+                            u = (t2 - prev["time"]) / max(1e-6, k["time"] - prev["time"])
+                            return [a + (b - a) * u for a, b in zip(prev["value"], k["value"])]
+                        prev = k
+                    return list(prev["value"])
+            return fallback
+        return at("camera/position", self.camera.get("position", [0, 0, 5])), \
+            at("camera/target", self.camera.get("target", [0, 0, 0]))
+
+    def project(self, point, t=0.0, aspect=16.0 / 9.0):
+        """A world point's screen position (u right, v down, 0..1) and its depth, through the camera at time t: the
+        engine's lens (vertical field of view from a 24 mm sensor height and the focal length)."""
+        pos, tgt = self._camera_at(t)
+        focal = float(self.params.get("camera/lens/focalLength", BASE_PARAMS["camera/lens/focalLength"]))
+        fy = 1.0 / math.tan(math.atan(12.0 / focal))
+        fx = fy / aspect
+        f = [b - a for a, b in zip(pos, tgt)]
+        n = math.sqrt(sum(c * c for c in f)) or 1.0
+        f = [c / n for c in f]
+        r = [-f[2], 0.0, f[0]]                       # cross(f, up) with up = +Y
+        rn = math.sqrt(sum(c * c for c in r)) or 1.0
+        r = [c / rn for c in r]
+        u_ = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]  # cross(r, f)
+        d = [b - a for a, b in zip(pos, point)]
+        x = sum(a * b for a, b in zip(d, r))
+        y = sum(a * b for a, b in zip(d, u_))
+        z = sum(a * b for a, b in zip(d, f))
+        z = max(z, 1e-3)
+        return 0.5 + 0.5 * fx * x / z, 0.5 - 0.5 * fy * y / z, z
+
+    def region(self, rid, centre=None, radius=None, box=None, t=0.0):
+        """One evaluator region: `box` [x0, y0, x1, y1] in 0..1 screen units (y down), or a world `centre` and
+        `radius` projected through the camera at time t (clamped to the frame)."""
+        if box is None:
+            u, v, z = self.project(centre, t)
+            focal = float(self.params.get("camera/lens/focalLength", BASE_PARAMS["camera/lens/focalLength"]))
+            fy = focal / 12.0
+            hv = 0.5 * fy * radius / z
+            hu = hv * 9.0 / 16.0
+            box = [u - hu, v - hv, u + hu, v + hv]
+        box = [round(min(1.0, max(0.0, c)), 3) for c in box]
+        self.regions.append({"id": rid, "box": box})
+        return box
+
+    def region_points(self, rid, points, pad=0.0, t=0.0):
+        """One evaluator region: the screen bounding box of world points (corners of a thing, samples round a ring),
+        padded by `pad` screen units."""
+        uv = [self.project(p, t)[:2] for p in points]
+        box = [min(u for u, _ in uv) - pad, min(v for _, v in uv) - pad,
+               max(u for u, _ in uv) + pad, max(v for _, v in uv) + pad]
+        return self.region(rid, box=box)
+
+    def region_ring(self, rid, centre, radius, n=16, pad=0.0, t=0.0, axis="y"):
+        """The screen box of a horizontal (axis y) or vertical (axis z) ring round a world centre."""
+        pts = []
+        for i in range(n):
+            a = 2.0 * math.pi * i / n
+            if axis == "y":
+                pts.append([centre[0] + radius * math.cos(a), centre[1], centre[2] + radius * math.sin(a)])
+            else:
+                pts.append([centre[0] + radius * math.cos(a), centre[1] + radius * math.sin(a), centre[2]])
+        return self.region_points(rid, pts, pad, t)
+
     # ---------------------------------------------------------------- output
     def scene_doc(self):
         doc = {"format": "avgen-scene", "version": 1, "name": self.id, "camera": self.camera,
@@ -590,6 +667,8 @@ class Scene:
                "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                           "path": "renders/sonic-vfx-" + self.id + ".mp4"},
                "sonicScene": dict(self.design, id=self.id, title=self.title)}
+        if self.regions:
+            doc["sonicScene"]["regions"] = self.regions
         if self.effects:
             doc["effects"] = self.effects
         if self.palette:

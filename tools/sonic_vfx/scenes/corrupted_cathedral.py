@@ -219,4 +219,10 @@ def build():
         "post/lens/chromaticAberration": 0.02, "post/output/vignette": 0.45, "post/output/grain": 0.02,
         "post/grade/contrast": 1.12, "camera/lens/focalLength": 24.0, "camera/exposure/compensation": 0.0,
     })
+    # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
+    s.region("rose", centre=[0.0, ROSE_Y, APSE_Z], radius=4.5)
+    s.region_points("nave", [[-6.0, 15.0, -BAY], [6.0, 15.0, -BAY], [-6.0, 15.0, APSE_Z + 6.0],
+                             [6.0, 15.0, APSE_Z + 6.0], [-6.0, 0.0, -BAY], [6.0, 0.0, -BAY]])
+    s.region("floor", box=[0.1, 0.72, 0.9, 1.0])
+    s.response = {"sensitivity": 0.5, "transient": 0.6, "sustain": 0.5, "attack": 0.8, "release": 0.9}
     return s

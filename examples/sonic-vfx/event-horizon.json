@@ -105,6 +105,13 @@
      "slow": 2.0
     }
    }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.55,
+   "attack": 1.2,
+   "release": 1.5
   }
  },
  "parameters": {
@@ -1257,7 +1264,45 @@
   ],
   "tier": "live: no fog march; one DF lens, two light beams, four particle systems",
   "id": "event-horizon",
-  "title": "Event Horizon"
+  "title": "Event Horizon",
+  "regions": [
+   {
+    "id": "horizon",
+    "box": [
+     0.537,
+     0.355,
+     0.776,
+     0.78
+    ]
+   },
+   {
+    "id": "disk",
+    "box": [
+     0.244,
+     0.53,
+     1.0,
+     0.667
+    ]
+   },
+   {
+    "id": "lensed",
+    "box": [
+     0.445,
+     0.188,
+     0.872,
+     0.941
+    ]
+   },
+   {
+    "id": "background",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.2
+    ]
+   }
+  ]
  },
  "effects": [
   {

@@ -105,6 +105,13 @@
      "slow": 2.0
     }
    }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 0.8,
+   "release": 1.0
   }
  },
  "parameters": {
@@ -890,7 +897,27 @@
   ],
   "tier": "light: one plate, one program, two particle systems",
   "id": "cymatic-plate",
-  "title": "Cymatic Plate"
+  "title": "Cymatic Plate",
+  "regions": [
+   {
+    "id": "plate",
+    "box": [
+     0.124,
+     0.031,
+     0.89,
+     1.0
+    ]
+   },
+   {
+    "id": "background",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.12
+    ]
+   }
+  ]
  },
  "effects": [
   {

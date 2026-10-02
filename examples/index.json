@@ -332,15 +332,27 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Event Horizon",
-      "project": "sonic-vfx/event-horizon.json"
+      "description": "On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as meteors, the bass makes the horizon shimmer, and a black monolith answers the drums. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Salt Flat Mirage",
+      "project": "sonic-vfx/salt-flat-mirage.json"
     },
     {
       "category": "Sonic VFX",
       "description": "A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies climb its hanging threads as light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "name": "Sonic VFX - The Breathing Deep",
       "project": "sonic-vfx/breathing-deep.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a chord is two figures at war. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Cymatic Plate",
+      "project": "sonic-vfx/cymatic-plate.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Ferrofluid Crown",
+      "project": "sonic-vfx/ferrofluid-crown.json"
     },
     {
       "category": "Sonic VFX",
@@ -356,15 +368,9 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Ferrofluid Crown",
-      "project": "sonic-vfx/ferrofluid-crown.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a chord is two figures at war. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Cymatic Plate",
-      "project": "sonic-vfx/cymatic-plate.json"
+      "description": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
+      "name": "Sonic VFX - Event Horizon",
+      "project": "sonic-vfx/event-horizon.json"
     }
   ]
 }

@@ -320,4 +320,10 @@ def build():
         "post/dof/enabled": True, "post/dof/physical": True, "camera/lens/aperture": 2.8,
         "camera/focus/mode": 0, "camera/lens/focusDistance": 34.0,
     })
+    # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
+    s.region("horizon", centre=list(BH), radius=4.5)
+    s.region_ring("disk", list(BH), 15.0)
+    s.region_ring("lensed", list(BH), 8.0, axis="z")
+    s.region("background", box=[0.0, 0.0, 1.0, 0.2])
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.55, "attack": 1.2, "release": 1.5}
     return s

@@ -259,4 +259,9 @@ def build():
         "camera/lens/focalLength": 30.0, "camera/exposure/compensation": 0.0,
         "scene/volumeAnisotropy": 0.35,
     })
+    # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
+    s.region("core", centre=list(CORE_TOP), radius=2.5)
+    s.region_ring("towers", [0.0, TOWER_TOP_Y, 0.0], RING_R)
+    s.region("background", box=[0.0, 0.0, 1.0, 0.22])
+    s.response = {"sensitivity": 0.5, "transient": 0.65, "sustain": 0.45, "attack": 0.7, "release": 0.8}
     return s

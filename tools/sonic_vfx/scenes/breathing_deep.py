@@ -313,4 +313,10 @@ def build():
         "camera/focus/mode": 0, "camera/lens/focusDistance": 19.0,
         "scene/volumeAnisotropy": 0.45, "scene/volumeScattering": 1.0,
     })
+    # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
+    s.region("organism", centre=list(ORG), radius=3.5)
+    s.region_points("threads", [[ORG[0] - 3.2, ORG[1], ORG[2]], [ORG[0] + 3.2, ORG[1], ORG[2]],
+                                [ORG[0] - 3.2, 2.0, ORG[2]], [ORG[0] + 3.2, 2.0, ORG[2]]])
+    s.region("background", box=[0.0, 0.0, 0.4, 1.0])
+    s.response = {"sensitivity": 0.5, "transient": 0.4, "sustain": 0.6, "attack": 1.4, "release": 1.8}
     return s
