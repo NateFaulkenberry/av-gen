@@ -5,13 +5,48 @@ these are the art side's. Newest state first.*
 
 ## RESUME HERE: ART PASS 4 (2026-10-02, the owner's `04-art-pass-4.md` governs; my parts: 2-6 and 8-16)
 
-**State (15:10):** the whole pass 4 film generates (`make_all_you_got_pass4.py`, about 95 s) and the pass 4 validator
-(ADR-1056) reports **0 critical, 8 warnings** on it (static): the lounge's television faces its sofa, not the room's
-centre (correct), and seven camera passes through doors and windows at the CSG bound (pass 3 had the same seven). The
-film pass (`--film`, ADR-1057) is running (`$S/liminal4/val/film.*`); the first preview `prev-v1` is queued on the GPU
-(`$S/liminal4/preview.sh v1`, log `$S/liminal4/prev-v1.log`). **Re-pinned** to `47ad4c73` (`$S/liminal4/avgen.sh`,
-`$S/liminal2/bin-47ad4c73`): the journey near plane is 5 cm there (ADR-1058; the 2:15 cut-open bookcase).
-Next: look at prev-v1 section by section, fix, render the 1080p final, the critic, the gate.
+**State (2026-10-02 evening, commit `457b358d`):** the film generates (`make_all_you_got_pass4.py`, about 100 s;
+`export AVGEN=$S/liminal2/bin-47ad4c73/avgen`) with **0 errors, 8 warnings** static, and the film pass
+(`$S/liminal4/filmval.sh <tag>`, about 90 s, CPU) reports **0 critical, 9 warnings** (`$S/liminal4/val5/film.txt`):
+the lounge's television faces its sofa (correct); seven camera passes through doors and windows at the CSG bound
+(pass 3 had the same seven); and "camera enters bathroom before it opens" at 90.2-91.4. That last one is the top of
+the climb: it lies inside the bathroom's volume upstairs, but the hall chapter draws only the hall, and C06 has
+dissolved even that. The validator does not read visibility, so it is a false positive.
+Preview v1 (`$S/liminal4/prev-v1.mp4`, commit a42d6f94) was reviewed sheet by sheet (`$S/liminal4/qa-v1/*.png`); its
+fixes are in `457b358d` (list below). **Preview v2** (`$S/liminal4/preview.sh v2` -> `prev-v2.mp4`) is the check of
+them. Next: review v2 (`$S/liminal4/qa_sheets.sh <mp4> <dir>`), fix, the 1080p final
+(`~/Desktop/av-gen-review/24-liminal-space/pass4/all-you-got-pass4.mp4`), `pass2_av.py`, the critic (`critic_pass4.py`),
+the gate, the hand-back.
+
+**Preview v1 review, what changed (`457b358d`):**
+- intro: the street trees stand level (`props4.street_tree`: two flat octagonal crowns; the kit's round tree was a
+  cube on its corner, a tumbling die); a picket fence snaps in along every front garden on the eighths of bar 8
+  (`intro4.fences`, `fenceClip`);
+- kitchen: on the clap the camera is 1.9 m behind his left shoulder, the pot and the steam past it; LET IT SHOW is
+  left of him, not across him; the hall entry is eased (the doorway at 2 m/s, not 4);
+- basement: the gym mirror reads as a mirror (`rooms4.gym_mirror`: a pale pane and two diagonal glints, its own
+  emission); the bar is seen from 1.6 m behind his shoulder (v1: 1.2 m from his back);
+- every glide's gaze turns by heading and pitch (`Builder4._angular_gaze`). The great circle between two far-apart
+  headings with the same slight downward pitch passes under the camera, which made five whip-downs: the bedroom
+  115.6, the bathroom 123, the study 134.5 and 138.5, and the bar 105.7. The study's turns are keyed past the window
+  and the bookcase, the bathroom's past the door, and the bedroom camera no longer backs into the wardrobe. The
+  summit shot (a plain `shot`) is re-keyed the same way: it whipped at 236.5. Check with
+  `python3 $S/liminal4/camspeed2.py <cam.csv> 140 -50` (sustained turns and steep looks, cuts excluded);
+- let it grow: the late world's stars (30-110 m up) hung among the towers like dust, so the city has its own field,
+  380 m up (`cityStars`). The inner city keeps only its far towers and its first row of blocks
+  (`city4.INNER_OF`), so the middle city grows legibly at bar 67. The park, the bar and the junction arrive with
+  their ring (visibility keys); before, they stood finished on bare ground;
+- is that all you: the lonely palette's shopfronts are a low amber (`P9lonely` canvas `#B8733A`); a street of red
+  bands drowned the one red that matters. The cars' tail lights keep their own red (`TAIL`). The red light is now
+  seen from behind his car, over the boot and through the open cabin: the back of his head, the people crossing
+  just ahead, the cross traffic and the red light over his lane. The signals face the lanes they govern
+  (`city4.SIGNALS`). The bar shot pushes in to 2.2 m behind his shoulder. His rim is 2.3 in the city;
+- bridge 3: the orbit round the downtown tower goes clockwise and leaves along its tangent, east down the x-road
+  (v1 turned back on itself, looking straight down and spinning, 190.2-191.6);
+- the final chorus: he stands at the top of the stairs (`film4_late.TOP` = (5.3, 14.2, 0): on the summit's edge
+  where the flight arrives). In the middle of the summit, its edge hid him from the whole climb. The climb stops
+  2.7 m short of him. The summit camera rises beside him, over the wall, for the look back. The air clears at the
+  summit (volumeDensity 0.022 -> 0.006, t(107)-t(113)), and the far city has its own warm lights.
 
 Validator fixes made in the scene data (the engineer's findings on pass 3 and mine on pass 4):
 - trim (skirting, dado) stops at every door and window: `rooms4.shell_with` puts the bands inside the openings'
@@ -80,7 +115,9 @@ python3 tools/liminal/make_all_you_got_pass4.py          # writes examples/limin
 python3 tools/liminal/preview4.py city                    # stills projects; render with $S/liminal4/stills.sh city
 python3 $S/liminal4/sheet4.py <mp4> <out.png> 6 400 12:24:0.5   # labelled contact sheets
 ```
-Render with the pinned engine `$S/liminal3/avgen.sh` (bin-5dd835a4) through `tools/gpu-lock.sh`, one job per hold.
+Render with the pinned engine `$S/liminal4/avgen.sh` (`$S/liminal2/bin-47ad4c73` and its shaders) through
+`tools/gpu-lock.sh`, one job per hold: `$S/liminal4/preview.sh <tag> [a:b]` (960x540 with the song, about 4 min for
+the film once the lock is free), `$S/liminal4/qa_sheets.sh <mp4> <dir>` (PART 16's timestamps as sheets).
 
 
 ## RESUME HERE: ART PASS 3 (2026-10-01, the owner's `03-art-pass-3-addendum.md` governs)
