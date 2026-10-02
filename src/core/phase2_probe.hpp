@@ -53,6 +53,14 @@ struct Frame {
     std::uint64_t texturesUploaded = 0;
     double textureUploadMs = 0.0;
     double environmentMs = 0.0;
+    // TEMPORARY (live-render-perf, 2026-10-02): three per-frame renderer costs read as suspects.
+    double diagFrameMs = 0.0;        // the per-entity RenderObjectDiagnostic build
+    double prevModelsMs = 0.0;       // prevModelsNext_, the name-keyed motion-vector map
+    double frameBindGroupsMs = 0.0;  // rebuildFrameBindGroups(): 3 + kMaxShadowViews groups
+    double sdfPackMs = 0.0;          // SdfRenderer::update, all of it
+    double applyParamsMs = 0.0;      // Composition::applyParameters
+    std::uint64_t sdfCompiles = 0;   // compiled SDF variants built this frame
+    double procRebuildMs = 0.0;      // ProceduralGeometry::rebuild that did not early-out
 
     // ---- the SDL input queue, as the frame loop drained it ------------------------------------
     // The application already times `input->present ms` from the newest *motion* event. These add

@@ -97,6 +97,9 @@
 //             + 0.125 * valueNoise(p * 4.11 + 31.0, seed)) / 0.875;
 //   }
 
+#include <cstdlib>
+#include <chrono>
+#include "core/phase2_probe.hpp" // TEMPORARY: live-render-perf
 #include "scene/procedural.hpp"
 
 #include "scene/text_mesh.hpp"
@@ -2599,7 +2602,21 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     if (structureVersion != 0 && hash == builtHash) {
         return false;
     }
-    gProceduralRebuilds.fetch_add(1, std::memory_order_relaxed);
+    const std::uint64_t probeN = gProceduralRebuilds.fetch_add(1, std::memory_order_relaxed);
+    // TEMPORARY (live-render-perf): name the procedurals that regenerate during playback.
+    static const bool probeLog = std::getenv("AVGEN_X_PROCLOG") != nullptr;
+    if (probeLog && probeN >= 200 && probeN < 240) {
+        log::info("live-perf procregen #{} '{}' hash {:016x} -> {:016x} points {}", probeN, name, builtHash, hash,
+                  instances.size());
+    }
+    const auto probeStart = std::chrono::steady_clock::now();
+    struct ProbeTimer {
+        std::chrono::steady_clock::time_point start;
+        ~ProbeTimer() {
+            probe2::frame().procRebuildMs +=
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        }
+    } probeTimer{probeStart};
     builtHash = hash;
     meshHash = detail::resolvedSourceHash(*this, ctx); // the referenced object's for a Procedural source
     ++structureVersion;

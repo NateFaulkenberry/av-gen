@@ -1,3 +1,4 @@
+#include "core/phase2_probe.hpp" // TEMPORARY: live-render-perf
 #include "rendering/sdf_renderer.hpp"
 
 #include "rendering/field_uniforms.hpp"
@@ -429,6 +430,7 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     auto module = shaders.compile(source, "sdf-raymarch-compiled");
     Result<Pipelines> built = module ? buildPipelines(*module) : Result<Pipelines>(std::unexpected(module.error()));
     ++compilesThisFrame;
+    ++probe2::frame().sdfCompiles; // TEMPORARY: live-render-perf
     if (!built) {
         slot.failed = true;
         log::warn("sdf '{}': compiling the tree failed, drawing it interpreted: {}", object.name, built.error().message);

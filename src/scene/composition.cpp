@@ -7541,7 +7541,10 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     cameraCutThisFrame_ = false; // ADR-912: `applyParameters` says whether this frame is a cut
-    applyParameters();
+    {
+        const probe2::Add probeApply(probe2::frame().applyParamsMs); // TEMPORARY: live-render-perf
+        applyParameters();
+    }
     // ADR-346: after `applyParameters`, not before it. The day/night cycle asks for the map swap
     // from inside that call, so resolving first meant the swap landed a frame late -- and in a
     // one-frame headless render it never landed at all, which is how this was found: the night map
