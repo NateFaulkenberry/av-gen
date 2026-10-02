@@ -1,0 +1,480 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "impossible-architecture.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.1
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.12,
+  "post/bloom/threshold": 1.4,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.02,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 22.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 3,
+  "post/outline/amount": 1.0,
+  "post/outline/color": [
+   0.02315,
+   0.01096,
+   0.007
+  ],
+  "post/outline/intensity": 1.0,
+  "post/outline/width": 1.6,
+  "post/outline/depthThreshold": 0.05,
+  "post/outline/normalThreshold": 0.35,
+  "post/outline/objectEdges": 1.0,
+  "post/outline/fadeStart": 25.0,
+  "post/outline/fadeEnd": 70.0
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "sdf/court/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 240.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 240.0,
+      "value": [
+       0.0,
+       0.0,
+       360.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 56.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.3,
+       1.1,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       3.0071,
+       1.7,
+       8.3515
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       3.3,
+       1.1,
+       9.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 21.0,
+      "value": [
+       3.0071,
+       0.5,
+       10.0485
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.0,
+      "value": [
+       2.3,
+       1.1,
+       10.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.0,
+      "value": [
+       1.5929,
+       1.7,
+       10.0485
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       1.3,
+       1.1,
+       9.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 49.0,
+      "value": [
+       1.5929,
+       0.5,
+       8.3515
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       2.3,
+       1.1,
+       8.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 56.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.8707,
+       -0.8219,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       -4.0343,
+       -1.2436,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       -4.3493,
+       -3.1781,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 21.0,
+      "value": [
+       -5.6313,
+       -2.7564,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.0,
+      "value": [
+       -7.1293,
+       -0.8219,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.0,
+      "value": [
+       -7.9657,
+       -1.2436,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -7.6507,
+       -3.1781,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 49.0,
+      "value": [
+       -6.3687,
+       -2.7564,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       -4.8707,
+       -0.8219,
+       -14.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-impossible-architecture.mp4"
+ },
+ "sonicScene": {
+  "category": "impossible architecture",
+  "thesis": "Relativity Court: a staircase module in three gravities, repeated forever in every direction, rooms inside rooms at its heart, in a low golden light. The music breathes the lattice, folds the stairs into new gravities and turns the whole world.",
+  "composition": {
+   "background": "the lattice repeating into a warm haze; green-teal sky in the gaps",
+   "midground": "flights of stairs in three gravities, landings, doorways on nothing",
+   "foreground": "the nearest flight sweeping across the frame",
+   "focal": "the nested open cubes at the nearest module's heart",
+   "secondary": [
+    "the doorways",
+    "the long shadows"
+   ],
+   "atmosphere": "warm surface haze swallowing the far repetitions",
+   "post": "ink outlines fading with distance, a little grain",
+   "camera": "drifting inside the lattice; the world rolls"
+  },
+  "palette": {
+   "dominant": "#f3e3c3",
+   "secondary": "#c8553d",
+   "accent": "#1f6f6a",
+   "highlight": "#ffd08a",
+   "background_value": "mid",
+   "saturation": "warm flat earth colours against a green-teal sky"
+  },
+  "motion": {
+   "very_slow": [
+    "the world's roll",
+    "the camera's drift"
+   ],
+   "medium": [
+    "the lattice's breath",
+    "the shadows' sweep"
+   ],
+   "fast": [
+    "doorways lighting on notes"
+   ],
+   "extremely_fast": [
+    "a stair module sliding on the kick"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the lattice breathes apart and together"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a flight slides one step"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a flight folds over into a new gravity"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the sun sweeps; the shadows move"
+   ],
+   [
+    "highs",
+    "audio.treble",
+    "the ink sharpens"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "more rooms nest inside the room"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "a doorway at the pitch's height lights"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the court turns slowly in the light"
+   ]
+  ],
+  "tier": "heavy: one compiled SDF repeated in three axes, a shadow march, the outline pass",
+  "id": "impossible-architecture",
+  "title": "Impossible Architecture",
+  "regions": [
+   {
+    "id": "rooms",
+    "box": [
+     0.364,
+     0.271,
+     0.672,
+     0.818
+    ]
+   },
+   {
+    "id": "lattice",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     1.0
+    ]
+   }
+  ]
+ }
+}

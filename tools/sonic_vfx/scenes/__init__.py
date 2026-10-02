@@ -32,4 +32,10 @@ SCENES = [
 ABSTRACT = [
     "sacred_geometry",          # 1 Sacred Geometry Garden: The Armillary
     "neon_vector",              # 2 Neon Vector World: Pulsar Plain
+    "cel_dream",                # 3 Cel-Shaded Dream World: Candy Archipelago
+    "color_geometry",           # 4 Infinite Color Geometry: Chromatic Corridor
+    "organic_garden",           # 5 Organic Digital Garden: Lantern Reef
+    "particle_world",           # 6 Particle / VFX World: Galaxy Engine
+    "impossible_architecture",  # 7 Impossible Architecture: Relativity Court
+    "cinematic_void",           # 8 Abstract Cinematic Void: The Gate
 ]

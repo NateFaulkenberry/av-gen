@@ -1,0 +1,595 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "cel-dream.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.18,
+  "post/bloom/threshold": 1.4,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.18,
+  "post/output/grain": 0.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 32.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4,
+  "post/outline/amount": 1.0,
+  "post/outline/color": [
+   0.04667,
+   0.01229,
+   0.07819
+  ],
+  "post/outline/intensity": 1.0,
+  "post/outline/width": 2.2,
+  "post/outline/depthThreshold": 0.06,
+  "post/outline/normalThreshold": 0.4,
+  "post/outline/objectEdges": 1.0
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       9.7617,
+       8.5,
+       22.9251
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       12.1829,
+       8.5,
+       21.6779
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       14.1139,
+       8.5,
+       20.4113
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.875,
+      "value": [
+       15.3323,
+       8.5,
+       19.464
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       15.7454,
+       8.5,
+       19.113
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.125,
+      "value": [
+       15.3323,
+       8.5,
+       19.464
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       14.1139,
+       8.5,
+       20.4113
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.375,
+      "value": [
+       12.1829,
+       8.5,
+       21.6779
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       9.7617,
+       8.5,
+       22.9251
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.625,
+      "value": [
+       7.2147,
+       8.5,
+       23.8899
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       4.9814,
+       8.5,
+       24.4774
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       3.4621,
+       8.5,
+       24.749
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.9249,
+       8.5,
+       24.8211
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 73.125,
+      "value": [
+       3.4621,
+       8.5,
+       24.749
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       4.9814,
+       8.5,
+       24.4774
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 84.375,
+      "value": [
+       7.2147,
+       8.5,
+       23.8899
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       9.7617,
+       8.5,
+       22.9251
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -1.0963,
+       2.8,
+       1.4881
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       -1.0339,
+       2.8,
+       1.6091
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       -0.9706,
+       2.8,
+       1.7057
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.875,
+      "value": [
+       -0.9232,
+       2.8,
+       1.7666
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -0.9057,
+       2.8,
+       1.7873
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.125,
+      "value": [
+       -0.9232,
+       2.8,
+       1.7666
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       -0.9706,
+       2.8,
+       1.7057
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.375,
+      "value": [
+       -1.0339,
+       2.8,
+       1.6091
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -1.0963,
+       2.8,
+       1.4881
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.625,
+      "value": [
+       -1.1445,
+       2.8,
+       1.3607
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       -1.1739,
+       2.8,
+       1.2491
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       -1.1874,
+       2.8,
+       1.1731
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       -1.1911,
+       2.8,
+       1.1462
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 73.125,
+      "value": [
+       -1.1874,
+       2.8,
+       1.1731
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       -1.1739,
+       2.8,
+       1.2491
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 84.375,
+      "value": [
+       -1.1445,
+       2.8,
+       1.3607
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -1.0963,
+       2.8,
+       1.4881
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-cel-dream.mp4"
+ },
+ "sonicScene": {
+  "category": "cel-shaded",
+  "thesis": "Candy Archipelago: a toy island floating in a candy sky, inked and cel-shaded, where three round creatures sing the notes, hop on the kick and the giant flower blooms when the sound is held.",
+  "composition": {
+   "background": "a peach-to-pink sky with flat pastel clouds; small islands drifting behind",
+   "midground": "the island: a mint lawn on a lilac rock, lollipop and cone trees, the giant flower, the ring",
+   "foreground": "three round creatures in a row on the lawn's front edge, looking at the camera",
+   "focal": "the creatures, with the giant flower above them",
+   "secondary": [
+    "the giant flower",
+    "the waterfall",
+    "the far islands"
+   ],
+   "atmosphere": "(none: flat colour)",
+   "post": "plum outlines, a soft bloom on the rims",
+   "camera": "a slow arc round the diorama from slightly above"
+  },
+  "palette": {
+   "dominant": "#ffd6b4",
+   "secondary": "#8ff0c0",
+   "accent": "#ff8a7a",
+   "highlight": "#ffe27a",
+   "background_value": "light",
+   "saturation": "pastel pushed to candy; plum ink"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's arc",
+    "the clouds' drift"
+   ],
+   "medium": [
+    "the flower's bloom",
+    "the island's bob"
+   ],
+   "fast": [
+    "the creatures singing"
+   ],
+   "extremely_fast": [
+    "the creatures' hop on the kick"
+   ]
+  },
+  "vocabulary": [
+   [
+    "kick",
+    "response.kick",
+    "the creatures hop"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the creatures squash and stretch; the island bobs"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the flower's petals flick; a confetti puff"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "sparkles round the flower"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "the creature at the pitch's place sings (low left, high right)"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the giant flower blooms"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the time of day: noon pastel to lavender dusk"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the island floats; the creatures breathe"
+   ]
+  ],
+  "tier": "light: about 45 low-poly procedural nodes with cel lighting, the outline pass, one particle system",
+  "id": "cel-dream",
+  "title": "Cel-Shaded Dream World",
+  "regions": [
+   {
+    "id": "creatures",
+    "box": [
+     0.3,
+     0.45,
+     0.7,
+     0.8
+    ]
+   },
+   {
+    "id": "flower",
+    "box": [
+     0.25,
+     0.1,
+     0.5,
+     0.45
+    ]
+   }
+  ]
+ }
+}

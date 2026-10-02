@@ -1,0 +1,616 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "impossible-architecture",
+ "camera": {
+  "mode": 1,
+  "position": [
+   2.3,
+   1.1,
+   8.6
+  ],
+  "target": [
+   -6.0,
+   -2.0,
+   -14.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.35,
+  "background": [
+   0.0137,
+   0.15896,
+   0.14413
+  ],
+  "fogColor": [
+   0.80695,
+   0.48515,
+   0.25415
+  ],
+  "volumeDensity": 0.03,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00402,
+    0.04374,
+    0.04231
+   ],
+   "horizonColor": [
+    0.0137,
+    0.15896,
+    0.14413
+   ],
+   "groundColor": [
+    0.00304,
+    0.02315,
+    0.02315
+   ],
+   "haze": 0.4,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "court",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "repeat",
+      "size": [
+       14.0,
+       14.0,
+       14.0
+      ],
+      "count": 0,
+      "children": [
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "recurse",
+          "name": "rooms",
+          "count": 2,
+          "scale": 2.35,
+          "translation": [
+           0.0,
+           0.0,
+           0.0
+          ],
+          "rotation": [
+           0.0,
+           35.0,
+           20.0
+          ],
+          "size": [
+           0.0,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "difference",
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               2.0,
+               2.0,
+               2.0
+              ],
+              "material": 0
+             },
+             {
+              "kind": "box",
+              "size": [
+               1.55,
+               1.55,
+               2.6
+              ]
+             },
+             {
+              "kind": "box",
+              "size": [
+               1.55,
+               2.6,
+               1.55
+              ]
+             },
+             {
+              "kind": "box",
+              "size": [
+               2.6,
+               1.55,
+               1.55
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -3.15,
+             -2.24,
+             3.6
+            ],
+            "children": [
+             {
+              "kind": "stairs",
+              "size": [
+               0.45,
+               0.32,
+               1.1
+              ],
+              "count": 14,
+              "height": 0.45,
+              "material": 1
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -4.05,
+             -2.4400000000000004,
+             3.6
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.9,
+               0.2,
+               1.1
+              ],
+              "material": 2
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             4.05,
+             2.04,
+             3.6
+            ],
+            "children": [
+             {
+              "kind": "box",
+              "size": [
+               0.9,
+               0.2,
+               1.1
+              ],
+              "material": 2
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             4.75,
+             3.79,
+             3.6
+            ],
+            "children": [
+             {
+              "kind": "difference",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.16,
+                 1.55,
+                 1.05
+                ],
+                "material": 0
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 -0.35,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.4,
+                   1.25,
+                   0.62
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ],
+          "name": "flightA"
+         },
+         {
+          "kind": "rotate",
+          "rotation": [
+           90.0,
+           0.0,
+           90.0
+          ],
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               -3.15,
+               -2.24,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "stairs",
+                "size": [
+                 0.45,
+                 0.32,
+                 1.1
+                ],
+                "count": 14,
+                "height": 0.45,
+                "material": 1
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               -4.05,
+               -2.4400000000000004,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.9,
+                 0.2,
+                 1.1
+                ],
+                "material": 2
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               4.05,
+               2.04,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.9,
+                 0.2,
+                 1.1
+                ],
+                "material": 2
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               4.75,
+               3.79,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "difference",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.16,
+                   1.55,
+                   1.05
+                  ],
+                  "material": 0
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -0.35,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.4,
+                     1.25,
+                     0.62
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "name": "flightB"
+           }
+          ]
+         },
+         {
+          "kind": "rotate",
+          "rotation": [
+           0.0,
+           270.0,
+           270.0
+          ],
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               -3.15,
+               -2.24,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "stairs",
+                "size": [
+                 0.45,
+                 0.32,
+                 1.1
+                ],
+                "count": 14,
+                "height": 0.45,
+                "material": 1
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               -4.05,
+               -2.4400000000000004,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.9,
+                 0.2,
+                 1.1
+                ],
+                "material": 2
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               4.05,
+               2.04,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.9,
+                 0.2,
+                 1.1
+                ],
+                "material": 2
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               4.75,
+               3.79,
+               3.6
+              ],
+              "children": [
+               {
+                "kind": "difference",
+                "children": [
+                 {
+                  "kind": "box",
+                  "size": [
+                   0.16,
+                   1.55,
+                   1.05
+                  ],
+                  "material": 0
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -0.35,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "box",
+                    "size": [
+                     0.4,
+                     1.25,
+                     0.62
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "name": "flightC"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "name": "lattice"
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.8,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.0,
+      "shadowColor": [
+       0.42,
+       0.52,
+       0.62
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "specular": 0.0
+     }
+    },
+    "boundsMin": [
+     -120.0,
+     -120.0,
+     -120.0
+    ],
+    "boundsMax": [
+     120.0,
+     120.0,
+     120.0
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 110,
+    "epsilon": 0.0012,
+    "stepScale": 0.9,
+    "normalEpsilon": 0.002,
+    "maxDistance": 75.0,
+    "surfaces": [
+     {
+      "color": [
+       0.89627,
+       0.76815,
+       0.54572
+      ]
+     },
+     {
+      "color": [
+       0.57758,
+       0.09084,
+       0.04667
+      ]
+     },
+     {
+      "color": [
+       0.7454,
+       0.37124,
+       0.09759
+      ]
+     }
+    ],
+    "look": {
+     "aoStrength": 0.0,
+     "shadowStrength": 0.62,
+     "shadowSoftness": 0.02,
+     "shadowDirection": [
+      -0.6211190222681673,
+      0.420758047342952,
+      0.6611912172532104
+     ],
+     "shadowSteps": 28
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "lights": [
+  {
+   "id": "sun",
+   "name": "sun",
+   "type": "directional",
+   "direction": [
+    0.6211190222681673,
+    -0.420758047342952,
+    -0.6611912172532104
+   ],
+   "color": [
+    1.0,
+    0.63076,
+    0.25415
+   ],
+   "intensity": 3.0,
+   "castsShadow": false
+  },
+  {
+   "id": "sky",
+   "name": "sky",
+   "type": "directional",
+   "direction": [
+    -0.3,
+    0.8,
+    0.5
+   ],
+   "color": [
+    0.21223,
+    0.63076,
+    0.57758
+   ],
+   "intensity": 0.5,
+   "castsShadow": false
+  }
+ ]
+}

@@ -1,0 +1,712 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "particle-world.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.65,
+  "post/bloom/threshold": 0.55,
+  "post/bloom/emissionWeight": 1.0,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.5,
+  "post/output/grain": 0.015,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 30.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 3,
+  "post/lens/chromaticAberration": 0.006,
+  "temporal/feedback/enabled": true,
+  "temporal/feedback/frames": 10,
+  "temporal/feedback/amount": 0.9,
+  "temporal/feedback/decay": 0.72,
+  "temporal/feedback/zoom": 1.0,
+  "temporal/feedback/rotate": 0.0,
+  "temporal/feedback/hue": 0.0
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "spline/arm0_in/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 6.283185307179586,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/arm0_mid/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 2.638937829015426,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 8.922123136195012,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/arm0_out/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 5.15221195188726,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 11.435397259066846,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/arm1_in/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 3.141592653589793,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 9.42477796076938,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/arm1_mid/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 5.780530482605219,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 12.063715789784805,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "spline/arm1_out/startAngle",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 80.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 8.293804605477053,
+      "interp": "linear"
+     },
+     {
+      "time": 80.0,
+      "value": 14.57698991265664,
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       6.4984,
+       8.2,
+       17.8542
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       9.922,
+       8.2,
+       16.2035
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       12.5184,
+       8.2,
+       14.293
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       14.0566,
+       8.2,
+       12.7832
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       14.5548,
+       8.2,
+       12.213
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       14.0566,
+       8.2,
+       12.7832
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       12.5184,
+       8.2,
+       14.293
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       9.922,
+       8.2,
+       16.2035
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       6.4984,
+       8.2,
+       17.8542
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.8148,
+       8.2,
+       18.7903
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       -0.4023,
+       8.2,
+       18.9957
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       -2.5511,
+       8.2,
+       18.828
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -3.2993,
+       8.2,
+       18.7113
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 97.5,
+      "value": [
+       -2.5511,
+       8.2,
+       18.828
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "value": [
+       -0.4023,
+       8.2,
+       18.9957
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 112.5,
+      "value": [
+       2.8148,
+       8.2,
+       18.7903
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       6.4984,
+       8.2,
+       17.8542
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.2553,
+       -0.8,
+       -0.8208
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       2.0468,
+       -0.8,
+       -1.2533
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       1.8054,
+       -0.8,
+       -1.5813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       1.6147,
+       -0.8,
+       -1.7756
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       1.5427,
+       -0.8,
+       -1.8385
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       1.6147,
+       -0.8,
+       -1.7756
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       1.8054,
+       -0.8,
+       -1.5813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       2.0468,
+       -0.8,
+       -1.2533
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       2.2553,
+       -0.8,
+       -0.8208
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.3735,
+       -0.8,
+       -0.3556
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       2.3995,
+       -0.8,
+       0.0508
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       2.3783,
+       -0.8,
+       0.3222
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       2.3635,
+       -0.8,
+       0.4168
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 97.5,
+      "value": [
+       2.3783,
+       -0.8,
+       0.3222
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "value": [
+       2.3995,
+       -0.8,
+       0.0508
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 112.5,
+      "value": [
+       2.3735,
+       -0.8,
+       -0.3556
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       2.2553,
+       -0.8,
+       -0.8208
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-particle-world.mp4"
+ },
+ "sonicScene": {
+  "category": "particles",
+  "thesis": "Galaxy Engine: a spiral of light made only of points. Its arms are rivers flowing into a white-hot core; the bass pulls it in and lets it bloom, the kick explodes it and it reforms, chords grow arms.",
+  "composition": {
+   "background": "violet-black space with faint feedback smears",
+   "midground": "the halo of dust curtains",
+   "foreground": "a stream of particles arcing over the camera",
+   "focal": "the white-hot core, a third of the way in from the right",
+   "secondary": [
+    "the two arms",
+    "the halo",
+    "the stream"
+   ],
+   "atmosphere": "(none: light only)",
+   "post": "bloom, feedback silk, a chromatic fringe",
+   "camera": "a slow orbit at 25 degrees"
+  },
+  "palette": {
+   "dominant": "#05020c",
+   "secondary": "#2b6bff",
+   "accent": "#ff3fb4",
+   "highlight": "#ffc35a",
+   "background_value": "black",
+   "saturation": "iridescent: gold core, magenta arms, blue rim"
+  },
+  "motion": {
+   "very_slow": [
+    "the galaxy's turn",
+    "the camera's orbit"
+   ],
+   "medium": [
+    "the arms' flow inward",
+    "the breath of the pull"
+   ],
+   "fast": [
+    "comets on notes"
+   ],
+   "extremely_fast": [
+    "the kick's explosion"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the pull: the galaxy contracts and blooms"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "an explosion from the core; the arms reform"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a flare runs along an arm"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "glitter"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the turn speeds up; turbulence"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "more arms light"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "a comet launches from the rim at the pitch's angle"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the galaxy turns slowly"
+   ]
+  ],
+  "tier": "light: about 60 k particles in nine systems, feedback",
+  "id": "particle-world",
+  "title": "Particle / VFX World",
+  "regions": [
+   {
+    "id": "core",
+    "box": [
+     0.367,
+     0.372,
+     0.47,
+     0.555
+    ]
+   },
+   {
+    "id": "disc",
+    "box": [
+     0.0,
+     0.275,
+     0.865,
+     1.0
+    ]
+   }
+  ]
+ }
+}

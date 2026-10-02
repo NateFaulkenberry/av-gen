@@ -1,0 +1,446 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "organic-garden.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.6,
+   "attack": 1.2,
+   "release": 1.4
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.6,
+  "post/bloom/threshold": 0.7,
+  "post/bloom/emissionWeight": 1.0,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.5,
+  "post/output/grain": 0.02,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 55.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 3,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/dof/maxRadius": 18.0,
+  "camera/lens/aperture": 1.6,
+  "camera/focus/mode": 0,
+  "camera/lens/focusDistance": 4.282
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.55,
+       1.15,
+       4.025
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       0.7975,
+       1.23,
+       4.0689
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0.9,
+       1.15,
+       4.175
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.7975,
+       1.07,
+       4.2811
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       0.55,
+       1.15,
+       4.325
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       0.3025,
+       1.23,
+       4.2811
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       0.2,
+       1.15,
+       4.175
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       0.3025,
+       1.07,
+       4.0689
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.55,
+       1.15,
+       4.025
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.4822,
+       1.6621,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       -0.4321,
+       1.647,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       -0.451,
+       1.5779,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       -0.5279,
+       1.593,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       -0.6178,
+       1.6621,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -0.6679,
+       1.647,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       -0.649,
+       1.5779,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -0.5721,
+       1.593,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -0.4822,
+       1.6621,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-organic-garden.mp4"
+ },
+ "sonicScene": {
+  "category": "organic",
+  "thesis": "Lantern Reef: a macro view into a twilight meadow of translucent organisms that breathe, bloom and sway with the music; the notes open flowers, the kick blooms the lantern, held sound makes it grow.",
+  "composition": {
+   "background": "giant jelly-trees trailing tendrils, softly blurred, in a teal-to-violet dusk",
+   "midground": "tentacle vines and a cluster of polka-dot mushrooms",
+   "foreground": "dark out-of-focus leaves framing the bottom corners; spore bokeh",
+   "focal": "the lantern flower on the left third: twelve coral petals round a peach heart",
+   "secondary": [
+    "the mushrooms",
+    "the jelly-trees",
+    "the spores"
+   ],
+   "atmosphere": "a teal haze; depth of field",
+   "post": "bloom on the rims, macro depth of field, grain",
+   "camera": "a slow macro slide past the flower"
+  },
+  "palette": {
+   "dominant": "#06302f",
+   "secondary": "#2a1648",
+   "accent": "#ff6f61",
+   "highlight": "#c6ff5e",
+   "background_value": "dark",
+   "saturation": "glow from within: coral, peach, lime, mint"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's slide",
+    "growth"
+   ],
+   "medium": [
+    "breathing",
+    "the sway"
+   ],
+   "fast": [
+    "blooms on notes"
+   ],
+   "extremely_fast": [
+    "spore puffs on the snare"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the garden breathes: bells inflate"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "the lantern blooms open and closes again"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the mushrooms puff spores"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "cilia shimmer; spores sparkle"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the current: the tentacles sway"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the flower grows taller"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "a flower opens at the pitch's place"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the meadow sways gently and glows"
+   ]
+  ],
+  "tier": "medium: about 25 procedural nodes with one fresnel program, macro depth of field, spores",
+  "id": "organic-garden",
+  "title": "Organic Digital Garden",
+  "regions": [
+   {
+    "id": "flower",
+    "box": [
+     0.238,
+     0.0,
+     0.668,
+     0.669
+    ]
+   },
+   {
+    "id": "mushrooms",
+    "box": [
+     0.77,
+     0.542,
+     1.0,
+     1.0
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,152 @@
+"""7. IMPOSSIBLE ARCHITECTURE: RELATIVITY COURT (04-brief-abstract-direction.md, direction 7; ABSTRACT-PLAN.md section 7).
+
+Escher's Relativity as Manifold Garden would build it: one module repeated forever in all three directions, fading into
+warm haze. The module holds three flights of stairs, each in its own gravity (one climbs along X with the floor below,
+one along Y with the floor behind, one along Z with the floor to the side: the same flight turned by the two cyclic
+permutations of the axes), each with its landings and a doorway that stands on nothing; at the module's heart sit open
+cubes nested inside each other (rooms inside rooms, each turned against the last). De Chirico's light: a low raking
+sun, long hard shadows, warm flat colour, ink on every edge.
+
+Construction: one compiled SDF. `repeat` (infinite, three axes) of the cell; `recurse` for the nested rooms (its count is
+the number of rooms inside the room); the `stairs` primitive (ADR-1040). Cel lighting on the SDF material (ADR-1071),
+the SDF look's own shadow march for the long shadows, the screen-space outline (ADR-1072) for the ink, surface fog for
+the haze. The world rolls (the SDF object's rotation), so up keeps changing and the shadows sweep.
+"""
+import math
+
+from .. import kit
+from ..kit import (R, M, hexrgb, scale3, SLOW, MEDIUM, FAST, HIT, VERY_SLOW, sd_union, sd_diff, sd_move, sd_rot,
+                   sd_box, sd_repeat)
+
+ID = "impossible-architecture"
+TITLE = "Impossible Architecture"
+
+TERRACOTTA = "#c8553d"
+OCHRE = "#e0a458"
+CREAM = "#f3e3c3"
+INK = "#2a1b14"
+SKY_TOP = "#0d3b3a"
+SKY = "#1f6f6a"
+HAZE = "#e8b98a"
+SUN = "#ffd08a"
+
+CELL = 14.0
+RUN, RISE, STEPS = 0.45, 0.32, 14
+OFFSET = 3.6              # each flight's distance from the cell's centre line
+P1 = (90.0, 0.0, 90.0)    # x->y, y->z, z->x: the flight that climbs Y, its floor behind
+P2 = (0.0, 270.0, 270.0)  # x->z, y->x, z->y: the flight that climbs Z, its floor to the side
+
+DESIGN = {
+    "category": "impossible architecture",
+    "thesis": "Relativity Court: a staircase module in three gravities, repeated forever in every direction, rooms "
+              "inside rooms at its heart, in a low golden light. The music breathes the lattice, folds the stairs "
+              "into new gravities and turns the whole world.",
+    "composition": {
+        "background": "the lattice repeating into a warm haze; green-teal sky in the gaps",
+        "midground": "flights of stairs in three gravities, landings, doorways on nothing",
+        "foreground": "the nearest flight sweeping across the frame",
+        "focal": "the nested open cubes at the nearest module's heart",
+        "secondary": ["the doorways", "the long shadows"],
+        "atmosphere": "warm surface haze swallowing the far repetitions",
+        "post": "ink outlines fading with distance, a little grain",
+        "camera": "drifting inside the lattice; the world rolls",
+    },
+    "palette": {"dominant": CREAM, "secondary": TERRACOTTA, "accent": SKY, "highlight": SUN,
+                "background_value": "mid", "saturation": "warm flat earth colours against a green-teal sky"},
+    "motion": {
+        "very_slow": ["the world's roll", "the camera's drift"],
+        "medium": ["the lattice's breath", "the shadows' sweep"],
+        "fast": ["doorways lighting on notes"],
+        "extremely_fast": ["a stair module sliding on the kick"],
+    },
+    "vocabulary": [
+        ["bass", "response.bass", "the lattice breathes apart and together"],
+        ["kick", "response.kick", "a flight slides one step"],
+        ["snare", "response.snare", "a flight folds over into a new gravity"],
+        ["mids", "audio.mid", "the sun sweeps; the shadows move"],
+        ["highs", "audio.treble", "the ink sharpens"],
+        ["chord", "notes.polyphony", "more rooms nest inside the room"],
+        ["note", "notes.lastPitch", "a doorway at the pitch's height lights"],
+        ["silence", "(no input)", "the court turns slowly in the light"],
+    ],
+    "tier": "heavy: one compiled SDF repeated in three axes, a shadow march, the outline pass",
+}
+
+
+def stairs(name=None, m=None):
+    o = {"kind": "stairs", "size": [RUN, RISE, 1.1], "count": STEPS, "height": 0.45}
+    if name:
+        o["name"] = name
+    if m is not None:
+        o["material"] = int(m)
+    return o
+
+
+def flight(tag):
+    """One flight with its two landings and a doorway on the top landing, climbing +X, floor below, centred on the
+    cell's X axis at z = OFFSET."""
+    L, H = RUN * STEPS, RISE * STEPS
+    st = sd_move((-L * 0.5, -H * 0.5, OFFSET), stairs(m=1))
+    low = sd_move((-L * 0.5 - 0.9, -H * 0.5 - 0.2, OFFSET), sd_box((0.9, 0.2, 1.1), m=2))
+    high = sd_move((L * 0.5 + 0.9, H * 0.5 - 0.2, OFFSET), sd_box((0.9, 0.2, 1.1), m=2))
+    door = sd_move((L * 0.5 + 1.6, H * 0.5 + 1.55, OFFSET),
+                   sd_diff(sd_box((0.16, 1.55, 1.05), m=0), sd_move((0.0, -0.35, 0.0), sd_box((0.4, 1.25, 0.62)))))
+    return sd_union(st, low, high, door, name="flight" + tag)
+
+
+def rooms():
+    """An open cube (a frame with square openings on all six faces), nested in itself by `recurse`."""
+    cube = sd_diff(sd_box((2.0, 2.0, 2.0), m=0), sd_box((1.55, 1.55, 2.6)), sd_box((1.55, 2.6, 1.55)),
+                   sd_box((2.6, 1.55, 1.55)))
+    return {"kind": "recurse", "name": "rooms", "count": 2, "scale": 2.35, "translation": [0.0, 0.0, 0.0],
+            "rotation": [0.0, 35.0, 20.0], "size": [0.0, 0.0, 0.0], "children": [cube]}
+
+
+def lattice():
+    cell = sd_union(rooms(), flight("A"), sd_rot(P1, flight("B")), sd_rot(P2, flight("C")))
+    return sd_repeat((CELL, CELL, CELL), cell, count=0, name="lattice")
+
+
+def build():
+    s = kit.Scene(ID, TITLE, DESIGN)
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
+    s.environment = {
+        "intensity": 0.35, "background": hexrgb(SKY), "fogColor": hexrgb(HAZE), "volumeDensity": 0.03,
+        "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
+        "sky": {"enabled": True, "zenithColor": hexrgb(SKY_TOP), "horizonColor": hexrgb(SKY),
+                "groundColor": hexrgb("#0a2a2a"), "haze": 0.4, "sunIntensity": 0.0, "intensity": 1.0,
+                "background": True, "useKeyLight": False},
+    }
+    sun_dir = [0.62, -0.42, -0.66]
+    n = math.sqrt(sum(c * c for c in sun_dir))
+    sun_dir = [c / n for c in sun_dir]
+    s.light("sun", "directional", direction=sun_dir, color=hexrgb(SUN), intensity=3.0, castsShadow=False)
+    s.light("sky", "directional", direction=[-0.3, 0.8, 0.5], color=hexrgb("#7fd0c8"), intensity=0.5,
+            castsShadow=False)
+    surfaces = [{"color": hexrgb(CREAM)}, {"color": hexrgb(TERRACOTTA)}, {"color": hexrgb(OCHRE)}]
+    s.sdf("court", lattice(), (-120.0, -120.0, -120.0), (120.0, 120.0, 120.0), surfaces=surfaces,
+          look={"aoStrength": 0.0, "shadowStrength": 0.62, "shadowSoftness": 0.02,
+                "shadowDirection": [-c for c in sun_dir], "shadowSteps": 28},
+          material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 0.8,
+                    "metallic": 0.0,
+                    "toon": {"bands": 2, "softness": 0.02, "terminator": 0.0, "shadowColor": [0.42, 0.52, 0.62],
+                             "ambient": 0.62, "rimWidth": 0.0, "specular": 0.0}},
+          max_steps=110, epsilon=0.0012, step_scale=0.9, max_distance=75.0)
+
+    # the world turns slowly about the view axis (a full turn in four minutes)
+    s.track("sdf/court/transform/rotation", [
+        {"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
+        {"time": 240.0, "value": [0.0, 0.0, 360.0], "interp": "linear"}], loop=240.0)
+
+    s.params_({"camera/lens/focalLength": 22.0, "post/bloom/intensity": 0.12, "post/bloom/threshold": 1.4,
+               "post/output/vignette": 0.4, "post/output/grain": 0.02, "post/tonemap/operator": 3,
+               "post/outline/amount": 1.0, "post/outline/color": hexrgb(INK), "post/outline/intensity": 1.0,
+               "post/outline/width": 1.6, "post/outline/depthThreshold": 0.05, "post/outline/normalThreshold": 0.35,
+               "post/outline/objectEdges": 1.0, "post/outline/fadeStart": 25.0, "post/outline/fadeEnd": 70.0})
+    cam = [2.3, 1.1, 8.6]
+    tgt = [-6.0, -2.0, -14.0]
+    s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 50.0, "orbitSpeed": 0.0}
+    s.drift_camera(cam, tgt, period=56.0, amp=(1.0, 0.6, 1.2), tamp=(2.0, 1.4, 0.0))
+    s.region("rooms", centre=[0.0, 0.0, 0.0], radius=2.5)
+    s.region("lattice", box=[0.0, 0.0, 1.0, 1.0])
+    return s

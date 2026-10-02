@@ -1,0 +1,2427 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "organic-garden",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.55,
+   1.15,
+   4.1
+  ],
+  "target": [
+   -0.55,
+   1.62,
+   0.0
+  ],
+  "fov": 30.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.15,
+  "background": [
+   0.00091,
+   0.01033,
+   0.01161
+  ],
+  "fogColor": [
+   0.00304,
+   0.02843,
+   0.0331
+  ],
+  "volumeDensity": 0.05,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00518,
+    0.00304,
+    0.01764
+   ],
+   "horizonColor": [
+    0.00402,
+    0.04231,
+    0.04519
+   ],
+   "groundColor": [
+    0.00091,
+    0.01033,
+    0.01161
+   ],
+   "haze": 0.7,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      60.0,
+      0.2,
+      60.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.1,
+      -10.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00243,
+      0.01681,
+      0.016
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "stalk",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.045,
+     "tubeTaper": 0.55,
+     "tubeSides": 10,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -0.75,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         -0.85,
+         0.7,
+         0.02
+        ]
+       },
+       {
+        "position": [
+         -0.7,
+         1.45,
+         0.06
+        ]
+       },
+       {
+        "position": [
+         -0.62,
+         2.05,
+         0.08
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "bell",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.42,
+     "segments": 16,
+     "rings": 10
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 0.2,
+     "plane": "xz",
+     "orientation": "outward",
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      -0.62,
+      2.11,
+      0.08
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.15896,
+      0.11954
+     ],
+     "emissiveIntensity": 2.2,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rotation": [
+      52.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.34,
+      0.13,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "heart",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.15,
+     "segments": 16,
+     "rings": 10
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -0.62,
+      1.9899999999999998,
+      0.08
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 6.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "vine0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.05,
+     "tubeTaper": 0.1,
+     "tubeSides": 8,
+     "tubeSegments": 36,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -1.8,
+         0.0,
+         -0.6
+        ]
+       },
+       {
+        "position": [
+         -1.6,
+         0.6,
+         -0.4
+        ]
+       },
+       {
+        "position": [
+         -1.95,
+         1.2,
+         -0.5
+        ]
+       },
+       {
+        "position": [
+         -1.55,
+         1.7,
+         -0.2
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 1.3,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.08,
+      "frequency": 1.7,
+      "speed": 0.9,
+      "phase": 0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.3
+      ],
+      "falloff": 1.4,
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "vineTip0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.05,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.55,
+      1.7,
+      -0.2
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "vine1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.046,
+     "tubeTaper": 0.1,
+     "tubeSides": 8,
+     "tubeSegments": 36,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         0.35,
+         0.0,
+         -0.8
+        ]
+       },
+       {
+        "position": [
+         0.55,
+         0.5,
+         -0.7
+        ]
+       },
+       {
+        "position": [
+         0.3,
+         1.0,
+         -0.9
+        ]
+       },
+       {
+        "position": [
+         0.62,
+         1.35,
+         -0.6
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 1.3,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.08,
+      "frequency": 1.7,
+      "speed": 1.03,
+      "phase": 1,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.3
+      ],
+      "falloff": 1.4,
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "vineTip1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.05,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.62,
+      1.35,
+      -0.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "vine2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.042,
+     "tubeTaper": 0.1,
+     "tubeSides": 8,
+     "tubeSegments": 36,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -0.2,
+         0.0,
+         0.9
+        ]
+       },
+       {
+        "position": [
+         -0.05,
+         0.35,
+         1.0
+        ]
+       },
+       {
+        "position": [
+         -0.3,
+         0.7,
+         0.95
+        ]
+       },
+       {
+        "position": [
+         -0.1,
+         0.95,
+         1.1
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 1.3,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.08,
+      "frequency": 1.7,
+      "speed": 1.1600000000000001,
+      "phase": 2,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.3
+      ],
+      "falloff": 1.4,
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "vineTip2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.05,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -0.1,
+      0.95,
+      1.1
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "vine3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.038000000000000006,
+     "tubeTaper": 0.1,
+     "tubeSides": 8,
+     "tubeSegments": 36,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         1.4,
+         0.0,
+         -1.6
+        ]
+       },
+       {
+        "position": [
+         1.6,
+         0.7,
+         -1.4
+        ]
+       },
+       {
+        "position": [
+         1.3,
+         1.4,
+         -1.7
+        ]
+       },
+       {
+        "position": [
+         1.7,
+         2.0,
+         -1.5
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 1.3,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.08,
+      "frequency": 1.7,
+      "speed": 1.29,
+      "phase": 3,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.3
+      ],
+      "falloff": 1.4,
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "vineTip3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.05,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      1.7,
+      2.0,
+      -1.5
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "vine4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.034,
+     "tubeTaper": 0.1,
+     "tubeSides": 8,
+     "tubeSegments": 36,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -2.6,
+         0.0,
+         0.4
+        ]
+       },
+       {
+        "position": [
+         -2.4,
+         0.4,
+         0.5
+        ]
+       },
+       {
+        "position": [
+         -2.75,
+         0.85,
+         0.35
+        ]
+       },
+       {
+        "position": [
+         -2.5,
+         1.15,
+         0.6
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 1.3,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.08,
+      "frequency": 1.7,
+      "speed": 1.42,
+      "phase": 4,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.3
+      ],
+      "falloff": 1.4,
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "vineTip4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.05,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.5,
+      1.15,
+      0.6
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45079,
+      0.25415
+     ],
+     "emissiveIntensity": 5.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "stems",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.07,
+     "height": 0.62,
+     "radialSegments": 12,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "spiral",
+     "count": 7,
+     "radius": 0.25,
+     "radiusGrowth": 0.55,
+     "turns": 1.15,
+     "plane": "xz",
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      1.25,
+      0.0,
+      0.35
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "variation": {
+     "seed": 31,
+     "randomScale": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "uniformScale": 0.45,
+     "randomRotation": [
+      0.12,
+      3.1,
+      0.12
+     ]
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.31,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "caps",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.3,
+     "segments": 20,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "spiral",
+     "count": 7,
+     "radius": 0.25,
+     "radiusGrowth": 0.55,
+     "turns": 1.15,
+     "plane": "xz",
+     "center": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      1.25,
+      0.0,
+      0.35
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 1.2,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogDots"
+    },
+    "variation": {
+     "seed": 31,
+     "randomScale": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "uniformScale": 0.45,
+     "randomRotation": [
+      0.12,
+      3.1,
+      0.12
+     ]
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      0.64,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.55,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "jtStalk0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.12,
+     "tubeTaper": 0.6,
+     "tubeSides": 10,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -4.5,
+         0.0,
+         -7.5
+        ]
+       },
+       {
+        "position": [
+         -4.2,
+         2.1,
+         -7.5
+        ]
+       },
+       {
+        "position": [
+         -4.7,
+         4.2,
+         -7.5
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtBell0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.7,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.7,
+      4.2,
+      -7.5
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtTendrils0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.035,
+     "tubeTaper": 0.2,
+     "tubeSides": 6,
+     "tubeSegments": 20,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         0.05,
+         -0.8,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         -0.05,
+         -1.7,
+         0.02
+        ]
+       },
+       {
+        "position": [
+         0.04,
+         -2.6,
+         0.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 1.394,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.7,
+      4.1000000000000005,
+      -7.5
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.12,
+      "frequency": 1.2,
+      "speed": 0.7,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.5
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "jtStalk1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.12,
+     "tubeTaper": 0.6,
+     "tubeSides": 10,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         3.2,
+         0.0,
+         -10.0
+        ]
+       },
+       {
+        "position": [
+         3.5,
+         2.7,
+         -10.0
+        ]
+       },
+       {
+        "position": [
+         3.0,
+         5.4,
+         -10.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtBell1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 2.2,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      3.0,
+      5.4,
+      -10.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtTendrils1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.035,
+     "tubeTaper": 0.2,
+     "tubeSides": 6,
+     "tubeSegments": 20,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         0.05,
+         -0.8,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         -0.05,
+         -1.7,
+         0.02
+        ]
+       },
+       {
+        "position": [
+         0.04,
+         -2.6,
+         0.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 1.804,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      3.0,
+      5.300000000000001,
+      -10.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.12,
+      "frequency": 1.2,
+      "speed": 0.7999999999999999,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.5
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "jtStalk2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.12,
+     "tubeTaper": 0.6,
+     "tubeSides": 10,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         -9.0,
+         0.0,
+         -14.0
+        ]
+       },
+       {
+        "position": [
+         -8.7,
+         3.0,
+         -14.0
+        ]
+       },
+       {
+        "position": [
+         -9.2,
+         6.0,
+         -14.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtBell2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 2.6,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.2,
+      6.0,
+      -14.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtTendrils2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.035,
+     "tubeTaper": 0.2,
+     "tubeSides": 6,
+     "tubeSegments": 20,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         0.05,
+         -0.8,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         -0.05,
+         -1.7,
+         0.02
+        ]
+       },
+       {
+        "position": [
+         0.04,
+         -2.6,
+         0.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 2.132,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.2,
+      5.9,
+      -14.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.521,
+      1.0,
+      0.80695
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.12,
+      "frequency": 1.2,
+      "speed": 0.8999999999999999,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.5
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "jtStalk3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.12,
+     "tubeTaper": 0.6,
+     "tubeSides": 10,
+     "tubeSegments": 40,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         8.5,
+         0.0,
+         -16.0
+        ]
+       },
+       {
+        "position": [
+         8.8,
+         2.4,
+         -16.0
+        ]
+       },
+       {
+        "position": [
+         8.3,
+         4.8,
+         -16.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtBell3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 2.0,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.3,
+      4.8,
+      -16.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.6,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "jtTendrils3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.035,
+     "tubeTaper": 0.2,
+     "tubeSides": 6,
+     "tubeSegments": 20,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "samplesPerSegment": 10,
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         0.05,
+         -0.8,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         -0.05,
+         -1.7,
+         0.02
+        ]
+       },
+       {
+        "position": [
+         0.04,
+         -2.6,
+         0.0
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 1.64,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      8.3,
+      4.7,
+      -16.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.12,
+      "frequency": 1.2,
+      "speed": 1.0,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.5
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "leaf0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.9,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.6,
+      0.35,
+      2.7
+     ],
+     "rotation": [
+      70.0,
+      30.0,
+      25.0
+     ],
+     "scale": [
+      0.38,
+      1.0,
+      0.06
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00061,
+      0.00243,
+      0.00212
+     ],
+     "emissiveColor": [
+      0.01229,
+      0.14703,
+      0.09084
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "leaf1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.9,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      1.9,
+      0.25,
+      2.5
+     ],
+     "rotation": [
+      70.0,
+      -25.0,
+      -30.0
+     ],
+     "scale": [
+      0.38,
+      1.0,
+      0.06
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00061,
+      0.00243,
+      0.00212
+     ],
+     "emissiveColor": [
+      0.01229,
+      0.14703,
+      0.09084
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "leaf2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.9,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.9,
+      0.12,
+      3.2
+     ],
+     "rotation": [
+      70.0,
+      10.0,
+      -10.0
+     ],
+     "scale": [
+      0.38,
+      1.0,
+      0.06
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00061,
+      0.00243,
+      0.00212
+     ],
+     "emissiveColor": [
+      0.01229,
+      0.14703,
+      0.09084
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   }
+  },
+  {
+   "name": "spores",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2500,
+    "seed": 9,
+    "shape": "box",
+    "position": [
+     0.0,
+     1.5,
+     -1.5
+    ],
+    "extent": [
+     4.5,
+     1.5,
+     4.0
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 260.0,
+    "lifetimeMin": 6.0,
+    "lifetimeMax": 10.0,
+    "spread": 1.0,
+    "speedMin": 0.02,
+    "speedMax": 0.08,
+    "gravity": [
+     0,
+     0.02,
+     0
+    ],
+    "drag": 0.3,
+    "turbulence": 0.12,
+    "turbulenceScale": 0.6,
+    "turbulenceSpeed": 0.15,
+    "sizeStart": 0.018,
+    "sizeEnd": 0.012,
+    "sizeVariance": 0.6,
+    "sizeSkew": 2.0,
+    "colorStart": [
+     1.0,
+     0.45079,
+     0.25415,
+     0.9
+    ],
+    "colorEnd": [
+     0.521,
+     1.0,
+     0.80695,
+     0.0
+    ],
+    "emissive": 3.0,
+    "blend": "additive",
+    "pulseRate": 0.6,
+    "pulseDepth": 0.5
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "heartLight",
+   "name": "heartLight",
+   "type": "point",
+   "position": [
+    -0.62,
+    1.9,
+    0.08
+   ],
+   "color": [
+    1.0,
+    0.45079,
+    0.25415
+   ],
+   "intensity": 6.0,
+   "range": 6.0,
+   "castsShadow": false
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.25,
+    -0.35,
+    0.9
+   ],
+   "color": [
+    0.19462,
+    0.26225,
+    1.0
+   ],
+   "intensity": 0.9,
+   "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "ogJelly",
+   "ops": [
+    {
+     "kind": "fresnel",
+     "dst": 0,
+     "value": 2.2
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.16,
+      1.25
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 1,
+     "srcB": 0
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "ogDots",
+   "ops": [
+    {
+     "kind": "fresnel",
+     "dst": 0,
+     "value": 2.0
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.2,
+      1.1
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 1,
+     "srcB": 0
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "localPosition"
+    },
+    {
+     "kind": "voronoi",
+     "dst": 4,
+     "srcA": 3,
+     "value": 7.0,
+     "seed": 4
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.34,
+      0.26,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      2.2118,
+      2.4,
+      1.64804,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 5
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}

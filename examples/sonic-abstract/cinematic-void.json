@@ -1,0 +1,379 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "cinematic-void.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.6,
+   "attack": 1.2,
+   "release": 1.5
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.45,
+  "post/bloom/threshold": 1.2,
+  "post/bloom/emissionWeight": 0.8,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.03,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 50.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.25,
+  "post/halation/warmth": 0.8,
+  "post/tonemap/operator": 3,
+  "scene/volumeAnisotropy": 0.72
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.8,
+       70.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       0.0,
+       1.8,
+       10.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       6.39617927841282,
+       -29.894319838721017
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       0.0,
+       6.39617927841282,
+       -89.89431983872102
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "procedural/barTop/transform/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       2.055001454549842,
+       69.01067480355049
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       0.0,
+       2.055001454549842,
+       9.01067480355049
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "procedural/barBottom/transform/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.636922131018414,
+       68.9914387996751
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       0.0,
+       1.636922131018414,
+       8.991438799675091
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-cinematic-void.mp4"
+ },
+ "sonicScene": {
+  "category": "cinematic",
+  "thesis": "The Gate: a colossal segmented ring on the horizon of a mirror plane, a low sun burning inside it, amber haze, one tiny figure. The music breathes the haze and the light, parts the ring's segments as it builds and lights the segment at the pitch's angle.",
+  "composition": {
+   "background": "a teal sky grading to amber at the horizon; the sun inside the ring",
+   "midground": "the ring and its reflection, a dark silhouette with seams of light",
+   "foreground": "one figure on the lower third, and its reflection",
+   "focal": "the sun inside the ring, on the frame's vertical centre line",
+   "secondary": [
+    "the figure",
+    "the reflection",
+    "the dust in the light"
+   ],
+   "atmosphere": "amber haze lit from behind the ring",
+   "post": "letterbox 2.39:1, halation, grain, a slow bloom",
+   "camera": "a slow straight push toward the ring, low (1.8 m)"
+  },
+  "palette": {
+   "dominant": "#0e2a33",
+   "secondary": "#ff9a3c",
+   "accent": "#ffcf86",
+   "highlight": "#fff4dc",
+   "background_value": "mid-dark",
+   "saturation": "amber against teal; a black silhouette"
+  },
+  "motion": {
+   "very_slow": [
+    "the push",
+    "the ring's turn"
+   ],
+   "medium": [
+    "the haze breathing",
+    "the segments parting"
+   ],
+   "fast": [
+    "a segment lighting on a note"
+   ],
+   "extremely_fast": [
+    "a pulse of light round the seams on the kick"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the haze breathes; the sun's glow swells"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a pulse of light runs round the ring's seams"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "dust bursts in the light"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the ring turns slowly"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the sun brightens"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "the ring's segments part as the piece builds"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "the segment count"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "the segment at the pitch's angle lights"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the push; the ring stands"
+   ]
+  ],
+  "tier": "medium: 64 instanced segments twice, a haze march, a few particles",
+  "id": "cinematic-void",
+  "title": "Abstract Cinematic Void",
+  "regions": [
+   {
+    "id": "ring",
+    "box": [
+     0.328,
+     0.034,
+     0.672,
+     0.644
+    ]
+   },
+   {
+    "id": "figure",
+    "box": [
+     0.563,
+     0.573,
+     0.609,
+     0.655
+    ]
+   }
+  ]
+ }
+}
