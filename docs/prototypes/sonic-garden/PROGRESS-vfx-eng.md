@@ -171,4 +171,10 @@ arm, from 2.5 s after start-up:**
 
 ## Suites
 
-(filled in at the hand-back)
+Final hand-back, at engineering head `6ac1f9a2` (CMake reconfigured first), under `tools/gpu-lock.sh`, one after the
+other:
+
+- `avgen_tests`: **exit 0**. 4,013 test cases: 3,993 passed, 19 skipped, 1 failed as expected (the slope lean,
+  `[!shouldfail]`).
+- `avgen_render_tests`: **exit 0**. 570 test cases: 569 passed, 1 skipped.
+- No tracked `temporal-*.png` was left modified.
