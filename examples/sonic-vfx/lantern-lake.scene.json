@@ -751,18 +751,18 @@
    "kind": "particles",
    "particles": {
     "enabled": true,
-    "capacity": 400,
+    "capacity": 900,
     "seed": 23,
     "shape": "box",
     "position": [
-     -1.0,
-     1.4,
-     6.0
+     -2.4,
+     1.0,
+     -4.0
     ],
     "extent": [
-     3.0,
-     0.8,
-     5.0
+     1.6,
+     0.5,
+     11.0
     ],
     "direction": [
      0,
@@ -770,8 +770,8 @@
      0
     ],
     "spawnRate": 0.0,
-    "lifetimeMin": 0.4,
-    "lifetimeMax": 1.0,
+    "lifetimeMin": 0.16,
+    "lifetimeMax": 0.38,
     "spread": 1.0,
     "speedMin": 0.05,
     "speedMax": 0.2,
@@ -783,8 +783,8 @@
     "drag": 0.8,
     "turbulence": 0.3,
     "turbulenceScale": 0.8,
-    "sizeStart": 0.02,
-    "sizeEnd": 0.0,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.01,
     "colorStart": [
      0.68669,
      1.0,
@@ -797,7 +797,7 @@
      0.10224,
      0.0
     ],
-    "emissive": 10.0,
+    "emissive": 16.0,
     "blend": "additive"
    }
   }
@@ -847,13 +847,13 @@
    "ops": [
     {
      "kind": "input",
-     "dst": 0,
+     "dst": 7,
      "input": "viewDirection"
     },
     {
      "kind": "swizzle",
      "dst": 0,
-     "srcA": 0,
+     "srcA": 7,
      "constant": [
       1.0,
       1.0,
@@ -959,6 +959,170 @@
      "dst": 2,
      "srcA": 2,
      "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 0,
+     "value": 1,
+     "constant": [
+      0.002,
+      1.0,
+      0.002,
+      1.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": -1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      39.9,
+      39.9,
+      39.9,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 7,
+     "srcB": 1
+    },
+    {
+     "kind": "input",
+     "dst": 5,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 1
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      2.4,
+      0.0,
+      16.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "gradient",
+     "dst": 5,
+     "srcA": 5,
+     "value": 0.000625,
+     "constant": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 0.5
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "value": 1,
+     "constant": [
+      0.778,
+      0.8220000000000001,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "constant3": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      0.87137,
+      0.39157,
+      0.29614,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 1
     },
     {
      "kind": "constant",

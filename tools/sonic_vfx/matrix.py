@@ -218,6 +218,8 @@ def report(a):
             cells.append("%d/%d" % (n_ans, n_play) if n_play else "-")
         grid.append("| %s | %s |" % (sc, " | ".join(cells)))
     lines += grid + [""]
+    if matrix_notes is not None and getattr(matrix_notes, "LIVE", ""):
+        lines += [matrix_notes.LIVE.rstrip(), ""]
     for sc in scenes:
         reps = {}
         for p in sorted(glob.glob(os.path.join(a.out, sc, "*.critic.json"))):

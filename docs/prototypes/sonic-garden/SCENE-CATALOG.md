@@ -111,6 +111,15 @@ Saturation is highest in the inner disk, and the stars are desaturated.
 **Kill if** the disk still reads as dots or as a plate after two passes. DNGR's "anemic", thin, bright disk is the
 target.
 
+**As built** (`scenes/event_horizon.py`):
+- The disk reads, and the lens bends its far side over and under the shadow as planned: three thin opaque bands at
+  the innermost orbit, inner and outer particle gas and a beaming patch, all on the orbit force.
+- Each note is born as stars at the orbit its pitch sets (low notes far out, high notes close) and spirals in; the
+  velocity scales the burst.
+- The kick flashes the photon ring and pulses the jets, and sends a shock ring out from the hole (ADR-1065's
+  `post/shock`, centred on the hole's projected position).
+- No fog; the cost is the lens, in the scene pass.
+
 ### 2. The Breathing Deep (organic)
 
 **Thesis.** A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies
@@ -169,6 +178,16 @@ the only warm area.
 **Kill if** it reads as the old garden underground. It must read as a single enormous creature, not a field of
 mushrooms.
 
+**As built** (`scenes/breathing_deep.py`):
+- It reads as one creature: an inverted cap whose gill ring (the hymenium) is the only warm light, eleven threads
+  hanging from its rim into the haze over a black pool, a wet lip with small glowing caps in the lower left.
+- Each note lights its own thread (low to high, left to right) and a pulse climbs it; a chord shimmers through all of
+  them. The kick contracts the cap on a spring; the snare flashes the gill ring and sheds spores; the bass breathes
+  the cap and sways the threads.
+- Sustain heats the ring. Its gain is capped: dense held playing burnt it out to a white ellipse and lost the gills.
+- The cavern is an SDF meshed once at load (surface nets, 128 cells a side). Raymarched every frame it cost 24 ms at
+  1080p; the march now carries only the haze, at 16 steps.
+
 ### 3. Tesla Choir (energy)
 
 **Thesis.** Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn
@@ -221,6 +240,13 @@ in lightning, so harmony has a shape.
 
 **Kill if** the arcs read as random lightning rather than as the chord's shape.
 
+**As built** (`scenes/tesla_choir.py`):
+- The towers stand on the circle of fifths, and each held note arcs from the core to its pitch class's tower (the
+  per-note signals of ADR-1062), so a triad draws a narrow triangle of lightning and a cluster a jagged fan.
+- A held note is a steady writhing arc and a staccato note one crack. The kick discharges bolts to the ring, the
+  snare crackles over the core's cage, and the hats spit sparks from the crown.
+- The hall is one SDF; the haze march carries the arcs' light; the sodium windows are the only warm colour.
+
 ### 4. The Corrupted Cathedral (digital and glitch)
 
 **Thesis.** A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held
@@ -269,6 +295,17 @@ chords.
 - **Cost class: medium.**
 
 **Kill if** the glitch reads as an always-on filter. Menkman's rule: it must break something readable.
+
+**As built** (`scenes/corrupted_cathedral.py`):
+- The nave reads as planned: one compiled SDF of repeats and polar repeats, drawn by the line look in cold cyan, the
+  rose window the brightest thing on the axis.
+- **The kick no longer fractures the stone.** A Voronoi displacement over the whole nave, evaluated at every march
+  step, cost most of a 92 ms SDF pass at 1080p. The kick now breaks the image instead: it splits along the nave and a
+  shock runs out from the rose (ADR-1065's `post/split` and `post/shock`).
+- The snare moshes and tears the frame; roughness drips the glass's light down it as sorted pixels; held chords heal
+  everything (the lines sharpen, the sort recedes). The glitch stays rationed to hits, so it breaks something
+  readable.
+- It is the heaviest scene: the line look needs the raymarch (a meshed SDF has no edge look).
 
 ### 5. Ferrofluid Crown (abstract)
 
@@ -322,6 +359,15 @@ Colour comes only from reflected light.
 
 **Kill if** it reads as chrome blobs rather than as a material with a will.
 
+**As built** (`scenes/ferrofluid_crown.py`):
+- It reads as a material: glossy black, seen only through the long warm softbox's and the thin cool strip's
+  reflections, after Kodama.
+- Twelve note spikes wait below the surface round the crown, each a named SDF node raised by its own pitch place, so
+  a melody pulls spikes up one after another and a held note keeps its spike up. The field's small spikes are rings
+  of polar-repeated cones graded by radius, never a grid.
+- The hat's shimmer is particles (glints on the skin), not a noise over the liquid: evaluated at every march step,
+  that noise cost a tenth of the frame. Dissonance swells the surface instead.
+
 ### 6. Cymatic Plate (abstract and scientific)
 
 **Thesis.** Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a
@@ -371,6 +417,14 @@ chord is two figures at war.
 - **Cost class: light.**
 
 **Kill if** the pattern reads as a screensaver rather than as sand on steel.
+
+**As built** (`scenes/cymatic_plate.py`):
+- The figure is a material program: Chladni modes built from the palette op's cosines, the mode numbers routed by
+  pitch, so a melody re-forms the sand continuously; a chord superposes its lowest and highest notes' modes.
+- The kick throws sand off the plate, the snare bursts it from the nodes, the hat glitters; a held note sharpens
+  the lines.
+- The key is a pool rather than a flood (an 8 to 19 degree cone), so the figure's centre is the brightest place and
+  the corners sink toward the void.
 
 ### 7. Storm Cell (atmospheric, violent)
 

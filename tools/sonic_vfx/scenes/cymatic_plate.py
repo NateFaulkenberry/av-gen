@@ -174,8 +174,10 @@ def build():
                 colorStart=hexrgb("#ffffff") + [1.0], colorEnd=hexrgb(WARM) + [0.0], emissive=8.0, blend="additive")
 
     # light: a warm key from above-front for the sand, a cold grazing rim from behind for the relief
+    # (a pool, not a flood: the key's cone falls off across the plate, so the figure's centre is the brightest place
+    #  and the corners sink toward the void -- one dominant subject instead of an evenly lit diagram)
     s.light("key", "spot", position=[-1.2, 5.4, 2.6], direction=[0.2, -1.0, -0.45], color=hexrgb(WARM),
-            intensity=140.0, range=14.0, innerCone=18.0, outerCone=34.0, castsShadow=True, volumetric=0.0)
+            intensity=175.0, range=14.0, innerCone=8.0, outerCone=19.0, castsShadow=True, volumetric=0.0)
     s.light("rim", "directional", direction=[0.55, -0.22, 0.8], color=hexrgb(RIM), intensity=1.6,
             castsShadow=False)
 

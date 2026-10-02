@@ -212,7 +212,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/efAsh/op/9/constant/constant",
+   "target": "material/efAsh/op/10/constant/constant",
    "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
@@ -224,7 +224,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/efAsh/op/9/constant/constant",
+   "target": "material/efAsh/op/10/constant/constant",
    "amount": 0.72065,
    "op": "add",
    "polarity": "unipolar",
@@ -328,6 +328,17 @@
    "source": "response.sustain",
    "target": "procedural/fireline/material/emissive",
    "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "env/sky/intensity",
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

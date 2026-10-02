@@ -4,6 +4,7 @@
     python3 tools/sonic_vfx/capture.py still <scene-id> [--class full] [--at 9.0] [--size 1920x1080]
     python3 tools/sonic_vfx/capture.py clip  <scene-id> [--class full] [--size 1920x1080]
     python3 tools/sonic_vfx/capture.py tour  [--seconds 10] [--size 1280x720]
+    python3 tools/sonic_vfx/capture.py tourfull [--seconds 8] [--size 1280x720]   # one full mix through every scene
 
 Files go to ~/Desktop/av-gen-review/25-sonic-vfx/, named by set-list position (`01-salt-flat-mirage.png`, ...). The
 tour plays the set list in order, a few seconds of each scene with its test audio, cross-faded. Every render goes
@@ -77,17 +78,26 @@ def clip(a, seconds=None, size=None, dst=None, cls=None):
     return dst
 
 
-def tour(a):
+def tour(a, same_music=False):
     """The set list in order, `--seconds` of each scene's capture clip (from 3 s in, past the growing-in), cross-faded.
-    Cut from the clips `capture.py clip` wrote (no re-render); a missing clip is rendered first."""
+    Cut from the clips `capture.py clip` wrote (no re-render); a missing clip is rendered first.
+
+    `same_music` (mode `tourfull`): every scene plays the same full mix (pads, bass, lead and drums), rendered afresh at
+    the tour's size, so the cut compares sixteen worlds answering one piece of music."""
     parts = []
-    work = os.path.join(OUT, "work", "tour")
+    work = os.path.join(OUT, "work", "tourfull" if same_music else "tour")
     os.makedirs(work, exist_ok=True)
     for sid in scene_ids():
-        src = os.path.join(OUT, numbered(sid) + ".mp4")
-        if not os.path.exists(src):
-            a.scene = sid
-            clip(a, cls=SHOWCASE.get(sid, "full"))
+        if same_music:
+            src = os.path.join(work, sid + "--full.mp4")
+            if not os.path.exists(src):
+                a.scene = sid
+                clip(a, seconds=3.0 + a.seconds + 0.5, size=a.size, dst=src, cls="full")
+        else:
+            src = os.path.join(OUT, numbered(sid) + ".mp4")
+            if not os.path.exists(src):
+                a.scene = sid
+                clip(a, cls=SHOWCASE.get(sid, "full"))
         part = os.path.join(work, sid + ".mp4")
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", "3.0", "-t", "%.2f" % a.seconds, "-i", src,
                         "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
@@ -103,7 +113,7 @@ def tour(a):
         vf.append("%s[%d:v]xfade=transition=fade:duration=%g:offset=%g[v%d]" % (prev_v, i, fade, off, i))
         af.append("%s[%d:a]acrossfade=d=%g[a%d]" % (prev_a, i, fade, i))
         prev_v, prev_a = "[v%d]" % i, "[a%d]" % i
-    dst = os.path.join(OUT, "00-tour.mp4")
+    dst = os.path.join(OUT, "00-tour-same-music.mp4" if same_music else "00-tour.mp4")
     cmd = ["ffmpeg", "-y", "-v", "error"] + inputs + ["-filter_complex", ";".join(vf + af), "-map", prev_v, "-map",
                                                        prev_a, "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
                                                        "-c:a", "aac", "-b:a", "192k", dst]
@@ -113,7 +123,7 @@ def tour(a):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["still", "clip", "tour"])
+    ap.add_argument("mode", choices=["still", "clip", "tour", "tourfull"])
     ap.add_argument("scene", nargs="?")
     ap.add_argument("--class", dest="cls", default="")
     ap.add_argument("--at", type=float, default=None)
@@ -122,7 +132,10 @@ def main():
     ap.add_argument("--projects", default="")
     ap.add_argument("--tier", default="realtime", help="the live tier, so a capture shows what the live demo shows")
     a = ap.parse_args()
-    {"still": still, "clip": clip, "tour": tour}[a.mode](a)
+    if a.mode == "tourfull":
+        tour(a, same_music=True)
+    else:
+        {"still": still, "clip": clip, "tour": tour}[a.mode](a)
 
 
 if __name__ == "__main__":

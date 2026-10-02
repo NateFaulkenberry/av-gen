@@ -69,9 +69,11 @@ def ground_program():
             {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.22, "seed": 6},
             {"kind": "remap", "dst": 1, "srcA": 1, "value": 0, "constant": [0.5, 1.0, 0.0, 1.0]},
             {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 1},
-            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.0, 0.0012, 0.0, 0.0]},
+            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.0, 0.0008, 0.0, 0.0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},   # 1 on a seam
             {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.9, "seed": 8},                         # flicker grain
+            # (broken into live lengths and dead ones: an unbroken contour read as a map's line, not as coal)
+            {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.4, 0.62, 0.0, 0.0]},
             {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
             {"kind": "constant", "dst": 3, "constant": hexrgb(EMBER, 1.0) + [0.0]},                # OP_SEAM
             {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 1},
@@ -83,7 +85,8 @@ def ground_program():
     }
 
 
-OP_SEAM = 9
+OP_SEAM = 10
+assert ground_program()["ops"][OP_SEAM - 1]["kind"] == "constant"
 
 
 def bark_program():
@@ -242,7 +245,9 @@ def build():
             R("hat", "particles/sparks/burst", 40.0, attackMs=0, decayMs=40),
             R("sustain", "lights/fire/intensity", 1.6, **SLOW),
             R("sustain", "procedural/fireline/material/emissive", 6.0, **SLOW),
-
+            # (live, a routed sky draws its background every frame and relights at most twice a second, ADR-1070:
+            #  a slow route like this one is what that schedule suits)
+            R("sustain", "env/sky/intensity", 0.6, **SLOW),
             R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({

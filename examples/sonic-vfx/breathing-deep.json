@@ -1014,7 +1014,7 @@
   {
    "source": "visual.heat",
    "target": "procedural/hymenium/material/emissive",
-   "amount": 2.2,
+   "amount": 1.5,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1025,7 +1025,7 @@
   {
    "source": "visual.heat",
    "target": "lights/hymenium/intensity",
-   "amount": 900.0,
+   "amount": 650.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

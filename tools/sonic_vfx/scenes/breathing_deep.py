@@ -261,8 +261,9 @@ def build():
     s.map2(M("chordShimmer", [("noteOn", 1.0), ("polyphony", 1.0)], "min"))
 
     # sustained: the gill ring blooms, the light under the organism warms, spores thicken
-    s.route(R("visual.heat", "procedural/hymenium/material/emissive", 2.2, **SLOW),
-            R("visual.heat", "lights/hymenium/intensity", 900.0, **SLOW),
+    # (dense held playing drives heat to 1: past +1.5 the gill ring burns out to a white ellipse and loses its gills)
+    s.route(R("visual.heat", "procedural/hymenium/material/emissive", 1.5, **SLOW),
+            R("visual.heat", "lights/hymenium/intensity", 650.0, **SLOW),
             R("visual.heat", "procedural/gills/material/emissive", 1.6, **SLOW),
             R("visual.heat", "particles/spores/spawnRate", 160.0, **SLOW),
             R("visual.heat", "scene/fogColor", 0.02, comp=0, **SLOW),

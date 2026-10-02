@@ -107,28 +107,69 @@ def jetty(mirror):
     return parts
 
 
+# The kick's ripple: a ring on the water centred on the jetty's end, its radius and brightness routed into the mirror
+# program. RING_R is the radius the ring's parameter is normalised to; the ring starts at RING_START and runs out to
+# RING_END (fractions of RING_R) as its route's envelope falls.
+RING_CENTRE = (-2.4, -16.0)
+RING_R = 40.0
+RING_START, RING_END, RING_W = 0.03, 0.8, 0.022
+MIRROR_DEPTH = 39.9        # the mirror plane's top below the waterline
+OP_BANDS = OP_RING = OP_RING_GAIN = 0
+
+
 def mirror_program():
     """The lake's mirror of the sky, painted on an unlit plane below the reflected world: the sky's own gradient,
     flipped (the horizon colour at grazing, the zenith's when looking down), weighted by water's Fresnel (a mirror
-    at grazing, dark underfoot), broken into long horizontal ripple bands."""
+    at grazing, dark underfoot), broken into long horizontal ripple bands -- and the kick's ripple ring, drawn where the
+    view ray crosses the waterline (the plane's point lifted back up the ray by the mirror's depth)."""
+    global OP_BANDS, OP_RING, OP_RING_GAIN
+    bands = {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.3, 0.7, 0.82, 1.12]}
+    ring = {"kind": "remap", "dst": 5, "srcA": 5, "value": 1,
+            "constant": [RING_END - RING_W, RING_END + RING_W, 0.0, 1.0]}
+    gain = {"kind": "constant", "dst": 3, "constant": [0.0, 0.0, 0.0, 0.0]}
+    ops = [
+        {"kind": "input", "dst": 7, "input": "viewDirection"},
+        {"kind": "swizzle", "dst": 0, "srcA": 7, "constant": [1.0, 1.0, 1.0, 1.0]},             # its y
+        {"kind": "remap", "dst": 1, "srcA": 0, "value": 1, "constant": [0.0, 0.3, 0.0, 1.0]},    # 0 grazing
+        {"kind": "ramp", "dst": 2, "srcA": 1, "constant": hexrgb(HORIZON, 0.95) + [1.0],
+         "constant2": hexrgb("#4a3050", 0.6) + [1.0], "constant3": hexrgb(ZENITH, 0.5) + [1.0]},
+        {"kind": "remap", "dst": 3, "srcA": 0, "value": 1, "constant": [0.0, 0.45, 1.0, 0.08]},  # Fresnel
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
+        {"kind": "input", "dst": 4, "input": "worldPosition"},
+        {"kind": "constant", "dst": 5, "constant": [0.03, 0.0, 1.3, 0.0]},                     # long bands
+        {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+        {"kind": "noise", "dst": 4, "srcA": 4, "value": 1.0, "seed": 5},
+        bands,                                                                                  # OP_BANDS (bass)
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+        # ---- the ripple ring: the waterline point P0 = P + V * depth / V.y, its distance from the jetty's end
+        {"kind": "remap", "dst": 1, "srcA": 0, "value": 1, "constant": [0.002, 1.0, 0.002, 1.0]},  # V.y >= 0.002
+        {"kind": "power", "dst": 1, "srcA": 1, "value": -1.0},                                  # 1 / V.y
+        {"kind": "constant", "dst": 3, "constant": [MIRROR_DEPTH, MIRROR_DEPTH, MIRROR_DEPTH, 0.0]},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 3},
+        {"kind": "multiply", "dst": 1, "srcA": 7, "srcB": 1},                                   # V * depth / V.y
+        {"kind": "input", "dst": 5, "input": "worldPosition"},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 1},                                        # P0 (y ~ 0)
+        {"kind": "constant", "dst": 3, "constant": [-RING_CENTRE[0], 0.0, -RING_CENTRE[1], 0.0]},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 3},
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 5},
+        {"kind": "gradient", "dst": 5, "srcA": 5, "value": 1.0 / (RING_R * RING_R), "constant": [1.0, 0.0, 1.0, 0.0]},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 0.5},                                   # r / RING_R
+        ring,                                                                                   # OP_RING (kick)
+        {"kind": "ramp", "dst": 5, "srcA": 5, "constant": [0.0, 0.0, 0.0, 0.0], "constant2": [1.0, 1.0, 1.0, 0.0],
+         "constant3": [0.0, 0.0, 0.0, 0.0]},                                                    # the band
+        gain,                                                                                   # OP_RING_GAIN
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 3},
+        {"kind": "constant", "dst": 1, "constant": hexrgb("#f0a894") + [0.0]},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 5},
+        {"kind": "add", "dst": 2, "srcA": 2, "srcB": 1},
+        {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 1.0]},
+    ]
+    OP_BANDS = ops.index(bands) + 1
+    OP_RING = ops.index(ring) + 1
+    OP_RING_GAIN = ops.index(gain) + 1
+    assert len(ops) <= 48
     return {
-        "name": "llMirror",
-        "ops": [
-            {"kind": "input", "dst": 0, "input": "viewDirection"},
-            {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},             # its y
-            {"kind": "remap", "dst": 1, "srcA": 0, "value": 1, "constant": [0.0, 0.3, 0.0, 1.0]},    # 0 grazing
-            {"kind": "ramp", "dst": 2, "srcA": 1, "constant": hexrgb(HORIZON, 0.95) + [1.0],
-             "constant2": hexrgb("#4a3050", 0.6) + [1.0], "constant3": hexrgb(ZENITH, 0.5) + [1.0]},
-            {"kind": "remap", "dst": 3, "srcA": 0, "value": 1, "constant": [0.0, 0.45, 1.0, 0.08]},  # Fresnel
-            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
-            {"kind": "input", "dst": 4, "input": "worldPosition"},
-            {"kind": "constant", "dst": 5, "constant": [0.03, 0.0, 1.3, 0.0]},                     # long bands
-            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
-            {"kind": "noise", "dst": 4, "srcA": 4, "value": 1.0, "seed": 5},
-            {"kind": "remap", "dst": 4, "srcA": 4, "value": 1, "constant": [0.3, 0.7, 0.82, 1.12]},
-            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
-            {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 1.0]},
-        ],
+        "name": "llMirror", "ops": ops,
         "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": -1,
     }
 
@@ -175,10 +216,11 @@ def build():
     s.particles("twins", position=[0.0, -0.3, RELEASE_Z], direction=[0.12, -1.0, 0.0], gravity=[0.06, -0.02, 0.0],
                 colorStart=hexrgb("#ff9a50") + [0.7], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=1.8, **common)
     # fireflies at the jetty (hats)
-    s.particles("fireflies", capacity=400, seed=23, shape="box", position=[-1.0, 1.4, 6.0], extent=[3.0, 0.8, 5.0],
-                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.4, lifetimeMax=1.0, spread=1.0, speedMin=0.05,
-                speedMax=0.2, gravity=[0, 0, 0], drag=0.8, turbulence=0.3, turbulenceScale=0.8, sizeStart=0.02,
-                sizeEnd=0.0, colorStart=hexrgb("#d8ff7a") + [1.0], colorEnd=hexrgb("#ffd25a") + [0.0], emissive=10.0,
+    # (along the jetty's length, low over the deck, where they read against the dark water: a short blink per hat)
+    s.particles("fireflies", capacity=900, seed=23, shape="box", position=[-2.4, 1.0, -4.0], extent=[1.6, 0.5, 11.0],
+                direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.16, lifetimeMax=0.38, spread=1.0, speedMin=0.05,
+                speedMax=0.2, gravity=[0, 0, 0], drag=0.8, turbulence=0.3, turbulenceScale=0.8, sizeStart=0.05,
+                sizeEnd=0.01, colorStart=hexrgb("#d8ff7a") + [1.0], colorEnd=hexrgb("#ffd25a") + [0.0], emissive=16.0,
                 blend="additive")
 
     # ---- the water: a shimmer column under the waterline wobbles the mirror world (bass swells, kick ripples)
@@ -217,12 +259,23 @@ def build():
                 R("sustain", "particles/%s/emissive" % sysname, 1.6 if sysname == "lanterns" else 0.7, **SLOW))
     s.route(R("noteEnv", "lights/glow/intensity", 260.0, attackMs=0, decayMs=900),
             R("sustain", "lights/glow/intensity", 120.0, **SLOW))
-    # bass: the swell; kick: a ripple through the reflection
+    # bass: the swell -- the mirror world heaves and the reflection's long bands deepen
     s.route(R("bass", "fx/swell/strength", 0.35, attackMs=50, decayMs=1800),
-            R("kick", "fx/swell/strength", 0.5, attackMs=0, decayMs=500),
+            R("bass", "material/llMirror/op/%d/remap/constant" % OP_BANDS, -0.3, comp=2, attackMs=50, decayMs=1800),
+            R("bass", "material/llMirror/op/%d/remap/constant" % OP_BANDS, 0.35, comp=3, attackMs=50, decayMs=1800))
+    # kick: a ripple ring runs out across the water from the jetty's end (its radius rides the route's envelope down,
+    # linearly, from RING_START to RING_END in half a second; its light fades as it goes) and the mirror wobbles
+    for c in (0, 1):
+        s.route(R("kick", "material/llMirror/op/%d/remap/constant" % OP_RING, -(RING_END - RING_START), comp=c,
+                  envelope="linearfall", envelopeFallPerSecond=2.0))
+    for c in (0, 1, 2):
+        # (brightest at the jetty, dimming as it spreads: near the camera, perspective makes the ring a wide band)
+        s.route(R("kick", "material/llMirror/op/%d/constant/constant" % OP_RING_GAIN, 1.5, comp=c, attackMs=0,
+                  decayMs=320))
+    s.route(R("kick", "fx/swell/strength", 0.5, attackMs=0, decayMs=500),
             R("kick", "fx/swell/scale", 0.6, attackMs=0, decayMs=500))
     # hat: fireflies
-    s.route(R("hat", "particles/fireflies/burst", 8.0, attackMs=0, decayMs=40),
+    s.route(R("hat", "particles/fireflies/burst", 16.0, attackMs=0, decayMs=40),
             R("hatRate", "particles/fireflies/spawnRate", 30.0, **MEDIUM),
             R("sustain", "post/bloom/intensity", 0.1, **SLOW),
             R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))

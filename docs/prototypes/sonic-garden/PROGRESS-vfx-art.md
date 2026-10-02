@@ -8,47 +8,53 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
 ## Resume here (cold)
 
 - **Done and committed:**
-  - research reports 1 and 3;
-  - `SCENE-CATALOG.md`;
+  - research reports 1 and 3; `SCENE-CATALOG.md` (as-built notes for Salt Flat, Storm Cell and tier B);
   - the kit and tools in `tools/sonic_vfx/`;
-  - **all 16 scenes**, listed in `examples/index.json` in set-list order (`scenes/__init__.py` SCENES).
+  - **all 16 scenes**, listed in `examples/index.json` in set-list order (`scenes/__init__.py` SCENES);
+  - the perf pass (`4423e4da`): static SDFs as surface-nets meshes (`kit.sdf(..., mesh=128)`), Cathedral without its
+    Voronoi fracture, Ferrofluid without the shimmer noise, no surface-pass march in Salt Flat and Lantern Lake;
+  - the matrix report (`1d079577`): set-list order, an at-a-glance grid, verdicts from `tools/sonic_vfx/matrix_notes.py`
+    (`VERDICTS`, filled after the run); `live.py` runs the probe's `tour` with per-scene live stats (`tour.md`).
+- **The pin is `96bc0214`** (ADR-1069 voronoiEdge, ADR-1070 the live sky): `$S/vfx/bin-96bc0214`. The matrix's first
+  seven scenes ran on e6978f28; ADR-1070 changes only live rendering, so their numbers stand.
+- **In flight (2026-10-02 ~13:15):**
+  - the matrix re-run (`matrix.py run` per scene, one loop) had done scenes 1-7 and was on Ferrofluid;
+  - look development, each built to `$S/vfx/look-<xx>` and rendered with `review.py stills|clip --projects`:
+    - Silk Theatre: the silk is a band (a box emitter as tall as a hand, fibres of tiny additive particles), a darker
+      stage (haze 0.0035, wash 150), the rim light's source moved out of frame (it showed as a red dot), the camera
+      closer (radius 7), no note on the spot or the bloom (the evaluator's "whole frame answers");
+    - Abyssal Bloom v2: 56 bigger zooids with hanging palps lit by the same program, jellies larger and nearer,
+      brighter snow, a brighter note band and jelly answer;
+    - Aurora Tundra: the curtains reflected in the black ice (ops 21-32 of `atIce`; colour bound to the palette's low
+      role, gain routed by sustain and kick);
+    - Salt Flat: the near crust darkened by camera distance (a value plan against "muddy midtones");
+    - Cymatic Plate: a tighter key (8/19 degrees), a pool instead of a flood;
+    - Storm Cell: a wall-cloud ceiling (cloudWidth 11) and more funnel detail;
+    - Ember Forest: the coal seams thinner and broken into live lengths (OP_SEAM moved to 10), the slow sky route back
+      (ADR-1070 makes it cheap live);
+    - Breathing Deep: the sustain bloom capped (the gill ring burnt out to a white ellipse under dense playing);
+    - Lantern Lake (built to examples): the kick's ripple ring on the mirror (an expanding band where the view ray
+      crosses the waterline), fireflies along the jetty.
+  - perf ablations (`$S/vfx/ablate.py <id> <tag> <edits>`, then `$S/vfx/abl-perf.sh <id> <tags>`): the Cathedral's
+    parts (floor, warp, piers, arcades, ribs, rose, edges, steps, volume), Ferrofluid's (dish, swell, tower, spikes,
+    rings, steps, epsilon), and the volume march of six scenes (steps 16, no volumetric lights, no noise).
 - **Next:**
-  1. The evaluator pass on every scene, then iterate on its findings. `$S/vfx/evalall.sh <out> <id>:<class> ...`
-     runs `review.py eval` for each and prints the scores and findings.
-  2. The test matrix: `matrix.py run <id>` for every scene (13 classes each), then `matrix.py report` writes
-     `TEST-MATRIX.md`. Its preamble (the material and the drum detector's limit) is
-     `~/Desktop/av-gen-review/25-sonic-vfx/matrix/preamble.md`.
-  3. Live runs (`live.py <id> --scenario demo`; it opens an editor window).
-  4. `perf.py`, then the captures (`capture.py still|clip <id>`, `capture.py tour`).
-  5. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 before the hand-back. That uses the
-     engineer's build.
-- **Open with the engineer:**
-  - **kick/snare under a mix, and drums on melodic material:** fixed by ADR-1067 and ADR-1068 (e6978f28). The matrix
-    is re-run on that pin.
-  - `--sonic-live-log` lacks `response.*` columns.
-  - a probe scenario with program changes;
-  - a Voronoi edge op;
-  - the masked-program prepass.
-- **GPU etiquette:** one job per lock hold. The engineer runs only short targeted tests until its hand-back.
+  1. Read the look-dev renders; keep what improves, `git checkout` the module otherwise; rebuild to examples.
+  2. Re-run the matrix for every scene changed after its run, then `matrix.py report`, write `VERDICTS`, commit.
+  3. Perf: apply what the ablations justify; re-measure all 16 with `perf.py` (realtime and preview, 1080p).
+  4. Live: `live.py salt-flat-mirage --scenario tour --no-capture` (all 16 through the switcher, ~6 min), then one
+     with capture.
+  5. Captures: `capture.py still|clip <id>` for all 16, `capture.py tour`, `capture.py tourfull --seconds 8 --size
+     1280x720` (one full mix through every scene).
+  6. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 (the engineer's build).
+  7. The final report (deliverable 24) through SubagentHandback.
+- **GPU etiquette:** one job per lock hold. The lock is shared with the engineer and other agents (a full
+  `avgen_tests` run held it for 45 minutes at 12:25); do CPU work meanwhile.
 - **The set list** is `scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher
-  (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count. The planned full
-  order, from the calm opening to the cosmic finale:
-  1. Salt Flat
-  2. Lantern Lake
-  3. Aurora Tundra
-  4. Breathing Deep
-  5. Abyssal Bloom
-  6. Cymatic Plate
-  7. Silk Theatre
-  8. Ferrofluid Crown
-  9. Feedback Mirror
-  10. Tesla Choir
-  11. Datascape
-  12. Ember Forest
-  13. Cathedral
-  14. Storm Cell
-  15. Stellar Nursery
-  16. Event Horizon
+  (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count:
+  1 Salt Flat, 2 Lantern Lake, 3 Aurora Tundra, 4 Breathing Deep, 5 Abyssal Bloom, 6 Cymatic Plate, 7 Silk Theatre,
+  8 Ferrofluid Crown, 9 Feedback Mirror, 10 Tesla Choir, 11 Datascape, 12 Ember Forest, 13 Cathedral, 14 Storm Cell,
+  15 Stellar Nursery, 16 Event Horizon.
 - **Each scene carries:**
   - `sonic.response`: the performer's baseline (sensitivity, transient, sustain, attack, release). The switcher carries
     the performer's offsets from it across a switch.
@@ -56,17 +62,12 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   - `sonicScene.vocabulary`: rows whose second entry is exactly one bus id the trace carries. The evaluator checks
     the first id in a row: hits are named by their `response.*` event (it reads the `...Env`), notes by
     `response.note`. A combined string is skipped silently.
-- **The pinned engine:** `$S/vfx/bin-e6978f28` (binary, probe and shaders), used through the wrapper
+- **The pinned engine:** `$S/vfx/bin-96bc0214` (binary, probe and shaders), used through the wrapper
   `$S/vfx/avgen.sh`. `S` is the scratchpad:
   `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
   - Each pin is built in an isolated `git archive` export, `$S/vfx/src-<sha>` (`cmake --preset release
     -DCPM_SOURCE_CACHE=../av-gen/.cache/cpm`, targets `avgen avgen_sonic_probe`). Never build or touch
     `build/release`: the engineer owns it.
-  - e6978f28 adds two ADRs to 337903f0 (ADR-1060-1066):
-    - ADR-1067: drums under a mix (percussive flux, a lasting snare, a kick with a period);
-    - ADR-1068: a note is not a drum (hat tilt, snare noise share, the MIDI note-on cue).
-    The full mix now detects 29/32 kicks, 16/16 snares and 91/105 hats, and the arp fires 0/0/2. So the showcase
-    workaround is retired: captures use the full mix.
   - The evaluator `tools/sonic_vfx_critic.py` is python only. Its `trace` mode calls `build/release`, so
     `review.py eval` runs the trace with the pin instead.
 
@@ -181,6 +182,17 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   (Silk Theatre's stroke).
 - **Light direction is the direction of travel** (verified with primitives: `[1,0,0]` lights left-facing
   surfaces).
+- **A scripted variant build can import stale bytecode.** This Python keeps its caches in
+  `~/Library/Caches/com.apple.python` (`sys.pycache_prefix`), keyed by the source's mtime in whole seconds and its
+  size. Two `sed` flips of a module within one second that leave its size unchanged (`True False` to `False True`)
+  rebuilt the previous variant. Give each build its own `PYTHONPYCACHEPREFIX`.
+- **The GPU lock times out after an hour of waiting** (`AVGEN_GPU_LOCK_TIMEOUT`, default 3600 s, exit 75). Behind a
+  long suite a queued render fails; set the variable higher for long queues, and re-run a matrix with
+  `--skip-existing`.
+- **Material program ops added this pass:** `voronoiEdge` (ADR-1069) gives `vec4(F2-F1, F1, hash, F2)`; flatten the
+  position with a multiply by (1, 0, 1) first for ground patterns (Salt Flat's polygons, the aurora ice's plates).
+  A palette binding can target a program op's constant (`material/<p>/op/<i>/constant/constant`): the aurora ice's
+  reflection colour follows the palette's low role.
 
 ## Scenes built (set-list order)
 

@@ -65,5 +65,8 @@ What the numbers cannot say:
 - The verdicts below are the art agent's, from the clips and the sheets, with the numbers as evidence.
 """
 
+# The live run (live.py --scenario tour): every scene through the switcher with live input, its table pasted here.
+LIVE = ""
+
 # scene id -> the art agent's verdict, written from the clips and the sheets after the matrix run
 VERDICTS = {}

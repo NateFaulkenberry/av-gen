@@ -103,6 +103,27 @@ def salt_program():
             {"kind": "remap", "dst": 3, "srcA": 3, "value": 1, "constant": [0.0, 1.0, 0.0, 1.0]},  # wet 0..1
             {"kind": "constant", "dst": 4, "constant": hexrgb(SALT, 0.72) + [1.0]},         # dry crust
             {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 1},
+            # the crust's polygons (ADR-1069's Worley F2 - F1, flattened onto the ground): raised white ridges between
+            # cells about 1.3 m across, each cell a shade apart, fading out before they could alias
+            {"kind": "constant", "dst": 5, "constant": [1.0, 0.0, 1.0, 0.0]},
+            {"kind": "multiply", "dst": 5, "srcA": 0, "srcB": 5},
+            {"kind": "voronoiEdge", "dst": 5, "srcA": 5, "value": 0.75, "seed": 3},
+            {"kind": "swizzle", "dst": 6, "srcA": 5, "constant": [0.0, 0.0, 0.0, 0.0]},             # F2 - F1
+            {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.0, 0.07, 0.0, 0.0]},
+            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},   # 1 on a ridge
+            {"kind": "input", "dst": 2, "input": "cameraDistance"},
+            {"kind": "remap", "dst": 2, "srcA": 2, "value": 1, "constant": [10.0, 65.0, 1.0, 0.0]},
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 2},
+            {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [0.0, 1.0, 0.9, 1.35]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 6},
+            {"kind": "swizzle", "dst": 5, "srcA": 5, "constant": [2.0, 2.0, 2.0, 2.0]},             # the cell's hash
+            {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 0.94, 1.05]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+            # the value plan: the crust underfoot sits in the dusk's shadow side (seen steeply it gives back little
+            # sky), brightening toward the far sheet -- a dark foreground under a bright horizon band
+            {"kind": "input", "dst": 7, "input": "cameraDistance"},
+            {"kind": "remap", "dst": 7, "srcA": 7, "value": 1, "constant": [4.0, 70.0, 0.5, 1.0]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 7},
             {"kind": "constant", "dst": 5, "constant": hexrgb("#6a6478", 0.3) + [1.0]},     # wet salt
             {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 3},
             {"kind": "remap", "dst": 6, "srcA": 3, "value": 1, "constant": [0.0, 1.0, 0.88, 0.04]},  # wet: a mirror

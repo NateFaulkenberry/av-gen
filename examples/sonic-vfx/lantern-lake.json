@@ -322,6 +322,90 @@
    }
   },
   {
+   "source": "response.bass",
+   "target": "material/llMirror/op/11/remap/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/llMirror/op/11/remap/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/25/remap/constant",
+   "amount": -0.77,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.0
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/25/remap/constant",
+   "amount": -0.77,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.0
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
    "source": "response.kick",
    "target": "fx/swell/strength",
    "amount": 0.5,
@@ -346,7 +430,7 @@
   {
    "source": "response.hat",
    "target": "particles/fireflies/burst",
-   "amount": 8.0,
+   "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

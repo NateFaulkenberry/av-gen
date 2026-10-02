@@ -410,10 +410,10 @@
     0.68669,
     0.39157
    ],
-   "intensity": 140.0,
+   "intensity": 175.0,
    "range": 14.0,
-   "innerCone": 18.0,
-   "outerCone": 34.0,
+   "innerCone": 8.0,
+   "outerCone": 19.0,
    "castsShadow": true,
    "volumetric": 0.0
   },

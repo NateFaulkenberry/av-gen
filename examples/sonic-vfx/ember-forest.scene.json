@@ -746,7 +746,7 @@
      "srcA": 1,
      "constant": [
       0.0,
-      0.0012,
+      0.0008,
       0.0,
       0.0
      ]
@@ -769,6 +769,17 @@
      "srcA": 0,
      "value": 0.9,
      "seed": 8
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.4,
+      0.62,
+      0.0,
+      0.0
+     ]
     },
     {
      "kind": "multiply",
