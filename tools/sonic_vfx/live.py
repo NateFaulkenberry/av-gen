@@ -52,7 +52,7 @@ def tour_table(out, rows):
             continue
         ns = [int(r["frameNs"]) for r in seg]
         dt = [(ns[j] - ns[j - 1]) / 1e6 for j in range(1, len(ns))]
-        gpu = [float(r["gpuMs"]) for r in seg if r.get("gpuMs") not in (None, "", "-1")]
+        gpu = [g for g in (float(r.get("gpuMs") or -1.0) for r in seg) if g >= 0.0]
 
         def mx(col):
             vals = [float(r[col]) for r in seg if r.get(col) not in (None, "")]

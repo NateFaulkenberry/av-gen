@@ -189,6 +189,14 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
 - **The GPU lock times out after an hour of waiting** (`AVGEN_GPU_LOCK_TIMEOUT`, default 3600 s, exit 75). Behind a
   long suite a queued render fails; set the variable higher for long queues, and re-run a matrix with
   `--skip-existing`.
+- **SDF cost is per step and per tree:** a part every ray must evaluate at every step costs the whole frame, even
+  when it fills a tenth of it. The Cathedral's rose (twelve-fold polar tracery) was half its 61 ms SDF pass; as its
+  own object with tight bounds it marches only its rect, and both objects together cost 16 ms. Static parts that
+  need no line look can also leave the tree as lit meshes (the Cathedral's floor became a plane with tile lines).
+  Meshing is not always cheaper: the Ferrofluid's dish meshed cost 8 ms in the lit pass under three rect lights
+  against 6 ms raymarched.
+- **Volume steps:** 16 held the look in Ember Forest, Silk Theatre, Abyssal Bloom, Tesla Choir and the Cathedral
+  (7-8 ms saved each at 1080p); the tornado speckles at 16, so Storm Cell keeps 24.
 - **Material program ops added this pass:** `voronoiEdge` (ADR-1069) gives `vec4(F2-F1, F1, hash, F2)`; flatten the
   position with a multiply by (1, 0, 1) first for ground patterns (Salt Flat's polygons, the aurora ice's plates).
   A palette binding can target a program op's constant (`material/<p>/op/<i>/constant/constant`): the aurora ice's

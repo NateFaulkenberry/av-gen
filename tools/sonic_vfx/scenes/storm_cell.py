@@ -149,10 +149,10 @@ def build():
         "taper": 1.5, "shellWidth": 0.24, "shellGain": 1.0, "coreRadius": 0.55, "coreDensity": 0.4,
         "edgeSoft": 0.35, "wallCloudGain": 0.9, "cloudWidth": 5.0, "cloudHeight": 0.16, "cloudDensity": 1.1,
         "touchdown": 1.0, "footSoft": 0.04, "skirtWidth": 2.6, "skirtHeight": 0.09, "skirtDensity": 0.9,
-        "skirtFlare": 0.7, "stripeCount": 4.0, "stripePitch": 3.4, "stripeDepth": 0.35, "stripeHarmonic": 0.4,
+        "skirtFlare": 0.7, "stripeCount": 4.0, "stripePitch": 3.4, "stripeDepth": 0.5, "stripeHarmonic": 0.4,
         "suctionCount": 0.0, "suctionStrength": 0.0, "suctionRadius": 1.0, "suctionWidth": 0.35,
-        "suctionSpeed": 0.9, "cloudAmount": 0.65, "macroAmp": 1.0, "mesoAmp": 0.5, "microAmp": 0.25,
-        "detailContrast": 1.6, "detailScale": 2.4, "climbRate": 0.07, "erosion": 1.2, "edgeWidth": 0.6,
+        "suctionSpeed": 0.9, "cloudAmount": 0.65, "macroAmp": 1.0, "mesoAmp": 0.75, "microAmp": 0.4,
+        "detailContrast": 2.0, "detailScale": 2.4, "climbRate": 0.07, "erosion": 1.2, "edgeWidth": 0.6,
         "circulation": 700.0, "coreRadiusMetres": 0.0, "inflow": 0.25, "lift": 1.0, "rotationBottom": 1.0,
         "rotationTop": 0.55, "rotationCurve": 1.0, "wobbleAmount": 22.0, "wobbleSpeed": 0.12, "lean": [-60.0, 0.0],
         # dense and dark: mostly absorbing (a low scattering), so the funnel is a silhouette on the clear slot
@@ -242,13 +242,15 @@ def build():
             intensity=0.0, range=900.0, radius=80.0, castsShadow=False, volumetric=1.0)
 
     # ---- lightning: the snare strikes under the cloud, scattered round the funnel
+    #      (flashRange under the strike's distance from the camera: a flash whose range held the camera lit the
+    #       funnel's medium in hard screen-tile rectangles)
     s.effect("strike", "lightning", ("world",),
              trigger={"source": "signal", "name": signals.S("snare"), "threshold": 0.25},
              parameters={"jaggedness": 0.3, "branchProbability": 0.55, "branchDecay": 0.5, "depth": 7,
                          "height": CLOUD_Y - 30.0, "lean": 120.0, "scatter": 650.0,
                          "coreColor": hexrgb(BOLT), "coreIntensity": 90.0, "coreWidth": 1.6,
                          "glowColor": hexrgb("#8fa8ff"), "glowIntensity": 2.0, "glowWidth": 22.0,
-                         "flashIntensity": 4.0e6, "flashRange": 2600.0, "flashFog": 0.9, "leader": 0.05,
+                         "flashIntensity": 4.0e6, "flashRange": 900.0, "flashFog": 0.9, "leader": 0.05,
                          "restrikes": 2.0, "strokeDuration": 0.3, "afterglow": 0.3, "seed": 7.0,
                          "source": {"kind": "world", "position": [TORNADO[0] - 220.0, 0.0, TORNADO[2] + 120.0]}})
 
@@ -291,7 +293,7 @@ def build():
     s.route(R("noteEnv", "post/bloom/intensity", 0.06, attackMs=0, decayMs=300))
 
     s.params_({
-        "scene/volumeSteps": 40, "scene/volumeJitter": 0.5,
+        "scene/volumeSteps": 24, "scene/volumeJitter": 0.5,   # (40: 12 ms; 16 speckled the funnel)
         "post/bloom/intensity": 0.12, "post/bloom/threshold": 1.2,
         "post/output/vignette": 0.42, "post/output/grain": 0.035, "post/grade/saturation": 0.78,
         "post/grade/contrast": 1.08, "post/grade/temperature": -0.04, "post/grade/tint": -0.05,

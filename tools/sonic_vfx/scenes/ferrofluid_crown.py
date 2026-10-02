@@ -121,8 +121,9 @@ def build():
           surfaces=[{"color": scale3(hexrgb("#050506"), 1.0)}],
           material={"baseColor": hexrgb("#030304"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                     "roughness": 0.07, "metallic": 0.35},
-          look={"aoStrength": 0.0, "aoDistance": 0.25}, max_steps=72, epsilon=0.0018, step_scale=1.0,
+          look={"aoStrength": 0.0, "aoDistance": 0.25}, max_steps=72, epsilon=0.0028, step_scale=1.0,
           max_distance=20.0)
+    # (the dish raymarched costs 6 ms; meshed, the lit pass's three rect lights over its area cost 8: it stays an SDF)
     s.sdf("dish", dish(), (-2.7, -0.45, -2.7), (2.7, 0.3, 2.7),
           material={"baseColor": hexrgb("#0a0a0b"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                     "roughness": 0.22, "metallic": 0.0},

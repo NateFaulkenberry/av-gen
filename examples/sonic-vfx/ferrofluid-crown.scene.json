@@ -587,7 +587,7 @@
     "castShadows": false,
     "depthPrepass": false,
     "maxSteps": 72,
-    "epsilon": 0.0018,
+    "epsilon": 0.0028,
     "stepScale": 1.0,
     "normalEpsilon": 0.002,
     "maxDistance": 20.0,

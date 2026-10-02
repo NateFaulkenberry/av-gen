@@ -258,6 +258,7 @@ def build():
         "post/grade/contrast": 1.18, "post/grade/saturation": 0.95,
         "camera/lens/focalLength": 30.0, "camera/exposure/compensation": 0.0,
         "scene/volumeAnisotropy": 0.35,
+        "scene/volumeSteps": 16,          # (24: 11.7 ms of the frame; 16: 7.9, the arcs' haze unchanged)
     })
     # ---- the evaluator's screen regions, projected through the camera at t = 0, and the performer's baseline
     s.region("core", centre=list(CORE_TOP), radius=2.5)
