@@ -164,4 +164,10 @@ Keep. A VFX frame: copper coils on the circle of fifths round a humming core, so
 chord's shape. The kick's discharge is the strongest drum answer in the set (z 20-28 in the drum classes, 77 in the
 capture), and the bass charges the core (z 8-11). Fast notes (arp, rapid, dense) keep every arc lit, so single notes
 stop reading there. The snare's crackle was lost on the glowing top-load; it now snaps the core's light too.""",
+    "datascape": """
+Keep. Pure measurement to the horizon: dashed barcode ridges that no noise ever touches, red where a crest rises,
+numerals standing on the plain. The kick sends a shock ring and the snare tears the data, both at 0-67 ms in the drum
+classes (kick 4.6-7.3, snare 3.1-4.8); a note writes a strip at its pitch's place (sparse z 24, lead 5.8) and velocity
+its brightness (z 16). The hats' flicker on the distant numerals is too small to measure, and fast notes blur into one
+another as they do in the other note-placed scenes.""",
 }
