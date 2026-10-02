@@ -24,9 +24,15 @@ after the other, then restore `temporal-*.png`. Item 6 would be a new SDF domain
 `p.x += amount * (hash(floor(p.y * bands + seed)) - 0.5)`), which touches `src/spatial/sdf.*`, `shaders/sdf.wgsl` and the
 compiled path, in the pattern of ADR-1040's `warp`.
 
-**Suites (pass 3, head `868ebbab`):** `avgen_tests` exit 0 (3,991 cases: 3,971 passed, 19 skipped, 1 failed as expected,
-the slope lean). `avgen_render_tests` was held for the art agent's final render (the binary was moved to
-`build/release/tests/avgen_render_tests.held`). Restore it with `mv` and run it alone under the lock.
+**Suites (pass 3, code at `5dd835a4`, run at `367d39c2`):**
+- `avgen_tests`: exit 0. 3,991 cases: 3,971 passed, 19 skipped, 1 failed as expected (the slope lean).
+- `avgen_render_tests`: exit 42. 567 cases: 565 passed, 1 skipped, 1 failed. The failure was "Showcase projects render
+  bit-identically across fresh engines and renderers" on `examples/worlds/worlds.json`, at `test_procedural_examples_gpu.cpp:95`.
+  - Rerun alone under the lock, it passes (152 assertions).
+  - That scene has no SDF objects (4 procedural, 1 grid, 1 particles), and nothing in pass 3 touches its render path. So the
+    failure is intermittent and is not traced to pass 3, but it is unexplained. A successor should rerun the full render suite,
+    and if it recurs, diff the two images.
+- `temporal-*.png` was checked: clean.
 
 **The missing head (§33), found by the validator:** in `all-you-got-pass2.scene.json`, `hillMan` has boundsMax y = 2.5 and its
 head is at y = 2.896, so the head is never marched. This is a data fix in the art agent's generator (grow the bounds). The
