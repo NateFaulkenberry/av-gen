@@ -65,7 +65,7 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.3}
     s.environment = {
         "intensity": 0.0, "background": hexrgb("#020001"), "fogColor": hexrgb("#120406"),
-        "volumeDensity": 0.03, "volumeMaxDistance": 24.0, "volumeAnisotropy": 0.45, "volumeNoise": 0.25,
+        "volumeDensity": 0.006, "volumeMaxDistance": 24.0, "volumeAnisotropy": 0.45, "volumeNoise": 0.3,
         "volumeNoiseScale": 0.35, "volumeNoiseSpeed": 0.05, "volumeLocalLights": 1.0, "skyIntensity": 0.0,
         "sky": {"enabled": False, "background": False},
     }
@@ -98,23 +98,24 @@ def build():
     # ---- light: one top spot whose cone stands in the haze; a faint warm bounce from the floor's pool
     s.light("spot", "spot", position=[0.0, 9.5, 0.6], direction=[0.0, -1.0, -0.06], color=hexrgb("#ffe7c4"),
             intensity=900.0, range=22.0, innerCone=14.0, outerCone=24.0, castsShadow=False, volumetric=1.0)
-    s.light("bounce", "point", position=[0.0, 0.3, 0.5], color=hexrgb("#ff6a40"), intensity=6.0, range=9.0,
-            radius=2.0, castsShadow=False, volumetric=0.0)
+    # the curtain's wash: a spot from above the stage front, grazing the velvet so its folds stand out
+    s.light("wash", "spot", position=[0.0, 10.5, -2.5], direction=[0.0, -0.72, -0.69], color=hexrgb("#ffd0c0"),
+            intensity=380.0, range=18.0, innerCone=34.0, outerCone=56.0, castsShadow=False, volumetric=0.0)
     s.light("rim", "spot", position=[0.0, 7.5, -6.8], direction=[0.0, -0.4, 1.0], color=hexrgb("#ff3040"),
-            intensity=60.0, range=16.0, innerCone=30.0, outerCone=55.0, castsShadow=False, volumetric=0.15)
+            intensity=60.0, range=16.0, innerCone=30.0, outerCone=55.0, castsShadow=False, volumetric=0.0)
 
     # ---- the silk: particles orbit the leader's hand; their trails are the ribbons
     silk = dict(shape="sphere", position=list(LEAD), extent=[0.04, 0.04, 0.04], direction=[0, 1, 0],
-                spawnRate=0.0, spread=1.0, gravity=[0, -0.15, 0], drag=0.35, turbulence=0.05, turbulenceScale=0.6,
-                attractorPosition=list(LEAD), attractorStrength=2.6, attractorRadius=2.4, orbit=3.2,
-                blend="alpha", trailEnabled=True, trailStride=2, trailTaper=0.0, trailFade=0.0)
-    s.particles("silk", capacity=900, seed=7, lifetimeMin=4.0, lifetimeMax=6.0, speedMin=0.5, speedMax=0.9,
-                sizeStart=0.05, sizeEnd=0.035, colorStart=hexrgb(SCARLET) + [0.95],
-                colorEnd=hexrgb("#7a0610") + [0.0], emissive=1.6, trailLength=32, trailWidth=1.0,
+                spawnRate=0.0, spread=1.0, gravity=[0, -0.12, 0], drag=0.25, turbulence=0.04, turbulenceScale=0.6,
+                attractorPosition=list(LEAD), attractorStrength=1.8, attractorRadius=2.2, orbit=2.0,
+                blend="alpha", trailEnabled=True, trailStride=4, trailTaper=0.0, trailFade=0.0)
+    s.particles("silk", capacity=200, seed=7, lifetimeMin=6.0, lifetimeMax=8.0, speedMin=0.6, speedMax=1.0,
+                sizeStart=0.12, sizeEnd=0.08, colorStart=hexrgb(SCARLET) + [0.95],
+                colorEnd=hexrgb("#7a0610") + [0.0], emissive=1.2, trailLength=32, trailWidth=1.0,
                 trailTint=hexrgb("#ff5a4a"), **silk)
-    s.particles("gold", capacity=600, seed=13, lifetimeMin=3.0, lifetimeMax=4.5, speedMin=0.7, speedMax=1.1,
-                sizeStart=0.03, sizeEnd=0.02, colorStart=hexrgb(GOLD) + [0.9],
-                colorEnd=hexrgb("#a86a1a") + [0.0], emissive=2.2, trailLength=28, trailWidth=1.0,
+    s.particles("gold", capacity=300, seed=13, lifetimeMin=4.0, lifetimeMax=6.0, speedMin=0.8, speedMax=1.2,
+                sizeStart=0.06, sizeEnd=0.04, colorStart=hexrgb(GOLD) + [0.9],
+                colorEnd=hexrgb("#a86a1a") + [0.0], emissive=1.8, trailLength=32, trailWidth=1.0,
                 trailTint=hexrgb("#ffdf9a"), **silk)
     s.particles("glitter", capacity=1500, seed=17, shape="sphere", position=list(LEAD), extent=[0.6, 0.6, 0.6],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.25, lifetimeMax=0.7, spread=1.0, speedMin=0.05,
@@ -149,13 +150,13 @@ def build():
             s.route(R("lastPitch", "particles/%s/attractorPosition" % sysname, 5.0, comp=1, springHz=1.6,
                       springDamping=0.6, offset=-0.3))
     # each note throws a flick; a held line keeps spinning silk (one unbroken stroke)
-    s.route(R("noteOn", "particles/silk/burst", 4.0, threshold="binary", thresholdLevel=0.01),
-            R("held", "particles/silk/spawnRate", 40.0, **MEDIUM),
+    s.route(R("noteOn", "particles/silk/burst", 1.0, threshold="binary", thresholdLevel=0.01),
+            R("held", "particles/silk/spawnRate", 3.0, **MEDIUM),
             R("lastVelocity", "particles/silk/trailWidth", 1.4, **FAST))
     # chord: a sheaf of gold ribbons
     s.map(M("chordOn", [("noteOn", 1.0), ("polyphony", 1.0)], "min"))
-    s.route(R("visual.chordOn", "particles/gold/burst", 30.0, attackMs=0, decayMs=60),
-            R("polyphony", "particles/gold/spawnRate", 25.0, **MEDIUM))
+    s.route(R("visual.chordOn", "particles/gold/burst", 10.0, attackMs=0, decayMs=0),
+            R("polyphony", "particles/gold/spawnRate", 2.0, **MEDIUM))
     # bass: the dance sways; kick: the whip-crack (the ribbons snap tight round the hand)
     for sysname in ("silk", "gold"):
         s.route(R("bass", "particles/%s/attractorPosition" % sysname, 0.6, comp=0, attackMs=300, decayMs=900),
@@ -173,7 +174,7 @@ def build():
         "post/bloom/intensity": 0.3, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
         "post/output/grain": 0.02, "post/grade/temperature": 0.05, "post/grade/contrast": 1.06,
         "post/lens/chromaticAberration": 0.002, "post/tonemap/operator": 3,
-        "camera/lens/focalLength": 35.0,
+        "camera/lens/focalLength": 28.0,
     })
 
     # ---- the evaluator's screen regions, projected through the camera at t = 0

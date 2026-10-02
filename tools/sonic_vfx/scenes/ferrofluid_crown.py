@@ -78,7 +78,9 @@ def fluid():
         cone = sd_move((r, 0.0, 0.0), sd_cone(cr, ch, name="ringCone%d" % j))
         rings.append(sd_move((0.0, ch * 0.5 - 0.02, 0.0), sd_rot((0, 9.0 * j, 0), sd_polar(n, cone)),
                              name="ringLift%d" % j))
-    field = sd_union(*rings)
+    # the field's spikes are as regular as the physics makes them, but not machine-identical: a faint noise bends
+    # and nicks each copy differently (a polar repeat alone would draw the same cone forty times)
+    field = sd_noise(0.014, 7.0, sd_union(*rings), seed=17)
     # the twelve note spikes: each hides below the surface (y -0.62) until its note pulls it up
     spikes = []
     for k in range(N_SPIKES):

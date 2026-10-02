@@ -71,38 +71,38 @@ def hills(mirror):
     mat = {"baseColor": scale3(hexrgb("#0d1022"), 0.45 if mirror else 1.0), "emissiveColor": [0, 0, 0],
            "emissiveIntensity": 0.0, "roughness": 1.0, "metallic": 0.0, "doubleSided": True}
     return dict(name="hillsM" if mirror else "hills",
-                source={"kind": "box", "size": [1000.0, 60.0, 50.0], "subdivisions": 64}, material=mat,
-                deformers=[{"kind": "noise", "amount": 30.0, "scale": 0.018, "speed": 0.0, "seed": 9,
-                            "axisMask": [0, 1, 0]},
-                           {"kind": "noise", "amount": 7.0, "scale": 0.09, "speed": 0.0, "seed": 10,
-                            "axisMask": [0, 1, 0]}],
-                transform={"position": [0.0, -10.0 if mirror else 10.0, SHORE_Z],
+                source={"kind": "box", "size": [1000.0, 24.0, 50.0], "subdivisions": 64}, material=mat,
+                # the ridgeline: noise that fades to nothing at the box's foot (falloff from the local bottom), so the
+                # shore meets the waterline flat and the twin meets it from below
+                deformers=[{"kind": "noise", "amount": 16.0, "scale": 0.018, "speed": 0.0, "seed": 9,
+                            "axisMask": [0, 1, 0], "axis": [0, 1, 0], "center": [0.0, -12.0, 0.0], "falloff": 24.0},
+                           {"kind": "noise", "amount": 4.0, "scale": 0.09, "speed": 0.0, "seed": 10,
+                            "axisMask": [0, 1, 0], "axis": [0, 1, 0], "center": [0.0, -12.0, 0.0], "falloff": 24.0}],
+                transform={"position": [0.0, -12.0 if mirror else 12.0, SHORE_Z],
                            "rotation": [180.0 if mirror else 0.0, 0.0, 0.0], "scale": [4.5, 1.0, 1.0]})
 
 
 def jetty(mirror):
-    """Planks on stringers on posts, from the lower left of the frame out to its end beside the camera."""
+    """A low jetty from just in front of the camera out into the lake, lower left: planks on posts that stand from the
+    waterline to just above the deck (so the twin's posts end at the waterline too)."""
     sy = -1.0 if mirror else 1.0
     wood = {"baseColor": scale3(hexrgb("#1a1410"), 0.5 if mirror else 1.0), "emissiveColor": [0, 0, 0],
             "emissiveIntensity": 0.0, "roughness": 0.85, "metallic": 0.0, "doubleSided": True}
-    parts = []
-    deck_y = 0.75
-    x0, z0, z1 = -1.6, 14.0, -1.0
+    deck_y = 0.45
+    x0, z0, z1 = -2.4, 5.0, -16.0
     tag = "M" if mirror else ""
-    parts.append(dict(name="planks" + tag, source={"kind": "box", "size": [1.8, 0.05, 0.22], "subdivisions": 1},
-                      distribution={"kind": "linear", "count": 48, "start": [x0, deck_y * sy, z0],
-                                    "end": [x0, deck_y * sy, z1]},
-                      variation={"seed": 5, "position": [0.03, 0.01, 0.0], "rotation": [0.0, 0.02, 0.01],
-                                 "scale": [0.04, 0.0, 0.0]},
-                      material=wood))
-    parts.append(dict(name="posts" + tag, source={"kind": "cylinder", "radius": 0.1, "height": 2.4, "segments": 8},
-                      distribution={"kind": "linear", "count": 6, "start": [x0 - 0.85, -0.45 * sy, z0],
-                                    "end": [x0 - 0.85, -0.45 * sy, z1]},
-                      variation={"seed": 6, "rotation": [0.04, 0.0, 0.04]}, material=wood))
-    parts.append(dict(name="postsB" + tag, source={"kind": "cylinder", "radius": 0.1, "height": 2.4, "segments": 8},
-                      distribution={"kind": "linear", "count": 6, "start": [x0 + 0.85, -0.45 * sy, z0],
-                                    "end": [x0 + 0.85, -0.45 * sy, z1]},
-                      variation={"seed": 7, "rotation": [0.04, 0.0, 0.04]}, material=wood))
+    parts = [dict(name="planks" + tag, source={"kind": "box", "size": [1.8, 0.05, 0.22], "subdivisions": 1},
+                  distribution={"kind": "linear", "count": 64, "start": [x0, deck_y * sy, z0],
+                                "end": [x0, deck_y * sy, z1]},
+                  variation={"seed": 5, "position": [0.03, 0.01, 0.0], "rotation": [0.0, 0.02, 0.01],
+                             "scale": [0.04, 0.0, 0.0]},
+                  material=wood)]
+    for side, seed in ((-0.85, 6), (0.85, 7)):
+        parts.append(dict(name=("postsL" if side < 0 else "postsR") + tag,
+                          source={"kind": "cylinder", "radius": 0.07, "height": 0.6, "segments": 8},
+                          distribution={"kind": "linear", "count": 8, "start": [x0 + side, 0.3 * sy, z0],
+                                        "end": [x0 + side, 0.3 * sy, z1]},
+                          variation={"seed": seed, "rotation": [0.03, 0.0, 0.03]}, material=wood))
     return parts
 
 
@@ -136,11 +136,11 @@ def build():
     # ---- the lanterns and their twins (same seed, same bursts; the twin falls where the lantern rises)
     common = dict(capacity=2400, seed=19, shape="box", extent=[1.5, 0.0, 6.0], spawnRate=0.0, lifetimeMin=24.0,
                   lifetimeMax=34.0, spread=0.18, speedMin=0.35, speedMax=0.6, drag=0.04, turbulence=0.04,
-                  turbulenceScale=0.15, sizeStart=0.24, sizeEnd=0.2, blend="additive")
+                  turbulenceScale=0.15, sizeStart=0.45, sizeEnd=0.36, blend="additive")
     s.particles("lanterns", position=[0.0, 0.3, RELEASE_Z], direction=[0.12, 1.0, 0.0], gravity=[0.06, 0.02, 0.0],
-                colorStart=hexrgb("#ffd08a") + [1.0], colorEnd=hexrgb("#ff8a3a") + [0.0], emissive=7.0, **common)
+                colorStart=hexrgb("#ffb050") + [1.0], colorEnd=hexrgb("#ff7a2a") + [0.0], emissive=2.6, **common)
     s.particles("twins", position=[0.0, -0.3, RELEASE_Z], direction=[0.12, -1.0, 0.0], gravity=[0.06, -0.02, 0.0],
-                colorStart=hexrgb("#ffb070") + [0.55], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=3.2, **common)
+                colorStart=hexrgb("#ff9a50") + [0.5], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=1.2, **common)
     # fireflies at the jetty (hats)
     s.particles("fireflies", capacity=400, seed=23, shape="box", position=[-1.0, 1.4, 6.0], extent=[3.0, 0.8, 5.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.4, lifetimeMax=1.0, spread=1.0, speedMin=0.05,
@@ -155,7 +155,7 @@ def build():
         "offsetX": CAM[0], "offsetY": -60.0, "offsetZ": CAM[2] - 300.0})
 
     # ---- light: dusk sky light, and a warm glow round the release point (the lanterns light the water's air)
-    s.light("dusk", "directional", direction=[0.2, -0.3, 0.93], color=hexrgb("#c08070"), intensity=0.25,
+    s.light("dusk", "directional", direction=[0.2, -0.3, 0.93], color=hexrgb("#c08070"), intensity=0.1,
             castsShadow=False)
     s.light("glow", "point", position=[0.0, 1.5, RELEASE_Z], color=hexrgb(AMBER), intensity=0.0, range=30.0,
             radius=4.0, castsShadow=False, volumetric=0.6)
@@ -165,10 +165,10 @@ def build():
     s.track("camera/position", [{"time": 0.0, "value": list(CAM), "interp": "smooth"},
                                 {"time": 60.0, "value": [CAM[0], CAM[1] + 0.05, CAM[2] - 2.5], "interp": "smooth"},
                                 {"time": 120.0, "value": list(CAM), "interp": "smooth"}], loop=120.0)
-    s.track("camera/target", [{"time": 0.0, "value": [4.0, 6.0, -80.0], "interp": "smooth"},
-                              {"time": 60.0, "value": [5.0, 6.2, -80.0], "interp": "smooth"},
-                              {"time": 120.0, "value": [4.0, 6.0, -80.0], "interp": "smooth"}], loop=120.0)
-    s.camera = {"mode": 1, "position": list(CAM), "target": [4.0, 6.0, -80.0], "fov": 45.0, "orbitSpeed": 0.0}
+    s.track("camera/target", [{"time": 0.0, "value": [4.0, 12.0, -80.0], "interp": "smooth"},
+                              {"time": 60.0, "value": [5.0, 12.2, -80.0], "interp": "smooth"},
+                              {"time": 120.0, "value": [4.0, 12.0, -80.0], "interp": "smooth"}], loop=120.0)
+    s.camera = {"mode": 1, "position": list(CAM), "target": [4.0, 12.0, -80.0], "fov": 45.0, "orbitSpeed": 0.0}
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # notes: a lantern (and its twin) at the pitch's place across the lake; a chord releases a cluster
@@ -179,9 +179,9 @@ def build():
                   decayMs=0),
                 R("noteOn", "particles/%s/burst" % sysname, 1.0, threshold="binary", thresholdLevel=0.01),
                 R("visual.cluster", "particles/%s/burst" % sysname, 8.0, attackMs=0, decayMs=0),
-                R("lastVelocity", "particles/%s/emissive" % sysname, 5.0 if sysname == "lanterns" else 2.2,
+                R("lastVelocity", "particles/%s/emissive" % sysname, 2.0 if sysname == "lanterns" else 0.9,
                   **MEDIUM),
-                R("sustain", "particles/%s/emissive" % sysname, 4.0 if sysname == "lanterns" else 1.8, **SLOW))
+                R("sustain", "particles/%s/emissive" % sysname, 1.6 if sysname == "lanterns" else 0.7, **SLOW))
     s.route(R("noteEnv", "lights/glow/intensity", 260.0, attackMs=0, decayMs=900),
             R("sustain", "lights/glow/intensity", 120.0, **SLOW))
     # bass: the swell; kick: a ripple through the reflection

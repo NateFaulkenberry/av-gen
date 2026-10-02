@@ -69,11 +69,11 @@ def ground_program():
             {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.22, "seed": 6},
             {"kind": "remap", "dst": 1, "srcA": 1, "value": 0, "constant": [0.5, 1.0, 0.0, 1.0]},
             {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 1},
-            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.0, 0.004, 0.0, 0.0]},
+            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.0, 0.0012, 0.0, 0.0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},   # 1 on a seam
             {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.9, "seed": 8},                         # flicker grain
             {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
-            {"kind": "constant", "dst": 3, "constant": hexrgb(EMBER, 1.6) + [0.0]},                # OP_SEAM
+            {"kind": "constant", "dst": 3, "constant": hexrgb(EMBER, 1.0) + [0.0]},                # OP_SEAM
             {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 1},
             {"kind": "microDetail", "dst": 4, "srcA": 0, "value": 2.0, "seed": 9},
             {"kind": "ramp", "dst": 5, "srcA": 4, "constant": hexrgb("#0a0807") + [1.0],
@@ -116,11 +116,11 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.1, "release": 1.4}
     s.environment = {
         "intensity": 0.15, "background": hexrgb("#0a0504"), "fogColor": hexrgb("#2a1c16"),
-        "volumeDensity": 0.05, "volumeMaxDistance": 90.0, "volumeAnisotropy": 0.55, "volumeNoise": 0.45,
+        "volumeDensity": 0.012, "volumeMaxDistance": 60.0, "volumeAnisotropy": 0.6, "volumeNoise": 0.5,
         "volumeNoiseScale": 0.08, "volumeNoiseSpeed": 0.04, "fogHeight": 2.5, "fogHeightFalloff": 0.35,
         "fogHeightAmount": 1.0, "volumeShadowStrength": 0.8, "volumeShadowSteps": 4, "volumeLocalLights": 1.0,
         "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb("#050404"), "horizonColor": hexrgb("#7a2a0a"),
+        "sky": {"enabled": True, "zenithColor": hexrgb("#030202"), "horizonColor": hexrgb("#4a1806"),
                 "groundColor": hexrgb("#050303"), "haze": 0.06, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
@@ -157,7 +157,7 @@ def build():
                transform={"position": [0.0, h * 0.5, z], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
     # ---- light: the fire's glow low behind the last plane (it lights the smoke into shafts); a dim cold fill
-    s.light("fire", "directional", direction=[0.12, -0.08, 0.99], color=hexrgb("#ff7a2a"), intensity=2.2,
+    s.light("fire", "directional", direction=[0.12, -0.08, 0.99], color=hexrgb("#ff7a2a"), intensity=1.4,
             castsShadow=True, contactShadow=False, shadowStrength=1.0, softness=0.4, volumetric=1.0)
     s.light("fill", "directional", direction=[-0.3, -1.0, -0.2], color=hexrgb("#3a4050"), intensity=0.03,
             castsShadow=False)

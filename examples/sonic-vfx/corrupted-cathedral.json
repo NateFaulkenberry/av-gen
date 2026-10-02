@@ -145,7 +145,21 @@
   "post/sweep/intensity": 0.0,
   "post/sweep/progress": 1.0,
   "post/lens/chromaticAberration": 0.02,
-  "post/grade/contrast": 1.12
+  "post/grade/contrast": 1.12,
+  "post/split/amount": 0.0,
+  "post/split/angle": 90.0,
+  "post/split/spectral": 0.6,
+  "post/glitch/amount": 0.0,
+  "post/glitch/tear": 0.0,
+  "post/glitch/tearShift": 70.0,
+  "post/glitch/block": 40.0,
+  "post/glitch/rate": 14.0,
+  "post/glitch/swap": 0.5,
+  "post/glitch/drift": 30.0,
+  "post/sort/amount": 0.0,
+  "post/sort/threshold": 0.9,
+  "post/sort/length": 140.0,
+  "post/sort/angle": 90.0
  },
  "sources": [
   {
@@ -862,9 +876,20 @@
    }
   },
   {
+   "source": "response.kickEnv",
+   "target": "post/split/amount",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
    "source": "response.kick",
    "target": "post/lens/chromaticAberration",
-   "amount": 0.14,
+   "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -928,6 +953,28 @@
    }
   },
   {
+   "source": "response.snareEnv",
+   "target": "post/glitch/tear",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "post/glitch/amount",
+   "amount": 0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
    "source": "response.hat",
    "target": "particles/motes/emissive",
    "amount": 7.0,
@@ -985,6 +1032,28 @@
    "chain": {
     "attackMs": 30,
     "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "post/sort/amount",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.heal",
+   "target": "post/sort/amount",
+   "amount": -0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
    }
   },
   {

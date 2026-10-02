@@ -10,7 +10,7 @@ depths; the one at the pitch's depth answers. Marine snow drifts down through ev
 import math
 
 from .. import kit, signals
-from ..kit import R, M, hexrgb, scale3, lathe, SLOW, MEDIUM, FAST, HIT, SNAP, VERY_SLOW
+from ..kit import R, M, hexrgb, scale3, lathe, strand, SLOW, MEDIUM, FAST, HIT, SNAP, VERY_SLOW
 
 ID = "abyssal-bloom"
 TITLE = "Abyssal Bloom"
@@ -87,7 +87,7 @@ def zooid_program():
             {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
             {"kind": "constant", "dst": 3, "constant": [0.4, 0.0, 0.0, 0.0]},             # OP_GAIN
             {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
-            {"kind": "constant", "dst": 3, "constant": [0.15, 0.0, 0.0, 0.0]},            # OP_BASE (sustain)
+            {"kind": "constant", "dst": 3, "constant": [0.04, 0.0, 0.0, 0.0]},            # OP_BASE (sustain)
             {"kind": "add", "dst": 2, "srcA": 2, "srcB": 3},
             {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [0.0, 0.0, 0.0, 0.0]},
             {"kind": "constant", "dst": 4, "constant": hexrgb(CYAN, 1.0) + [0.0]},
@@ -149,7 +149,18 @@ def build():
                          "emissiveIntensity": 0.25, "roughness": 0.2, "metallic": 0.0},
                deformers=[{"kind": "sine", "amount": 0.06 * r, "axis": [0, 1, 0], "displacementAxis": [1, 0, 1],
                            "frequency": 3.0, "phase": k * 1.3, "speed": 1.6}],
-               transform={"position": list(pos), "rotation": [180.0, 0.0, 12.0 * (k - 2)], "scale": [1, 1, 1]})
+               transform={"position": list(pos), "rotation": [0.0, 0.0, 9.0 * (k - 2)], "scale": [1, 1, 1]})
+        # its tentacles: faint strands hanging from round the rim, drifting
+        s.proc("tentacles%d" % k, strand((0.0, 0.0, 0.0), (0.0, -6.0 * r, 0.0), 0.006 + 0.004 * r, taper=0.1,
+                                         seed=40 + k, noise=0.35 * r, noise_scale=0.6, count=6, sides=4,
+                                         segments=24),
+               distribution={"kind": "radial", "count": 9, "radius": r * 0.82, "center": [pos[0], pos[1], pos[2]],
+                             "plane": "xz", "orientation": "none"},
+               material={"baseColor": hexrgb("#05101a"), "emissiveColor": hexrgb(MAGENTA if k % 2 else CYAN),
+                         "emissiveIntensity": 0.12, "roughness": 0.4, "metallic": 0.0},
+               variation={"seed": 60 + k, "rotation": [0.15, 3.1, 0.15], "scale": [0.0, 0.35, 0.0]},
+               deformers=[{"kind": "noise", "amount": 0.25 * r, "scale": 0.5, "speed": 0.25, "seed": k,
+                           "axisMask": [1.0, 0.0, 1.0], "space": "world"}])
         s.light("jellyLight%d" % k, "point", position=[pos[0], pos[1] - 0.3 * r, pos[2]],
                 color=hexrgb(MAGENTA if k % 2 else CYAN), intensity=0.6, range=4.0 + 4.0 * r, radius=r,
                 castsShadow=False, volumetric=1.0)

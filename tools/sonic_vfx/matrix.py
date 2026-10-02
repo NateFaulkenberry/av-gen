@@ -90,6 +90,9 @@ def report(a):
              "event latency for hits.",
              "- **Quality:** the evaluator's mean dimension score (0..1) and its lowest dimension.",
              "- **Problems:** the evaluator's findings for that clip (severity medium and up).", ""]
+    pre = os.path.join(a.out, "preamble.md")
+    if os.path.exists(pre):        # notes written beside the reports (the material, the detector's limits)
+        lines += [open(pre).read().rstrip(), ""]
     for sc in scenes:
         reps = {}
         for p in sorted(glob.glob(os.path.join(a.out, sc, "*.critic.json"))):

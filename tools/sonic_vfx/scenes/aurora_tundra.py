@@ -72,8 +72,8 @@ def ice_program():
             {"kind": "input", "dst": 0, "input": "worldPosition"},
             {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.05, "seed": 21},              # frost patches
             {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.5, 0.64, 0.0, 0.0]},
-            {"kind": "constant", "dst": 2, "constant": hexrgb("#0c1626", 0.6) + [1.0]},    # clear ice
-            {"kind": "constant", "dst": 3, "constant": hexrgb("#a9bccb", 0.55) + [1.0]},   # frost
+            {"kind": "constant", "dst": 2, "constant": hexrgb("#070d18", 0.5) + [1.0]},    # clear ice
+            {"kind": "constant", "dst": 3, "constant": hexrgb("#a9bccb", 0.35) + [1.0]},   # frost
             {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 3, "srcC": 1},
             {"kind": "remap", "dst": 4, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 0.06, 0.7]},  # roughness
             {"kind": "noise", "dst": 5, "srcA": 0, "value": 0.11, "seed": 5},               # the crack network
@@ -137,7 +137,7 @@ def build():
 
     # ---- the aurora (its own spectrum response off: the routes are its instrument)
     s.effect("aurora", "aurora", ("world",), parameters={
-        "appearance": {"edgeBrightness": 2.2, "emission": 1.0, "filaments": 1.1, "horizonGlow": 0.45,
+        "appearance": {"edgeBrightness": 2.2, "emission": 1.0, "filaments": 1.1, "horizonGlow": 0.25,
                        "intensity": 2.2, "lowColor": hexrgb("#3dff8f"), "midColor": hexrgb("#3ce0c8"),
                        "topColor": hexrgb("#7d6bff"), "opacity": 0.85, "sparkle": 0.2},
         "audio": {"bass": 0.0, "beat": 0.0, "glints": 0.0, "high": 0.0, "lowMid": 0.0, "mid": 0.0,
@@ -145,10 +145,10 @@ def build():
         "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
                     "speed": 0.0},
         "shape": {"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": 60.0, "complexity": 30.0,
-                  "curtainCount": 3.0, "curtainHeight": 2400.0, "driftSpeed": 0.08, "flowSpeed": 0.04,
+                  "curtainCount": 2.0, "curtainHeight": 2400.0, "driftSpeed": 0.08, "flowSpeed": 0.04,
                   "layerSpacing": 0.32, "radius": 5200.0, "turbulence": 0.4, "verticalSpeed": 0.05,
                   "waveAmplitude": 0.32, "waveScale": 2.2}},
-        extra={"ground": {"color": hexrgb("#3dff8f"), "falloff": 2.0, "intensity": 0.6, "mode": "subtle",
+        extra={"ground": {"color": hexrgb("#3dff8f"), "falloff": 2.0, "intensity": 0.12, "mode": "subtle",
                           "radius": 400.0},
                "flow": {"field": "", "influence": 0.0}},
         timing={"fadeIn": 1.5})
@@ -166,14 +166,14 @@ def build():
     # ---- the pressure ridge: three runs of broken slabs, graded large (near) to small (far)
     slab = {"baseColor": hexrgb("#9ab8cf", 0.8), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
             "roughness": 0.18, "metallic": 0.0}
-    runs = [((-9.0, 0.1, -4.0), (6.0, 0.1, -60.0), 26, 1.0, 3), ((6.0, 0.1, -60.0), (40.0, 0.1, -180.0), 30, 0.6, 7),
-            ((40.0, 0.1, -180.0), (55.0, 0.1, -420.0), 30, 0.35, 9)]
+    runs = [((-6.5, 0.2, 2.0), (1.5, 0.2, -24.0), 16, 1.0, 3), ((1.5, 0.2, -24.0), (14.0, 0.2, -90.0), 24, 0.55, 7),
+            ((14.0, 0.2, -90.0), (30.0, 0.2, -260.0), 28, 0.3, 9)]
     for k, (a, b, n, sc, seed) in enumerate(runs):
-        s.proc("ridge%d" % k, {"kind": "box", "size": [1.6 * sc, 1.1 * sc, 0.22 * sc], "subdivisions": 1},
+        s.proc("ridge%d" % k, {"kind": "box", "size": [2.6 * sc, 1.5 * sc, 0.32 * sc], "subdivisions": 1},
                distribution={"kind": "linear", "count": n, "start": list(a), "end": list(b), "orientAlong": True},
                material=slab,
-               variation={"seed": seed, "position": [0.9 * sc, 0.25 * sc, 0.9 * sc], "rotation": [0.6, 1.2, 0.5],
-                          "scale": [0.5, 0.6, 0.4], "uniformScale": 0.3})
+               variation={"seed": seed, "position": [0.7 * sc, 0.3 * sc, 0.7 * sc], "rotation": [0.75, 1.0, 0.6],
+                          "scale": [0.5, 0.6, 0.4], "uniformScale": 0.35})
 
     # ---- the far shore: a band of spruce silhouettes
     tree = {"baseColor": hexrgb("#020304"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 1.0,
@@ -195,7 +195,7 @@ def build():
     # ---- light: the aurora's own green on the ice is the effect's ground light; a faint navy skylight
     s.light("sky", "directional", direction=[0.15, -1.0, -0.2], color=hexrgb("#3a5a8a"), intensity=0.05,
             castsShadow=False)
-    s.light("auroraKey", "directional", direction=[-0.1, -0.35, 0.93], color=hexrgb("#4cffa0"), intensity=0.22,
+    s.light("auroraKey", "directional", direction=[-0.1, -0.35, 0.93], color=hexrgb("#4cffa0"), intensity=0.5,
             castsShadow=False)
 
     # ---- camera: low on the ice looking up; a slow pan along the shore

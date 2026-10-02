@@ -111,12 +111,15 @@ def shaped_noise(count, lo, hi, seed):
 
 def drum(kind, vel, seed):
     if kind == "kick":
-        n = int(0.5 * RATE)
+        # a drum machine's kick: a pitch-dropping body, saturated, and the beater's click -- a broadband
+        # transient about a millisecond long, added AFTER the saturation so the body's peak does not squash it
+        n = int(0.45 * RATE)
         t = np.arange(n) / RATE
-        f = 46.0 + 110.0 * np.exp(-t / 0.035)
-        body = np.sin(2 * np.pi * np.cumsum(f) / RATE) * np.exp(-t / 0.32)
-        click = shaped_noise(n, 2000.0, 9000.0, seed) * np.exp(-t / 0.004) * 0.35
-        return np.tanh(1.6 * (body + click)) * (0.4 + 0.6 * vel)
+        f = 48.0 + 140.0 * np.exp(-t * 35.0)
+        body = np.sin(2 * np.pi * np.cumsum(f) / RATE) * np.exp(-t * 9.0)
+        rng = np.random.RandomState(seed)
+        click = rng.uniform(-1.0, 1.0, n) * np.exp(-t * 900.0) * 0.25
+        return (0.8 * body + click) * 1.2 * (0.4 + 0.6 * vel)
     if kind == "snare":
         n = int(0.35 * RATE)
         t = np.arange(n) / RATE
@@ -135,7 +138,7 @@ def drum(kind, vel, seed):
         n = int((decay * 5.0 + 0.02) * RATE)
         t = np.arange(n) / RATE
         noise = shaped_noise(n, 7000.0, 18000.0, seed)
-        return noise * np.exp(-t / decay) * np.minimum(1.0, t / 0.0003) * 0.55 * (0.3 + 0.7 * vel)
+        return noise * np.exp(-t / decay) * np.minimum(1.0, t / 0.0003) * 0.22 * (0.3 + 0.7 * vel)
     if kind in ("tomhi", "tomlo"):
         n = int(0.6 * RATE)
         t = np.arange(n) / RATE
@@ -286,7 +289,9 @@ def perf_full():
     lead, _, _ = perf_lead()
     _, hits, _ = perf_drumloop()
     lead = [(b + 4.0, length, p, v, voice) for b, length, p, v, voice in lead if b + 4.0 < 30.0]
-    return [x for x in pads if x[0] < 30.0] + bass + lead, hits, 32.0
+    # a mix, not a pad bed: the pads sit under the drums (a mixing engineer's -10 dB), as they would in a track
+    pads = [(b, length, p, int(v * 0.45), voice) for b, length, p, v, voice in pads if b < 30.0]
+    return pads + bass + lead, hits, 32.0
 
 
 PERFORMANCES = {"pads": perf_pads, "chords": perf_chords, "bass": perf_bass, "lead": perf_lead, "arp": perf_arp,

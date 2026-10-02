@@ -60,7 +60,7 @@ DESIGN = {
         "post": "halation round the sun, fine grain, a cool dusk grade with a warm horizon",
         "camera": "ultra-wide (18 mm), low, nearly still: a 90 s drift of a few centimetres",
     },
-    "palette": {"dominant": LAVENDER, "secondary": SALT, "accent": "#0a0a0c", "highlight": MOON,
+    "palette": {"dominant": "#5a5070", "secondary": "#c48a8a", "accent": "#0a0a0c", "highlight": "#ffd8a0",
                 "background_value": "mid (a dusk sky)",
                 "saturation": "the horizon band is the only saturated region; the salt takes the sky's colour"},
     "motion": {
@@ -201,7 +201,7 @@ def build():
            transform={"position": [0.0, -0.2, -2000.0], "rotation": [0, 0, 0], "scale": [9.0, 1.0, 9.0]})
     s.proc("monolith", {"kind": "box", "size": [hw, hh, hd], "subdivisions": 1},
            material={"baseColor": hexrgb("#07070a"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0,
-                     "roughness": 0.16, "metallic": 0.0, "program": "sfMonolith"},
+                     "roughness": 0.38, "metallic": 0.0, "program": "sfMonolith"},
            transform={"position": [MONO[0], hh * 0.5, MONO[1]], "rotation": [0, MONO_YAW, 0], "scale": [1, 1, 1]})
     s.entity("monolith")
     # the range: eight 1000 m spans whose ridgeline is one world-space noise, so they join without a seam
@@ -220,19 +220,27 @@ def build():
     s.light("sun", "directional", direction=[-v for v in toward], color=hexrgb("#ffb08a"), intensity=9.0,
             castsShadow=True, contactShadow=False, shadowStrength=1.0, softness=0.25)
     # (contactShadow off: at a 4.5 degree sun the screen-space contact march dithers the whole lit flat)
+    s.light("foot", "point", position=[MONO[0] + 0.6, 0.35, MONO[1] + 1.2], color=hexrgb("#ffe6cc"),
+            intensity=0.0, range=26.0, radius=0.6, castsShadow=False, volumetric=0.0)
 
     # ---- meteors: one per note, falling at the pitch's place across the sky, all from one radiant (upper right)
-    s.particles("meteors", capacity=600, seed=21, shape="sphere", position=[-1300.0, 760.0, -2200.0],
+    s.particles("meteors", capacity=600, seed=21, shape="sphere", position=[-1000.0, 400.0, -1200.0],
                 extent=[0.0, 0.0, 0.0], direction=[-0.78, -0.6, 0.08], spawnRate=0.0, lifetimeMin=0.8,
-                lifetimeMax=1.3, spread=0.035, speedMin=280.0, speedMax=360.0, gravity=[0, 0, 0], drag=0.0,
-                sizeStart=7.0, sizeEnd=2.0, colorStart=hexrgb("#f2fff4") + [1.0],
-                colorEnd=hexrgb("#ffd2a8") + [0.0], emissive=12.0, blend="additive", trailEnabled=True,
-                trailLength=26, trailStride=1, trailWidth=0.5, trailTaper=0.0, trailFade=0.0,
+                lifetimeMax=1.2, spread=0.035, speedMin=200.0, speedMax=260.0, gravity=[0, 0, 0], drag=0.0,
+                sizeStart=6.0, sizeEnd=1.6, colorStart=hexrgb("#f2fff4") + [1.0],
+                colorEnd=hexrgb("#ffd2a8") + [0.0], emissive=16.0, blend="additive", trailEnabled=True,
+                trailLength=30, trailStride=1, trailWidth=0.55, trailTaper=0.0, trailFade=0.0,
                 trailTint=hexrgb("#ffb27a"))
+    # ...and its ignition: a flare the instant it enters (the impact frame), gone in a fifth of a second
+    s.particles("ignition", capacity=60, seed=22, shape="sphere", position=[-1000.0, 400.0, -1200.0],
+                extent=[0.0, 0.0, 0.0], direction=[-0.78, -0.6, 0.08], spawnRate=0.0, lifetimeMin=0.12,
+                lifetimeMax=0.2, spread=0.0, speedMin=200.0, speedMax=200.0, gravity=[0, 0, 0], drag=0.0,
+                sizeStart=34.0, sizeEnd=6.0, colorStart=hexrgb("#f6fff8") + [1.0],
+                colorEnd=hexrgb("#ffd2a8") + [0.0], emissive=10.0, blend="additive")
     # ---- blowing salt (hat): grains streaming low across the flat
     s.particles("salt", capacity=3000, seed=23, shape="box", position=[-2.0, 0.12, -10.0], extent=[16.0, 0.1, 9.0],
-                direction=[1, 0.03, 0.25], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=1.1, spread=0.1,
-                speedMin=5.0, speedMax=8.5, gravity=[0, -0.2, 0], drag=0.2, turbulence=0.3, turbulenceScale=0.6,
+                direction=[1, 0.03, 0.25], spawnRate=0.0, lifetimeMin=0.22, lifetimeMax=0.55, spread=0.1,
+                speedMin=9.0, speedMax=13.0, gravity=[0, -0.2, 0], drag=0.2, turbulence=0.3, turbulenceScale=0.6,
                 sizeStart=0.009, sizeEnd=0.004, colorStart=hexrgb("#fff8ee") + [0.7],
                 colorEnd=hexrgb("#fff8ee") + [0.0], emissive=0.7, blend="additive", velocityStretch=1.0,
                 stretchMax=0.35)
@@ -265,18 +273,18 @@ def build():
     s.map(M("mood", [("tension", 1.0), ("brightness", 0.6, True)], "mean"))
     s.map(M("glow", [("sustain", 1.0), ("held", 0.5)], "max"))
     s.route(R("visual.mood", "palette/position", 2.6, attackMs=1800, decayMs=4500),
-            R("visual.glow", "palette/value", 0.2, **SLOW),
-            R("visual.glow", "env/sky/sunIntensity", 5.0, **SLOW),
+            R("visual.glow", "env/sky/sunIntensity", 8.0, **SLOW),
             R("visual.glow", "env/sky/sunGlow", 0.12, **SLOW))
     # melodic: the meteor's birthplace follows the latest note across the sky; velocity sets its brightness
     s.map(M("skyX", [("lastPitch", 1.0)], "mean", -0.3 / 0.4, 1.0 / 0.4))
-    s.route(R("visual.skyX", "particles/meteors/position", 2600.0, comp=0, attackMs=0, decayMs=0),
-            R("visual.skyX", "particles/meteors/position", 420.0, comp=1, attackMs=0, decayMs=0),
-            # exactly one meteor per note-on: a burst is a whole count each frame, so binarise the event
-            R("noteOn", "particles/meteors/burst", 1.0, threshold="binary", thresholdLevel=0.01),
-            R("lastVelocity", "particles/meteors/emissive", 10.0, **FAST))
+    for sysname in ("meteors", "ignition"):
+        s.route(R("visual.skyX", "particles/%s/position" % sysname, 2000.0, comp=0, attackMs=0, decayMs=0),
+                R("visual.skyX", "particles/%s/position" % sysname, 260.0, comp=1, attackMs=0, decayMs=0),
+                # exactly one per note-on: a burst is a whole count each frame, so binarise the event
+                R("noteOn", "particles/%s/burst" % sysname, 1.0, threshold="binary", thresholdLevel=0.01),
+                R("lastVelocity", "particles/%s/emissive" % sysname, 12.0, **FAST))
     # bass: the horizon shimmers and the haze thickens
-    s.route(R("bass", "fx/shimmer/strength", 1.4, attackMs=120, decayMs=1200),
+    s.route(R("bass", "fx/shimmer/strength", 1.4, attackMs=40, decayMs=1200),
             R("bass", "scene/volumeDensity", 0.00018, attackMs=300, decayMs=1800))
     # hat: salt grains blowing
     s.route(R("hat", "particles/salt/burst", 50.0, attackMs=0, decayMs=40),
@@ -285,7 +293,9 @@ def build():
     for c in range(3):
         s.route(R("snare", "material/sfMonolith/op/%d/constant/constant" % OP_RIM, 9.0, comp=c, attackMs=0,
                   decayMs=260))
-    s.route(R("kick", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
+    # kick: the impact at the monolith's foot is instant (a flash of light on the salt); the ring then runs out
+    s.route(R("kick", "lights/foot/intensity", 900.0, attackMs=0, decayMs=220),
+            R("kick", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
             R("visual.glow", "post/bloom/intensity", 0.05, **SLOW))
 
     s.params_({

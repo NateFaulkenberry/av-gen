@@ -112,179 +112,188 @@
             ]
            },
            {
-            "kind": "union",
+            "kind": "displaceNoise",
+            "amount": 0.014,
+            "frequency": 7.0,
+            "speed": 0.0,
+            "seed": 17,
             "children": [
              {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.15000000000000002,
-               0.0
-              ],
+              "kind": "union",
               "children": [
                {
-                "kind": "rotate",
-                "rotation": [
+                "kind": "translate",
+                "translation": [
                  0.0,
-                 0.0,
+                 0.15000000000000002,
                  0.0
                 ],
                 "children": [
                  {
-                  "kind": "polarRepeat",
-                  "count": 13,
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   0.0,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "translate",
-                    "translation": [
-                     0.52,
-                     0.0,
-                     0.0
-                    ],
+                    "kind": "polarRepeat",
+                    "count": 13,
                     "children": [
                      {
-                      "kind": "cone",
-                      "radius": 0.07,
-                      "height": 0.34,
-                      "name": "ringCone0"
+                      "kind": "translate",
+                      "translation": [
+                       0.52,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "cone",
+                        "radius": 0.07,
+                        "height": 0.34,
+                        "name": "ringCone0"
+                       }
+                      ]
                      }
                     ]
                    }
                   ]
                  }
-                ]
-               }
-              ],
-              "name": "ringLift0"
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.115,
-               0.0
-              ],
-              "children": [
+                ],
+                "name": "ringLift0"
+               },
                {
-                "kind": "rotate",
-                "rotation": [
+                "kind": "translate",
+                "translation": [
                  0.0,
-                 9.0,
+                 0.115,
                  0.0
                 ],
                 "children": [
                  {
-                  "kind": "polarRepeat",
-                  "count": 20,
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   9.0,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "translate",
-                    "translation": [
-                     0.8,
-                     0.0,
-                     0.0
-                    ],
+                    "kind": "polarRepeat",
+                    "count": 20,
                     "children": [
                      {
-                      "kind": "cone",
-                      "radius": 0.065,
-                      "height": 0.27,
-                      "name": "ringCone1"
+                      "kind": "translate",
+                      "translation": [
+                       0.8,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "cone",
+                        "radius": 0.065,
+                        "height": 0.27,
+                        "name": "ringCone1"
+                       }
+                      ]
                      }
                     ]
                    }
                   ]
                  }
-                ]
-               }
-              ],
-              "name": "ringLift1"
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.08,
-               0.0
-              ],
-              "children": [
+                ],
+                "name": "ringLift1"
+               },
                {
-                "kind": "rotate",
-                "rotation": [
+                "kind": "translate",
+                "translation": [
                  0.0,
-                 18.0,
+                 0.08,
                  0.0
                 ],
                 "children": [
                  {
-                  "kind": "polarRepeat",
-                  "count": 34,
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   18.0,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "translate",
-                    "translation": [
-                     1.55,
-                     0.0,
-                     0.0
-                    ],
+                    "kind": "polarRepeat",
+                    "count": 34,
                     "children": [
                      {
-                      "kind": "cone",
-                      "radius": 0.055,
-                      "height": 0.2,
-                      "name": "ringCone2"
+                      "kind": "translate",
+                      "translation": [
+                       1.55,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "cone",
+                        "radius": 0.055,
+                        "height": 0.2,
+                        "name": "ringCone2"
+                       }
+                      ]
                      }
                     ]
                    }
                   ]
                  }
-                ]
-               }
-              ],
-              "name": "ringLift2"
-             },
-             {
-              "kind": "translate",
-              "translation": [
-               0.0,
-               0.05,
-               0.0
-              ],
-              "children": [
+                ],
+                "name": "ringLift2"
+               },
                {
-                "kind": "rotate",
-                "rotation": [
+                "kind": "translate",
+                "translation": [
                  0.0,
-                 27.0,
+                 0.05,
                  0.0
                 ],
                 "children": [
                  {
-                  "kind": "polarRepeat",
-                  "count": 41,
+                  "kind": "rotate",
+                  "rotation": [
+                   0.0,
+                   27.0,
+                   0.0
+                  ],
                   "children": [
                    {
-                    "kind": "translate",
-                    "translation": [
-                     1.82,
-                     0.0,
-                     0.0
-                    ],
+                    "kind": "polarRepeat",
+                    "count": 41,
                     "children": [
                      {
-                      "kind": "cone",
-                      "radius": 0.05,
-                      "height": 0.14,
-                      "name": "ringCone3"
+                      "kind": "translate",
+                      "translation": [
+                       1.82,
+                       0.0,
+                       0.0
+                      ],
+                      "children": [
+                       {
+                        "kind": "cone",
+                        "radius": 0.05,
+                        "height": 0.14,
+                        "name": "ringCone3"
+                       }
+                      ]
                      }
                     ]
                    }
                   ]
                  }
-                ]
+                ],
+                "name": "ringLift3"
                }
-              ],
-              "name": "ringLift3"
+              ]
              }
             ]
            },

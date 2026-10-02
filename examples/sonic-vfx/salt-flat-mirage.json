@@ -202,19 +202,8 @@
   },
   {
    "source": "visual.glow",
-   "target": "palette/value",
-   "amount": 0.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2400
-   }
-  },
-  {
-   "source": "visual.glow",
    "target": "env/sky/sunIntensity",
-   "amount": 5.0,
+   "amount": 8.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -236,7 +225,7 @@
   {
    "source": "visual.skyX",
    "target": "particles/meteors/position",
-   "amount": 2600.0,
+   "amount": 2000.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -248,7 +237,7 @@
   {
    "source": "visual.skyX",
    "target": "particles/meteors/position",
-   "amount": 420.0,
+   "amount": 260.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -271,7 +260,53 @@
   {
    "source": "notes.lastVelocity",
    "target": "particles/meteors/emissive",
-   "amount": 10.0,
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/ignition/position",
+   "amount": 2000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/ignition/position",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/ignition/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "notes.lastVelocity",
+   "target": "particles/ignition/emissive",
+   "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -286,7 +321,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 120,
+    "attackMs": 40,
     "decayMs": 1200
    }
   },
@@ -357,6 +392,17 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 260
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/foot/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
    }
   },
   {
@@ -596,10 +642,10 @@
    "camera": "ultra-wide (18 mm), low, nearly still: a 90 s drift of a few centimetres"
   },
   "palette": {
-   "dominant": "#8a86b3",
-   "secondary": "#e7e1d8",
+   "dominant": "#5a5070",
+   "secondary": "#c48a8a",
    "accent": "#0a0a0c",
-   "highlight": "#fff6ea",
+   "highlight": "#ffd8a0",
    "background_value": "mid (a dusk sky)",
    "saturation": "the horizon band is the only saturated region; the salt takes the sky's colour"
   },

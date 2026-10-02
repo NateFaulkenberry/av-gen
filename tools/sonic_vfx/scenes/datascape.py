@@ -75,13 +75,13 @@ def data_program():
         {"kind": "constant", "dst": 1, "constant": [1.0, 0.0, 0.0, 0.0]},
         {"kind": "multiply", "dst": 1, "srcA": 0, "srcB": 1},
         {"kind": "noise", "dst": 2, "srcA": 1, "value": 2.6, "seed": 3},
-        {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.52, 0.54, 0.0, 0.0]},
+        {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.6, 0.607, 0.0, 0.0]},
         # dashes along z: noise of (0, 0, z)
         {"kind": "constant", "dst": 3, "constant": [0.0, 0.0, 1.0, 0.0]},
         {"kind": "multiply", "dst": 3, "srcA": 0, "srcB": 3},
         {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
         {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.9, "seed": 8},
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.42, 0.44, 0.0, 0.0]},       # OP_DASH: edge
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.5, 0.52, 0.0, 0.0]},        # OP_DASH: edge
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},                                   # strip x dash
         # the note band: 1 within 0.35 m of x = note
         {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [0.0, 0.0, 0.0, 0.0]},             # x
@@ -95,7 +95,7 @@ def data_program():
         {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
         # fade with distance (the vanishing point stays clean) and a faint base grid everywhere
         {"kind": "input", "dst": 6, "input": "cameraDistance"},
-        {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [30.0, 420.0, 1.0, 0.15]},
+        {"kind": "remap", "dst": 6, "srcA": 6, "value": 1, "constant": [40.0, 270.0, 1.0, 0.0]},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 6},
         # the crests are red: height above 2.2 m
         {"kind": "swizzle", "dst": 7, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},             # y
@@ -128,14 +128,14 @@ def build():
     s.program(data_program())
 
     # ---- the plain: a long subdivided strip of ridges (scaled along z; the ridges are a world-space sine set)
-    s.proc("plain", {"kind": "box", "size": [160.0, 0.1, 1000.0], "subdivisions": 64},   # rides the glide
+    s.proc("plain", {"kind": "box", "size": [160.0, 0.1, 300.0], "subdivisions": 64},   # rides the glide
            material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 1.0, "roughness": 1.0,
                      "metallic": 0.0, "program": "dsData"},
            deformers=[{"kind": "sine", "amount": 1.1, "axis": [0, 0, 1], "displacementAxis": [0, 1, 0],
                        "frequency": 0.21, "phase": 0.0, "speed": 0.0, "space": "world"},
                       {"kind": "noise", "amount": 1.6, "scale": 0.05, "speed": 0.0, "seed": 4,
                        "axisMask": [0, 1, 0], "space": "world"}],
-           transform={"position": [0.0, 0.0, -1500.0], "rotation": [0, 0, 0], "scale": [1.0, 1.0, 3.2]})
+           transform={"position": [0.0, 0.0, -138.0], "rotation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]})
 
     # ---- numerals standing on the plain, receding (white, emissive): four digits, each a long receding row
     num = {"baseColor": [0, 0, 0], "emissiveColor": hexrgb(WHITE), "emissiveIntensity": 1.4, "roughness": 1.0,
