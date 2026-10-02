@@ -25,6 +25,9 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 ### For the art agent (pass 4): the validator, now
 
 Build: `cmake --build --preset release -j 10` (or use the binary at `build/release/src/avgen`; it has everything below).
+**Re-pin your render binary to `47ad4c73` or later** (with `git archive <sha> shaders`, as in PROGRESS-art): your pinned
+`5dd835a4` has the 0.40 m near plane that cuts open anything the camera passes within 40 cm of (PART 7 below), and not
+this validator. Nothing else in the render path changed (the near plane changes only for journey cameras).
 
 ```sh
 # static (about 5 s, no GPU): the scene as authored, with the project's journey keys and visibility tracks
