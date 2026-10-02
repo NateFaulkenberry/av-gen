@@ -179,7 +179,7 @@
   {
    "source": "response.noteEnv",
    "target": "particles/ember/emissive",
-   "amount": 30.0,
+   "amount": 12.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "notes.lastVelocity",

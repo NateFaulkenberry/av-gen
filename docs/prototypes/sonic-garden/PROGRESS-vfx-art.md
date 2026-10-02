@@ -23,9 +23,8 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   5. `tools/gpu-lock.sh build/release/tests/avgen_tests "[sonic]"` must exit 0 before the hand-back. That uses the
      engineer's build.
 - **Open with the engineer:**
-  - **kick/snare under a mix:** `response.kick/snare` collapse under a bass or a pad (1 of 32 kicks in the full mix;
-    `drum_recall.py`). The engineer is fixing it. Until the sha arrives, the full and dense classes record kick
-    and snare as missing.
+  - **kick/snare under a mix, and drums on melodic material:** fixed by ADR-1067 and ADR-1068 (e6978f28). The matrix
+    is re-run on that pin.
   - `--sonic-live-log` lacks `response.*` columns.
   - a probe scenario with program changes;
   - a Voronoi edge op;
@@ -57,21 +56,19 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   - `sonicScene.vocabulary`: rows whose second entry is exactly one bus id the trace carries. The evaluator checks
     the first id in a row: hits are named by their `response.*` event (it reads the `...Env`), notes by
     `response.note`. A combined string is skipped silently.
-- **The pinned engine:** `$S/vfx/bin-337903f0` (binary, probe and shaders), used through the wrapper
+- **The pinned engine:** `$S/vfx/bin-e6978f28` (binary, probe and shaders), used through the wrapper
   `$S/vfx/avgen.sh`. `S` is the scratchpad:
   `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
   - Each pin is built in an isolated `git archive` export, `$S/vfx/src-<sha>` (`cmake --preset release
     -DCPM_SOURCE_CACHE=../av-gen/.cache/cpm`, targets `avgen avgen_sonic_probe`). Never build or touch
     `build/release`: the engineer owns it.
-  - 337903f0 has:
-    - ADR-1060/1061: live kick, snare and hat, and signal triggers;
-    - ADR-1062: `response.*` and per-note `notes.*`;
-    - ADR-1063: the scene switcher;
-    - ADR-1064: the publish source;
-    - ADR-1065: `post/shock|glitch|split|sort|radial|display`;
-    - ADR-1066: `temporal/feedback|slit`.
-  - The evaluator `tools/sonic_vfx_critic.py` (0f809c90) is python only, so there is no re-pin. Its `trace` mode calls
-    `build/release`, so `review.py eval` runs the trace with the pin instead.
+  - e6978f28 adds two ADRs to 337903f0 (ADR-1060-1066):
+    - ADR-1067: drums under a mix (percussive flux, a lasting snare, a kick with a period);
+    - ADR-1068: a note is not a drum (hat tilt, snare noise share, the MIDI note-on cue).
+    The full mix now detects 29/32 kicks, 16/16 snares and 91/105 hats, and the arp fires 0/0/2. So the showcase
+    workaround is retired: captures use the full mix.
+  - The evaluator `tools/sonic_vfx_critic.py` is python only. Its `trace` mode calls `build/release`, so
+    `review.py eval` runs the trace with the pin instead.
 
 ### The workflow
 

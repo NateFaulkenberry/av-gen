@@ -23,13 +23,13 @@ from tools.sonic_vfx.scenes import SCENES  # noqa: E402
 
 OUT = os.path.expanduser("~/Desktop/av-gen-review/25-sonic-vfx")
 # the class each scene is shown with in its clip and in the tour (the input it was designed round)
-# ("showcase" is the drum loop under the saw lead: until the live detector hears kicks under a bass or a pad, the
-#  mix in which every scene's drum and melody vocabulary can both be seen)
-SHOWCASE = {"salt-flat-mirage": "showcase", "lantern-lake": "showcase", "aurora-tundra": "pads",
+# The class each scene is shown with: the full mix (pads, bass, lead and drums) wherever the scene answers drums --
+# since ADR-1067/1068 the live detector hears them under a mix -- and the input it was designed round otherwise.
+SHOWCASE = {"salt-flat-mirage": "full", "lantern-lake": "full", "aurora-tundra": "pads",
             "breathing-deep": "pads", "abyssal-bloom": "lead", "cymatic-plate": "lead", "silk-theatre": "lead",
             "ferrofluid-crown": "chords", "feedback-mirror": "arp", "tesla-choir": "chords",
-            "datascape": "showcase", "ember-forest": "showcase", "corrupted-cathedral": "showcase",
-            "storm-cell": "showcase", "stellar-nursery": "chords", "event-horizon": "showcase"}
+            "datascape": "full", "ember-forest": "full", "corrupted-cathedral": "full",
+            "storm-cell": "full", "stellar-nursery": "chords", "event-horizon": "full"}
 
 
 def scene_ids():

@@ -503,8 +503,8 @@
     "sizeEnd": 0.02,
     "colorStart": [
      1.0,
-     0.7913,
-     0.35153,
+     0.52712,
+     0.11697,
      1.0
     ],
     "colorEnd": [
@@ -513,7 +513,7 @@
      0.0,
      0.0
     ],
-    "emissive": 30.0,
+    "emissive": 9.0,
     "blend": "additive",
     "trailEnabled": true,
     "trailLength": 32,

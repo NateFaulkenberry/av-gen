@@ -62,7 +62,8 @@ def main():
         cells = []
         for kind in ("kick", "snare", "hat"):
             col = [x[h.index("response.%sEnv" % kind)] for x in rows]
-            truth = [b * mtm.BEAT for (b, k, v) in hits if k == kind or (kind == "snare" and k == "clap")]
+            truth = [b * mtm.BEAT for (b, k, v) in hits
+                     if k == kind or (kind == "snare" and k == "clap") or (kind == "hat" and k == "openhat")]
             found = sum(any(t - 0.03 <= tt <= t + 0.09 and col[i] > 0.3 for i, tt in enumerate(T)) for t in truth)
             edges = [T[i] for i in range(1, len(T)) if col[i] > 0.3 and col[i - 1] <= 0.3]
             false = sum(1 for e in edges if not any(t - 0.03 <= e <= t + 0.09 for t in truth))
