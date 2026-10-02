@@ -278,10 +278,10 @@ def build():
         s.route(R("visual.grit", "procedural/thread%d/deform/2/amount" % k, 0.12, **FAST))
     s.map2(M("accentPlus", [("visual.accent", 0.6)], "mean", 0.4))  # dense playing: smaller flashes (0.4 .. 1.0)
     # bass: the organism breathes
-    s.route(R("bass", "fx/capBreath/amplitude", 0.22, attackMs=120, decayMs=900),
-            R("bass", "procedural/gills/transform/scale", 0.05, comp=1, attackMs=120, decayMs=900))
+    s.route(R("bass", "fx/capBreath/amplitude", 0.22, attackMs=50, decayMs=900),
+            R("bass", "procedural/gills/transform/scale", 0.05, comp=1, attackMs=50, decayMs=900))
     for k in range(N_THREADS):
-        s.route(R("bass", "procedural/thread%d/deform/1/amount" % k, 0.35, attackMs=200, decayMs=1200))
+        s.route(R("bass", "procedural/thread%d/deform/1/amount" % k, 0.35, attackMs=50, decayMs=1200))
     # kick: a contraction, on a spring (overshoot and settle), and a puff of spores
     for node in ("cap", "gills", "hymenium"):
         s.route(R("kick", "procedural/%s/transform/scale" % node, 1.0, op="multiply", gain=-0.07, offset=1.0,

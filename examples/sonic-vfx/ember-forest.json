@@ -191,7 +191,7 @@
   {
    "source": "response.noteEnv",
    "target": "lights/emberLight/intensity",
-   "amount": 30.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -218,7 +218,7 @@
    "polarity": "unipolar",
    "component": 0,
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 1400
    }
   },
@@ -230,7 +230,7 @@
    "polarity": "unipolar",
    "component": 1,
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 1400
    }
   },
@@ -241,7 +241,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 400,
+    "attackMs": 50,
     "decayMs": 1500
    }
   },
@@ -252,7 +252,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 400,
+    "attackMs": 50,
     "decayMs": 1500
    }
   },
@@ -263,7 +263,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 200,
+    "attackMs": 50,
     "decayMs": 900
    }
   },

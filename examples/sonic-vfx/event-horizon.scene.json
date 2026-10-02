@@ -1438,8 +1438,8 @@
     "attractorStrength": 1.6,
     "attractorRadius": 18.0,
     "orbit": 3.8,
-    "sizeStart": 0.11,
-    "sizeEnd": 0.03,
+    "sizeStart": 0.2,
+    "sizeEnd": 0.05,
     "colorStart": [
      0.73791,
      0.81485,
@@ -1452,7 +1452,7 @@
      0.71569,
      0.0
     ],
-    "emissive": 22.0,
+    "emissive": 30.0,
     "blend": "additive",
     "trailEnabled": true,
     "trailLength": 24,

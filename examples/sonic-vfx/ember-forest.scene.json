@@ -499,8 +499,8 @@
     "attractorStrength": 2.2,
     "attractorRadius": 2.0,
     "orbit": 2.6,
-    "sizeStart": 0.03,
-    "sizeEnd": 0.012,
+    "sizeStart": 0.06,
+    "sizeEnd": 0.02,
     "colorStart": [
      1.0,
      0.7913,
@@ -513,12 +513,12 @@
      0.0,
      0.0
     ],
-    "emissive": 26.0,
+    "emissive": 30.0,
     "blend": "additive",
     "trailEnabled": true,
     "trailLength": 32,
     "trailStride": 2,
-    "trailWidth": 0.6,
+    "trailWidth": 0.8,
     "trailTaper": 0.0,
     "trailFade": 0.0,
     "trailTint": [
@@ -699,8 +699,8 @@
     0.14413,
     0.0
    ],
-   "intensity": 6.0,
-   "range": 6.0,
+   "intensity": 10.0,
+   "range": 9.0,
    "radius": 0.3,
    "castsShadow": false,
    "volumetric": 0.6

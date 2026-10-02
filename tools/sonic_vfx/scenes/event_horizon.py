@@ -218,8 +218,8 @@ def build():
                 direction=[0, 0, -1], spawnRate=0.0, lifetimeMin=2.5, lifetimeMax=4.0, spread=0.15,
                 speedMin=2.2, speedMax=3.0, gravity=[0, 0, 0], drag=0.15, turbulence=0.05,
                 attractorPosition=[0, 0, 0], attractorStrength=1.6, attractorRadius=18.0, orbit=3.8,
-                sizeStart=0.11, sizeEnd=0.03, colorStart=hexrgb("#dfe9ff") + [1.0],
-                colorEnd=hexrgb(WHITE_HOT) + [0.0], emissive=22.0, blend="additive",
+                sizeStart=0.2, sizeEnd=0.05, colorStart=hexrgb("#dfe9ff") + [1.0],
+                colorEnd=hexrgb(WHITE_HOT) + [0.0], emissive=30.0, blend="additive",
                 trailEnabled=True, trailLength=24, trailStride=2, trailWidth=0.8, trailTaper=0.05, trailFade=0.0)
     # ---- the flare (snare): a burst from the hot spot on the approaching side
     s.particles("flare", capacity=4000, seed=41, shape="sphere", position=[4.6, 0.05, 1.2], extent=[0.35, 0.05, 0.35],
@@ -268,8 +268,8 @@ def build():
     s.map(M("grit", [("roughness", 1.0), ("energy", 0.4), ("inharmonicity", 2.0, True)], "product", -0.3, 6.5))
 
     # mass: the bass swells the lens (medium attack, slow release: heavy things move slowly)
-    s.route(R("bass", "fx/bh/einsteinRadius", 1.8, attackMs=90, decayMs=900),
-            R("bass", "fx/bh/horizonScale", 0.03, attackMs=90, decayMs=900))
+    s.route(R("bass", "fx/bh/einsteinRadius", 1.8, attackMs=50, decayMs=900),
+            R("bass", "fx/bh/horizonScale", 0.03, attackMs=50, decayMs=900))
     # heat: sustained sound brightens the disk and thickens its gas (the whole disk, slowly)
     for i in range(N_BANDS):
         s.route(R("visual.heat", "procedural/band%d/material/emissive" % i, 5.0, **SLOW))
@@ -294,7 +294,7 @@ def build():
     s.route(R("visual.orbit", "particles/stars/position", -9.0, comp=0, attackMs=0, decayMs=0),
             R("polyphony", "particles/stars/extent", 2.5, comp=0, **FAST),
             R("polyphony", "particles/stars/extent", 2.5, comp=2, **FAST),
-            R("noteOn", "particles/stars/burst", 9.0, depth="lastVelocity", attackMs=0, decayMs=140))
+            R("noteOn", "particles/stars/burst", 14.0, depth="lastVelocity", attackMs=0, decayMs=140))
     # kick: the photon ring flashes, the jets pulse
     s.route(R("kick", "fx/bh/photonRing", 22.0, **HIT),
             R("kick", "particles/jetUp/burst", 70.0, attackMs=0, decayMs=90),

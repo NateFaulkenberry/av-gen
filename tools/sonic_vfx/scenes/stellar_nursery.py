@@ -192,15 +192,16 @@ def build():
     red, blue = hexrgb("#ff6a3a", 1.0), hexrgb("#a8d4ff", 1.0)
     for k in range(N_STARS):
         for c in range(3):
-            s.route(R(lit[k], "sdf/pillars/surface/%d/emission" % (k + 1), 9.0 * red[c], comp=c, **MEDIUM),
+            s.route(R(lit[k], "sdf/pillars/surface/%d/emission" % (k + 1), 9.0 * red[c], comp=c, attackMs=30,
+                      decayMs=900),
                     R("visual.pc", "sdf/pillars/surface/%d/emission" % (k + 1), 9.0 * (blue[c] - red[c]), comp=c,
-                      depth=lit[k], **MEDIUM))
+                      depth=lit[k], attackMs=30, decayMs=900))
         s.route(R("noteEnv", "sdf/pillars/surface/%d/emission" % (k + 1), 6.0, depth=lit[k], attackMs=0,
                   decayMs=350))
         s.route(R("held", "sdf/pillars/node/star%d/radius" % k, 0.45, springHz=0.8, springDamping=0.8))
-    s.route(R("polyphony", "lights/nest/intensity", 400.0, **MEDIUM))
+    s.route(R("polyphony", "lights/nest/intensity", 400.0, attackMs=30, decayMs=900))
     # bass: the cloud's density and glow; sustain: ionisation (the rims); tension: the cloud churns (a phase)
-    s.route(R("bass", "procedural/nebula/material/emissive", 1.2, attackMs=300, decayMs=1400),
+    s.route(R("bass", "procedural/nebula/material/emissive", 1.2, attackMs=50, decayMs=1400),
             R("sustain", "lights/rim/intensity", 8.0, **SLOW),
             R("tension", "material/snNebula/op/%d/noise/constant" % OP_CHURN, 0.12, comp=0, integrate=True,
               attackMs=500, decayMs=500))

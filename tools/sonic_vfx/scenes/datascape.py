@@ -173,8 +173,8 @@ def build():
             R("noteEnv", "material/dsData/op/%d/constant/constant" % OP_NOTE_GAIN, 2.4, comp=0,
               depth="lastVelocity", attackMs=0, decayMs=700))
     # bass: the ridges heave
-    s.route(R("bass", "procedural/plain/deform/1/amount", 0.36, attackMs=150, decayMs=900),
-            R("bass", "procedural/plain/deform/2/amount", 0.25, attackMs=200, decayMs=1200))
+    s.route(R("bass", "procedural/plain/deform/1/amount", 0.36, attackMs=50, decayMs=900),
+            R("bass", "procedural/plain/deform/2/amount", 0.25, attackMs=50, decayMs=1200))
     # sustain: order -- the dashes lengthen (the dash threshold falls)
     s.route(R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=0, **SLOW),
             R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=1, **SLOW))

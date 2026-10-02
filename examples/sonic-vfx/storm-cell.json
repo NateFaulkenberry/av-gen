@@ -654,7 +654,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 200,
+    "attackMs": 50,
     "decayMs": 1400
    }
   },
@@ -665,7 +665,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 1600
    }
   },
@@ -676,7 +676,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 150,
+    "attackMs": 50,
     "decayMs": 900
    }
   },
@@ -687,7 +687,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 200,
+    "attackMs": 50,
     "decayMs": 900
    }
   },

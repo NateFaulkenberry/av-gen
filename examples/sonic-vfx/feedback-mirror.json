@@ -222,7 +222,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 120,
+    "attackMs": 50,
     "decayMs": 700
    }
   },

@@ -231,7 +231,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 90,
+    "attackMs": 50,
     "decayMs": 900
    }
   },
@@ -242,7 +242,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 90,
+    "attackMs": 50,
     "decayMs": 900
    }
   },
@@ -707,7 +707,7 @@
   {
    "source": "notes.noteOn",
    "target": "particles/stars/burst",
-   "amount": 9.0,
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "notes.lastVelocity",

@@ -725,7 +725,7 @@
    "polarity": "unipolar",
    "component": 0,
    "chain": {
-    "attackMs": 400,
+    "attackMs": 50,
     "decayMs": 1600
    }
   },
@@ -736,7 +736,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 1200
    }
   },

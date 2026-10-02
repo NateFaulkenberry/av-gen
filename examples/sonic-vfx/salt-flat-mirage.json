@@ -317,7 +317,7 @@
   {
    "source": "response.bass",
    "target": "fx/shimmer/strength",
-   "amount": 1.4,
+   "amount": 1.6,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -332,8 +332,19 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/glints/burst",
+   "amount": 160.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 30
    }
   },
   {
@@ -701,7 +712,7 @@
    [
     "hat",
     "response.hat",
-    "salt grains blowing low across the flat"
+    "salt crystals glint across the near crust; grains blow low across the flat"
    ],
    [
     "silence",
@@ -805,20 +816,20 @@
     "windowStart": 0.0
    },
    "parameters": {
-    "strength": 0.2,
-    "radius": 2600.0,
-    "height": 28.0,
-    "scale": 16.0,
-    "riseSpeed": 2.0,
+    "strength": 0.3,
+    "radius": 400.0,
+    "height": 30.0,
+    "scale": 4.0,
+    "riseSpeed": 1.5,
     "chroma": 0.0,
-    "churn": 0.6,
-    "edgeSoftness": 0.6,
-    "heightFalloff": 1.6,
-    "thicknessRef": 900.0,
+    "churn": 0.7,
+    "edgeSoftness": 0.5,
+    "heightFalloff": 1.4,
+    "thicknessRef": 300.0,
     "fadeDistance": 0.0,
     "offsetX": 2.5,
     "offsetY": 0.0,
-    "offsetZ": -1194.0
+    "offsetZ": -374.0
    }
   },
   {

@@ -202,8 +202,8 @@ def build():
     # sustain: brighter, longer curtains; bass: they reach lower and taller
     s.route(R("sustain", "fx/aurora/intensity", 1.6, **SLOW),
             R("sustain", "fx/aurora/curtainHeight", 600.0, **SLOW),
-            R("bass", "fx/aurora/baseHeight", -140.0, attackMs=200, decayMs=1200),
-            R("bass", "fx/aurora/curtainHeight", 500.0, attackMs=200, decayMs=1200))
+            R("bass", "fx/aurora/baseHeight", -140.0, attackMs=50, decayMs=1200),
+            R("bass", "fx/aurora/curtainHeight", 500.0, attackMs=50, decayMs=1200))
     # chords: tension and polyphony move the palette (green -> teal -> violet -> rose)
     s.map(M("mood", [("tension", 1.0), ("polyphony", 0.4)], "mean"))
     s.route(R("visual.mood", "palette/position", 3.0, attackMs=1600, decayMs=4000))

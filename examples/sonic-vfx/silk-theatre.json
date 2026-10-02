@@ -210,6 +210,28 @@
    }
   },
   {
+   "source": "response.noteEnv",
+   "target": "particles/silk/emissive",
+   "amount": 2.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "lights/spot/intensity",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
    "source": "notes.polyphony",
    "target": "particles/gold/spawnRate",
    "amount": 600.0,
@@ -228,7 +250,7 @@
    "polarity": "unipolar",
    "component": 0,
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 900
    }
   },
@@ -251,7 +273,7 @@
    "polarity": "unipolar",
    "component": 0,
    "chain": {
-    "attackMs": 300,
+    "attackMs": 50,
     "decayMs": 900
    }
   },

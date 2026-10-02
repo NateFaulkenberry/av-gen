@@ -1369,6 +1369,138 @@
    }
   },
   {
+   "source": "visual.spHit0",
+   "target": "lights/glint0/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit1",
+   "target": "lights/glint1/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit2",
+   "target": "lights/glint2/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit3",
+   "target": "lights/glint3/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit4",
+   "target": "lights/glint4/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit5",
+   "target": "lights/glint5/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit6",
+   "target": "lights/glint6/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit7",
+   "target": "lights/glint7/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit8",
+   "target": "lights/glint8/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit9",
+   "target": "lights/glint9/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit10",
+   "target": "lights/glint10/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "visual.spHit11",
+   "target": "lights/glint11/intensity",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
    "source": "visual.crown",
    "target": "sdf/fluid/node/ringLift0/translation",
    "amount": 0.18,
@@ -1423,7 +1555,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 60,
+    "attackMs": 50,
     "decayMs": 500
    }
   },
@@ -1434,7 +1566,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 90,
+    "attackMs": 80,
     "decayMs": 500
    }
   },
@@ -1445,7 +1577,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 120,
+    "attackMs": 110,
     "decayMs": 500
    }
   },
@@ -1456,7 +1588,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 150,
+    "attackMs": 140,
     "decayMs": 500
    }
   },
@@ -1467,7 +1599,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 80,
+    "attackMs": 50,
     "decayMs": 700
    }
   },

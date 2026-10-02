@@ -47,7 +47,7 @@ DESIGN = {
         ["melodic / chords", "response.note", "each held note arcs from the core to its tower; a "
          "triad draws a triangle of lightning, a cluster a jagged fan"],
         ["velocity", "notes.lastVelocity", "arc brightness and its light"],
-        ["sustained", "notes.held", "a held note is a steady writhing arc; a staccato note one crack"],
+        ["sustained", "notes.active", "a held note is a steady writhing arc; a staccato note one crack"],
         ["bass", "response.bass", "the core charges: its top-load glows and the hall hums brighter"],
         ["kick", "response.kick", "a discharge: bolts from the core to the ring, the hall flashes"],
         ["snare", "response.snare", "crackle crawls over the core"],
@@ -233,10 +233,10 @@ def build():
                 R("visual.jag", "fx/arc%d/jaggedness" % i, 0.25, **MEDIUM),
                 R("visual.jag", "fx/arc%d/flicker" % i, 0.4, **MEDIUM))
     # bass: the core charges
-    s.route(R("bass", "procedural/coreLoad/material/emissive", 3.0, attackMs=80, decayMs=700),
-            R("bass", "lights/coreGlow/intensity", 150.0, attackMs=80, decayMs=700),
-            R("bass", "procedural/coreCoil/material/emissive", 1.6, attackMs=80, decayMs=700),
-            R("bass", "procedural/cables/material/emissive", 0.4, attackMs=120, decayMs=900))
+    s.route(R("bass", "procedural/coreLoad/material/emissive", 3.0, attackMs=50, decayMs=700),
+            R("bass", "lights/coreGlow/intensity", 150.0, attackMs=50, decayMs=700),
+            R("bass", "procedural/coreCoil/material/emissive", 1.6, attackMs=50, decayMs=700),
+            R("bass", "procedural/cables/material/emissive", 0.4, attackMs=50, decayMs=900))
     # snare: crackle over the core
     s.route(R("snare", "fx/crackle/intensity", 60.0, attackMs=0, decayMs=240),
             R("snare", "fx/crackle/crackle", 14.0, attackMs=0, decayMs=240),

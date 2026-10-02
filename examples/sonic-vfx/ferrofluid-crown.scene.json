@@ -894,6 +894,246 @@
    "width": 2.0,
    "height": 2.0,
    "castsShadow": false
+  },
+  {
+   "id": "glint0",
+   "name": "glint0",
+   "type": "point",
+   "position": [
+    -1.2418977676306566,
+    0.75,
+    -0.4520138214192037
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint1",
+   "name": "glint1",
+   "type": "point",
+   "position": [
+    -1.3216,
+    0.75,
+    1.6184932097531423e-16
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint2",
+   "name": "glint2",
+   "type": "point",
+   "position": [
+    -1.2418977676306564,
+    0.75,
+    0.45201382141920404
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint3",
+   "name": "glint3",
+   "type": "point",
+   "position": [
+    -1.0124043360260413,
+    0.75,
+    0.8495081049617306
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint4",
+   "name": "glint4",
+   "type": "point",
+   "position": [
+    -0.6607999999999998,
+    0.75,
+    1.1445391736415143
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint5",
+   "name": "glint5",
+   "type": "point",
+   "position": [
+    -0.2294934316046151,
+    0.75,
+    1.3015219263809341
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint6",
+   "name": "glint6",
+   "type": "point",
+   "position": [
+    0.22949343160461524,
+    0.75,
+    1.3015219263809341
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint7",
+   "name": "glint7",
+   "type": "point",
+   "position": [
+    0.6608000000000002,
+    0.75,
+    1.144539173641514
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint8",
+   "name": "glint8",
+   "type": "point",
+   "position": [
+    1.0124043360260413,
+    0.75,
+    0.8495081049617303
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint9",
+   "name": "glint9",
+   "type": "point",
+   "position": [
+    1.2418977676306566,
+    0.75,
+    0.45201382141920377
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint10",
+   "name": "glint10",
+   "type": "point",
+   "position": [
+    1.3216,
+    0.75,
+    0.0
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
+   "id": "glint11",
+   "name": "glint11",
+   "type": "point",
+   "position": [
+    1.2418977676306566,
+    0.75,
+    -0.45201382141920377
+   ],
+   "color": [
+    1.0,
+    0.42327,
+    0.10224
+   ],
+   "intensity": 0.0,
+   "range": 1.2,
+   "radius": 0.05,
+   "castsShadow": false,
+   "volumetric": 0.0
   }
  ],
  "composition": {

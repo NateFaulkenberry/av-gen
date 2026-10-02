@@ -169,7 +169,7 @@ def build():
             castsShadow=True, contactShadow=False, shadowStrength=1.0, softness=0.4, volumetric=1.0)
     s.light("fill", "directional", direction=[-0.3, -1.0, -0.2], color=hexrgb("#3a4050"), intensity=0.03,
             castsShadow=False)
-    s.light("emberLight", "point", position=list(DANCE), color=hexrgb(EMBER), intensity=6.0, range=6.0, radius=0.3,
+    s.light("emberLight", "point", position=list(DANCE), color=hexrgb(EMBER), intensity=10.0, range=9.0, radius=0.3,
             castsShadow=False, volumetric=0.6)
 
     # ---- the dancing ember: three particles orbiting a hand that rises with the melody, long trails
@@ -177,8 +177,8 @@ def build():
                 direction=[0, 1, 0], spawnRate=1.2, lifetimeMin=4.0, lifetimeMax=6.0, spread=1.0, speedMin=0.3,
                 speedMax=0.6, gravity=[0, 0.05, 0], drag=0.3, turbulence=0.25, turbulenceScale=0.5,
                 attractorPosition=list(DANCE), attractorStrength=2.2, attractorRadius=2.0, orbit=2.6,
-                sizeStart=0.03, sizeEnd=0.012, colorStart=hexrgb(HOT) + [1.0], colorEnd=hexrgb(EMBER) + [0.0],
-                emissive=26.0, blend="additive", trailEnabled=True, trailLength=32, trailStride=2, trailWidth=0.6,
+                sizeStart=0.06, sizeEnd=0.02, colorStart=hexrgb(HOT) + [1.0], colorEnd=hexrgb(EMBER) + [0.0],
+                emissive=30.0, blend="additive", trailEnabled=True, trailLength=32, trailStride=2, trailWidth=0.8,
                 trailTaper=0.0, trailFade=0.0, trailTint=hexrgb("#ff5a10"))
     # sparks (hat) and thrown embers (kick): from the ground seams round the near trunks
     s.particles("sparks", capacity=4000, seed=9, shape="box", position=[0.0, 0.1, -9.0], extent=[14.0, 0.1, 3.0],
@@ -220,18 +220,18 @@ def build():
     for t in ("particles/ember/position", "particles/ember/attractorPosition", "lights/emberLight/position"):
         s.route(R("lastPitch", t, 4.0, comp=1, offset=-0.3, springHz=1.3, springDamping=0.55))
     s.route(R("noteEnv", "particles/ember/emissive", 30.0, depth="lastVelocity", attackMs=0, decayMs=400),
-            R("noteEnv", "lights/emberLight/intensity", 30.0, attackMs=0, decayMs=400),
+            R("noteEnv", "lights/emberLight/intensity", 70.0, attackMs=0, decayMs=400),
             R("noteOn", "particles/ember/burst", 1.0, threshold="binary", thresholdLevel=0.01))
     # bass: the wind breathes on the coals and stirs the smoke
     for c, w in enumerate(hexrgb(EMBER, 1.0)):
         if w > 1e-4:
-            s.route(R("bass", "material/efAsh/op/%d/constant/constant" % OP_SEAM, 5.0 * w, comp=c, attackMs=300,
+            s.route(R("bass", "material/efAsh/op/%d/constant/constant" % OP_SEAM, 5.0 * w, comp=c, attackMs=50,
                       decayMs=1400))
     # (the smoke stirs: its structure, never much more of it -- a density route six times the base drowned the
     #  trunks in lit smoke)
-    s.route(R("bass", "scene/volumeNoise", 0.35, attackMs=400, decayMs=1500),
-            R("bass", "scene/volumeDensity", 0.0012, attackMs=400, decayMs=1500),
-            R("bass", "particles/sparks/spawnRate", 120.0, attackMs=200, decayMs=900))
+    s.route(R("bass", "scene/volumeNoise", 0.35, attackMs=50, decayMs=1500),
+            R("bass", "scene/volumeDensity", 0.0012, attackMs=50, decayMs=1500),
+            R("bass", "particles/sparks/spawnRate", 120.0, attackMs=50, decayMs=900))
     # snare: a flare-up runs up the trunks
     for c, w in enumerate(hexrgb(EMBER, 1.0)):
         if w > 1e-4:

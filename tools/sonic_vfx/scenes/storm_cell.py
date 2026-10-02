@@ -259,10 +259,10 @@ def build():
 
     # ---- the instrument ---------------------------------------------------------------------------------------------
     # bass: the funnel winds (rotation and width), the debris skirt thickens, the wind leans on the wheat
-    s.route(R("bass", "fx/storm/circulation", 900.0, attackMs=200, decayMs=1400),
-            R("bass", "fx/storm/radiusBottom", 22.0, attackMs=300, decayMs=1600),
-            R("bass", "fx/storm/skirtDensity", 1.2, attackMs=150, decayMs=900),
-            R("bass", "procedural/wheat/deform/1/amount", 0.25, attackMs=200, decayMs=900))
+    s.route(R("bass", "fx/storm/circulation", 900.0, attackMs=50, decayMs=1400),
+            R("bass", "fx/storm/radiusBottom", 22.0, attackMs=50, decayMs=1600),
+            R("bass", "fx/storm/skirtDensity", 1.2, attackMs=50, decayMs=900),
+            R("bass", "procedural/wheat/deform/1/amount", 0.25, attackMs=50, decayMs=900))
     # density: the storm's chaos
     s.route(R("density", "fx/storm/wobbleAmount", 40.0, **SLOW),
             R("density", "particles/rain/turbulence", 1.5, **SLOW))

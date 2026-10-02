@@ -836,8 +836,8 @@
      0
     ],
     "drag": 0.0,
-    "sizeStart": 6.0,
-    "sizeEnd": 1.6,
+    "sizeStart": 11.0,
+    "sizeEnd": 3.0,
     "colorStart": [
      0.88792,
      1.0,
@@ -850,12 +850,12 @@
      0.39157,
      0.0
     ],
-    "emissive": 16.0,
+    "emissive": 24.0,
     "blend": "additive",
     "trailEnabled": true,
     "trailLength": 30,
     "trailStride": 1,
-    "trailWidth": 0.55,
+    "trailWidth": 0.7,
     "trailTaper": 0.0,
     "trailFade": 0.0,
     "trailTint": [
@@ -900,8 +900,8 @@
      0
     ],
     "drag": 0.0,
-    "sizeStart": 14.0,
-    "sizeEnd": 4.0,
+    "sizeStart": 22.0,
+    "sizeEnd": 5.0,
     "colorStart": [
      0.92158,
      1.0,
@@ -914,7 +914,7 @@
      0.39157,
      0.0
     ],
-    "emissive": 10.0,
+    "emissive": 14.0,
     "blend": "additive"
    }
   },
@@ -973,6 +973,59 @@
     "blend": "additive",
     "velocityStretch": 1.0,
     "stretchMax": 0.35
+   }
+  },
+  {
+   "name": "glints",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4000,
+    "seed": 27,
+    "shape": "box",
+    "position": [
+     0.0,
+     0.04,
+     -14.0
+    ],
+    "extent": [
+     22.0,
+     0.02,
+     14.0
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 0.06,
+    "lifetimeMax": 0.18,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.01,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.92158,
+     0.80695,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.68669,
+     0.43415,
+     0.0
+    ],
+    "emissive": 26.0,
+    "blend": "additive"
    }
   }
  ],

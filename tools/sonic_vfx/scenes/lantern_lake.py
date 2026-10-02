@@ -218,7 +218,7 @@ def build():
     s.route(R("noteEnv", "lights/glow/intensity", 260.0, attackMs=0, decayMs=900),
             R("sustain", "lights/glow/intensity", 120.0, **SLOW))
     # bass: the swell; kick: a ripple through the reflection
-    s.route(R("bass", "fx/swell/strength", 0.35, attackMs=400, decayMs=1800),
+    s.route(R("bass", "fx/swell/strength", 0.35, attackMs=50, decayMs=1800),
             R("kick", "fx/swell/strength", 0.5, attackMs=0, decayMs=500),
             R("kick", "fx/swell/scale", 0.6, attackMs=0, decayMs=500))
     # hat: fireflies

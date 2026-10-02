@@ -213,8 +213,8 @@ def build():
         s.route(R("visual.jlHit%d" % k, "lights/jellyLight%d/intensity" % k, 14.0, attackMs=0, decayMs=1400),
                 R("visual.jlHit%d" % k, "procedural/jelly%d/material/emissive" % k, 2.5, attackMs=0, decayMs=1400))
     # bass: the current -- the snow streams sideways and the colony light swells
-    s.route(R("bass", "particles/snow/gravity", 0.25, comp=0, attackMs=400, decayMs=1600),
-            R("bass", "particles/snow/turbulence", 0.3, attackMs=300, decayMs=1200))
+    s.route(R("bass", "particles/snow/gravity", 0.25, comp=0, attackMs=50, decayMs=1600),
+            R("bass", "particles/snow/turbulence", 0.3, attackMs=50, decayMs=1200))
     # kick: a pressure wave; hat: snow glints
     s.route(R("kickEnv", "post/shock/amount", 26.0, attackMs=0, decayMs=0),
             R("kickEnv", "post/shock/radius", -1.1, op="replace", offset=-1.0, attackMs=0, decayMs=0),

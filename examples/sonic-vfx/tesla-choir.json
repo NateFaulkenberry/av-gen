@@ -960,7 +960,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 80,
+    "attackMs": 50,
     "decayMs": 700
    }
   },
@@ -971,7 +971,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 80,
+    "attackMs": 50,
     "decayMs": 700
    }
   },
@@ -982,7 +982,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 80,
+    "attackMs": 50,
     "decayMs": 700
    }
   },
@@ -993,7 +993,7 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "attackMs": 120,
+    "attackMs": 50,
     "decayMs": 900
    }
   },
@@ -1615,7 +1615,7 @@
    ],
    [
     "sustained",
-    "notes.held",
+    "notes.active",
     "a held note is a steady writhing arc; a staccato note one crack"
    ],
    [

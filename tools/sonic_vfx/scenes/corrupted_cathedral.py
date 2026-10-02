@@ -187,8 +187,8 @@ def build():
     for k in range(N_BAYS):
         s.route(R("visual.bayHit%d" % k, "lights/bay%d/intensity" % k, 900.0, attackMs=0, decayMs=650))
     # bass: the nave sways and the lines thicken
-    s.route(R("bass", "sdf/nave/node/sway/amount", 0.35, attackMs=120, decayMs=900),
-            R("bass", "sdf/nave/look/edge/pixels", 1.2, attackMs=60, decayMs=600))
+    s.route(R("bass", "sdf/nave/node/sway/amount", 0.35, attackMs=50, decayMs=900),
+            R("bass", "sdf/nave/look/edge/pixels", 1.2, attackMs=50, decayMs=600))
     # kick: a structural fracture for a moment, and the image splits along the nave's axis (ADR-1065)
     s.route(R("kick", "sdf/nave/node/fracture/amount", 0.18, attackMs=0, decayMs=260),
             R("kickEnv", "post/split/amount", 9.0, attackMs=0, decayMs=0),

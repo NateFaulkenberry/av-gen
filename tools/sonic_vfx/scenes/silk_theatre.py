@@ -146,12 +146,14 @@ def build():
     # a sounding note lays silk (legato: one unbroken stroke; staccato: short strokes); each note-on a small knot
     s.route(R("active", "particles/silk/spawnRate", 700.0, attackMs=20, decayMs=60),
             R("noteOn", "particles/silk/burst", 12.0, threshold="binary", thresholdLevel=0.01),
-            R("lastVelocity", "particles/silk/size", 0.6, **FAST))
+            R("lastVelocity", "particles/silk/size", 0.6, **FAST),
+            R("noteEnv", "particles/silk/emissive", 2.2, attackMs=0, decayMs=260),
+            R("noteEnv", "lights/spot/intensity", 260.0, attackMs=0, decayMs=300))
     # chord: a second, gold stroke beside the red
     s.route(R("polyphony", "particles/gold/spawnRate", 600.0, attackMs=20, decayMs=80))
     # bass: the dance sways; kick: the whip-crack -- the laid silk shudders all along its length
     for sysname in ("silk", "gold"):
-        s.route(R("bass", "particles/%s/position" % sysname, 0.5, comp=0, attackMs=300, decayMs=900),
+        s.route(R("bass", "particles/%s/position" % sysname, 0.5, comp=0, attackMs=50, decayMs=900),
                 R("kick", "particles/%s/turbulence" % sysname, 2.4, attackMs=0, decayMs=180))
     # hat: glitter; sustain: the spot breathes
     s.route(R("hat", "particles/glitter/burst", 60.0, attackMs=0, decayMs=40),

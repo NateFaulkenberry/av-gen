@@ -164,14 +164,21 @@ def build():
     for k in range(N_SPIKES):
         s.route(R("visual.spHeld%d" % k, "sdf/fluid/node/spike%d/translation" % k, 1.05, comp=1, attackMs=40,
                   decayMs=700, springHz=3.2, springDamping=0.45))
+    # ...and a glint runs up it: a small warm light just above each spike, flashing as the note lands, so the black
+    # liquid shows the new spike as a highlight
+    for k in range(N_SPIKES):
+        a = math.radians(200.0 - k * (220.0 / (N_SPIKES - 1)))
+        s.light("glint%d" % k, "point", position=[RING_R * math.cos(a) * 1.12, 0.75, RING_R * math.sin(a) * 1.12],
+                color=hexrgb(WARM), intensity=0.0, range=1.2, radius=0.05, castsShadow=False, volumetric=0.0)
+        s.route(R("visual.spHit%d" % k, "lights/glint%d/intensity" % k, 6.0, attackMs=0, decayMs=500))
     # chord: the crown forms (the spike field rises round the tower)
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
         s.route(R("visual.crown", "sdf/fluid/node/ringLift%d/translation" % j, 0.06 + 0.04 * (3 - j), comp=1,
                   attackMs=300 + 120 * j, decayMs=1500))
     # bass: the field strength (the small spikes lengthen together) and a heave
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
-        s.route(R("bass", "sdf/fluid/node/ringCone%d/height" % j, ch * 0.9, attackMs=60 + 30 * j, decayMs=500))
-    s.route(R("bass", "sdf/fluid/node/swell/amount", 0.03, attackMs=80, decayMs=700))
+        s.route(R("bass", "sdf/fluid/node/ringCone%d/height" % j, ch * 0.9, attackMs=50 + 30 * j, decayMs=500))
+    s.route(R("bass", "sdf/fluid/node/swell/amount", 0.03, attackMs=50, decayMs=700))
     # hat: shimmer
     s.route(R("hat", "sdf/fluid/node/shimmer/amount", 0.008, attackMs=0, decayMs=90))
     # snare: droplets

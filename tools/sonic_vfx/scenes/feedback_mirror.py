@@ -140,7 +140,7 @@ def build():
     s.route(R("interval", "temporal/feedback/rotate", 9.0, attackMs=350, decayMs=350))
     # sustain: the echoes last; bass: the tunnel stretches; kick: a zoom punch and the core flares
     s.route(R("sustain", "temporal/feedback/decay", 0.1, **SLOW),
-            R("bass", "temporal/feedback/zoom", -0.012, attackMs=120, decayMs=700),
+            R("bass", "temporal/feedback/zoom", -0.012, attackMs=50, decayMs=700),
             R("kick", "temporal/feedback/zoom", -0.035, attackMs=0, decayMs=200),
             R("kick", "sdf/glyph/surface/2/emission", 8.0, attackMs=0, decayMs=240),
             R("kick", "sdf/glyph/node/core/radius", 0.05, attackMs=0, decayMs=260))
