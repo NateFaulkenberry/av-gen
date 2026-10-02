@@ -207,7 +207,10 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         case OutsideFrame::Hide: outside = palette().ground | IM_COL32(0, 0, 0, 255); break;
         }
     }
-    canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre),
+    // ADR-1026: while projecting, the frame is rendered for the projector and the workspace shows no
+    // picture -- drawing it here would only spend the editor's GPU time on a copy nobody needs.
+    const std::uint64_t shownTexture = projection.active ? 0 : canvasTexture;
+    canvas_ = drawCanvasWindow(shownTexture, layout_.regionNode(DockRegion::Centre),
                                [&](const CanvasRect& rect, const PreviewFrame& frame) {
                                    previewFrame_ = frame;
                                    drawViewportEditor(engine, rect, frame);
@@ -222,6 +225,13 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
                                                                       : kMaxOutputDimension);
     } else {
         previewRender_ = PreviewRender{};
+    }
+    if (projection.active && canvas_.valid()) {
+        ImDrawList* list = ImGui::GetForegroundDrawList();
+        const char* note = "Projecting -- the picture is on the projection window";
+        const ImVec2 sz = ImGui::CalcTextSize(note);
+        list->AddText(ImVec2(canvas_.x + (canvas_.width - sz.x) * 0.5f, canvas_.y + (canvas_.height - sz.y) * 0.5f),
+                      IM_COL32(200, 200, 200, 255), note);
     }
     drawPanels(engine, stats);
     serviceLayoutStore();

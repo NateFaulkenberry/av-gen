@@ -4572,6 +4572,17 @@ int Application::runLive() {
             cw = previewExtent.width;
             ch = previewExtent.height;
         }
+        // While the Live panel is projecting (ADR-1026), the one render this frame makes is for the
+        // projector, so it is sized to the projection window's own pixels, not the editor canvas's.
+        // The canvas then shows no picture (ControlPanel hides it), so nothing renders "for the
+        // workspace": no pixels are spent on a canvas-shaped frame nobody is meant to watch.
+        if (projection_.state() == Projection::State::Running) {
+            if (const Output* out = outputs_.find(kProjectionOutputName);
+                out != nullptr && out->pixelWidth() > 0 && out->pixelHeight() > 0) {
+                cw = std::max(1u, static_cast<std::uint32_t>(std::lround(out->pixelWidth() * renderScale)));
+                ch = std::max(1u, static_cast<std::uint32_t>(std::lround(out->pixelHeight() * renderScale)));
+            }
+        }
         // A new size only takes effect once it has held still for a few frames. Following every
         // frame of a splitter drag would be more correct and much worse: each size is a new render
         // target and a new texture view, and ImGui's WebGPU backend caches a bind group per view
