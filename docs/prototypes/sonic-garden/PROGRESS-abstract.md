@@ -13,9 +13,14 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 
 ## Resume here (cold)
 
-- **State (2026-10-02 18:45):** the plan is written. Two prototypes are blocked out: 1 Sacred Geometry (v5 is strong:
-  a gold mandala on an ultramarine halo, with a flower-of-life field and a spiral well) and 2 Neon Vector (v3
-  rendering). Next: the other six blockouts, then routes and iteration on the weakest.
+- **State (2026-10-02 19:05):** all eight modules exist with their instruments (routes audited clean: no unresolved
+  target). Reviewed so far: 1 Sacred Geometry (v5, strong) and 2 Neon Vector (v2: the hidden-line ridges work).
+  Blockouts of 2 (v3) and 3-8 are queued behind the Liminal agent's suite (the GPU lock). Framings were checked on the
+  CPU with `kit.Scene.project` and fixed for 2, 5 and 8. Next: review the blockouts, iterate on the weakest, then the
+  silent 1080p stills, the real-music clips, the MIDI clips, perf, live runs, the contact sheet, the notes and
+  `REPORT.md`.
+- **The pin is now `eac7cb96`** (the engineer's cel lighting ADR-1071 and outline ADR-1072), at `$S/vfx/bin-eac7cb96`;
+  `avgen.sh` points at it.
 - **Build:** `python3 tools/sonic_vfx/abstract.py build [module ...]` writes `examples/sonic-abstract/<id>.json` and
   `.scene.json`. With no module it builds all of `scenes.ABSTRACT` and rewrites the index's "Sonic Abstract" entries.
   For look development elsewhere, use `--projects DIR`.
@@ -28,8 +33,8 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   - `frame`, `sheet [--blockouts]`, and `music` (cuts the real-music excerpts into the gitignored `assets/audio`).
 - **Live:** `python3 tools/sonic_vfx/live.py <id> --abstract --scenario demo` runs one prototype live. The switcher
   steps through the Sonic VFX set only; the engineer is extending it to the open project's set.
-- **The pinned engine:** `96bc0214` at `$S/vfx/bin-96bc0214`, through `$S/vfx/avgen.sh` (sets `AVGEN_SHADER_DIR` to
-  the pin's shaders). `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
+- **The pinned engine:** `eac7cb96` at `$S/vfx/bin-eac7cb96` (the previous pin `96bc0214` is beside it), through
+  `$S/vfx/avgen.sh` (sets `AVGEN_SHADER_DIR` to the pin's shaders). `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
   Never render art from `build/release` (the engineer's). To re-pin when the engineer posts a ready note:
   1. `git archive <sha> | tar -x -C $S/vfx/src-<sha>`;
   2. `cmake --preset release -DCPM_SOURCE_CACHE=/Users/natefaulkenberry/Documents/GitHub/av-gen/.cache/cpm`;
@@ -38,6 +43,8 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   5. point `avgen.sh` at it.
 - **GPU:** every job goes through `tools/gpu-lock.sh`, one job per hold (shared with the Liminal art agent and the
   engineer). No `timeout` command.
+- **Modulation maps:** `abstract.py maps [id ...]` writes `NN-<id>-modulation.md` from the built project (every route by
+  audio dimension, `[S]` for structural targets) plus the scene's plain-words vocabulary.
 - **Real music:** 30 s excerpts of the owner's tracks (Desktop: `All You Got.wav` from 34 s, `Rebuild.mp3` from 156 s),
   cut by `abstract.py music` into `assets/audio/sonic-abstract-{allyougot,rebuild}.wav`. Classes `allyougot` and
   `rebuild` in `review.REAL_MUSIC`.
@@ -56,6 +63,17 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   with amount 0 is a spin. Two local twists give a ring its spin and its opening about a diameter.
 - The route chain has `delayMs` (up to 4 s), which staggers one hit across nodes into a travelling wave.
 - `volumeMaxDistance: 0` with `volumeDensity` > 0 is analytic surface fog only (no march).
+- A particle system and a procedural node with the same name collide: the particle parameters do not register
+  (`particles/beads/burst` was unknown while a procedural `beads` existed).
+- Lights are steered by `lights/<id>/azimuth` and `elevation` (there is no direction parameter); the sky's colours are
+  `env/sky/{zenithColor,horizonColor,groundColor,sunColor}`.
+- A procedural's scale cannot be negative, but a radially symmetric ring mirrors to itself: its twin in a mirror plane
+  is the same ring at the mirrored height.
+- A radial distribution of ONE instance with a routed `distribution/startAngle` places a single object at any angle on
+  a circle (the void's beacon); a short spiral spline with a routed `startAngle` does the same for an emitter.
+- `notes.polyphony` is the number of sounding notes / 8.
+- The route liveness audit calls `audio.*` and `beat.*` routes dead in a project with no audio file; live input
+  publishes them (`Engine::publishFrame`). Those verdicts are expected for live projects.
 
 ## Log
 

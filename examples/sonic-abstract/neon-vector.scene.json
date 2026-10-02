@@ -1036,8 +1036,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 27.0,
-     "minorRadius": 0.4,
+     "majorRadius": 18.0,
+     "minorRadius": 0.34,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1046,9 +1046,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1085,8 +1085,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 24.8,
-     "minorRadius": 0.22,
+     "majorRadius": 16.5,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1095,9 +1095,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1134,8 +1134,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 22.6,
-     "minorRadius": 0.22,
+     "majorRadius": 15.0,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1144,9 +1144,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1183,8 +1183,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 20.4,
-     "minorRadius": 0.22,
+     "majorRadius": 13.5,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1193,9 +1193,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1232,8 +1232,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 18.2,
-     "minorRadius": 0.22,
+     "majorRadius": 12.0,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1242,9 +1242,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1281,8 +1281,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 16.0,
-     "minorRadius": 0.22,
+     "majorRadius": 10.5,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1291,9 +1291,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,
@@ -1330,8 +1330,8 @@
    "procedural": {
     "source": {
      "kind": "torus",
-     "majorRadius": 13.799999999999999,
-     "minorRadius": 0.22,
+     "majorRadius": 9.0,
+     "minorRadius": 0.2,
      "majorSegments": 256,
      "minorSegments": 4
     },
@@ -1340,9 +1340,9 @@
     },
     "distributionTransform": {
      "position": [
-      34.0,
-      46.0,
-      -215.4
+      65.0,
+      21.5,
+      -203.4
      ],
      "rotation": [
       90.0,

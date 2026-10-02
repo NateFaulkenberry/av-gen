@@ -27,8 +27,8 @@ AMBER_PALE = "#ffcf86"
 LIGHT = "#fff4dc"
 SIL = "#0a0a0c"
 
-RING_C = (0.0, 128.0, -950.0)
-RING_R = 150.0
+RING_C = (0.0, 103.0, -950.0)    # 6.2 degrees up from the camera
+RING_R = 100.0                    # 6 degrees: it stands on the horizon, inside the letterbox
 SEGMENTS = 64
 FOCAL = 50.0
 PUSH = 120.0                       # seconds for the push
@@ -183,7 +183,7 @@ def build():
                 blend="additive", scatterStrength=6.0, scatterAnisotropy=0.8)
 
     # the push: position and target move together (a constant direction), the letterbox bars ride it
-    look = [0.0, (RING_C[1] - CAM1[1]) * 0.35, RING_C[2] - CAM1[2]]
+    look = [0.0, math.tan(math.radians(3.24)), -1.0]     # 3.24 degrees up: the horizon on the lower third
     n = math.sqrt(sum(c * c for c in look))
     look = [c / n for c in look]
     t0 = [CAM0[k] + look[k] * 100.0 for k in range(3)]

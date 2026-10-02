@@ -316,10 +316,10 @@ def build():
             castsShadow=False)
 
     # ---- camera: a macro slide past the flower; focus on the bell
-    cam = [0.55, 1.15, 4.1]
-    tgt = [-0.55, 1.62, 0.0]
+    cam = [0.35, 1.25, 4.7]
+    tgt = [-0.05, 1.32, 0.0]
     focus = math.dist(cam, BELL)
-    s.params_({"camera/lens/focalLength": 55.0, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
+    s.params_({"camera/lens/focalLength": 40.0, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.02,
                "post/tonemap/operator": 3, "post/dof/enabled": True, "post/dof/physical": True,
                "post/dof/maxRadius": 18.0, "camera/lens/aperture": 1.6, "camera/focus/mode": 0,

@@ -1466,47 +1466,77 @@
    [
     "bass",
     "response.bass",
-    "the diagram breathes radially; the core glows"
+    "the diagram breathes radially, the inner layers most; the core glows"
    ],
    [
     "kick",
     "response.kick",
-    "the rings snap open about their diameters and spring back flat"
+    "the armillary rings snap open about their diameters, a ripple inward, and ring back flat on a loose spring; a zoom punch"
    ],
    [
     "snare",
     "response.snare",
-    "the star flashes vermilion; the crown fires sparks"
+    "the star and the seed's rim flash; sparks fly off the crown"
    ],
    [
     "hat",
     "response.hat",
-    "beads run along the rings"
+    "beads run along the armillary"
    ],
    [
-    "melodic",
-    "response.melodic",
-    "the differential rotation speeds up"
+    "mids",
+    "audio.mid",
+    "the differential rotation speeds up (ring k gains k times the turn)"
    ],
    [
-    "chord",
-    "notes.polyphony",
-    "the inner star's polygon order (3 notes a triangle, 4 a square...)"
+    "bands",
+    "audio.lowMid",
+    "each band lights its own layer, from the seed (bass) to the crown (treble)"
    ],
    [
-    "pitch class",
-    "notes.class.0",
-    "each of the 12 pitch classes lights its petal pair on the crown"
+    "brightness",
+    "sonic.brightness",
+    "gold turns toward ivory and cyan-white"
    ],
    [
     "sustained",
     "response.sustain",
-    "the camera pushes into the well; the trails lengthen"
+    "the camera pushes into the well; the light trails lengthen"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "the petals breathe on the beat and flip a half turn each bar"
    ],
    [
     "intensity",
     "response.intensity",
-    "more rings and petals switch on as a piece builds"
+    "STRUCTURE: the crown doubles its petals (24 to 48), the well deepens"
+   ],
+   [
+    "pitch class",
+    "notes.class.0",
+    "the twelve pitch classes are a clock of diamonds and spokes: a chord lights its own polygon (an augmented triad a triangle, a diminished seventh a square)"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: a polygon in the heart with as many sides as notes sounding"
+   ],
+   [
+    "held",
+    "notes.held",
+    "the armillary stays open while a note is held"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how hard a note flares the core"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "opens the armillary into a sphere by hand"
    ],
    [
     "silence",

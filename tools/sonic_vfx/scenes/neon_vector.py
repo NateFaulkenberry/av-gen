@@ -210,10 +210,10 @@ def build():
     # (never cut by the horizon: a cut circle is a sunset), a hairline horizon
     far_z = GROUPS[-1][1] - (GROUPS[-1][2] - 1) * SPACING
     cz = far_z - 40.0
-    ring_c = [34.0, 46.0, cz - 30.0]
+    ring_c = [65.0, 21.5, cz - 18.0]
     for i in range(7):
-        rad = 27.0 - i * 2.2
-        s.proc("circle%d" % i, {"kind": "torus", "majorRadius": rad, "minorRadius": 0.22 if i else 0.4,
+        rad = 18.0 - i * 1.5
+        s.proc("circle%d" % i, {"kind": "torus", "majorRadius": rad, "minorRadius": 0.2 if i else 0.34,
                                 "majorSegments": 256, "minorSegments": 4},
                material=line_mat(5.0 if i else 7.0),
                transform={"position": ring_c, "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})

@@ -11,8 +11,8 @@
   ],
   "target": [
    0.0,
-   6.39617927841282,
-   -29.894319838721017
+   7.451853448202454,
+   -29.84015501089752
   ],
   "fov": 30.0,
   "orbitSpeed": 0.0
@@ -65,7 +65,7 @@
     "source": {
      "kind": "box",
      "size": [
-      13.25359400733194,
+      8.835729338221293,
       16.0,
       11.0
      ],
@@ -76,14 +76,14 @@
     "distribution": {
      "kind": "radial",
      "count": 64,
-     "radius": 150.0,
+     "radius": 100.0,
      "plane": "xy",
      "orientation": "outward"
     },
     "distributionTransform": {
      "position": [
       0.0,
-      128.0,
+      103.0,
       -950.0
      ],
      "rotation": [
@@ -121,7 +121,7 @@
     "source": {
      "kind": "box",
      "size": [
-      13.25359400733194,
+      8.835729338221293,
       16.0,
       11.0
      ],
@@ -132,14 +132,14 @@
     "distribution": {
      "kind": "radial",
      "count": 64,
-     "radius": 150.0,
+     "radius": 100.0,
      "plane": "xy",
      "orientation": "outward"
     },
     "distributionTransform": {
      "position": [
       0.0,
-      -128.0,
+      -103.0,
       -950.0
      ],
      "rotation": [
@@ -177,7 +177,7 @@
     "source": {
      "kind": "box",
      "size": [
-      12.193306486745385,
+      8.12887099116359,
       17.0,
       11.6
      ],
@@ -186,7 +186,7 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 150.0,
+     "radius": 100.0,
      "plane": "xy",
      "orientation": "outward",
      "startAngle": 1.5708,
@@ -195,7 +195,7 @@
     "distributionTransform": {
      "position": [
       0.0,
-      128.0,
+      103.0,
       -949.6
      ],
      "rotation": [
@@ -233,7 +233,7 @@
     "source": {
      "kind": "box",
      "size": [
-      12.193306486745385,
+      8.12887099116359,
       17.0,
       11.6
      ],
@@ -242,7 +242,7 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 150.0,
+     "radius": 100.0,
      "plane": "xy",
      "orientation": "outward",
      "startAngle": 1.5708,
@@ -251,7 +251,7 @@
     "distributionTransform": {
      "position": [
       0.0,
-      -128.0,
+      -103.0,
       -949.6
      ],
      "rotation": [
@@ -552,11 +552,11 @@
     "distributionTransform": {
      "position": [
       0.0,
-      2.055001454549842,
-      69.01067480355049
+      2.0654448504908816,
+      69.01342556413606
      ],
      "rotation": [
-      2.6343448040613553,
+      3.2400000000000007,
       0.0,
       0.0
      ],
@@ -603,11 +603,11 @@
     "distributionTransform": {
      "position": [
       0.0,
-      1.636922131018414,
-      68.9914387996751
+      1.6475922184731675,
+      68.989771335646
      ],
      "rotation": [
-      2.6343448040613553,
+      3.2400000000000007,
       0.0,
       0.0
      ],
@@ -643,8 +643,8 @@
    "type": "directional",
    "direction": [
     0.0,
-    -0.13033696163238373,
-    0.9914697556821582
+    -0.10483577316295613,
+    0.9944895477908882
    ],
    "color": [
     1.0,

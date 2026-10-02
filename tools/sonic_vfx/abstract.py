@@ -12,6 +12,7 @@ reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modu
     python3 tools/sonic_vfx/abstract.py clip <id> [--class allyougot] [--seconds 30] [--size 1920x1080]
     python3 tools/sonic_vfx/abstract.py frame <id> --class allyougot --at 12   # one frame of a reactive clip
     python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the eight
+    python3 tools/sonic_vfx/abstract.py maps [id ...]                           # each one's as-built modulation map
 
 Files go to ~/Desktop/av-gen-review/28-sonic-abstract/, named by set-list position (`01-sacred-geometry-still.png`,
 `01-sacred-geometry-allyougot.mp4`). Every render goes through tools/gpu-lock.sh with the pinned engine (review.py's
@@ -141,9 +142,98 @@ def sheet(dst, blockouts=False, cols=4):
     print(dst)
 
 
+# What each signal is, in the owner's words (the brief's audio dimensions), for the modulation maps.
+DIMENSIONS = [
+    ("Bass", ("response.bass",)),
+    ("Kick (onset, low)", ("response.kick", "response.kickEnv", "response.low")),
+    ("Snare (onset, mid)", ("response.snare", "response.snareEnv")),
+    ("Hats and highs", ("response.hat", "response.hatEnv", "response.hatRate", "audio.treble")),
+    ("Any onset", ("response.onset", "response.onsetEnv")),
+    ("Mids", ("audio.mid", "response.melodic")),
+    ("Spectral bands", ("audio.bass", "audio.lowMid", "audio.highMid")),
+    ("Centroid (brightness)", ("sonic.brightness", "sonic.brightness.slow", "audio.spectralCentroid")),
+    ("Flux", ("response.flux",)),
+    ("Sustain", ("response.sustain",)),
+    ("Tempo and beat", ("beat.pulse", "beat.bar", "beat.phase", "beat.bpm")),
+    ("Intensity (12 s dynamics)", ("response.intensity",)),
+    ("MIDI notes", ("notes.lastPitch", "response.note", "response.noteEnv", "notes.noteOn", "visual.")),
+    ("MIDI velocity", ("notes.lastVelocity",)),
+    ("MIDI chords", ("notes.polyphony", "notes.class.", "notes.chord", "notes.tension")),
+    ("MIDI voices", ("notes.voice.",)),
+    ("Held notes and releases", ("notes.held", "notes.release")),
+    ("Mod wheel (CC 1)", ("control.modwheel",)),
+]
+STRUCTURAL = ("distribution/count", "majorSegments", "radialSegments", "node/polygon/count", "node/rooms/count",
+              "accordion/size", "lattice/size", "distribution/radius", "/radiusGrowth", "spline/", "spawnRate")
+
+
+def dimension_of(src):
+    for name, prefixes in DIMENSIONS:
+        if any(src == p or (p.endswith(".") and src.startswith(p)) for p in prefixes):
+            return name
+    return "Other"
+
+
+def describe_chain(r):
+    c = r.get("chain", {})
+    bits = []
+    if c.get("integrate"):
+        bits.append("integrated (a rate into a position)")
+    if c.get("delayMs"):
+        bits.append("delay %d ms" % c["delayMs"])
+    if c.get("threshold") == "binary":
+        bits.append("a switch above %.2f" % c.get("thresholdLevel", 0.5))
+    if c.get("springHz"):
+        bits.append("spring %.1f Hz" % c["springHz"])
+    if "attackMs" in c or "decayMs" in c:
+        bits.append("attack %d / decay %d ms" % (c.get("attackMs", 0), c.get("decayMs", 0)))
+    if r.get("op") == "multiply":
+        bits.append("scales it")
+    if r.get("depthSource"):
+        bits.append("scaled by %s" % r["depthSource"])
+    return "; ".join(bits)
+
+
+def write_map(sid):
+    import json
+    proj = json.load(open(project_path(sid)))
+    d = proj.get("sonicScene", {})
+    routes = proj.get("routes", [])
+    groups = {}
+    for r in routes:
+        groups.setdefault(dimension_of(r["source"]), []).append(r)
+    lines = ["# %s: %s" % (numbered(sid), d.get("title", sid)), "", d.get("thesis", ""), "",
+             "Project: `examples/sonic-abstract/%s.json`. %d routes; `[S]` marks a STRUCTURAL target (a count, an "
+             "order, a spacing, a recursion depth, a spline's shape)." % (sid, len(routes)), "",
+             "## In plain words", ""]
+    for row in d.get("vocabulary", []):
+        lines.append("- **%s** (`%s`): %s" % (row[0], row[1], row[2]))
+    lines += ["", "## As built: every route, by audio dimension", ""]
+    order = [n for n, _ in DIMENSIONS] + ["Other"]
+    for dim in order:
+        rs = groups.get(dim)
+        if not rs:
+            continue
+        lines += ["### %s" % dim, "", "| signal | drives | amount | shaping |", "|---|---|---|---|"]
+        for r in rs:
+            tgt = r["target"] + ("[%d]" % r["component"] if "component" in r else "")
+            s_mark = " `[S]`" if any(k in r["target"] for k in STRUCTURAL) else ""
+            lines.append("| `%s` | `%s`%s | %g | %s |" % (r["source"], tgt, s_mark, r["amount"], describe_chain(r)))
+        lines.append("")
+    maps_ = [m for src in proj.get("sources", []) if src.get("kind") == "interpret"
+             for m in src.get("settings", {}).get("mappings", [])]
+    if maps_:
+        lines += ["## Derived signals (interpret mappings)", "",
+                  "%d mappings build the `visual.*` signals above (for example a note's place: `visual.<name>Hit<k>` "
+                  "is a note-on that lands at place k)." % len(maps_), ""]
+    dst = os.path.join(OUT, numbered(sid) + "-modulation.md")
+    open(dst, "w").write("\n".join(lines) + "\n")
+    print(dst)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet"])
+    ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet", "maps"])
     ap.add_argument("scene", nargs="*")
     ap.add_argument("--at", type=float, default=6.0)
     ap.add_argument("--size", default="")
@@ -159,6 +249,10 @@ def main():
     proj = a.projects or None
     if a.mode == "build":
         build(a.scene, proj)
+        return
+    if a.mode == "maps":
+        for sid in (a.scene or scene_ids()):
+            write_map(sid)
         return
     a.scene = a.scene[0] if a.scene else None
     if a.mode == "music":
