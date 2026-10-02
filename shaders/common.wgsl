@@ -160,6 +160,10 @@ struct FrameUniforms {
     // (0 = the constant fogParams.rgb, and `fogSkyTex` is never read), y = the sky is drawn behind
     // the world, z = the distance at which the fog is fully the sky's colour. Mirrors FrameUniforms.
     fogSky: vec4<f32>,
+    // ADR-1070: x = 1 when the live background draws the procedural sky from these values rather
+    // than its cube, y = the sun's intensity, z = the sky's intensity, w = the sun disc's floor
+    // radius. Mirrors FrameUniforms; zero offline.
+    skyLive: vec4<f32>,
 };
 
 struct ObjectUniforms {

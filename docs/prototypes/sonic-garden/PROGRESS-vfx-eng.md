@@ -21,18 +21,24 @@ agent keeps its own notes. Worktree `../av-gen-sonic`, branch `proto/sonic-garde
   | `1ccc0404` | Help documents PageUp/PageDown (test_help caught the binding) |
   | `f5e72f9d` | ADR-1067: drums under a mix (the art agent's finding), its matrix as `[adr1067]` |
   | `e6978f28` | ADR-1068: a note is not a drum (arp/chords false hits), `[adr1068]` |
+  | `28347601` | the evaluator's four null-model fixes (IOI shifts plus a fixed-lag null, the full search in the null, Fisher z, the slow tier) |
+  | `8c9230df` | `response.*` in `--sonic-live-log`; the probe's `tour` program-change scenario |
+  | `f271fbc1` | ADR-1069: the `voronoiEdge` material op |
+  | (this commit) | ADR-1070: the live sky (background every frame, lighting at a capped rate spread across frames) |
 
   Every one was sent to the coordinator with its usage.
 - **State:** the engineer's deliverables 11-16, 18 and 19 are all in. ADR-1067/1068 rebuilt the detector after the
   art agent's measurements. Its full-mix kick, snare and hat recall meets the targets.
 - **Queue, in the coordinator's order:**
-  1. the evaluator's four biases (palette roles, a periodic null, the slow tier, resolution);
-  2. `response.*` in `--sonic-live-log`;
-  3. a probe program-change scenario;
-  4. a Voronoi F2-F1 material op;
-  5. (cosmetic) the Mask prepass;
-  6. the performance tiers;
-  7. FULL suites only at the final hand-back (the GPU rule: in between, targeted tags only, one job per lock).
+  1. items 1-4 of the previous queue are done (the evaluator biases, `response.*` in the live log, the probe tour,
+     `voronoiEdge`); the cosmetic Mask prepass was skipped as not small, and the coordinator has been told;
+  2. the performance tiers: ADR-1070 (the live sky) is in; next, the remaining measurements for the table below;
+  3. FULL suites only at the final hand-back (the GPU rule: in between, targeted tags only, one job per lock).
+- **Measuring live frame pacing:** the scratch script used for ADR-1070 launches `build/release/src/avgen --project
+  <p> --live --input BlackHole --sonic-live-log live.csv` plus `build/release/tools/avgen_sonic_probe demo --device
+  BlackHole`, under `tools/gpu-lock.sh`. It reads `frameNs` intervals and `presentNs - frameNs` (the frame's CPU
+  work). Freeze a copy of the project first: the art agent edits `examples/sonic-vfx/*` while you measure.
+  `tools/sonic_vfx/live.py --no-capture` does the same with the art agent's pinned engine.
 - **Measuring the drums:** `python3 tools/sonic_vfx/drum_recall.py --avgen $PWD/build/release/src/avgen`. Without
   `--avgen` it runs the art agent's pinned engine.
 - **If resuming:**
@@ -86,6 +92,19 @@ agent keeps its own notes. Worktree `../av-gen-sonic`, branch `proto/sonic-garde
   timers.
 - **Evaluator** (`0f809c90`): `tools/sonic_vfx_critic.py {measure, inputs, compare, trace, selftest}`. The example
   report is in `~/Desktop/av-gen-review/25-sonic-vfx/eng/critic-example-garden-perc.md`.
+- **ADR-1067/1068 drums under a mix** (`f5e72f9d`, `e6978f28`): the detector rebuilt on the percussive flux, a
+  noise-rise snare and a kick score with a kick-period comb; a snare or hat within 120 ms of a MIDI note-on is
+  dropped unless its drumness is 0.9 or more (`sonic.response.midiDrumness`). Matrices `[adr1067]`, `[adr1068]`.
+- **Evaluator null-model fixes** (`28347601`): IOI-aware shifts plus a fixed-lag null for regular trains, the full
+  search repeated in the null, Fisher z, and the slow tier (8 s high-pass, 1/3 s differences, lags 0-3 s).
+- **Live log and probe** (`8c9230df`): `--sonic-live-log` carries `response.*`; `avgen_sonic_probe tour` sends program
+  changes (`--scenes N`).
+- **ADR-1069 `voronoiEdge`** (`f271fbc1`): `{"op": "voronoiEdge", "a": r, "value": freq, "constant": [x,y,z,_],
+  "seed": n}` writes `vec4(F2 - F1, F1, cellHash, F2)`.
+- **ADR-1070 the live sky** (this commit): live only and on by default in the editor. `--live-sky-rate <hz>` sets the
+  lighting's rebuild cap (default 2; 0 = the ADR-233 deferral, the old behaviour). The background is drawn from the
+  frame's sky values; the IBL chain is spread across frames (`SceneRenderer::LiveSkyLighting{enabled, maxRateHz,
+  passBudget}`). Offline unchanged.
 - **Tools:** `tools/sonic_post_fx_sheet.py` makes a contact sheet of the effects on any project, or a cost table with
   `--bench`.
 
@@ -121,6 +140,14 @@ p50 is 21.56 ms at the default tier and 19.27 ms at Preview, with no effect on.
   `temporalHistoryScale` (0.25 at Preview, 0.5 at Realtime/High, 1.0 at Offline).
 - Tiers: Preview halves the tap counts (`postEffectTapScale`). Amounts, lengths and history lengths never change with
   the tier.
+
+**Live sky (ADR-1070), Salt Flat Mirage live, probe `demo` via BlackHole, no capture, 60 Hz, two interleaved runs an
+arm, from 2.5 s after start-up:**
+
+| arm | interval p99 | hitches (> 25 ms) | frame CPU work p99 | lighting builds |
+|---|---|---|---|---|
+| `--live-sky-rate 0` (before) | 33.80 / 33.96 ms | 62 / 71 | 14.45 / 14.24 ms | 120 blocking, 9 ms each |
+| default, 2 a second (after) | 17.13 / 17.23 ms | 0 / 0 | 5.73 / 5.87 ms | 51 spread across frames |
 
 **Detector accuracy (test kit: 16 bars, 124 BPM, kick, snare, hats, a saw bass and a pad):**
 

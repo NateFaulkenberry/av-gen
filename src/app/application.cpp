@@ -180,6 +180,9 @@ std::string usageText() {
            "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
            "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
            "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
+           "  --live-sky-rate <hz>  editor: the procedural sky's lighting rebuilds a second, at most, its\n"
+           "                      background drawn from the current sky every frame (ADR-1070; default 2,\n"
+           "                      0 = the ADR-233 deferral, the background from the lighting cube)\n"
            "  --live-capture <d>  with live Sonic input: every 2nd frame (--live-capture-every <n>) re-rendered\n"
            "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
            "                      review clip; costs frame time\n"
@@ -417,6 +420,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--live-capture-every");
             if (!v) return std::unexpected(v.error());
             options.liveCaptureEvery = std::max(1, std::atoi(v->c_str()));
+            ++i;
+        } else if (arg == "--live-sky-rate") {
+            auto v = need(i, "--live-sky-rate");
+            if (!v) return std::unexpected(v.error());
+            options.liveSkyRateHz = std::max(0.0, std::atof(v->c_str()));
             ++i;
         } else if (arg == "--sonic-live-log") {
             auto v = need(i, "--sonic-live-log");
@@ -4463,6 +4471,9 @@ int Application::runLive() {
     // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
     // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
     renderer_->setInteractiveEnvironmentBudget(2.0);
+    // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
+    // and rebuilds its lighting at a capped rate, spread across frames.
+    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
     // ---- the interleaved arms (--ui-ab) ---------------------------------------------------------
     //
     // One process, several interactions, cycled in blocks. The first `uiAbSettle` frames of a block
@@ -4520,6 +4531,8 @@ int Application::runLive() {
                     comp->setLegacyProceduralGeneration(spec.legacyProcGen);
                 }
                 renderer_->setInteractiveEnvironmentBudget(spec.eagerSky ? 0.0 : 2.0);
+                renderer_->setLiveSkyLighting(
+                    {.enabled = !spec.eagerSky && options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
                 // The seek deferral's before and after, as two blocks of one process. A shell loop
                 // over two builds would compare two runs, which §3 of
                 // docs/application-performance.md forbids, and on a machine whose load average
@@ -5623,6 +5636,11 @@ int Application::runLive() {
               static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, renderer_->stats().triangles,
               renderer_->stats().drawCalls);
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
+    if (renderer_ && renderer_->liveSkyBuilds() > 0) {
+        // ADR-1070: how often the live schedule rebuilt the sky's lighting, for a measurement to read.
+        log::info("live sky: {} lighting builds spread across frames (at most {:.1f} a second)",
+                  renderer_->liveSkyBuilds(), renderer_->liveSkyLighting().maxRateHz);
+    }
     if (uiScript_.failedChecks() > 0) {
         log::error("ui script: {} check(s) failed", uiScript_.failedChecks());
         return 8;

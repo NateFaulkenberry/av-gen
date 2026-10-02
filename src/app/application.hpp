@@ -290,6 +290,9 @@ struct AppOptions {
     bool startProjection = false;
     std::optional<std::string> midi;
     std::optional<std::string> sonicLiveLog;
+    // ADR-1070: the live sky's lighting rebuilds a second, at most (0 = the ADR-233 deferral alone,
+    // the behaviour before; the background then reads the cube).
+    double liveSkyRateHz = 2.0;
     // --live-capture <dir>: every Nth live frame re-rendered at a small size into <dir> as PPM, with frames.csv
     // (frame, host ns). For review clips of a live session; it costs frame time, so not in a latency run.
     std::optional<std::string> liveCapture;

@@ -594,6 +594,7 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
                 skyHash_ = 0;
                 skyDeferral_ = scene::RebuildDeferral{};
             }
+            skyJob_.reset();
             return;
         }
         const scene::SkyRuntime sky = scene::resolveSky(scene.environment.sky, scene.lights);
@@ -614,6 +615,15 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         // Routes through slow chains move it by parts per million a frame, and without this every
         // one of those frames paid the whole chain (about 20 ms at 1080p in the Sonic Garden).
         const bool sameSizes = envSettings.cubeSize == builtSkyCube_ && envSettings.prefilteredSize == builtSkyPrefiltered_;
+        // ADR-1070: live, once a sky exists at these sizes, the capped and amortised schedule owns
+        // it. A first sky, or a tier change, is built at once below: there is nothing to lag behind.
+        if (liveSky_.enabled && skyBuilt_ && ibl_.valid && sameSizes) {
+            if (serviceLiveSky(sky, hash, envSettings)) {
+                return;
+            }
+        } else {
+            skyJob_.reset();
+        }
         if (skyBuilt_ && ibl_.valid &&
             (hash == skyHash_ || (sameSizes && scene::skyWithinRebuildTolerance(builtSky_, sky)))) {
             skyDeferral_.deferring = false;
@@ -679,6 +689,7 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         builtSkyPrefiltered_ = envSettings.prefilteredSize;
         return;
     }
+    skyJob_.reset();
     if (&scene == environmentScene_ && scene.identity == environmentIdentity_ && id == environmentTexture_ &&
         scene.textureVersion == environmentVersion_) {
         return;
@@ -698,6 +709,58 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     environmentVersion_ = scene.textureVersion;
 }
 
+
+bool SceneRenderer::liveSkyBuildInFlight() const {
+    return skyJob_ && skyJob_->active();
+}
+
+// ADR-1070. One call a frame while the live schedule owns the sky. A build in flight takes its next
+// slice and, on its last, is swapped in; otherwise a sky past ADR-1022's tolerance of the one the
+// lighting was built from starts a build, at most `maxRateHz` times a second. Returns true always
+// (the blocking path never runs live once a sky exists); the bool is there so a caller that wants
+// the old path for a frame has one place to say so.
+bool SceneRenderer::serviceLiveSky(const scene::SkyRuntime& sky, std::uint64_t hash,
+                                   const EnvironmentSettings& settings) {
+    skyDeferral_.deferring = false;
+    if (skyJob_ && skyJob_->active()) {
+        if (environment_->advanceSky(*skyJob_, liveSky_.passBudget)) {
+            IblResources built = skyJob_->result;
+            if (!built.valid) {
+                log::error("procedural sky (live): the build raised GPU errors: {}", context_.lastError());
+                skyJob_.reset();
+                return true;
+            }
+            built.fromSky = true;
+            setIbl(built);
+            skyHash_ = skyJobHash_;
+            builtSky_ = skyJob_->sky;
+            ++liveSkyBuilds_;
+            skyJob_.reset();
+        }
+        return true;
+    }
+    if (hash == skyHash_ || scene::skyWithinRebuildTolerance(builtSky_, sky)) {
+        return true;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const double minGapMs = liveSky_.maxRateHz > 0.0 ? 1000.0 / liveSky_.maxRateHz : 0.0;
+    if (lastSkyJobStart_.time_since_epoch().count() != 0 &&
+        std::chrono::duration<double, std::milli>(now - lastSkyJobStart_).count() < minGapMs) {
+        return true;
+    }
+    if (!skyJob_) {
+        skyJob_ = std::make_unique<SkyBuildJob>();
+    }
+    if (auto r = environment_->beginSky(*skyJob_, sky, settings); !r) {
+        log::error("procedural sky (live): {}", r.error().message);
+        skyJob_.reset();
+        return true;
+    }
+    skyJobHash_ = hash;
+    lastSkyJobStart_ = now;
+    // The first slice this frame: a build that fits one budget swaps in on the frame it started.
+    return serviceLiveSky(sky, hash, settings);
+}
 
 // The froxel-build pass's uniform block (shaders/clusters.wgsl `ClusterParams`).
 namespace {
@@ -2972,6 +3035,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const bool analyticBackground =
             scene::skyBackgroundFor(scene.environment, ibl, skyIbl) == scene::SkyBackground::Analytic;
         frame.skySunRadiance = glm::vec4(resolved.sunColor, analyticBackground ? 1.0f : 0.0f);
+        // ADR-1070: live, the procedural sky's background is drawn from these values rather than
+        // from the cube the lighting schedule rebuilds at its capped rate. A blurred background
+        // (skyboxBlur > 0) is a prefiltered mip and stays on the cube.
+        const bool liveBackground = liveSky_.enabled && skyIbl && scene.environment.skyboxBlur <= 0.0f;
+        frame.skyLive = liveBackground
+                            ? glm::vec4(1.0f, resolved.sunIntensity, resolved.intensity,
+                                        1.5f * 1.5707963f / static_cast<float>(std::max(ibl_.sourceCubeSize, 1u)))
+                            : glm::vec4(0.0f);
     // ADR-379: the vortex's own light on what floats above it. Zero intensity when there is no
     // vortex, which is the gate the surface shader tests.
     // ADR-562: read out of the medium's packed lanes. The lane map is declared beside each kind's

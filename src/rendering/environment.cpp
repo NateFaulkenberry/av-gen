@@ -233,28 +233,44 @@ wgpu::TextureView cubeFaceView(const wgpu::Texture& texture, std::uint32_t face,
 }
 } // namespace
 
-Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceCube, const EnvironmentSettings& settings) {
-    auto irradiance = createCube(settings.irradianceSize, 1, "env-irradiance");
-    if (!irradiance) return std::unexpected(irradiance.error());
-    auto prefiltered = createCube(settings.prefilteredSize, settings.prefilteredMips, "env-prefiltered");
-    if (!prefiltered) return std::unexpected(prefiltered.error());
+void EnvironmentProcessor::addPass(SkyJob& job, const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
+                                   const wgpu::BindGroup& group, const EnvUniforms& uniforms, double cost) {
+    SkyJob::Pass pass;
+    pass.pipeline = &pipeline;
+    pass.target = target;
+    pass.group = group;
+    std::memcpy(pass.uniforms.data(), &uniforms, sizeof(uniforms));
+    pass.cost = cost;
+    job.totalCost += cost;
+    job.passes.push_back(std::move(pass));
+}
 
+void EnvironmentProcessor::encodePass(wgpu::CommandEncoder& encoder, const SkyJob::Pass& pass, std::uint32_t slot) {
+    EnvUniforms u{};
+    std::memcpy(&u, pass.uniforms.data(), sizeof(u));
+    runPass(encoder, *pass.pipeline, pass.target, pass.group, u, slot);
+}
+
+void EnvironmentProcessor::runBlocking(SkyJob& job) {
     std::uint32_t slot = 0;
     wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
-    auto flush = [&]() {
-        wgpu::CommandBuffer commands = encoder.Finish();
-        context_.queue().Submit(1, &commands);
-        context_.waitForQueue();
-        encoder = context_.device().CreateCommandEncoder();
-        slot = 0;
-    };
-    auto nextSlot = [&]() {
+    for (; job.next < job.passes.size(); ++job.next) {
         if (slot >= kUniformSlots) {
-            flush();
+            wgpu::CommandBuffer commands = encoder.Finish();
+            context_.queue().Submit(1, &commands);
+            context_.waitForQueue();
+            encoder = context_.device().CreateCommandEncoder();
+            slot = 0;
         }
-        return slot++;
-    };
+        encodePass(encoder, job.passes[job.next], slot++);
+    }
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context_.queue().Submit(1, &commands);
+    context_.waitForQueue();
+}
 
+void EnvironmentProcessor::recordFilter(SkyJob& job, const CubeTexture& sourceCube, const CubeTexture& irradiance,
+                                        const CubeTexture& prefiltered, const EnvironmentSettings& settings) {
     const wgpu::BindGroup cubeGroup = makeBindGroup(nullptr, sourceCube.cubeView);
     for (std::uint32_t face = 0; face < 6; ++face) {
         EnvUniforms u{};
@@ -262,12 +278,14 @@ Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceC
         u.sampleCount = settings.irradianceSamples;
         u.sourceMipCount = static_cast<float>(sourceCube.mips);
         u.sourceSize = static_cast<float>(sourceCube.size);
-        runPass(encoder, irradiancePipeline_, cubeFaceView(irradiance->texture, face, 0), cubeGroup, u, nextSlot());
+        addPass(job, irradiancePipeline_, cubeFaceView(irradiance.texture, face, 0), cubeGroup, u,
+                static_cast<double>(settings.irradianceSize) * settings.irradianceSize * settings.irradianceSamples);
     }
     for (std::uint32_t mip = 0; mip < settings.prefilteredMips; ++mip) {
         const float roughness = settings.prefilteredMips > 1
                                     ? static_cast<float>(mip) / static_cast<float>(settings.prefilteredMips - 1)
                                     : 0.0f;
+        const double size = std::max(settings.prefilteredSize >> mip, 1u);
         for (std::uint32_t face = 0; face < 6; ++face) {
             EnvUniforms u{};
             u.faceIndex = face;
@@ -276,19 +294,28 @@ Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceC
             u.roughness = roughness;
             u.sourceMipCount = static_cast<float>(sourceCube.mips);
             u.sourceSize = static_cast<float>(sourceCube.size);
-            runPass(encoder, prefilterPipeline_, cubeFaceView(prefiltered->texture, face, mip), cubeGroup, u,
-                    nextSlot());
+            addPass(job, prefilterPipeline_, cubeFaceView(prefiltered.texture, face, mip), cubeGroup, u,
+                    size * size * settings.prefilterSamples);
         }
     }
-    flush();
+    job.result = IblResources{};
+    job.result.irradiance = irradiance.cubeView;
+    job.result.prefiltered = prefiltered.cubeView;
+    job.result.brdfLut = brdf_.view;
+    job.result.prefilteredMips = settings.prefilteredMips;
+    job.result.sourceCubeSize = sourceCube.size;
+    job.result.prefilteredSize = settings.prefilteredSize;
+}
 
-    IblResources out;
-    out.irradiance = irradiance->cubeView;
-    out.prefiltered = prefiltered->cubeView;
-    out.brdfLut = brdf_.view;
-    out.prefilteredMips = settings.prefilteredMips;
-    out.sourceCubeSize = sourceCube.size;
-    out.prefilteredSize = settings.prefilteredSize;
+Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceCube, const EnvironmentSettings& settings) {
+    auto irradiance = createCube(settings.irradianceSize, 1, "env-irradiance");
+    if (!irradiance) return std::unexpected(irradiance.error());
+    auto prefiltered = createCube(settings.prefilteredSize, settings.prefilteredMips, "env-prefiltered");
+    if (!prefiltered) return std::unexpected(prefiltered.error());
+    SkyJob job;
+    recordFilter(job, sourceCube, *irradiance, *prefiltered, settings);
+    runBlocking(job);
+    IblResources out = job.result;
     out.valid = context_.errorCount() == 0;
     // The textures stay alive through the views the caller holds (a wgpu::TextureView keeps a
     // reference to its texture), exactly as the pre-ADR-036 code relied on.
@@ -365,19 +392,18 @@ Result<IblResources> EnvironmentProcessor::process(const scene::TextureData& equ
     return out;
 }
 
-Result<IblResources> EnvironmentProcessor::processSky(const scene::SkyRuntime& sky,
-                                                      const EnvironmentSettings& settings) {
-    if (!initialised_) {
-        return fail("environment processor not initialised");
-    }
-    const auto start = std::chrono::steady_clock::now();
-    gEnvironmentBuilds.fetch_add(1, std::memory_order_relaxed);
+Result<void> EnvironmentProcessor::recordSky(SkyJob& job, const scene::SkyRuntime& sky,
+                                             const EnvironmentSettings& settings) {
     if (auto r = ensureBrdf(settings); !r) {
         return std::unexpected(r.error());
     }
     const std::uint32_t cubeMips = gpu::mipLevelCount(settings.cubeSize, settings.cubeSize);
     auto sourceCube = createCube(settings.cubeSize, cubeMips, "env-sky-cube");
     if (!sourceCube) return std::unexpected(sourceCube.error());
+    auto irradiance = createCube(settings.irradianceSize, 1, "env-irradiance");
+    if (!irradiance) return std::unexpected(irradiance.error());
+    auto prefiltered = createCube(settings.prefilteredSize, settings.prefilteredMips, "env-prefiltered");
+    if (!prefiltered) return std::unexpected(prefiltered.error());
 
     EnvUniforms sky4{};
     sky4.skyZenith = glm::vec4(sky.zenithColor, sky.hazeWidth);
@@ -386,44 +412,87 @@ Result<IblResources> EnvironmentProcessor::processSky(const scene::SkyRuntime& s
     sky4.skySun = glm::vec4(sky.sunColor * sky.sunIntensity, sky.intensity);
     sky4.skySunDir = glm::vec4(sky.sunDirection, 0.0f);
 
-    std::uint32_t slot = 0;
-    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    job = SkyJob{};
+    job.sky = sky;
+    job.settings = settings;
     const wgpu::BindGroup skyGroup = makeBindGroup(nullptr, nullptr);
     for (std::uint32_t mip = 0; mip < cubeMips; ++mip) {
+        const std::uint32_t size = std::max(settings.cubeSize >> mip, 1u);
         for (std::uint32_t face = 0; face < 6; ++face) {
-            if (slot >= kUniformSlots) {
-                wgpu::CommandBuffer commands = encoder.Finish();
-                context_.queue().Submit(1, &commands);
-                context_.waitForQueue();
-                encoder = context_.device().CreateCommandEncoder();
-                slot = 0;
-            }
             EnvUniforms u = sky4;
             u.faceIndex = face;
             u.mipLevel = mip;
-            u.faceSize = static_cast<float>(std::max(settings.cubeSize >> mip, 1u));
-            runPass(encoder, skyPipeline_, cubeFaceView(sourceCube->texture, face, mip), skyGroup, u, slot++);
+            u.faceSize = static_cast<float>(size);
+            addPass(job, skyPipeline_, cubeFaceView(sourceCube->texture, face, mip), skyGroup, u,
+                    static_cast<double>(size) * size);
         }
     }
-    {
-        wgpu::CommandBuffer commands = encoder.Finish();
-        context_.queue().Submit(1, &commands);
-        context_.waitForQueue();
-    }
+    recordFilter(job, *sourceCube, *irradiance, *prefiltered, settings);
+    return {};
+}
 
-    auto out = filterCube(*sourceCube, settings);
-    if (!out) {
-        return out;
+Result<IblResources> EnvironmentProcessor::processSky(const scene::SkyRuntime& sky,
+                                                      const EnvironmentSettings& settings) {
+    if (!initialised_) {
+        return fail("environment processor not initialised");
     }
+    const auto start = std::chrono::steady_clock::now();
+    gEnvironmentBuilds.fetch_add(1, std::memory_order_relaxed);
+    SkyJob job;
+    if (auto r = recordSky(job, sky, settings); !r) {
+        return std::unexpected(r.error());
+    }
+    runBlocking(job);
+    IblResources out = job.result;
+    out.valid = context_.errorCount() == 0;
+    const std::uint32_t cubeMips = gpu::mipLevelCount(settings.cubeSize, settings.cubeSize);
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     log::info("procedural sky built in {:.1f} ms: cube {} ({} mips), irradiance {}, prefiltered {} x {} mips; "
               "sun ({:.2f}, {:.2f}, {:.2f})",
               ms, settings.cubeSize, cubeMips, settings.irradianceSize, settings.prefilteredSize,
               settings.prefilteredMips, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z);
-    if (!out->valid) {
+    if (!out.valid) {
         return fail("procedural sky processing raised GPU errors: {}", context_.lastError());
     }
     return out;
+}
+
+Result<void> EnvironmentProcessor::beginSky(SkyJob& job, const scene::SkyRuntime& sky,
+                                            const EnvironmentSettings& settings) {
+    if (!initialised_) {
+        return fail("environment processor not initialised");
+    }
+    gEnvironmentBuilds.fetch_add(1, std::memory_order_relaxed);
+    return recordSky(job, sky, settings);
+}
+
+bool EnvironmentProcessor::advanceSky(SkyJob& job, double budget) {
+    if (!job.active()) {
+        return !job.passes.empty();
+    }
+    std::uint32_t slot = 0;
+    double spent = 0.0;
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    while (job.next < job.passes.size() && (spent == 0.0 || spent + job.passes[job.next].cost <= budget)) {
+        if (slot >= kUniformSlots) {
+            // No wait: the uniform writes for the next batch are ordered after this submission on
+            // the queue timeline, so the passes already submitted read the values they were given.
+            wgpu::CommandBuffer commands = encoder.Finish();
+            context_.queue().Submit(1, &commands);
+            encoder = context_.device().CreateCommandEncoder();
+            slot = 0;
+        }
+        spent += job.passes[job.next].cost;
+        encodePass(encoder, job.passes[job.next], slot++);
+        ++job.next;
+    }
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context_.queue().Submit(1, &commands);
+    if (job.next < job.passes.size()) {
+        return false;
+    }
+    job.result.valid = context_.errorCount() == 0;
+    return true;
 }
 
 } // namespace avgen::rendering
