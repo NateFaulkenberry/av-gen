@@ -18,10 +18,23 @@ agent keeps its own notes. Worktree `../av-gen-sonic`, branch `proto/sonic-garde
   | `337903f0` | ADR-1065 (post glitch and display) and ADR-1066 (temporal feedback and slit-scan, temporal timers) |
   | `0f809c90` | the evaluator, `tools/sonic_vfx_critic.py` |
   | `d44d7c51` | a hidden detector benchmark |
+  | `1ccc0404` | Help documents PageUp/PageDown (test_help caught the binding) |
+  | `f5e72f9d` | ADR-1067: drums under a mix (the art agent's finding), its matrix as `[adr1067]` |
+  | `e6978f28` | ADR-1068: a note is not a drum (arp/chords false hits), `[adr1068]` |
 
   Every one was sent to the coordinator with its usage.
-- **State:** all of deliverables 11-16, 18 and 19 that are the engineer's are in. The final step is both full suites
-  under the lock (see "Suites" below for the result).
+- **State:** the engineer's deliverables 11-16, 18 and 19 are all in. ADR-1067/1068 rebuilt the detector after the
+  art agent's measurements. Its full-mix kick, snare and hat recall meets the targets.
+- **Queue, in the coordinator's order:**
+  1. the evaluator's four biases (palette roles, a periodic null, the slow tier, resolution);
+  2. `response.*` in `--sonic-live-log`;
+  3. a probe program-change scenario;
+  4. a Voronoi F2-F1 material op;
+  5. (cosmetic) the Mask prepass;
+  6. the performance tiers;
+  7. FULL suites only at the final hand-back (the GPU rule: in between, targeted tags only, one job per lock).
+- **Measuring the drums:** `python3 tools/sonic_vfx/drum_recall.py --avgen $PWD/build/release/src/avgen`. Without
+  `--avgen` it runs the art agent's pinned engine.
 - **If resuming:**
   1. Re-run the suites if the head moved.
   2. Restore the tracked `temporal-*.png` with `git checkout -- temporal-*.png` (the GPU suite rewrites them).
