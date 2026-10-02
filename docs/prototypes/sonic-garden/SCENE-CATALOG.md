@@ -820,19 +820,19 @@ music.
 | Event Horizon | void, an object at distance | DF lens, particles | arc | black / ember |
 | Breathing Deep | enclosed cavern, looking up | procedural, FXL, fog | push and tilt | teal-black / amber |
 | Tesla Choir | interior hall | arcs, discharge | low dolly | steel / violet-white |
-| Corrupted Cathedral | interior nave, one-point | SDF line look, mosh | walk | black / cyan / magenta |
+| Corrupted Cathedral | interior nave, one-point | SDF line look (nave and rose as two objects), mosh, split, sort | walk | black / cyan / magenta |
 | Ferrofluid Crown | macro studio | SDF smooth unions | locked macro | black / reflections |
 | Cymatic Plate | top-down plate | material program | rotation | black / bone |
 | Storm Cell | prairie | tornado, lightning, rain | static, low | green-grey |
-| Salt Flat Mirage | ultra-wide landscape | sky, shimmer | static | lavender / salt |
-| Stellar Nursery | volumetric pillars | fog banks, plasma | parallax | teal / rust / magenta |
-| Abyssal Bloom | underwater | tubes, bubbles | descent | blue-black / cyan |
-| Silk Theatre | stage | ribbons | orbit | crimson / gold |
+| Salt Flat Mirage | ultra-wide landscape | the palette-driven sky, Worley salt polygons, shimmer, meteors | static | lavender / salt |
+| Stellar Nursery | volumetric pillars | meshed SDF pillars, a painted nebula, star spheres | parallax | teal / rust / magenta |
+| Abyssal Bloom | underwater | lathed zooids and palps on a spline, a band program, rim-lit bells | descent | blue-black / cyan |
+| Silk Theatre | stage | a laid particle band (twisting), a spot in haze | orbit | crimson / gold |
 | Aurora Tundra | night landscape | aurora | pan up | navy / green / violet |
 | Ember Forest | forest | trunks, embers | tracking | soot / ember |
-| Lantern Lake | lake | particles, water | push | indigo / amber |
+| Lantern Lake | lake | particles and their twins, a built mirror with a ripple ring | push | indigo / amber |
 | Feedback Mirror | abstract | temporal feedback | static | violet / gold |
-| Datascape | data plane | SDF strips, text | glide | white on black / red |
+| Datascape | data plane | a cosine barcode program, text, post shock and tear | glide | white on black / red |
 
 The catalog's own measure of distinctness: no two scenes share more than one of space, technique, camera and palette
 family.
