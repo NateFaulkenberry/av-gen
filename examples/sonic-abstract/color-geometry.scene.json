@@ -29,20 +29,20 @@
    0.14413,
    0.32314
   ],
-  "volumeDensity": 0.022,
+  "volumeDensity": 0.007,
   "volumeMaxDistance": 110.0,
   "skyIntensity": 1.0,
   "sky": {
    "enabled": true,
    "zenithColor": [
-    0.02315,
-    0.00304,
-    0.04231
+    0.01033,
+    0.00182,
+    0.02122
    ],
    "horizonColor": [
-    0.19462,
-    0.0137,
-    0.14413
+    0.06848,
+    0.00518,
+    0.08022
    ],
    "groundColor": [
     0.00605,
@@ -132,9 +132,9 @@
                  {
                   "kind": "box",
                   "size": [
-                   1.25,
-                   0.035,
-                   0.7
+                   0.85,
+                   0.03,
+                   0.5
                   ]
                  }
                 ],
@@ -248,9 +248,9 @@
     0.89627,
     0.65837
    ],
-   "intensity": 26000.0,
+   "intensity": 9000.0,
    "range": 260.0,
-   "volumetric": 1.0,
+   "volumetric": 0.7,
    "castsShadow": false
   },
   {
@@ -267,9 +267,9 @@
     0.02624,
     0.25415
    ],
-   "intensity": 900.0,
+   "intensity": 300.0,
    "range": 60.0,
-   "volumetric": 0.6,
+   "volumetric": 0.4,
    "castsShadow": false
   },
   {
@@ -286,7 +286,7 @@
     0.63076,
     0.80695
    ],
-   "intensity": 0.6,
+   "intensity": 0.3,
    "castsShadow": false
   }
  ],
@@ -314,10 +314,10 @@
      "kind": "constant",
      "dst": 2,
      "constant": [
-      -0.006666666666666667,
-      -0.006666666666666667,
-      -0.006666666666666667,
-      -0.006666666666666667
+      -0.011111111111111112,
+      -0.011111111111111112,
+      -0.011111111111111112,
+      -0.011111111111111112
      ]
     },
     {
@@ -371,7 +371,7 @@
    "metallic": -1,
    "roughness": -1,
    "emission": 7,
-   "emissionIntensity": 0.55,
+   "emissionIntensity": 0.95,
    "opacity": -1
   }
  ]

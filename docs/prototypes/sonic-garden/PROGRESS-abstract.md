@@ -59,7 +59,14 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
    matching colour (the Sacred Geometry lattice takes the halo's colour to fade).
 4. **A per-instance phase for deformers** (a wave travelling across a distribution's instances): a field of slabs
    flipping in a stadium wave needs one node per row today.
-5. **The liveness audit for live projects**: a `sonic.live` project hears its input, but `--audit-routes` calls every
+5. **A BUG: a small uniform scale pops an object back to full size.** `Transform::fromMatrix` (`src/scene/scene.cpp`)
+   falls back to the identity (keeping only the position) when `glm::decompose` fails, and it fails when the composed
+   matrix's determinant is under float epsilon: a uniform scale below about 0.005 (0.001 cubed is 1e-9). Measured
+   2026-10-02 with four tori turned 90 degrees at scales 1, 0.1, 0.01 and 0.001 (a node scale or a distribution
+   transform): at 0.001 the torus drew at full size and unrotated. Any route or track that shrinks something toward
+   zero makes it jump to full size at the bottom; 0.001 is also the parameters' hard minimum, so a clamp lands on it.
+   Workaround here: park at 0.01, or hide under geometry.
+6. **The liveness audit for live projects**: a `sonic.live` project hears its input, but `--audit-routes` calls every
    `audio.*` and `beat.*` route dead because the project has no audio file.
 
 ## Engine facts learned this pass
@@ -76,6 +83,7 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   with amount 0 is a spin. Two local twists give a ring its spin and its opening about a diameter.
 - The route chain has `delayMs` (up to 4 s), which staggers one hit across nodes into a travelling wave.
 - `volumeMaxDistance: 0` with `volumeDensity` > 0 is analytic surface fog only (no march).
+- Parking an object at scale 0.001 does NOT hide it (engine need 5): it draws at full size, unrotated. Use 0.01.
 - A particle system and a procedural node with the same name collide: the particle parameters do not register
   (`particles/beads/burst` was unknown while a procedural `beads` existed).
 - Lights are steered by `lights/<id>/azimuth` and `elevation` (there is no direction parameter); the sky's colours are

@@ -127,7 +127,7 @@
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 32.0,
+  "camera/lens/focalLength": 30.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
@@ -907,32 +907,34 @@
   },
   {
    "source": "response.intensity",
-   "target": "nodes/blob4/scale",
-   "amount": 1.0,
+   "target": "nodes/blob4/position",
+   "amount": 3.4,
    "op": "add",
    "polarity": "unipolar",
+   "component": 1,
    "chain": {
     "threshold": "binary",
     "thresholdLevel": 0.5,
-    "attackMs": 300,
+    "attackMs": 250,
     "decayMs": 900,
     "springHz": 1.6,
-    "springDamping": 0.5
+    "springDamping": 0.45
    }
   },
   {
    "source": "response.intensity",
-   "target": "nodes/blob5/scale",
-   "amount": 1.0,
+   "target": "nodes/blob5/position",
+   "amount": 3.4,
    "op": "add",
    "polarity": "unipolar",
+   "component": 1,
    "chain": {
     "threshold": "binary",
     "thresholdLevel": 0.5,
-    "attackMs": 300,
+    "attackMs": 250,
     "decayMs": 900,
     "springHz": 1.6,
-    "springDamping": 0.5
+    "springDamping": 0.45
    }
   },
   {
@@ -1158,153 +1160,153 @@
      {
       "time": 0.0,
       "value": [
-       9.7617,
-       8.5,
-       22.9251
+       6.381,
+       5.2,
+       18.2985
       ],
       "interp": "smooth"
      },
      {
       "time": 5.625,
       "value": [
-       12.1829,
-       8.5,
-       21.6779
+       7.8802,
+       5.2,
+       17.6036
       ],
       "interp": "smooth"
      },
      {
       "time": 11.25,
       "value": [
-       14.1139,
-       8.5,
-       20.4113
+       9.0913,
+       5.2,
+       16.8994
       ],
       "interp": "smooth"
      },
      {
       "time": 16.875,
       "value": [
-       15.3323,
-       8.5,
-       19.464
+       9.8654,
+       5.2,
+       16.3727
       ],
       "interp": "smooth"
      },
      {
       "time": 22.5,
       "value": [
-       15.7454,
-       8.5,
-       19.113
+       10.1299,
+       5.2,
+       16.1775
       ],
       "interp": "smooth"
      },
      {
       "time": 28.125,
       "value": [
-       15.3323,
-       8.5,
-       19.464
+       9.8654,
+       5.2,
+       16.3727
       ],
       "interp": "smooth"
      },
      {
       "time": 33.75,
       "value": [
-       14.1139,
-       8.5,
-       20.4113
+       9.0913,
+       5.2,
+       16.8994
       ],
       "interp": "smooth"
      },
      {
       "time": 39.375,
       "value": [
-       12.1829,
-       8.5,
-       21.6779
+       7.8802,
+       5.2,
+       17.6036
       ],
       "interp": "smooth"
      },
      {
       "time": 45.0,
       "value": [
-       9.7617,
-       8.5,
-       22.9251
+       6.381,
+       5.2,
+       18.2985
       ],
       "interp": "smooth"
      },
      {
       "time": 50.625,
       "value": [
-       7.2147,
-       8.5,
-       23.8899
+       4.8199,
+       5.2,
+       18.84
       ],
       "interp": "smooth"
      },
      {
       "time": 56.25,
       "value": [
-       4.9814,
-       8.5,
-       24.4774
+       3.4595,
+       5.2,
+       19.1749
       ],
       "interp": "smooth"
      },
      {
       "time": 61.875,
       "value": [
-       3.4621,
-       8.5,
-       24.749
+       2.5368,
+       5.2,
+       19.3337
       ],
       "interp": "smooth"
      },
      {
       "time": 67.5,
       "value": [
-       2.9249,
-       8.5,
-       24.8211
+       2.2108,
+       5.2,
+       19.377
       ],
       "interp": "smooth"
      },
      {
       "time": 73.125,
       "value": [
-       3.4621,
-       8.5,
-       24.749
+       2.5368,
+       5.2,
+       19.3337
       ],
       "interp": "smooth"
      },
      {
       "time": 78.75,
       "value": [
-       4.9814,
-       8.5,
-       24.4774
+       3.4595,
+       5.2,
+       19.1749
       ],
       "interp": "smooth"
      },
      {
       "time": 84.375,
       "value": [
-       7.2147,
-       8.5,
-       23.8899
+       4.8199,
+       5.2,
+       18.84
       ],
       "interp": "smooth"
      },
      {
       "time": 90.0,
       "value": [
-       9.7617,
-       8.5,
-       22.9251
+       6.381,
+       5.2,
+       18.2985
       ],
       "interp": "smooth"
      }
@@ -1321,153 +1323,153 @@
      {
       "time": 0.0,
       "value": [
-       -1.0963,
-       2.8,
-       1.4881
+       -0.3563,
+       2.7,
+       3.2248
       ],
       "interp": "smooth"
      },
      {
       "time": 5.625,
       "value": [
-       -1.0339,
-       2.8,
-       1.6091
+       -0.331,
+       2.7,
+       3.2793
       ],
       "interp": "smooth"
      },
      {
       "time": 11.25,
       "value": [
-       -0.9706,
-       2.8,
-       1.7057
+       -0.3054,
+       2.7,
+       3.3233
       ],
       "interp": "smooth"
      },
      {
       "time": 16.875,
       "value": [
-       -0.9232,
-       2.8,
-       1.7666
+       -0.2863,
+       2.7,
+       3.3515
       ],
       "interp": "smooth"
      },
      {
       "time": 22.5,
       "value": [
-       -0.9057,
-       2.8,
-       1.7873
+       -0.2792,
+       2.7,
+       3.3611
       ],
       "interp": "smooth"
      },
      {
       "time": 28.125,
       "value": [
-       -0.9232,
-       2.8,
-       1.7666
+       -0.2863,
+       2.7,
+       3.3515
       ],
       "interp": "smooth"
      },
      {
       "time": 33.75,
       "value": [
-       -0.9706,
-       2.8,
-       1.7057
+       -0.3054,
+       2.7,
+       3.3233
       ],
       "interp": "smooth"
      },
      {
       "time": 39.375,
       "value": [
-       -1.0339,
-       2.8,
-       1.6091
+       -0.331,
+       2.7,
+       3.2793
       ],
       "interp": "smooth"
      },
      {
       "time": 45.0,
       "value": [
-       -1.0963,
-       2.8,
-       1.4881
+       -0.3563,
+       2.7,
+       3.2248
       ],
       "interp": "smooth"
      },
      {
       "time": 50.625,
       "value": [
-       -1.1445,
-       2.8,
-       1.3607
+       -0.376,
+       2.7,
+       3.168
       ],
       "interp": "smooth"
      },
      {
       "time": 56.25,
       "value": [
-       -1.1739,
-       2.8,
-       1.2491
+       -0.3882,
+       2.7,
+       3.1185
       ],
       "interp": "smooth"
      },
      {
       "time": 61.875,
       "value": [
-       -1.1874,
-       2.8,
-       1.1731
+       -0.394,
+       2.7,
+       3.085
       ],
       "interp": "smooth"
      },
      {
       "time": 67.5,
       "value": [
-       -1.1911,
-       2.8,
-       1.1462
+       -0.3955,
+       2.7,
+       3.0731
       ],
       "interp": "smooth"
      },
      {
       "time": 73.125,
       "value": [
-       -1.1874,
-       2.8,
-       1.1731
+       -0.394,
+       2.7,
+       3.085
       ],
       "interp": "smooth"
      },
      {
       "time": 78.75,
       "value": [
-       -1.1739,
-       2.8,
-       1.2491
+       -0.3882,
+       2.7,
+       3.1185
       ],
       "interp": "smooth"
      },
      {
       "time": 84.375,
       "value": [
-       -1.1445,
-       2.8,
-       1.3607
+       -0.376,
+       2.7,
+       3.168
       ],
       "interp": "smooth"
      },
      {
       "time": 90.0,
       "value": [
-       -1.0963,
-       2.8,
-       1.4881
+       -0.3563,
+       2.7,
+       3.2248
       ],
       "interp": "smooth"
      }

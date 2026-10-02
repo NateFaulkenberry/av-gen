@@ -288,7 +288,7 @@ def build():
                                       sides=6, segments=12), material=jelly(MINT, 0.5))
         s.proc("budPetals%d" % k, {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
                distribution={"kind": "radial", "count": 5, "radius": 0.11, "plane": "xz", "orientation": "outward"},
-               material=jelly(BUD_COLS[k], 1.4), transform=at(x - 0.04, h + 0.03, z, sc=(0.001, 0.001, 0.001)),
+               material=jelly(BUD_COLS[k], 1.4), transform=at(x - 0.04, h + 0.03, z, sc=(0.01, 0.01, 0.01)),
                extra={"sourceTransform": {"rotation": [-35.0, 0.0, 0.0], "scale": [0.45, 0.15, 1.0]}})
         s.proc("budHeart%d" % k, {"kind": "sphere", "radius": 0.06, "segments": 10, "rings": 6},
                material=jelly(PEACH, 1.0), transform=at(x - 0.04, h + 0.05, z))
@@ -323,7 +323,7 @@ def build():
     s.params_({"camera/lens/focalLength": 40.0, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.02,
                "post/tonemap/operator": 3, "post/dof/enabled": True, "post/dof/physical": True,
-               "post/dof/maxRadius": 18.0, "camera/lens/aperture": 1.6, "camera/focus/mode": 0,
+               "post/dof/maxRadius": 26.0, "camera/lens/aperture": 0.9, "camera/focus/mode": 0,
                "camera/lens/focusDistance": round(focus, 3)})
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 30.0, "orbitSpeed": 0.0}
     s.drift_camera(cam, tgt, period=48.0, amp=(0.35, 0.08, 0.15), tamp=(0.12, 0.05, 0.0))

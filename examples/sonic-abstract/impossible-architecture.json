@@ -144,8 +144,8 @@
   "post/outline/depthThreshold": 0.05,
   "post/outline/normalThreshold": 0.35,
   "post/outline/objectEdges": 1.0,
-  "post/outline/fadeStart": 25.0,
-  "post/outline/fadeEnd": 70.0
+  "post/outline/fadeStart": 14.0,
+  "post/outline/fadeEnd": 42.0
  },
  "sources": [
   {

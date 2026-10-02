@@ -37,7 +37,7 @@ APOTHEM = 4.2          # the portal opening's inradius
 FRAME = 1.1            # the frame's width (radial)
 DEPTH = 0.55           # the frame's thickness along the corridor (half)
 SIDES = 4              # the portal's polygon order at rest
-HUE_PERIOD = 150.0     # metres for a full turn of the colour wheel
+HUE_PERIOD = 90.0      # metres for a full turn of the colour wheel
 TRAVEL_PERIOD = 2.6    # seconds for the corridor to advance one spacing (3.5 m/s)
 
 DESIGN = {
@@ -82,7 +82,7 @@ def corridor():
     slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge), name="slab"))
     portal = sd_polar(SIDES, slab, name="polygon")
     # a floating card in each bay, tilted, off-axis: the slabs that cross the space
-    card = sd_move((1.9, SPACING * 0.28, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((1.25, 0.035, 0.7)), name="card"),
+    card = sd_move((1.9, SPACING * 0.28, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((0.85, 0.03, 0.5)), name="card"),
                    m=0)
     cell = sd_union(portal, card)
     rep = sd_repeat((0.0, SPACING, 0.0), cell, count=0, name="accordion")
@@ -104,7 +104,7 @@ def colour_program():
             {"kind": "gradient", "dst": 6, "srcA": 5, "constant": [0.35, 0.8, -0.45, 0.62], "value": 0.42},
             {"kind": "multiply", "dst": 7, "srcA": 4, "srcB": 6},
         ],
-        "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.55, "opacity": -1,
+        "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.95, "opacity": -1,
     }
 
 
@@ -157,9 +157,9 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.0,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(HAZE), "fogColor": hexrgb("#ff6a9a"), "volumeDensity": 0.022,
+        "intensity": 0.0, "background": hexrgb(HAZE), "fogColor": hexrgb("#ff6a9a"), "volumeDensity": 0.007,
         "volumeMaxDistance": 110.0, "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb("#2a0a3a"), "horizonColor": hexrgb("#7a1f6a"),
+        "sky": {"enabled": True, "zenithColor": hexrgb("#1a0628"), "horizonColor": hexrgb("#4a1050"),
                 "groundColor": hexrgb("#12052a"), "haze": 0.5, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
@@ -175,11 +175,11 @@ def build():
           position=(0.0, 0.0, 0.0), rotation=(-90.0, 0.0, 0.0), max_steps=96, epsilon=0.0008, step_scale=0.85,
           max_distance=130.0)
     # the light at the end, and a magenta fill behind the viewer: they colour the haze
-    s.light("end", "point", position=[0.0, 0.0, -118.0], color=hexrgb(LIGHT), intensity=26000.0, range=260.0,
-            volumetric=1.0, castsShadow=False)
-    s.light("near", "point", position=[0.0, 1.0, 14.0], color=hexrgb(MAGENTA), intensity=900.0, range=60.0,
-            volumetric=0.6, castsShadow=False)
-    s.light("fill", "directional", direction=[-0.3, -0.6, -0.7], color=hexrgb("#ffd0e8"), intensity=0.6,
+    s.light("end", "point", position=[0.0, 0.0, -118.0], color=hexrgb(LIGHT), intensity=9000.0, range=260.0,
+            volumetric=0.7, castsShadow=False)
+    s.light("near", "point", position=[0.0, 1.0, 14.0], color=hexrgb(MAGENTA), intensity=300.0, range=60.0,
+            volumetric=0.4, castsShadow=False)
+    s.light("fill", "directional", direction=[-0.3, -0.6, -0.7], color=hexrgb("#ffd0e8"), intensity=0.3,
             castsShadow=False)
 
     # the flow: the corridor advances one spacing per TRAVEL_PERIOD, a seamless sawtooth

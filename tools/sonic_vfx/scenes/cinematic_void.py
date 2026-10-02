@@ -136,10 +136,10 @@ def build():
     elev = math.atan2(RING_C[1] - CAM1[1], -(RING_C[2] - CAM1[2]))
     sun_dir = [0.0, -math.sin(elev), math.cos(elev)]          # travelling toward the camera, slightly down
     s.environment = {
-        "intensity": 0.35, "background": hexrgb(TEAL), "fogColor": hexrgb("#c46a2a"), "volumeDensity": 0.0016,
+        "intensity": 0.35, "background": hexrgb(TEAL), "fogColor": hexrgb("#c46a2a"), "volumeDensity": 0.00032,
         "volumeMaxDistance": 1400.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(TEAL), "horizonColor": hexrgb(AMBER),
-                "groundColor": hexrgb("#3a1e12"), "haze": 0.22, "sunIntensity": 26.0, "sunGlow": 0.06,
+                "groundColor": hexrgb("#3a1e12"), "haze": 0.3, "sunIntensity": 18.0, "sunGlow": 0.05,
                 "intensity": 1.0, "background": True, "useKeyLight": True},
     }
     s.light("sun", "directional", direction=sun_dir, color=hexrgb(AMBER_PALE), intensity=6.0, castsShadow=False,

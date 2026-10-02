@@ -32,7 +32,7 @@ SPACING = 2.2          # metres between rows
 GROUPS = [             # (name, nearest z, rows, line radius, line intensity)
     ("near", 2.0, 16, 0.022, 2.2),
     ("mid", 2.0 - 16 * SPACING, 22, 0.034, 1.9),
-    ("far", 2.0 - 38 * SPACING, 30, 0.06, 1.5),
+    ("far", 2.0 - 38 * SPACING, 30, 0.05, 0.9),
 ]
 CAM = [0.0, 6.5, 14.0]
 
@@ -261,12 +261,12 @@ def build():
     tri_pos = [-26.0, 9.0, -75.0]
     s.proc("block", {"kind": "cylinder", "radius": 13.0, "height": 0.2, "radialSegments": 3, "caps": True},
            material=accent_mat(MAGENTA, 1.6),
-           transform={"position": tri_pos, "rotation": [90.0, 0.0, 30.0], "scale": [1, 1, 1]})
+           transform={"position": tri_pos, "rotation": [90.0, 0.0, 90.0], "scale": [1, 1, 1]})
     s.proc("blockEdge", {"kind": "torus", "majorRadius": 15.0, "minorRadius": 0.16, "majorSegments": 3,
                          "minorSegments": 4},
            material=line_mat(3.0),
            transform={"position": [tri_pos[0] + 1.2, tri_pos[1] + 1.0, tri_pos[2] + 0.6],
-                      "rotation": [90.0, 0.0, 30.0], "scale": [1, 1, 1]})
+                      "rotation": [90.0, 0.0, 90.0], "scale": [1, 1, 1]})
 
     # ---- camera: low and level, looking down the plain; the horizon on the upper third
     focal = 28.0
@@ -282,7 +282,9 @@ def build():
                                             {"time": 600.0, "value": [0.0, 0.0, 600.0 * speed], "interp": "linear"}],
                 loop=600.0)
 
-    # ---- construction: three flat shapes the snare builds (scale 0 at rest), each a different accent shape
+    # ---- construction: three flat shapes the snare builds, PARKED at scale 0.01 at rest (not 0.001: below a uniform
+    # scale of about 0.005 the composed transform's determinant is under float epsilon, glm::decompose fails and the
+    # object pops back to full size, unrotated), each a different accent shape
     for name, src, pos, rot, col in (
             ("buildBar", {"kind": "box", "size": [26.0, 3.2, 0.2], "subdivisions": 1}, [14.0, 26.0, -95.0],
              [0.0, 0.0, -12.0], YELLOW),
@@ -291,7 +293,7 @@ def build():
             ("buildDisc", {"kind": "torus", "majorRadius": 7.0, "minorRadius": 0.5, "majorSegments": 96,
                            "minorSegments": 4}, [-44.0, 22.0, -105.0], [90.0, 0.0, 0.0], MAGENTA)):
         s.proc(name, src, material=accent_mat(col, 1.6),
-               transform={"position": pos, "rotation": rot, "scale": [0.001, 0.001, 0.001]})
+               transform={"position": pos, "rotation": rot, "scale": [0.01, 0.01, 0.01]})   # see PARKED below
 
     instrument(s)
     s.region("peaks", box=[0.38, 0.35, 0.62, 0.75])

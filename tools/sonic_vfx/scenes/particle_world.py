@@ -184,14 +184,14 @@ def build():
 
     # ---- the halo: faint dust curtains, a wide disc of large soft points that orbits
     s.particles("halo", capacity=9000, seed=21, shape="disc", position=[0.0, 0.0, 0.0], extent=[15.0, 0.6, 15.0],
-                direction=[0, 1, 0], spawnRate=1500.0, lifetimeMin=5.0, lifetimeMax=8.0, spread=1.0, speedMin=0.0,
+                direction=[0, 1, 0], spawnRate=1100.0, lifetimeMin=5.0, lifetimeMax=8.0, spread=1.0, speedMin=0.0,
                 speedMax=0.1, gravity=[0, 0, 0], drag=0.2, turbulence=0.25, turbulenceScale=0.15,
                 turbulenceSpeed=0.1, attractorPosition=[0, 0, 0], attractorStrength=0.02, attractorRadius=20.0,
-                orbit=0.35, sizeStart=0.3, sizeEnd=0.5, sizeVariance=0.6, colorStart=hexrgb("#3b2a9a") + [0.0],
+                orbit=0.35, sizeStart=0.16, sizeEnd=0.26, sizeVariance=0.6, colorStart=hexrgb("#3b2a9a") + [0.0],
                 colorEnd=hexrgb(CYAN) + [0.0],
                 colorCurve=[{"t": 0.0, "color": hexrgb("#4a2ab8")}, {"t": 0.5, "color": hexrgb("#2b6bff")},
                             {"t": 1.0, "color": hexrgb("#ff3fb4")}],
-                opacityCurve=[{"t": 0.0, "value": 0.0}, {"t": 0.3, "value": 0.16}, {"t": 0.7, "value": 0.16},
+                opacityCurve=[{"t": 0.0, "value": 0.0}, {"t": 0.3, "value": 0.1}, {"t": 0.7, "value": 0.1},
                               {"t": 1.0, "value": 0.0}], emissive=1.2, blend="additive")
 
     # ---- the stream: points flung from the rim, arcing over toward the camera's side and falling back
@@ -250,8 +250,8 @@ def build():
                "temporal/feedback/enabled": True, "temporal/feedback/frames": 10, "temporal/feedback/amount": 0.9,
                "temporal/feedback/decay": 0.72, "temporal/feedback/zoom": 1.0, "temporal/feedback/rotate": 0.0,
                "temporal/feedback/hue": 0.0})
-    s.arc_camera([0.0, 0.0, 0.0], radius=19.0, height=8.2, period=120.0, centre_deg=20.0, sweep_deg=60.0,
-                 side=-2.4, lift=-0.8)
+    s.arc_camera([0.0, 0.0, 0.0], radius=22.0, height=9.5, period=120.0, centre_deg=20.0, sweep_deg=60.0,
+                 side=-2.8, lift=-1.2)
     cu, cv, _ = s.project([0.0, 0.0, 0.0])
     s.params_({"post/shock/radius": 1.0, "post/shock/width": 0.06, "post/shock/chroma": 0.6,
                "post/shock/centerX": round(cu, 3), "post/shock/centerY": round(cv, 3)})

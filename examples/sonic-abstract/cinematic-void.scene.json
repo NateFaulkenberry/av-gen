@@ -29,7 +29,7 @@
    0.14413,
    0.02315
   ],
-  "volumeDensity": 0.0016,
+  "volumeDensity": 0.00032,
   "volumeMaxDistance": 1400.0,
   "skyIntensity": 1.0,
   "sky": {
@@ -49,9 +49,9 @@
     0.01298,
     0.00605
    ],
-   "haze": 0.22,
-   "sunIntensity": 26.0,
-   "sunGlow": 0.06,
+   "haze": 0.3,
+   "sunIntensity": 18.0,
+   "sunGlow": 0.05,
    "intensity": 1.0,
    "background": true,
    "useKeyLight": true

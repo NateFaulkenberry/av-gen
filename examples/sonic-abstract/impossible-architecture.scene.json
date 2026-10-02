@@ -18,7 +18,7 @@
   "orbitSpeed": 0.0
  },
  "environment": {
-  "intensity": 0.35,
+  "intensity": 0.45,
   "background": [
    0.0137,
    0.15896,
@@ -29,7 +29,7 @@
    0.48515,
    0.25415
   ],
-  "volumeDensity": 0.03,
+  "volumeDensity": 0.042,
   "volumeMaxDistance": 0.0,
   "skyIntensity": 1.0,
   "sky": {
@@ -526,11 +526,11 @@
       "softness": 0.02,
       "terminator": 0.0,
       "shadowColor": [
-       0.42,
-       0.52,
-       0.62
+       0.5,
+       0.62,
+       0.74
       ],
-      "ambient": 0.62,
+      "ambient": 0.72,
       "rimWidth": 0.0,
       "specular": 0.0
      }
@@ -650,7 +650,7 @@
     0.63076,
     0.25415
    ],
-   "intensity": 3.0,
+   "intensity": 4.6,
    "castsShadow": false
   },
   {

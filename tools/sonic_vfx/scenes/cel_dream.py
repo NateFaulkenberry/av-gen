@@ -21,7 +21,7 @@ TITLE = "Cel-Shaded Dream World"
 
 SKY_TOP = "#ff8fc0"
 SKY_HORIZON = "#ffd6b4"
-VOID = "#c4a6ff"
+VOID = "#ffc4d6"
 LAWN = "#8ff0c0"
 ROCK = "#b9a3ff"
 ROCK_DARK = "#8f78e8"
@@ -122,6 +122,7 @@ def creature(s, name, pos, body_col, facing=0.0, scale=1.0):
 
 
 CREATURES = ("blob1", "blob2", "blob3")
+HIDE_DEPTH = 3.4      # how far under the lawn the extra creatures wait
 EXTRA = ("blob4", "blob5")
 RAINBOW = ["#ff9aa8", "#ffc38a", "#fff09a", "#a8f0b8", "#9ad4ff", "#c8a8ff"]
 
@@ -163,10 +164,10 @@ def instrument(s):
     # ---- TEMPO: everyone bobs on the beat
     for name in CREATURES + EXTRA:
         s.route(R("beat", N % name + "position", 0.1, comp=1, attackMs=0, decayMs=200))
-    # ---- INTENSITY: STRUCTURE -- two more creatures join as the piece builds
+    # ---- INTENSITY: STRUCTURE -- two more creatures pop up out of the lawn and join as the piece builds
     for name in EXTRA:
-        s.route(R("intensity", N % name + "scale", 1.0, threshold="binary", thresholdLevel=0.5, attackMs=300,
-                  decayMs=900, springHz=1.6, springDamping=0.5))
+        s.route(R("intensity", N % name + "position", HIDE_DEPTH, comp=1, threshold="binary", thresholdLevel=0.5,
+                  attackMs=250, decayMs=900, springHz=1.6, springDamping=0.45))
     # ---- MIDI: the creature at the pitch's place sings (low left, high right): its mouth opens and it lifts;
     # STRUCTURE: as many lawn flowers bloom as there are notes in the chord; a held note raises the rainbow
     for k, name in enumerate(CREATURES):
@@ -200,9 +201,9 @@ def build():
 
     # ---- the island and its far siblings
     island(s, "isle", (0.0, 0.0, 0.0), 1.0)
-    island(s, "farA", (27.0, 7.0, -34.0), 0.42, lawn="#a9f5cf", rock="#cbb8ff")
-    island(s, "farB", (-31.0, 11.0, -52.0), 0.3, lawn="#b8f7d8", rock="#d4c4ff")
-    island(s, "farC", (40.0, -6.0, -70.0), 0.25, lawn="#b8f7d8", rock="#d4c4ff")
+    island(s, "farA", (-17.0, 7.5, -24.0), 0.38, lawn="#a9f5cf", rock="#cbb8ff")
+    island(s, "farB", (19.0, 11.0, -36.0), 0.3, lawn="#b8f7d8", rock="#d4c4ff")
+    island(s, "farC", (4.0, -6.5, -48.0), 0.24, lawn="#b8f7d8", rock="#d4c4ff")
 
     # ---- the giant flower (left of centre, behind the creatures): a curved stem, eight petals, a butter heart
     stem = {"kind": "tube", "tubeRadius": 0.22, "tubeTaper": 0.7, "tubeSides": 7, "tubeSegments": 20,
@@ -264,8 +265,10 @@ def build():
 
     # ---- extra creatures that join as a piece builds (scale 0 at rest), small lawn flowers (one per chord voice),
     # a rainbow behind the island for held notes (scale 0 at rest)
+    # (the extra creatures wait under the lawn, full size, and rise out of it: parking at a tiny scale fails below about
+    # 0.005, where the composed transform's determinant is under float epsilon and the object pops back to full size)
     for name, x, z, col, face in (("blob4", -0.9, 2.2, PINK, 26.0), ("blob5", 4.2, 2.6, "#9ff0d0", 12.0)):
-        creature(s, name, (x, 0.95, z), col, facing=face, scale=0.001)
+        creature(s, name, (x, 0.95 - HIDE_DEPTH, z), col, facing=face)
     tulip_dist = {"kind": "radial", "count": 3, "radius": 7.2, "plane": "xz", "orientation": "outward",
                   "startAngle": 0.6, "endAngle": 2.9}
     s.proc("tulipStems", cyl(0.05, 0.7, 6), distribution=tulip_dist, material=toon(MINT_DARK),
@@ -276,7 +279,7 @@ def build():
         s.proc("rainbow%d" % k, {"kind": "torus", "majorRadius": 9.0 - 0.42 * k, "minorRadius": 0.2,
                                  "majorSegments": 64, "minorSegments": 6},
                material=toon(col, bands=1, ambient=0.9, emissive=0.25),
-               transform={"position": [0.0, -0.4, -3.5], "rotation": [90.0, 0.0, 0.0], "scale": [0.001, 0.001, 0.001]})
+               transform={"position": [0.0, -0.4, -3.5], "rotation": [90.0, 0.0, 0.0], "scale": [0.01, 0.01, 0.01]})
 
     # ---- confetti (the snare) and sparkles (the hats) from the flower
     s.particles("confetti", capacity=2000, seed=19, shape="sphere", position=list(head), extent=[0.4, 0.4, 0.4],
@@ -295,14 +298,14 @@ def build():
     instrument(s)
 
     # ---- camera: a slow arc round the diorama from slightly above; the creatures and flower left of centre
-    focal = 32.0
-    focus = [0.0, 2.2, 1.0]
+    focal = 30.0
+    focus = [0.2, 2.3, 3.0]
     s.params_({"camera/lens/focalLength": focal, "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.4,
                "post/output/vignette": 0.18, "post/output/grain": 0.0, "post/tonemap/operator": 4,
                "post/outline/amount": 1.0, "post/outline/color": hexrgb(PLUM), "post/outline/intensity": 1.0,
                "post/outline/width": 2.2, "post/outline/depthThreshold": 0.06,
                "post/outline/normalThreshold": 0.4, "post/outline/objectEdges": 1.0})
-    s.arc_camera(focus, radius=24.0, height=8.5, period=90.0, centre_deg=24.0, sweep_deg=34.0, side=1.2, lift=0.6)
+    s.arc_camera(focus, radius=16.5, height=5.2, period=90.0, centre_deg=22.0, sweep_deg=30.0, side=0.6, lift=0.4)
     s.region("creatures", box=[0.3, 0.45, 0.7, 0.8])
     s.region("flower", box=[0.25, 0.1, 0.5, 0.45])
     return s

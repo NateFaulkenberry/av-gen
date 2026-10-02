@@ -748,7 +748,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 0.06,
+     "tubeRadius": 0.05,
      "tubeTaper": 1.0,
      "tubeSides": 4,
      "tubeSegments": 320,
@@ -801,7 +801,7 @@
       0.90466,
       0.87137
      ],
-     "emissiveIntensity": 1.5,
+     "emissiveIntensity": 0.9,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true,
@@ -1450,7 +1450,7 @@
      "rotation": [
       90.0,
       0.0,
-      30.0
+      90.0
      ],
      "scale": [
       1,
@@ -1499,7 +1499,7 @@
      "rotation": [
       90.0,
       0.0,
-      30.0
+      90.0
      ],
      "scale": [
       1,
@@ -1553,9 +1553,9 @@
       -12.0
      ],
      "scale": [
-      0.001,
-      0.001,
-      0.001
+      0.01,
+      0.01,
+      0.01
      ]
     },
     "material": {
@@ -1604,9 +1604,9 @@
       45.0
      ],
      "scale": [
-      0.001,
-      0.001,
-      0.001
+      0.01,
+      0.01,
+      0.01
      ]
     },
     "material": {
@@ -1653,9 +1653,9 @@
       0.0
      ],
      "scale": [
-      0.001,
-      0.001,
-      0.001
+      0.01,
+      0.01,
+      0.01
      ]
     },
     "material": {

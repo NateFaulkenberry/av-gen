@@ -5,14 +5,14 @@
  "camera": {
   "mode": 1,
   "position": [
-   6.4984,
-   8.2,
-   17.8542
+   7.5244,
+   9.5,
+   20.6732
   ],
   "target": [
-   2.2553,
-   -0.8,
-   -0.8208
+   2.6311,
+   -1.2,
+   -0.9577
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -756,7 +756,7 @@
      1,
      0
     ],
-    "spawnRate": 1500.0,
+    "spawnRate": 1100.0,
     "lifetimeMin": 5.0,
     "lifetimeMax": 8.0,
     "spread": 1.0,
@@ -779,8 +779,8 @@
     "attractorStrength": 0.02,
     "attractorRadius": 20.0,
     "orbit": 0.35,
-    "sizeStart": 0.3,
-    "sizeEnd": 0.5,
+    "sizeStart": 0.16,
+    "sizeEnd": 0.26,
     "sizeVariance": 0.6,
     "colorStart": [
      0.04374,
@@ -827,11 +827,11 @@
      },
      {
       "t": 0.3,
-      "value": 0.16
+      "value": 0.1
      },
      {
       "t": 0.7,
-      "value": 0.16
+      "value": 0.1
      },
      {
       "t": 1.0,

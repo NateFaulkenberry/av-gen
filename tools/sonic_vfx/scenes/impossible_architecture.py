@@ -161,7 +161,7 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.35, "background": hexrgb(SKY), "fogColor": hexrgb(HAZE), "volumeDensity": 0.03,
+        "intensity": 0.45, "background": hexrgb(SKY), "fogColor": hexrgb(HAZE), "volumeDensity": 0.042,
         "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(SKY_TOP), "horizonColor": hexrgb(SKY),
                 "groundColor": hexrgb("#0a2a2a"), "haze": 0.4, "sunIntensity": 0.0, "intensity": 1.0,
@@ -170,7 +170,7 @@ def build():
     sun_dir = [0.62, -0.42, -0.66]
     n = math.sqrt(sum(c * c for c in sun_dir))
     sun_dir = [c / n for c in sun_dir]
-    s.light("sun", "directional", direction=sun_dir, color=hexrgb(SUN), intensity=3.0, castsShadow=False)
+    s.light("sun", "directional", direction=sun_dir, color=hexrgb(SUN), intensity=4.6, castsShadow=False)
     s.light("sky", "directional", direction=[-0.3, 0.8, 0.5], color=hexrgb("#7fd0c8"), intensity=0.5,
             castsShadow=False)
     surfaces = [{"color": hexrgb(CREAM)}, {"color": hexrgb(TERRACOTTA)}, {"color": hexrgb(OCHRE)},
@@ -181,8 +181,8 @@ def build():
                 "shadowDirection": [-c for c in sun_dir], "shadowSteps": SHADOW_STEPS},
           material={"baseColor": [1, 1, 1], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 0.8,
                     "metallic": 0.0,
-                    "toon": {"bands": 2, "softness": 0.02, "terminator": 0.0, "shadowColor": [0.42, 0.52, 0.62],
-                             "ambient": 0.62, "rimWidth": 0.0, "specular": 0.0}},
+                    "toon": {"bands": 2, "softness": 0.02, "terminator": 0.0, "shadowColor": [0.5, 0.62, 0.74],
+                             "ambient": 0.72, "rimWidth": 0.0, "specular": 0.0}},
           max_steps=MAX_STEPS, epsilon=0.0012, step_scale=0.9, max_distance=REACH)
 
     # the world turns slowly about the view axis (a full turn in four minutes)
@@ -194,7 +194,7 @@ def build():
                "post/output/vignette": 0.4, "post/output/grain": 0.02, "post/tonemap/operator": 3,
                "post/outline/amount": 1.0, "post/outline/color": hexrgb(INK), "post/outline/intensity": 1.0,
                "post/outline/width": 1.6, "post/outline/depthThreshold": 0.05, "post/outline/normalThreshold": 0.35,
-               "post/outline/objectEdges": 1.0, "post/outline/fadeStart": 25.0, "post/outline/fadeEnd": 70.0})
+               "post/outline/objectEdges": 1.0, "post/outline/fadeStart": 14.0, "post/outline/fadeEnd": 42.0})
     cam = [2.3, 1.1, 8.6]
     tgt = [-6.0, -2.0, -14.0]
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 50.0, "orbitSpeed": 0.0}
