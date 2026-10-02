@@ -1,0 +1,1884 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "ferrofluid-crown.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.22,
+  "post/bloom/threshold": 1.1,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.6,
+  "post/output/grain": 0.012,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.4,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 58.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.15,
+  "post/grade/saturation": 0.85,
+  "post/lens/chromaticAberration": 0.01,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "camera/lens/aperture": 4.0,
+  "camera/focus/mode": 0,
+  "camera/lens/focusDistance": 6.9
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sp0_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.5952380952380958,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp1_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.804761904761905,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp2_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.014285714285715,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp3_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.223809523809525,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp4_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.433333333333334,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp5_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.6428571428571437,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp6_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -2.8523809523809533,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp7_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.061904761904763,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp8_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.2714285714285727,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp9_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.4809523809523824,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp10_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.6904761904761916,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "sp11_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.9000000000000004,
+      "gain": 6.547619047619049
+     },
+     {
+      "name": "anyHeld",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.active",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "crown",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.chord",
+        "weight": 0.6
+       }
+      ]
+     },
+     {
+      "name": "unrest",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.tension",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.roughness",
+        "weight": 0.6
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sp0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp3_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp3_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp3_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp3_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp4_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp4_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp4_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp4_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp5_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp5_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp5_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp5_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp6_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp6_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp6_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp6_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp7_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp7_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp7_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp7_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp8_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp8_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp8_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp8_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp9_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp9_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp9_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp9_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp10_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp10_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp10_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp10_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp11_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp11_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     },
+     {
+      "name": "sp11_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sp11_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.2459893048128334,
+      "gain": 4.491978609625667
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sp0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp0_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp0_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp1_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp1_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp2_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp2_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp3_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp3_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp3_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp4_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp4_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp4_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp5_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp5_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp5_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp6_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp6_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp6_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp7",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp7_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp7_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit7",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp7_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp7_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp8",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp8_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp8_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit8",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp8_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp8_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp9",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp9_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp9_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit9",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp9_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp9_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp10",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp10_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp10_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit10",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp10_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp10_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sp11",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp11_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp11_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHit11",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp11_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sp11_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp0",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp1",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp2",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld3",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp3",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld4",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp4",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld5",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp5",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld6",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp6",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld7",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp7",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld8",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp8",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld9",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp9",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld10",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp10",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "spHeld11",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sp11",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.anyHeld",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.spHeld0",
+   "target": "sdf/fluid/node/spike0/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld1",
+   "target": "sdf/fluid/node/spike1/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld2",
+   "target": "sdf/fluid/node/spike2/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld3",
+   "target": "sdf/fluid/node/spike3/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld4",
+   "target": "sdf/fluid/node/spike4/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld5",
+   "target": "sdf/fluid/node/spike5/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld6",
+   "target": "sdf/fluid/node/spike6/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld7",
+   "target": "sdf/fluid/node/spike7/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld8",
+   "target": "sdf/fluid/node/spike8/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld9",
+   "target": "sdf/fluid/node/spike9/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld10",
+   "target": "sdf/fluid/node/spike10/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.spHeld11",
+   "target": "sdf/fluid/node/spike11/translation",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 700,
+    "springHz": 3.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.crown",
+   "target": "sdf/fluid/node/ringLift0/translation",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "visual.crown",
+   "target": "sdf/fluid/node/ringLift1/translation",
+   "amount": 0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 420,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "visual.crown",
+   "target": "sdf/fluid/node/ringLift2/translation",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 540,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "visual.crown",
+   "target": "sdf/fluid/node/ringLift3/translation",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 660,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/fluid/node/ringCone0/height",
+   "amount": 0.30600000000000005,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/fluid/node/ringCone1/height",
+   "amount": 0.24300000000000002,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 90,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/fluid/node/ringCone2/height",
+   "amount": 0.18000000000000002,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/fluid/node/ringCone3/height",
+   "amount": 0.12600000000000003,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/fluid/node/swell/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "sdf/fluid/node/shimmer/amount",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/droplets/burst",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 30
+   }
+  },
+  {
+   "source": "visual.unrest",
+   "target": "sdf/fluid/node/shimmer/amount",
+   "amount": 0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "lights/softbox/color",
+   "amount": -0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "lights/softbox/color",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "visual.crown",
+   "target": "post/bloom/intensity",
+   "amount": 0.08,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -1.5,
+       1.7,
+       6.7
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       -1.2525,
+       1.78,
+       6.7586
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       -1.15,
+       1.7,
+       6.9
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -1.2525,
+       1.62,
+       7.0414
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -1.5,
+       1.7,
+       7.1
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       -1.7475,
+       1.78,
+       7.0414
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -1.85,
+       1.7,
+       6.9
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       -1.7475,
+       1.62,
+       6.7586
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -1.5,
+       1.7,
+       6.7
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.7218,
+       0.4452,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.5,
+      "value": [
+       -0.7009,
+       0.4362,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       -0.7087,
+       0.3948,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -0.7408,
+       0.4038,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -0.7782,
+       0.4452,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5,
+      "value": [
+       -0.7991,
+       0.4362,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -0.7913,
+       0.3948,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       -0.7592,
+       0.4038,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -0.7218,
+       0.4452,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-ferrofluid-crown.mp4"
+ },
+ "sonicScene": {
+  "category": "abstract",
+  "thesis": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown.",
+  "composition": {
+   "background": "studio darkness",
+   "midground": "a shallow lacquered dish of ferrofluid, a field of small spikes over its surface",
+   "foreground": "the dish's near rim, soft with depth of field",
+   "focal": "the central spiral tower and the tallest spike, on the right third",
+   "secondary": [
+    "the ring of twelve note spikes",
+    "droplets thrown off on hits"
+   ],
+   "atmosphere": "none: clean air",
+   "post": "macro depth of field, a gentle bloom on speculars, a vignette, a near-monochrome grade",
+   "camera": "macro, 15 degrees above the dish, a slow 60 s breathing drift"
+  },
+  "palette": {
+   "dominant": "#020203",
+   "secondary": "#3a3c40",
+   "accent": "#ffae5a",
+   "highlight": "#ffffff",
+   "background_value": "black",
+   "saturation": "none in the material; a warm key and a cool rim exist only as reflections"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's drift",
+    "the tower turning"
+   ],
+   "medium": [
+    "the surface's swell and the spike field (bass)"
+   ],
+   "fast": [
+    "note spikes rising and melting"
+   ],
+   "extremely_fast": [
+    "surface shimmer (hat)",
+    "the ripple ring (kick)",
+    "droplets (snare)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "melodic",
+    "notes.noteOn + notes.lastPitch",
+    "a spike rises from the liquid at its pitch's place round the crown (low notes on the left, high on the right)"
+   ],
+   [
+    "sustained",
+    "notes.held",
+    "a held note's spike stays up; released, it melts back"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "the crown forms: the spike field rises round the tower"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the magnetic field: the surface heaves, the small spikes lengthen together"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a ripple ring crosses the dish"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "spike tips throw black droplets"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "fine shimmer on the surface"
+   ],
+   [
+    "tension",
+    "notes.tension",
+    "dissonance makes the surface restless (noise)"
+   ],
+   [
+    "brightness",
+    "sonic.brightness",
+    "the warm key cools toward white"
+   ]
+  ],
+  "tier": "medium: two compiled SDF objects, no fog",
+  "id": "ferrofluid-crown",
+  "title": "Ferrofluid Crown"
+ },
+ "effects": [
+  {
+   "id": "ripple",
+   "name": "ripple",
+   "type": "ripple",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "amplitude": 0.22,
+    "radius": 2.2,
+    "wavelength": 0.32,
+    "speed": 2.6,
+    "plane": 1,
+    "crestColor": [
+     0.68669,
+     0.77582,
+     1.0
+    ],
+    "crestEmission": 0.15,
+    "chroma": 0.06,
+    "radialDecay": 1.2,
+    "ageDecay": 2.4,
+    "duration": 1.1,
+    "maxConcurrent": 3,
+    "offsetX": 0.0,
+    "offsetY": 0.05,
+    "offsetZ": 0.0
+   },
+   "trigger": {
+    "source": "signal",
+    "name": "response.kick",
+    "threshold": 0.25
+   }
+  }
+ ]
+}

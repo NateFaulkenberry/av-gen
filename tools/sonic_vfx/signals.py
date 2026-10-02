@@ -47,7 +47,7 @@ RESPONSE = {
     "phrase": "notes.phraseStart",
     # ---- MIDI: the latest note (per-note placement and strength)
     "lastPitch": "notes.lastPitch", "lastVelocity": "notes.lastVelocity",
-    "interval": "notes.interval", "step": "notes.step",  # |step| / 12, and signed -1..1
+    "interval": "notes.interval", "step": "notes.interval",  # signed: an octave = 1 (ADR-1062 has no notes.step)
     "held": "notes.held",                 # how long the longest sounding note has been held (log 0.05-4 s)
     "channel": "notes.channel",
     # ---- MIDI: the playing (context, 0..1)

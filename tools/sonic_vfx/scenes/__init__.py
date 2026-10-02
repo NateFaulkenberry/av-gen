@@ -5,4 +5,5 @@ SCENES = [
     "breathing_deep",
     "tesla_choir",
     "corrupted_cathedral",
+    "ferrofluid_crown",
 ]
