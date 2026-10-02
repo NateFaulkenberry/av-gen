@@ -78,7 +78,7 @@ def build(b):
     # ---- 1.1-2.3: the neighbours land, a pair of lots a beat -----------------------------------------------------
     lands = [t(1, 1), t(1, 2), t(1, 3), t(1, 4), t(2, 1), t(2, 2), t(2, 3)]
     clip = [(0.0, [0.0, 0.0, 0.0], "step")]      # closed: a point in the road (a zero-width box still cuts a plane)
-    fall = [(0.0, [IN.LOT, 60.0, 0.0], "step")]
+    fall = [(0.0, [IN.LOT, -10.0, 0.0], "step")]       # waiting under the street (pass 3: in the sky above its bounds)
     for k, tl in enumerate(lands, start=1):
         x = IN.LOT * k
         # a fall from 34 m accelerating into the lot, landing ON the beat, no bounce (build -> lock). (A key's interp
@@ -87,7 +87,7 @@ def build(b):
         # the row takes the lot over the instant before the faller leaves it (the next drop starts 0.2 s early)
         nxt = lands[k] - 0.2 if k < len(lands) else tl + 0.6
         clip.append((nxt - 0.005, [x + 3.8, 8.0, 30.0], "step"))
-        fall.append((nxt - 0.004, [x, 60.0, 0.0], "step"))
+        fall.append((nxt - 0.004, [x, -10.0, 0.0], "step"))
         c = b.clap(f"land{k}", tl, release=0.32)
         f.route(c, "post/bloom/intensity", 0.7)
         f.route(c, "sdf/row/look/edge/intensity", 5.0)

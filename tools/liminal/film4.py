@@ -61,6 +61,30 @@ class Builder4(F3.Builder3):
         self.f.track(target, keys, mode=mode, component=component)
         return keys
 
+    # ---- words: a floor's clear area must be clear right down to the floor (a mat or a rug 2 cm high is not clear) ----
+    def _surface_mask(self, m):
+        if m["grid"] is None and m["key"] == "floor":
+            grid = super()._surface_mask(m)
+            import sdf_eval
+            room = m["room"]
+            objs = [o for o in room["objects"] if o[2] != "figure" and not o[0].endswith("Shell")]
+            (a0, a1), (b0, b1) = m["a"], m["b"]
+            step = m["step"]
+            for i, row in enumerate(grid):
+                for j, ok in enumerate(row):
+                    if not ok:
+                        continue
+                    p = self._surface_point("floor", m["plane"], a0 + i * step, b0 + j * step)
+                    for dd in (0.005, 0.02, 0.05):
+                        q = [p[0], p[1] + dd, p[2]]
+                        near = [o[1] for o in objs if all(o[3][c] - 0.05 <= q[c] <= o[4][c] + 0.05 for c in range(3))]
+                        if near and min(sdf_eval.evaluate(tr, q) for tr in near) < 0.03:
+                            row[j] = False
+                            break
+            m["grid"] = grid
+            return grid
+        return super()._surface_mask(m)
+
     def opens(self, room_id, tt):
         self.opened[room_id] = round(tt, 3)
 

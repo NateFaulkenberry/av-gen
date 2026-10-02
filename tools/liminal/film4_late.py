@@ -116,14 +116,30 @@ def build(b):
     k = 0
     pats = [[(-0.5, -0.35), (0.0, -0.55), (0.5, -0.3)], [(0.45, -0.5), (-0.1, -0.3), (-0.55, -0.6)],
             [(-0.6, -0.2), (-0.15, -0.45), (0.35, -0.65)], [(0.55, -0.25), (0.1, -0.6), (-0.4, -0.4)]]
+    import sdf_eval
+    trees_n = next(n for n in f.nodes if n["name"] == "landTrees")["sdf"]["tree"]["root"]
+    stones_n = next(n for n in f.nodes if n["name"] == "landStones")["sdf"]["tree"]["root"]
+
+    def clear_of_trees(e):
+        p = e["position"]
+        n = e["normal"]
+        rgt = [n[2], 0.0, -n[0]]
+        hw = 0.5 * e["height"] * 0.66 / 0.72 * len(e["text"])
+        pts = [[p[0] + rgt[0] * hw * u, p[1] + e["height"] * v, p[2] + rgt[2] * hw * u] for u in (-1.0, 0.0, 1.0) for v in (-0.5, 0.0, 0.5)]
+        return all(min(sdf_eval.evaluate(trees_n, q), sdf_eval.evaluate(stones_n, q)) > 0.25 for q in pts)
     for bar in range(91, 99):
         for half, b0 in ((0, 1.0), (1, 3.0)):
             pat = pats[(2 * (bar - 91) + half) % 4]
             for j, wd in enumerate(("LET", "IT", "GO")):
                 tw = t(bar, b0 + 0.5 * j)
-                b.word_at(wd, tw, tw + G.BAR2 * 1.5, ("ground", gy), pat[j][0], pat[j][1] + 0.12, k=0.085, style="rise",
-                          role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=3.0, tin=0.15, tout=0.35,
-                          stand=True, category="floatingText")
+                # a standing word must not stand inside a tree (ADR-1056's text check found one): try nearby spots
+                for dx, dy in ((0.0, 0.0), (0.12, 0.0), (-0.12, 0.0), (0.0, -0.1), (0.24, 0.05), (-0.24, 0.05)):
+                    e = b.word_at(wd, tw, tw + G.BAR2 * 1.5, ("ground", gy), pat[j][0] + dx, pat[j][1] + 0.12 + dy, k=0.085, style="rise",
+                                  role="word" if j != 1 else "accent", name=f"chA{k:02d}", intensity=3.0, tin=0.15, tout=0.35,
+                                  stand=True, category="floatingText")
+                    if clear_of_trees(e):
+                        break
+                    b.words.remove(e)
                 k += 1
     g_ch = b.gate("gChorus", t(91), t(113))
     b.pulse("sdf/landGround/look/edge/intensity", 2.0, "quarter", g_ch)

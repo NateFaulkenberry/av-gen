@@ -41,7 +41,7 @@ def lyric_glitch(b, name, tt, amount=0.3, shift=8.0, release=0.12):
 
 def build(b):
     f = b.f
-    house = {"liv": R3.living_room(), "kit": R4.kitchen(), "hall": R3.hall()}
+    house = {"liv": R3.living_room(), "kit": R4.kitchen(), "hall": R4.hall()}
     for key, room in house.items():
         b.room_world(key, room)
     liv, kit, hall = house["liv"], house["kit"], house["hall"]

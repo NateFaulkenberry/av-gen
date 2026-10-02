@@ -95,7 +95,7 @@ def row():
 def faller():
     """The house landing on the next lot: the module under `fall` (keyed to [LOT * k, height, 0]), mirrored across
     the road and about the hero lot, so four land together."""
-    m = T([0, 0, 0], house_module("fallRoof", "fallWin"), name="fall")
+    m = T([LOT, -10.0, 0], house_module("fallRoof", "fallWin"), name="fall")      # at rest where it waits: under the street
     return T([0, 0, ROAD_Z], K.mirror([0, 0, 1], T([HERO_X, 0, NEAR_C], K.mirror([1, 0, 0], m))))
 
 
@@ -205,7 +205,7 @@ def objects():
     return [
         ("street", street(), "wall", (-180, -0.7, -180), (180, 0.3, 180), dict(far, edge_pixels=1.6, step_scale=0.8)),
         ("row", row(), "furn2", (HERO_X - LOT * LOTS - 5, -0.1, -6.0), (HERO_X + LOT * LOTS + 5, 10.0, 30.0), far),
-        ("faller", faller(), "furn2", (HERO_X - LOT * LOTS - 5, -0.1, -6.0), (HERO_X + LOT * LOTS + 5, 60.0, 30.0), far),
+        ("faller", faller(), "furn2", (HERO_X - LOT * LOTS - 5, -12.0, -6.0), (HERO_X + LOT * LOTS + 5, 44.0, 30.0), far),
         ("lamps", lamps(), "furn", (HERO_X - LOT * LOTS - 8, -0.1, 4.0), (HERO_X + LOT * LOTS + 8, 9.0, 20.0), far),
         ("parked", parked(), "furn", (HERO_X - LOT * LOTS - 5, -0.1, -2.0), (HERO_X + LOT * LOTS + 12, 2.0, 26.0), far),
         ("heroShell", hero_shell(), "wall", (HERO["x0"] - 0.3, -0.1, HERO["z0"] - 0.3), (HERO["x1"] + 0.3, 6.2, HERO["z1"] + 0.6), far),

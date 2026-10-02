@@ -77,5 +77,31 @@
   "floorSit": {
    "support": "floor"
   }
+ },
+ "motion": {
+  "allow": [
+   "livShell/transform/scale",
+   "livDecor/transform/scale",
+   "kitTable/node/kitPlate",
+   "kitTable/node/kitChairA",
+   "kitCounter/node/kitKettle",
+   "bedShell/transform/position",
+   "bedFurn/transform/position",
+   "bathShell/transform/position",
+   "bathFurn/transform/position",
+   "bathMirror/transform/position",
+   "bathShell/transform/scale",
+   "bathFurn/transform/scale",
+   "stuShell/transform/position",
+   "stuFurn/transform/position",
+   "stuShelf/transform/position",
+   "stuCeil/transform/position",
+   "stuDesk/transform/position",
+   "stuFloor/transform/position",
+   "stuCeil/node/stuCeil",
+   "heroRoof/node/hp_",
+   "ringLow/transform/scale",
+   "ringHigh/transform/scale"
+  ]
  }
 }

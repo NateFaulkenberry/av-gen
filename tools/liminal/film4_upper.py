@@ -31,7 +31,7 @@ BEAT1 = G.BAR1 / 4.0
 def build(b):
     f = b.f
     end = f.end
-    low, up = R4.basement(), R3.upstairs()
+    low, up = R4.basement(), R4.upstairs()
     for key, room in {**low, **up}.items():
         b.room_world(key, room)
     lau, gym, lng = low["lau"], low["gym"], low["lng"]
@@ -327,5 +327,5 @@ def build(b):
     for i, (wd, beat, sx, sy, kk) in enumerate((("FEEL", 1.0, -0.5, 0.35, 0.09), ("IT", 1.5, 0.0, 0.1, 0.07),
                                                 ("GROW", 2.0, 0.5, 0.3, 0.11), ("FEEL", 3.0, -0.45, -0.1, 0.09),
                                                 ("IT", 3.5, 0.05, 0.25, 0.07), ("GROW", 4.0, 0.45, 0.55, 0.12))):
-        b.word_at(wd, t(66, beat), t(67), ("box", stu["interior"]), sx, sy, k=kk, style="rise", role="word",
+        b.word_at(wd, t(66, beat), t(66, 3.0) if i < 3 else t(67), ("box", stu["interior"]), sx, sy, k=kk, style="rise", role="word",
                   name=f"fig66_{i}", tin=0.15, room="study")

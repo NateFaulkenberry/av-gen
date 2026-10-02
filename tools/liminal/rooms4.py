@@ -33,8 +33,49 @@ import props4 as P4  # noqa: E402
 import rooms3 as R3  # noqa: E402
 import tableaux3 as TB  # noqa: E402
 import tableaux4 as T4  # noqa: E402
-from kit import ACCENT, CANVAS, CANVAS2, FILL, FLOOR, GLASS, GLOW, SCREEN, R, S, T, U, X, place  # noqa: E402
+from kit import ACCENT, CANVAS, CANVAS2, FILL, FLOOR, GLASS, GLOW, SCREEN, D, R, S, T, U, X, place  # noqa: E402
 from rooms3 import CEIL, DOWN, on_wall, shell_with, tag, window_on  # noqa: E402
+
+
+# ---- the walls' trim stops at the doors and windows (ADR-1056's openingCrossed: pass 3's skirting and dado ran across
+# every doorway, the owner's "wall details intersecting doors") ----------------------------------------------------------
+def shell_with(ext, rid, doors=(), windows=(), tiled=False, dado=True, boards="x", extra_cuts=(), ceiling=True, sealed=False):
+    """rooms3.shell_with, with the skirting and the dado inside the difference that cuts the openings, so they stop at
+    every door and window (the bands are pieces of the room's shell, not separate trim entities: the cut has to be in
+    the same subtree as the band for the band to be cut). Same nodes as pass 3's."""
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    cuts = [K.door_cut(wl, ext, along, w, 2.05) for wl, along, w, _ in doors]
+    for wl, along, w, h, sill in windows:
+        ys = (y0 + sill, y0 + sill + h)
+        cuts.append({"+x": X(((x1 - 0.5, x1 + 0.5), ys, (along - w / 2, along + w / 2))),
+                     "-x": X(((x0 - 0.5, x0 + 0.5), ys, (along - w / 2, along + w / 2))),
+                     "+z": X(((along - w / 2, along + w / 2), ys, (z1 - 0.5, z1 + 0.5))),
+                     "-z": X(((along - w / 2, along + w / 2), ys, (z0 - 0.5, z0 + 0.5)))}[wl])
+    if not ceiling:
+        cuts.append(X(((x0 - 0.3, x1 + 0.3), (y1 - 0.02, y1 + 0.5), (z0 - 0.3, z1 + 0.3))))
+    cuts += list(extra_cuts)
+    ent = {"id": rid}
+    if sealed:
+        ent["sealed"] = True
+    bands = [K.skirting(ext)]
+    if dado:
+        bands.append(K.wall_band(ext, y0 + 0.88, y0 + 0.92, 0.015))
+    for bnd in bands:
+        bnd.pop("entity", None)
+    sh = K.shell(ext, 0.15, entity=ent)
+    room_ent = sh.pop("entity")
+    body = U(sh, *bands)
+    body["entity"] = room_ent        # the validator gives a difference's cuts to its first child: the room is that child
+    walls = D(body, *cuts)
+    ext_in = ((x0 + 0.03, x1 - 0.03), (y0, y1), (z0 + 0.03, z1 - 0.03))     # the floor's lines stop short of the thresholds
+    parts = [walls, K.tiles(ext_in, 0.5) if tiled else K.floorboards(ext_in, 0.2, boards)]
+    for wl, along, w, did in doors:
+        parts.append(K.door_frame(wl, ext, along, w, 2.05, entity={"id": did, "room": rid}))
+    return parts
+
+
+R3.shell_with = shell_with      # pass 4's rooms (and pass 3's room builders when called from pass 4) cut their trim;
+                                # pass 3's own generator never imports this module, so its film is unchanged
 
 
 def rot(yaw, x, z):
@@ -211,6 +252,78 @@ def lounge():
 
 def basement():
     return {"lau": laundry(), "gym": gym(), "lng": lounge()}
+
+
+def study():
+    """Pass 3's study with the bookcase moved off the door (ADR-1056: it stood across a third of StudyDoor's opening
+    and 5 cm into the wall) and the painting moved past it."""
+    rid = "study"
+    ext = ((-2.6, 1.2), (R3.UP, R3.UP + CEIL), (-6.4, -2.35))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    doors = [("+x", -3.0, 0.9, "StudyDoor")]
+    walls = U(*shell_with(ext, rid, doors=doors, windows=[("-z", -0.9, 1.2, 1.1, 1.05)], ceiling=False))
+    shell = U(K.wave(walls, 0.0, 7.0, [1.0, 0.0, 0.0], name="stuWarp"),
+              window_on("-z", ext, -0.9, 1.2, 1.1, 1.05, eid="StudyWindow", room=rid),
+              on_wall(K.painting(0.8, 0.55, motif="horizon", entity={"id": "StudyPainting", "room": rid}), "+x", ext, -5.8, y0 + 1.6))
+    desk_at = (-0.9, y0, z0 + 0.46)
+    fig_at = (desk_at[0] - 0.2, y0, desk_at[2] + 0.6)
+    group = place(TB.desk_group("Study", rid), fig_at, 180.0)
+    furn = U(group, place(K.globe(0.16, name="stuGlobe", entity={"id": "Globe", "room": rid}), (-0.25, y0 + 0.75, z0 + 0.3)))
+    shelf = place(K.bookshelf(0.9, 1.9, 0.3, entity={"id": "StudyBookcase", "room": rid}), (x1 - 0.165, y0, -4.65), -90.0)
+    figs = R3.figure_objects(rid, [("stuDesk", "desk", fig_at, 180.0, "StudyChair"),
+                                   ("stuFloor", "floor_sit", (x0 + 0.32, y0, -4.2), 90.0, None)])
+    return {"id": rid, "interior": ext,
+            "objects": [("stuShell", shell, "wall", (x0 - 0.5, y0 - 0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("stuFurn", furn, "furn", (x0 - 0.05, y0 - 0.05, z0 - 0.05), (x1 + 0.05, y0 + 2.0, z1 + 0.05)),
+                        ("stuShelf", shelf, "furn2", (x1 - 0.5, y0 - 0.05, -5.2), (x1 + 0.05, y0 + 2.0, -4.1)),
+                        ("stuCeil", R3.ceiling_halves(ext, "stu", attach_left=[place(tag(U(K.ceiling_fan(name="stuFan"), K.CY([0, -0.02, 0], 0.08, 0.04)),
+                                                                                          "ceilingFan", "CeilingFan", rid), (-0.8, y1, -4.3))]),
+                         "wall", (x0 - 12, y1 - 0.8, z0 - 12), (x1 + 12, y1 + 40.0, z1 + 12))] + figs,
+            "lights": [("stuLamp", (-0.2, y0 + 1.6, z0 + 0.5), "lamp"), ("stuScreen", (-1.1, y0 + 1.0, z0 + 0.9), "screen")],
+            "anchors": {"desk": (desk_at[0], y0 + 0.9, desk_at[2]), "monitor": (-1.1, y0 + 1.0, z0 + 0.31), "window": (-0.9, y0 + 1.6, z0),
+                        "wall": (x0, y0 + 1.0, -4.2), "door": (x1, y0 + 1.0, -3.0), "fan": (-0.8, y1 - 0.3, -4.3)}}
+
+
+def upstairs():
+    return {"bed": R3.bedroom(), "bath": R3.bathroom(), "stu": study()}
+
+
+def hall():
+    """Pass 3's hall (rooms3.hall), rebuilt so the front door's closed leaf belongs to its frame's entity (ADR-1056's
+    opening check takes anything in a doorway that is not the door's own frame for an obstruction: a closed leaf was
+    reported as crossing its own doorway); its stair ends at the cliff on purpose (the climb's top): `terminates`."""
+    rid = "hall"
+    ext = ((2.75, 4.95), (0.0, CEIL), (-6.4, 2.2))
+    (x0, x1), (y0, y1), (z0, z1) = ext
+    s = R3.STAIR
+    top_z = s["foot_z"] + s["steps"] * s["run"]
+    doors = [("-x", -1.2, 0.9, "HallLivingDoor"), ("-x", -4.6, 0.9, "HallKitchenDoor")]
+    well = X(((s["x0"] - 0.05, x1 + 0.3), (y1 - 0.05, y1 + 0.6), (s["foot_z"] + 1.1, top_z + 0.1)))
+    flight = {"kind": "stairs", "size": [s["run"], s["rise"], (s["x1"] - s["x0"]) / 2], "count": s["steps"], "height": 0.0}
+    stair = T([(s["x0"] + s["x1"]) / 2, 0.0, s["foot_z"]], R([0, -90, 0], flight))
+    ls.tag(stair, "stairs", id="HallStair", room=rid, terminates=True)
+    rail = K.SEG([s["x0"] - 0.03, 0.95, s["foot_z"]], [s["x0"] - 0.03, CEIL + 0.95, top_z], 0.022)
+    post = K.SEG([s["x0"] - 0.03, 0.0, s["foot_z"]], [s["x0"] - 0.03, 0.97, s["foot_z"]], 0.03, box_section=(0.03, 0.03))
+    stair_obj = U(S(stair, FILL), S(U(rail, post), ACCENT))
+    front_cut = K.door_cut("+z", ext, 3.45, 1.0, 2.05)
+    frame = K.door_frame("+z", ext, 3.45, 1.0, 2.05)
+    frame.pop("entity", None)
+    leaf = place(PR.front_door(1.0, 2.05, name="frontDoorSwing"), (3.45, 0.0, z1), 180.0)
+    front = ls.tag(U(frame, leaf), "door", id="FrontDoor", room=rid, normal=[0, 0, -1])
+    shell = U(*shell_with(ext, rid, doors=doors, windows=[], boards="z", extra_cuts=[well, front_cut]), front,
+              on_wall(K.painting(0.45, 0.6, motif="portrait", entity={"id": "HallPortrait", "room": rid}), "-x", ext, 0.5, 1.6))
+    furn = U(on_wall(K.coat_hooks(4, entity={"id": "CoatHooks", "room": rid}), "-x", ext, 1.4, 1.7),
+             on_wall(K.mirror_frame(0.55, 0.85, entity={"id": "HallMirror", "room": rid}), "-x", ext, -2.6, 1.5),
+             place(K.phone_table(entity={"id": "PhoneTable", "room": rid}), (x0 + 0.24, 0.0, -2.0), 90.0),
+             place(K.rug(0.8, 2.4, entity={"id": "Runner", "room": rid}), (3.35, 0.0, 0.6)))
+    figs = R3.figure_objects(rid, [("hallMan", "stair", (3.32, 0.0, -3.55), 10.0, None)])
+    return {"id": rid, "interior": ext,
+            "objects": [("hallShell", shell, "wall", (x0 - 0.5, -0.3, z0 - 0.5), (x1 + 0.5, y1 + 0.3, z1 + 0.5)),
+                        ("hallStair", stair_obj, "furn2", (s["x0"] - 0.2, -0.4, s["foot_z"] - 0.1), (x1 + 0.05, CEIL + 1.1, top_z + 0.1)),
+                        ("hallFurn", furn, "furn", (x0 - 0.05, -0.05, -3.0), (4.0, 2.1, 2.2))] + figs,
+            "lights": [("hallLamp", (3.4, 2.35, 0.6), "lamp"), ("hallLamp2", (3.4, 2.35, -5.4), "lamp")],
+            "anchors": {"frontDoor": (3.45, 1.0, z1), "stairFoot": (4.42, 0.0, s["foot_z"]), "stairTop": (4.42, CEIL, top_z),
+                        "mirror": (x0, 1.5, -2.6)}}
 
 
 if __name__ == "__main__":

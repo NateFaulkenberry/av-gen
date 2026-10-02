@@ -215,7 +215,7 @@ def grow_words(b):
             for j, wd in enumerate(("FEEL", "IT", "GROW")):
                 tw = t(bar, b0 + 0.5 * j)
                 sx, sy = pats[j]
-                road_word(b, wd, tw, tw + G.BAR1 * 0.9, sx, sy + 0.08 * half, name=f"grow{bar}{half}{j}")
+                road_word(b, wd, tw, t(bar, b0 + 1.95), sx, sy + 0.08 * half, name=f"grow{bar}{half}{j}")
 
 
 def road_word(b, text, t0, t1, sx, sy, name):
@@ -231,9 +231,9 @@ def road_word(b, text, t0, t1, sx, sy, name):
     zk = 12.0 + 40.0 * round((p[2] - 12.0) / 40.0)
     xi = C.XI + 40.0 * round((p[0] - C.XI) / 40.0)
     if abs(p[2] - zk) < abs(p[0] - xi):
-        p = [p[0], 0.02, zk]
+        p = [p[0], 0.17, zk]
     else:
-        p = [xi, 0.02, p[2]]
+        p = [xi, 0.17, p[2]]
     dist = math.dist(eye, p)
     h = min(max(dist * 0.06, 1.2), 4.2)
     e_, fw, rt, upv, fov = f.basis(t0 + 0.12)
@@ -242,7 +242,7 @@ def road_word(b, text, t0, t1, sx, sy, name):
     ty = math.tan(math.radians(fov / 2))
     if z <= 1.0 or abs(sum(a * c for a, c in zip(dd, rt)) / z) > ty * 16 / 9 * 0.8 or abs(sum(a * c for a, c in zip(dd, upv)) / z) > ty * 0.8:
         p = [e + v * s_ for e, v in zip(eye, d)]        # the snap left the frame: the word stays where the ray met the ground
-        p[1] = 0.02
+        p[1] = 0.17                                       # (over a kerb's height: read from the air, 17 cm is nothing)
     tilt = f.flat_tilt([0, 1, 0], fwd)
     e = b.word(text, t0, t1, p, [0.0, 1.0, 0.0], h, style="rise", role="word", tilt=tilt, name=name, intensity=4.0, tin=0.18,
                tout=0.3, category="floorText")
@@ -384,8 +384,6 @@ def isolation(b):
     b.glide("crossing", eyeD, lookD, nodes_keys=base + ("crowdMan", "walkD", "walkD2"), fov=54.0)
     b.show("crowdMan", t(81), t(83))
     set_signals(b, t(80, 4), t(83), ns="red", ew="green")
-    # cars waiting at his lines in the crossing shot: the hero car again (empty now) stays where it stopped
-    f.shots[-1]["nodes"].append("heroCar")
 
     # ---- the city moves on the beat; he does not -----------------------------------------------------------------------------
     traffic_flow(b, t(66), t(91) + 1.0)
@@ -413,11 +411,17 @@ def isolation(b):
     b.val += [(t(82, 4) + 0.02, 1.0, "step"), (t(82, 4) + 0.06, 0.0, "step"), (t(83) - 0.001, 0.0, "step"), (t(83), 1.0, "step")]
 
 
+def text_width(text, h):
+    """An estimate of a line's width in metres (Helvetica Neue capitals at cap height h)."""
+    return 0.66 * h / 0.72 * len(text) + 0.1 * h
+
+
 def bridge2_words(b):
     """IS THAT ALL YOU, once a bar (IS on the previous bar's 4.5, so it is sung, and seen, in the shot before the cut):
-    each word placed in whichever shot it appears in -- on the bar building's front behind him at the red light, on
-    the bar's back wall over the bottles, in the dark between the park's trees over his bench, on the road round him
-    at the crossing; the descent's IS floats ahead of the camera."""
+    each word placed in whichever shot it appears in -- across the podium beyond the junction at the red light, over
+    the bottles on the bar's back wall, stacked in the dark between the park's trees over his bench, in rows on the road
+    round him at the crossing; the descent's IS floats ahead of the camera. A bar's words leave as the next bar's IS
+    comes in, and no two share a place."""
     f = b.f
     seq = []
     for bar in range(75, 83):
@@ -429,26 +433,40 @@ def bridge2_words(b):
             seq.append(("GOT?", t(bar, 2.5), bar, 4))
     bb = C.BAR
     bx, _, bz = C.BENCH_AT
+
+    def row_x(words, h, x0, gap):
+        xs, x = [], x0
+        for w_ in words:
+            wd = text_width(w_, h)
+            xs.append(x + wd / 2)
+            x += wd + gap
+        return xs
+    line = ["IS", "THAT", "ALL", "YOU"]
     for i, (wd, te, bar, j) in enumerate(seq):
         shot = f.camera_at(te + 0.12)[3]
         second = bar % 2 == 0
+        t1 = min(te + G.BAR2 * 0.85, t(bar, 4.45))
         if shot == "rise":
-            e = b.word_at(wd, te, te + G.BAR2 * 0.85, ("view", 16.0), 0.0, 0.1, k=0.08, style="flash", role="word", name=f"isth{i:02d}",
-                          intensity=3.8, tin=0.08, tout=0.3, category="floatingText")
+            b.word_at(wd, te, t1, ("view", 16.0), 0.0, 0.1, k=0.08, style="flash", role="word", name=f"isth{i:02d}",
+                      intensity=3.8, tin=0.08, tout=0.3, category="floatingText")
             continue
-        if shot == "redlight":       # the podium across the junction (its south face, z = -115), above the cross traffic
-            pos, nrm, h, cat = (C.HX + 40.0 - 13.0 + 1.6 + 2.2 * j, 5.6 - 0.5 * j + (0.3 if second else 0.0), -88.0 - 40.0 + 13.0 + 0.01), (0, 0, 1), \
-                1.1, "floatingText"   # on a podium's face: the city's blocks are SDF repeats, not rooms the validator knows
-        elif shot == "bar":          # the back wall over the bottles
-            zz = (bb["z0"] + bb["z1"]) / 2 - 2.4 + 1.25 * j
-            pos, nrm, h, cat = (bb["x1"] - 0.02, 0.12 + 2.85 - (0.85 if wd == "GOT?" else 0.0), zz if wd != "GOT?" else (bb["z0"] + bb["z1"]) / 2 + 1.6), (-1, 0, 0), \
-                0.3 if wd != "GOT?" else 0.55, "wallText"
-        elif shot == "bench":        # in the dark between the trees, over him
-            pos, nrm, h, cat = (bx - 2.4 + 1.6 * j, 3.6 - 0.35 * j, bz + 2.6), (0, 0, -1), 0.62, "floatingText"
-        else:                        # the crossing: on the road round him, read from above
-            pos, nrm, h, cat = (C.XI - 3.0 + 2.0 * j, 0.02, C.ZK + C.CROSS_OFF - 3.2 - (1.9 if second else 0.0)), (0, 1, 0), 0.9, "floorText"
+        if shot == "redlight":       # across the podium beyond the junction (its south face, z = -115), over the cross traffic
+            h = 0.7
+            xs = row_x(line, h, C.HX + 40.0 - 13.0 + 0.8, 0.6)
+            pos, nrm, cat = (xs[min(j, 3)], 5.4 - (0.9 if second else 0.0), -88.0 - 40.0 + 13.0 + 0.01), (0, 0, 1), "floatingText"
+        elif shot == "bar":          # over the bottles on the back wall; GOT? lower and bigger
+            h = 0.26 if wd != "GOT?" else 0.4
+            zs = row_x(line, 0.26, (bb["z0"] + bb["z1"]) / 2 - 2.6, 0.45)
+            zz = zs[min(j, 3)] if wd != "GOT?" else (bb["z0"] + bb["z1"]) / 2 + 0.6
+            pos, nrm, cat = (bb["x1"] - 0.02, 0.12 + (2.66 if wd != "GOT?" else 3.3), zz), (-1, 0, 0), "wallText"
+        elif shot == "bench":        # stacked in the dark between the trees, over him
+            h = 0.5
+            pos, nrm, cat = (bx - 0.3 + (0.9 if second else 0.0), 4.4 - 0.62 * j, bz + 2.6), (0, 0, -1), "floatingText"
+        else:                        # the crossing: in rows on the road between him and us, read from above
+            h = 0.8
+            pos, nrm, cat = (C.XI + 0.3, 0.02, C.ZK + C.CROSS_OFF + 1.7 + 1.15 * j + (0.5 if second else 0.0)), (0, 1, 0), "floorText"
         tilt = f.flat_tilt([0, 1, 0], f.basis(te + 0.12)[1]) if nrm[1] > 0.5 else 0.0
-        b.word(wd, te, te + G.BAR2 * 0.85, pos, nrm, h, style="flash" if wd != "GOT?" else "pop", role="word", name=f"isth{i:02d}",
+        b.word(wd, te, t1, pos, nrm, h, style="flash" if wd != "GOT?" else "pop", role="word", name=f"isth{i:02d}",
                intensity=3.8 if wd != "GOT?" else 6.0, tin=0.08, tout=0.3, category=cat, tilt=tilt)
 
 
