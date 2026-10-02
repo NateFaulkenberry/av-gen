@@ -66,8 +66,8 @@ const char* kDefaultRules = R"json({
   "window": {"clearanceDepth": 0.3},
   "camera": {"eyeHeight": 1.6, "clearance": 0.12, "step": 0.1},
   "film": {"closeDistance": 0.3, "closeShare": 0.35, "clearance": 0.12, "cutDistance": 1.5, "raysX": 9, "raysY": 5},
-  "motion": {"settle": 0.25, "epsilon": 0.0015, "epsilonRelative": 0.003, "epsilonDegrees": 0.1, "twitchRange": 0.3,
-             "twitchRangeRelative": 0.15, "twitchRangeDegrees": 20.0, "minActiveSeconds": 0.5, "minReversals": 3,
+  "motion": {"settle": 0.3, "episodeGap": 0.5, "jitterRate": 3.0, "epsilon": 0.0015, "epsilonRelative": 0.003, "epsilonDegrees": 0.1, "twitchRange": 0.3,
+             "twitchRangeRelative": 0.25, "twitchRangeDegrees": 45.0, "minActiveSeconds": 0.5, "minReversals": 3,
              "allow": []},
   "categories": {
     "room":        {"group": "architecture"},
@@ -2357,7 +2357,7 @@ void checkTextGeometry(SpCtx& ctx, const json& scene) {
                      json{{"share", r3(share)}}},
                     "");
         }
-        if (hits.empty()) ctx.pass("lyric");
+        if (hits.empty()) ctx.pass("textGeometry");
         // other text at the same time
         for (std::size_t oj = ti + 1; oj < ctx.entities.size(); ++oj) {
             const SpEntity& o = ctx.entities[oj];
@@ -2608,18 +2608,26 @@ void checkStructure(SpCtx& ctx, const SpGroup& g, const std::string& gname,
                 std::vector<float> sorted = widths;
                 std::sort(sorted.begin(), sorted.end());
                 const float median = sorted[sorted.size() / 2];
-                std::size_t k = 0;
-                while (k < rows.size() && !rows[k].any()) ++k;
-                std::size_t sillEnd = k;
-                while (sillEnd < rows.size() && rows[sillEnd].any() && rows[sillEnd].width() > median + 0.03f) ++sillEnd;
-                if (sillPart == nullptr && sillEnd > k) {
+                // the lowest run of rows wider than the frame, in the window's lower half
+                std::size_t sillBegin = rows.size(), sillEnd = rows.size();
+                for (std::size_t q = 0; q < rows.size() * 55 / 100; ++q) {
+                    if (rows[q].any() && rows[q].width() > median + 0.03f) {
+                        sillBegin = q;
+                        break;
+                    }
+                }
+                if (sillBegin < rows.size()) {
+                    sillEnd = sillBegin;
+                    while (sillEnd < rows.size() && rows[sillEnd].any() && rows[sillEnd].width() > median + 0.03f) ++sillEnd;
+                }
+                if (sillPart == nullptr && sillBegin < rows.size()) {
                     sillTop = rows[sillEnd - 1].v + 0.005f;
                     haveSill = true;
                 }
                 if (framePart == nullptr) {
                     SpRect2 f{kInf, -kInf, kInf, -kInf};
-                    for (std::size_t q = sillEnd; q < rows.size(); ++q) {
-                        if (!rows[q].any()) continue;
+                    for (std::size_t q = 0; q < rows.size(); ++q) {
+                        if (!rows[q].any() || (q >= sillBegin && q < sillEnd)) continue;
                         f.u0 = std::min(f.u0, rows[q].u0);
                         f.u1 = std::max(f.u1, rows[q].u1 + 0.01f);
                         f.v0 = std::min(f.v0, rows[q].v - 0.005f);
@@ -3329,6 +3337,7 @@ std::string formatSpaceReport(const json& report) {
     line("character", "character poses");
     line("integrity", "entities complete");
     line("lyric", "lyric placements");
+    line("textGeometry", "texts clear of geometry");
     line("camera", "camera paths clear");
     for (const auto& n : report["notes"]) out += "note: " + n.get<std::string>() + "\n";
     return out;

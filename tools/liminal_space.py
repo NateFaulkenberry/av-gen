@@ -58,6 +58,8 @@ KIT_CATEGORIES = {
     "ceiling_fan": "ceilingFan", "stack_of_books": "prop", "bathtub": "bathtub", "coat_hooks": "coatHooks",
     "mannequin": "mannequin", "shell": "room", "door_frame": "door", "toilet": "toilet", "sink": "sink",
     "monitor": "monitor", "computer": "monitor", "stairway": "stairs",
+    # ADR-1056: trim is checked against doors and windows (it must stop at them)
+    "wall_band": "trim", "skirting": "trim",
 }
 
 _WALL_NORMALS = {"-z": [0, 0, 1], "+z": [0, 0, -1], "-x": [1, 0, 0], "+x": [-1, 0, 0]}
@@ -140,6 +142,14 @@ def instrument_kit(kit) -> None:
                     if head is not None:
                         part(head, "head")
                     extra.setdefault("id", name)
+                elif fname == "window_frame":
+                    # ADR-1056: the frame and the sill are measured against the wall's opening
+                    kids = node.get("children", [])
+                    if len(kids) >= 3:
+                        part(kids[0], "frame")
+                        part(kids[2], "sill")
+                    if "name" in kwargs and kwargs["name"]:
+                        extra.setdefault("id", kwargs["name"])
                 elif "name" in kwargs and kwargs["name"]:
                     extra.setdefault("id", kwargs["name"])
                 tag(node, extra.pop("category", category), id=extra.pop("id", None), **extra)
@@ -167,10 +177,15 @@ def strip(scene: dict) -> dict:
 
 
 def validate(scene, rules: dict | None = None, margin: float | None = None, eye: float | None = None,
-             title: str | None = None, camera: bool = True, avgen: str | None = None) -> dict:
+             title: str | None = None, camera: bool = True, avgen: str | None = None, film: bool = False,
+             fps: float | None = None, range_: str | None = None, motion: bool = True, md: str | None = None) -> dict:
     """Run the validator on a scene dict or a scene/project path. Returns the report dict (see ADR-1051):
-    report["summary"] {errors, warnings, pass}, report["violations"] [{severity, rule, entities, message,
-    measured, expected, suggestion, fix, groups}], report["entities"], report["groups"]."""
+    report["summary"] {errors, warnings, infos, pass}, report["violations"] [{severity, tier, rule, entities, message,
+    measured, expected, suggestion, fix, groups}], report["entities"], report["groups"].
+
+    film=True (a project PATH only; ADR-1057) also plays the film offline and checks the camera as placed and the
+    build-lock of structural transforms; `fps`, `range_` ("a:b" seconds) and `motion` tune it. `md` writes the
+    Markdown Scene Validation Report (ADR-1056) to that path."""
     exe = avgen or os.environ.get("AVGEN") or DEFAULT_AVGEN
     with tempfile.TemporaryDirectory() as d:
         if isinstance(scene, dict):
@@ -194,6 +209,18 @@ def validate(scene, rules: dict | None = None, margin: float | None = None, eye:
             cmd += ["--title", title]
         if not camera:
             cmd += ["--no-camera"]
+        if film:
+            if isinstance(scene, dict):
+                raise ValueError("film=True needs a project path (it plays the film)")
+            cmd += ["--film"]
+            if fps:
+                cmd += ["--fps", str(fps)]
+            if range_:
+                cmd += ["--range", range_]
+            if not motion:
+                cmd += ["--no-motion"]
+        if md:
+            cmd += ["--md", md]
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out):
             raise RuntimeError(f"avgen --validate-space failed ({r.returncode}): {r.stderr.strip()}")
@@ -285,18 +312,48 @@ def apply_fixes(scene: dict, report: dict, rules=("floor", "lyricPlacement", "ly
     return applied
 
 
+def selftest() -> int:
+    """The instrumented kit tags what the validator measures: window frame and sill parts, trim, rooms."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "liminal"))
+    import importlib
+    kit = importlib.import_module("kit")
+    instrument_kit(kit)
+    w = kit.window_frame(1.2, 1.4, 0.9)
+    parts = [c.get("part") for c in w.get("children", [])]
+    assert w["entity"]["category"] == "window", w.get("entity")
+    assert parts[0] == "frame" and parts[2] == "sill", parts
+    ext = ((-2.0, 2.0), (0.0, 2.7), (-1.5, 1.5))
+    band = kit.wall_band(ext, 0.88, 0.92)
+    assert band["entity"]["category"] == "trim", band.get("entity")
+    sk = kit.skirting(ext)
+    assert sk["entity"]["category"] == "trim", sk.get("entity")
+    room = kit.shell(ext, 0.15, entity={"id": "lab"})
+    assert room["entity"]["interior"] == [list(e) for e in ext] and room["entity"]["wall"] == 0.15
+    print("liminal_space selftest: ok (window frame/sill parts, trim, room interior)")
+    return 0
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("scene")
+    ap.add_argument("scene", nargs="?")
     ap.add_argument("--json")
     ap.add_argument("--margin", type=float)
     ap.add_argument("--eye", type=float)
     ap.add_argument("--rules")
     ap.add_argument("--fix", help="write the scene with the safe fixes applied to this path")
+    ap.add_argument("--film", action="store_true", help="also play the film (a project): camera and build-lock (ADR-1057)")
+    ap.add_argument("--fps", type=float)
+    ap.add_argument("--range", dest="range_")
+    ap.add_argument("--md", help="write the Markdown Scene Validation Report here")
+    ap.add_argument("--selftest", action="store_true", help="check the kit instrumentation (no avgen needed)")
     a = ap.parse_args(argv)
+    if a.selftest:
+        return selftest()
+    if not a.scene:
+        ap.error("a scene or project path is required")
     rules = json.load(open(a.rules)) if a.rules else None
-    report = validate(a.scene, rules=rules, margin=a.margin, eye=a.eye)
+    report = validate(a.scene, rules=rules, margin=a.margin, eye=a.eye, film=a.film, fps=a.fps, range_=a.range_, md=a.md)
     print(text(report))
     if a.json:
         with open(a.json, "w") as f:

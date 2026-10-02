@@ -250,21 +250,38 @@ SemanticMap semanticMap(const json& scene) {
 
 // ---- motion watchers ------------------------------------------------------------------------------------
 
+// A motion episode: bursts of movement separated by holds shorter than the episode gap.
+struct Episode {
+    double t0 = 0.0, t1 = 0.0;
+    std::array<float, 3> lo{kInf, kInf, kInf};
+    std::array<float, 3> hi{-kInf, -kInf, -kInf};
+    int reversals = 0;
+    int bursts = 0;
+    float activeSeconds = 0.0f;
+};
+
 struct Watch {
     params::IParameter* param = nullptr;
     TransformClass cls;
     std::string path;
     params::IParameter* visible = nullptr;
-    double settle = -1.0;     // construction ends here (the last timeline key, plus the settle margin)
     bool hasPrev = false;
     std::array<float, 3> prev{};
-    std::array<float, 3> lo{kInf, kInf, kInf};
-    std::array<float, 3> hi{-kInf, -kInf, -kInf};
-    int active = 0;
-    int reversals = 0;
-    int lastSign = 0;
-    double firstActive = -1.0, lastActive = -1.0;
     double firstVisible = -1.0;
+    // build -> lock: the first time it has held still for `settleHold` after appearing; motion before is its build
+    bool settled = false;
+    double stillSince = -1.0;
+    double settledAt = -1.0;
+    // the current burst and episode
+    bool inBurst = false;
+    std::array<float, 3> burstNet{};
+    int lastSign = 0;   // sign of the last frame's dominant step (within-burst reversals)
+    int lastBurstSign = 0;
+    int lastAxis = -1;
+    double lastActive = -1.0;
+    bool inEpisode = false;
+    Episode ep;
+    std::vector<Episode> episodes; // finished episodes with at least one burst
 };
 
 float magnitude(const Watch& w, const std::array<float, 3>& d, const std::array<float, 3>& ref) {
@@ -318,6 +335,8 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
     const double minActive = mr.value("minActiveSeconds", 0.5);
     const int minReversals = mr.value("minReversals", 3);
     const json allow = mr.value("allow", json::array());
+    const double episodeGap = mr.value("episodeGap", 0.5);
+    const double jitterRate = mr.value("jitterRate", 3.0);
 
     const double rate = options.fps > 0.0 ? options.fps : std::max(1.0, engine.renderSettings().fps);
     const double renderFps = std::max(1.0, engine.renderSettings().fps);
@@ -330,18 +349,13 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
 
     // tracks and routes by target
     std::map<std::string, std::vector<const json*>> routesByTarget;
-    std::map<std::string, double> lastKey;
+    std::map<std::string, int> trackKeys;
     if (doc.contains("routes")) {
         for (const auto& r : doc["routes"]) routesByTarget[r.value("target", std::string())].push_back(&r);
     }
     if (doc.contains("timeline") && doc["timeline"].contains("tracks")) {
         for (const auto& t : doc["timeline"]["tracks"]) {
-            double last = -1.0;
-            if (t.contains("keys")) {
-                for (const auto& k : t["keys"]) last = std::max(last, k.value("time", 0.0));
-            }
-            auto& slot = lastKey[t.value("target", std::string())];
-            slot = std::max(slot, last);
+            if (t.contains("keys")) trackKeys[t.value("target", std::string())] += static_cast<int>(t["keys"].size());
         }
     }
 
@@ -379,7 +393,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
             return 2;
         }
         if (allMove) return 0;
-        if (why) *why = cs.empty() ? std::string("untagged") : [&] {
+        if (why) *why = cs.empty() ? std::string("untagged: treated as structural") : [&] {
             std::string s;
             for (const auto& c : cs) s += (s.empty() ? "" : ", ") + c;
             return s;
@@ -405,7 +419,6 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
                 ++skippedMoving;
                 continue;
             }
-            if (auto it = lastKey.find(w.path); it != lastKey.end()) w.settle = it->second + settleMargin;
             watches.push_back(w);
         }
     }
@@ -553,33 +566,101 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
                 w.hasPrev = false;
                 continue;
             }
-            if (w.firstVisible < 0.0) w.firstVisible = now;
-            const double settle = std::max(w.settle, w.firstVisible + settleMargin);
-            if (w.hasPrev && now > settle) {
+            if (w.firstVisible < 0.0) {
+                w.firstVisible = now;
+                w.stillSince = now;
+            }
+            if (w.hasPrev) {
                 std::array<float, 3> d{};
-                int dominant = 0;
-                for (int i = 0; i < 3; ++i) {
-                    d[static_cast<std::size_t>(i)] = v[static_cast<std::size_t>(i)] - w.prev[static_cast<std::size_t>(i)];
-                    if (std::abs(d[static_cast<std::size_t>(i)]) > std::abs(d[static_cast<std::size_t>(dominant)])) dominant = i;
+                int axis = 0;
+                for (std::size_t i = 0; i < 3; ++i) {
+                    d[i] = v[i] - w.prev[i];
+                    if (std::abs(d[i]) > std::abs(d[static_cast<std::size_t>(axis)])) axis = static_cast<int>(i);
                 }
                 const float m = magnitude(w, d, v);
                 const float eps = w.cls.measure == TransformMeasure::Metres ? epsMetres
                                   : w.cls.measure == TransformMeasure::Degrees ? epsDegrees : epsRelative;
-                for (std::size_t i = 0; i < 3; ++i) {
-                    w.lo[i] = std::min(w.lo[i], v[i]);
-                    w.hi[i] = std::max(w.hi[i], v[i]);
-                }
-                if (m > eps) {
-                    ++w.active;
-                    if (w.firstActive < 0.0) w.firstActive = now;
-                    w.lastActive = now;
-                    const int sign = d[static_cast<std::size_t>(dominant)] > 0.0f ? 1 : -1;
-                    if (w.lastSign != 0 && sign != w.lastSign) ++w.reversals;
-                    w.lastSign = sign;
+                // A wrap of a spin (359 -> 0 degrees) is not motion back.
+                const bool wrap = w.cls.measure == TransformMeasure::Degrees && std::abs(d[static_cast<std::size_t>(axis)]) > 180.0f;
+                const bool moving = m > eps && !wrap;
+                if (!w.settled) {
+                    if (moving) {
+                        w.stillSince = now;
+                    } else if (now - w.stillSince >= settleMargin) {
+                        w.settled = true;
+                        w.settledAt = now;
+                    }
+                } else {
+                    auto closeBurst = [&]() {
+                        if (!w.inBurst) return;
+                        w.inBurst = false;
+                        int ax = 0;
+                        for (std::size_t i = 0; i < 3; ++i) {
+                            if (std::abs(w.burstNet[i]) > std::abs(w.burstNet[static_cast<std::size_t>(ax)])) ax = static_cast<int>(i);
+                        }
+                        const int sign = w.burstNet[static_cast<std::size_t>(ax)] >= 0.0f ? 1 : -1;
+                        if (w.lastBurstSign != 0 && ax == w.lastAxis && sign != w.lastBurstSign) ++w.ep.reversals;
+                        w.lastBurstSign = sign;
+                        w.lastAxis = ax;
+                    };
+                    auto closeEpisode = [&]() {
+                        closeBurst();
+                        if (w.inEpisode && w.ep.bursts > 0) w.episodes.push_back(w.ep);
+                        w.inEpisode = false;
+                        w.ep = Episode{};
+                        w.lastBurstSign = 0;
+                        w.lastSign = 0;
+                        w.lastAxis = -1;
+                    };
+                    if (moving) {
+                        if (w.inEpisode && now - w.lastActive > episodeGap) closeEpisode();
+                        if (!w.inEpisode) {
+                            w.inEpisode = true;
+                            w.ep.t0 = now;
+                            for (std::size_t i = 0; i < 3; ++i) w.ep.lo[i] = w.ep.hi[i] = w.prev[i];
+                        }
+                        if (!w.inBurst) {
+                            w.inBurst = true;
+                            w.burstNet = {};
+                            ++w.ep.bursts;
+                        }
+                        const int sign = d[static_cast<std::size_t>(axis)] > 0.0f ? 1 : -1;
+                        if (w.lastSign != 0 && sign != w.lastSign) ++w.ep.reversals; // turned within a burst
+                        w.lastSign = sign;
+                        for (std::size_t i = 0; i < 3; ++i) {
+                            w.burstNet[i] += d[i];
+                            w.ep.lo[i] = std::min(w.ep.lo[i], v[i]);
+                            w.ep.hi[i] = std::max(w.ep.hi[i], v[i]);
+                        }
+                        w.ep.t1 = now;
+                        w.ep.activeSeconds += static_cast<float>(1.0 / rate);
+                        w.lastActive = now;
+                    } else {
+                        // a still frame ends the burst; the next burst's direction is compared with this one's
+                        if (w.inBurst) {
+                            closeBurst();
+                            w.lastSign = 0;
+                        }
+                        if (w.inEpisode && now - w.lastActive > episodeGap) closeEpisode();
+                    }
                 }
             }
             w.prev = v;
             w.hasPrev = true;
+        }
+    }
+    for (Watch& w : watches) {
+        if (w.inEpisode && w.ep.bursts > 0) {
+            if (w.inBurst) {
+                // the last burst's reversal against the one before it
+                int ax = 0;
+                for (std::size_t i = 0; i < 3; ++i) {
+                    if (std::abs(w.burstNet[i]) > std::abs(w.burstNet[static_cast<std::size_t>(ax)])) ax = static_cast<int>(i);
+                }
+                const int sign = w.burstNet[static_cast<std::size_t>(ax)] >= 0.0f ? 1 : -1;
+                if (w.lastBurstSign != 0 && ax == w.lastAxis && sign != w.lastBurstSign) ++w.ep.reversals;
+            }
+            w.episodes.push_back(w.ep);
         }
     }
 
@@ -671,69 +752,106 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
         return a.second["time"].template get<double>() < b.second["time"].template get<double>();
     });
 
-    // ---- motion -> violations
-    int lockedOk = 0, twitch = 0, animated = 0;
+    // ---- motion -> violations: per transform, its wobble episodes (small, reversing) and its large ones
+    int lockedOk = 0, twitch = 0, animated = 0, rebuilds = 0;
     for (Watch& w : watches) {
-        if (w.active == 0) {
-            if (w.firstVisible >= 0.0) ++lockedOk;
-            continue;
+        if (w.firstVisible < 0.0) continue;
+        const float limit = w.cls.measure == TransformMeasure::Metres ? twitchMetres
+                            : w.cls.measure == TransformMeasure::Degrees ? twitchDegrees : twitchRelative;
+        std::vector<const Episode*> wobble, large;
+        float worstWobble = 0.0f, worstLarge = 0.0f;
+        double wobbleSeconds = 0.0;
+        int wobbleReversals = 0;
+        for (const Episode& e : w.episodes) {
+            std::array<float, 3> range{}, mid{};
+            for (std::size_t i = 0; i < 3; ++i) {
+                range[i] = e.hi[i] - e.lo[i];
+                mid[i] = (e.hi[i] + e.lo[i]) * 0.5f;
+            }
+            const float extent = magnitude(w, range, mid);
+            if (e.reversals < minReversals || e.activeSeconds < static_cast<float>(minActive) * 0.25f) {
+                ++rebuilds; // a build event: it moved and locked again
+                continue;
+            }
+            const double span = std::max(1.0 / rate, e.t1 - e.t0);
+            const bool jitter = static_cast<double>(e.reversals) / span >= jitterRate && extent <= limit * 3.0f;
+            if (extent <= limit || jitter) {
+                wobble.push_back(&e);
+                worstWobble = std::max(worstWobble, extent);
+                wobbleSeconds += e.t1 - e.t0;
+                wobbleReversals += e.reversals;
+            } else {
+                large.push_back(&e);
+                worstLarge = std::max(worstLarge, extent);
+            }
         }
-        const double activeSeconds = w.active / rate;
-        if (activeSeconds < minActive || w.reversals < minReversals) {
+        if (wobble.empty() && large.empty()) {
             ++lockedOk;
             continue;
         }
-        std::array<float, 3> range{};
-        std::array<float, 3> mid{};
-        for (std::size_t i = 0; i < 3; ++i) {
-            range[i] = w.hi[i] - w.lo[i];
-            mid[i] = (w.hi[i] + w.lo[i]) * 0.5f;
-        }
-        const float extent = magnitude(w, range, mid);
-        const float limit = w.cls.measure == TransformMeasure::Metres ? twitchMetres
-                            : w.cls.measure == TransformMeasure::Degrees ? twitchDegrees : twitchRelative;
         std::string why;
         const int structural = structuralOf(w, &why);
         json drivers = json::array();
         std::string driverText;
         if (auto it = routesByTarget.find(w.path); it != routesByTarget.end()) {
             for (const json* r : it->second) {
-                json c{{"source", r->value("source", std::string())}, {"amount", r->value("amount", 1.0)}};
+                json c{{"kind", "route"}, {"source", r->value("source", std::string())}, {"amount", r->value("amount", 1.0)}};
                 if (r->contains("depthSource")) c["depthSource"] = (*r)["depthSource"];
                 if (r->contains("chain")) c["chain"] = (*r)["chain"];
                 drivers.push_back(c);
-                driverText += fmt::format("{}{} x {}", driverText.empty() ? "" : ", ", r->value("source", std::string()),
+                driverText += fmt::format("{}route {} x {}", driverText.empty() ? "" : ", ", r->value("source", std::string()),
                                           r3(r->value("amount", 1.0)));
             }
         }
-        const bool small = extent <= limit;
-        json v{{"rule", small ? "buildLock" : "structuralMotion"},
-               {"entities", json::array({w.path})},
-               {"time", r3(w.firstActive)},
-               {"timeEnd", r3(w.lastActive)},
-               {"groups", json::array({"film"})},
-               {"measured", {{"range", r3(extent)}, {"reversals", w.reversals}, {"activeSeconds", r3(activeSeconds)},
-                             {"settledAt", r3(std::max(w.settle, w.firstVisible + settleMargin))}, {"carries", why}}}};
-        if (!drivers.empty()) v["drivers"] = drivers;
-        const std::string drive = driverText.empty() ? std::string("a timeline track") : "route " + driverText;
-        if (small) {
-            ++twitch;
-            v["severity"] = structural == 2 ? "WARNING" : "INFO";
-            v["message"] = fmt::format("{} ({}) keeps moving after it is built: {} direction changes over {:.1f}s between {} and {}, "
-                                       "range {:.3f}{}; driven by {} -- continuous modulation on a structural transform "
-                                       "(it reads as a twitch)",
-                                       w.path, why, w.reversals, activeSeconds, fmtTime(w.firstActive), fmtTime(w.lastActive), extent,
-                                       unitOf(w.cls.measure), drive);
-            v["suggestion"] = "lock it once its construction event completes: gate the route with a depthSource that ends at "
-                              "the build, move the modulation to light/emission/edges, or tag the entity \"moves\": true if the "
-                              "motion is the effect";
-        } else {
-            ++animated;
-            v["severity"] = "INFO";
-            v["message"] = fmt::format("{} ({}) moves continuously after {} (range {:.2f}{}, {} direction changes); driven by {}",
-                                       w.path, why, fmtTime(w.firstActive), extent, unitOf(w.cls.measure), w.reversals, drive);
+        if (auto it = trackKeys.find(w.path); it != trackKeys.end()) {
+            drivers.push_back(json{{"kind", "track"}, {"keys", it->second}});
+            driverText += fmt::format("{}a timeline track ({} keys)", driverText.empty() ? "" : ", ", it->second);
         }
-        ordered.emplace_back(v["severity"] == "WARNING" ? 1 : 2, v);
+        if (driverText.empty()) driverText = "something upstream (a parent's transform, a chain)";
+        auto episodeJson = [&](const std::vector<const Episode*>& list) {
+            json a = json::array();
+            for (const Episode* e : list) {
+                a.push_back(json{{"from", r3(e->t0)}, {"to", r3(e->t1)}, {"reversals", e->reversals}, {"bursts", e->bursts}});
+            }
+            return a;
+        };
+        if (!wobble.empty()) {
+            ++twitch;
+            json v{{"rule", "buildLock"},
+                   {"severity", structural >= 1 ? "WARNING" : "INFO"},
+                   {"entities", json::array({w.path})},
+                   {"time", r3(wobble.front()->t0)},
+                   {"timeEnd", r3(wobble.back()->t1)},
+                   {"frame", static_cast<std::uint64_t>(std::llround(wobble.front()->t0 * renderFps))},
+                   {"frameEnd", static_cast<std::uint64_t>(std::llround(wobble.back()->t1 * renderFps))},
+                   {"groups", json::array({"film"})},
+                   {"measured", {{"range", r3(worstWobble)}, {"episodes", episodeJson(wobble)}, {"reversals", wobbleReversals},
+                                 {"seconds", r3(wobbleSeconds)}, {"builtAt", r3(w.settledAt)}, {"carries", why}}}};
+            if (!drivers.empty()) v["drivers"] = drivers;
+            v["message"] = fmt::format("{} ({}) wobbles after it is built: {} episode(s) between {} and {}, {} direction changes over "
+                                       "{:.1f}s, range up to {:.3f}{}; driven by {}. Build, then lock (PART 15)",
+                                       w.path, why, wobble.size(), fmtTime(wobble.front()->t0), fmtTime(wobble.back()->t1),
+                                       wobbleReversals, wobbleSeconds, worstWobble, unitOf(w.cls.measure), driverText);
+            v["suggestion"] = "make each change a one-way build event that holds (snap or ease, then hold), move the jitter to "
+                              "light/emission/edges/post, gate a route with a depthSource that ends at the build, or tag the "
+                              "entity \"moves\": true if the motion is the effect";
+            ordered.emplace_back(v["severity"] == "WARNING" ? 1 : 2, v);
+        }
+        if (!large.empty()) {
+            ++animated;
+            json v{{"rule", "structuralMotion"},
+                   {"severity", "INFO"},
+                   {"entities", json::array({w.path})},
+                   {"time", r3(large.front()->t0)},
+                   {"timeEnd", r3(large.back()->t1)},
+                   {"groups", json::array({"film"})},
+                   {"measured", {{"range", r3(worstLarge)}, {"episodes", episodeJson(large)}, {"carries", why}}}};
+            if (!drivers.empty()) v["drivers"] = drivers;
+            v["message"] = fmt::format("{} ({}) moves back and forth over {:.2f}{} after it is built ({} episode(s), {}-{}); driven by {}",
+                                       w.path, why, worstLarge, unitOf(w.cls.measure), large.size(), fmtTime(large.front()->t0),
+                                       fmtTime(large.back()->t1), driverText);
+            ordered.emplace_back(2, v);
+        }
     }
     std::stable_sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
     for (auto& [rank, v] : ordered) violations.push_back(v);
@@ -741,7 +859,7 @@ Result<json> validateFilm(const std::string& project, const json& scene, const j
              {"camera", {{"samples", samples}, {"fps", rate}, {"minClearance", minClearance < kInf ? json(r3(minClearance)) : json()},
                          {"minClearanceAt", r3(minClearanceAt)}}},
              {"motion", {{"watched", watches.size()}, {"mayMove", skippedMoving}, {"locked", lockedOk}, {"twitching", twitch},
-                         {"animated", animated}}}};
+                         {"animated", animated}, {"rebuildEvents", rebuilds}}}};
     return out;
 }
 
