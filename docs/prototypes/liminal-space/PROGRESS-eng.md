@@ -20,7 +20,10 @@ Design and research: `ENGINEERING.md`. Decisions: ADR-1040 to 1044.*
 | 6 | tiers (critical/warning/info; expected overlaps are info), Markdown "Scene Validation Report" (`--md`) | **landed** | 1056 |
 | 7 | ~2:15: root cause found and the engine half fixed (`camera/near`, journey auto near 5 cm) | **engine fixed; data half is the art agent's** | 1058 |
 | 8 | tests: Catch2 `[adr1056]` (9 cases), `[adr1057]` + `[adr1058]` (5 cases), python `tools/liminal_space.py --selftest`; ADRs 1056-1058 written | **done** | - |
-| 9 | final hand-back: both full suites under the lock | pending (see the end of this section) | - |
+| 9 | final hand-back: both full suites under the lock (code at `827a7601`) | **done**: `avgen_tests` exit 0 (4,005 cases: 3,985 passed, 19 skipped, 1 failed as expected, the slope lean); `avgen_render_tests` exit 0 (567 cases: 566 passed, 1 skipped); `temporal-*.png` clean | - |
+
+**Resume here (pass 4, engineering):** Phases 1-2 and PART 7 are done and committed. Next, only if the art agent asks:
+mesh text in the film pass's camera geometry, an inferred `opensAt`, and glyph-level text self-overlap (see Gaps).
 
 ### For the art agent (pass 4): the validator, now
 
