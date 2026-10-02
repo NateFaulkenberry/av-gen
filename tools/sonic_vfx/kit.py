@@ -315,6 +315,47 @@ def sd_count(node):
     return n
 
 
+# ================================================================================================ camera composition
+def project_from(pos, tgt, focal, point, aspect=16.0 / 9.0):
+    """A world point's screen position (u right, v down, 0..1) and depth, for a camera at `pos` looking at `tgt` with
+    a lens of `focal` mm (the engine's: the vertical field of view from a 24 mm sensor height)."""
+    fy = focal / 12.0
+    fx = fy / aspect
+    f = [b - a for a, b in zip(pos, tgt)]
+    n = math.sqrt(sum(c * c for c in f)) or 1.0
+    f = [c / n for c in f]
+    r = [-f[2], 0.0, f[0]]
+    rn = math.sqrt(sum(c * c for c in r)) or 1.0
+    r = [c / rn for c in r]
+    u_ = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+    d = [b - a for a, b in zip(pos, point)]
+    x = sum(a * b for a, b in zip(d, r))
+    y = sum(a * b for a, b in zip(d, u_))
+    z = max(sum(a * b for a, b in zip(d, f)), 1e-3)
+    return 0.5 + 0.5 * fx * x / z, 0.5 - 0.5 * fy * y / z, z
+
+
+def aim(pos, point, u, v, focal, aspect=16.0 / 9.0, dist=None):
+    """The camera target that puts `point` at screen (u, v) -- the composition, solved: say where the hero sits in the
+    frame (a third, a golden section, low on the horizon) instead of pointing the camera at it."""
+    d = [p - c for p, c in zip(point, pos)]
+    yaw = math.atan2(d[0], -d[2])
+    pitch = math.atan2(d[1], math.hypot(d[0], d[2]))
+    fy = focal / 12.0
+    fx = fy / aspect
+    L = dist or math.sqrt(sum(c * c for c in d))
+    tgt = None
+    for _ in range(60):
+        fwd = [math.sin(yaw) * math.cos(pitch), math.sin(pitch), -math.cos(yaw) * math.cos(pitch)]
+        tgt = [pos[k] + fwd[k] * L for k in range(3)]
+        pu, pv, _ = project_from(pos, tgt, focal, point, aspect)
+        if abs(pu - u) < 1e-5 and abs(pv - v) < 1e-5:
+            break
+        yaw += (pu - u) * 2.0 / fx * 0.8
+        pitch -= (pv - v) * 2.0 / fy * 0.8
+    return [round(c, 4) for c in tgt]
+
+
 # ================================================================================================ scene builder
 class Scene:
     """One live scene: its world (scene file) and its instrument (project file)."""
