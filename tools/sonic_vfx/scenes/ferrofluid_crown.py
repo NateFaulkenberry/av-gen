@@ -45,7 +45,7 @@ DESIGN = {
         "extremely_fast": ["surface shimmer (hat)", "the ripple ring (kick)", "droplets (snare)"],
     },
     "vocabulary": [
-        ["melodic", "notes.noteOn + notes.lastPitch", "a spike rises from the liquid at its pitch's place round the "
+        ["melodic", "response.note", "a spike rises from the liquid at its pitch's place round the "
          "crown (low notes on the left, high on the right)"],
         ["sustained", "notes.held", "a held note's spike stays up; released, it melts back"],
         ["chord", "notes.polyphony", "the crown forms: the spike field rises round the tower"],

@@ -2136,12 +2136,12 @@
    ],
    [
     "melodic",
-    "notes.noteOn + notes.lastPitch",
+    "response.note",
     "a pulse of light lights the thread its pitch picks (the threads hang left to right, low to high) and climbs it"
    ],
    [
     "velocity",
-    "notes.noteOn strength",
+    "notes.lastVelocity",
     "how bright the thread's pulse is"
    ],
    [

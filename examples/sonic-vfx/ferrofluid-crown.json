@@ -1791,7 +1791,7 @@
   "vocabulary": [
    [
     "melodic",
-    "notes.noteOn + notes.lastPitch",
+    "response.note",
     "a spike rises from the liquid at its pitch's place round the crown (low notes on the left, high on the right)"
    ],
    [

@@ -70,16 +70,16 @@ DESIGN = {
         "extremely_fast": ["the monolith's outline (snare)", "the ring of light (kick)"],
     },
     "vocabulary": [
-        ["sustained / chords", "notes.tension, sonic.brightness, response.sustain", "the chord paints the sky: the "
+        ["sustained / chords", "notes.tension", "the chord paints the sky: the "
          "palette moves from gold (consonant, bright) through rose and violet to indigo (dissonant, dark), and held "
          "sound brightens the whole sky"],
-        ["melodic", "notes.noteOn + notes.lastPitch", "a meteor falls at the pitch's place across the sky (low notes "
+        ["melodic", "response.note", "a meteor falls at the pitch's place across the sky (low notes "
          "low and left, high notes high and right), all from one radiant"],
         ["velocity", "notes.lastVelocity", "the meteor's brightness"],
         ["bass", "response.bass", "heat shimmer along the horizon; the haze thickens"],
         ["kick", "response.kick", "a ring of light runs out across the salt from the monolith's base"],
         ["snare", "response.snare", "the monolith's outline flares white"],
-        ["hat", "response.hat, response.hatRate", "salt grains blowing low across the flat"],
+        ["hat", "response.hat", "salt grains blowing low across the flat"],
         ["silence", "(no input)", "a still rose dusk: the sky settles, nothing moves but the drift"],
     ],
     "tier": "light: one shadowed sun, a thin uniform haze (no march detail), one DF shimmer column",

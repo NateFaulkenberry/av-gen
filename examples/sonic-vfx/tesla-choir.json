@@ -1605,12 +1605,12 @@
   "vocabulary": [
    [
     "melodic / chords",
-    "notes.class.<k> (pitch class)",
+    "response.note",
     "each held note arcs from the core to its tower; a triad draws a triangle of lightning, a cluster a jagged fan"
    ],
    [
     "velocity",
-    "the class's held velocity",
+    "notes.lastVelocity",
     "arc brightness and its light"
    ],
    [
@@ -1645,7 +1645,7 @@
    ],
    [
     "timbre",
-    "sonic.roughness, brightness",
+    "sonic.roughness",
     "arc jaggedness; arc colour from violet to blue-white"
    ]
   ],

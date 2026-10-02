@@ -1213,7 +1213,7 @@
    ],
    [
     "melodic",
-    "notes.noteOn + notes.lastPitch",
+    "response.note",
     "a star is born at the orbit set by its pitch (low notes far and slow, high notes close and fast) and spirals in, trailing light"
    ],
    [

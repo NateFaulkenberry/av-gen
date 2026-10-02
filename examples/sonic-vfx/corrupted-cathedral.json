@@ -1246,7 +1246,7 @@
    ],
    [
     "melodic",
-    "notes.noteOn + notes.lastPitch",
+    "response.note",
     "the bay at the pitch's place flares (low notes near the door, high notes near the apse)"
    ],
    [
@@ -1271,7 +1271,7 @@
    ],
    [
     "phrase",
-    "notes.phraseStart",
+    "notes.phrase",
     "a scan sweep crosses the frame and rebuilds it"
    ],
    [

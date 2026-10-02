@@ -45,9 +45,9 @@ DESIGN = {
     },
     "vocabulary": [
         ["sustained", "response.sustain", "the gill ring blooms, the air under the organism warms, spores thicken"],
-        ["melodic", "notes.noteOn + notes.lastPitch", "a pulse of light lights the thread its pitch picks (the "
+        ["melodic", "response.note", "a pulse of light lights the thread its pitch picks (the "
          "threads hang left to right, low to high) and climbs it"],
-        ["velocity", "notes.noteOn strength", "how bright the thread's pulse is"],
+        ["velocity", "notes.lastVelocity", "how bright the thread's pulse is"],
         ["chord", "notes.polyphony", "a chord shimmers through the whole curtain of threads"],
         ["bass", "response.bass", "the organism breathes: the cap swells, the threads sway"],
         ["kick", "response.kick", "a contraction: the cap tightens and springs back; a puff of spores"],

@@ -46,13 +46,13 @@ DESIGN = {
     },
     "vocabulary": [
         ["sustained", "response.sustain", "reconstruction: the lines sharpen and brighten, the corruption heals"],
-        ["melodic", "notes.noteOn + notes.lastPitch", "the bay at the pitch's place flares (low notes near the "
+        ["melodic", "response.note", "the bay at the pitch's place flares (low notes near the "
          "door, high notes near the apse)"],
         ["bass", "response.bass", "the structure sways (an SDF warp) and the lines thicken"],
         ["kick", "response.kick", "a structural fracture: the stone breaks into Voronoi cells for a moment"],
         ["snare", "response.snare", "frame corruption: mosh blocks and a magenta channel shift"],
         ["hat", "response.hat", "data motes flicker"],
-        ["phrase", "notes.phraseStart", "a scan sweep crosses the frame and rebuilds it"],
+        ["phrase", "notes.phrase", "a scan sweep crosses the frame and rebuilds it"],
         ["velocity", "notes.lastVelocity", "how hard a note flares its bay"],
         ["density", "notes.density", "fragmentation: more, smaller mosh blocks"],
         ["roughness", "sonic.roughness", "a rough sound leaves the stone permanently fractured"],

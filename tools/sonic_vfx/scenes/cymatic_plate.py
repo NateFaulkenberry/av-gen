@@ -41,7 +41,7 @@ DESIGN = {
     },
     "vocabulary": [
         ["melodic", "notes.lastPitch", "the mode numbers: low notes draw simple figures, high notes intricate ones"],
-        ["chord", "notes.lowest, notes.chord", "a second figure from the lowest note is superposed: the figures "
+        ["chord", "notes.lowest", "a second figure from the lowest note is superposed: the figures "
          "fight"],
         ["sustained", "notes.held", "a held note sharpens the figure (the nodal lines narrow); silence scatters the "
          "sand"],

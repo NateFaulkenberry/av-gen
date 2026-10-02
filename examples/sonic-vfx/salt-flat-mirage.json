@@ -624,12 +624,12 @@
   "vocabulary": [
    [
     "sustained / chords",
-    "notes.tension, sonic.brightness, response.sustain",
+    "notes.tension",
     "the chord paints the sky: the palette moves from gold (consonant, bright) through rose and violet to indigo (dissonant, dark), and held sound brightens the whole sky"
    ],
    [
     "melodic",
-    "notes.noteOn + notes.lastPitch",
+    "response.note",
     "a meteor falls at the pitch's place across the sky (low notes low and left, high notes high and right), all from one radiant"
    ],
    [
@@ -654,7 +654,7 @@
    ],
    [
     "hat",
-    "response.hat, response.hatRate",
+    "response.hat",
     "salt grains blowing low across the flat"
    ],
    [

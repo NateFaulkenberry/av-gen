@@ -46,7 +46,7 @@ DESIGN = {
     },
     "vocabulary": [
         ["sustained", "response.sustain", "the disk heats: every band brighter, the gas denser and whiter"],
-        ["melodic", "notes.noteOn + notes.lastPitch", "a star is born at the orbit set by its pitch (low notes far "
+        ["melodic", "response.note", "a star is born at the orbit set by its pitch (low notes far "
          "and slow, high notes close and fast) and spirals in, trailing light"],
         ["velocity", "notes.lastVelocity", "how many stars and how bright"],
         ["polyphony", "notes.polyphony", "a chord releases a cluster: the birthplace spreads"],

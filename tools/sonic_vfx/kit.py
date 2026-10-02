@@ -427,7 +427,7 @@ class Scene:
         return e
 
     def effect(self, fid, ftype, owner=None, parameters=None, activation="always", timing=None, style="",
-               trigger=None, order=0, name=None):
+               trigger=None, order=0, name=None, extra=None):
         """An Effect Library instance (ADR-702). `owner` is ("world",) or ("entity", name) or ("camera",) or
         ("light", name). `trigger` (a dict, e.g. {"source": "signal", "name": "response.kick", "threshold": 0.3})
         makes it an EVENT activation."""
@@ -445,6 +445,8 @@ class Scene:
         if trigger is not None:
             e["activation"] = "trigger"
             e["trigger"] = trigger
+        if extra:
+            e.update(extra)       # the shared rows a type uses at its top level: "ground", "flow", ...
         self.effects.append(e)
         return e
 

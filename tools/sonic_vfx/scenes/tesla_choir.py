@@ -44,16 +44,16 @@ DESIGN = {
         "extremely_fast": ["the kick's discharge", "the snare's crackle", "sparks (hat)"],
     },
     "vocabulary": [
-        ["melodic / chords", "notes.class.<k> (pitch class)", "each held note arcs from the core to its tower; a "
+        ["melodic / chords", "response.note", "each held note arcs from the core to its tower; a "
          "triad draws a triangle of lightning, a cluster a jagged fan"],
-        ["velocity", "the class's held velocity", "arc brightness and its light"],
+        ["velocity", "notes.lastVelocity", "arc brightness and its light"],
         ["sustained", "notes.held", "a held note is a steady writhing arc; a staccato note one crack"],
         ["bass", "response.bass", "the core charges: its top-load glows and the hall hums brighter"],
         ["kick", "response.kick", "a discharge: bolts from the core to the ring, the hall flashes"],
         ["snare", "response.snare", "crackle crawls over the core"],
         ["hat", "response.hat", "sparks spit from the core's crown"],
         ["tension", "notes.tension", "dissonant chords make the arcs jagged and flickering"],
-        ["timbre", "sonic.roughness, brightness", "arc jaggedness; arc colour from violet to blue-white"],
+        ["timbre", "sonic.roughness", "arc jaggedness; arc colour from violet to blue-white"],
     ],
     "tier": "medium: haze march (24 steps live), twelve ribbon arcs, one SDF hall",
 }
