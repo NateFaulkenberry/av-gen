@@ -102,8 +102,6 @@ public:
 
 private:
     ResponseSignals ids_;
-    std::array<analysis::HitPicker, analysis::kHitClassCount> pickers_{};
-    bool pickersReady_ = false;
     std::array<float, kResponseHitCount> env_{};
     std::array<bool, kResponseHitCount> pending_{};
     std::array<float, kResponseHitCount> pendingStrength_{};

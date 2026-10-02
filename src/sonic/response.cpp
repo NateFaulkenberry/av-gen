@@ -137,23 +137,19 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     const float levelS = levelSensitivity(c);
     const double att = std::clamp(static_cast<double>(c.attack), 0.25, 4.0);
     const double rel = std::clamp(static_cast<double>(c.release), 0.25, 4.0);
-    if (!pickersReady_) {
-        for (std::size_t k = 0; k < pickers_.size(); ++k) {
-            pickers_[k] = analysis::defaultHitPicker(static_cast<analysis::HitClass>(k));
-        }
-        pickersReady_ = true;
-    }
-    // ---- hits: the causal ratios, picked at a threshold the sensitivity moves ----
+    // ---- hits: the detector's decisions (ADR-1067), their strength shaped by the sensitivity. Below neutral the
+    // weakest are dropped (at 0.25 those under 0.3); above it they are lifted, but no hit is made that the detector did
+    // not hear: the detector's thresholds are measured, the performer's knob is how much they show. ----
     for (std::size_t h = 0; h < kResponseHitCount; ++h) {
         env_[h] *= static_cast<float>(std::exp(-dt / (static_cast<double>(s.hitRelease[h]) * rel)));
     }
+    const float minStrength = std::max(0.0f, 0.5f - hitS) * 1.2f;
     for (std::size_t i = 0; i < kAudioHits.size(); ++i) {
         const auto k = static_cast<std::size_t>(kAudioHits[i]);
-        analysis::HitPicker& p = pickers_[k];
-        const float base = analysis::defaultHitPicker(kAudioHits[i]).fire;
-        p.fire = base * std::exp2((0.5f - hitS) * 1.2f); // 0.66x .. 1.5x the default threshold
-        const float ratio = o.valid ? o.ratio[k] : 0.0f;
-        const float strength = hitS > 0.0f ? p.step(ratio, dt) : 0.0f;
+        float strength = hitS > 0.0f && o.valid && o.hit[k] ? o.strength[k] : 0.0f;
+        if (strength < minStrength) {
+            strength = 0.0f;
+        }
         if (strength > 0.0f) {
             const float shaped = curve(strength, hitS) * presence(hitS);
             const std::size_t h = i; // kAudioHits are in ResponseHit order

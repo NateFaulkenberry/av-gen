@@ -82,14 +82,20 @@ inline Kit makeKit(int bars, bool drums = true, bool bassLine = true, bool pad =
             if (bassLine && (s16 == 2 || s16 == 10)) {
                 k.bass.push_back(t0);
                 const double f = (b % 4 < 2) ? 55.0 : 49.0;
-                double lp = 0.0;
+                // An alias-free saw (additive) through a falling filter envelope, as a synth's plucked bass: the
+                // cutoff starts near 1.2 kHz and falls to 200 Hz. (A naive saw aliases its whole spectrum into a
+                // broadband buzz that no synth produces, and that reads as noise to a frequency median: ADR-1067.)
                 for (std::size_t i = 0; i < at(0.22); ++i) {
                     const double t = static_cast<double>(i) / kRate;
-                    const double saw = 2.0 * (f * t - std::floor(f * t + 0.5));
-                    const double cut = 0.02 + 0.25 * std::exp(-t * 18.0);
-                    lp += cut * (saw - lp);
+                    const double cutoff = 200.0 + 1000.0 * std::exp(-t * 18.0);
+                    double saw = 0.0;
+                    for (int h = 1; h * f < 4000.0; ++h) {
+                        const double fh = h * f;
+                        const double lowpass = 1.0 / std::sqrt(1.0 + std::pow(fh / cutoff, 4.0));
+                        saw += lowpass * std::sin(kTwoPi * fh * t) / h;
+                    }
                     const double env = std::min(1.0, t / 0.003) * std::exp(-t * 7.0);
-                    if (i0 + i < n) mono[i0 + i] += static_cast<float>(0.45 * env * lp);
+                    if (i0 + i < n) mono[i0 + i] += static_cast<float>(0.3 * env * saw);
                 }
             }
         }

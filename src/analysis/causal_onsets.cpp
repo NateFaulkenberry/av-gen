@@ -9,12 +9,17 @@ namespace avgen::analysis {
 
 namespace {
 
-constexpr float kCompression = 40.0f; // Y = log(1 + 40 |X| / ref): tuned on the kit at full level and 12 dB down
-
-float smoothstep(float a, float b, float x) {
-    const float t = std::clamp((x - a) / (b - a), 0.0f, 1.0f);
-    return t * t * (3.0f - 2.0f * t);
-}
+constexpr float kCompression = 40.0f; // Y = log(1 + 40 |X| / ref)
+constexpr double kKickRefractory = 0.11;
+constexpr double kGridWindow = 4.0;   // seconds of accepted kicks the period is read from
+constexpr double kGridTolerance = 0.02;
+constexpr double kOnGrid = 0.03;      // seconds from the grid that count as on it
+constexpr double kOffGrid = 0.08;     // ...and as clearly off it
+constexpr float kOffGridPenalty = 0.0f;
+constexpr float kLowFloorDb = -60.0f;  // the kick's rise is measured from no lower than this
+constexpr float kLowLevelDb = -45.0f;  // ...and only once the low band reaches this
+constexpr float kSnareHoldDb = 6.0f;
+constexpr float kLowShareDb = 12.0f;   // the low band must be within this of the frame's level   // the snare's noise must hold within this of its attack peak
 
 float powerDb(double power) {
     // Summed squared sine-normalised magnitude over kHannEnergyGain reads a full-scale sine as 1 (0 dB).
@@ -40,7 +45,7 @@ float HitPicker::step(float ratio, double dt) {
     since += dt;
     float fired = 0.0f;
     if (armed && ratio >= fire && ratio >= previous && since >= refractory) {
-        fired = std::clamp((ratio - fire) / std::max(span, 1e-3f) + floor, floor, 1.0f);
+        fired = std::clamp(floor + (1.0f - floor) * (1.0f - fire / std::max(ratio, 1e-6f)), floor, 1.0f);
         armed = false;
         since = 0.0;
     } else if (!armed && ratio < rearm * fire) {
@@ -53,11 +58,11 @@ float HitPicker::step(float ratio, double dt) {
 HitPicker defaultHitPicker(HitClass c) {
     HitPicker p;
     switch (c) {
-    case HitClass::Kick: p.refractory = 0.11; p.fire = 2.0f; p.span = 20.0f; break;
-    case HitClass::Low: p.refractory = 0.10; p.fire = 1.7f; p.span = 20.0f; break;
-    case HitClass::Snare: p.refractory = 0.09; p.fire = 4.0f; p.span = 40.0f; break;
-    case HitClass::Hat: p.refractory = 0.045; p.fire = 2.5f; p.span = 15.0f; break;
-    case HitClass::Onset: p.refractory = 0.04; p.fire = 1.8f; p.span = 15.0f; break;
+    case HitClass::Kick: p.refractory = kKickRefractory; p.fire = 1.0f; break; // decided by its score, not a ratio
+    case HitClass::Low: p.refractory = 0.10; p.fire = 1.7f; break;
+    case HitClass::Snare: p.refractory = 0.09; p.fire = 3.0f; break;
+    case HitClass::Hat: p.refractory = 0.045; p.fire = 3.0f; break;
+    case HitClass::Onset: p.refractory = 0.04; p.fire = 1.8f; break;
     case HitClass::Count: break;
     }
     return p;
@@ -69,15 +74,23 @@ CausalOnsetDetector::CausalOnsetDetector(CausalOnsetConfig config) : config_(con
 
 void CausalOnsetDetector::reset() {
     havePrevious_ = false;
+    reference_ = 0.0f;
+    seconds_ = 0.0;
+    frames_ = 0;
     for (std::size_t c = 0; c < kHitClassCount; ++c) {
         history_[c].assign(static_cast<std::size_t>(std::max(config_.medianFrames, 1)), 0.0f);
         head_[c] = 0;
         pickers_[c] = defaultHitPicker(static_cast<HitClass>(c));
-        peak_[c] = 0.0f;
     }
-    previousOnsetRatio_ = 0.0f;
-    snareFloorDb_ = -120.0f;
-    reference_ = 0.0f;
+    scratch_.assign(history_[0].size(), 0.0f);
+    lowDb_.fill(-120.0f);
+    subDb_.fill(-120.0f);
+    rise_.fill(0.0f);
+    click_.fill(0.0f);
+    lastKick_ = -1e9;
+    kicks_.clear();
+    noiseHistory_.fill(-120.0f);
+    pending_.clear();
 }
 
 void CausalOnsetDetector::layout(std::size_t bins, float binHz) {
@@ -89,38 +102,121 @@ void CausalOnsetDetector::layout(std::size_t bins, float binHz) {
         b.to = std::min(bins, std::max(b.from + 1, static_cast<std::size_t>(std::round(hi / binHz)) + 1));
         return b;
     };
-    kick_ = band(40.0f, 120.0f);
-    harmonic_ = band(130.0f, 400.0f);
-    body_ = band(150.0f, 300.0f);
+    low_ = band(40.0f, 120.0f);
+    sub_ = band(30.0f, 70.0f);
     snare_ = band(1500.0f, 5000.0f);
     hat_ = band(7000.0f, 16000.0f);
     broad_ = band(30.0f, 16000.0f);
     bass_ = band(30.0f, 150.0f);
-    split_ = {band(40.0f, 120.0f), band(121.0f, 400.0f), band(401.0f, 1500.0f), band(1501.0f, 5000.0f),
-              band(5001.0f, 7000.0f), band(7001.0f, 16000.0f)};
     previous_.assign(bins, 0.0f);
     flux_.assign(bins, 0.0f);
-    scratch_.assign(history_[0].size(), 0.0f);
+    percussive_.assign(bins, 0.0f);
+    window_.assign(static_cast<std::size_t>(2 * std::max(config_.percussiveHalfWidth, 1) + 1), 0.0f);
     havePrevious_ = false;
 }
 
-float CausalOnsetDetector::bandMean(const Band& b) const {
+float CausalOnsetDetector::meanOf(const std::vector<float>& v, const Band& b) {
     if (b.to <= b.from) {
         return 0.0f;
     }
     double sum = 0.0;
     for (std::size_t k = b.from; k < b.to; ++k) {
-        sum += flux_[k];
+        sum += v[k];
     }
     return static_cast<float>(sum / static_cast<double>(b.to - b.from));
 }
 
-float CausalOnsetDetector::bandPower(const AnalysisFrame& frame, const Band& b) const {
+float CausalOnsetDetector::bandDb(const AnalysisFrame& frame, const Band& b) const {
     double p = 0.0;
     for (std::size_t k = b.from; k < b.to && k < frame.magnitude.size(); ++k) {
         p += static_cast<double>(frame.magnitude[k]) * frame.magnitude[k];
     }
     return powerDb(p);
+}
+
+float CausalOnsetDetector::ratioOf(std::size_t c, float odf) {
+    auto& h = history_[c];
+    std::copy(h.begin(), h.end(), scratch_.begin());
+    const auto mid = scratch_.begin() + static_cast<std::ptrdiff_t>(scratch_.size() / 2);
+    std::nth_element(scratch_.begin(), mid, scratch_.end());
+    const float threshold = config_.lambda * *mid + config_.delta[c];
+    h[head_[c]] = odf;
+    head_[c] = (head_[c] + 1) % h.size();
+    return odf / std::max(threshold, 1e-9f);
+}
+
+void CausalOnsetDetector::decideKick(CausalOnsets& out, double hop) {
+    constexpr auto kKick = static_cast<std::size_t>(HitClass::Kick);
+    // The candidate is the previous hop: a local maximum of the rise, decided now that this hop is known.
+    const float r = rise_[1];
+    if (!(r >= config_.kickCandidateRise && r >= rise_[2] && r >= rise_[0])) {
+        return;
+    }
+    const double t = seconds_ - hop;
+    if (t - lastKick_ < kKickRefractory) {
+        return;
+    }
+    // The click from three hops before the peak to this hop: a kick's sweep starts above the low band and falls into
+    // it, so the band's rise peaks two or three hops after the beater's click.
+    const float click = *std::max_element(click_.begin(), click_.end());
+    // The period the recent kicks keep: a comb over their pairwise differences, the longest period that explains
+    // most of them (its divisors explain them too, so the longest is the kick's own).
+    float onGrid = 0.0f;
+    float offGrid = 0.0f;
+    while (!kicks_.empty() && t - kicks_.front() > kGridWindow) {
+        kicks_.erase(kicks_.begin());
+    }
+    if (kicks_.size() >= 4) {
+        std::size_t pairs = 0;
+        for (std::size_t a = 0; a < kicks_.size(); ++a) {
+            pairs += kicks_.size() - a - 1;
+        }
+        double bestScore = 0.0;
+        std::array<double, 251> scores{}; // periods 0.25 .. 1.5 s in 5 ms steps
+        for (std::size_t s = 0; s < scores.size(); ++s) {
+            const double period = 0.25 + 0.005 * static_cast<double>(s);
+            int fit = 0;
+            for (std::size_t a = 0; a < kicks_.size(); ++a) {
+                for (std::size_t b = a + 1; b < kicks_.size(); ++b) {
+                    const double d = kicks_[b] - kicks_[a];
+                    const double n = std::round(d / period);
+                    fit += (n >= 1.0 && std::abs(d - n * period) <= kGridTolerance) ? 1 : 0;
+                }
+            }
+            scores[s] = static_cast<double>(fit) / static_cast<double>(pairs);
+            bestScore = std::max(bestScore, scores[s]);
+        }
+        if (bestScore >= 0.6) {
+            double period = 0.25;
+            for (std::size_t s = 0; s < scores.size(); ++s) {
+                if (scores[s] >= 0.9 * bestScore) {
+                    period = 0.25 + 0.005 * static_cast<double>(s);
+                }
+            }
+            const double phase = std::fmod((t - kicks_.back()) / period, 1.0);
+            const double distance = std::min(phase, 1.0 - phase) * period;
+            onGrid = distance <= kOnGrid ? 1.0f : 0.0f;
+            offGrid = distance >= kOffGrid ? 1.0f : 0.0f;
+            out.kickPeriod = static_cast<float>(period);
+        }
+    }
+    const float score = std::min(r / config_.kickRiseScale, config_.kickRiseCap) +
+                        std::min(click / config_.kickClickScale, 1.5f) + config_.kickGrid * onGrid -
+                        kOffGridPenalty * offGrid;
+    const bool strong = r >= config_.kickStrongRise && click > config_.kickStrongClick;
+    if (!strong && score < config_.kickThreshold) {
+        return;
+    }
+    out.hit[kKick] = true;
+    out.deferred[kKick] = true;
+    out.kickScore = score;
+    float strength = std::clamp(0.35f + 0.65f * (score - config_.kickThreshold) / 1.5f, 0.35f, 1.0f);
+    if (strong) {
+        strength = std::max(strength, 0.6f);
+    }
+    out.strength[kKick] = strength;
+    lastKick_ = t;
+    kicks_.push_back(t);
 }
 
 void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopSeconds) {
@@ -133,11 +229,11 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
     if (bins != bins_ || binHz != binHz_) {
         layout(bins, binHz);
     }
-    // ---- SuperFlux over the compressed spectrum ----
-    // The compression is relative to a causal peak of the spectrum (up at once, down over 3 s, never below -80 dB),
-    // so a take 12 dB quieter gives the same flux: log(1 + 100 |X|) alone is linear for quiet partials and
-    // logarithmic for loud ones, which moved the band shares the classes read with the input level.
+    seconds_ = static_cast<double>(frames_) * hopSeconds;
+    ++frames_;
     const auto& m = frame.magnitude;
+
+    // ---- the compressed spectrum's flux, against a causal spectral peak (level-free) ----
     float framePeak = 0.0f;
     for (std::size_t k = 1; k < bins; ++k) {
         framePeak = std::max(framePeak, m[k]);
@@ -148,93 +244,131 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
         reference_ += static_cast<float>(1.0 - std::exp(-hopSeconds / 3.0)) * (framePeak - reference_);
     }
     const float gain = kCompression / std::max(reference_, 1e-4f);
+    const bool first = !havePrevious_;
     for (std::size_t k = 0; k < bins; ++k) {
-        const float y = std::log1p(gain * std::max(m[k], 0.0f));
-        if (havePrevious_) {
-            const auto prev = [&](std::size_t i) { return std::log1p(gain * previous_[i]); };
-            const float ref = std::max(prev(k), std::max(prev(k > 0 ? k - 1 : k), prev(k + 1 < bins ? k + 1 : k)));
-            flux_[k] = std::max(0.0f, y - ref);
-        } else {
+        if (first) {
             flux_[k] = 0.0f;
+            continue;
         }
+        const auto prev = [&](std::size_t i) { return std::log1p(gain * previous_[i]); };
+        const float ref = std::max(prev(k), std::max(prev(k > 0 ? k - 1 : k), prev(k + 1 < bins ? k + 1 : k)));
+        flux_[k] = std::max(0.0f, std::log1p(gain * std::max(m[k], 0.0f)) - ref);
     }
-    // The previous frame is kept raw and compressed with this frame's reference, so the two are compared alike.
     for (std::size_t k = 0; k < bins; ++k) {
         previous_[k] = std::max(m[k], 0.0f);
     }
-    const bool first = !havePrevious_;
     havePrevious_ = true;
 
-    const float kick = bandMean(kick_);
-    const float harmonic = bandMean(harmonic_);
-    const float body = bandMean(body_);
-    const float snare = bandMean(snare_);
-    const float hat = bandMean(hat_);
-    const float broad = bandMean(broad_);
-    out.flux = broad;
-    out.bassDb = bandPower(frame, bass_);
-    out.levelDb = bandPower(frame, broad_);
-    out.snareDb = bandPower(frame, snare_);
-    out.hatDb = bandPower(frame, hat_);
-    // How much of the low attack is the kick band's own: a kick's attack sits below 120 Hz, a bass note's carries up
-    // its harmonics. Summed rather than averaged, so the wider harmonic band is not diluted.
-    const double kickSum = static_cast<double>(kick) * static_cast<double>(kick_.to - kick_.from);
-    const double harmonicSum = static_cast<double>(harmonic) * static_cast<double>(harmonic_.to - harmonic_.from);
-    for (std::size_t b = 0; b < split_.size(); ++b) {
-        out.bandFlux[b] = bandMean(split_[b]) * static_cast<float>(split_[b].to - split_[b].from);
+    // ---- the frequency medians: percussive flux over 1.5-16 kHz, the noise floor over 1.5-5 kHz ----
+    const auto hw = static_cast<std::size_t>(std::max(config_.percussiveHalfWidth, 1));
+    const auto median = [&](const std::vector<float>& v, std::size_t k) {
+        const std::size_t lo = k >= hw ? k - hw : 0;
+        const std::size_t hi = std::min(bins, k + hw + 1);
+        const std::size_t n = hi - lo;
+        std::copy(v.begin() + static_cast<std::ptrdiff_t>(lo), v.begin() + static_cast<std::ptrdiff_t>(hi),
+                  window_.begin());
+        const auto mid = window_.begin() + static_cast<std::ptrdiff_t>(n / 2);
+        std::nth_element(window_.begin(), mid, window_.begin() + static_cast<std::ptrdiff_t>(n));
+        return *mid;
+    };
+    for (std::size_t k = snare_.from; k < hat_.to; ++k) {
+        percussive_[k] = median(flux_, k);
     }
-    out.bodyRatio = body / std::max(snare, 1e-4f);
-    out.kickShape = kickSum + harmonicSum > 1e-9 ? static_cast<float>(kickSum / (kickSum + harmonicSum)) : 0.0f;
-    // Where this frame's new energy is: each band's share of the summed log-flux. A kick's attack puts about 5-16%
-    // of it below 120 Hz (a bright bass pluck 1-2%: its attack spreads up the harmonics); a hat's about 40-90% above
-    // 7 kHz.
-    float totalFlux = 0.0f;
-    for (const float v : out.bandFlux) {
-        totalFlux += v;
+    double noise = 0.0;
+    for (std::size_t k = snare_.from; k < snare_.to; ++k) {
+        noise += median(m, k);
     }
-    const float lowShare = totalFlux > 1e-6f ? out.bandFlux[0] / totalFlux : 0.0f;
-    const float hatShare = totalFlux > 1e-6f ? out.bandFlux[5] / totalFlux : 0.0f;
-    // How far the snare band's power rose over its own recent floor (a follower that falls at once and rises over
-    // 0.4 s): a snare's noise lifts it 10 dB or more, a kick's click (a millisecond in a 43 ms window) a few.
-    const float snareRise = out.snareDb - snareFloorDb_;
-    snareFloorDb_ = out.snareDb < snareFloorDb_
-                        ? out.snareDb
-                        : snareFloorDb_ + static_cast<float>(1.0 - std::exp(-hopSeconds / 0.4)) * (out.snareDb - snareFloorDb_);
-    out.snareRise = snareRise;
+    noise /= static_cast<double>(std::max<std::size_t>(snare_.to - snare_.from, 1));
+    out.noiseDb = noise > 1e-12 ? static_cast<float>(20.0 * std::log10(noise)) : -120.0f;
 
-    const std::array<float, kHitClassCount> odf{kick, kick, std::max(snare, 0.5f * (snare + body)), hat, broad};
-    // The classes are evaluated with the broadband onset first, so the kick can ask whether a click came with it.
-    constexpr std::array<std::size_t, kHitClassCount> kOrder{4, 0, 1, 2, 3};
-    float onsetRatio = 0.0f;
-    for (const std::size_t c : kOrder) {
-        auto& h = history_[c];
-        std::copy(h.begin(), h.end(), scratch_.begin());
-        const auto mid = scratch_.begin() + static_cast<std::ptrdiff_t>(scratch_.size() / 2);
-        std::nth_element(scratch_.begin(), mid, scratch_.end());
-        peak_[c] *= static_cast<float>(std::exp(-hopSeconds / std::max(config_.peakSeconds, 1e-3)));
-        const float threshold = std::max(config_.lambda * *mid + config_.delta[c], config_.peakShare * peak_[c]);
-        peak_[c] = std::max(peak_[c], odf[c]);
-        float ratio = first ? 0.0f : odf[c] / threshold;
-        switch (static_cast<HitClass>(c)) {
-        case HitClass::Kick:
-            ratio *= smoothstep(2.6f, 5.0f, std::max(onsetRatio, previousOnsetRatio_)) * smoothstep(0.03f, 0.06f, lowShare);
-            break;
-        case HitClass::Snare: ratio *= smoothstep(-19.5f, -17.0f, out.snareDb - out.levelDb); break;
-        case HitClass::Hat: ratio *= smoothstep(0.25f, 0.35f, hatShare); break;
-        default: break;
-        }
-        out.ratio[c] = ratio;
-        out.odf[c] = odf[c];
-        if (c == static_cast<std::size_t>(HitClass::Onset)) {
-            onsetRatio = ratio;
-        }
-        h[head_[c]] = odf[c];
-        head_[c] = (head_[c] + 1) % h.size();
-        const float s = pickers_[c].step(ratio, hopSeconds);
+    // ---- levels ----
+    out.bassDb = bandDb(frame, bass_);
+    out.levelDb = bandDb(frame, broad_);
+    out.snareDb = bandDb(frame, snare_);
+    out.hatDb = bandDb(frame, hat_);
+    const float lowDb = bandDb(frame, low_);
+    const float subDb = bandDb(frame, sub_);
+
+    // ---- the ODFs and their ratios ----
+    constexpr auto kKick = static_cast<std::size_t>(HitClass::Kick);
+    constexpr auto kLow = static_cast<std::size_t>(HitClass::Low);
+    constexpr auto kSnare = static_cast<std::size_t>(HitClass::Snare);
+    constexpr auto kHat = static_cast<std::size_t>(HitClass::Hat);
+    constexpr auto kOnset = static_cast<std::size_t>(HitClass::Onset);
+    out.flux = meanOf(flux_, broad_);
+    out.click = meanOf(percussive_, snare_);
+    out.odf[kLow] = meanOf(flux_, low_);
+    out.odf[kSnare] = meanOf(percussive_, snare_);
+    out.odf[kHat] = meanOf(percussive_, hat_);
+    out.odf[kOnset] = out.flux;
+    for (const std::size_t c : {kLow, kSnare, kHat, kOnset}) {
+        const float ratio = ratioOf(c, out.odf[c]);
+        out.ratio[c] = first ? 0.0f : ratio;
+    }
+    for (const std::size_t c : {kLow, kHat, kOnset}) {
+        const float s = pickers_[c].step(out.ratio[c], hopSeconds);
         out.hit[c] = s > 0.0f;
         out.strength[c] = s;
     }
-    previousOnsetRatio_ = onsetRatio;
+
+    // ---- the kick: the low band's rise over its own floor (the minimum of the previous three hops), the click,
+    // the period. lowDb_[1..3] hold the previous three hops. ----
+    // Measured from no lower than kLowFloorDb, and only when the band is at least kLowLevelDb: from silence a hat's
+    // sidelobe "rises" tens of dB.
+    const auto riseOf = [](const std::array<float, 4>& db, float now) {
+        if (now < kLowLevelDb) {
+            return 0.0f;
+        }
+        return now - std::max(kLowFloorDb, std::min(db[1], std::min(db[2], db[3])));
+    };
+    // A kick's body is a large part of the frame; a snare's body leaking through the window's sidelobes is not.
+    const bool lowCarries = std::max(lowDb, subDb) >= out.levelDb - kLowShareDb;
+    const float rise = lowCarries ? std::max(riseOf(lowDb_, lowDb), riseOf(subDb_, subDb)) : 0.0f;
+    for (std::size_t i = 1; i + 1 < lowDb_.size(); ++i) {
+        lowDb_[i] = lowDb_[i + 1];
+        subDb_[i] = subDb_[i + 1];
+    }
+    lowDb_.back() = lowDb;
+    subDb_.back() = subDb;
+    rise_ = {rise_[1], rise_[2], frames_ > 4 ? rise : 0.0f};
+    std::rotate(click_.begin(), click_.begin() + 1, click_.end());
+    click_.back() = out.click;
+    out.lowRise = rise_[2];
+    out.odf[kKick] = rise_[2];
+    out.ratio[kKick] = rise_[2] / std::max(config_.kickCandidateRise, 1e-3f);
+    // A kick's body is still there on the decision hop; a snare's onset smears into the low band for one frame.
+    if (frames_ > 5 && lowCarries) {
+        decideKick(out, hopSeconds);
+    }
+
+    // ---- the snare: an attack now, confirmed kDeferFrames hops later by a noise floor that stayed up ----
+    for (Pending& p : pending_) {
+        ++p.age;
+        if (p.age <= 1) {
+            p.peak = std::max(p.peak, out.noiseDb); // the attack and the hop after it
+        }
+    }
+    while (!pending_.empty() && pending_.front().age >= kDeferFrames) {
+        const Pending p = pending_.front();
+        pending_.erase(pending_.begin());
+        if (!out.hit[kSnare] && out.noiseDb - p.before >= config_.snareNoiseRise &&
+            out.noiseDb >= p.peak - kSnareHoldDb) {
+            out.hit[kSnare] = true;
+            out.deferred[kSnare] = true;
+            out.strength[kSnare] = p.strength;
+        }
+    }
+    {
+        const float s = pickers_[kSnare].step(out.ratio[kSnare], hopSeconds);
+        if (s > 0.0f && pending_.size() < 8) {
+            pending_.push_back(Pending{0, noiseHistory_.back(), s, out.noiseDb});
+        }
+    }
+    for (std::size_t i = 0; i + 1 < noiseHistory_.size(); ++i) {
+        noiseHistory_[i] = noiseHistory_[i + 1];
+    }
+    noiseHistory_.back() = out.noiseDb;
+
     out.valid = true;
     frame.causal = out;
 }
