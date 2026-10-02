@@ -23,11 +23,13 @@ from tools.sonic_vfx.scenes import SCENES  # noqa: E402
 
 OUT = os.path.expanduser("~/Desktop/av-gen-review/25-sonic-vfx")
 # the class each scene is shown with in its clip and in the tour (the input it was designed round)
-SHOWCASE = {"salt-flat-mirage": "full", "breathing-deep": "pads", "cymatic-plate": "lead",
-            "ferrofluid-crown": "chords", "tesla-choir": "chords", "corrupted-cathedral": "full",
-            "event-horizon": "full", "storm-cell": "full", "feedback-mirror": "arp", "aurora-tundra": "pads",
-            "silk-theatre": "lead", "lantern-lake": "sparse", "datascape": "drumloop", "ember-forest": "full",
-            "abyssal-bloom": "lead"}
+# ("showcase" is the drum loop under the saw lead: until the live detector hears kicks under a bass or a pad, the
+#  mix in which every scene's drum and melody vocabulary can both be seen)
+SHOWCASE = {"salt-flat-mirage": "showcase", "lantern-lake": "showcase", "aurora-tundra": "pads",
+            "breathing-deep": "pads", "abyssal-bloom": "lead", "cymatic-plate": "lead", "silk-theatre": "lead",
+            "ferrofluid-crown": "chords", "feedback-mirror": "arp", "tesla-choir": "chords",
+            "datascape": "showcase", "ember-forest": "showcase", "corrupted-cathedral": "showcase",
+            "storm-cell": "showcase", "stellar-nursery": "chords", "event-horizon": "showcase"}
 
 
 def scene_ids():
@@ -76,13 +78,21 @@ def clip(a, seconds=None, size=None, dst=None, cls=None):
 
 
 def tour(a):
+    """The set list in order, `--seconds` of each scene's capture clip (from 3 s in, past the growing-in), cross-faded.
+    Cut from the clips `capture.py clip` wrote (no re-render); a missing clip is rendered first."""
     parts = []
     work = os.path.join(OUT, "work", "tour")
     os.makedirs(work, exist_ok=True)
     for sid in scene_ids():
-        a.scene = sid
-        parts.append(clip(a, seconds=a.seconds, size=a.size, dst=os.path.join(work, sid + ".mp4"),
-                          cls=SHOWCASE.get(sid, "full")))
+        src = os.path.join(OUT, numbered(sid) + ".mp4")
+        if not os.path.exists(src):
+            a.scene = sid
+            clip(a, cls=SHOWCASE.get(sid, "full"))
+        part = os.path.join(work, sid + ".mp4")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", "3.0", "-t", "%.2f" % a.seconds, "-i", src,
+                        "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+                        part], check=True)
+        parts.append(part)
     # cross-fade the parts (video xfade, audio acrossfade), 0.6 s each
     fade, n = 0.6, len(parts)
     inputs = sum((["-i", p] for p in parts), [])

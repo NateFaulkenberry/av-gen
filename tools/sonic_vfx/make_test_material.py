@@ -294,9 +294,19 @@ def perf_full():
     return pads + bass + lead, hits, 32.0
 
 
+def perf_showcase():
+    """A mix built to show the drums and the melody at once while the live drum detector cannot hear kicks under a
+    bass, a pad or key stabs (drum_recall.py; stabs measured 19 of 32 kicks): the drum loop and the saw lead."""
+    lead, _, _ = perf_lead()
+    _, hits, _ = perf_drumloop()
+    lead = [(b + 4.0, length, p, v, voice) for b, length, p, v, voice in lead if b + 4.0 < 30.0]
+    return lead, hits, 32.0
+
+
 PERFORMANCES = {"pads": perf_pads, "chords": perf_chords, "bass": perf_bass, "lead": perf_lead, "arp": perf_arp,
                 "edrums": perf_edrums, "drumloop": perf_drumloop, "dense": perf_dense, "sparse": perf_sparse,
-                "velocity": perf_velocity, "rapid": perf_rapid, "sustained": perf_sustained, "full": perf_full}
+                "velocity": perf_velocity, "rapid": perf_rapid, "sustained": perf_sustained, "full": perf_full,
+                "showcase": perf_showcase}
 
 
 # ---- rendering ------------------------------------------------------------------------------------------------------
