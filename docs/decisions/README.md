@@ -39,6 +39,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1000-1019 | proto/procedural-space |
 | 1020-1039 | proto/sonic-garden |
 | 1040-1059 | proto/liminal-space |
+| 1060-1079 | proto/sonic-garden VFX expansion |
 | 701+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
