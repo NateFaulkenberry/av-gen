@@ -12,6 +12,7 @@ reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modu
     python3 tools/sonic_vfx/abstract.py stills [id ...] [--size 1920x1080] [--tag v3]       # many silent stills,
                                                                        #   one render queue (one short GPU job)
     python3 tools/sonic_vfx/abstract.py clip <id> [--class allyougot] [--seconds 30] [--size 1920x1080]
+    python3 tools/sonic_vfx/abstract.py clips [id ...] [--class allyougot] [--seconds 30]   # many clips, one queue
     python3 tools/sonic_vfx/abstract.py frame <id> --class allyougot --at 12   # one frame of a reactive clip
     python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the eight
     python3 tools/sonic_vfx/abstract.py maps [id ...]                           # each one's as-built modulation map
@@ -342,10 +343,33 @@ def stills_queue(ids, at, size, tag, projects=None, tier="realtime"):
             print("no frame for", dst)
 
 
+def clips_queue(ids, cls, size, seconds, projects=None, tier="realtime"):
+    """Reactive clips of several prototypes in ONE engine process (a render queue, one GPU lock hold). A queue job
+    takes no particle warm-up, so each clip opens with its particles assembling (the music excerpt starts mid-song)."""
+    import json
+    work = os.path.join(OUT, "work", "reactive")
+    os.makedirs(work, exist_ok=True)
+    w, h = (int(v) for v in size.split("x"))
+    jobs, outs = [], []
+    for sid in ids:
+        proj, dur = review.variant(sid, cls, work, projects or kit.ABSTRACT_DIR)
+        end = min(dur, seconds) if seconds else dur
+        dst = os.path.join(OUT, "%s-%s.mp4" % (numbered(sid), cls))
+        jobs.append({"project": proj, "render": {"width": w, "height": h, "fps": 30, "start": 0.0, "end": end,
+                                                 "output": "video", "path": dst, "codec": "h264", "quality": 90,
+                                                 "muxAudio": True, "tier": tier}})
+        outs.append(dst)
+    qf = os.path.join(work, "queue-%s.json" % cls)
+    json.dump({"format": "avgen-render-queue", "jobs": jobs}, open(qf, "w"), indent=1)
+    review.run(["--headless", "--queue", qf])
+    for dst in outs:
+        print(dst, "ok" if os.path.exists(dst) else "MISSING")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet", "maps",
-                                         "tour", "notes", "stills"])
+                                         "tour", "notes", "stills", "clips"])
     ap.add_argument("scene", nargs="*")
     ap.add_argument("--at", type=float, default=6.0)
     ap.add_argument("--size", default="")
@@ -364,6 +388,9 @@ def main():
         return
     if a.mode == "tour":
         tour(a.cls, a.seconds or 3.6)
+        return
+    if a.mode == "clips":
+        clips_queue(a.scene or scene_ids(), a.cls, a.size or "1920x1080", a.seconds, a.projects or None, a.tier)
         return
     if a.mode == "stills":
         stills_queue(a.scene or scene_ids(), a.at, a.size or "1920x1080", a.tag, a.projects or None, a.tier)
