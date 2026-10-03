@@ -37,6 +37,6 @@ ABSTRACT = [
     "organic_garden",           # 5 Organic Digital Garden: Lantern Reef
     "digital_alpine",           # 6 Digital Alpine: Glass Caldera (07-brief-digital-alpine.md)
     "chromatic_topography",     # 7 Chromatic Topography: Contour Valley (05-brief-direction-correction.md)
-    # 8 glitch_signal            Glitch Signal (06-brief-glitch-signal.md): being built
+    "glitch_signal",            # 8 Glitch Signal: Pixel Canyon (06-brief-glitch-signal.md)
     # 9 bit_ocean                8-Bit Ocean (08-brief-8bit-ocean.md): being built
 ]
