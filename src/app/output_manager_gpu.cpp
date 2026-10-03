@@ -8,8 +8,6 @@
 #include "rendering/output_mapper.hpp"
 
 #include <chrono>
-#include <cstdlib>
-#include <thread>
 
 namespace avgen::app {
 
@@ -138,19 +136,11 @@ Result<void> OutputManager::presentAll(gpu::Context& context, const wgpu::Textur
         if (rt.window->minimised() || !rt.surface->configured()) {
             continue;
         }
-        // TEMPORARY (live-quality §17 verification, not for main): AVGEN_X_SLOW_OUTPUT_MS=<ms> makes the projection's
-        // acquire block that long (a stand-in for a projector that is not taking frames); AVGEN_X_NO_PACER=1 turns
-        // the pacing off, so the two can be compared in the real loop.
-        static const double probeSlowMs = std::getenv("AVGEN_X_SLOW_OUTPUT_MS") != nullptr ? std::atof(std::getenv("AVGEN_X_SLOW_OUTPUT_MS")) : 0.0;
-        static const bool probeNoPacer = std::getenv("AVGEN_X_NO_PACER") != nullptr;
         // ADR-1089: a slow output is presented to less often rather than allowed to hold the loop.
-        if (!o->pacer.due() && !probeNoPacer) {
+        if (!o->pacer.due()) {
             continue;
         }
         const auto acquireStart = std::chrono::steady_clock::now();
-        if (probeSlowMs > 0.0 && o->projection) {
-            std::this_thread::sleep_for(std::chrono::microseconds(static_cast<long long>(probeSlowMs * 1000.0)));
-        }
         auto target = rt.surface->acquire();
         o->pacer.acquired(
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - acquireStart).count());
