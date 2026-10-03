@@ -1101,7 +1101,8 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params0 = glm::vec4(std::clamp(g.displayScanlines, 0.0f, 1.0f), std::max(g.displayLines, 1.0f),
                               g.displayPixelate >= 1.0f ? std::max(g.displayPixelate * pixelScale, 1.0f) : 0.0f,
                               g.displayPosterize >= 2.0f ? std::round(g.displayPosterize) : 0.0f);
-        u.params1 = glm::vec4(std::clamp(g.displayDither, 0.0f, 1.0f), 0.0f, 0.0f, 0.0f);
+        u.params1 = glm::vec4(std::clamp(g.displayDither, 0.0f, 1.0f), std::max(g.displayLetterbox, 0.0f),
+                              std::clamp(g.displayLetterboxAmount, 0.0f, 1.0f), 0.0f);
         PassTextures textures;
         textures.source = current;
         stage_ = "post/display";

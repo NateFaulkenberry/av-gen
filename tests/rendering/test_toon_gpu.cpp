@@ -546,3 +546,39 @@ TEST_CASE("Wire lines draw a procedural node's feature edges, follow its width, 
     CHECK(testing::byteDiff(alone.rgba, again->rgba).identical());
     CHECK(h.ctx->errorCount() == 0);
 }
+
+TEST_CASE("The letterbox blacks the bars to its aspect and slides them in", "[gpu][letterbox][adr1075]") {
+    Harness h;
+    scene::Scene base = cubeOnFloor();
+    const gpu::Image8 control = h.render(base);
+    scene::Scene amountOnly = base;
+    amountOnly.post.glitch.displayLetterboxAmount = 0.5f;
+    CHECK(testing::byteDiff(h.render(amountOnly).rgba, control.rgba).identical());
+
+    scene::Scene wide = base;
+    wide.post.glitch.displayLetterbox = 2.0f; // 256x192 is 1.33: bars of (1 - 1.33/2)/2 = 1/6 of the height
+    const gpu::Image8 boxed = h.render(wide);
+    dump(boxed, "letterbox");
+    const auto rowBlack = [&](const gpu::Image8& img, std::uint32_t y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            if (rgb(img, x, y) != glm::vec3(0.0f)) {
+                return false;
+            }
+        }
+        return true;
+    };
+    CHECK(rowBlack(boxed, 2));
+    CHECK(rowBlack(boxed, kH / 6 - 2));
+    CHECK_FALSE(rowBlack(boxed, kH / 6 + 3));
+    CHECK(rowBlack(boxed, kH - 3));
+    wide.post.glitch.displayLetterboxAmount = 0.5f;
+    const gpu::Image8 half = h.render(wide);
+    CHECK(rowBlack(half, 2));
+    CHECK_FALSE(rowBlack(half, kH / 12 + 3));
+    scene::Scene tall = base;
+    tall.post.glitch.displayLetterbox = 1.0f; // narrower than the frame: pillars
+    const gpu::Image8 pillars = h.render(tall);
+    CHECK(rgb(pillars, 3, kH / 2) == glm::vec3(0.0f));
+    CHECK(rgb(pillars, kW - 4, kH / 2) == glm::vec3(0.0f));
+    CHECK(h.ctx->errorCount() == 0);
+}

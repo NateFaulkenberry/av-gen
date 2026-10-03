@@ -49,6 +49,10 @@ const Spec kSpecs[] = {
     {"post/display/pixelate", "displayPixelate", &PostGlitchSettings::displayPixelate, 0.0f, 512.0f, 0.0f, 64.0f},
     {"post/display/posterize", "displayPosterize", &PostGlitchSettings::displayPosterize, 0.0f, 256.0f, 0.0f, 16.0f},
     {"post/display/dither", "displayDither", &PostGlitchSettings::displayDither, 0.0f, 1.0f, 0.0f, 1.0f},
+    // ADR-1075: the letterbox.
+    {"post/display/letterbox", "displayLetterbox", &PostGlitchSettings::displayLetterbox, 0.0f, 10.0f, 0.0f, 3.0f},
+    {"post/display/letterboxAmount", "displayLetterboxAmount", &PostGlitchSettings::displayLetterboxAmount, 0.0f, 1.0f,
+     0.0f, 1.0f},
 };
 
 } // namespace

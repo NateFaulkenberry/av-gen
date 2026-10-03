@@ -1238,6 +1238,24 @@ fn fs_display(in: FsIn) -> @location(0) vec4<f32> {
         let s = 0.5 + 0.5 * cos(6.2831853 * in.uv.y * post.params0.y);
         colour = colour * mix(1.0, s, depth) / (1.0 - 0.5 * depth); // darker between lines, the mean held
     }
+    // The letterbox: black bars to `params1.y` (width / height), top and bottom for a wider aspect than the
+    // frame's, left and right for a narrower one; `params1.z` slides them in (0 none, 1 the full aspect).
+    let aspect = post.params1.y;
+    if (aspect > 0.0) {
+        let frameAspect = size.x / max(size.y, 1.0);
+        let amount = clamp(post.params1.z, 0.0, 1.0);
+        if (aspect > frameAspect) {
+            let bar = 0.5 * (1.0 - frameAspect / aspect) * amount;
+            if (in.uv.y < bar || in.uv.y > 1.0 - bar) {
+                colour = vec3<f32>(0.0);
+            }
+        } else {
+            let bar = 0.5 * (1.0 - aspect / frameAspect) * amount;
+            if (in.uv.x < bar || in.uv.x > 1.0 - bar) {
+                colour = vec3<f32>(0.0);
+            }
+        }
+    }
     return vec4<f32>(colour, 1.0);
 }
 

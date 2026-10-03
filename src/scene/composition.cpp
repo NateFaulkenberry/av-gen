@@ -4410,6 +4410,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         floatDesc(prefix_ + "camera/orbitSpeed", cameraOrbitSpeedSetting_, -3.0f, 3.0f, -1.0f, 1.0f));
     cameraFov_ =
         &params.add(floatDesc(prefix_ + "camera/fov", cameraFovSetting_, 5.0f, 120.0f, 20.0f, 90.0f));
+    // ADR-1075: a roll about the line of sight, in degrees (positive rolls the camera clockwise, so the horizon
+    // tilts anticlockwise in the picture). The world
+    // and its lights stay put; only the camera's up turns.
+    cameraRoll_ = &params.add(floatDesc(prefix_ + "camera/roll", 0.0f, -720.0f, 720.0f, -180.0f, 180.0f));
     cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
                                                      .defaultValue = cameraModeSetting_,
                                                      .hardMin = 0,
@@ -5797,6 +5801,7 @@ void Composition::detach() {
     cameraSplineOffset_ = nullptr;
     materialParams_.clear();
     cameraFov_ = nullptr;
+    cameraRoll_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
     cameraTarget_ = nullptr;
@@ -8763,6 +8768,16 @@ void Composition::applyParameters() {
         applyCameraBreath(breath, scene_.camera.position, scene_.camera.target, fov);
     }
     scene_.camera.fovYRadians = glm::radians(fov);
+    // ADR-1075: camera/roll turns the up vector about the line of sight; 0 is the world's up exactly.
+    {
+        const float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
+        if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {
+            up = glm::angleAxis(glm::radians(roll), glm::normalize(forward)) * up;
+        }
+        scene_.camera.up = up;
+    }
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();

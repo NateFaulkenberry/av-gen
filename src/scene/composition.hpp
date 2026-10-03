@@ -2385,6 +2385,7 @@ private:
     params::Parameter<float>* cameraHeight_ = nullptr;
     params::Parameter<float>* cameraOrbitSpeed_ = nullptr;
     params::Parameter<float>* cameraFov_ = nullptr;
+    params::Parameter<float>* cameraRoll_ = nullptr; // ADR-1075
     params::Parameter<float>* envIntensity_ = nullptr;
     params::Parameter<float>* envRotation_ = nullptr;
     // env/sky/* (ADR-036)

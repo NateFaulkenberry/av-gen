@@ -71,13 +71,16 @@ struct PostGlitchSettings {
     float displayPixelate = 0.0f;  // mosaic cell, pixels at 1080 lines (< 1 off)
     float displayPosterize = 0.0f; // levels per channel (< 2 off)
     float displayDither = 0.0f;    // 0..1: ordered (Bayer 4x4) dither across the levels
+    float displayLetterbox = 0.0f; // ADR-1075: black bars to this aspect (width / height, e.g. 2.39); 0 off
+    float displayLetterboxAmount = 1.0f; // ADR-1075: 0..1, how far the bars have slid in
 
     [[nodiscard]] bool glitchPassActive() const {
         return shockAmount > 0.0f || glitchAmount > 0.0f || glitchTear > 0.0f || splitAmount > 0.0f ||
                sortAmount > 0.0f || radialAmount > 0.0f;
     }
     [[nodiscard]] bool displayPassActive() const {
-        return displayScanlines > 0.0f || displayPixelate >= 1.0f || displayPosterize >= 2.0f;
+        return displayScanlines > 0.0f || displayPixelate >= 1.0f || displayPosterize >= 2.0f ||
+               (displayLetterbox > 0.0f && displayLetterboxAmount > 0.0f);
     }
 };
 

@@ -20,6 +20,7 @@ agent (`sonic-art`) builds the prototypes on the same branch and reads the "Read
 | 3 | wire lines (edges as lines) on procedural nodes | 1073 | **landed** (procedural nodes incl. instancing, deformers, culling; not glTF entities yet) |
 | 4 | live probe recording limit | - | **landed**: `--record-seconds`, default covers the tour |
 | 5 | live switcher steps through the open project's set (coordinator's request) | 1074 | **landed** |
+| 6 | art agent's engine needs 1, 2, 5: letterbox, camera roll, tiny-scale transform bug | 1075 | **landed** |
 
 ## Resume here
 
@@ -113,6 +114,14 @@ Inspector section **wire**.
 GPU cost (1920x1080, `stylized-eng/bench-wire*.scene.json`, 400 spheres + 24 towers + floor): scene pass 9.70 ms
 without, 10.09 ms with feature edges (+0.4 ms), 10.68 ms with every triangle edge (about 600k edges, +1.0 ms).
 
+## Ready for the art agent: letterbox, camera roll, tiny scales (ADR-1075)
+
+- `post` keys `displayLetterbox` (aspect, e.g. 2.39; 0 off) and `displayLetterboxAmount` (0..1 slide-in); params
+  `post/display/letterbox`, `post/display/letterboxAmount`. Replaces the black-geometry bars.
+- `camera/roll` (degrees) turns the camera, not the world: lights stay fixed.
+- Scale 0.001 now really is tiny (the `Transform::fromMatrix` fallback); the 0.01 parking workaround is no longer needed.
+- No uniform block changed size.
+
 ## Live switcher sets (ADR-1074)
 
 PageUp/PageDown, the Live panel's Scenes row and MIDI program change step through the set the open project belongs
@@ -128,6 +137,10 @@ barycentric builtin, and faking it needs a de-indexed copy of every mesh and a s
 pipeline (depth, shadow, lit), where the edge list costs nothing to any draw that does not ask for lines.
 
 ## Log
+
+- 2026-10-02 (resumed): ADR-1075 landed; `[adr1075]`, `[tinyscale]`, `[camera]`, `[adr1065]` pass. Not done: engine
+  needs 3 (translucent procedurals), 4 (per-instance deformer phase), 6 (audit for live projects), wire/toon on glTF
+  entities (ObjectUniforms is full; needs its own uniform).
 
 - 2026-10-02: feature 3 (wire lines) and the switcher sets landed; `[adr1073]` GPU (1 case) and CPU (3 cases) pass,
   `[live]` CPU passes.

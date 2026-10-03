@@ -33,10 +33,52 @@ Transform Transform::fromMatrix(const glm::mat4& m) {
     Transform t;
     glm::vec3 skew;
     glm::vec4 perspective;
-    if (!glm::decompose(m, t.scale, t.rotation, t.position, skew, perspective)) {
-        t = Transform{};
-        t.position = glm::vec3(m[3]);
+    if (glm::decompose(m, t.scale, t.rotation, t.position, skew, perspective)) {
+        return t;
     }
+    // glm::decompose refuses a matrix whose determinant is under float epsilon -- a uniform scale below about
+    // 0.005 -- and this used to fall back to the identity, so an object shrunk toward zero by a route or a track
+    // popped back to full size, unrotated, at the bottom (the parameters' hard minimum, 0.001, is exactly there).
+    // An affine matrix is decomposed directly instead: the column lengths are the scale (one negated for a
+    // mirror), the normalised columns the rotation, re-orthogonalised so a degenerate axis cannot break it.
+    t = Transform{};
+    t.position = glm::vec3(m[3]);
+    glm::vec3 c[3] = {glm::vec3(m[0]), glm::vec3(m[1]), glm::vec3(m[2])};
+    for (int i = 0; i < 3; ++i) {
+        t.scale[i] = glm::length(c[i]);
+    }
+    if (glm::determinant(glm::mat3(m)) < 0.0f) {
+        t.scale.x = -t.scale.x;
+        c[0] = -c[0];
+    }
+    constexpr float kTiny = 1e-30f;
+    if (t.scale.x * t.scale.x < kTiny && t.scale.y * t.scale.y < kTiny && t.scale.z * t.scale.z < kTiny) {
+        return t; // no direction left to recover: keep the identity rotation
+    }
+    // Gram-Schmidt from the longest axis, completing any degenerate one with a cross product.
+    int a = 0;
+    for (int i = 1; i < 3; ++i) {
+        if (std::abs(t.scale[i]) > std::abs(t.scale[a])) {
+            a = i;
+        }
+    }
+    const int b = (a + 1) % 3;
+    const int d = (a + 2) % 3;
+    glm::vec3 axes[3];
+    axes[a] = c[a] / glm::length(c[a]);
+    glm::vec3 vb = c[b] - axes[a] * glm::dot(axes[a], c[b]);
+    if (glm::dot(vb, vb) < kTiny * 1e6f) {
+        vb = std::abs(axes[a].x) < 0.9f ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+        vb = vb - axes[a] * glm::dot(axes[a], vb);
+    }
+    axes[b] = glm::normalize(vb);
+    axes[d] = glm::cross(axes[a], axes[b]); // (a, b, d) is cyclic, so this is right-handed
+    // Keep the third axis pointing where the matrix's own does, when it has one.
+    if (glm::dot(c[d], c[d]) > kTiny && glm::dot(axes[d], c[d]) < 0.0f) {
+        axes[d] = -axes[d];
+        axes[b] = -axes[b];
+    }
+    t.rotation = glm::normalize(glm::quat_cast(glm::mat3(axes[0], axes[1], axes[2])));
     return t;
 }
 
