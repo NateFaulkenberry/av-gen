@@ -164,6 +164,8 @@ struct AppOptions {
     LiveQualityOverride liveQuality;
     // --live-target <fps> (ADR-1080): the live frame-rate target for the run. 0 = use the setting.
     int liveTargetFps = 0;
+    // --live-frame-cap <on|off> (ADR-1107): pace the live loop at the target. Unset = the setting.
+    std::optional<bool> liveFrameCap;
     // --adaptive-floor <scale>: the lowest scale the ladder may reach (ADR-1024). 0 = use the
     // setting.
     float adaptiveFloor = 0.0f;

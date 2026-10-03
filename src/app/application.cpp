@@ -265,6 +265,8 @@ std::string usageText() {
            "  --live-quality <auto|ultra|high|medium|low|emergency>  the same, naming the level to pin\n"
            "  --live-target <fps>  the live frame-rate target; the GPU budget is derived from it with\n"
            "                      12% headroom (default: the setting, 60) (ADR-1080)\n"
+           "  --live-frame-cap <on|off>  pace the live editor's frames at the target (a whole number of\n"
+           "                      vsyncs) (default: the setting, on) (ADR-1107)\n"
            "  --adaptive-floor <s>  the lowest scale the ladder may reach, 0.38-1 (ADR-1024/1083)\n"
            "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
            "                      given, it also applies to a headless playback run (ADR-1024)\n"
@@ -910,6 +912,14 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                 return fail("--live-target must be between {} and {} fps, got '{}'", kLiveTargetFpsMin,
                             kLiveTargetFpsMax, *v);
             }
+            ++i;
+        } else if (arg == "--live-frame-cap") {
+            auto v = need(i, "--live-frame-cap");
+            if (!v) return std::unexpected(v.error());
+            if (*v != "on" && *v != "off") {
+                return fail("--live-frame-cap expects on or off, got '{}'", *v);
+            }
+            options.liveFrameCap = *v == "on";
             ++i;
         } else if (arg == "--adaptive-floor") {
             auto v = need(i, "--adaptive-floor");
@@ -4522,9 +4532,51 @@ int Application::runLive() {
                   abGroups.size(), options_.uiAbBlocks, options_.uiAbFrames, options_.uiAbSettle);
     }
 
+    // ADR-1107: the frame cap's grid and the refresh it is aligned to (re-read every couple of seconds:
+    // enumerating the displays is not free, and a window dragged to another display is rare).
+    double paceDeadlineMs = 0.0;
+    double paceRefreshHz = 0.0;
+    int paceRefreshAge = 0;
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
         prof.beginFrame();
+        // ---- the frame cap (ADR-1107) ----------------------------------------------------------------
+        //
+        // Wait for the frame's slot on the target's grid, before the input is read, so the wait costs no
+        // input latency. The wait is inside the frame interval (it is how long the frame took to come
+        // round) but is taken out of what the quality controller reads: a capped interval is not GPU cost.
+        // Live editor only (`runHeadless` never gets here), and never while a render job shares the loop
+        // or an --ui-ab measurement is running.
+        double paceWaitMs = 0.0;
+        {
+            const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !job_ && !abRunning;
+            if (capOn && --paceRefreshAge <= 0) {
+                paceRefreshAge = 120;
+                int index = window_ != nullptr ? window_->displayIndex() : -1;
+                if (projection_.state() == Projection::State::Running) {
+                    if (const Output* out = outputs_.find(kProjectionOutputName); out != nullptr && out->desc.display >= 0) {
+                        index = out->desc.display;
+                    }
+                }
+                paceRefreshHz = 0.0;
+                for (const auto& d : platform::Window::displays()) {
+                    if (d.index == index || (index < 0 && d.primary)) {
+                        paceRefreshHz = d.refreshRate;
+                    }
+                }
+            }
+            const double period = liveFrameCapPeriodMs(capOn, autoResolution_.settings().targetFps, paceRefreshHz);
+            const double nowMs = std::chrono::duration<double, std::milli>(frameStart.time_since_epoch()).count();
+            const LivePaceStep step = livePaceStep(nowMs, paceDeadlineMs, period);
+            paceDeadlineMs = step.nextDeadlineMs;
+            if (step.waitMs > 0.0) {
+                std::this_thread::sleep_until(
+                    frameStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                     std::chrono::duration<double, std::milli>(step.waitMs)));
+                paceWaitMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart)
+                                 .count();
+            }
+        }
         if (abRunning) {
             const int perBlock = std::max(1, options_.uiAbFrames);
             const auto arms = static_cast<int>(abGroups.size());
@@ -5456,7 +5508,9 @@ int Application::runLive() {
             // Fed the *interval*, not the CPU time: the controller is deciding whether a smaller
             // world would make frames arrive sooner, and `cpuFrameMs` excludes the swapchain wait
             // that a GPU-bound frame spends most of itself in.
-            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
+            // ADR-1107: less the frame cap's wait, which is idle time, not cost: read with it, a capped
+            // 16.7 ms interval would cap ADR-1085's cost reading and hide that the GPU has room.
+            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs - paceWaitMs));
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
             prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
@@ -5469,7 +5523,7 @@ int Application::runLive() {
             };
             // ADR-1085's reading, smoothed: the span, capped by the (smoothed, so mean) frame interval.
             smooth(liveGpuSpanShown_, stats.gpuFrameMs);
-            smooth(liveIntervalShown_, stats.frameIntervalMs);
+            smooth(liveIntervalShown_, stats.frameIntervalMs - paceWaitMs);
             liveGpuMsShown_ = liveIntervalShown_ > 0.0 && liveIntervalShown_ < liveGpuSpanShown_ ? liveIntervalShown_
                                                                                                  : liveGpuSpanShown_;
             smooth(liveCpuMsShown_, stats.cpuFrameMs);
@@ -5510,7 +5564,7 @@ int Application::runLive() {
             f.frameMs = stats.frameIntervalMs;
             f.gpuMs = stats.gpuFrameMs;
             f.cpuWorkMs = stats.cpuFrameMs;
-            f.waitMs = prof.current(kPhAcquire) + prof.current(kPhPresent);
+            f.waitMs = prof.current(kPhAcquire) + prof.current(kPhPresent) + paceWaitMs;
             f.outputsMs = prof.current(kPhOutputs);
             f.uiMs = prof.current(kPhUi) + prof.current(kPhImgui);
             f.engineUpdateMs = prof.current(kPhEngine);

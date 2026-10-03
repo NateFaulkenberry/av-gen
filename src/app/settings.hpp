@@ -76,6 +76,9 @@ struct AppSettings {
     // (`liveBudget`). The performer's choice, not the display's refresh: a 120 Hz screen does not
     // mean the show wants 120 fps.
     int liveTargetFps = 60;
+    // ADR-1107: pace the live loop so frames are presented at the target (a 60 target on a 120 Hz display
+    // presents every second vsync) instead of as fast as the GPU allows. Live editor only; never a render.
+    bool liveFrameCap = true;
     // ADR-1024, widened by ADR-1083. The lowest render scale the ladder may reach. Its own lowest is
     // 0.38 (pixel-bound scenes at Emergency); raising it is the trade the ladder cannot make for you:
     // measured on the Sonic Garden (AA-RESEARCH.md), thin geometry -- 4-5 px rings -- beads at 0.71

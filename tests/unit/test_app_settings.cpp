@@ -219,6 +219,35 @@ TEST_CASE("the live quality and target round-trip; the target is clamped, an unk
     }
 }
 
+// ADR-1107: the live frame cap is on by default, round-trips, and a file without it (every file written
+// before it existed) gets the default.
+TEST_CASE("the live frame cap round-trips and defaults on", "[app][settings][live-quality]") {
+    app::AppSettings settings;
+    CHECK(settings.liveFrameCap);
+    CHECK(settings.toJson().at("general").at("liveFrameCap") == true);
+    settings.liveFrameCap = false;
+    const auto document = settings.toJson();
+    REQUIRE(document.at("general").at("liveFrameCap") == false);
+    const auto loaded = app::AppSettings::fromJson(document);
+    REQUIRE(loaded.has_value());
+    CHECK_FALSE(loaded->liveFrameCap);
+    {
+        auto doc = document;
+        doc["general"].erase("liveFrameCap");
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->liveFrameCap);
+    }
+    {
+        // Not a bool: the default stands and the rest of the file still loads.
+        auto doc = document;
+        doc["general"]["liveFrameCap"] = "yes";
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->liveFrameCap);
+    }
+}
+
 // ADR-1024: the live antialiasing and the adaptive scale's floor. Per machine, like the budget.
 TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[unit][settings][adr1024]") {
     app::AppSettings settings;

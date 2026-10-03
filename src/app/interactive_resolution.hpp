@@ -126,6 +126,27 @@ struct LiveBudget {
     return {fps, frame, frame * (1.0 - kLiveBudgetHeadroom)};
 }
 
+// ---- the frame cap (ADR-1107) -------------------------------------------------------------------------
+
+// The period the live loop is paced to, in milliseconds; 0 means no cap. Uncapped, a GPU that finishes in
+// 13 ms presents whenever it is done and Fifo lands those frames on alternate 9 and 25 ms intervals; capped,
+// they land on a steady cadence. With the display's refresh known the period is a whole number of vsyncs,
+// the most that is still at least the target rate (60 on 120 Hz: every 2nd vsync; 60 on 144 Hz: every 2nd,
+// 72 fps, rather than an uneven 2-3 alternation). A target above the refresh is not capped: the display
+// is already the lower ceiling. A target equal to it is: measured on this machine, Fifo through the editor
+// and the projection window does not hold the loop at the refresh (72 fps mean on a 60 Hz display).
+// Unknown refresh: the target's own period.
+[[nodiscard]] double liveFrameCapPeriodMs(bool enabled, double targetFps, double refreshHz);
+
+// One step of the pacer: how long to wait now, and the next deadline. Deadlines advance on a fixed grid, so
+// a wake-up that oversleeps does not lengthen the next period; a frame later than half a period restarts
+// the grid from now instead of bursting to catch up. `deadlineMs <= 0` is the first frame (no wait).
+struct LivePaceStep {
+    double waitMs = 0.0;
+    double nextDeadlineMs = 0.0;
+};
+[[nodiscard]] LivePaceStep livePaceStep(double nowMs, double deadlineMs, double periodMs);
+
 // ---- the ladder (ADR-1083, ADR-1084) -------------------------------------------------------------------
 
 enum class LiveQualityLevel : std::uint8_t { Ultra, High, Medium, Low, Emergency };
@@ -321,8 +342,10 @@ struct InteractiveResolutionSettings {
     // The decision is taken on the median of this many recent GPU samples, so one stalled frame
     // (a shader compile, another agent's process) cannot move the rung.
     int windowFrames = 20;
-    // A higher rung must be predicted to fit inside `budgetMs * raiseMargin` ...
-    double raiseMargin = 0.80;
+    // A higher rung must be predicted to fit inside `budgetMs * raiseMargin` ... ADR-1107 raised it from
+    // 0.80: at 0.80 the level that would hold a 60 target sat within 20% of the budget and was never climbed
+    // back to. A raise that then misses is undone by ADR-1104's probation.
+    double raiseMargin = 0.90;
     // ... for this many consecutive frames before the controller climbs (ADR-1085). Two seconds at
     // 60 fps: recovering is the cautious direction, degrading the quick one.
     int raiseHoldFrames = 120;

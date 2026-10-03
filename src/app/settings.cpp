@@ -57,6 +57,7 @@ json AppSettings::toJson() const {
                           {"liveQuality", liveQualityPinned ? std::string(liveQualityLevelToken(*liveQualityPinned))
                                                             : std::string("auto")},
                           {"liveTargetFps", liveTargetFps},
+                          {"liveFrameCap", liveFrameCap},
                           {"adaptiveCanvasFloor", adaptiveCanvasFloor},
                           {"liveAntialias", liveAntialias ? "fxaa" : "off"},
                           {"appearance", appearanceThemeName(appearance)},
@@ -122,6 +123,10 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
         // it can", not a reason to lose the rest of the file.
         out.liveTargetFps =
             std::clamp(general->value("liveTargetFps", out.liveTargetFps), kLiveTargetFpsMin, kLiveTargetFpsMax);
+        // ADR-1107. Not a bool is not a reason to lose the rest of the file: the default stands.
+        if (const auto cap = general->find("liveFrameCap"); cap != general->end() && cap->is_boolean()) {
+            out.liveFrameCap = cap->get<bool>();
+        }
         // Clamped into the ladder's range (ADR-1024, ADR-1083).
         out.adaptiveCanvasFloor =
             std::clamp(general->value("adaptiveCanvasFloor", out.adaptiveCanvasFloor), kLiveScaleFloorMin, 1.0f);

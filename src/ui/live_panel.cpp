@@ -26,6 +26,26 @@ namespace avgen::ui {
 
 namespace {
 
+// The width that leaves a right-hand label room to be read in full: the label's own width plus ImGui's gap
+// between a frame and its label, and a few pixels so the last glyph is not against the edge. A fixed
+// negative width cut "Anti-aliasing" to "Anti-aliasin" at the default font.
+float widthBesideLabel(const char* label) {
+    return -(ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().ItemInnerSpacing.x + 4.0f);
+}
+
+// SameLine, but only when the next item -- a frame `itemWidth` wide with `label` to its right -- fits in what is
+// left of the line; otherwise it starts the next line, so a narrow panel wraps a row rather than clipping it.
+void sameLineIfFits(float itemWidth, const char* label) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float text = label != nullptr ? ImGui::CalcTextSize(label, nullptr, true).x : 0.0f;
+    const float labelWidth = text > 0.0f ? text + style.ItemInnerSpacing.x : 0.0f;
+    // The cursor is at the start of the next line now; that line's start plus what is available is the right edge.
+    const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + itemWidth + labelWidth <= right) {
+        ImGui::SameLine();
+    }
+}
+
 void light(bool on, const char* label) {
     const float h = ImGui::GetTextLineHeight();
     const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -115,7 +135,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             for (const auto& l : labels) {
                 names.push_back(l.c_str());
             }
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Display"));
             if (ImGui::Combo("Display", &current, names.data(), static_cast<int>(names.size()))) {
                 if (current == 0) {
                     pj.display.clear();
@@ -217,7 +237,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
                               "raises it again once the frame has fitted comfortably for a while. Ultra .. Emergency "
                               "hold that level whatever it costs. Never affects a render.");
             }
-            ImGui::SameLine();
+            sameLineIfFits(90.0f, "Target");
             char target[32];
             std::snprintf(target, sizeof(target), "%d fps", machine->liveTargetFps);
             ImGui::BeginDisabled(q.targetFromCommandLine);
@@ -241,6 +261,17 @@ void ControlPanel::drawLive(app::Engine& engine) {
                             ? "Set on the command line for this run (--live-target)."
                             : "The frame rate the live picture is held to. The GPU budget is that frame minus 12%% "
                               "headroom. Your choice, not the display's refresh rate: 60 on a 120 Hz screen is fine.");
+            }
+            // ADR-1107: next to Target, because it is about how the target is held.
+            sameLineIfFits(ImGui::GetFrameHeight(), "Cap at target");
+            if (ImGui::Checkbox("Cap at target", &machine->liveFrameCap) && settings.onChanged) {
+                settings.onChanged();
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("Present frames at the target rate, on a whole number of the display's refreshes (60 on a "
+                        "120 Hz screen: every second refresh), rather than as fast as the GPU allows. A steady 60 "
+                        "looks smoother than frames alternating 9 and 25 ms. Off: as fast as possible. Never "
+                        "affects a render (ADR-1107).");
             }
         }
         ImGui::Text("Now: %s%s  scale %.2f  %ux%u into %ux%u", q.level.c_str(), q.automatic ? " (auto)" : "",
@@ -276,7 +307,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
                         "half the motion-blur and depth-of-field taps, fewer particles, coarser detail sooner.\n"
                         "Heroes are never reduced by these.");
             }
-            ImGui::SameLine();
+            sameLineIfFits(110.0f, "Lowest");
             static const char* minimums[] = {"Ultra", "High", "Medium", "Low", "Emergency"};
             int minimum = 4;
             for (int k = 0; k < 5; ++k) {
@@ -293,7 +324,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
                         "budget there, the panel says LIVE TARGET UNSUSTAINABLE instead of going lower.");
             }
             if (onSaveLiveProfile) {
-                ImGui::SameLine();
+                sameLineIfFits(ImGui::CalcTextSize("Save live profile").x + ImGui::GetStyle().FramePadding.x * 2.0f,
+                               nullptr);
                 if (ImGui::Button("Save live profile")) {
                     onSaveLiveProfile();
                 }
@@ -397,7 +429,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             // quiet interface channel reads as a quiet sound until it is brought up here.
             const float linear = std::max(gain->baseComponent(0), 1e-4f);
             float db = 20.0f * std::log10(linear);
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Sensitivity"));
             if (ImGui::SliderFloat("Sensitivity", &db, -24.0f, 18.0f, "%+.1f dB")) {
                 gain->setBaseComponent(0, std::clamp(std::pow(10.0f, db / 20.0f), 0.0f, 8.0f));
             }
@@ -459,7 +491,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
     // ---- feel and picture ----
     {
         float smoothing = engine.liveSonicSmoothing();
-        ImGui::SetNextItemWidth(-90);
+        ImGui::SetNextItemWidth(widthBesideLabel("Smoothing"));
         if (ImGui::SliderFloat("Smoothing", &smoothing, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic) &&
             onLiveSmoothing) {
             onLiveSmoothing(smoothing);
@@ -471,7 +503,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         if (machine != nullptr) {
             const char* modes[] = {"Off", "FXAA"};
             int mode = machine->liveAntialias ? 1 : 0;
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Anti-aliasing"));
             if (ImGui::Combo("Anti-aliasing", &mode, modes, 2)) {
                 machine->liveAntialias = mode == 1;
                 if (settings.onChanged) {

@@ -8,6 +8,37 @@
 
 namespace avgen::app {
 
+double liveFrameCapPeriodMs(bool enabled, double targetFps, double refreshHz) {
+    if (!enabled || !(targetFps > 0.0)) {
+        return 0.0;
+    }
+    if (!(refreshHz > 0.0)) {
+        return 1000.0 / targetFps;
+    }
+    // 1% tolerance: a 59.94 Hz display with a 60 target is "equal", not "above".
+    if (targetFps > refreshHz * 1.01) {
+        return 0.0;
+    }
+    const double vsyncs = std::max(1.0, std::floor(refreshHz / targetFps + 0.01));
+    return vsyncs * 1000.0 / refreshHz;
+}
+
+LivePaceStep livePaceStep(double nowMs, double deadlineMs, double periodMs) {
+    if (!(periodMs > 0.0)) {
+        return {0.0, 0.0};
+    }
+    if (!(deadlineMs > 0.0)) {
+        return {0.0, nowMs + periodMs};
+    }
+    if (nowMs < deadlineMs) {
+        return {deadlineMs - nowMs, deadlineMs + periodMs};
+    }
+    if (nowMs - deadlineMs > periodMs * 0.5) {
+        return {0.0, nowMs + periodMs};
+    }
+    return {0.0, deadlineMs + periodMs};
+}
+
 // ---- the ladders (ADR-1083, ADR-1084) -------------------------------------------------------------
 //
 // Every value is a ceiling on the live tier's own (see `applyLiveRung`). The realtime tier marches

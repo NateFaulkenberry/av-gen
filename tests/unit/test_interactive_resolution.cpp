@@ -17,6 +17,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <utility>
 
 using namespace avgen;
 using app::LiveQualityLevel;
@@ -483,4 +484,98 @@ TEST_CASE("a new strategy is a new ladder: the controller starts again at the to
     REQUIRE(at > 0);
     c.configure(fast(LiveQualityStrategy::ResolutionFirst, 90));
     CHECK(c.rung() == at);
+}
+
+// ---- ADR-1107: the raise margin and the frame cap ------------------------------------------------------------------
+
+TEST_CASE("the raise margin is 0.9: a level predicted at 85% of the budget is climbed back to",
+          "[unit][resolution][live-quality]") {
+    // REPORT §4 (30-live-quality): at 0.8 the level that would hold 60 sat within 20% of the budget and was never
+    // climbed back to. The same controller at 0.8 is the paired arm (ADR-182): it must stay down.
+    CHECK(app::InteractiveResolutionSettings{}.raiseMargin == Catch::Approx(0.9));
+    const auto settle = [](double margin) {
+        app::InteractiveResolutionSettings s = fast(LiveQualityStrategy::Balanced, 60);
+        s.raiseMargin = margin;
+        app::InteractiveResolution c;
+        c.configure(s);
+        // Over budget: it drops.
+        for (int i = 0; i < 200 && c.rung() == 0; ++i) {
+            c.note(16.0, 17.0);
+        }
+        const std::size_t low = c.rung();
+        REQUIRE(low > 0);
+        // The lower level measured at 8 ms: the step's ratio is learned, and 8 x ratio is still over the budget.
+        feed(c, s.dwellFrames + s.windowFrames, 8.0, 9.0);
+        REQUIRE(c.rung() == low);
+        // The content gets lighter: the level above is now predicted at 85% of the budget.
+        const double predictedAbove = 0.85 * s.budgetMs;
+        const double now = predictedAbove / c.stepRatio(low);
+        feed(c, 2000, now, now + 1.0);
+        return std::pair{low, c.rung()};
+    };
+    const auto [low9, at9] = settle(0.9);
+    CHECK(at9 < low9);
+    const auto [low8, at8] = settle(0.8);
+    CHECK(at8 == low8);
+}
+
+TEST_CASE("the frame cap's period: whole vsyncs at or above the target rate, off above the refresh",
+          "[unit][resolution][live-quality]") {
+    using app::liveFrameCapPeriodMs;
+    // Off.
+    CHECK(liveFrameCapPeriodMs(false, 60, 120) == 0.0);
+    CHECK(liveFrameCapPeriodMs(true, 0, 120) == 0.0);
+    CHECK(liveFrameCapPeriodMs(true, 90, 60) == 0.0);   // the display is already the lower ceiling
+    CHECK(liveFrameCapPeriodMs(true, 120, 60) == 0.0);
+    // 60 on 120 Hz: every second vsync.
+    CHECK(liveFrameCapPeriodMs(true, 60, 120) == Catch::Approx(1000.0 / 60.0));
+    // 60 on 60 Hz and on 59.94 Hz: every vsync (Fifo did not hold the loop there, ADR-1107).
+    CHECK(liveFrameCapPeriodMs(true, 60, 60) == Catch::Approx(1000.0 / 60.0));
+    CHECK(liveFrameCapPeriodMs(true, 60, 59.94) == Catch::Approx(1000.0 / 59.94));
+    // 60 on 144 Hz: two vsyncs (72 fps), never three (48, below the target).
+    CHECK(liveFrameCapPeriodMs(true, 60, 144) == Catch::Approx(2000.0 / 144.0));
+    // 90 on 120 Hz: one vsync, not an uneven 1-2 alternation; 30 on 120 Hz: four.
+    CHECK(liveFrameCapPeriodMs(true, 90, 120) == Catch::Approx(1000.0 / 120.0));
+    CHECK(liveFrameCapPeriodMs(true, 30, 120) == Catch::Approx(4000.0 / 120.0));
+    // Refresh unknown: the target's own period.
+    CHECK(liveFrameCapPeriodMs(true, 60, 0) == Catch::Approx(1000.0 / 60.0));
+}
+
+TEST_CASE("the frame cap's steps hold a fixed grid: no drift from oversleeping, no burst after a stall",
+          "[unit][resolution][live-quality]") {
+    using app::livePaceStep;
+    const double period = 1000.0 / 60.0;
+    // No period: never waits.
+    CHECK(livePaceStep(100.0, 90.0, 0.0).waitMs == 0.0);
+    // The first frame: no wait, the grid starts one period on.
+    auto first = livePaceStep(1000.0, 0.0, period);
+    CHECK(first.waitMs == 0.0);
+    CHECK(first.nextDeadlineMs == Catch::Approx(1000.0 + period));
+    // Early: wait for the deadline; the next deadline is a period after it, not after now.
+    auto early = livePaceStep(1010.0, 1000.0 + period, period);
+    CHECK(early.waitMs == Catch::Approx(period - 10.0));
+    CHECK(early.nextDeadlineMs == Catch::Approx(1000.0 + 2 * period));
+    // A little late (under half a period): no wait, the grid kept.
+    auto late = livePaceStep(1000.0 + period + 3.0, 1000.0 + period, period);
+    CHECK(late.waitMs == 0.0);
+    CHECK(late.nextDeadlineMs == Catch::Approx(1000.0 + 2 * period));
+    // A stall: the grid restarts from now rather than running frames back to back to catch up.
+    auto stall = livePaceStep(1000.0 + period + 100.0, 1000.0 + period, period);
+    CHECK(stall.waitMs == 0.0);
+    CHECK(stall.nextDeadlineMs == Catch::Approx(1000.0 + period + 100.0 + period));
+
+    // Closed loop: 9 ms of work, every wake 0.4 ms late. 600 frames take 600 periods, not 600 x (period + 0.4).
+    double now = 0.0;
+    double deadline = 0.0;
+    double start = -1.0;
+    for (int i = 0; i < 601; ++i) {
+        const auto step = livePaceStep(now, deadline, period);
+        deadline = step.nextDeadlineMs;
+        now += step.waitMs > 0.0 ? step.waitMs + 0.4 : 0.0;
+        if (i == 0) {
+            start = now;
+        }
+        now += 9.0;
+    }
+    CHECK((now - 9.0 - start) == Catch::Approx(600 * period + 0.4).margin(0.01));
 }
