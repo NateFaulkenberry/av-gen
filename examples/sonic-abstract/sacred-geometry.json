@@ -300,57 +300,57 @@
   {
    "source": "response.kick",
    "target": "procedural/ring1/deform/2/phase",
-   "amount": 1.15,
+   "amount": 0.75,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 260,
+    "decayMs": 240,
     "delayMs": 0,
-    "springHz": 1.3,
-    "springDamping": 0.32
+    "springHz": 1.4,
+    "springDamping": 0.42
    }
   },
   {
    "source": "response.kick",
    "target": "procedural/ring2/deform/2/phase",
-   "amount": -1.012,
+   "amount": -0.66,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 260,
+    "decayMs": 240,
     "delayMs": 55,
-    "springHz": 1.3,
-    "springDamping": 0.32
+    "springHz": 1.4,
+    "springDamping": 0.42
    }
   },
   {
    "source": "response.kick",
    "target": "procedural/ring3/deform/2/phase",
-   "amount": 0.8739999999999999,
+   "amount": 0.5700000000000001,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 260,
+    "decayMs": 240,
     "delayMs": 110,
-    "springHz": 1.3,
-    "springDamping": 0.32
+    "springHz": 1.4,
+    "springDamping": 0.42
    }
   },
   {
    "source": "response.kick",
    "target": "procedural/ring4/deform/2/phase",
-   "amount": -0.736,
+   "amount": -0.48,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 260,
+    "decayMs": 240,
     "delayMs": 165,
-    "springHz": 1.3,
-    "springDamping": 0.32
+    "springHz": 1.4,
+    "springDamping": 0.42
    }
   },
   {

@@ -132,8 +132,8 @@ def instrument(s):
     # ---- KICK: the armillary snaps OPEN about its diameters, a ripple inward (staggered), and rings back flat on a
     # loose spring; the outer rim flashes
     for k, name in enumerate(rings):
-        s.route(R("kick", P % name + "deform/2/phase", (1.15 if k % 2 == 0 else -1.15) * (1.0 - 0.12 * k),
-                  attackMs=0, decayMs=260, delayMs=55 * k, springHz=1.3, springDamping=0.32))
+        s.route(R("kick", P % name + "deform/2/phase", (0.75 if k % 2 == 0 else -0.75) * (1.0 - 0.12 * k),
+                  attackMs=0, decayMs=240, delayMs=55 * k, springHz=1.4, springDamping=0.42))
     s.route(R("kick", P % "rimOuter" + "material/emissive", 5.0, attackMs=0, decayMs=220),
             R("kick", "camera/lens/focalLength", 2.2, attackMs=0, decayMs=240))
     # ---- SNARE: the star and the seed's rim flash vermilion-white; sparks fly off the crown
