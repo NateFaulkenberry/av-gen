@@ -1102,8 +1102,8 @@
   },
   {
    "source": "notes.polyphony",
-   "target": "procedural/chordGon/material/emissive",
-   "amount": 5.0,
+   "target": "procedural/chordGon/transform/scale",
+   "amount": 0.99,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

@@ -1200,9 +1200,9 @@
       0.0
      ],
      "scale": [
-      1.0,
-      1.0,
-      1.0
+      0.01,
+      0.01,
+      0.01
      ]
     },
     "material": {
@@ -1216,7 +1216,7 @@
       0.06848,
       0.01764
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 4.0,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1364,7 +1364,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1471,7 +1471,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1578,7 +1578,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1685,7 +1685,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1792,7 +1792,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -1899,7 +1899,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2006,7 +2006,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2113,7 +2113,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2220,7 +2220,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2327,7 +2327,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2434,7 +2434,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true
@@ -2541,7 +2541,7 @@
       0.47932,
       0.07036
      ],
-     "emissiveIntensity": 0.0,
+     "emissiveIntensity": 0.3,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true

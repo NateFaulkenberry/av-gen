@@ -182,7 +182,7 @@ def instrument(s):
     # the chord's own polygon in the heart: as many sides as notes sounding (3 to 8), shown only while a chord sounds
     s.route(R("polyphony", P % "chordGon" + "source/majorSegments", 1.0, gain=8.0, offset=-3.0, clampEnabled=True,
               clampMin=0.0, clampMax=5.0),
-            R("polyphony", P % "chordGon" + "material/emissive", 5.0, threshold="binary", thresholdLevel=0.3,
+            R("polyphony", P % "chordGon" + "transform/scale", 0.99, threshold="binary", thresholdLevel=0.3,
               attackMs=40, decayMs=500))
     for k, name in enumerate(rings):
         s.route(R("held", P % name + "deform/2/phase", (0.5 if k % 2 == 0 else -0.5), **MEDIUM))
@@ -309,7 +309,9 @@ def build():
            transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
     s.proc("seedCentre", torus(0.55, 0.02, 96, 5), material=glow(IVORY, 2.6), transform=face(-2.4))
     s.proc("seedRim", torus(1.1, 0.03, 128, 5), material=glow(VERMILION, 3.0), transform=face(-2.4))
-    s.proc("chordGon", torus(1.02, 0.03, 3, 4), material=glow(VERMILION, 0.0), transform=face(-2.35))
+    # parked at scale 0.01 at rest (an unlit black line would print over the halo; 0.01, not 0.001: below about 0.005
+    # the transform's decomposition fails and the object pops to full size)
+    s.proc("chordGon", torus(1.02, 0.03, 3, 4), material=glow(VERMILION, 4.0), transform=face(-2.35, 0.01))
     s.proc("core", {"kind": "sphere", "radius": 0.16, "segments": 24, "rings": 12},
            material=glow("#ffe6c2", 9.0), transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0],
                                                       "scale": [1, 1, 1]})
@@ -334,7 +336,7 @@ def build():
                transform={"position": [7.55 * c, 7.55 * sn, 0.1], "rotation": [90.0, 0.0, math.degrees(ang) - 90.0],
                           "scale": [0.55, 1.0, 1.0]})
         s.proc("spoke%d" % k, {"kind": "box", "size": [0.035, 0.035, 2.4], "subdivisions": 1},
-               material=glow(GOLD, 0.0),
+               material=glow(GOLD, 0.3),       # a faint stroke at rest (black would print as a dark line)
                transform={"position": [5.75 * c, 5.75 * sn, -0.15], "rotation": [0.0, 0.0, 0.0], "scale": [1, 1, 1]},
                extra={"sourceTransform": {"rotation": [math.degrees(-ang) + 90.0, 90.0, 0.0]}})
 
