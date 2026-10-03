@@ -77,7 +77,14 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
    transform): at 0.001 the torus drew at full size and unrotated. Any route or track that shrinks something toward
    zero makes it jump to full size at the bottom; 0.001 is also the parameters' hard minimum, so a clamp lands on it.
    Workaround here: park at 0.01, or hide under geometry.
-6. **The liveness audit for live projects**: a `sonic.live` project hears its input, but `--audit-routes` calls every
+6. **A far surface leaks the cleared background.** A second opaque surface 25 m in front of another at 1700 m (a
+   cylinder's triangle fan) showed the environment's background colour through slivers of its triangles: its depth
+   prepass and colour pass disagree at that range (a red background turned the streaks red). The Cinematic Void now
+   draws its sun's reflection inside the mirror's own program.
+7. **The headless sky's sun disc is blocky**: offline renders draw the procedural sky from the prefiltered lighting
+   cube (`sky_background.wgsl`, the non-live branch), so its sun disc is a few texels wide. The Cinematic Void draws its
+   sun as geometry.
+8. **The liveness audit for live projects**: a `sonic.live` project hears its input, but `--audit-routes` calls every
    `audio.*` and `beat.*` route dead because the project has no audio file.
 
 ## Engine facts learned this pass
@@ -104,6 +111,13 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 - A radial distribution of ONE instance with a routed `distribution/startAngle` places a single object at any angle on
   a circle (the void's beacon); a short spiral spline with a routed `startAngle` does the same for an emitter.
 - `notes.polyphony` is the number of sounding notes / 8.
+- Beyond `volumeMaxDistance` the SAME density is analytic surface fog on every surface (not on the sky): a far object
+  takes the fog colour while the sky behind it keeps its gradient. For a distant silhouette, keep the density tiny.
+- The sky mixes zenith and horizon LINEARLY: 25% of a bright amber (red 1.0) swamps a dim teal (0.02) into warm grey.
+  A narrow `haze` confines the horizon colour.
+- A procedural box's size is at most 1000 m: widen it with the transform's scale.
+- In the corridor, the SDF's `localPosition` is the object's frame, before its internal `translate` nodes: a colour
+  computed from it stays put while the geometry travels through it.
 - The route liveness audit calls `audio.*` and `beat.*` routes dead in a project with no audio file; live input
   publishes them (`Engine::publishFrame`). Those verdicts are expected for live projects.
 
