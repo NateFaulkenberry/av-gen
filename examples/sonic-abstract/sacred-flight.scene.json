@@ -1,0 +1,2086 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "sacred-flight",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   -200.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.00182,
+   0.00182,
+   0.01161
+  ],
+  "fogColor": [
+   0.00478,
+   0.00368,
+   0.0331
+  ],
+  "volumeDensity": 0.0042,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00182,
+    0.00182,
+    0.01161
+   ],
+   "horizonColor": [
+    0.00182,
+    0.00182,
+    0.01161
+   ],
+   "groundColor": [
+    0.00182,
+    0.00182,
+    0.01161
+   ],
+   "haze": 0.35,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "gateCircle",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 9.0,
+     "minorRadius": 0.1,
+     "majorSegments": 192,
+     "minorSegments": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "gateRim",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 9.7,
+     "minorRadius": 0.035,
+     "majorSegments": 192,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 1.2,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "starTriA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 9.0,
+     "minorRadius": 0.05,
+     "majorSegments": 3,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      90.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "starTriB",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 9.0,
+     "minorRadius": 0.05,
+     "majorSegments": 3,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      30.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "starInner",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 4.5,
+     "minorRadius": 0.035,
+     "majorSegments": 128,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "roseInner",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 3.0,
+     "minorRadius": 0.035,
+     "majorSegments": 128,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -322.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      42.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "spokeRing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.03,
+      0.03,
+      4.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 6.75,
+     "plane": "xy",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 1.2,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    }
+   }
+  },
+  {
+   "name": "beadRing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 9.0,
+     "plane": "xy",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87962,
+      0.63076
+     ],
+     "emissiveIntensity": 3.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    }
+   }
+  },
+  {
+   "name": "roseRing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 3.0,
+     "minorRadius": 0.045,
+     "majorSegments": 128,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 6.0,
+     "plane": "xy",
+     "orientation": "outward",
+     "startAngle": 0.5235987755982988,
+     "endAngle": 6.806784082777885
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    }
+   }
+  },
+  {
+   "name": "spokes",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "procedural",
+     "reference": "spokeRing"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "roses",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "procedural",
+     "reference": "roseRing"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 14,
+     "start": [
+      0.0,
+      0.0,
+      -322.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      42.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "beads",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "procedural",
+     "reference": "beadRing"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      0.0,
+      0.0,
+      -336.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.25415
+     ],
+     "emissiveIntensity": 2.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       5.51091059616309e-16,
+       9.0,
+       -356.0
+      ],
+      "end": [
+       5.51091059616309e-16,
+       9.0,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       4.500000000000001,
+       7.794228634059947,
+       -356.0
+      ],
+      "end": [
+       4.500000000000001,
+       7.794228634059947,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       7.794228634059948,
+       4.499999999999999,
+       -356.0
+      ],
+      "end": [
+       7.794228634059948,
+       4.499999999999999,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       9.0,
+       0.0,
+       -356.0
+      ],
+      "end": [
+       9.0,
+       0.0,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       7.794228634059948,
+       -4.499999999999999,
+       -356.0
+      ],
+      "end": [
+       7.794228634059948,
+       -4.499999999999999,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       4.500000000000001,
+       -7.794228634059947,
+       -356.0
+      ],
+      "end": [
+       4.500000000000001,
+       -7.794228634059947,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       5.51091059616309e-16,
+       -9.0,
+       -356.0
+      ],
+      "end": [
+       5.51091059616309e-16,
+       -9.0,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -4.499999999999998,
+       -7.794228634059948,
+       -356.0
+      ],
+      "end": [
+       -4.499999999999998,
+       -7.794228634059948,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -7.794228634059948,
+       -4.499999999999999,
+       -356.0
+      ],
+      "end": [
+       -7.794228634059948,
+       -4.499999999999999,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -9.0,
+       -1.102182119232618e-15,
+       -356.0
+      ],
+      "end": [
+       -9.0,
+       -1.102182119232618e-15,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -7.794228634059947,
+       4.500000000000001,
+       -356.0
+      ],
+      "end": [
+       -7.794228634059947,
+       4.500000000000001,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "rail11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.04,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 400,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "polyline",
+      "generator": "line",
+      "count": 2,
+      "start": [
+       -4.5000000000000036,
+       7.794228634059945,
+       -356.0
+      ],
+      "end": [
+       -4.5000000000000036,
+       7.794228634059945,
+       48.0
+      ],
+      "samplesPerSegment": 64,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "outerRings",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 34.0,
+     "minorRadius": 0.3,
+     "majorSegments": 256,
+     "minorSegments": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      0.0,
+      0.0,
+      -308.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      28.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.88792,
+      0.47932,
+      0.07036
+     ],
+     "emissiveIntensity": 1.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfWave"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.022,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "endLight",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 700.0,
+     "height": 1.0,
+     "radialSegments": 128,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.0,
+      -366.0
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.00182,
+      0.00182,
+      0.01161
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "sgfEnd"
+    }
+   }
+  },
+  {
+   "name": "sparks",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 6000,
+    "seed": 19,
+    "shape": "disc",
+    "position": [
+     0.0,
+     0.0,
+     -170.0
+    ],
+    "extent": [
+     8.0,
+     0.2,
+     8.0
+    ],
+    "direction": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "spawnRate": 150.0,
+    "lifetimeMin": 4.5,
+    "lifetimeMax": 6.0,
+    "spread": 0.02,
+    "speedMin": 34.0,
+    "speedMax": 46.0,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.03,
+    "colorStart": [
+     1.0,
+     0.87962,
+     0.63076,
+     1.0
+    ],
+    "colorEnd": [
+     0.88792,
+     0.47932,
+     0.07036,
+     0.0
+    ],
+    "emissive": 6.0,
+    "blend": "additive",
+    "velocityStretch": 2.5,
+    "stretchMax": 1.6
+   }
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "sgfWave",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      396.0,
+      396.0,
+      396.0,
+      396.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "value": -0.02040816326530612
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      7.0,
+      4.8571,
+      1.77906,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "input",
+     "dst": 5,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 5,
+     "srcB": 6
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 7,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "sgfEnd",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "localPosition"
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 0
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "value": 2.040816326530612e-06
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": 0.5
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 1,
+     "value": 45.0
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      24.0,
+      11.08985,
+      1.64348,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "power",
+     "dst": 4,
+     "srcA": 1,
+     "value": 600.0
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      300.0,
+      276.47456,
+      237.38938,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "power",
+     "dst": 4,
+     "srcA": 1,
+     "value": 7.0
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.27246,
+      0.05924,
+      0.36715,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.00478,
+      0.00368,
+      0.0331,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 2,
+     "srcB": 6
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 7,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}

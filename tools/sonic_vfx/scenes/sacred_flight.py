@@ -1,84 +1,106 @@
-"""1. SACRED GEOMETRY GARDEN: THE ARMILLARY (04-brief-abstract-direction.md, direction 1; ABSTRACT-PLAN.md section 1).
+"""1. SACRED GEOMETRY FLIGHT: THE GOLDEN PASSAGE (05-brief-direction-correction.md; ABSTRACT-PLAN.md section 1).
 
-A giant living geometric diagram, frontal and perfectly symmetric: a crown of vesica petals, a 12-pointed star, an
-armillary of nested rings that open about their own diameters into a sphere, a well of nested polygons that spirals
-away into the depth, a seed of life at the centre, and a flower-of-life lattice as the ground behind it. Gold and ivory
-lines on ultramarine black, one vermilion accent.
+The viewer flies down the axis of an endless luminous sculpture of sacred geometry: a procession of colossal gates drawn
+in gold light, alternating two figures -- the STAR gate (a hexagram inscribed in the rim, its inner circle, twelve
+spokes) and the ROSE gate (six tangent circles inside the rim round an open heart, the rose window's tracery) -- every
+gate with a double rim and twelve beads, strung on twelve helical rails that run the length of the passage. Outside,
+enormous rings stand in the haze; at the vanishing point burns a gold light against which the far gates
+stand dark. While notes sound, every rose's open heart is a vermilion polygon of the chord.
 
-Grammar: everything is a circle or a regular polygon about one centre, drawn as fine self-luminous lines with beads.
-Motion is differential rotation (John Whitney): ring k turns at k times a base rate. Rings are coplanar at rest (a flat
-mandala) and the music opens them (an armillary sphere).
+Coherence: ONE module, the pair of bays (a star gate, then a rose gate, 14 m apart), repeated along the flight axis, and
+every element sits on the same twelve-fold radial grid (the rails run through the gates' bead points). The camera holds
+the axis: the symmetry is the point. A world twist about the flight axis turns the
+grid with depth, so the rails are helices and the gates, which travel toward the camera along them, turn as they come
+(rifling).
 
-Construction: thin unlit emissive tori (low `majorSegments` = polygons). Every ring carries two local twists: slot 1 about
-its own normal (the spin: `speed` the base rate, `phase` the music's) and slot 2 about a diameter (the opening: `phase`).
-The well is a `linear` distribution of rings along -Z under a world twist about Z, so in the frontal view the deeper
-rings read as smaller and turned further: a golden spiral of polygons that is also a tunnel.
+The flight is a seamless sawtooth: the gates advance one pair of bays per PERIOD seconds and jump back exactly that far,
+which leaves every (position, rotation) pair where it was; the outer rings do the same with their own spacing. The rails are
+continuous, so they stand still.
+
+The instrument (ABSTRACT-PLAN.md section 1): the twelve rails are the twelve pitch classes (a chord lights its own
+polygon of lines down the whole passage); the kick sends a wave of light down the passage; the bass widens it; the mids
+turn the whole lattice; the snare blooms the stars.
 """
 import math
 
 from .. import kit
 from ..kit import R, M, hexrgb, scale3, SLOW, MEDIUM, FAST, HIT, VERY_SLOW
 
-ID = "sacred-geometry"
-TITLE = "Sacred Geometry Garden"
+ID = "sacred-flight"
+TITLE = "Sacred Geometry Flight"
 
-INK = "#05061a"
-DEEP = "#0d1240"
+INK = "#06061c"
+HAZE = "#0f0c33"            # the air: the fog's colour, the end disc's rim, what a faded line becomes
 GOLD = "#f2b84b"
 PALE_GOLD = "#ffd98a"
 IVORY = "#fff1d0"
 VERMILION = "#ff4a24"
+SUN = "#ffb54a"
 
-CAM_Z = 26.0
+BAY = 14.0                 # metres between gates
+BAYS = 26                  # bays from the far end to the near end (even: the gates alternate star and rose)
+BAY_SECONDS = 1.9          # the flight: one bay every 1.9 s (7.4 m/s)
+PAIR = 2.0 * BAY           # the repeating module: a star gate and a rose gate
+PERIOD = 2.0 * BAY_SECONDS
+R_OUT = 9.0                # the gates' outer circle, and the rails' radius
+R_IN = R_OUT / math.sqrt(3.0)          # the hexagram's inner hexagon (its vertices are the triangles' crossings)
+R_CORE = R_IN * math.cos(math.pi / 6)  # the circle inscribed in the inner hexagon (= R_OUT / 2)
+TWIST = 0.022              # radians the grid turns per metre of depth
+Z_NEAR = 2.0 * BAY         # the nearest gate's resting z (behind the camera; the sawtooth brings it past)
+Z_FAR = Z_NEAR - BAYS * BAY
+WAVE_REST = -(Z_FAR - 60.0)  # op 3's constant at rest: the light wave parked beyond the far end
+RING_EVERY = 4             # an enormous outer ring every 4 bays
+R_ROSE = R_OUT / 3.0       # the rose's six circles: radius R/3, centred 2R/3 out, so they touch the rim and each other
 
 DESIGN = {
     "category": "sacred geometry",
-    "thesis": "The Armillary: a giant living geometric diagram in gold light. Its rings turn at harmonic rates, open "
-              "into a sphere on the music and close back into a flat mandala; chords draw their own polygons.",
+    "thesis": "The Golden Passage: you fly through an endless luminous sculpture of sacred geometry, rose-window gates "
+              "strung on twelve helical rails; a chord lights its own polygon of rails down the whole passage, the "
+              "kick sends a wave of light ahead of you, the bass widens the passage.",
     "composition": {
-        "background": "a flower-of-life lattice, dim gold on ultramarine black, behind a soft indigo halo",
-        "midground": "the armillary rings and the 12-pointed star; the well of nested polygons spiralling away",
-        "foreground": "the crown of 24 vesica petals and the bead ring, at the frame's edge",
-        "focal": "the seed of life and its vermilion core at the exact centre",
-        "secondary": ["the 12-pointed star", "the polygon well", "the crown"],
-        "atmosphere": "deeper layers dimmer (an indigo depth)",
-        "post": "bloom; light trails from the feedback when the rings turn",
-        "camera": "locked frontal on the axis, a slow breathing arc",
+        "background": "the gold sun at the vanishing point, the far gates dissolving into its glow",
+        "midground": "gates receding and turning along the helical rails; enormous rings outside in the haze",
+        "foreground": "the nearest gate sweeping past the frame; the inner tunnel of triangles",
+        "focal": "the vanishing point",
+        "secondary": ["the rails", "the inner tunnel", "the outer rings"],
+        "atmosphere": "indigo haze that turns gold toward the sun",
+        "post": "bloom; a radial burst on the kick",
+        "camera": "flying forward through the passage, a little off its axis, banking slowly",
     },
-    "palette": {"dominant": INK, "secondary": DEEP, "accent": VERMILION, "highlight": GOLD,
-                "background_value": "near black (ultramarine)",
-                "saturation": "gold and ivory lines; vermilion only at the core and the chord's ring"},
+    "palette": {"dominant": INK, "secondary": HAZE, "accent": VERMILION, "highlight": GOLD,
+                "background_value": "near black (indigo), gold at the vanishing point",
+                "saturation": "gold and ivory light; vermilion only on the star's bloom"},
     "motion": {
-        "very_slow": ["the base rotation (k turns per period)", "the camera's breath"],
-        "medium": ["the armillary opening and closing", "the well's spiral"],
-        "fast": ["the petals answering the pitch classes"],
-        "extremely_fast": ["the kick's snap open", "bead flashes"],
+        "very_slow": ["the bank", "the camera's drift"],
+        "medium": ["the flight", "the lattice's turn"],
+        "fast": ["rails lighting on notes", "the stars' bloom"],
+        "extremely_fast": ["the kick's wave of light"],
     },
     "vocabulary": [
-        ["bass", "response.bass", "the diagram breathes radially, the inner layers most; the core glows"],
-        ["kick", "response.kick", "the armillary rings snap open about their diameters, a ripple inward, and ring back "
-         "flat on a loose spring; a zoom punch"],
-        ["snare", "response.snare", "the star and the seed's rim flash; sparks fly off the crown"],
-        ["hat", "response.hat", "beads run along the armillary"],
-        ["mids", "audio.mid", "the differential rotation speeds up (ring k gains k times the turn)"],
-        ["bands", "audio.lowMid", "each band lights its own layer, from the seed (bass) to the crown (treble)"],
-        ["brightness", "sonic.brightness", "gold turns toward ivory and cyan-white"],
-        ["sustained", "response.sustain", "the camera pushes into the well; the light trails lengthen"],
-        ["beat", "beat.pulse", "the petals breathe on the beat and flip a half turn each bar"],
-        ["intensity", "response.intensity", "STRUCTURE: the crown doubles its petals (24 to 48), the well deepens"],
-        ["pitch class", "notes.class.0", "the twelve pitch classes are a clock of diamonds and spokes: a chord lights "
-         "its own polygon (an augmented triad a triangle, a diminished seventh a square)"],
-        ["chord", "notes.polyphony", "STRUCTURE: a polygon in the heart with as many sides as notes sounding"],
-        ["held", "notes.held", "the armillary stays open while a note is held"],
-        ["velocity", "notes.lastVelocity", "how hard a note flares the core"],
-        ["mod wheel", "control.modwheel", "opens the armillary into a sphere by hand"],
-        ["silence", "(no input)", "the diagram turns slowly, flat and complete"],
+        ["bass", "response.bass", "STRUCTURE: the passage widens and narrows; the outer rings expand"],
+        ["kick", "response.kick", "a wave of light runs down the passage from you to the sun; a surge forward"],
+        ["snare", "response.snare", "the gates' stars bloom open and flash vermilion; sparks stream past"],
+        ["hat", "response.hat", "the beads glint"],
+        ["highs", "audio.treble", "sparks stream past along the walls"],
+        ["mids", "audio.mid", "the whole lattice turns (the twist's phase)"],
+        ["brightness", "sonic.brightness", "gold turns toward ivory and white"],
+        ["beat", "beat.pulse", "the rails pulse"],
+        ["intensity", "response.intensity", "STRUCTURE: the gates double (a gate every 7 m)"],
+        ["pitch class", "notes.class.0", "each of the twelve rails is a pitch class: a chord lights its polygon down "
+         "the whole passage"],
+        ["chord", "notes.polyphony", "STRUCTURE: every rose's open heart becomes a vermilion polygon with as many "
+         "sides as notes sounding"],
+        ["pitch", "notes.lastPitch", "the sun's colour: deep orange (low) to white gold (high)"],
+        ["velocity", "notes.lastVelocity", "how bright a note flares the gates' circles"],
+        ["held", "notes.held", "the enormous outer rings glow while notes are held"],
+        ["mod wheel", "control.modwheel", "STRUCTURE: the helix tightens"],
+        ["silence", "(no input)", "the flight goes on, slow and golden"],
     ],
-    "tier": "light: about 30 procedural objects of thin tori, unlit; bloom; feedback trails",
+    "tier": "light: instanced thin tori and tubes, unlit, one material program, analytic fog, bloom",
 }
 
 
-def glow(hexc, intensity, program=None):
+def glow(hexc, intensity, program="sgfWave"):
     m = {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb(hexc), "emissiveIntensity": float(intensity),
          "roughness": 1.0, "metallic": 0.0, "unlit": True}
     if program:
@@ -86,286 +108,280 @@ def glow(hexc, intensity, program=None):
     return m
 
 
-def torus(R_, r, n=96, m=6):
+def torus(R_, r, n=192, m=6):
     return {"kind": "torus", "majorRadius": float(R_), "minorRadius": float(r), "majorSegments": int(n),
             "minorSegments": int(m)}
 
 
-def spin_open(spin_rate, open_axis=(1, 0, 0)):
-    """Slot 1: the spin about the ring's own normal (source +Y), rate in rad/s, the music's turn in `phase`.
-    Slot 2: the opening about a diameter (`phase`, radians)."""
-    return [{"kind": "twist", "amount": 0.0, "speed": float(spin_rate), "phase": 0.0, "axis": [0, 1, 0],
-             "space": "local"},
-            {"kind": "twist", "amount": 0.0, "speed": 0.0, "phase": 0.0, "axis": [float(v) for v in open_axis],
-             "space": "local"}]
+def gates(count=BAYS + 1, z_far=Z_FAR, z_near=Z_NEAR):
+    return {"kind": "linear", "count": int(count), "start": [0.0, 0.0, float(z_far)], "end": [0.0, 0.0, float(z_near)]}
 
 
-FACE = {"position": [0.0, 0.0, 0.0], "rotation": [90.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]}
+def stars():
+    """The star gates: every other bay, from the far end."""
+    return gates(BAYS // 2 + 1, Z_FAR, Z_NEAR)
 
 
-def face(z=0.0, scale=1.0):
-    return {"position": [0.0, 0.0, float(z)], "rotation": [90.0, 0.0, 0.0], "scale": [float(scale)] * 3}
+def roses():
+    """The rose gates: the bays between the stars."""
+    return gates(BAYS // 2 + 1, Z_FAR + BAY, Z_NEAR + BAY)
 
 
-# The armillary: (name, radius, polygon order, line radius, colour, intensity, depth, spin rad/s (k x base), opening
-# axis). Ring k spins at k times the base rate, alternating direction; the opening axis alternates between the X and Z
-# diameters (Z in source space is the frame's vertical after the face-on turn).
-BASE = 2.0 * math.pi / 96.0
-ARMILLARY = [
-    ("ring1", 4.30, 192, 0.034, GOLD, 2.6, -0.6, 1, (1, 0, 0)),
-    ("ring2", 3.88, 12, 0.022, IVORY, 1.9, -0.9, -2, (0, 0, 1)),
-    ("ring3", 3.50, 160, 0.024, GOLD, 2.2, -1.2, 3, (1, 0, 0)),
-    ("ring4", 3.14, 6, 0.022, PALE_GOLD, 2.0, -1.5, -4, (0, 0, 1)),
+def twist(amount=TWIST):
+    """The grid's turn with depth (world space, about the flight axis): angle = amount * z + phase. Slot 1."""
+    return [{"kind": "twist", "amount": float(amount), "speed": 0.0, "phase": 0.0, "axis": [0, 0, 1],
+             "center": [0, 0, 0], "space": "world"}]
+
+
+def facing(spin_deg=0.0):
+    """A torus lies in its XZ plane; X 90 turns it to face the flight axis, then Z spins it in that plane (the engine's
+    Euler order applies X, then Y, then Z, about the world axes)."""
+    return {"sourceTransform": {"rotation": [90.0, 0.0, float(spin_deg)]}}
+
+
+def wave_program():
+    """The light wave: each line's own emission plus a band of light round the depth in op 3's constant (minus the
+    band's z), as bright as op 7's constant. The kick carries the band from the camera to the far end."""
+    w = 7.0
+    return {
+        "name": "sgfWave",
+        "ops": [
+            {"kind": "input", "dst": 0, "input": "worldPosition"},
+            {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [2.0, 2.0, 2.0, 2.0]},
+            {"kind": "constant", "dst": 2, "constant": [WAVE_REST] * 4},                    # op 3: -z of the band
+            {"kind": "add", "dst": 3, "srcA": 1, "srcB": 2},
+            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 3},
+            {"kind": "gradient", "dst": 4, "srcA": 3, "constant": [1.0, 0.0, 0.0, 1.0], "value": -1.0 / (w * w)},
+            {"kind": "constant", "dst": 6, "constant": hexrgb(PALE_GOLD, 7.0) + [1.0]},     # op 7: the band's light
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 4},
+            {"kind": "input", "dst": 5, "input": "materialEmission"},
+            {"kind": "add", "dst": 7, "srcA": 5, "srcB": 6},
+        ],
+        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 1.0, "opacity": -1,
+    }
+
+
+def end_light_program(radius):
+    """The light at the end of the passage: radial falloff from the disc's centre (its local XZ plane), a broad gold
+    glow plus a white-hot core, on the haze's own colour at the rim (fogged: it sits past the last gate)."""
+    return {
+        "name": "sgfEnd",
+        "ops": [
+            {"kind": "input", "dst": 0, "input": "localPosition"},
+            {"kind": "multiply", "dst": 1, "srcA": 0, "srcB": 0},
+            {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [1.0, 0.0, 1.0, 0.0], "value": 1.0 / radius ** 2},
+            {"kind": "power", "dst": 1, "srcA": 1, "value": 0.5},
+            {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},   # 1 centre, 0 rim
+            {"kind": "power", "dst": 2, "srcA": 1, "value": 45.0},
+            {"kind": "constant", "dst": 3, "constant": hexrgb(SUN, 24.0) + [1.0]},
+            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
+            {"kind": "power", "dst": 4, "srcA": 1, "value": 600.0},
+            {"kind": "constant", "dst": 5, "constant": hexrgb("#fff6e6", 300.0) + [1.0]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+            {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
+            {"kind": "power", "dst": 4, "srcA": 1, "value": 7.0},
+            {"kind": "constant", "dst": 5, "constant": hexrgb("#7a3a8c", 1.4) + [1.0]},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+            {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
+            {"kind": "constant", "dst": 6, "constant": hexrgb(HAZE) + [1.0]},
+            {"kind": "add", "dst": 7, "srcA": 2, "srcB": 6},
+        ],
+        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 1.0, "opacity": -1,
+    }
+
+
+# the gates: (name, source, colour, intensity, spin in degrees, which gates). Every gate has the double rim; the star's
+# two triangles have their six vertices on the rim at 30 + 60k degrees and its inner circle touches the hexagon their
+# crossings make; the rose's inner circle is the open heart its six circles leave.
+GATE = [
+    ("gateCircle", torus(R_OUT, 0.1, 192, 6), GOLD, 2.4, 0.0, gates),
+    ("gateRim", torus(R_OUT + 0.7, 0.035, 192, 4), PALE_GOLD, 1.2, 0.0, gates),
+    ("starTriA", torus(R_OUT, 0.05, 3, 4), GOLD, 1.8, 90.0, stars),
+    ("starTriB", torus(R_OUT, 0.05, 3, 4), GOLD, 1.8, 30.0, stars),
+    ("starInner", torus(R_CORE, 0.035, 128, 4), PALE_GOLD, 1.0, 0.0, stars),
+    ("roseInner", torus(R_ROSE, 0.035, 128, 4), PALE_GOLD, 1.0, 0.0, roses),
 ]
+GATE_PARTS = [g[0] for g in GATE] + ["spokes", "beads", "roses"]
+STAR_PARTS = ["starTriA", "starTriB", "starInner", "spokes"]
+ROSE_PARTS = ["roseInner", "roses"]
+TRAVELLING = GATE_PARTS
+
+
+def rail_angle(k):
+    """Pitch class k's rail: C at the top, clockwise in semitones (a clock), so a chord's shape is its intervals."""
+    return math.radians(90.0 - 30.0 * k)
 
 
 def instrument(s):
     """The modulation map (ABSTRACT-PLAN.md section 1). Every audio dimension has its own job."""
     P = "procedural/%s/"
-    rings = [a[0] for a in ARMILLARY]
-    # ---- BASS: the diagram breathes radially, inner layers more (a pulse from the centre); the core glows
-    for node, depth in (("rimOuter", 0.025), ("rimInner", 0.025), ("beads", 0.025), ("petals", 0.03),
-                        ("petalsInner", 0.035), ("star", 0.045), ("ring1", 0.05), ("ring2", 0.055), ("ring3", 0.06),
-                        ("ring4", 0.065), ("seed", 0.12), ("seedCentre", 0.12), ("seedRim", 0.1)):
-        s.route(R("bass", P % node + "transform/scale", depth, attackMs=25, decayMs=320))
-    s.route(R("bass", P % "core" + "material/emissive", 14.0, attackMs=20, decayMs=260))
-    # ---- KICK: the armillary snaps OPEN about its diameters, a ripple inward (staggered), and rings back flat on a
-    # loose spring; the outer rim flashes
-    for k, name in enumerate(rings):
-        s.route(R("kick", P % name + "deform/2/phase", (0.75 if k % 2 == 0 else -0.75) * (1.0 - 0.12 * k),
-                  attackMs=0, decayMs=240, delayMs=55 * k, springHz=1.4, springDamping=0.42))
-    s.route(R("kick", P % "rimOuter" + "material/emissive", 5.0, attackMs=0, decayMs=220),
-            R("kick", "camera/lens/focalLength", 2.2, attackMs=0, decayMs=240))
-    # ---- SNARE: the star and the seed's rim flash vermilion-white; sparks fly off the crown
-    s.route(R("snare", P % "star" + "material/emissive", 7.0, attackMs=0, decayMs=200),
-            R("snare", P % "seedRim" + "material/emissive", 8.0, attackMs=0, decayMs=260),
-            R("snare", "particles/sparks/burst", 420.0, threshold="binary", thresholdLevel=0.05))
-    # ---- HIGHS: beads run along the armillary; the bead crown shimmers
-    s.route(R("hat", "particles/beadRun/burst", 60.0, threshold="binary", thresholdLevel=0.05),
-            R("hat", "particles/beads3/burst", 50.0, threshold="binary", thresholdLevel=0.05),
-            R("audio.treble", "particles/beadRun/spawnRate", 220.0, attackMs=30, decayMs=300),
-            R("audio.treble", P % "beads" + "material/emissive", 4.0, attackMs=20, decayMs=200))
-    # ---- MIDS: the differential rotation speeds up (ring k gains k x the turn), integrated so it never jumps
-    for k, name in enumerate(rings, start=1):
-        s.route(R("audio.mid", P % name + "deform/1/phase", 0.45 * k * (1 if k % 2 else -1), integrate=True,
-                  attackMs=80, decayMs=600))
-    s.route(R("response.melodic", P % "star" + "deform/1/phase", 0.6, integrate=True, attackMs=120, decayMs=900),
-            R("audio.mid", P % "wellHex" + "deform/1/phase", 0.5, integrate=True, attackMs=120, decayMs=900),
-            R("audio.mid", P % "wellSquare" + "deform/1/phase", -0.4, integrate=True, attackMs=120, decayMs=900))
-    # ---- CENTROID (brightness): gold toward ivory and pale cyan-white
-    for node in ("rimOuter", "petals", "ring1", "ring3", "star"):
-        s.route(R("brightness", P % node + "material/emissiveColor", 0.35, comp=2, **SLOW),
-                R("brightness", P % node + "material/emissiveColor", 0.12, comp=1, **SLOW))
-    # ---- BANDS: each band owns a layer, from the core (bass) to the crown (treble)
-    s.route(R("audio.bass", P % "seedCentre" + "material/emissive", 3.0, attackMs=30, decayMs=300),
-            R("audio.lowMid", P % "wellHex" + "material/emissive", 1.6, attackMs=40, decayMs=350),
-            R("audio.lowMid", P % "wellSquare" + "material/emissive", 1.4, attackMs=40, decayMs=350),
-            R("audio.mid", P % "ring2" + "material/emissive", 2.0, attackMs=40, decayMs=350),
-            R("audio.mid", P % "ring4" + "material/emissive", 2.0, attackMs=40, decayMs=350),
-            R("audio.highMid", P % "petalsInner" + "material/emissive", 2.4, attackMs=30, decayMs=300),
-            R("audio.treble", P % "petals" + "material/emissive", 1.8, attackMs=30, decayMs=300))
-    # ---- SUSTAIN: the camera pushes into the well; the light trails lengthen
-    s.route(R("sustain", "camera/position", -3.5, comp=2, **SLOW),
-            R("sustain", "temporal/feedback/decay", 0.22, **SLOW))
-    # ---- TEMPO: the petals breathe on the beat; the crown's petals flip about their own long axis on the bar
-    s.route(R("beat", P % "petals" + "transform/scale", 0.02, attackMs=0, decayMs=180),
-            R("beat.bar", P % "petals" + "deform/1/phase", math.pi, attackMs=0, decayMs=0))
-    # ---- INTENSITY: STRUCTURE -- the crown doubles its petals (24 to 48) and the well deepens as the piece builds
-    for node, extra in (("petals", 24.0), ("petalsInner", 24.0), ("wellHex", 8.0), ("wellSquare", 8.0)):
-        s.route(R("intensity", P % node + "distribution/count", extra, threshold="binary", thresholdLevel=0.55))
-    # ---- MIDI: the pitch classes light their diamonds and spokes (a chord draws its polygon); polyphony is the star's
-    # polygon order (STRUCTURE); a held note keeps the armillary open; velocity flares the core
+    rails = ["rail%d" % k for k in range(12)]
+    lattice = TRAVELLING + rails
+    # ---- BASS: STRUCTURE -- the passage widens and narrows (every part scaled about the flight axis); the enormous
+    # outer rings expand further
+    for node in lattice:
+        for comp in (0, 1):
+            s.route(R("bass", P % node + "transform/scale", 0.14, comp=comp, attackMs=40, decayMs=420))
+    for comp in (0, 1):
+        s.route(R("bass", P % "outerRings" + "transform/scale", 0.3, comp=comp, attackMs=60, decayMs=700))
+    # ---- KICK: a wave of light runs from the camera to the far end at a constant speed (a binary trigger, then a
+    # linear fall: op 3's constant goes from 0, the camera, back to WAVE_REST); a surge forward and a radial burst
+    s.route(R("kick", "material/sgfWave/op/3/constant/constant", -WAVE_REST, threshold="binary", thresholdLevel=0.12,
+              envelope="linearfall", envelopeHoldMs=0, envelopeFallPerSecond=1.15),
+            R("kick", "post/radial/amount", 0.05, attackMs=0, decayMs=220),
+            R("kick", "camera/lens/focalLength", -1.6, attackMs=0, decayMs=260))
+    # ---- SNARE: the gates bloom (the stars' triangles and the roses' circles swell past the rim and ring back) and
+    # flash; a burst of sparks
+    for node in ("starTriA", "starTriB", "roses"):
+        for comp in (0, 1):
+            s.route(R("snare", P % node + "transform/scale", 0.16, comp=comp, attackMs=0, decayMs=300,
+                      springHz=2.2, springDamping=0.35))
+        s.route(R("snare", P % node + "material/emissive", 5.0, attackMs=0, decayMs=240))
+    s.route(R("snare", "particles/sparks/burst", 420.0, threshold="binary", thresholdLevel=0.05))
+    # ---- HIGHS: the beads glint; sparks stream past along the walls
+    s.route(R("hat", P % "beads" + "material/emissive", 7.0, attackMs=0, decayMs=140),
+            R("audio.treble", "particles/sparks/spawnRate", 320.0, attackMs=30, decayMs=300),
+            R("audio.highMid", P % "starInner" + "material/emissive", 2.0, attackMs=30, decayMs=300),
+            R("audio.highMid", P % "roseInner" + "material/emissive", 2.0, attackMs=30, decayMs=300))
+    # ---- MIDS: the whole lattice turns (the twist's phase, integrated so it never jumps); the inner tunnel the other way
+    for node in lattice:
+        s.route(R("audio.mid", P % node + "deform/1/phase", 0.3, integrate=True, attackMs=120, decayMs=800))
+    # ---- CENTROID: gold toward ivory and white
+    for node in ["gateCircle", "starTriA", "starTriB", "roses"] + rails:
+        s.route(R("brightness", P % node + "material/emissiveColor", 0.1, comp=2, **SLOW),
+                R("brightness", P % node + "material/emissiveColor", 0.05, comp=1, **SLOW))
+    # ---- TEMPO: the rails pulse on the beat
+    for node in rails:
+        s.route(R("beat", P % node + "material/emissive", 0.7, attackMs=0, decayMs=180))
+    # ---- INTENSITY: STRUCTURE -- the gates double as the piece builds: a rim every 7 m, and every gate both a star
+    # and a rose (each figure's count doubles, so each now stands every 14 m)
+    for node in ["gateCircle", "gateRim", "beads"]:
+        s.route(R("intensity", P % node + "distribution/count", float(BAYS), threshold="binary", thresholdLevel=0.55))
+    for node in STAR_PARTS + ROSE_PARTS:
+        s.route(R("intensity", P % node + "distribution/count", float(BAYS // 2), threshold="binary",
+                  thresholdLevel=0.55))
+    # ---- MIDI: the twelve rails are the twelve pitch classes (a chord lights its polygon down the passage); the chord's
+    # size is the polygon in every rose's heart; the last pitch is the sun's colour;
+    # velocity is how hard a note flares the gates' circles; held notes light the enormous outer rings
     for k in range(12):
-        sig = "notes.class.%d" % k
-        s.route(R(sig, P % ("pc%d" % k) + "material/emissive", 7.0, attackMs=0, decayMs=420),
-                R(sig, P % ("spoke%d" % k) + "material/emissive", 4.5, attackMs=0, decayMs=520))
-    # the chord's own polygon in the heart: as many sides as notes sounding (3 to 8), shown only while a chord sounds
-    s.route(R("polyphony", P % "chordGon" + "source/majorSegments", 1.0, gain=8.0, offset=-3.0, clampEnabled=True,
-              clampMin=0.0, clampMax=5.0),
-            R("polyphony", P % "chordGon" + "transform/scale", 0.99, threshold="binary", thresholdLevel=0.3,
-              attackMs=40, decayMs=500))
-    for k, name in enumerate(rings):
-        s.route(R("held", P % name + "deform/2/phase", (0.5 if k % 2 == 0 else -0.5), **MEDIUM))
-    s.route(R("noteEnv", P % "core" + "material/emissive", 10.0, depth="lastVelocity", attackMs=0, decayMs=300),
-            R("noteEnv", P % "seedRim" + "material/emissive", 3.0, depth="lastVelocity", attackMs=0, decayMs=400))
-    # ---- MOD WHEEL: opens the whole armillary into a sphere by hand
+        s.route(R("notes.class.%d" % k, P % ("rail%d" % k) + "material/emissive", 10.0, attackMs=0, decayMs=500))
+    # the chord's polygon: every rose's open heart is a circle at rest and, while notes sound, a vermilion polygon with
+    # as many sides as notes (a triangle for one to three, up to an octagon): 128 segments less 125 while any note
+    # sounds, plus (8 x polyphony - 3) clamped to 0..5
+    s.route(R("polyphony", P % "roseInner" + "source/majorSegments", -125.0, threshold="binary", thresholdLevel=0.06),
+            R("polyphony", P % "roseInner" + "source/majorSegments", 1.0, gain=8.0, offset=-3.0,
+              clampEnabled=True, clampMin=0.0, clampMax=5.0),
+            R("polyphony", P % "roseInner" + "material/emissiveColor", -0.42, comp=1, threshold="binary",
+              thresholdLevel=0.06, attackMs=30, decayMs=600),
+            R("polyphony", P % "roseInner" + "material/emissive", 3.0, threshold="binary", thresholdLevel=0.06,
+              attackMs=30, decayMs=600),
+            R("lastPitch", "env/sky/sunColor", 0.5, comp=2, **MEDIUM),
+            R("lastPitch", "env/sky/sunColor", 0.2, comp=1, **MEDIUM),
+            R("noteEnv", P % "gateCircle" + "material/emissive", 5.0, depth="lastVelocity", attackMs=0, decayMs=420),
+            R("held", P % "outerRings" + "material/emissive", 2.4, **MEDIUM))
+    # ---- MOD WHEEL: STRUCTURE -- the helix tightens
     wheel = s.modwheel()
-    for k, name in enumerate(rings):
-        s.route(R(wheel, P % name + "deform/2/phase", 1.5 if k % 2 == 0 else -1.5, attackMs=60, decayMs=60))
+    for node in lattice:
+        s.route(R(wheel, P % node + "deform/1/amount", 0.03, attackMs=80, decayMs=80))
 
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    # a uniform dark sky (the sky's own sun glows only above its horizon, which drew a horizon across the passage); the
+    # light at the end is geometry. The fog dims the far gates, so near the end they stand dark against the light.
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(INK), "fogColor": [0, 0, 0], "volumeDensity": 0.0,
-        "skyIntensity": 1.0,
+        "intensity": 0.0, "background": hexrgb(INK), "fogColor": hexrgb(HAZE), "volumeDensity": 0.0042,
+        "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(INK), "horizonColor": hexrgb(INK),
-                "groundColor": hexrgb(INK), "haze": 0.6, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": hexrgb(INK), "haze": 0.35, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    s.composition = {"focalPoints": [{"name": "seed", "position": [0.0, 0.0, -2.4], "radius": 1.0, "weight": 1.0}]}
+    s.program(wave_program())
 
-    # ---- the ground: an ultramarine halo disc far behind, and in front of it the flower-of-life lattice, which fades
-    # out toward the centre. Opaque lines cannot fade to nothing, so where the lattice fades its lines take the
-    # halo's own colour at that pixel (the same radial function, scaled for the 10 m between them) and vanish into it.
-    halo_r = 44.0                      # the halo's radius at z = -90 (camera at z = 26: 116 m away)
-    lat_z, halo_z = -80.0, -90.0
-    k_proj = (CAM_Z - halo_z) / (CAM_Z - lat_z)       # a lattice point at r covers the halo at r * k_proj
-    halo_col = hexrgb("#1b2380")
+    # ---- the gates (a star and a rose in each pair of bays)
+    for name, src, col, inten, spin, where in GATE:
+        s.proc(name, src, distribution=where(), material=glow(col, inten), deformers=twist(), extra=facing(spin))
+    # spokes, beads and the rose's six circles: one gate's radial figures (templates), composed onto the gates
+    # (ADR-029). A template
+    # must stay visible (a hidden one composes nothing), so it is parked far behind the camera: its own distribution
+    # transform does not reach the composed copies.
+    s.proc("spokeRing", {"kind": "box", "size": [0.03, 0.03, R_OUT - R_CORE], "subdivisions": 1},
+           distribution={"kind": "radial", "count": 12, "radius": (R_OUT + R_CORE) * 0.5, "plane": "xy",
+                         "orientation": "outward"},
+           material=glow(PALE_GOLD, 1.2))
+    s.proc("beadRing", {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
+           distribution={"kind": "radial", "count": 12, "radius": R_OUT, "plane": "xy", "orientation": "outward"},
+           material=glow(IVORY, 3.0))
+    s.proc("roseRing", torus(R_ROSE, 0.045, 128, 4),
+           distribution={"kind": "radial", "count": 6, "radius": 2.0 * R_ROSE, "plane": "xy", "orientation": "outward",
+                         "startAngle": math.pi / 6.0, "endAngle": math.pi / 6.0 + 2.0 * math.pi},
+           material=glow(GOLD, 1.8))
+    s.proc("spokes", {"kind": "procedural", "reference": "spokeRing"}, distribution=stars(),
+           material=glow(PALE_GOLD, 1.1), deformers=twist())
+    s.proc("roses", {"kind": "procedural", "reference": "roseRing"}, distribution=roses(),
+           material=glow(GOLD, 1.8), deformers=twist())
+    s.proc("beads", {"kind": "procedural", "reference": "beadRing"}, distribution=gates(),
+           material=glow(PALE_GOLD, 2.6), deformers=twist())
 
-    def halo_ops(dst, scale_r):
-        """dst = halo colour at |p.xy| * scale_r (radius halo_r, falloff (1 - r/R)^1.7)."""
-        return [
-            {"kind": "multiply", "dst": dst, "srcA": 0, "srcB": 0},
-            {"kind": "gradient", "dst": dst, "srcA": dst, "constant": [1.0, 1.0, 0.0, 0.0],
-             "value": (scale_r / halo_r) ** 2},
-            {"kind": "power", "dst": dst, "srcA": dst, "value": 0.5},
-            {"kind": "remap", "dst": dst, "srcA": dst, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},
-            {"kind": "power", "dst": dst, "srcA": dst, "value": 1.7},
-            {"kind": "constant", "dst": 7, "constant": halo_col + [1.0]},
-            {"kind": "multiply", "dst": dst, "srcA": dst, "srcB": 7},
-        ]
-    s.program({"name": "sgHalo", "ops": [{"kind": "input", "dst": 0, "input": "worldPosition"}] + halo_ops(3, 1.0),
-               "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 3, "emissionIntensity": 1.0,
-               "opacity": -1})
-    s.proc("halo", {"kind": "cylinder", "radius": 120.0, "height": 0.1, "radialSegments": 96, "caps": True},
-           material=glow(INK, 1.0, program="sgHalo"), transform=face(halo_z))
-    s.program({
-        "name": "sgLattice",
-        "ops": [{"kind": "input", "dst": 0, "input": "worldPosition"}] + halo_ops(5, k_proj) + [
-            {"kind": "multiply", "dst": 1, "srcA": 0, "srcB": 0},
-            {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [1.0, 1.0, 0.0, 0.0], "value": 1.0 / 900.0},
-            {"kind": "power", "dst": 1, "srcA": 1, "value": 0.5},                      # |p.xy| / 30
-            {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.5, 1.0, 0.0, 0.0]},
-            {"kind": "constant", "dst": 2, "constant": hexrgb(GOLD, 0.3) + [1.0]},
-            {"kind": "multiply", "dst": 3, "srcA": 2, "srcB": 1},
-            {"kind": "add", "dst": 3, "srcA": 3, "srcB": 5},
-        ],
-        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 3, "emissionIntensity": 1.0, "opacity": -1,
-    })
-    # flower of life: circles of radius r on a hexagonal lattice of spacing r (two offset rectangular grids)
-    r_l = 2.8
-    for k, off in enumerate(((0.0, 0.0), (r_l * 0.5, r_l * math.sqrt(3.0) * 0.5))):
-        s.proc("lattice%d" % k, torus(r_l, 0.045, 64, 4),
-               distribution={"kind": "grid", "gridCount": [33, 1, 11],
-                             "gridSpacing": [r_l, 1.0, r_l * math.sqrt(3.0)]},
-               material=glow(GOLD, 0.3, program="sgLattice"),
-               transform={"position": [off[0], off[1], lat_z], "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
-
-    # ---- the crown (the nearest layer): an outer double rim, 48 beads, 24 vesica petals (ellipses, long radially)
-    s.proc("rimOuter", torus(6.85, 0.035, 192, 6), material=glow(GOLD, 2.6), transform=face(0.0))
-    s.proc("rimInner", torus(6.55, 0.018, 192, 6), material=glow(PALE_GOLD, 2.0), transform=face(0.0))
-    s.proc("beads", {"kind": "sphere", "radius": 0.07, "segments": 12, "rings": 6},
-           distribution={"kind": "radial", "count": 48, "radius": 6.7, "plane": "xy", "orientation": "outward"},
-           material=glow(IVORY, 3.2), transform={"position": [0, 0, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
-    # petals: an ellipse in the source's XZ plane (X tangent, Z radial under `outward`), squashed across
-    s.proc("petals", torus(0.95, 0.03, 64, 5),
-           distribution={"kind": "radial", "count": 24, "radius": 5.55, "plane": "xy", "orientation": "outward"},
-           material=glow(GOLD, 2.4), deformers=[{"kind": "twist", "amount": 0.0, "speed": 0.0, "phase": 0.0,
-                                                 "axis": [0, 0, 1], "space": "local"}],
-           transform={"position": [0, 0, -0.2], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
-           extra={"sourceTransform": {"scale": [0.36, 1.0, 1.0]}})
-    s.proc("petalsInner", torus(0.62, 0.022, 64, 5),
-           distribution={"kind": "radial", "count": 24, "radius": 4.95, "plane": "xy", "orientation": "outward",
-                         "startAngle": math.pi / 24.0, "endAngle": math.pi / 24.0 + 2.0 * math.pi},
-           material=glow(PALE_GOLD, 1.8),
-           transform={"position": [0, 0, -0.3], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
-           extra={"sourceTransform": {"scale": [0.42, 1.0, 1.0]}})
-    # ---- the 12-pointed star: four triangles turned 30 degrees apart (two hexagrams), one ring of its tips
-    s.proc("star", torus(4.30, 0.024, 3, 4),
-           distribution={"kind": "radial", "count": 4, "radius": 0.001, "plane": "xy", "orientation": "outward"},
-           material=glow(PALE_GOLD, 2.2),
-           deformers=[{"kind": "twist", "amount": 0.0, "speed": BASE * 0.5, "phase": 0.0, "axis": [0, 1, 0],
-                       "space": "local"}],
-           transform={"position": [0, 0, -0.45], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
-
-    # ---- the armillary rings
-    for name, rad, n, lw, col, inten, z, k, axis in ARMILLARY:
-        s.proc(name, torus(rad, lw, n, 6), material=glow(col, inten), deformers=spin_open(BASE * k, axis),
-               transform=face(z))
-
-    # ---- the well: nested polygons receding along -Z under a world twist (a spiral of squares and hexagons)
-    s.proc("wellHex", torus(2.9, 0.026, 6, 4),
-           distribution={"kind": "linear", "count": 12, "start": [0.0, 0.0, -48.0], "end": [0.0, 0.0, -3.0]},
-           material=glow(GOLD, 1.0),
-           material_variation={"emissiveGradient": 2.2},
-           deformers=[{"kind": "twist", "amount": 0.055, "speed": BASE * 0.6, "phase": 0.0, "axis": [0, 0, 1],
-                       "center": [0, 0, 0], "space": "world"}],
-           extra={"sourceTransform": {"rotation": [90.0, 0.0, 0.0]}})
-    s.proc("wellSquare", torus(2.75, 0.02, 4, 4),
-           distribution={"kind": "linear", "count": 12, "start": [0.0, 0.0, -50.0], "end": [0.0, 0.0, -5.0]},
-           material=glow(PALE_GOLD, 0.8),
-           material_variation={"emissiveGradient": 2.2},
-           deformers=[{"kind": "twist", "amount": -0.04, "speed": -BASE * 0.4, "phase": 0.0, "axis": [0, 0, 1],
-                       "center": [0, 0, 0], "space": "world"}],
-           extra={"sourceTransform": {"rotation": [90.0, 0.0, 0.0]}})
-
-    # ---- the seed of life: seven circles (six round one) and the core
-    s.proc("seed", torus(0.55, 0.02, 96, 5),
-           distribution={"kind": "radial", "count": 6, "radius": 0.55, "plane": "xy", "orientation": "outward"},
-           material=glow(IVORY, 2.6),
-           transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
-    s.proc("seedCentre", torus(0.55, 0.02, 96, 5), material=glow(IVORY, 2.6), transform=face(-2.4))
-    s.proc("seedRim", torus(1.1, 0.03, 128, 5), material=glow(VERMILION, 3.0), transform=face(-2.4))
-    # parked at scale 0.01 at rest (an unlit black line would print over the halo; 0.01, not 0.001: below about 0.005
-    # the transform's decomposition fails and the object pops to full size)
-    s.proc("chordGon", torus(1.02, 0.03, 3, 4), material=glow(VERMILION, 4.0), transform=face(-2.35, 0.01))
-    s.proc("core", {"kind": "sphere", "radius": 0.16, "segments": 24, "rings": 12},
-           material=glow("#ffe6c2", 9.0), transform={"position": [0, 0, -2.4], "rotation": [0, 0, 0],
-                                                      "scale": [1, 1, 1]})
-
-    # ---- camera: frontal on the axis, a slow breathing arc (4 degrees, 64 s)
-    s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.55, "post/bloom/threshold": 0.6,
-               "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.45, "post/output/grain": 0.008,
-               "post/tonemap/operator": 4, "temporal/feedback/enabled": True, "temporal/feedback/frames": 8,
-               "temporal/feedback/amount": 0.7, "temporal/feedback/decay": 0.5, "temporal/feedback/zoom": 1.0,
-               "temporal/feedback/rotate": 0.0, "temporal/feedback/hue": 0.0})
-    s.camera = {"mode": 1, "position": [0.0, 0.0, CAM_Z], "target": [0.0, 0.0, -2.0], "fov": 30.0,
-                "orbitSpeed": 0.0}
-    s.drift_camera([0.0, 0.0, CAM_Z], [0.0, 0.0, -2.0], period=64.0, amp=(1.4, 0.5, 0.6), tamp=(0.0, 0.0, 0.0))
-
-    # ---- the twelve pitch classes: a clock of faint diamonds and spokes round the crown (C at the top, clockwise,
-    # chromatic, so a chord's interval structure is its shape: an augmented triad is a triangle, a diminished seventh a
-    # square). A sounding class lights its diamond and spoke, so a chord draws its own polygon.
+    # ---- the twelve rails (the pitch classes): continuous tubes through the bead points, helices under the twist
     for k in range(12):
-        ang = math.radians(90.0 - 30.0 * k)
-        c, sn = math.cos(ang), math.sin(ang)
-        s.proc("pc%d" % k, torus(0.34, 0.026, 4, 4), material=glow(PALE_GOLD, 0.35),
-               transform={"position": [7.55 * c, 7.55 * sn, 0.1], "rotation": [90.0, 0.0, math.degrees(ang) - 90.0],
-                          "scale": [0.55, 1.0, 1.0]})
-        s.proc("spoke%d" % k, {"kind": "box", "size": [0.035, 0.035, 2.4], "subdivisions": 1},
-               material=glow(GOLD, 0.3),       # a faint stroke at rest (black would print as a dark line)
-               transform={"position": [5.75 * c, 5.75 * sn, -0.15], "rotation": [0.0, 0.0, 0.0], "scale": [1, 1, 1]},
-               extra={"sourceTransform": {"rotation": [math.degrees(-ang) + 90.0, 90.0, 0.0]}})
+        a = rail_angle(k)
+        x, y = R_OUT * math.cos(a), R_OUT * math.sin(a)
+        s.proc("rail%d" % k, {"kind": "tube", "tubeRadius": 0.04, "tubeTaper": 1.0, "tubeSides": 5,
+                              "tubeSegments": 400, "tubeTwist": 0.0, "tubeCaps": False,
+                              "curve": {"kind": "polyline", "generator": "line", "count": 2,
+                                        "start": [x, y, Z_FAR - 20.0], "end": [x, y, Z_NEAR + 20.0],
+                                        "samplesPerSegment": 64, "up": [0.0, 1.0, 0.0]}},
+               material=glow(GOLD, 0.55), deformers=twist())
 
-    # ---- sparks off the crown (the snare) and beads along the armillary (the hats)
-    s.nodes.append({"name": "crownPath", "kind": "spline", "spline": {
-        "kind": "catmullRom", "generator": "circle", "closed": True, "count": 48, "radius": 5.6,
-        "center": [0.0, 0.0, -0.2], "axis": [0.0, 0.0, 1.0], "up": [0.0, 0.0, 1.0], "samplesPerSegment": 8}})
-    s.particles("sparks", capacity=4000, seed=17, shape="spline", spline="crownPath", position=[0, 0, 0],
-                extent=[0.05, 0.05, 0.05], direction=[-1.0, 0.0, 0.0], spawnRate=0.0, lifetimeMin=0.5,
-                lifetimeMax=1.1, spread=0.08, speedMin=2.5, speedMax=5.5, gravity=[0, 0, 0], drag=1.6,
-                sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb("#ffd9a0") + [1.0], colorEnd=hexrgb(VERMILION) + [0.0],
-                emissive=6.0, blend="additive", velocityStretch=1.2, stretchMax=0.35)
-    for name, rad, *_ in ARMILLARY:
-        s.nodes.append({"name": name + "Path", "kind": "spline", "spline": {
-            "kind": "catmullRom", "generator": "circle", "closed": True, "count": 48, "radius": rad,
-            "center": [0.0, 0.0, 0.0], "axis": [0.0, 0.0, 1.0], "up": [0.0, 0.0, 1.0], "samplesPerSegment": 8}})
-    s.particles("beadRun", capacity=3000, seed=23, shape="spline", spline="ring1Path", position=[0, 0, 0],
-                extent=[0.02, 0.02, 0.02], direction=[0.0, 0.0, 1.0], spawnRate=0.0, lifetimeMin=0.25,
-                lifetimeMax=0.6, spread=0.0, speedMin=0.6, speedMax=1.4, gravity=[0, 0, 0], drag=0.5,
-                sizeStart=0.075, sizeEnd=0.0, colorStart=hexrgb("#fffaf0") + [1.0], colorEnd=hexrgb(GOLD) + [0.0],
-                emissive=7.0, blend="additive")
-    s.particles("beads3", capacity=3000, seed=29, shape="spline", spline="ring3Path", position=[0, 0, -1.2],
-                extent=[0.02, 0.02, 0.02], direction=[0.0, 0.0, -1.0], spawnRate=0.0, lifetimeMin=0.25,
-                lifetimeMax=0.6, spread=0.0, speedMin=0.6, speedMax=1.4, gravity=[0, 0, 0], drag=0.5,
-                sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb("#fffaf0") + [1.0], colorEnd=hexrgb(PALE_GOLD) + [0.0],
-                emissive=7.0, blend="additive")
+    # ---- outside: enormous rings standing in the haze every RING_EVERY bays (their own seamless sawtooth)
+    span = RING_EVERY * BAY
+    n_rings = int((Z_NEAR - Z_FAR) // span) + 1
+    s.proc("outerRings", torus(34.0, 0.3, 256, 6),
+           distribution=gates(n_rings, Z_NEAR - (n_rings - 1) * span, Z_NEAR),
+           material=glow(GOLD, 1.1), deformers=twist(), extra=facing(0.0))
+    # the light at the end: a disc just beyond the last gate, a soft gold glow fading to the haze's colour at its rim
+    # (opaque, so its rim must match what is around it), with a white-hot core
+    end_r = 700.0
+    s.program(end_light_program(end_r))
+    s.proc("endLight", {"kind": "cylinder", "radius": end_r, "height": 1.0, "radialSegments": 128, "caps": True},
+           material=glow(INK, 1.0, program="sgfEnd"),
+           transform={"position": [0.0, 0.0, Z_FAR - 30.0], "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
+
+    # ---- sparks streaming past along the walls (the highs, the snare)
+    s.particles("sparks", capacity=6000, seed=19, shape="disc", position=[0.0, 0.0, -170.0],
+                extent=[8.0, 0.2, 8.0], direction=[0.0, 0.0, 1.0], spawnRate=150.0, lifetimeMin=4.5,
+                lifetimeMax=6.0, spread=0.02, speedMin=34.0, speedMax=46.0, gravity=[0, 0, 0], drag=0.0,
+                sizeStart=0.05, sizeEnd=0.03, colorStart=hexrgb(IVORY) + [1.0],
+                colorEnd=hexrgb(GOLD) + [0.0], emissive=6.0, blend="additive", velocityStretch=2.5, stretchMax=1.6)
+
+    # ---- the flight: every travelling part advances one pair of bays per PERIOD, then jumps back by it (seamless: a
+    # pair is two gate spacings, or one star or one rose spacing); the outer rings likewise
+    for node in TRAVELLING:
+        s.track("procedural/%s/transform/position" % node, [
+            {"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
+            {"time": PERIOD, "value": [0.0, 0.0, PAIR], "interp": "linear"}], loop=PERIOD)
+    s.track("procedural/outerRings/transform/position", [
+        {"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
+        {"time": RING_EVERY * BAY_SECONDS, "value": [0.0, 0.0, span], "interp": "linear"}],
+        loop=RING_EVERY * BAY_SECONDS)
+
+    # ---- camera: on the axis (the symmetry is the point), drifting a metre about it, banking slowly
+    cam = [0.0, 0.0, 0.0]
+    tgt = [0.0, 0.0, -200.0]
+    s.params_({"camera/lens/focalLength": 20.0, "post/dof/enabled": True, "post/dof/physical": False,
+               "post/dof/focusDistance": 34.0, "post/dof/focusRange": 16.0, "post/dof/maxRadius": 8.0,
+               "post/bloom/intensity": 0.55, "post/bloom/threshold": 0.75,
+               "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.01,
+               "post/tonemap/operator": 4})
+    s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 50.0, "orbitSpeed": 0.0}
+    s.drift_camera(cam, tgt, period=44.0, amp=(1.0, 0.7, 0.0), tamp=(4.0, 3.0, 0.0))
+    s.track("camera/roll", [{"time": round(36.0 * i / 8, 3), "value": round(10.0 * math.sin(2.0 * math.pi * i / 8), 3),
+                             "interp": "smooth"} for i in range(9)], loop=36.0)
 
     instrument(s)
-    s.region("seed", centre=[0.0, 0.0, -2.4], radius=1.4)
-    s.region("armillary", centre=[0.0, 0.0, -1.2], radius=4.2)
-    s.region("crown", box=[0.2, 0.0, 0.8, 1.0])
+    s.region("sun", box=[0.42, 0.38, 0.58, 0.62])
+    s.region("passage", box=[0.0, 0.0, 1.0, 1.0])
     return s

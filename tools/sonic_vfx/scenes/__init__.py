@@ -26,11 +26,11 @@ SCENES = [
 ]
 
 # SONIC ABSTRACT (04-brief-abstract-direction.md, docs/prototypes/sonic-garden/ABSTRACT-PLAN.md): the abstract
-# direction's eight prototypes, each a distinct visual language. Their own project (the owner's decision, 2026-10-02):
+# direction's nine prototypes (as amended by briefs 05-08), each a distinct visual language. Their own project (the owner's decision, 2026-10-02):
 # examples/sonic-abstract/, the index category "Sonic Abstract", built by tools/sonic_vfx/abstract.py `build`. Numbered
 # as the owner's brief numbers its directions.
 ABSTRACT = [
-    # 1 sacred_flight            Sacred Geometry Flight (05-brief-direction-correction.md): being built
+    "sacred_flight",            # 1 Sacred Geometry Flight: The Golden Passage (05-brief-direction-correction.md)
     "neon_vector",              # 2 Neon Vector World: Pulsar Plain
     "cel_dream",                # 3 Cel-Shaded Dream World: Candy Archipelago
     "color_geometry",           # 4 Infinite Color Geometry: Chromatic Corridor
