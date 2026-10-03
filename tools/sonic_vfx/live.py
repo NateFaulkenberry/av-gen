@@ -31,12 +31,20 @@ def pct(xs, q):
     return xs[min(len(xs) - 1, int(len(xs) * q))] if xs else float("nan")
 
 
-def tour_table(out, rows):
+def tour_names(abstract=False):
+    """The switcher's list (ADR-1063/1074): the Sonic VFX set is Sonic Live and then the VFX scenes; the Sonic
+    Abstract set is its eight prototypes alone, in index order."""
+    import importlib
+    from tools.sonic_vfx.scenes import SCENES, ABSTRACT
+    if abstract:
+        return [importlib.import_module("tools.sonic_vfx.scenes." + n).TITLE for n in ABSTRACT]
+    return ["Sonic Live"] + [importlib.import_module("tools.sonic_vfx.scenes." + n).TITLE for n in SCENES]
+
+
+def tour_table(out, rows, abstract=False):
     """Split a tour's live log at the probe's program changes (both stamp the host clock in ns): per scene, the
     frame interval and GPU time, the notes that arrived, and how high the response's envelopes went."""
-    import importlib
-    from tools.sonic_vfx.scenes import SCENES
-    names = ["Sonic Live"] + [importlib.import_module("tools.sonic_vfx.scenes." + n).TITLE for n in SCENES]
+    names = tour_names(abstract)
     events = list(csv.DictReader(open(os.path.join(out, "probe.csv"))))
     cuts = [(int(e["hostNs"]), int(e["key"])) for e in events if e["kind"] == "program"]
     if not cuts:
@@ -95,6 +103,9 @@ def main():
     subprocess.run(["rm", "-rf", out])
     os.makedirs(os.path.join(out, "frames"), exist_ok=True)
     project = os.path.join(kit.ABSTRACT_DIR if a.abstract else kit.OUT_DIR, a.scene + ".json")
+    tour_scenes = len(tour_names(a.abstract))
+    if a.scenario == "tour":
+        PROBE_LEN["tour"] = 1.0 + 20.0 * tour_scenes
     length = PROBE_LEN.get(a.scenario, 30.0) + 4.0
     frames = int(length * 120)
     b = pin_bin()
@@ -111,8 +122,9 @@ def main():
         f.write("%s/avgen --project %s --live --input BlackHole %s--sonic-live-log %s --frames %d > %s 2>&1 &\n"
                 % (b, project, capture, os.path.join(out, "live.csv"), frames, os.path.join(out, "editor.log")))
         f.write("APP=$!\nsleep 3\n")
-        f.write("%s %s --out %s --wav %s --device BlackHole --lead-in 2\n"
-                % (probe, a.scenario, os.path.join(out, "probe.csv"), os.path.join(out, "probe.wav")))
+        f.write("%s %s --out %s --wav %s --device BlackHole --lead-in 2%s\n"
+                % (probe, a.scenario, os.path.join(out, "probe.csv"), os.path.join(out, "probe.wav"),
+                   " --scenes %d" % tour_scenes if a.scenario == "tour" else ""))
         # the scenario is over: let the last notes ring out, then close the editor (--frames is only a bound)
         f.write("sleep 2\nkill -TERM $APP 2>/dev/null || true\nwait $APP 2>/dev/null || true\n")
     subprocess.run([review.LOCK, "bash", script])
@@ -123,7 +135,7 @@ def main():
         print("live frame interval p50 %.1f ms, p95 %.1f ms, p99 %.1f ms; notes received %s"
               % (dt[len(dt) // 2], dt[int(len(dt) * 0.95)], dt[int(len(dt) * 0.99)], rows[-1].get("notesReceived")))
     if a.scenario == "tour":
-        tour_table(out, rows)
+        tour_table(out, rows, a.abstract)
     if a.no_capture:
         return
     # the capture as a clip, and the live log as a trace (time = seconds since the first captured frame)
