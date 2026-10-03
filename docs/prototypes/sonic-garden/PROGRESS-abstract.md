@@ -13,20 +13,21 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 
 ## Resume here (cold)
 
-- **State (2026-10-02 20:15, after a session restart):** all eight modules exist with their instruments (routes
-  audited clean). Two blockout rounds reviewed; round 2's verdicts and fixes:
-  - **strong:** 1 Sacred Geometry, 6 Particle World and 7 Impossible Architecture (busy);
-  - **2 Neon Vector:** the far rows merged into a band, so they open out with distance and the sweep rests beyond the
-    plain;
-  - **4 Color Geometry:** thin outlines became monumental mitred frames in a luminous cream haze;
-  - **5 Organic Garden:** the floor's hard horizon is gone (a 900 m floor), and the voice buds rest closed;
-  - **3 Cel Dream:** recomposed (a chain of islands fading into pink haze, a ringed planet, a sea of clouds);
-  - **8 Cinematic Void:** the air no longer floods (a 70 m march), and the mirror is built (a backdrop with the sky's
-    mirrored gradient, a twin sun).
-
-  Next: round 3 stills with the new pin (one queued job), then the 1080p silent stills, the real-music and MIDI clips,
-  perf, the live runs (the switcher now steps through the Sonic Abstract set, ADR-1074), the contact sheet, the notes,
-  the maps, the tour and the report.
+- **State (2026-10-02 21:40):** four look rounds done; all eight committed.
+  - **Strong:** 1 Sacred Geometry, 2 Neon Vector (with ADR-1073 wireframe monoliths), 6 Particle World (fine-dust
+    halo), 7 Impossible Architecture (18 m cells, a uniform teal sky) and 8 Cinematic Void (rebuilt: teal sky, a
+    geometric sun, a one-surface mirror).
+  - **Round 5 pending:** 3 Cel Dream (a three-layer cloud sea, a sky-whale), 4 Color Geometry (no cards, more twist,
+    an off-axis vanishing point) and 5 Organic Garden (macro, deeper focus).
+  - **The MIDI note places** were re-centred on real registers: in the test material the last pitch is bimodal.
+  - **Queued on the GPU** (the engineer's suites hold it): the round-5 stills of 3, 4 and 5, and the real-music clips
+    of 1, 2, 6, 7 and 8 (`abstract.py clips ...`, one render queue).
+  - **Next:** review round 5; the clips of 3, 4 and 5; the 1080p silent stills of all eight (`abstract.py stills`, one
+    job); the MIDI clips (`abstract.py clips --class full`); perf (`$S/abs/produce.sh perf`, or perf.py with
+    `--projects examples/sonic-abstract`); the live tour (`live.py sacred-geometry --abstract --scenario tour
+    --no-capture`); the tour cut (`abstract.py tour`); notes and maps (`abstract.py notes`, `maps`); the verdicts in
+    `abstract_notes.py`; the contact sheet (`abstract.py sheet`); the `[sonic]` and `[sdf]` tags on both test
+    binaries; the report.
 - **The scratchpad is WIPED when a session restarts** (it happened 2026-10-02 ~20:00): the pin and `avgen.sh` must be
   rebuilt (steps below). `review.py` now refuses to render without the pin. Before 20:04 it silently fell back to
   `build/release` once.
