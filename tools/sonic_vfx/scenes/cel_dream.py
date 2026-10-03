@@ -19,8 +19,8 @@ from ..kit import R, M, hexrgb, scale3, SLOW, MEDIUM, FAST, HIT, VERY_SLOW
 ID = "cel-dream"
 TITLE = "Cel-Shaded Dream World"
 
-SKY_TOP = "#ff8fc0"
-SKY_HORIZON = "#ffd6b4"
+SKY_TOP = "#9d8cff"
+SKY_HORIZON = "#ffc9b0"
 VOID = "#ffc4d6"
 LAWN = "#8ff0c0"
 ROCK = "#b9a3ff"
@@ -189,11 +189,12 @@ def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.0,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    # surface fog the colour of the horizon: the classic cel depth cue, every island paler the farther it floats
     s.environment = {
-        "intensity": 0.6, "background": hexrgb(SKY_HORIZON), "fogColor": hexrgb(SKY_HORIZON), "volumeDensity": 0.0,
-        "skyIntensity": 1.0,
+        "intensity": 0.6, "background": hexrgb(SKY_HORIZON), "fogColor": hexrgb("#ffc4c8"), "volumeDensity": 0.011,
+        "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(SKY_TOP), "horizonColor": hexrgb(SKY_HORIZON),
-                "groundColor": hexrgb(VOID), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": hexrgb(VOID), "haze": 0.38, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     s.light("sun", "directional", direction=[0.55, -0.75, -0.38], color=hexrgb("#fff3e6"), intensity=3.2,
@@ -201,9 +202,34 @@ def build():
 
     # ---- the island and its far siblings
     island(s, "isle", (0.0, 0.0, 0.0), 1.0)
-    island(s, "farA", (-17.0, 7.5, -24.0), 0.38, lawn="#a9f5cf", rock="#cbb8ff")
-    island(s, "farB", (19.0, 11.0, -36.0), 0.3, lawn="#b8f7d8", rock="#d4c4ff")
-    island(s, "farC", (4.0, -6.5, -48.0), 0.24, lawn="#b8f7d8", rock="#d4c4ff")
+    # a chain of islands receding to the right, each smaller and higher, each with a tree or two
+    chain = [("farA", (22.0, 2.5, -22.0), 0.5), ("farB", (40.0, 6.0, -48.0), 0.42), ("farC", (55.0, 1.0, -80.0), 0.36),
+             ("farD", (-30.0, 9.0, -60.0), 0.34), ("farE", (70.0, 9.5, -115.0), 0.3)]
+    for name, c, sz in chain:
+        island(s, name, c, sz, lawn="#9ff2c8", rock="#c3b0ff")
+        s.proc(name + "Tree", kit.lathe([(0.0, 1.5 * sz * 2), (4.0 * sz * 2, 0.0)], sides=7, samples=3),
+               material=toon("#4fd6a8", rim=0.12), transform=at(c[0] + 2.0 * sz, c[1] + 0.2, c[2] - 1.0 * sz))
+        s.proc(name + "Pop", sphere(1.2 * sz * 2, 12, 8), material=toon(PINK, rim=0.2),
+               transform=at(c[0] - 2.5 * sz, c[1] + 4.2 * sz * 2, c[2] + 1.0 * sz))
+        s.proc(name + "Stick", cyl(0.12 * sz * 2, 4.0 * sz * 2, 6), material=toon(CREAM),
+               transform=at(c[0] - 2.5 * sz, c[1] + 2.0 * sz * 2, c[2] + 1.0 * sz))
+
+    # ---- the giant ringed planet in the sky (upper right), flat pastel bands
+    s.proc("planet", sphere(26.0, 40, 24), material=toon("#ffe7a8", bands=2, rim=0.15, ambient=0.75, softness=0.03),
+           transform=at(78.0, 62.0, -230.0))
+    s.proc("planetRing", {"kind": "torus", "majorRadius": 44.0, "minorRadius": 1.6, "majorSegments": 96,
+                          "minorSegments": 6},
+           material=toon("#ff9ec4", bands=1, ambient=0.85),
+           transform={"position": [78.0, 62.0, -230.0], "rotation": [72.0, 0.0, -18.0], "scale": [1.0, 1.0, 0.25]})
+    s.proc("moon", sphere(5.0, 24, 14), material=toon("#c9f0ff", rim=0.2, ambient=0.75),
+           transform=at(28.0, 48.0, -150.0))
+
+    # ---- the sea of clouds far below the islands
+    s.proc("cloudSea", sphere(7.0, 14, 8),
+           distribution={"kind": "grid", "gridCount": [9, 1, 6], "gridSpacing": [24.0, 1.0, 26.0]},
+           variation={"seed": 3, "randomScale": [0.45, 0.35, 0.4], "randomPosition": [7.0, 2.0, 8.0]},
+           material=toon(CLOUD, bands=1, ambient=0.86, rim=0.15),
+           transform=at(20.0, -16.0, -70.0), extra={"sourceTransform": {"scale": [1.0, 0.42, 0.8]}})
 
     # ---- the giant flower (left of centre, behind the creatures): a curved stem, eight petals, a butter heart
     stem = {"kind": "tube", "tubeRadius": 0.22, "tubeTaper": 0.7, "tubeSides": 7, "tubeSegments": 20,
@@ -298,14 +324,14 @@ def build():
     instrument(s)
 
     # ---- camera: a slow arc round the diorama from slightly above; the creatures and flower left of centre
-    focal = 30.0
-    focus = [0.2, 2.3, 3.0]
+    focal = 24.0
+    focus = [6.0, 3.0, -6.0]
     s.params_({"camera/lens/focalLength": focal, "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.4,
                "post/output/vignette": 0.18, "post/output/grain": 0.0, "post/tonemap/operator": 4,
                "post/outline/amount": 1.0, "post/outline/color": hexrgb(PLUM), "post/outline/intensity": 1.0,
                "post/outline/width": 2.2, "post/outline/depthThreshold": 0.06,
                "post/outline/normalThreshold": 0.4, "post/outline/objectEdges": 1.0})
-    s.arc_camera(focus, radius=16.5, height=5.2, period=90.0, centre_deg=22.0, sweep_deg=30.0, side=0.6, lift=0.4)
+    s.arc_camera(focus, radius=31.0, height=5.0, period=90.0, centre_deg=14.0, sweep_deg=26.0, side=-1.0, lift=1.2)
     s.region("creatures", box=[0.3, 0.45, 0.7, 0.8])
     s.region("flower", box=[0.25, 0.1, 0.5, 0.45])
     return s

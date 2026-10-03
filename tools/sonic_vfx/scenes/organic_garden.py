@@ -118,6 +118,7 @@ def at(x, y, z, rot=(0, 0, 0), sc=(1, 1, 1)):
 
 
 VOICES = 6
+BUD_REST = 0.32       # a closed bud at rest; a held note opens it to full size
 BUDS = [(-2.9, 0.0, -1.9), (-2.1, 0.0, -2.6), (-1.2, 0.0, -2.9), (2.3, 0.0, -2.2), (3.0, 0.0, -1.3), (2.6, 0.0, -0.4)]
 BUD_COLS = [CORAL, ORCHID, PEACH, CYAN, LIME, ORCHID]
 
@@ -176,7 +177,7 @@ def instrument(s):
     # STRUCTURE: a chord multiplies the lantern's petals (12 to 24); a note's release drops petals (more for a long one)
     for k in range(VOICES):
         v = "notes.voice.%d." % k
-        s.route(R(v + "held", P % ("budPetals%d" % k) + "transform/scale", 1.0, attackMs=120, decayMs=700,
+        s.route(R(v + "held", P % ("budPetals%d" % k) + "transform/scale", 1.0 - BUD_REST, attackMs=120, decayMs=700,
                   springHz=2.0, springDamping=0.5),
                 R(v + "velocity", P % ("budPetals%d" % k) + "material/emissive", 3.0, attackMs=60, decayMs=600),
                 R(v + "held", P % ("budHeart%d" % k) + "material/emissive", 6.0, attackMs=60, decayMs=600))
@@ -201,7 +202,8 @@ def build():
     s.program(dots_program())
 
     # ---- the ground: a dark teal floor
-    s.proc("ground", {"kind": "box", "size": [60.0, 0.2, 60.0], "subdivisions": 1},
+    # (wide enough that its far edge is lost in the haze: a hard floor horizon read as a stage)
+    s.proc("ground", {"kind": "box", "size": [900.0, 0.2, 900.0], "subdivisions": 1},
            material={"baseColor": hexrgb("#082322"), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                      "roughness": 0.9, "metallic": 0.0},
            transform=at(0.0, -0.1, -10.0))
@@ -288,7 +290,7 @@ def build():
                                       sides=6, segments=12), material=jelly(MINT, 0.5))
         s.proc("budPetals%d" % k, {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
                distribution={"kind": "radial", "count": 5, "radius": 0.11, "plane": "xz", "orientation": "outward"},
-               material=jelly(BUD_COLS[k], 1.4), transform=at(x - 0.04, h + 0.03, z, sc=(0.01, 0.01, 0.01)),
+               material=jelly(BUD_COLS[k], 1.4), transform=at(x - 0.04, h + 0.03, z, sc=(BUD_REST,) * 3),
                extra={"sourceTransform": {"rotation": [-35.0, 0.0, 0.0], "scale": [0.45, 0.15, 1.0]}})
         s.proc("budHeart%d" % k, {"kind": "sphere", "radius": 0.06, "segments": 10, "rings": 6},
                material=jelly(PEACH, 1.0), transform=at(x - 0.04, h + 0.05, z))

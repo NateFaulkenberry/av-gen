@@ -5,14 +5,14 @@
  "camera": {
   "mode": 1,
   "position": [
-   6.381,
-   5.2,
-   18.2985
+   13.4996,
+   5.0,
+   24.0792
   ],
   "target": [
-   -0.3563,
-   2.7,
-   3.2248
+   6.9703,
+   4.2,
+   -6.2419
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -21,34 +21,35 @@
   "intensity": 0.6,
   "background": [
    1.0,
-   0.67244,
-   0.45641
+   0.58408,
+   0.43415
   ],
   "fogColor": [
    1.0,
-   0.67244,
-   0.45641
+   0.55201,
+   0.57758
   ],
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.011,
+  "volumeMaxDistance": 0.0,
   "skyIntensity": 1.0,
   "sky": {
    "enabled": true,
    "zenithColor": [
-    1.0,
-    0.27468,
-    0.52712
+    0.33716,
+    0.26225,
+    1.0
    ],
    "horizonColor": [
     1.0,
-    0.67244,
-    0.45641
+    0.58408,
+    0.43415
    ],
    "groundColor": [
     1.0,
     0.55201,
     0.67244
    ],
-   "haze": 0.45,
+   "haze": 0.38,
    "sunIntensity": 0.0,
    "intensity": 1.0,
    "background": true,
@@ -252,8 +253,8 @@
    "procedural": {
     "source": {
      "kind": "cylinder",
-     "radius": 3.42,
-     "height": 0.41800000000000004,
+     "radius": 4.5,
+     "height": 0.55,
      "radialSegments": 14,
      "caps": true
     },
@@ -262,9 +263,9 @@
     },
     "distributionTransform": {
      "position": [
-      -17.0,
-      7.291,
-      -24.0
+      22.0,
+      2.225,
+      -22.0
      ],
      "rotation": [
       0,
@@ -279,14 +280,14 @@
     },
     "material": {
      "baseColor": [
-      0.39676,
-      0.9131,
-      0.62396
+      0.3467,
+      0.88792,
+      0.57758
      ],
      "emissiveColor": [
-      0.39676,
-      0.9131,
-      0.62396
+      0.3467,
+      0.88792,
+      0.57758
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.6,
@@ -320,7 +321,7 @@
    "procedural": {
     "source": {
      "kind": "tube",
-     "tubeRadius": 3.268,
+     "tubeRadius": 4.3,
      "tubeTaper": 1.0,
      "tubeSides": 9,
      "tubeSegments": 10,
@@ -333,7 +334,7 @@
        {
         "position": [
          0.0,
-         -3.8,
+         -5.0,
          0.0
         ],
         "scale": 0.04651,
@@ -342,7 +343,7 @@
        {
         "position": [
          0.0,
-         -2.736,
+         -3.6,
          0.0
         ],
         "scale": 0.30233,
@@ -351,7 +352,7 @@
        {
         "position": [
          0.0,
-         -1.596,
+         -2.1,
          0.0
         ],
         "scale": 0.62791,
@@ -360,7 +361,7 @@
        {
         "position": [
          0.0,
-         -0.76,
+         -1.0,
          0.0
         ],
         "scale": 0.88372,
@@ -369,7 +370,7 @@
        {
         "position": [
          0.0,
-         -0.38,
+         -0.5,
          0.0
         ],
         "scale": 1.0,
@@ -384,9 +385,9 @@
     },
     "distributionTransform": {
      "position": [
-      -17.0,
-      7.5,
-      -24.0
+      22.0,
+      2.5,
+      -22.0
      ],
      "rotation": [
       0,
@@ -401,13 +402,13 @@
     },
     "material": {
      "baseColor": [
-      0.5972,
-      0.47932,
+      0.54572,
+      0.43415,
       1.0
      ],
      "emissiveColor": [
-      0.5972,
-      0.47932,
+      0.54572,
+      0.43415,
       1.0
      ],
      "emissiveIntensity": 0.0,
@@ -437,24 +438,51 @@
    }
   },
   {
-   "name": "farBLawn",
+   "name": "farATree",
    "kind": "procedural",
    "procedural": {
     "source": {
-     "kind": "cylinder",
-     "radius": 2.6999999999999997,
-     "height": 0.33,
-     "radialSegments": 14,
-     "caps": true
+     "kind": "tube",
+     "tubeRadius": 1.5,
+     "tubeTaper": 1.0,
+     "tubeSides": 7,
+     "tubeSegments": 4,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         4.0,
+         0.0
+        ],
+        "scale": 0.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
     },
     "distribution": {
      "kind": "single"
     },
     "distributionTransform": {
      "position": [
-      19.0,
-      10.835,
-      -36.0
+      23.0,
+      2.7,
+      -22.5
      ],
      "rotation": [
       0,
@@ -469,14 +497,217 @@
     },
     "material": {
      "baseColor": [
-      0.47932,
-      0.93011,
-      0.68669
+      0.07819,
+      0.67244,
+      0.39157
      ],
      "emissiveColor": [
-      0.47932,
-      0.93011,
-      0.68669
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farAPop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.2,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      20.75,
+      6.7,
+      -21.5
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farAStick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.12,
+     "height": 4.0,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      20.75,
+      4.5,
+      -21.5
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farBLawn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.78,
+     "height": 0.462,
+     "radialSegments": 14,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      40.0,
+      5.769,
+      -48.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.88792,
+      0.57758
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.6,
@@ -506,6 +737,1266 @@
   },
   {
    "name": "farBRock",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 3.6119999999999997,
+     "tubeTaper": 1.0,
+     "tubeSides": 9,
+     "tubeSegments": 10,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         -4.2,
+         0.0
+        ],
+        "scale": 0.04651,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -3.024,
+         0.0
+        ],
+        "scale": 0.30233,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -1.764,
+         0.0
+        ],
+        "scale": 0.62791,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.84,
+         0.0
+        ],
+        "scale": 0.88372,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.42,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 4
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      40.0,
+      6.0,
+      -48.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farBTree",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.26,
+     "tubeTaper": 1.0,
+     "tubeSides": 7,
+     "tubeSegments": 4,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         3.36,
+         0.0
+        ],
+        "scale": 0.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      40.84,
+      6.2,
+      -48.42
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farBPop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.008,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      38.95,
+      9.528,
+      -47.58
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farBStick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.10079999999999999,
+     "height": 3.36,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      38.95,
+      7.68,
+      -47.58
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farCLawn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.2399999999999998,
+     "height": 0.396,
+     "radialSegments": 14,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      55.0,
+      0.802,
+      -80.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farCRock",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 3.0959999999999996,
+     "tubeTaper": 1.0,
+     "tubeSides": 9,
+     "tubeSegments": 10,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         -3.5999999999999996,
+         0.0
+        ],
+        "scale": 0.04651,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -2.592,
+         0.0
+        ],
+        "scale": 0.30233,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -1.512,
+         0.0
+        ],
+        "scale": 0.62791,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.72,
+         0.0
+        ],
+        "scale": 0.88372,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.36,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 4
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      55.0,
+      1.0,
+      -80.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farCTree",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.08,
+     "tubeTaper": 1.0,
+     "tubeSides": 7,
+     "tubeSegments": 4,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         2.88,
+         0.0
+        ],
+        "scale": 0.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      55.72,
+      1.2,
+      -80.36
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farCPop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.864,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      54.1,
+      4.024,
+      -79.64
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farCStick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.08639999999999999,
+     "height": 2.88,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      54.1,
+      2.44,
+      -79.64
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farDLawn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.06,
+     "height": 0.37400000000000005,
+     "radialSegments": 14,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -30.0,
+      8.813,
+      -60.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farDRock",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 2.924,
+     "tubeTaper": 1.0,
+     "tubeSides": 9,
+     "tubeSegments": 10,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         -3.4000000000000004,
+         0.0
+        ],
+        "scale": 0.04651,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -2.4480000000000004,
+         0.0
+        ],
+        "scale": 0.30233,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -1.4280000000000002,
+         0.0
+        ],
+        "scale": 0.62791,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.68,
+         0.0
+        ],
+        "scale": 0.88372,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         -0.34,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 4
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -30.0,
+      9.0,
+      -60.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveColor": [
+      0.54572,
+      0.43415,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farDTree",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.02,
+     "tubeTaper": 1.0,
+     "tubeSides": 7,
+     "tubeSegments": 4,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         2.72,
+         0.0
+        ],
+        "scale": 0.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -29.32,
+      9.2,
+      -60.34
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farDPop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.8160000000000001,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -30.85,
+      11.856,
+      -59.66
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farDStick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.0816,
+     "height": 2.72,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -30.85,
+      10.36,
+      -59.66
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farELawn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 2.6999999999999997,
+     "height": 0.33,
+     "radialSegments": 14,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      70.0,
+      9.335,
+      -115.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.88792,
+      0.57758
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farERock",
    "kind": "procedural",
    "procedural": {
     "source": {
@@ -574,9 +2065,9 @@
     },
     "distributionTransform": {
      "position": [
-      19.0,
-      11.0,
-      -36.0
+      70.0,
+      9.5,
+      -115.0
      ],
      "rotation": [
       0,
@@ -591,13 +2082,13 @@
     },
     "material": {
      "baseColor": [
-      0.65837,
-      0.55201,
+      0.54572,
+      0.43415,
       1.0
      ],
      "emissiveColor": [
-      0.65837,
-      0.55201,
+      0.54572,
+      0.43415,
       1.0
      ],
      "emissiveIntensity": 0.0,
@@ -627,24 +2118,51 @@
    }
   },
   {
-   "name": "farCLawn",
+   "name": "farETree",
    "kind": "procedural",
    "procedural": {
     "source": {
-     "kind": "cylinder",
-     "radius": 2.16,
-     "height": 0.264,
-     "radialSegments": 14,
-     "caps": true
+     "kind": "tube",
+     "tubeRadius": 0.8999999999999999,
+     "tubeTaper": 1.0,
+     "tubeSides": 7,
+     "tubeSegments": 4,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         2.4,
+         0.0
+        ],
+        "scale": 0.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 3
+     }
     },
     "distribution": {
      "kind": "single"
     },
     "distributionTransform": {
      "position": [
-      4.0,
-      -6.632,
-      -48.0
+      70.6,
+      9.7,
+      -115.3
      ],
      "rotation": [
       0,
@@ -659,14 +2177,149 @@
     },
     "material": {
      "baseColor": [
-      0.47932,
-      0.93011,
-      0.68669
+      0.07819,
+      0.67244,
+      0.39157
      ],
      "emissiveColor": [
-      0.47932,
-      0.93011,
-      0.68669
+      0.07819,
+      0.67244,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farEPop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.72,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      69.25,
+      12.02,
+      -114.7
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveColor": [
+      1.0,
+      0.20864,
+      0.46778
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "farEStick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.072,
+     "height": 2.4,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      69.25,
+      10.7,
+      -114.7
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.6,
@@ -695,78 +2348,23 @@
    }
   },
   {
-   "name": "farCRock",
+   "name": "planet",
    "kind": "procedural",
    "procedural": {
     "source": {
-     "kind": "tube",
-     "tubeRadius": 2.064,
-     "tubeTaper": 1.0,
-     "tubeSides": 9,
-     "tubeSegments": 10,
-     "tubeTwist": 0.0,
-     "tubeCaps": true,
-     "curve": {
-      "kind": "catmullRom",
-      "generator": "points",
-      "points": [
-       {
-        "position": [
-         0.0,
-         -2.4,
-         0.0
-        ],
-        "scale": 0.04651,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         -1.728,
-         0.0
-        ],
-        "scale": 0.30233,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         -1.008,
-         0.0
-        ],
-        "scale": 0.62791,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         -0.48,
-         0.0
-        ],
-        "scale": 0.88372,
-        "roll": 0.0
-       },
-       {
-        "position": [
-         0.0,
-         -0.24,
-         0.0
-        ],
-        "scale": 1.0,
-        "roll": 0.0
-       }
-      ],
-      "samplesPerSegment": 4
-     }
+     "kind": "sphere",
+     "radius": 26.0,
+     "segments": 40,
+     "rings": 24
     },
     "distribution": {
      "kind": "single"
     },
     "distributionTransform": {
      "position": [
-      4.0,
-      -6.5,
-      -48.0
+      78.0,
+      62.0,
+      -230.0
      ],
      "rotation": [
       0,
@@ -781,13 +2379,148 @@
     },
     "material": {
      "baseColor": [
-      0.65837,
-      0.55201,
+      1.0,
+      0.7991,
+      0.39157
+     ],
+     "emissiveColor": [
+      1.0,
+      0.7991,
+      0.39157
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.03,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.75,
+      "rimWidth": 0.15,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "planetRing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 44.0,
+     "minorRadius": 1.6,
+     "majorSegments": 96,
+     "minorSegments": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      78.0,
+      62.0,
+      -230.0
+     ],
+     "rotation": [
+      72.0,
+      0.0,
+      -18.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      0.25
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.85,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   }
+  },
+  {
+   "name": "moon",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 5.0,
+     "segments": 24,
+     "rings": 14
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      28.0,
+      48.0,
+      -150.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.58408,
+      0.87137,
       1.0
      ],
      "emissiveColor": [
-      0.65837,
-      0.55201,
+      0.58408,
+      0.87137,
       1.0
      ],
      "emissiveIntensity": 0.0,
@@ -802,17 +2535,114 @@
        0.5,
        0.95
       ],
-      "ambient": 0.55,
-      "rimWidth": 0.0,
+      "ambient": 0.75,
+      "rimWidth": 0.2,
       "rimColor": [
        1.0,
        0.87137,
        0.95597
       ],
-      "rimIntensity": 0.0,
+      "rimIntensity": 0.9,
       "specular": 0.0,
       "specularSize": 0.12
      }
+    }
+   }
+  },
+  {
+   "name": "cloudSea",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 7.0,
+     "segments": 14,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      9,
+      1,
+      6
+     ],
+     "gridSpacing": [
+      24.0,
+      1.0,
+      26.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      20.0,
+      -16.0,
+      -70.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.86,
+      "rimWidth": 0.15,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    },
+    "variation": {
+     "seed": 3,
+     "randomScale": [
+      0.45,
+      0.35,
+      0.4
+     ],
+     "randomPosition": [
+      7.0,
+      2.0,
+      8.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.0,
+      0.42,
+      0.8
+     ]
     }
    }
   },

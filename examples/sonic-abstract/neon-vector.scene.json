@@ -11,8 +11,8 @@
   ],
   "target": [
    0.0,
-   -28.6827,
-   -182.3792
+   -33.7263,
+   -216.9937
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -29,7 +29,7 @@
    0,
    0
   ],
-  "volumeDensity": 0.0075,
+  "volumeDensity": 0.011,
   "volumeMaxDistance": 0.0,
   "skyIntensity": 0.0,
   "sky": {
@@ -487,11 +487,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 22,
+     "count": 18,
      "start": [
       0.0,
       0.0,
-      -79.4
+      -87.43
      ],
      "end": [
       0.0,
@@ -510,7 +510,7 @@
       0.90466,
       0.87137
      ],
-     "emissiveIntensity": 1.9,
+     "emissiveIntensity": 1.6,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true,
@@ -626,11 +626,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 22,
+     "count": 18,
      "start": [
       0.0,
       0.0,
-      -79.4
+      -87.43
      ],
      "end": [
       0.0,
@@ -778,16 +778,16 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 30,
+     "count": 18,
      "start": [
       0.0,
       0.0,
-      -145.4
+      -180.38
      ],
      "end": [
       0.0,
       0.0,
-      -81.60000000000001
+      -90.62
      ]
     },
     "material": {
@@ -801,7 +801,7 @@
       0.90466,
       0.87137
      ],
-     "emissiveIntensity": 0.9,
+     "emissiveIntensity": 0.75,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true,
@@ -917,16 +917,16 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 30,
+     "count": 18,
      "start": [
       0.0,
       0.0,
-      -145.4
+      -180.38
      ],
      "end": [
       0.0,
       0.0,
-      -81.60000000000001
+      -90.62
      ]
     },
     "material": {
@@ -1051,7 +1051,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1100,7 +1100,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1149,7 +1149,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1198,7 +1198,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1247,7 +1247,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1296,7 +1296,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1345,7 +1345,7 @@
      "position": [
       65.0,
       21.5,
-      -203.4
+      -238.38
      ],
      "rotation": [
       90.0,
@@ -1396,7 +1396,7 @@
      "position": [
       0.0,
       0.0,
-      -185.4
+      -220.38
      ],
      "rotation": [
       0,
@@ -1701,10 +1701,10 @@
      "kind": "constant",
      "dst": 2,
      "constant": [
-      145.4,
-      145.4,
-      145.4,
-      145.4
+      175.0,
+      175.0,
+      175.0,
+      175.0
      ]
     },
     {

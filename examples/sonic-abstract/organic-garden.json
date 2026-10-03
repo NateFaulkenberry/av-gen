@@ -842,7 +842,7 @@
   {
    "source": "notes.voice.0.held",
    "target": "procedural/budPetals0/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -877,7 +877,7 @@
   {
    "source": "notes.voice.1.held",
    "target": "procedural/budPetals1/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -912,7 +912,7 @@
   {
    "source": "notes.voice.2.held",
    "target": "procedural/budPetals2/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -947,7 +947,7 @@
   {
    "source": "notes.voice.3.held",
    "target": "procedural/budPetals3/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -982,7 +982,7 @@
   {
    "source": "notes.voice.4.held",
    "target": "procedural/budPetals4/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1017,7 +1017,7 @@
   {
    "source": "notes.voice.5.held",
    "target": "procedural/budPetals5/transform/scale",
-   "amount": 1.0,
+   "amount": 0.6799999999999999,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

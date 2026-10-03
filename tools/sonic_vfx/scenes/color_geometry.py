@@ -30,12 +30,12 @@ VIOLET = "#8a2be2"
 COBALT = "#1f4fff"
 TEAL = "#00c2b8"
 LIGHT = "#fff3d4"
-HAZE = "#3a0f3f"
+LUMEN = "#fff0e2"      # the luminous haze the far frames dissolve into (Turrell's light, not a dark void)
 
 SPACING = 9.0          # metres between portals
 APOTHEM = 4.2          # the portal opening's inradius
-FRAME = 1.1            # the frame's width (radial)
-DEPTH = 0.55           # the frame's thickness along the corridor (half)
+FRAME = 7.0            # the frame's width (radial): monumental, a wall of colour with a hole in it
+DEPTH = 0.8            # the frame's thickness along the corridor (half)
 SIDES = 4              # the portal's polygon order at rest
 HUE_PERIOD = 90.0      # metres for a full turn of the colour wheel
 TRAVEL_PERIOD = 2.6    # seconds for the corridor to advance one spacing (3.5 m/s)
@@ -78,7 +78,9 @@ DESIGN = {
 
 
 def corridor():
-    half_edge = APOTHEM * math.tan(math.pi / SIDES) + FRAME * 0.5
+    # each slab reaches the outer polygon's corners: polarRepeat folds space into one wedge per side, so the
+    # neighbouring slabs meet in a clean mitre on the wedge boundary
+    half_edge = (APOTHEM + FRAME) * math.tan(math.pi / SIDES)
     slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge), name="slab"))
     portal = sd_polar(SIDES, slab, name="polygon")
     # a floating card in each bay, tilted, off-axis: the slabs that cross the space
@@ -157,16 +159,16 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.0,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(HAZE), "fogColor": hexrgb("#ff6a9a"), "volumeDensity": 0.007,
-        "volumeMaxDistance": 110.0, "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb("#1a0628"), "horizonColor": hexrgb("#4a1050"),
+        "intensity": 0.0, "background": hexrgb(LUMEN), "fogColor": hexrgb(LUMEN), "volumeDensity": 0.016,
+        "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
+        "sky": {"enabled": True, "zenithColor": hexrgb(LUMEN), "horizonColor": hexrgb(LUMEN),
                 "groundColor": hexrgb("#12052a"), "haze": 0.5, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     s.program(colour_program())
     # the corridor: local +Y into the screen (rotation -90 about X), starting just behind the viewer
-    rmax = APOTHEM + FRAME + 2.5
-    s.sdf("corridor", corridor(), (-rmax, -4.0, -rmax), (rmax, 135.0, rmax),
+    rmax = (APOTHEM + FRAME) / math.cos(math.pi / 3.0) + 1.0     # a triangle's corners (the chords reach 3 sides)
+    s.sdf("corridor", corridor(), (-rmax, -16.0, -rmax), (rmax, 135.0, rmax),
           surfaces=[{"color": [1.0, 1.0, 1.0], "emission": [1.0, 1.0, 1.0], "edge": [1.0, 1.0, 1.0]}],
           look={"edgeIntensity": 0.0, "edgePixels": 1.4, "edgeThreshold": 0.03, "edgeSoftness": 0.25,
                 "edgeColor": hexrgb("#fff1d8")},

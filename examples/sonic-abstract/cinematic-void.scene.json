@@ -25,12 +25,12 @@
    0.0331
   ],
   "fogColor": [
-   0.55201,
-   0.14413,
-   0.02315
+   0.47932,
+   0.13287,
+   0.02732
   ],
-  "volumeDensity": 0.00032,
-  "volumeMaxDistance": 1400.0,
+  "volumeDensity": 0.004,
+  "volumeMaxDistance": 70.0,
   "skyIntensity": 1.0,
   "sky": {
    "enabled": true,
@@ -45,19 +45,121 @@
     0.04519
    ],
    "groundColor": [
-    0.04231,
-    0.01298,
+    0.01033,
+    0.00518,
     0.00605
    ],
    "haze": 0.3,
-   "sunIntensity": 18.0,
-   "sunGlow": 0.05,
+   "sunIntensity": 14.0,
+   "sunGlow": 0.045,
    "intensity": 1.0,
    "background": true,
    "useKeyLight": true
   }
  },
  "nodes": [
+  {
+   "name": "mirror",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6000.0,
+      900.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -448.2,
+      -1700.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "cvMirror"
+    }
+   }
+  },
+  {
+   "name": "twinSun",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 60.0,
+     "height": 0.5,
+     "radialSegments": 64,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -178.56791666666666,
+      -1698.5
+     ],
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.90466,
+      0.71569
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "cvTwinSun"
+    }
+   }
+  },
   {
    "name": "ring",
    "kind": "procedural",
@@ -653,7 +755,7 @@
    ],
    "intensity": 6.0,
    "castsShadow": false,
-   "volumetric": 1.0
+   "volumetric": 0.6
   },
   {
    "id": "fill",
@@ -671,6 +773,133 @@
    ],
    "intensity": 0.25,
    "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "cvMirror",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      -0.0011111111111111111,
+      0.0,
+      0.002
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "ramp",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      0.82,
+      0.26497,
+      0.03706,
+      1.0
+     ],
+     "constant2": [
+      0.35313,
+      0.1243,
+      0.03139,
+      1.0
+     ],
+     "constant3": [
+      0.17645,
+      0.07106,
+      0.02924,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "cvTwinSun",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "localPosition"
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 0
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "value": 0.0002777777777777778
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": 0.5
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": 3.0
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      6.0,
+      3.74376,
+      1.43039,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 2,
+     "srcB": 1
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 3,
+   "emissionIntensity": 1.0,
+   "opacity": -1
   }
  ]
 }

@@ -13,14 +13,25 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 
 ## Resume here (cold)
 
-- **State (2026-10-02 19:05):** all eight modules exist with their instruments (routes audited clean: no unresolved
-  target). Reviewed so far: 1 Sacred Geometry (v5, strong) and 2 Neon Vector (v2: the hidden-line ridges work).
-  Blockouts of 2 (v3) and 3-8 are queued behind the Liminal agent's suite (the GPU lock). Framings were checked on the
-  CPU with `kit.Scene.project` and fixed for 2, 5 and 8. Next: review the blockouts, iterate on the weakest, then the
-  silent 1080p stills, the real-music clips, the MIDI clips, perf, live runs, the contact sheet, the notes and
-  `REPORT.md`.
-- **The pin is now `eac7cb96`** (the engineer's cel lighting ADR-1071 and outline ADR-1072), at `$S/vfx/bin-eac7cb96`;
-  `avgen.sh` points at it.
+- **State (2026-10-02 20:15, after a session restart):** all eight modules exist with their instruments (routes
+  audited clean). Two blockout rounds reviewed; round 2's verdicts and fixes:
+  - **strong:** 1 Sacred Geometry, 6 Particle World and 7 Impossible Architecture (busy);
+  - **2 Neon Vector:** the far rows merged into a band, so they open out with distance and the sweep rests beyond the
+    plain;
+  - **4 Color Geometry:** thin outlines became monumental mitred frames in a luminous cream haze;
+  - **5 Organic Garden:** the floor's hard horizon is gone (a 900 m floor), and the voice buds rest closed;
+  - **3 Cel Dream:** recomposed (a chain of islands fading into pink haze, a ringed planet, a sea of clouds);
+  - **8 Cinematic Void:** the air no longer floods (a 70 m march), and the mirror is built (a backdrop with the sky's
+    mirrored gradient, a twin sun).
+
+  Next: round 3 stills with the new pin (one queued job), then the 1080p silent stills, the real-music and MIDI clips,
+  perf, the live runs (the switcher now steps through the Sonic Abstract set, ADR-1074), the contact sheet, the notes,
+  the maps, the tour and the report.
+- **The scratchpad is WIPED when a session restarts** (it happened 2026-10-02 ~20:00): the pin and `avgen.sh` must be
+  rebuilt (steps below). `review.py` now refuses to render without the pin. Before 20:04 it silently fell back to
+  `build/release` once.
+- **The pin is `da96635e`** (the engineer's cel lighting ADR-1071, outline ADR-1072, wire lines ADR-1073, the per-set
+  switcher ADR-1074), at `$S/vfx/bin-da96635e`; `$S/vfx/avgen.sh` points at it.
 - **Build:** `python3 tools/sonic_vfx/abstract.py build [module ...]` writes `examples/sonic-abstract/<id>.json` and
   `.scene.json`. With no module it builds all of `scenes.ABSTRACT` and rewrites the index's "Sonic Abstract" entries.
   For look development elsewhere, use `--projects DIR`.
@@ -32,17 +43,17 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   - `clip <id> --class allyougot|rebuild|full` gives the reactive clip `NN-<id>-<class>.mp4`;
   - `frame`, `sheet [--blockouts]`, and `music` (cuts the real-music excerpts into the gitignored `assets/audio`).
 - **Live:** `python3 tools/sonic_vfx/live.py <id> --abstract --scenario demo` runs one prototype live. The switcher
-  steps through the Sonic VFX set only; the engineer is extending it to the open project's set.
-- **The pinned engine:** `eac7cb96` at `$S/vfx/bin-eac7cb96` (the previous pin `96bc0214` is beside it), through
-  `$S/vfx/avgen.sh` (sets `AVGEN_SHADER_DIR` to the pin's shaders). `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
+  steps through the set the open project belongs to (ADR-1074): Sonic Abstract's eight, program n = scene n mod 8.
+- **The pinned engine:** `da96635e` at `$S/vfx/bin-da96635e`, through `$S/vfx/avgen.sh` (a three-line wrapper that sets
+  `AVGEN_SHADER_DIR` to the pin's shaders and runs its `avgen`; recreate it after a wipe). `S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad`.
   Never render art from `build/release` (the engineer's). To re-pin when the engineer posts a ready note:
   1. `git archive <sha> | tar -x -C $S/vfx/src-<sha>`;
   2. `cmake --preset release -DCPM_SOURCE_CACHE=/Users/natefaulkenberry/Documents/GitHub/av-gen/.cache/cpm`;
   3. build `avgen avgen_sonic_probe`;
   4. copy the binaries and `shaders/` into `$S/vfx/bin-<sha>`;
   5. point `avgen.sh` at it.
-- **GPU:** every job goes through `tools/gpu-lock.sh`, one job per hold (shared with the Liminal art agent and the
-  engineer). No `timeout` command.
+- **GPU:** every job goes through `tools/gpu-lock.sh`, one job per hold (shared with the engineer; the Liminal agent
+  is done). No `timeout` command. `abstract.py stills` renders several silent stills in ONE queued job.
 - **Modulation maps:** `abstract.py maps [id ...]` writes `NN-<id>-modulation.md` from the built project (every route by
   audio dimension, `[S]` for structural targets) plus the scene's plain-words vocabulary.
 - **Real music:** 30 s excerpts of the owner's tracks (Desktop: `All You Got.wav` from 34 s, `Rebuild.mp3` from 156 s),

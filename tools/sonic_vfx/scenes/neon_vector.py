@@ -29,10 +29,12 @@ ULTRA = "#3a3dff"
 
 HALF_W = 70.0          # the lines run from x = -70 to 70
 SPACING = 2.2          # metres between rows
-GROUPS = [             # (name, nearest z, rows, line radius, line intensity)
-    ("near", 2.0, 16, 0.022, 2.2),
-    ("mid", 2.0 - 16 * SPACING, 22, 0.034, 1.9),
-    ("far", 2.0 - 38 * SPACING, 30, 0.05, 0.9),
+# (name, nearest z, rows, row spacing, line radius, line intensity): the rows open out with distance, so the far plain
+# keeps separate lines on screen instead of merging into a white band
+GROUPS = [
+    ("near", 2.0, 16, SPACING, 0.022, 2.2),
+    ("mid", 2.0 - 16 * SPACING, 18, SPACING * 1.45, 0.034, 1.6),
+    ("far", 2.0 - 16 * SPACING - 18 * SPACING * 1.45, 18, SPACING * 2.4, 0.05, 0.75),
 ]
 CAM = [0.0, 6.5, 14.0]
 
@@ -82,7 +84,7 @@ def line_mat(intensity, program=None):
     return m
 
 
-SWEEP_FAR = 2.0 - 67 * SPACING      # the plain's far edge
+SWEEP_FAR = -175.0                  # where the band rests: beyond the plain's far edge (silence shows no band)
 SWEEP_NEAR = 2.0
 SWEEP_WIDTH = 6.0
 
@@ -208,7 +210,7 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.6, "sustain": 0.5, "attack": 1.0, "release": 1.0,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.0, "background": [0.0, 0.0, 0.0], "fogColor": [0, 0, 0], "volumeDensity": 0.0075,
+        "intensity": 0.0, "background": [0.0, 0.0, 0.0], "fogColor": [0, 0, 0], "volumeDensity": 0.011,
         "volumeMaxDistance": 0.0, "skyIntensity": 0.0,
         "sky": {"enabled": False, "zenithColor": [0, 0, 0], "horizonColor": [0, 0, 0], "groundColor": [0, 0, 0],
                 "haze": 0.0, "sunIntensity": 0.0, "intensity": 0.0, "background": True, "useKeyLight": False},
@@ -232,8 +234,8 @@ def build():
         "kind": "radial", "radius": 7.0, "scale": [1.0, 1.0, 1000.0], "strength": 1.0, "position": [0.0, 0.0, 0.0]}})
 
     # ---- the ridgelines: three row groups, each a line node and a fin node
-    for name, z_near, rows, radius, inten in GROUPS:
-        z_far = z_near - (rows - 1) * SPACING
+    for name, z_near, rows, spacing, radius, inten in GROUPS:
+        z_far = z_near - (rows - 1) * spacing
         dist = {"kind": "linear", "count": rows, "start": [0.0, 0.0, z_far], "end": [0.0, 0.0, z_near]}
         s.proc("lines_" + name, line_source(radius), distribution=dist, material=line_mat(inten, "beatSweep"),
                material_variation={"emissiveGradient": 0.6}, deformers=terrain_deformers())
@@ -244,7 +246,7 @@ def build():
 
     # ---- the sky: a colossal outline circle of seven rings floating whole above the horizon on the right third
     # (never cut by the horizon: a cut circle is a sunset), a hairline horizon
-    far_z = GROUPS[-1][1] - (GROUPS[-1][2] - 1) * SPACING
+    far_z = GROUPS[-1][1] - (GROUPS[-1][2] - 1) * GROUPS[-1][3]
     cz = far_z - 40.0
     ring_c = [65.0, 21.5, cz - 18.0]
     for i in range(7):

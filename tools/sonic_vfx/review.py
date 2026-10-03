@@ -23,7 +23,10 @@ from tools.sonic_vfx.variant import make_variant  # noqa: E402
 from tools.sonic_vfx import kit  # noqa: E402
 
 PIN = "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/vfx/avgen.sh"
-AVGEN = os.environ.get("AVGEN") or (PIN if os.path.exists(PIN) else os.path.join(REPO, "build/release/src/avgen"))
+# The pinned engine only: never the engineer's build/release (its binary and the shared source shaders move under a
+# render). The scratchpad is wiped when a session restarts; a missing pin is an error, not a silent fallback (it fell
+# back once, 2026-10-02 20:04). Rebuild it: docs/prototypes/sonic-garden/PROGRESS-abstract.md, "Resume here".
+AVGEN = os.environ.get("AVGEN") or PIN
 LOCK = os.path.join(REPO, "tools", "gpu-lock.sh")
 CLASSES = ["pads", "chords", "bass", "lead", "arp", "edrums", "drumloop", "dense", "sparse", "velocity", "rapid",
            "sustained", "full"]
@@ -67,6 +70,8 @@ def variant(scene, cls, workdir, project_dir=None):
 
 
 def run(args):
+    if not os.path.exists(AVGEN):
+        sys.exit("the pinned engine is missing (%s): rebuild it, see PROGRESS-abstract.md 'Resume here'" % AVGEN)
     cmd = [LOCK, AVGEN] + args
     r = subprocess.run(cmd, capture_output=True, text=True)
     tail = [l for l in (r.stdout + r.stderr).splitlines() if "render complete" in l or "error" in l.lower()]
