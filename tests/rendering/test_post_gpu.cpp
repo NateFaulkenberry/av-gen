@@ -277,6 +277,59 @@ TEST_CASE("Depth of field blurs an out-of-focus edge and motion blur smears came
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1083: the live quality ladder's two gates. Closed, the scene's own DoF and motion blur are skipped -- the frame
+// is byte-identical to the same scene authored without them; open, they run exactly as authored (the control, so a
+// gate wired to always skip would fail here too).
+TEST_CASE("the live quality gates skip the scene's DoF and motion blur, and open gates change nothing",
+          "[gpu][post][live-quality]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const auto moved = [&](bool gatesOpen, bool authoredEffects) {
+        // A fresh renderer per arm, so no history (exposure, previous matrices) crosses between arms.
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        rendering::QualitySettings q = renderer.qualitySettings();
+        q.motionBlur = gatesOpen;
+        q.depthOfField = gatesOpen;
+        renderer.setQualitySettings(q);
+        scene::Scene s;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        s.camera.position = {0.0f, 0.0f, 6.0f};
+        s.camera.target = {0.0f, 0.0f, 0.0f};
+        const auto mesh = s.addMesh(scene::makeCube(1.0f));
+        auto& e = s.addEntity("cube", mesh);
+        e.material.baseColor = {1.0f, 1.0f, 1.0f};
+        e.material.emissiveColor = {1.0f, 1.0f, 1.0f};
+        e.material.emissiveIntensity = 1.0f;
+        if (authoredEffects) {
+            s.post.dofEnabled = true;
+            s.post.focusDistance = 20.0f;
+            s.post.focusRange = 0.5f;
+            s.post.dofMaxRadius = 12.0f;
+            s.post.motionBlurAmount = 1.0f;
+            s.post.motionBlurMaxRadius = 200.0f;
+        }
+        FrameTime time{};
+        REQUIRE(renderer.renderToImage(s, time, 128, 128).has_value()); // seeds the previous matrices
+        s.camera.position.x += 0.6f;
+        s.camera.target.x += 0.6f;
+        auto image = renderer.renderToImage(s, time, 128, 128);
+        REQUIRE(image.has_value());
+        CHECK(ctx->errorCount() == 0);
+        return *image;
+    };
+    const gpu::Image8 authored = moved(/*gatesOpen=*/true, /*authoredEffects=*/true);
+    const gpu::Image8 gated = moved(/*gatesOpen=*/false, /*authoredEffects=*/true);
+    const gpu::Image8 plain = moved(/*gatesOpen=*/true, /*authoredEffects=*/false);
+    const auto gatedVsPlain = testing::byteDiff(gated.rgba, plain.rgba);
+    INFO("gated vs plain: " << gatedVsPlain.describe());
+    CHECK(gatedVsPlain.identical());
+    // The control: with the gates open the authored effects really run.
+    INFO("edge authored=" << edgeSharpness(authored, 64) << " plain=" << edgeSharpness(plain, 64));
+    CHECK(edgeSharpness(authored, 64) < edgeSharpness(plain, 64) * 0.8f);
+    CHECK_FALSE(testing::byteDiff(authored.rgba, plain.rgba).identical());
+}
+
 TEST_CASE("Transient pool reuses textures across frames", "[gpu][post]") {
     auto ctx = makeContext();
     gpu::TransientPool pool(*ctx);

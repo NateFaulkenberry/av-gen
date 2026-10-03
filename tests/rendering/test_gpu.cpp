@@ -331,6 +331,63 @@ TEST_CASE("SceneRenderer builds per-object diagnostics only for a consumer when 
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1086 (§11): a live quality change re-sizes the scene target and resets exactly the screen-space history, so the
+// first full-quality frame after a round trip through a low level is the frame a renderer that never left would draw.
+// The values are the balanced ladder's Low (render tests do not link the app's ladder table).
+TEST_CASE("a live quality round trip leaves no stale history", "[gpu][renderer][live-quality]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto scene = cubeScene();
+    scene.post.motionBlurAmount = 1.0f; // reads the previous matrices: the history most likely to go stale
+    const auto lowOf = [](rendering::QualitySettings q) {
+        q.renderScale = 0.5f;
+        q.volumeResolutionScale = 0.25f;
+        q.volumeStepScale = 0.5f;
+        q.motionBlur = false;
+        q.depthOfField = false;
+        q.cascadeCount = 2;
+        return q;
+    };
+    rendering::SceneRenderer stayed(*ctx, shaders);
+    REQUIRE(stayed.init().has_value());
+    rendering::SceneRenderer travelled(*ctx, shaders);
+    REQUIRE(travelled.init().has_value());
+    rendering::SceneRenderer kept(*ctx, shaders); // the control: keeps its history across the move
+    REQUIRE(kept.init().has_value());
+    const rendering::QualitySettings ultra = travelled.qualitySettings();
+
+    FrameTime time{};
+    REQUIRE(stayed.renderToImage(scene, time, 96, 64).has_value());
+    REQUIRE(travelled.renderToImage(scene, time, 96, 64).has_value());
+    REQUIRE(kept.renderToImage(scene, time, 96, 64).has_value());
+    // The traveller drops to Low for a frame, with the camera moving under it.
+    travelled.setQualitySettings(lowOf(ultra));
+    ++time.frameIndex;
+    scene.camera.position.x += 0.3f;
+    auto low = travelled.renderToImage(scene, time, 96, 64);
+    REQUIRE(low.has_value());
+    CHECK(travelled.stats().width == 48);
+    // Back to Ultra. Both renderers now draw the same frame after a camera that moved since their last frame.
+    travelled.setQualitySettings(ultra);
+    CHECK(travelled.stats().width == 96);
+    ++time.frameIndex;
+    scene.camera.position.x += 0.3f;
+    // The renderer that stayed must see the same "previous frame" the traveller's reset implies: none. A
+    // resize resets the history, so give the stayer the same reset by re-sizing it through the same path.
+    stayed.resetScreenHistory();
+    auto a = stayed.renderToImage(scene, time, 96, 64);
+    auto b = travelled.renderToImage(scene, time, 96, 64);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    CHECK(gpu::hashImage(*a) == gpu::hashImage(*b));
+    // ADR-182: history does reach this frame -- a renderer that kept its previous matrices across the move draws
+    // a different (motion-blurred) picture, so the equality above is a statement about the reset, not a tautology.
+    auto c = kept.renderToImage(scene, time, 96, 64);
+    REQUIRE(c.has_value());
+    CHECK(gpu::hashImage(*c) != gpu::hashImage(*b));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SceneRenderer does not reuse same-version meshes across scenes", "[gpu][renderer][forensics]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
