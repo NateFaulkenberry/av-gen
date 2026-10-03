@@ -61,16 +61,22 @@ DESIGN = {
         "extremely_fast": ["blocks snapping into place", "line flashes"],
     },
     "vocabulary": [
-        ["bass", "response.bass", "the near rows swell"],
-        ["kick", "response.kick", "a forward lurch and a rolling wave"],
-        ["snare", "response.snare", "a colour block snaps into existence"],
-        ["hat", "response.hat", "fine jitter on the lines"],
-        ["mids", "audio.mid", "the middle rows swell; the circle breathes"],
-        ["highs", "audio.highMid", "the far rows swell"],
-        ["note", "notes.lastPitch", "a peak rises at the pitch's place across the plain"],
-        ["intensity", "response.intensity", "the peaks grow taller as the piece builds"],
+        ["bass", "response.bass", "the near rows swell under the camera; the monoliths stretch taller"],
+        ["kick", "response.kick", "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"],
+        ["snare", "response.snare", "construction: three flat colour shapes snap into the sky in sequence; the lines "
+         "flash"],
+        ["hat", "response.hat", "fine jitter on every line"],
+        ["bands", "audio.lowMid", "the spectrum lies across the landscape in depth: low mids and mids swell the "
+         "middle rows, high mids the far rows"],
+        ["mids", "audio.mid", "the horizon circle's rings breathe and turn"],
+        ["brightness", "sonic.brightness.slow", "the section's accent colour (the whole image's hue turns; white "
+         "stays white)"],
         ["beat", "beat.phase", "the beat sweep: a band of light runs down the plain to the camera once per beat"],
-        ["silence", "(no input)", "the plain glides slowly under a still circle"],
+        ["intensity", "response.intensity", "STRUCTURE: denser rows, taller peaks, longer rows of monoliths"],
+        ["note", "notes.lastPitch", "a mountain rises across the plain at the pitch's place, as tall as the velocity"],
+        ["chord", "notes.polyphony", "STRUCTURE: the horizon circle becomes a polygon of as many sides as notes"],
+        ["mod wheel", "control.modwheel", "the plain's wavelength: smooth swells to jagged peaks"],
+        ["silence", "(no input)", "the plain glides toward the camera under a still circle"],
     ],
     "tier": "light: six tube nodes (about 70 rows), a few rings and slabs, unlit",
 }

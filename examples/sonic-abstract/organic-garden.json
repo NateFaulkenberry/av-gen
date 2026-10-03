@@ -1324,37 +1324,67 @@
    [
     "bass",
     "response.bass",
-    "the garden breathes: bells inflate"
+    "the garden breathes: the lantern swells, the jelly-trees' bells swim"
    ],
    [
     "kick",
     "response.kick",
-    "the lantern blooms open and closes again"
+    "the lantern blooms open on a spring; a spore puff from its heart"
    ],
    [
     "snare",
     "response.snare",
-    "the mushrooms puff spores"
+    "the mushrooms puff spores; their dots flash"
    ],
    [
     "hat",
     "response.hat",
-    "cilia shimmer; spores sparkle"
+    "the vines' tips sparkle; cilia shimmer"
    ],
    [
     "mids",
     "audio.mid",
-    "the current: the tentacles sway"
+    "the current: tentacles and tendrils sway harder"
+   ],
+   [
+    "brightness",
+    "sonic.brightness",
+    "the glow turns from coral to mint; the petals sharpen"
    ],
    [
     "sustained",
     "response.sustain",
-    "the flower grows taller"
+    "the lantern grows taller"
    ],
    [
-    "note",
-    "notes.lastPitch",
-    "a flower opens at the pitch's place"
+    "beat",
+    "beat.pulse",
+    "the jelly-trees pulse"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: more mushrooms, more tendrils"
+   ],
+   [
+    "voices",
+    "notes.voice.0.held",
+    "six flowers are six voices: a held note opens its flower"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: the lantern's petals multiply (12 to 24)"
+   ],
+   [
+    "release",
+    "notes.release",
+    "a note's end drops petals, more for a long note"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the season: the whole garden's hue turns"
    ],
    [
     "silence",

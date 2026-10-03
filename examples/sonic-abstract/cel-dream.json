@@ -1529,17 +1529,17 @@
    [
     "kick",
     "response.kick",
-    "the creatures hop"
+    "the creatures hop, a ripple left to right, landing on a spring"
    ],
    [
     "bass",
     "response.bass",
-    "the creatures squash and stretch; the island bobs"
+    "the creatures squash and stretch; the camera bobs"
    ],
    [
     "snare",
     "response.snare",
-    "the flower's petals flick; a confetti puff"
+    "the giant flower's petals flick; a confetti puff"
    ],
    [
     "hat",
@@ -1547,24 +1547,54 @@
     "sparkles round the flower"
    ],
    [
-    "note",
-    "notes.lastPitch",
-    "the creature at the pitch's place sings (low left, high right)"
-   ],
-   [
-    "sustained",
-    "response.sustain",
-    "the giant flower blooms"
+    "mids",
+    "audio.mid",
+    "the clouds sway; the creatures turn their heads"
    ],
    [
     "brightness",
     "sonic.brightness.slow",
-    "the time of day: noon pastel to lavender dusk"
+    "the time of day: the sky and the sun's strength"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the giant flower blooms open"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "everyone bobs on the beat"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: two more creatures pop up out of the lawn"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "the creature at the note's register sings: its mouth opens, it lifts by the velocity"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: as many lawn flowers bloom as there are notes"
+   ],
+   [
+    "held",
+    "notes.held",
+    "a rainbow rises behind the island"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "day to night"
    ],
    [
     "silence",
     "(no input)",
-    "the island floats; the creatures breathe"
+    "the islands float; the waterfall falls"
    ]
   ],
   "tier": "light: about 45 low-poly procedural nodes with cel lighting, the outline pass, one particle system",

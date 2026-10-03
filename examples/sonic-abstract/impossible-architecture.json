@@ -968,37 +968,62 @@
    [
     "bass",
     "response.bass",
-    "the lattice breathes apart and together"
+    "STRUCTURE: the lattice breathes apart and together"
    ],
    [
     "kick",
     "response.kick",
-    "a flight slides one step"
+    "a flight of stairs slides two steps and springs back"
    ],
    [
     "snare",
     "response.snare",
-    "a flight folds over into a new gravity"
-   ],
-   [
-    "mids",
-    "audio.mid",
-    "the sun sweeps; the shadows move"
+    "a flight folds over into a new gravity and swings back"
    ],
    [
     "highs",
     "audio.treble",
-    "the ink sharpens"
+    "the ink sharpens and thickens"
    ],
    [
-    "chord",
-    "notes.polyphony",
-    "more rooms nest inside the room"
+    "mids",
+    "audio.mid",
+    "the sun sweeps: the long shadows move"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the sky and the haze: teal dusk to gold noon"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "the doorways glow"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: more rooms nest inside the room"
    ],
    [
     "note",
     "notes.lastPitch",
-    "a doorway at the pitch's height lights"
+    "the doorways of the flight at the note's register light"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "the nested rooms twist"
+   ],
+   [
+    "held",
+    "notes.held",
+    "the sun warms"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the world rolls"
    ],
    [
     "silence",

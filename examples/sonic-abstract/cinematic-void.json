@@ -652,12 +652,12 @@
    [
     "bass",
     "response.bass",
-    "the haze breathes; the sun's glow swells"
+    "the air breathes; the sun swells"
    ],
    [
     "kick",
     "response.kick",
-    "a pulse of light runs round the ring's seams"
+    "a pulse of light round the ring's segments"
    ],
    [
     "snare",
@@ -665,9 +665,19 @@
     "dust bursts in the light"
    ],
    [
+    "hat",
+    "response.hat",
+    "the dust glitters"
+   ],
+   [
     "mids",
     "audio.mid",
     "the ring turns slowly"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the grade: amber to rose and teal"
    ],
    [
     "sustained",
@@ -675,24 +685,39 @@
     "the sun brightens"
    ],
    [
-    "intensity",
-    "response.intensity",
-    "the ring's segments part as the piece builds"
+    "beat",
+    "beat.pulse",
+    "the ring breathes its radius"
    ],
    [
-    "chord",
-    "notes.polyphony",
-    "the segment count"
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: the ring parts, its segments drifting apart as the piece builds"
    ],
    [
     "note",
     "notes.lastPitch",
-    "the segment at the pitch's angle lights"
+    "the segment at the note's angle lights: a beacon round the ring"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: the segment count"
+   ],
+   [
+    "held",
+    "notes.held",
+    "the segments drift outward"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the sun's height inside the ring"
    ],
    [
     "silence",
     "(no input)",
-    "the push; the ring stands"
+    "the slow push; the ring stands"
    ]
   ],
   "tier": "medium: 64 instanced segments twice, a haze march, a few particles",

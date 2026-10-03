@@ -662,17 +662,17 @@
    [
     "bass",
     "response.bass",
-    "the corridor's spacing breathes like an accordion"
+    "STRUCTURE: the corridor's spacing breathes like an accordion round the viewer"
    ],
    [
     "kick",
     "response.kick",
-    "a zoom punch toward the light; the frames flash"
+    "a zoom punch toward the light; the light flares"
    ],
    [
     "snare",
     "response.snare",
-    "the whole colour sequence jumps a step round the wheel"
+    "the whole colour sequence jumps a step round the wheel and stays there"
    ],
    [
     "mids",
@@ -682,22 +682,47 @@
    [
     "highs",
     "audio.treble",
-    "fine light traces the frames' edges"
+    "a fine light traces every edge"
    ],
    [
-    "chord",
-    "notes.polyphony",
-    "the portal's polygon order (square, hexagon, octagon)"
+    "brightness",
+    "sonic.brightness.slow",
+    "the colour range cools as the sound brightens"
+   ],
+   [
+    "flux",
+    "response.flux",
+    "the floating cards tumble"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "the corridor surges forward on each beat"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "the light at the end grows; the bloom opens"
    ],
    [
     "note",
     "notes.lastPitch",
-    "each note recolours the space"
+    "each note recolours the space (the pitch sets the hue)"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: the portals' polygon order: a triangle, square, hexagon..."
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the frames thicken"
    ],
    [
     "silence",
     "(no input)",
-    "the corridor flows slowly; the colours drift"
+    "the corridor flows slowly toward the light"
    ]
   ],
   "tier": "medium: one compiled SDF corridor, haze march, bloom",
