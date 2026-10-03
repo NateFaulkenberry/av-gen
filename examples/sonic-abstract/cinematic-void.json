@@ -125,16 +125,14 @@
   "post/output/vignette": 0.45,
   "post/output/grain": 0.03,
   "camera/exposure/mode": 0,
-  "camera/exposure/compensation": 0.0,
+  "camera/exposure/compensation": -0.6,
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 50.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "post/halation/enabled": true,
-  "post/halation/intensity": 0.25,
-  "post/halation/warmth": 0.8,
+  "post/halation/enabled": false,
   "post/tonemap/operator": 3,
   "scene/volumeAnisotropy": 0.72
  },
@@ -627,7 +625,7 @@
    "camera": "a slow straight push toward the ring, low (1.8 m)"
   },
   "palette": {
-   "dominant": "#0e2a33",
+   "dominant": "#2b7488",
    "secondary": "#ff9a3c",
    "accent": "#ffcf86",
    "highlight": "#fff4dc",

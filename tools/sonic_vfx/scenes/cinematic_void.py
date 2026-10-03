@@ -20,7 +20,7 @@ from ..kit import R, M, hexrgb, scale3, SLOW, MEDIUM, FAST, HIT, VERY_SLOW
 ID = "cinematic-void"
 TITLE = "Abstract Cinematic Void"
 
-TEAL = "#0e2a33"
+TEAL = "#2b7488"
 TEAL_MID = "#1d4a52"
 AMBER = "#ff9a3c"
 AMBER_PALE = "#ffcf86"
@@ -35,11 +35,13 @@ PUSH = 120.0                       # seconds for the push
 CAM0 = (0.0, 1.8, 70.0)
 CAM1 = (0.0, 1.8, 10.0)
 FIGURE = (7.5, 0.0, -32.0)
-HAZE_W = 0.3                       # the sky's haze width (its gradient's falloff)
+HAZE_W = 0.16                      # the sky's haze width: amber in a band at the horizon, teal above
 HORIZON_Y = CAM1[1]                # a backdrop's top edge at eye height reads as the horizon at any distance
 MIRROR_Z = -1700.0
-MIRROR_H = 900.0
-TWIN_SUN_R = 60.0
+MIRROR_H = 900.0                   # (a procedural box is at most 1000 m: the width comes from the transform's scale)
+SUN_D = 1500.0                     # the geometric sun's distance (behind the ring, before the mirror's backdrop)
+SUN_R = 140.0                      # its disc's radius: the glow fades to the sky's own colour at the rim
+TWIN_SUN_R = 160.0
 
 DESIGN = {
     "category": "cinematic",
@@ -96,46 +98,81 @@ def sky_mix(angle):
     return math.exp(-math.sin(angle) / HAZE_W)
 
 
-def mirror_program():
-    """The water: the sky's gradient at the mirrored angle. t = depth below the horizon over MIRROR_H (the backdrop's
-    whole height); a 3-stop ramp through the sky's colours at t = 0, 0.5, 1, x 0.82 (water's reflectance)."""
+def sky_colour(angle, dim=1.0):
+    m = sky_mix(angle)
+    return [round((z * (1.0 - m) + h * m) * dim, 5) for z, h in zip(hexrgb(TEAL), hexrgb(AMBER))]
+
+
+def gradient_ramp_ops(y0, y1, angles, dim):
+    """r1 = t over worldPosition.y from y0 (t 0) to y1 (t 1); r2 = the sky's colour at the three angles (a ramp)."""
+    stops = [sky_colour(a, dim) + [1.0] for a in angles]
+    return [
+        {"kind": "input", "dst": 0, "input": "worldPosition"},
+        {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / (y1 - y0), 0.0, -y0 / (y1 - y0)],
+         "value": 1.0},
+        {"kind": "ramp", "dst": 2, "srcA": 1, "constant": stops[0], "constant2": stops[1], "constant3": stops[2]},
+    ]
+
+
+def glow_ops(radius, colour, power):
+    """r3 = a radial glow (1 - r/R)^power in the disc's own plane (a cylinder's local XZ)."""
+    return [
+        {"kind": "input", "dst": 4, "input": "localPosition"},
+        {"kind": "multiply", "dst": 5, "srcA": 4, "srcB": 4},
+        {"kind": "gradient", "dst": 5, "srcA": 5, "constant": [1.0, 0.0, 1.0, 0.0], "value": 1.0 / (radius * radius)},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 0.5},
+        {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": power},
+        {"kind": "constant", "dst": 6, "constant": colour + [1.0]},
+        {"kind": "multiply", "dst": 3, "srcA": 6, "srcB": 5},
+    ]
+
+
+def mirror_program(twin_y):
+    """The water: the sky's gradient at the mirrored angle (t = depth below the horizon over MIRROR_H), x 0.82 for
+    water's reflectance, plus the sun's reflection as a radial glow round (0, twin_y) on the backdrop. One surface: a
+    separate glow disc 1700 m out leaked the cleared background through slivers of its triangle fan (its depth prepass
+    and colour pass disagreed at that range)."""
     dist = CAM1[2] - MIRROR_Z
-    stops = []
-    for t in (0.0, 0.5, 1.0):
-        ang = math.atan2(t * MIRROR_H, dist)
-        m = sky_mix(ang)
-        col = [(z * (1.0 - m) + h * m) * 0.82 for z, h in zip(hexrgb(TEAL), hexrgb(AMBER))]
-        stops.append([round(c, 5) for c in col] + [1.0])
-    return {
-        "name": "cvMirror",
-        "ops": [
-            {"kind": "input", "dst": 0, "input": "worldPosition"},
-            {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, -1.0 / MIRROR_H, 0.0, HORIZON_Y / MIRROR_H],
-             "value": 1.0},
-            {"kind": "ramp", "dst": 2, "srcA": 1, "constant": stops[0], "constant2": stops[1],
-             "constant3": stops[2]},
-        ],
-        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": -1,
-    }
+    angles = [math.atan2(t * MIRROR_H, dist) for t in (0.0, 0.5, 1.0)]
+    ops = gradient_ramp_ops(HORIZON_Y, HORIZON_Y - MIRROR_H, angles, 0.82)
+    ops += [
+        {"kind": "constant", "dst": 4, "constant": [0.0, -twin_y, 0.0, 0.0]},
+        {"kind": "add", "dst": 4, "srcA": 0, "srcB": 4},                         # p - centre
+        {"kind": "multiply", "dst": 5, "srcA": 4, "srcB": 4},
+        {"kind": "gradient", "dst": 5, "srcA": 5, "constant": [1.0, 1.0, 0.0, 0.0],
+         "value": 1.0 / (TWIN_SUN_R * TWIN_SUN_R)},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 0.5},
+        {"kind": "remap", "dst": 5, "srcA": 5, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},
+        {"kind": "power", "dst": 6, "srcA": 5, "value": 2.4},
+        {"kind": "constant", "dst": 7, "constant": hexrgb(AMBER_PALE, 2.0) + [1.0]},
+        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 8.0},
+        {"kind": "constant", "dst": 7, "constant": hexrgb(LIGHT, 9.0) + [1.0]},
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 7},
+        {"kind": "add", "dst": 6, "srcA": 6, "srcB": 5},
+        {"kind": "add", "dst": 7, "srcA": 2, "srcB": 6},
+    ]
+    return {"name": "cvMirror", "ops": ops, "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 7,
+            "emissionIntensity": 1.0, "opacity": -1}
 
 
-def twin_sun_program():
-    """The sun's reflection: a soft disc, (1 - r/R)^3 of a warm white, on the mirror."""
-    return {
-        "name": "cvTwinSun",
-        "ops": [
-            {"kind": "input", "dst": 0, "input": "localPosition"},
-            {"kind": "multiply", "dst": 1, "srcA": 0, "srcB": 0},
-            {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [1.0, 0.0, 1.0, 0.0],
-             "value": 1.0 / (TWIN_SUN_R * TWIN_SUN_R)},
-            {"kind": "power", "dst": 1, "srcA": 1, "value": 0.5},
-            {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},
-            {"kind": "power", "dst": 1, "srcA": 1, "value": 3.0},
-            {"kind": "constant", "dst": 2, "constant": hexrgb(AMBER_PALE, 6.0) + [1.0]},
-            {"kind": "multiply", "dst": 3, "srcA": 2, "srcB": 1},
-        ],
-        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 3, "emissionIntensity": 1.0, "opacity": -1,
-    }
+def sun_program(sun_y):
+    """The sun itself (the sky's own disc renders blocky from the lighting cube): the sky's gradient where it stands
+    (three stops round its elevation) plus a core and a glow, fading to the sky's own colour at the disc's rim."""
+    d = SUN_D
+    y0, y1 = sun_y - SUN_R, sun_y + SUN_R
+    angles = [math.atan2(y - HORIZON_Y, d) for y in (y0, sun_y, y1)]
+    ops = gradient_ramp_ops(y0, y1, angles, 1.0)
+    # a white-gold core and a wide amber halo from one radial falloff (r5 = 1 - r/R)
+    ops += glow_ops(SUN_R, hexrgb(AMBER_PALE, 2.4), 2.2)
+    ops += [{"kind": "power", "dst": 6, "srcA": 5, "value": 7.0},
+            {"kind": "constant", "dst": 7, "constant": hexrgb(LIGHT, 26.0) + [1.0]},
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+            {"kind": "add", "dst": 3, "srcA": 3, "srcB": 6},
+            {"kind": "add", "dst": 7, "srcA": 2, "srcB": 3}]
+    return {"name": "cvSun", "ops": ops, "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 7,
+            "emissionIntensity": 1.0, "opacity": -1}
 
 
 def instrument(s):
@@ -187,17 +224,18 @@ def build():
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     elev = math.atan2(RING_C[1] - CAM1[1], -(RING_C[2] - CAM1[2]))
     sun_dir = [0.0, -math.sin(elev), math.cos(elev)]          # travelling toward the camera, slightly down
-    # the air: the march covers only the near air (in-scatter toward a low sun floods a long march: the whole frame
-    # went amber at 1400 m); the distance is the sky's own gradient
+    # the air: almost none. In-scatter toward a low sun floods a long march (the whole frame went amber at 1400 m), and
+    # beyond the march the same density is analytic SURFACE fog, which turned the ring at 960 m into fog colour while
+    # the sky behind it kept its gradient. The distance is the sky's own gradient; the glow is the sun's disc.
     s.environment = {
-        "intensity": 0.35, "background": hexrgb(TEAL), "fogColor": hexrgb("#b8662e"), "volumeDensity": 0.004,
+        "intensity": 0.2, "background": hexrgb(TEAL), "fogColor": hexrgb("#c47a3c"), "volumeDensity": 0.00012,
         "volumeMaxDistance": 70.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(TEAL), "horizonColor": hexrgb(AMBER),
-                "groundColor": hexrgb("#1a1012"), "haze": HAZE_W, "sunIntensity": 14.0, "sunGlow": 0.045,
+                "groundColor": hexrgb(AMBER), "haze": HAZE_W, "sunIntensity": 0.0, "sunGlow": 0.045,
                 "intensity": 1.0, "background": True, "useKeyLight": True},
     }
     s.light("sun", "directional", direction=sun_dir, color=hexrgb(AMBER_PALE), intensity=6.0, castsShadow=False,
-            volumetric=0.6)
+            volumetric=0.25)
     s.light("fill", "directional", direction=[0.2, -0.3, -1.0], color=hexrgb("#4a8a96"), intensity=0.25,
             castsShadow=False)
 
@@ -205,18 +243,19 @@ def build():
     # still water is BUILT: a backdrop below the horizon whose emission is the sky's own gradient mirrored (the
     # sky's formula, mix(zenith, horizon, exp(-sin(angle) / haze)), sampled at the depression angle and dimmed to
     # water's reflectance), the twin sun on it, the twin ring and figure in front of it
-    s.program(mirror_program())
-    s.proc("mirror", {"kind": "box", "size": [6000.0, MIRROR_H, 2.0], "subdivisions": 1},
+    twin_y = HORIZON_Y - (CAM1[2] - MIRROR_Z) * math.tan(elev)
+    s.program(mirror_program(twin_y))
+    s.proc("mirror", {"kind": "box", "size": [1000.0, MIRROR_H, 2.0], "subdivisions": 1},
            material={"baseColor": [0, 0, 0], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 1.0,
                      "metallic": 0.0, "unlit": True, "program": "cvMirror"},
            transform={"position": [0.0, HORIZON_Y - MIRROR_H * 0.5, MIRROR_Z], "rotation": [0, 0, 0],
-                      "scale": [1, 1, 1]})
-    s.program(twin_sun_program())
-    twin_y = HORIZON_Y - (CAM1[2] - MIRROR_Z + 1.0) * math.tan(elev)
-    s.proc("twinSun", {"kind": "cylinder", "radius": TWIN_SUN_R, "height": 0.5, "radialSegments": 64, "caps": True},
+                      "scale": [7.0, 1, 1]})
+    sun_pos = [CAM1[0], HORIZON_Y + SUN_D * math.tan(elev), CAM1[2] - SUN_D]
+    s.program(sun_program(sun_pos[1]))
+    s.proc("sunDisc", {"kind": "cylinder", "radius": SUN_R, "height": 1.0, "radialSegments": 96, "caps": True},
            material={"baseColor": [0, 0, 0], "emissiveColor": hexrgb(LIGHT), "emissiveIntensity": 1.0,
-                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "cvTwinSun"},
-           transform={"position": [0.0, twin_y, MIRROR_Z + 1.5], "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "cvSun"},
+           transform={"position": sun_pos, "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
 
     ring(s, "ring", RING_C)
     ring(s, "ringTwin", (RING_C[0], -RING_C[1], RING_C[2]))
@@ -285,8 +324,8 @@ def build():
         s.track("procedural/%s/transform/position" % name, keys, loop=PUSH)
 
     s.params_({"camera/lens/focalLength": FOCAL, "post/bloom/intensity": 0.45, "post/bloom/threshold": 1.2,
-               "post/bloom/emissionWeight": 0.8, "post/halation/enabled": True, "post/halation/intensity": 0.25,
-               "post/halation/warmth": 0.8, "post/output/vignette": 0.45, "post/output/grain": 0.03,
+               "post/bloom/emissionWeight": 0.8, "post/halation/enabled": False,
+               "camera/exposure/compensation": -0.6, "post/output/vignette": 0.45, "post/output/grain": 0.03,
                "post/tonemap/operator": 3, "scene/volumeAnisotropy": 0.72, "scene/volumeSteps": 24})
     instrument(s)
     s.region("ring", centre=list(RING_C), radius=RING_R)
