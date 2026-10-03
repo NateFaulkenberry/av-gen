@@ -13,7 +13,7 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 
 ## Resume here (cold)
 
-- **State (2026-10-03 02:50): the set of NINE is built, produced and committed**; the deliverables are done except
+- **State (2026-10-03 03:00): the set of NINE is built, produced and committed**; the deliverables are done except
   where noted below (see `ABSTRACT-PLAN.md` for the set, the designs and every modulation map):
   1 Sacred Geometry Flight `sacred_flight.py`, 2 Neon Vector `neon_vector.py`, 3 Cel Dream `cel_dream.py`, 4 Color
   Geometry `color_geometry.py`, 5 Organic Garden `organic_garden.py` (with three radiolarians), 6 Digital Alpine
@@ -37,18 +37,23 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   cleaner), so they were not re-rendered).
 - **Generated meshes:** 6, 7 and 9 instance GLB meshes written by `tools/sonic_vfx/meshes.py` into
   `examples/sonic-abstract/meshes/` at build time (deterministic; committed, about 12 MB; no `assets/`).
-- **In flight (02:50): two look rounds, built into the modules, media not yet re-rendered.**
-  (a) Infinite Color Geometry: an 85 mm lens down the axis (the frames stack into one spiral of the whole colour wheel),
-  a third of the haze, a `saturate` op after the hue rotation, tonemap 4, a uniform sky (its dark ground hemisphere
-  showed through the far opening as a grey box), the light at the end as an emissive sphere, the march 72 steps to 112
-  m. Variants and their stills: `$S/abs/cg/` (`cgvar.py` builds them), `28-sonic-abstract/work/blockout/cg-*-lk*.png`;
-  cg-m is the chosen look (+1.8 ms over the old at the live floor before the march was shortened; q1/q2 measure the
-  shorter march). (b) 8-Bit Ocean: THE GUIDE, a big friendly voxel fish (`guide_cells()`, five meshes cut from one
-  solid) swimming the ring against the swim; first test stills `work/blockout/bit-ocean-guide1*.png`.
-  Then: `$S/abs/batch8.sh` (Color Geometry's and 8-Bit's stills and clips, Neon's still, both perf tables, the tour cut,
-  the contact sheet, the test tags with exit codes, the live tour), regenerate `maps` and `notes`, commit, push.
-  Also fixed: Neon Vector's horizon line (a box is at most 1000 m: its 1400 m is now its scale; the load warning is
-  gone), and the tour gives each world an equal share of the clip (nine 3.6 s cuts of a 30 s clip left 8-Bit 1.2 s).
+- **Two look rounds (02:30-02:57, `34427b53`, `f094f565`), built and committed.**
+  (a) Infinite Color Geometry: an 85 mm lens down the axis (the frames 20 to 110 m away stack into one spiral of the
+  whole colour wheel round the light; the 24 mm lens at the mouth saw one pink frame with a hole), a third of the haze,
+  a `saturate` op after the hue rotation, tonemap 4, a uniform sky (its dark ground hemisphere showed through the far
+  opening as a grey box), the light at the end as an emissive sphere, the march 72 steps to 130 m at epsilon 0.002 and
+  a 0.95 step. Cost at the live floor: 10.2 ms before, about 11.3 after. Variants: `$S/abs/cg/` (`cgvar.py` builds
+  them), stills `28-sonic-abstract/work/blockout/cg-*-lk*.png`.
+  (b) 8-Bit Ocean: THE GUIDE, a big friendly voxel fish (`guide_cells()`: five meshes cut from one solid) circling a
+  point over the lane just past the arch (20 m loop, 16 s, at eye level), phased to cross the lane ahead in profile at
+  14 s, which is now the hero still (`HERO_AT`). Swimming the ring against the swim it was seen nose-on (a blob of
+  blocks); above the arch it was cut by the frame. Stills `work/blockout/bit-ocean-g*.png`.
+  Also: Neon Vector's horizon line has its 1400 m by scale (a box is at most 1000 m; the load warning is gone), and the
+  tour gives each world an equal share of the clip (nine 3.6 s cuts of a 30 s clip had left 8-Bit 1.2 s).
+- **Final batch (`$S/abs/batch8.sh`, log `batch8.log`, started 02:57):** media DONE 03:01 (the two look rounds' stills
+  and clips, Neon's still, both perf tables, the tour cut, the contact sheet; maps and notes regenerated after it). Then
+  the test tags with each binary's own exit code (`$S/abs/tests8/`) and the live tour, queued behind the live-quality
+  agent's full suites on the GPU lock (03:01 onward). After it: the log entry, commit, push, hand-back.
 - **The scratchpad is WIPED when a session restarts**: the pin and `avgen.sh` must be rebuilt (steps below).
   `review.py` refuses to render without the pin.
 - **The pin is `8982404a`** (the engineer's last hand-back: cel lighting ADR-1071, outline ADR-1072, wire lines ADR-1073,
