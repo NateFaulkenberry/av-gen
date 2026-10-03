@@ -208,7 +208,6 @@ def sky_whale(s):
            position=WHALE, rotation=(0.0, -24.0, 4.0), scale=(WHALE_SCALE * 4.4, WHALE_SCALE * 2.0, WHALE_SCALE * 2.1))
     # children are in the body's unit-sphere frame (its scale divides them back): offsets as fractions of the body
     kids = [
-        ("whaleBelly", sphere(1.0, 22, 12), belly_col, (0.05, -0.2, 0.0), (0.0, 0.0, 0.0), (0.93, 0.78, 0.92)),
         ("whaleTail", sphere(1.0, 16, 10), body_col, (-0.92, 0.12, 0.0), (0.0, 0.0, 8.0), (0.42, 0.42, 0.42)),
         ("whaleFluke", sphere(1.0, 16, 8), body_col, (-1.22, 0.24, 0.0), (0.0, 0.0, 14.0), (0.2, 0.08, 0.95)),
         ("whaleFinL", sphere(1.0, 14, 8), belly_col, (0.15, -0.55, 0.78), (24.0, 0.0, -18.0), (0.26, 0.07, 0.3)),
