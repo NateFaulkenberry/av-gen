@@ -29,7 +29,8 @@
    0.00091,
    0.00273
   ],
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.0042,
+  "volumeMaxDistance": 0.0,
   "skyIntensity": 1.0,
   "sky": {
    "enabled": true,
@@ -944,83 +945,6 @@
     },
     {
      "kind": "input",
-     "dst": 2,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      30.0,
-      30.0,
-      30.0,
-      30.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.1,
-      0.1,
-      0.1,
-      0.1
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "add",
-     "dst": 3,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      3.0,
-      3.0,
-      3.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 3
-    },
-    {
-     "kind": "gradient",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      1.0,
-      0.0,
-      0.0,
-      1.0
-     ],
-     "value": -0.20661157024793386
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 7
-    },
-    {
-     "kind": "add",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 3
-    },
-    {
-     "kind": "input",
      "dst": 3,
      "input": "materialEmission"
     },
@@ -1029,34 +953,6 @@
      "dst": 6,
      "srcA": 6,
      "srcB": 3
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 2,
-     "constant": [
-      12.0,
-      62.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.00061,
-      0.00091,
-      0.00273,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 7,
-     "srcC": 3
     }
    ],
    "baseColor": -1,

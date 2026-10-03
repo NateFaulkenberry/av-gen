@@ -213,7 +213,10 @@ def heightfield(x0, x1, z0, z1, nx, nz, height, normal_eps=2.0):
             norms.append(unit((-hx, 2.0 * normal_eps, -hz)))
     idx = []
     w = nx + 1
-    for j in range(nz):
+    # rows from z1 down to z0: a camera at the +z end looking towards -z gets the near land first, so the depth test
+    # rejects the hills hidden behind it before they are shaded (a heightfield seen at a grazing angle overlaps itself
+    # three or four deep)
+    for j in reversed(range(nz)):
         for i in range(nx):
             a, b, c, d = j * w + i, j * w + i + 1, (j + 1) * w + i + 1, (j + 1) * w + i
             idx += [a, d, c, a, c, b]

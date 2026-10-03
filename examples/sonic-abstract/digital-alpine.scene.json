@@ -63,8 +63,8 @@
     "source": {
      "kind": "sphere",
      "radius": 1000.0,
-     "segments": 96,
-     "rings": 48
+     "segments": 64,
+     "rings": 32
     },
     "distribution": {
      "kind": "single"
@@ -103,6 +103,56 @@
      "unlit": true,
      "program": "daSky",
      "doubleSided": true
+    }
+   }
+  },
+  {
+   "name": "lakeSky",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1000.0,
+     "height": 1.0,
+     "radialSegments": 64,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -1000.0,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      30.0,
+      1.0,
+      30.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "daWater"
     }
    }
   },
@@ -2015,23 +2065,6 @@
      "srcB": 5
     },
     {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 5
-    },
-    {
-     "kind": "swizzle",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
      "kind": "gradient",
      "dst": 5,
      "srcA": 1,
@@ -2121,46 +2154,6 @@
      "srcB": 6
     },
     {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 3,
-     "constant": [
-      0.0,
-      10.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 6,
-     "srcA": 6,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.82,
-      1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.27468,
-      0.18782,
-      0.42327,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 5,
-     "srcA": 7,
-     "srcB": 5,
-     "srcC": 6
-    },
-    {
      "kind": "input",
      "dst": 0,
      "input": "viewDirection"
@@ -2222,61 +2215,11 @@
      "value": 0.85
     },
     {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      -900.0,
-      -900.0,
-      -900.0,
-      -900.0
-     ]
-    },
-    {
      "kind": "mixBy",
      "dst": 5,
      "srcA": 5,
      "srcB": 6,
      "srcC": 1
-    },
-    {
-     "kind": "add",
-     "dst": 6,
-     "srcA": 2,
-     "srcB": 7
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.5,
-      0.31198,
-      0.21163,
-      1.0
-     ]
-    },
-    {
-     "kind": "gradient",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      0.0,
-      0.0,
-      1.0
-     ],
-     "value": -0.008264462809917356
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 7
     },
     {
      "kind": "constant",
@@ -2287,12 +2230,6 @@
       0.86,
       1.0
      ]
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6
     },
     {
      "kind": "multiply",
@@ -2421,7 +2358,7 @@
     },
     {
      "kind": "mixBy",
-     "dst": 4,
+     "dst": 6,
      "srcA": 4,
      "srcB": 6,
      "srcC": 5
@@ -2440,7 +2377,7 @@
     },
     {
      "kind": "constant",
-     "dst": 6,
+     "dst": 7,
      "constant": [
       0.00439,
       0.00913,
@@ -2450,9 +2387,9 @@
     },
     {
      "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6,
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7,
      "srcC": 5
     },
     {
@@ -2468,8 +2405,159 @@
      "value": 1.0
     },
     {
-     "kind": "gradient",
+     "kind": "power",
+     "dst": 7,
+     "srcA": 5,
+     "value": 7.0
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.75,
+      0.25644,
+      0.1262,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
      "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "power",
+     "dst": 7,
+     "srcA": 5,
+     "value": 1000.0
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      9.0,
+      7.9166,
+      6.44124,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.36,
+      0.45,
+      0.86,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 3
+    },
+    {
+     "kind": "mixBy",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4,
+     "srcC": 2
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "daWater",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "viewDirection"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.55,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 0.55
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.39676,
+      0.23455,
+      0.45641,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      0.00439,
+      0.00913,
+      0.05127,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4,
+     "srcC": 2
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
      "srcA": 0,
      "constant": [
       -0.6152574167157706,
@@ -2480,21 +2568,14 @@
      "value": 1.0
     },
     {
-     "kind": "mixBy",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6,
-     "srcC": 2
-    },
-    {
      "kind": "power",
-     "dst": 6,
-     "srcA": 5,
+     "dst": 5,
+     "srcA": 4,
      "value": 7.0
     },
     {
      "kind": "constant",
-     "dst": 7,
+     "dst": 6,
      "constant": [
       0.75,
       0.25644,
@@ -2504,25 +2585,25 @@
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 7
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
+     "dst": 5,
+     "srcA": 5,
      "srcB": 6
     },
     {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
      "kind": "power",
-     "dst": 6,
-     "srcA": 5,
+     "dst": 5,
+     "srcA": 4,
      "value": 1000.0
     },
     {
      "kind": "constant",
-     "dst": 7,
+     "dst": 6,
      "constant": [
       9.0,
       7.9166,
@@ -2532,58 +2613,36 @@
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 7
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
+     "dst": 5,
+     "srcA": 5,
      "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      -11.0,
-      0.0,
-      -11.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 0,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      150.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 5,
-     "srcA": 1,
-     "srcB": 5
     },
     {
      "kind": "add",
      "dst": 3,
      "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      -11.0,
+      150.0,
+      -11.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 0,
      "srcB": 5
     },
     {
      "kind": "noise",
-     "dst": 3,
-     "srcA": 3,
+     "dst": 5,
+     "srcA": 5,
      "value": 1.0,
      "constant": [
       0.0,
@@ -2595,8 +2654,8 @@
     },
     {
      "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
+     "dst": 5,
+     "srcA": 5,
      "value": 1.0,
      "constant": [
       0.3,
@@ -2607,7 +2666,7 @@
     },
     {
      "kind": "smoothstep",
-     "dst": 7,
+     "dst": 6,
      "srcA": 1,
      "constant": [
       0.004,
@@ -2618,7 +2677,7 @@
     },
     {
      "kind": "constant",
-     "dst": 6,
+     "dst": 7,
      "constant": [
       1.0,
       1.0,
@@ -2628,10 +2687,10 @@
     },
     {
      "kind": "mixBy",
-     "dst": 3,
-     "srcA": 6,
-     "srcB": 3,
-     "srcC": 7
+     "dst": 5,
+     "srcA": 7,
+     "srcB": 5,
+     "srcC": 6
     },
     {
      "kind": "constant",
@@ -2647,17 +2706,17 @@
      "kind": "multiply",
      "dst": 6,
      "srcA": 6,
-     "srcB": 3
+     "srcB": 5
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 4,
+     "dst": 3,
+     "srcA": 3,
      "srcB": 6
     },
     {
      "kind": "gradient",
-     "dst": 5,
+     "dst": 6,
      "srcA": 0,
      "constant": [
       -0.6242038116425183,
@@ -2669,8 +2728,8 @@
     },
     {
      "kind": "power",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 6,
+     "srcA": 6,
      "value": 45.0
     },
     {
@@ -2685,34 +2744,27 @@
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 6,
+     "srcA": 6,
      "srcB": 7
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 3
-    },
-    {
-     "kind": "add",
      "dst": 6,
      "srcA": 6,
      "srcB": 5
     },
     {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6,
-     "srcC": 2
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 6
     }
    ],
    "baseColor": -1,
    "metallic": -1,
    "roughness": -1,
-   "emission": 4,
+   "emission": 3,
    "emissionIntensity": 1.0,
    "opacity": -1
   }

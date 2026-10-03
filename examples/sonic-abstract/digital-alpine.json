@@ -358,18 +358,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/daRock/op/28/constant/constant",
-   "amount": 0.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 40,
-    "decayMs": 600
-   }
-  },
-  {
-   "source": "response.bass",
-   "target": "material/daSky/op/43/constant/constant",
+   "target": "material/daWater/op/29/constant/constant",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
@@ -380,16 +369,13 @@
   },
   {
    "source": "response.kick",
-   "target": "material/daRock/op/37/constant/constant",
-   "amount": 900.0,
+   "target": "material/daRock/op/15/constant/constant",
+   "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "threshold": "binary",
-    "thresholdLevel": 0.3,
-    "envelope": "linearfall",
-    "envelopeHoldMs": 0,
-    "envelopeFallPerSecond": 0.62
+    "attackMs": 0,
+    "decayMs": 380
    }
   },
   {
@@ -426,8 +412,19 @@
    }
   },
   {
+   "source": "response.snare",
+   "target": "material/daWater/op/5/constant/constant",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
    "source": "audio.mid",
-   "target": "material/daSky/op/34/remap/constant",
+   "target": "material/daWater/op/20/remap/constant",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -439,7 +436,7 @@
   },
   {
    "source": "audio.mid",
-   "target": "material/daSky/op/34/remap/constant",
+   "target": "material/daWater/op/20/remap/constant",
    "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -462,7 +459,18 @@
   },
   {
    "source": "audio.treble",
-   "target": "material/daSky/op/21/constant/constant",
+   "target": "material/daSky/op/19/constant/constant",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "material/daWater/op/10/constant/constant",
    "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
@@ -473,7 +481,7 @@
   },
   {
    "source": "beat.phase",
-   "target": "material/daSky/op/33/noise/constant",
+   "target": "material/daWater/op/19/noise/constant",
    "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -481,7 +489,7 @@
   },
   {
    "source": "beat.phase",
-   "target": "material/daSky/op/33/noise/constant",
+   "target": "material/daWater/op/19/noise/constant",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
@@ -861,11 +869,10 @@
   },
   {
    "source": "notes.polyphony",
-   "target": "material/daRock/op/26/smoothstep/constant",
-   "amount": 90.0,
+   "target": "material/daWater/op/29/constant/constant",
+   "amount": 2.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
    "chain": {
     "attackMs": 250,
     "decayMs": 900
@@ -873,11 +880,114 @@
   },
   {
    "source": "control.modwheel",
-   "target": "material/daSky/op/17/gradient/constant",
-   "amount": -0.5,
+   "target": "material/daSky/op/15/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.6,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daSky/op/7/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.7,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daSky/op/8/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.7,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daSky/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.6,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daWater/op/5/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.7,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daRock/op/15/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.8,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daRock/op/25/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.6,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "material/daRock/op/26/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.6,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern0/material/emissive",
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
    "chain": {
     "attackMs": 300,
     "decayMs": 300
@@ -885,11 +995,10 @@
   },
   {
    "source": "control.modwheel",
-   "target": "material/daSky/op/18/gradient/constant",
-   "amount": 0.5,
+   "target": "procedural/lantern0Twin/material/emissive",
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
    "chain": {
     "attackMs": 300,
     "decayMs": 300
@@ -897,11 +1006,241 @@
   },
   {
    "source": "control.modwheel",
-   "target": "material/daRock/op/15/gradient/constant",
-   "amount": 0.5,
+   "target": "procedural/lantern1/material/emissive",
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern1Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern2/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern2Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern3/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern3Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern4/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern4Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern5/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern5Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern6/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern6Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern7/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern7Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern8/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern8Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern9/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern9Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern10/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern10Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern11/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "procedural/lantern11Twin/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "attackMs": 300,
     "decayMs": 300
@@ -2150,7 +2489,7 @@
     "the lanterns on the shore",
     "the rings of light on the water"
    ],
-   "atmosphere": "distance haze painted per facet in the sky's own colour; mist at the waterline",
+   "atmosphere": "distance haze painted per facet in the sky's own colour",
    "post": "a little bloom on the sun only",
    "camera": "a low glide round the lake, banking into the turn"
   },
@@ -2183,7 +2522,7 @@
    [
     "bass",
     "response.bass",
-    "the shore range lights from within; the waterline mist glows; the sun's path on the water brightens"
+    "the shore range lights from within; the sun's path on the water brightens"
    ],
    [
     "low mids",
@@ -2213,7 +2552,7 @@
    [
     "kick",
     "response.kick",
-    "a band of light runs out through the ranges; rings of light land on the water"
+    "the low sun flares across every facet that faces it; rings of light land on the water"
    ],
    [
     "snare",
@@ -2238,7 +2577,7 @@
    [
     "chord",
     "notes.polyphony",
-    "STRUCTURE: the waterline mist rises with the size of the chord"
+    "a bigger chord lays a brighter path of light on the water"
    ],
    [
     "velocity",
@@ -2248,7 +2587,7 @@
    [
     "mod wheel",
     "control.modwheel",
-    "STRUCTURE: the sun climbs (dusk to afternoon): its glow, its path on the water and the light on every facet"
+    "STRUCTURE: night falls: the sky and the lake darken, the sun's light leaves the facets, the lanterns brighten"
    ],
    [
     "silence",

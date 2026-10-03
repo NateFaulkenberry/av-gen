@@ -121,7 +121,7 @@ def height(x, z):
 
 def generate_meshes():
     """The land, the river, the groves and the crystals for one period (z from -LZ to 0). Deterministic."""
-    v, n, i = mx.heightfield(-WIDTH, WIDTH, -LZ, 0.0, 132, 220, height)
+    v, n, i = mx.heightfield(-WIDTH, WIDTH, -LZ, 0.0, 100, 168, height)
     mx.write_indexed(os.path.join(MESH_DIR, "ct-land.glb"), v, n, i, "land")
     v, n, i = mx.ribbon(path_x, 20.0, lambda z: 0.0, -LZ, 0.0, 240, lift=0.3)
     mx.write_indexed(os.path.join(MESH_DIR, "ct-river.glb"), v, n, i, "river")
@@ -263,7 +263,8 @@ def unlit(hexc, intensity, program, double=False):
 
 
 def copies():
-    return {"kind": "linear", "count": COPIES, "start": [0.0, 0.0, -(COPIES - 1) * LZ], "end": [0.0, 0.0, 0.0]}
+    """The land's copies along the flight, nearest first (so the depth test hides the far ones behind the near)."""
+    return {"kind": "linear", "count": COPIES, "start": [0.0, 0.0, 0.0], "end": [0.0, 0.0, -(COPIES - 1) * LZ]}
 
 
 TRAVELLING = ["land", "river", "cones", "balls"] + ["crystal%d" % k for k in range(12)]

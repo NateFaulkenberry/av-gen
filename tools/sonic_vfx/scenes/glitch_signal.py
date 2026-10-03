@@ -71,7 +71,7 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the RGB split widens; the walls push apart; the horizon flares"],
-        ["kick", "response.kick", "a wave of light runs down the canyon towards you; the floor's pixels flash"],
+        ["kick", "response.kick", "a ring of distortion comes out of the horizon through the frame; the lit pixels flash"],
         ["snare", "response.snare", "MESO: the frame tears; the rows shear sideways"],
         ["hat", "response.hat", "MICRO: glitch blocks flicker; sparks of pixels"],
         ["onset", "response.onset", "MESO: channels swap in the glitch blocks"],
@@ -155,32 +155,14 @@ def pixel_program():
              "constant2": [0.22, 0.22, 0.22, 0.22], "constant3": [1.0 / 0.9] * 4,
              "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 30 lines
             {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 3},                                      # 31
-            # the kick's band of light, travelling down the canyon towards the camera (decametres)
-            {"kind": "input", "dst": 2, "input": "cameraDistance"},                                    # 32
-            {"kind": "constant", "dst": 3, "constant": [BAND_REST] * 4},                              # 33 -band dist.
-            {"kind": "constant", "dst": 4, "constant": [0.1, 0.1, 0.1, 0.1]},                          # 34
-            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},                                      # 35 decametres
-            {"kind": "add", "dst": 3, "srcA": 2, "srcB": 3},                                           # 36
-            {"kind": "constant", "dst": 7, "constant": hexrgb(WHITE, 3.0) + [1.0]},                    # 37 band
-            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 3},                                      # 38
-            {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [1.0, 0.0, 0.0, 1.0],
-             "value": -1.0 / (BAND_W * BAND_W)},                                                        # 39
-            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 7},                                      # 40
-            {"kind": "add", "dst": 6, "srcA": 6, "srcB": 3},                                           # 41
             # the material's own emission on top (the fragments' notes; zero on the walls)
-            {"kind": "input", "dst": 3, "input": "materialEmission"},                                  # 42
-            {"kind": "add", "dst": 6, "srcA": 6, "srcB": 3},                                           # 43
-            # the fade into the dark with distance
-            {"kind": "smoothstep", "dst": 3, "srcA": 2, "constant": [12.0, 62.0, 0.0, 0.0]},           # 44
-            {"kind": "constant", "dst": 7, "constant": hexrgb(INK) + [1.0]},                           # 45 the dark
-            {"kind": "mixBy", "dst": 6, "srcA": 6, "srcB": 7, "srcC": 3},                              # 46
+            {"kind": "input", "dst": 3, "input": "materialEmission"},                                  # 32
+            {"kind": "add", "dst": 6, "srcA": 6, "srcB": 3},                                           # 33
         ],
         "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1,
     }
 
 
-BAND_REST = 30.0      # gsPixel op 33 at rest (decametres): the band parked behind the camera
-BAND_W = 2.2
 
 
 def ribbon_program():
@@ -257,10 +239,14 @@ def instrument(s):
             R("bass", P % "horizon" + "material/emissive", 30.0, attackMs=20, decayMs=400))
     for node, sgn in (("wallL", -1.0), ("wallR", 1.0)):
         s.route(R("bass", P % node + "transform/position", 2.5 * sgn, comp=0, attackMs=30, decayMs=350))
-    # ---- KICK: a band of light runs down the canyon towards the camera (op 33: minus its distance in decametres; the
-    # envelope falls 1 to 0 in 0.45 s, so the band comes from 900 m, passes the camera and parks behind it)
-    s.route(R("kick", "material/gsPixel/op/33/constant/constant", -120.0, threshold="binary",
-              thresholdLevel=0.3, envelope="linearfall", envelopeHoldMs=0, envelopeFallPerSecond=2.2))
+    # ---- KICK: a ring of displacement comes out of the horizon and through the frame (a shock from the vanishing
+    # point, its radius growing as the envelope falls); the lit pixels flash
+    s.route(R("kick", "post/shock/amount", 26.0, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+              envelopeHoldMs=0, envelopeFallPerSecond=2.2),
+            R("kick", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+              envelopeHoldMs=0, envelopeFallPerSecond=2.2, remapEnabled=True, remapInMin=0.0, remapInMax=1.0,
+              remapOutMin=1.0, remapOutMax=0.0),
+            R("kick", "material/gsPixel/op/27/constant/constant", 1.4, attackMs=0, decayMs=200))
     # ---- SNARE (MESO): the frame tears; the rows shear sideways
     s.route(R("snare", "post/glitch/tear", 0.35, attackMs=0, decayMs=180),
             R("snare", "post/glitch/tearShift", 90.0, attackMs=0, decayMs=180))
@@ -334,7 +320,8 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(INK), "fogColor": hexrgb(INK), "volumeDensity": 0.0,
+        "intensity": 0.0, "background": hexrgb(INK), "fogColor": hexrgb(INK), "volumeDensity": 0.0042,
+        "volumeMaxDistance": 0.0,
         "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(INK), "horizonColor": hexrgb("#06102e"),
                 "groundColor": hexrgb(INK), "haze": 0.2, "sunIntensity": 0.0, "intensity": 1.0,
