@@ -1005,6 +1005,28 @@
    }
   }
  ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.35
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0,
+   "temperature": 5600.0,
+   "softness": 1.0,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
  "materialPrograms": [
   {
    "name": "ctLand",
@@ -1043,86 +1065,66 @@
      ]
     },
     {
-     "kind": "threshold",
+     "kind": "constant",
      "dst": 5,
-     "srcA": 4,
-     "value": 0.07
-    },
-    {
-     "kind": "threshold",
-     "dst": 6,
-     "srcA": 4,
-     "value": 0.17
+     "constant": [
+      -0.07,
+      -0.17,
+      -0.3,
+      0.0
+     ]
     },
     {
      "kind": "add",
      "dst": 5,
-     "srcA": 5,
-     "srcB": 6
+     "srcA": 4,
+     "srcB": 5
     },
     {
      "kind": "threshold",
-     "dst": 6,
-     "srcA": 4,
-     "value": 0.3
-    },
-    {
-     "kind": "add",
      "dst": 5,
      "srcA": 5,
-     "srcB": 6
-    },
-    {
-     "kind": "threshold",
-     "dst": 6,
-     "srcA": 4,
-     "value": 0.45
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6
-    },
-    {
-     "kind": "threshold",
-     "dst": 6,
-     "srcA": 4,
-     "value": 0.62
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6
-    },
-    {
-     "kind": "threshold",
-     "dst": 6,
-     "srcA": 4,
-     "value": 0.8
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6
+     "value": 0.0
     },
     {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.16666666666666666,
-      0.16666666666666666,
-      0.16666666666666666,
-      0.16666666666666666
+      -0.45,
+      -0.62,
+      -0.8,
+      0.0
      ]
     },
     {
-     "kind": "multiply",
+     "kind": "add",
+     "dst": 6,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "threshold",
+     "dst": 6,
+     "srcA": 6,
+     "value": 0.0
+    },
+    {
+     "kind": "add",
      "dst": 5,
      "srcA": 5,
      "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.0
+     ],
+     "value": 1.0
     },
     {
      "kind": "ramp",
@@ -1202,17 +1204,6 @@
      "constant": [
       0.93,
       0.995,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.0,
       0.0,
       0.0
      ]

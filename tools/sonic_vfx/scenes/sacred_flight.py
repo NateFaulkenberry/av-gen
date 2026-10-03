@@ -287,6 +287,7 @@ def instrument(s):
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
+    s.unshadowed_key()          # every material is unlit: the default key's shadow would be pure cost
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     # a uniform dark sky (the sky's own sun glows only above its horizon, which drew a horizon across the passage); the

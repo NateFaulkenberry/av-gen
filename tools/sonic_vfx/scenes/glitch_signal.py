@@ -105,64 +105,50 @@ def unlit(hexc, intensity, program=None):
 
 
 def pixel_program():
-    """The blocks: each block's colour from its own centre (world position less local position, less the sawtooth's
-    offset, so the pattern rides with the block), a noise sampled on a cylinder round the flight axis (periodic over
-    MODULE, so the sawtooth is seamless), quantised into dark, dim and lit; scanlines across every face; the kick's
-    band of light; a fade into the dark with distance. Ops (1-based): 5 the sawtooth's offset (a track), 19 the noise
-    (its offset: the pattern), 20/22 the dim and lit thresholds, 24 the dim colour, 27 the lit colour, 33 minus the
-    band's distance, 37 the band's colour."""
-    tw = 2.0 * math.pi / MODULE
+    """The blocks: each block's colour from its own centre (world position less local position, so the pattern rides
+    with the block), a noise sampled on a cylinder round the flight axis (periodic over MODULE, so the sawtooth is
+    seamless), quantised into dark, dim and lit; scanlines across every face; the fragments' own emission on top.
+    Ops (1-based): 6 the cylinder (its value: minus the sawtooth's offset, a track), 10 the noise (its offset: the
+    pattern), 11/12 the dim and lit thresholds, 15 the colours (constant: ink, constant2: dim, constant3: lit).
+
+    20 ops; the first version's 33 cost 8 ms of a 15 ms frame at the live floor (the blocks cover the frame, several
+    deep). The same picture: one palette op makes the whole cylinder (per-channel frequency and phase: sin, 0, cos),
+    the sawtooth rides in that op's value, and the three colours are one ramp at t = 0, 1/2, 1."""
     return {
         "name": "gsPixel",
         "ops": [
             {"kind": "input", "dst": 0, "input": "worldPosition"},                                     # 1
             {"kind": "input", "dst": 1, "input": "localPosition"},                                     # 2
-            {"kind": "constant", "dst": 2, "constant": [-1.0, -1.0, -1.0, -1.0]},                      # 3
-            {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},                                      # 4
-            {"kind": "constant", "dst": 2, "constant": [0.0, 0.0, 0.0, 0.0]},                          # 5 -offset
-            {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},                                           # 6
-            {"kind": "add", "dst": 1, "srcA": 0, "srcB": 1},                                           # 7 centre
-            # the noise's input: (x and y as they are, and z wrapped onto a circle of radius MODULE / 2 pi / 24)
-            {"kind": "swizzle", "dst": 3, "srcA": 1, "constant": [2.0, 2.0, 2.0, 2.0]},               # 8 z
+            {"kind": "remap", "dst": 1, "srcA": 1, "value": 0.0, "constant": [0.0, 1.0, 0.0, -1.0]},  # 3 -local
+            {"kind": "add", "dst": 1, "srcA": 0, "srcB": 1},                                           # 4 centre
+            {"kind": "swizzle", "dst": 3, "srcA": 1, "constant": [2.0, 2.0, 2.0, 2.0]},               # 5 z
+            # z wrapped onto a circle of radius 1.3 in the noise's xz plane: (1.3 sin, 0, 1.3 cos) of 2 pi z / MODULE
             {"kind": "palette", "dst": 4, "srcA": 3, "value": 0.0, "constant": [0.0, 0.0, 0.0, 0.0],
-             "constant2": [1.3, 1.3, 1.3, 1.3], "constant3": [1.0 / MODULE] * 4,
-             "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 9 R cos
-            {"kind": "palette", "dst": 5, "srcA": 3, "value": 0.0, "constant": [0.0, 0.0, 0.0, 0.0],
-             "constant2": [1.3, 1.3, 1.3, 1.3], "constant3": [1.0 / MODULE] * 4,
-             "constant4": [-0.25, -0.25, -0.25, -0.25]},                                                # 10 R sin
-            {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 1.0, 0.0]},                          # 11
-            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 6},                                      # 12 (0,0,cos)
-            {"kind": "constant", "dst": 6, "constant": [1.0, 0.0, 0.0, 0.0]},                          # 13
-            {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                                      # 14 (sin,0,0)
-            {"kind": "constant", "dst": 6, "constant": [0.21, 0.37, 0.0, 0.0]},                        # 15 x, y scale
-            {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 6},                                      # 16
-            {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},                                           # 17
-            {"kind": "add", "dst": 3, "srcA": 3, "srcB": 4},                                           # 18
-            {"kind": "noise", "dst": 3, "srcA": 3, "value": 1.0, "constant": [0.0, 0.0, 0.0, 0.0],
-             "seed": 11},                                                                                # 19 pattern
-            {"kind": "threshold", "dst": 4, "srcA": 3, "value": 0.58},                                 # 20 dim
-            {"kind": "constant", "dst": 6, "constant": hexrgb(INK) + [1.0]},                           # 21
-            {"kind": "threshold", "dst": 5, "srcA": 3, "value": 0.7},                                 # 22 lit
-            {"kind": "swizzle", "dst": 5, "srcA": 5, "constant": [0.0, 0.0, 0.0, 0.0]},               # 23
-            {"kind": "constant", "dst": 7, "constant": hexrgb(DIM, 0.9) + [1.0]},                      # 24 dim colour
-            {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [0.0, 0.0, 0.0, 0.0]},               # 25
-            {"kind": "mixBy", "dst": 6, "srcA": 6, "srcB": 7, "srcC": 4},                              # 26
-            {"kind": "constant", "dst": 7, "constant": hexrgb(LIT, 2.6) + [1.0]},                      # 27 lit colour
-            {"kind": "mixBy", "dst": 6, "srcA": 6, "srcB": 7, "srcC": 5},                              # 28 block colour
+             "constant2": [1.3, 0.0, 1.3, 0.0], "constant3": [1.0 / MODULE, 0.0, 1.0 / MODULE, 0.0],
+             "constant4": [-0.25, 0.0, 0.0, 0.0]},                                                      # 6 cylinder
+            {"kind": "constant", "dst": 5, "constant": [0.21, 0.37, 0.0, 0.0]},                        # 7 x, y scale
+            {"kind": "multiply", "dst": 5, "srcA": 1, "srcB": 5},                                      # 8
+            {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},                                           # 9
+            {"kind": "noise", "dst": 3, "srcA": 4, "value": 1.0, "constant": [0.0, 0.0, 0.0, 0.0],
+             "seed": 11},                                                                                # 10 pattern
+            {"kind": "threshold", "dst": 4, "srcA": 3, "value": 0.58},                                 # 11 dim
+            {"kind": "threshold", "dst": 5, "srcA": 3, "value": 0.7},                                  # 12 lit
+            {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},                                           # 13 0, 1, 2
+            {"kind": "gradient", "dst": 4, "srcA": 4, "constant": [1.0 / 6.0] * 3 + [0.0], "value": 1.0},  # 14 /2
+            {"kind": "ramp", "dst": 6, "srcA": 4, "constant": hexrgb(INK) + [1.0],
+             "constant2": hexrgb(DIM, 0.9) + [1.0], "constant3": hexrgb(LIT, 2.6) + [1.0]},            # 15 colour
             # scanlines across every face (by the fragment's height)
-            {"kind": "swizzle", "dst": 3, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},               # 29 y
+            {"kind": "swizzle", "dst": 3, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},               # 16 y
             {"kind": "palette", "dst": 3, "srcA": 3, "value": 0.0, "constant": [0.78, 0.78, 0.78, 0.78],
              "constant2": [0.22, 0.22, 0.22, 0.22], "constant3": [1.0 / 0.9] * 4,
-             "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 30 lines
-            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 3},                                      # 31
+             "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 17 lines
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 3},                                      # 18
             # the material's own emission on top (the fragments' notes; zero on the walls)
-            {"kind": "input", "dst": 3, "input": "materialEmission"},                                  # 32
-            {"kind": "add", "dst": 6, "srcA": 6, "srcB": 3},                                           # 33
+            {"kind": "input", "dst": 3, "input": "materialEmission"},                                  # 19
+            {"kind": "add", "dst": 6, "srcA": 6, "srcB": 3},                                           # 20
         ],
         "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1,
     }
-
-
 
 
 def ribbon_program():
@@ -246,7 +232,7 @@ def instrument(s):
             R("kick", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
               envelopeHoldMs=0, envelopeFallPerSecond=2.2, remapEnabled=True, remapInMin=0.0, remapInMax=1.0,
               remapOutMin=1.0, remapOutMax=0.0),
-            R("kick", "material/gsPixel/op/27/constant/constant", 1.4, attackMs=0, decayMs=200))
+            R("kick", "material/gsPixel/op/15/ramp/constant3", 1.4, attackMs=0, decayMs=200))
     # ---- SNARE (MESO): the frame tears; the rows shear sideways
     s.route(R("snare", "post/glitch/tear", 0.35, attackMs=0, decayMs=180),
             R("snare", "post/glitch/tearShift", 90.0, attackMs=0, decayMs=180))
@@ -263,10 +249,10 @@ def instrument(s):
     s.route(R("audio.treble", "post/display/scanlines", 0.35, attackMs=20, decayMs=250),
             R("audio.treble", "particles/rain/spawnRate", 1600.0, attackMs=20, decayMs=250))
     # ---- BRIGHTNESS: the lit pixels brighten; TEMPO: they pulse; INTENSITY (STRUCTURE): more of the pattern lights
-    s.route(R("brightness", "material/gsPixel/op/27/constant/constant", 0.6, **SLOW),
-            R("beat", "material/gsPixel/op/27/constant/constant", 0.5, attackMs=0, decayMs=150),
-            R("intensity", "material/gsPixel/op/22/threshold/value", -0.04, **SLOW),
-            R("intensity", "material/gsPixel/op/20/threshold/value", -0.03, **SLOW))
+    s.route(R("brightness", "material/gsPixel/op/15/ramp/constant3", 0.6, **SLOW),
+            R("beat", "material/gsPixel/op/15/ramp/constant3", 0.5, attackMs=0, decayMs=150),
+            R("intensity", "material/gsPixel/op/12/threshold/value", -0.04, **SLOW),
+            R("intensity", "material/gsPixel/op/11/threshold/value", -0.03, **SLOW))
     # ---- MIDI: pitch picks the row a note lights (the lit threshold dips for one band of heights... the fragments
     # carry it: a note flares them); velocity is how hard it glitches; held notes hold the fragments lit
     s.route(R("noteEnv", P % "fragments" + "material/emissive", 3.0, depth="lastVelocity", attackMs=0, decayMs=500),
@@ -310,13 +296,14 @@ def instrument(s):
     # moved round the hue circle, a new data pattern, a new row stagger (each a 0.2 s pulse, integrated)
     s.route(staged(C, "camera/roll", 420.0, "rebuild", integrate=True),
             staged(C, "post/grade/hueShift", 5.0, "rebuild", integrate=True),
-            staged(C, "material/gsPixel/op/19/noise/constant", 35.0, "rebuild", comp=0, integrate=True))
+            staged(C, "material/gsPixel/op/10/noise/constant", 35.0, "rebuild", comp=0, integrate=True))
     for node in WALLS:
         s.route(staged(C, P % node + "deform/1/phase", 11.0, "rebuild", integrate=True))
 
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
+    s.unshadowed_key()          # every material is unlit: the default key's shadow would be pure cost
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
@@ -374,14 +361,14 @@ def build():
                 velocityStretch=0.6, stretchMax=1.2)
 
     # ---- the flight: the canyon slides one module per PERIOD towards the camera, then back (seamless: the pattern is
-    # periodic in MODULE and rides with the blocks through gsPixel's op 5)
+    # periodic in MODULE and rides with the blocks through gsPixel's op 6)
     for node in TRAVELLING:
         s.track("procedural/%s/transform/position" % node, [
             {"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
             {"time": PERIOD, "value": [0.0, 0.0, MODULE], "interp": "linear"}], loop=PERIOD, mode="add")
-    s.track("material/gsPixel/op/5/constant/constant", [
-        {"time": 0.0, "value": [0.0, 0.0, 0.0, 0.0], "interp": "linear"},
-        {"time": PERIOD, "value": [0.0, 0.0, -MODULE, 0.0], "interp": "linear"}], loop=PERIOD)
+    s.track("material/gsPixel/op/6/palette/value", [
+        {"time": 0.0, "value": 0.0, "interp": "linear"},
+        {"time": PERIOD, "value": -MODULE, "interp": "linear"}], loop=PERIOD)
 
     # ---- the collapse's trigger: a STRONG EVENT -- a hard kick at a moment of large spectral change (the kick's envelope
     # times the flux, above 0.62: measured at 30 fps on the two review excerpts, three to five times in thirty seconds,

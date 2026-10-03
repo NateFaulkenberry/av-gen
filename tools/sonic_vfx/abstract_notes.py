@@ -76,7 +76,7 @@ NOTES = {
                    "a creature choir, one creature per voice"],
         "verdict": ("Charming rather than holy-shit. It's a complete, coherent toy world: inked, cel-banded and "
                     'pastel, with a sky-whale, a ringed planet, an island chain and creatures who hop and sing. It '
-                    "reads as a game's key art and is the friendliest of the eight. Its ceiling is the genre: it "
+                    "reads as a game's key art and is the friendliest of the nine. Its ceiling is the genre: it "
                     'looks like a lovely indie game, not like something only Sonic Garden could make.'),
     },
     "color-geometry": {

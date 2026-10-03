@@ -138,7 +138,7 @@
  "routes": [
   {
    "source": "response.bass",
-   "target": "material/ctLand/op/27/smoothstep/constant",
+   "target": "material/ctLand/op/21/smoothstep/constant",
    "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
@@ -150,7 +150,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/ctLand/op/28/constant/constant",
+   "target": "material/ctLand/op/22/constant/constant",
    "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
@@ -172,7 +172,7 @@
   },
   {
    "source": "response.kick",
-   "target": "material/ctLand/op/24/constant/constant",
+   "target": "material/ctLand/op/18/constant/constant",
    "amount": 1.6,
    "op": "add",
    "polarity": "unipolar",
@@ -227,7 +227,7 @@
   },
   {
    "source": "audio.mid",
-   "target": "material/ctLand/op/21/palette/value",
+   "target": "material/ctLand/op/16/palette/value",
    "amount": 30.0,
    "op": "add",
    "polarity": "unipolar",
@@ -250,7 +250,7 @@
   },
   {
    "source": "audio.treble",
-   "target": "material/ctLand/op/24/constant/constant",
+   "target": "material/ctLand/op/18/constant/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
@@ -261,7 +261,7 @@
   },
   {
    "source": "beat.pulse",
-   "target": "material/ctLand/op/24/constant/constant",
+   "target": "material/ctLand/op/18/constant/constant",
    "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
@@ -785,7 +785,7 @@
   },
   {
    "source": "notes.polyphony",
-   "target": "material/ctLand/op/27/smoothstep/constant",
+   "target": "material/ctLand/op/21/smoothstep/constant",
    "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
@@ -797,7 +797,7 @@
   },
   {
    "source": "control.modwheel",
-   "target": "material/ctLand/op/21/palette/constant3",
+   "target": "material/ctLand/op/16/palette/constant3",
    "amount": -0.031818181818181815,
    "op": "add",
    "polarity": "unipolar",

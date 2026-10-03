@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""SONIC ABSTRACT: the abstract direction's eight prototypes (04-brief-abstract-direction.md), their own project
-(examples/sonic-abstract/, the index category "Sonic Abstract"). Builds them, and makes the review media: each a still, a
-reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modulation map.
+"""SONIC ABSTRACT: the abstract direction's nine prototypes (04-brief-abstract-direction.md as amended by briefs 05-08),
+their own project (examples/sonic-abstract/, the index category "Sonic Abstract"). Builds them, and makes the review
+media: each a still, reactive clips with real music, a MIDI clip, and its modulation map.
 
     python3 tools/sonic_vfx/abstract.py build [module ...]             # write examples/sonic-abstract/ (no module: all
-                                                                       #   eight, and the index's Sonic Abstract entries)
+                                                                       #   nine, and the index's Sonic Abstract entries)
     python3 tools/sonic_vfx/abstract.py build <module> --projects DIR  # look development elsewhere
     python3 tools/sonic_vfx/abstract.py music                          # cut the real-music excerpts (gitignored)
     python3 tools/sonic_vfx/abstract.py blockout <id> [--at 6] [--projects DIR] [--tag v2]  # silent, 960x540
@@ -14,9 +14,9 @@ reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modu
     python3 tools/sonic_vfx/abstract.py clip <id> [--class allyougot] [--seconds 30] [--size 1920x1080]
     python3 tools/sonic_vfx/abstract.py clips [id ...] [--class allyougot] [--seconds 30]   # many clips, one queue
     python3 tools/sonic_vfx/abstract.py frame <id> --class allyougot --at 12   # one frame of a reactive clip
-    python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the eight
+    python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the nine
     python3 tools/sonic_vfx/abstract.py maps [id ...]                           # each one's as-built modulation map
-    python3 tools/sonic_vfx/abstract.py tour [--class allyougot] [--seconds 3.6] # one piece of music, eight worlds
+    python3 tools/sonic_vfx/abstract.py tour [--class allyougot] [--seconds 3.6] # one piece of music, nine worlds
     python3 tools/sonic_vfx/abstract.py notes [id ...]                          # each one's one-page note
 
 Files go to ~/Desktop/av-gen-review/28-sonic-abstract/, named by set-list position (`01-sacred-geometry-still.png`,
@@ -134,7 +134,7 @@ def clip_frame(clip, at, dst):
     print(dst)
 
 
-def sheet(dst, blockouts=False, cols=4):
+def sheet(dst, blockouts=False, cols=3):
     from PIL import Image, ImageDraw
     if blockouts:
         paths = [os.path.join(OUT, "work", "blockout", s + ".png") for s in scene_ids()]
@@ -143,7 +143,7 @@ def sheet(dst, blockouts=False, cols=4):
     paths = [p for p in paths if os.path.exists(p)]
     if not paths:
         sys.exit("no stills yet")
-    w, h = 480, 270
+    w, h = 640, 360  # three by three: a 1920x1080 sheet
     rows = (len(paths) + cols - 1) // cols
     canvas = Image.new("RGB", (w * cols, h * rows), (0, 0, 0))
     d = ImageDraw.Draw(canvas)
@@ -159,6 +159,7 @@ def sheet(dst, blockouts=False, cols=4):
 
 # What each signal is, in the owner's words (the brief's audio dimensions), for the modulation maps.
 DIMENSIONS = [
+    ("Level (loudness)", ("response.level",)),
     ("Bass", ("response.bass",)),
     ("Kick (onset, low)", ("response.kick", "response.kickEnv", "response.low")),
     ("Snare (onset, mid)", ("response.snare", "response.snareEnv")),
@@ -203,7 +204,13 @@ def describe_chain(r):
     if "attackMs" in c or "decayMs" in c:
         bits.append("attack %d / decay %d ms" % (c.get("attackMs", 0), c.get("decayMs", 0)))
     if r.get("op") == "multiply":
-        bits.append("scales it")
+        g, o = c.get("gain", 1.0), c.get("offset", 0.0)
+        if g != 1.0 or o:
+            bits.append("scales it to %g at full input (x%g at rest)" % (o + g, o))
+        else:
+            bits.append("scales it")
+    elif c.get("gain", 1.0) != 1.0 or c.get("offset"):
+        bits.append("x %g %+g" % (c.get("gain", 1.0), c.get("offset", 0.0)))
     if r.get("depthSource"):
         bits.append("scaled by %s" % r["depthSource"])
     return "; ".join(bits)
@@ -260,7 +267,7 @@ def make_caption(text, dst, size=(1920, 1080)):
 
 
 def tour(cls, seg):
-    """One continuous piece of music through the eight worlds: every clip of `cls` starts the same excerpt at 0, so
+    """One continuous piece of music through the nine worlds: every clip of `cls` starts the same excerpt at 0, so
     prototype k's clip cut at [k seg, (k + 1) seg] continues the music where the previous one stopped. Hard cuts, the
     excerpt's own audio underneath, each segment captioned with its prototype."""
     work = os.path.join(OUT, "work", "tour-" + cls)

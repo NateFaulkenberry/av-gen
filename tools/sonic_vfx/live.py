@@ -33,7 +33,7 @@ def pct(xs, q):
 
 def tour_names(abstract=False):
     """The switcher's list (ADR-1063/1074): the Sonic VFX set is Sonic Live and then the VFX scenes; the Sonic
-    Abstract set is its eight prototypes alone, in index order."""
+    Abstract set is its nine prototypes alone, in index order."""
     import importlib
     from tools.sonic_vfx.scenes import SCENES, ABSTRACT
     if abstract:

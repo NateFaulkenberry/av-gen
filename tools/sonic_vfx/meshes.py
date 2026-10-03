@@ -223,6 +223,33 @@ def heightfield(x0, x1, z0, z1, nx, nz, height, normal_eps=2.0):
     return verts, norms, idx
 
 
+def heightfield_path(path, offsets, z0, z1, nz, height, normal_eps=2.0):
+    """A smooth-shaded grid whose columns follow a path: vertex (path(z) + d, height, z) for every d in `offsets`
+    (ascending), rows z0..z1 (nz cells). Spend the triangles where the eye is -- dense offsets near the path (a valley
+    floor, its banks), sparse far from it -- instead of a uniform grid's: at a grazing view the far rows of a uniform
+    grid are sub-pixel slivers, and a sliver costs as much to rasterize as a triangle the size of a quad. Periodic
+    along z when `path` and `height` are (the columns meet themselves at the seam). Returns (positions, normals,
+    indices), rows near-first as heightfield()'s."""
+    verts, norms = [], []
+    for j in range(nz + 1):
+        z = z0 + (z1 - z0) * j / nz
+        px = path(z)
+        for d in offsets:
+            x = px + d
+            y = height(x, z)
+            hx = height(x + normal_eps, z) - height(x - normal_eps, z)
+            hz = height(x, z + normal_eps) - height(x, z - normal_eps)
+            verts.append((x, y, z))
+            norms.append(unit((-hx, 2.0 * normal_eps, -hz)))
+    idx = []
+    w = len(offsets)
+    for j in reversed(range(nz)):
+        for i in range(w - 1):
+            a, b, c, d = j * w + i, j * w + i + 1, (j + 1) * w + i + 1, (j + 1) * w + i
+            idx += [a, d, c, a, c, b]
+    return verts, norms, idx
+
+
 def ribbon(path, width, y_of, z0, z1, n, lift=0.4):
     """A flat strip along x = path(z) from z0 to z1 (n segments), at height y_of(z) + lift, facing up."""
     verts, norms, idx = [], [], []

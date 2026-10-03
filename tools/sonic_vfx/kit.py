@@ -28,9 +28,9 @@ from .signals import S
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(REPO, "examples", "sonic-vfx")
-# The abstract direction (04-brief-abstract-direction.md): its eight prototypes are their own project, "Sonic
-# Abstract" (the owner's decision, 2026-10-02), in their own folder and index category; Sonic Garden and the Sonic VFX
-# set are untouched.
+# The abstract direction (04-brief-abstract-direction.md, amended by 05-08): its nine prototypes are their own project,
+# "Sonic Abstract" (the owner's decision, 2026-10-02), in their own folder and index category; Sonic Garden and the
+# Sonic VFX set are untouched.
 ABSTRACT_DIR = os.path.join(REPO, "examples", "sonic-abstract")
 ABSTRACT_CATEGORY = "Sonic Abstract"
 GARDEN_LIVE = os.path.join(REPO, "examples", "sonic-garden", "sonic-live.json")
@@ -667,6 +667,15 @@ class Scene:
             l[k] = [float(x) for x in v] if isinstance(v, (list, tuple)) else v
         self.lights.append(l)
         return l
+
+    def unshadowed_key(self):
+        """The engine's default key light (composition.cpp `defaultKeyLight`), authored WITHOUT its shadow. A scene that
+        authors no light gets that key, and it casts: every procedural is drawn again into the shadow cascades and a
+        shadow mask is resolved every frame. In a scene whose materials are all unlit (light changes nothing) that is
+        pure cost -- 1 to 3 ms a frame at the live floor (Neon Vector's ridgelines: 2.4 ms of shadow pass alone).
+        Authoring any light turns the default off (ADR-278); this one is the default minus its shadow."""
+        return self.light("key", "directional", direction=[-0.4, -1.0, -0.35], color=[1.0, 0.97, 0.92], intensity=3.0,
+                          temperature=5600.0, softness=1.0, castsShadow=False, contactShadow=False)
 
     def program(self, prog):
         self.programs.append(prog)

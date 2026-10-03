@@ -292,7 +292,7 @@
   },
   {
    "source": "response.kick",
-   "target": "material/gsPixel/op/27/constant/constant",
+   "target": "material/gsPixel/op/15/ramp/constant3",
    "amount": 1.4,
    "op": "add",
    "polarity": "unipolar",
@@ -449,7 +449,7 @@
   },
   {
    "source": "sonic.brightness",
-   "target": "material/gsPixel/op/27/constant/constant",
+   "target": "material/gsPixel/op/15/ramp/constant3",
    "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -460,7 +460,7 @@
   },
   {
    "source": "beat.pulse",
-   "target": "material/gsPixel/op/27/constant/constant",
+   "target": "material/gsPixel/op/15/ramp/constant3",
    "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
@@ -471,7 +471,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/gsPixel/op/22/threshold/value",
+   "target": "material/gsPixel/op/12/threshold/value",
    "amount": -0.04,
    "op": "add",
    "polarity": "unipolar",
@@ -482,7 +482,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/gsPixel/op/20/threshold/value",
+   "target": "material/gsPixel/op/11/threshold/value",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -939,7 +939,7 @@
   },
   {
    "source": "visual.collapse",
-   "target": "material/gsPixel/op/19/noise/constant",
+   "target": "material/gsPixel/op/10/noise/constant",
    "amount": 35.0,
    "op": "add",
    "polarity": "unipolar",
@@ -1149,7 +1149,7 @@
     ]
    },
    {
-    "target": "material/gsPixel/op/5/constant/constant",
+    "target": "material/gsPixel/op/6/palette/value",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -1158,22 +1158,12 @@
     "keys": [
      {
       "time": 0.0,
-      "value": [
-       0.0,
-       0.0,
-       0.0,
-       0.0
-      ],
+      "value": 0.0,
       "interp": "linear"
      },
      {
       "time": 6.4,
-      "value": [
-       0.0,
-       0.0,
-       -192.0,
-       0.0
-      ],
+      "value": -192.0,
       "interp": "linear"
      }
     ]

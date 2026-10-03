@@ -1871,6 +1871,28 @@
    }
   }
  ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.35
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0,
+   "temperature": 5600.0,
+   "softness": 1.0,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
  "materialPrograms": [
   {
    "name": "beatSweep",
