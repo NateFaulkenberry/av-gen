@@ -31,11 +31,15 @@
      period; a frame later than half a period restarts the grid instead of bursting to catch up.
    - **Live editor only.** `runHeadless` never paces; neither does the editor while a render job shares the loop,
      nor an `--ui-ab` measurement.
-   - **The controller's reading stays a cost.** ADR-1085 caps the GPU span by the mean frame interval. A capped
-     interval would read 16.7 ms however light the GPU is, and the controller's CPU-bound check (GPU under 70% of
-     the wall clock) would read the idle wait as the CPU. So the controller, and the status line's GPU figure, are
-     fed the interval minus the cap's wait. The live profile's frame statistics keep the real present interval and
-     count the wait among the waits.
+   - **The controller's reading stays a cost.** ADR-1085 reads min(median GPU span, mean frame interval). The
+     interval only ever caps the span, so a padded 16.7 ms interval cannot be read as cost; it only stops capping.
+     And when the cap waits, the GPU has finished the previous frame before the next is submitted, so the span is
+     not inflated by overlapping frames, the case the interval cap exists for. The controller is therefore fed the
+     whole interval, as before. **Tried and rejected:** feeding it the interval minus the cap's wait. The GPU works
+     *during* the wait, so that read 3-5 ms on a 12 ms GPU frame; the controller climbed and fell back every 4-5
+     seconds (Glowmere and Liminal Medium/Low x3, Sonic 11 changes in 15 s; ADR-1104's doubling was all that
+     slowed it). The live profile's frame statistics keep the real present interval and count the wait among the
+     waits.
 2. **The raise margin goes from 0.8 to 0.9.** The level above must be predicted at no more than 90% of the GPU
    budget for `raiseHoldFrames` before the controller climbs. A raise that then misses is undone at its next
    decision, and the same raise waits twice as long next time (ADR-1104's probation): that is the safety net that
@@ -49,4 +53,19 @@
 - Tests: `the frame cap's period ...`, `the frame cap's steps hold a fixed grid ...`, `the raise margin is 0.9 ...`
   (tests/unit/test_interactive_resolution.cpp) and `the live frame cap round-trips and defaults on`
   (test_app_settings.cpp).
-- Measurements: `docs/live-optimizer/PROGRESS.md`, "ADR-1107".
+- **Measured** (M2 Max, LG UltraFine at 60 Hz, 1080p projection window, 60 target, floor 0.38, 15 s, two
+  interleaved repeats per arm; `docs/live-optimizer/PROGRESS.md`, "ADR-1107"):
+
+  | scene | before (0.8, no cap) | 0.9, no cap | 0.9 + cap |
+  |---|---|---|---|
+  | Sonic | Medium, 72 fps, p50 8.8-9.2 / p99 28.6-28.8 ms, misses 12-13% | Medium, 72 fps, misses 12-16% | Medium, 60.1 fps, p50 16.6 / p99 21.7-23.1, misses 0 |
+  | Glowmere | Low, 83 fps, p50 8.7-8.8 / p99 25.7-25.9, misses 4.5% | Low, 83 fps, misses 3.6-3.9% | Low, 60.0 fps, p50 16.65 / p99 18.6-19.3, misses 0 |
+  | Liminal @60 s | Emergency, 85.5 fps, p50 8.7 / p99 25.8-26.1, misses 4% | Emergency, 85 fps, misses 3.9% | Emergency / Low, 60.1 fps, p50 16.65 / p99 20.9-21.1, misses 0 |
+
+  - The cap does what it is for: a steady 60, with zero deadline misses where every uncapped run missed 4-16%.
+  - The margin moved no settled level on this machine at this sitting: Sonic's High measures over the budget and
+    the next levels up for Glowmere and Liminal are not predicted within 90% of it. One capped Liminal run settled a
+    level higher (Low). The margin stays at 0.9 as decided: it is the cheaper of the two errors, and ADR-1104 bounds it.
+  - Capped, the GPU spans read 5-15% longer at the same level (Glowmere Low 12.5-13.4 ms against 11.2): with idle
+    time in every frame the GPU clocks down. That errs towards staying lower, never towards hunting.
+  - Not measured: a 120 Hz display (none attached), where 60 is every 2nd vsync.

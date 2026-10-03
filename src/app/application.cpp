@@ -4544,7 +4544,7 @@ int Application::runLive() {
         //
         // Wait for the frame's slot on the target's grid, before the input is read, so the wait costs no
         // input latency. The wait is inside the frame interval (it is how long the frame took to come
-        // round) but is taken out of what the quality controller reads: a capped interval is not GPU cost.
+        // round); the quality controller is fed that interval as before -- see `autoResolution_.note` below.
         // Live editor only (`runHeadless` never gets here), and never while a render job shares the loop
         // or an --ui-ab measurement is running.
         double paceWaitMs = 0.0;
@@ -5508,9 +5508,13 @@ int Application::runLive() {
             // Fed the *interval*, not the CPU time: the controller is deciding whether a smaller
             // world would make frames arrive sooner, and `cpuFrameMs` excludes the swapchain wait
             // that a GPU-bound frame spends most of itself in.
-            // ADR-1107: less the frame cap's wait, which is idle time, not cost: read with it, a capped
-            // 16.7 ms interval would cap ADR-1085's cost reading and hide that the GPU has room.
-            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs - paceWaitMs));
+            // ADR-1107: the whole interval, the frame cap's wait included. The interval only ever *caps* the
+            // GPU span (ADR-1085), so a padded interval cannot be read as cost; it can only stop capping. And
+            // when the cap waits, the GPU has finished the previous frame before the next is submitted, so the
+            // span is not inflated by overlapping frames -- the case the interval cap exists for. Subtracting
+            // the wait instead was measured to be wrong: the GPU works *during* the wait, so interval minus wait
+            // read 3-5 ms on a 12 ms GPU frame, and the controller climbed and fell back every few seconds.
+            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
             prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
@@ -5523,7 +5527,7 @@ int Application::runLive() {
             };
             // ADR-1085's reading, smoothed: the span, capped by the (smoothed, so mean) frame interval.
             smooth(liveGpuSpanShown_, stats.gpuFrameMs);
-            smooth(liveIntervalShown_, stats.frameIntervalMs - paceWaitMs);
+            smooth(liveIntervalShown_, stats.frameIntervalMs);
             liveGpuMsShown_ = liveIntervalShown_ > 0.0 && liveIntervalShown_ < liveGpuSpanShown_ ? liveIntervalShown_
                                                                                                  : liveGpuSpanShown_;
             smooth(liveCpuMsShown_, stats.cpuFrameMs);
