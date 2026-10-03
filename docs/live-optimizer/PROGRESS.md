@@ -22,17 +22,29 @@ Report target: `~/Desktop/av-gen-review/31-live-optimizer/REPORT.md`.
 | 3 panel | DONE in code, visually UNVERIFIED: Live performance section of the Performance panel (graph, categories, inspector, Optimize review with Apply/Cancel/Undo), Live panel profile/lowest/Save live profile/levers; project live block (ADR-1100/1101). |
 | 4 pre-warm, minimum, recovery, priority | DONE: async SDF variants + pre-warm (ADR-1102, `--no-prewarm` for A/B), minimum + UNSUSTAINABLE (1103), revert after a failed raise (1104), priority ladder (1105). 60-target tuning NOT touched. |
 
-## Measurements so far (measured, M2 Max, headless 1920x1080 unless said)
-- Glowmere at Ultra, `--verify-candidates 4` (2 counterbalanced pairs each): scale85 -7.86 ms GPU, volumequarter
-  -4.65, nomotionblur -4.19, lodbias2 -3.21; all outside the 2% floor. Estimates were 5.6-7.5, 3.4-4.9, 3.6-4.2,
-  0.7-4.6.
-- Liminal at 60 s: SDF tree variant compiled in 807 ms at first use (the mid-run compile Stage 4 removes).
+## Measurements (measured, M2 Max, LG 5K at 60 Hz; data in ~/Desktop/av-gen-review/31-live-optimizer/data/)
+- Live mode, 1080p projection, auto 60, floor 0.38 (A2-*): Sonic Medium 71.7-72.0 fps GPU 13.1; Glowmere (22
+  characters) Low 82.3-82.4 fps GPU 11.2; Liminal@60 s Low 82.8-83.0 fps GPU 11.5. Agrees with 30-live-quality (Sonic
+  after60 72-85 fps; Liminal pinned Low 80 fps / 11.0 ms). Glowmere there had no characters: not comparable.
+- Profiles at Ultra, headless (C-*), GPU p50: Sonic 16.52/16.55/13.67; Glowmere 38.34/37.16/22.48; Liminal
+  49.25/49.25/30.44 (QUALITY/BALANCED/PERFORMANCE).
+- Verified candidates (D-*, headless Ultra): Sonic noprograms -2.69 ms, scale85 -2.29, nodof -0.85, shadowatlas1k
+  noise; Glowmere scale85 -8.06, volumequarter -4.52, nomotionblur -4.19, lodbias2 -3.21; Liminal scale85 -12.12,
+  volumequarter -8.32, nomotionblur -5.05, posttaps noise (0.20).
+- Pre-warm (G-*, Liminal live pinned Low from 30 s): before worst 116/141 ms (main-thread compile at the hall, 36.4 s),
+  4 compiles while measuring; after worst 52/50 ms, 0 compiles, 7 variants on Dawn's workers in 0.36 s at load.
+  Main-thread compile times seen in a full play without pre-warm: 36, 55, 89, 145, 182, 199 s, 89-114 ms each (warm
+  Metal cache).
+- The report was refused as a file by the harness; it is in the agent's final message.
 
 ## Tests
 - CPU `[live-profile]`, `[live-optimizer]` (tests/unit/test_live_profile.cpp, test_live_optimizer.cpp); GPU
   `[live-optimizer]` (tests/rendering/test_live_optimizer_gpu.cpp). All pass (filtered runs, under the lock).
 
+## Full suites (at 807879e7, under the lock, one after the other)
+- `avgen_tests`: exit 0 -- 4043 cases: 4023 passed, 19 skipped, 1 failed as expected (the known [!shouldfail]).
+- `avgen_render_tests`: exit 0 -- 575 cases: 574 passed, 1 skipped.
+
 ## Next
-1. Final measurement set (scratchpad `$SP/final.sh`): live mode 3 scenes x 2 (agreement with the live-quality matrix),
-   profiles x 3 scenes, Liminal pre-warm before/after, verify-candidates on each scene.
-2. REPORT.md, both full suites at the end.
+All stages done. Remaining (owner): visual review of the panels and of the profiles/new low levels on a projector; the
+60-target tuning decision; merge order (live/quality first). Possible follow-ups are listed in the final report.
