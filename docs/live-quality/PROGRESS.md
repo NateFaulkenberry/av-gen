@@ -45,15 +45,25 @@ here, and every Glowmere number from this worktree describes the scene without i
 - Tests: `tests/unit/test_interactive_resolution.cpp` (rewritten), `test_app_settings.cpp`, `test_projection.cpp`,
   `test_skeleton.cpp`; GPU `[live-quality]` in `test_gpu.cpp` (records gate, round trip) and `test_post_gpu.cpp` (gates).
 
-## Measurement state (2026-10-03 ~02:30)
-- Binaries in scratch `bin/`: `avgen-before` (main + probes), `avgen-after` (feature, commit 1c8fe689 + probes).
-- `lq/matrix.sh` (running, nohup) = per scene `lq/mscene.sh` (native + before/after x 60/90/120 x 2), then
-  `lq/stall.sh` (Sonic, 480x270 pt window, before/after x2), then `lq/cpu2.sh` (22 x imported/alien.gltf, §9 A/B).
-  Progress: `lq/data/runs.txt`. Tabulate: `python3 lq/matrix.py lq/data <sonic|glow|lim> 240`,
-  `python3 lq/trans2.py lq/data <tags>`, `python3 lq/cpu.py lq/data <tags>`, `python3 lq/sweep.py lq/data sweep-*`.
-- Sweeps done (`sweep-sonic/glow/lim`): per-level costs and 27 transitions (worst +0.9 ms over steady max).
+## Results (2026-10-03, all measurements done)
+Tables and raw data: `~/Desktop/av-gen-review/30-live-quality/data/` (`matrix-tables.txt`, `sweep-tables.txt`,
+`cpu-tables.txt`, `raw/`, the scripts). The §23 report was refused as a file by the agent harness and was delivered
+in the agent's final message to the coordinator.
+- §19 matrix (after vs before, fps): Sonic 60: 72-85 vs 64 (judder); 90: 105 vs 91; 120: 104 vs 97. Glowmere (no
+  characters) 60: 92 vs 64; 90/120: 111-112 vs 70-72. Liminal 60/90/120: 117-118 vs 59-60. At 60 every scene settles
+  a level lower than needed (coarse steps + 0.8 raise margin) -- a tuning point.
+- Transitions: 27 sweep + 10 natural, worst +0.9 ms over the steady-state max. Resize path kept (ADR-1086).
+- §9: diag 0.6-0.75 -> 0.013 ms and render.record -0.7 ms on 22 x imported/alien.gltf; Glowmere here is within noise
+  (characters missing).
+- §17: simulated 15 ms projection block: unpaced 52-55 fps, paced 85 fps (healthy 88).
+- Full CPU suite at 18935d63: exit 42, 26 failed + 1 failed as expected; all 26 are alien/farm/musicians/city-kit/
+  quaternius/audio assets missing from this worktree (failure bodies show "glTF file not found"/missing files).
 
-## Next
-1. Finish the matrix, stall and a22 runs; write ADR-1089's numbers; write REPORT.md (both locations).
-2. Remove the TEMPORARY probes: commits 7a67ace1, b0c652e1, 299e7a99 (by hand where they conflict).
-3. Reconfigure CMake, full suites once each under the lock: `avgen_tests` then `avgen_render_tests` (nohup, poll).
+## Commits that are temporary-and-reverted (history only)
+7a67ace1, b0c652e1, 299e7a99 (reverted in aee7e18b), 2f28e016 (reverted in 989fe61f).
+
+## Next (for whoever resumes)
+- Owner: link `assets/aliens`, `assets/farm` (and quaternius, musicians, kenney/city, 100STYLE) into this worktree
+  as in `../av-gen-qa-coord`, then re-run the CPU suite and `lq/cpu.sh` for the real Glowmere §9 number.
+- Owner review of the Live panel block and the levels' look while projecting.
+- Tuning candidates: raiseMargin ~0.9; resolution_first Emergency 0.44; a frame cap to the target.
