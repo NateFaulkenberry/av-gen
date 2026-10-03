@@ -168,8 +168,9 @@ def build():
     s.environment = {
         "intensity": 0.45, "background": hexrgb(SKY), "fogColor": hexrgb(HAZE), "volumeDensity": 0.042,
         "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb(SKY_TOP), "horizonColor": hexrgb(SKY),
-                "groundColor": hexrgb("#0a2a2a"), "haze": 0.4, "sunIntensity": 0.0, "intensity": 1.0,
+        # one uniform sky: in a world with no up there is no horizon (a band would turn with the world's roll)
+        "sky": {"enabled": True, "zenithColor": hexrgb(SKY), "horizonColor": hexrgb(SKY),
+                "groundColor": hexrgb(SKY), "haze": 0.4, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     sun_dir = [0.62, -0.42, -0.66]
