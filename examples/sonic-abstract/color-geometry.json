@@ -746,7 +746,7 @@
     "the corridor flows slowly toward the light"
    ]
   ],
-  "tier": "medium: one compiled SDF corridor (72 steps to 112 m), analytic haze, an emissive light, bloom",
+  "tier": "medium: one compiled SDF corridor (72 steps to 130 m), analytic haze, an emissive light, bloom",
   "id": "color-geometry",
   "title": "Infinite Color Geometry",
   "regions": [

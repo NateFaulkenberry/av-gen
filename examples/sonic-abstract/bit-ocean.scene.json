@@ -7351,17 +7351,17 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 142.0,
+     "radius": 20.0,
      "plane": "xz",
      "orientation": "tangent",
-     "startAngle": -0.7498327729253689,
-     "endAngle": -0.7498327729253689
+     "startAngle": -7.681419566600406,
+     "endAngle": -7.681419566600406
     },
     "distributionTransform": {
      "position": [
-      0.0,
-      19.0,
-      0.0
+      112.22466892282812,
+      16.5,
+      36.4640053362438
      ],
      "rotation": [
       0,
@@ -7397,7 +7397,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.7,
+      "ambient": 0.9,
       "rimWidth": 0.3,
       "rimColor": [
        0.80695,
@@ -7420,14 +7420,7 @@
       ],
       "space": "local"
      }
-    ],
-    "sourceTransform": {
-     "rotation": [
-      0.0,
-      180.0,
-      0.0
-     ]
-    }
+    ]
    }
   },
   {
@@ -7441,17 +7434,17 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 142.0,
+     "radius": 20.0,
      "plane": "xz",
      "orientation": "tangent",
-     "startAngle": -0.7498327729253689,
-     "endAngle": -0.7498327729253689
+     "startAngle": -7.681419566600406,
+     "endAngle": -7.681419566600406
     },
     "distributionTransform": {
      "position": [
-      0.0,
-      19.0,
-      0.0
+      112.22466892282812,
+      16.5,
+      36.4640053362438
      ],
      "rotation": [
       0,
@@ -7487,7 +7480,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.8,
+      "ambient": 0.95,
       "rimWidth": 0.2,
       "rimColor": [
        0.80695,
@@ -7510,14 +7503,7 @@
       ],
       "space": "local"
      }
-    ],
-    "sourceTransform": {
-     "rotation": [
-      0.0,
-      180.0,
-      0.0
-     ]
-    }
+    ]
    }
   },
   {
@@ -7531,17 +7517,17 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 142.0,
+     "radius": 20.0,
      "plane": "xz",
      "orientation": "tangent",
-     "startAngle": -0.7498327729253689,
-     "endAngle": -0.7498327729253689
+     "startAngle": -7.681419566600406,
+     "endAngle": -7.681419566600406
     },
     "distributionTransform": {
      "position": [
-      0.0,
-      19.0,
-      0.0
+      112.22466892282812,
+      16.5,
+      36.4640053362438
      ],
      "rotation": [
       0,
@@ -7577,7 +7563,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.7,
+      "ambient": 0.9,
       "rimWidth": 0.3,
       "rimColor": [
        0.80695,
@@ -7600,14 +7586,7 @@
       ],
       "space": "local"
      }
-    ],
-    "sourceTransform": {
-     "rotation": [
-      0.0,
-      180.0,
-      0.0
-     ]
-    }
+    ]
    }
   },
   {
@@ -7621,17 +7600,17 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 142.0,
+     "radius": 20.0,
      "plane": "xz",
      "orientation": "tangent",
-     "startAngle": -0.7498327729253689,
-     "endAngle": -0.7498327729253689
+     "startAngle": -7.681419566600406,
+     "endAngle": -7.681419566600406
     },
     "distributionTransform": {
      "position": [
-      0.0,
-      19.0,
-      0.0
+      112.22466892282812,
+      16.5,
+      36.4640053362438
      ],
      "rotation": [
       0,
@@ -7667,7 +7646,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.95,
+      "ambient": 1.0,
       "rimWidth": 0.0,
       "rimColor": [
        0.80695,
@@ -7690,14 +7669,7 @@
       ],
       "space": "local"
      }
-    ],
-    "sourceTransform": {
-     "rotation": [
-      0.0,
-      180.0,
-      0.0
-     ]
-    }
+    ]
    }
   },
   {
@@ -7711,17 +7683,17 @@
     "distribution": {
      "kind": "radial",
      "count": 1,
-     "radius": 142.0,
+     "radius": 20.0,
      "plane": "xz",
      "orientation": "tangent",
-     "startAngle": -0.7498327729253689,
-     "endAngle": -0.7498327729253689
+     "startAngle": -7.681419566600406,
+     "endAngle": -7.681419566600406
     },
     "distributionTransform": {
      "position": [
-      0.0,
-      19.0,
-      0.0
+      112.22466892282812,
+      16.5,
+      36.4640053362438
      ],
      "rotation": [
       0,
@@ -7757,7 +7729,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.6,
+      "ambient": 0.7,
       "rimWidth": 0.0,
       "rimColor": [
        0.80695,
@@ -7780,14 +7752,7 @@
       ],
       "space": "local"
      }
-    ],
-    "sourceTransform": {
-     "rotation": [
-      0.0,
-      180.0,
-      0.0
-     ]
-    }
+    ]
    }
   },
   {

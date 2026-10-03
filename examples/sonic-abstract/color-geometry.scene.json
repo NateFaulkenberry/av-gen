@@ -151,10 +151,10 @@
     "castShadows": false,
     "depthPrepass": false,
     "maxSteps": 72,
-    "epsilon": 0.0008,
-    "stepScale": 0.85,
+    "epsilon": 0.002,
+    "stepScale": 0.95,
     "normalEpsilon": 0.002,
-    "maxDistance": 112.0,
+    "maxDistance": 130.0,
     "surfaces": [
      {
       "color": [
@@ -228,7 +228,7 @@
    "position": [
     0.0,
     0.0,
-    -110.0
+    -128.0
    ]
   }
  ],

@@ -223,18 +223,18 @@ NOTES = {
             "jellies and the caustics; the brightness clears the water.",
             "MIDI: velocity sizes a note's bubble burst; held notes light the kelp; the mod wheel takes the level "
             "deeper (darker, thicker water).",
-            "THE GUIDE, a big friendly voxel fish that swims the ring against you (you meet it every 100 s): it swims "
-            "the melody's contour (higher notes lift it), bobs on the kick, beats its tail on the bass, and its eyes "
-            "light while notes are held.",
+            "THE GUIDE, a big friendly voxel fish circling over the lane just past the arch (every lap begins by "
+            "meeting it): it swims the melody's contour (higher notes lift it), bobs on the kick, beats its tail on "
+            "the bass, and its eyes light while notes are held.",
             "Structure: intensity grows the coral.",
         ],
         "expand": ["a sunken castle level", "a night level of glowing jellies", "a boss chamber with a giant friendly "
                    "fish", "a lava level in the same grammar"],
-        "verdict": ("Charming, not yet stunning. It reads instantly as a game water level: the outlined checker "
-                    "floors, the coin trail through an arch, voxel kelp, brain coral, bubbles and light shafts, and "
-                    "the three palettes give the lap a story. The look round (the lane dressed, outlines block by "
-                    "block, clearer water, deeper toon shadows) took it from flat to crisp. What it lacks for the gate "
-                    "is a hero: one striking thing per area (a giant fish, a sunken castle) instead of a lap of "
-                    "even dressing."),
+        "verdict": ("Charming, and now with a hero. It reads instantly as a game water level: the outlined checker "
+                    "floors, the coin trail through an arch, voxel kelp, brain coral, bubbles and light shafts, three "
+                    "palettes that give the lap a story. The review asked for a hero; the guide is it: a big friendly "
+                    "voxel fish crossing the lane ahead in profile over the coin trail (the hero still) reads at once "
+                    "as a level's character, and it sings the melody. Not holy shit -- it is a game, which is its "
+                    "brief -- but the most immediately lovable of the nine."),
     },
 }

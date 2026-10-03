@@ -1439,7 +1439,7 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "add",
-    "loopLength": 300.0,
+    "loopLength": 16.0,
     "keys": [
      {
       "time": 0.0,
@@ -1451,10 +1451,10 @@
       "interp": "linear"
      },
      {
-      "time": 300.0,
+      "time": 16.0,
       "value": [
        0.0,
-       -360.0,
+       360.0,
        0.0
       ],
       "interp": "linear"
@@ -1467,7 +1467,7 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "add",
-    "loopLength": 300.0,
+    "loopLength": 16.0,
     "keys": [
      {
       "time": 0.0,
@@ -1479,10 +1479,10 @@
       "interp": "linear"
      },
      {
-      "time": 300.0,
+      "time": 16.0,
       "value": [
        0.0,
-       -360.0,
+       360.0,
        0.0
       ],
       "interp": "linear"
@@ -1495,7 +1495,7 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "add",
-    "loopLength": 300.0,
+    "loopLength": 16.0,
     "keys": [
      {
       "time": 0.0,
@@ -1507,10 +1507,10 @@
       "interp": "linear"
      },
      {
-      "time": 300.0,
+      "time": 16.0,
       "value": [
        0.0,
-       -360.0,
+       360.0,
        0.0
       ],
       "interp": "linear"
@@ -1523,7 +1523,7 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "add",
-    "loopLength": 300.0,
+    "loopLength": 16.0,
     "keys": [
      {
       "time": 0.0,
@@ -1535,10 +1535,10 @@
       "interp": "linear"
      },
      {
-      "time": 300.0,
+      "time": 16.0,
       "value": [
        0.0,
-       -360.0,
+       360.0,
        0.0
       ],
       "interp": "linear"
@@ -1551,7 +1551,7 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "add",
-    "loopLength": 300.0,
+    "loopLength": 16.0,
     "keys": [
      {
       "time": 0.0,
@@ -1563,10 +1563,10 @@
       "interp": "linear"
      },
      {
-      "time": 300.0,
+      "time": 16.0,
       "value": [
        0.0,
-       -360.0,
+       360.0,
        0.0
       ],
       "interp": "linear"
@@ -4188,13 +4188,14 @@
  },
  "sonicScene": {
   "category": "game world",
-  "thesis": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure.",
+  "thesis": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure, and a big friendly fish circling over the lane swims the melody.",
   "composition": {
    "background": "the giant coral tower across the basin, rock walls and kelp silhouettes in blue depth",
    "midground": "the level: arches, columns, pipes, giant flowers, coral, coins along the lane",
    "foreground": "kelp, rocks and bubbles sliding past the lens",
    "focal": "the next arch or the next landmark ahead on the lane",
    "secondary": [
+    "the guide (a big friendly voxel fish circling over the lane)",
     "fish schools",
     "bell flowers",
     "the coin trail"
@@ -4305,7 +4306,7 @@
    [
     "pitch",
     "notes.lastPitch",
-    "THE GUIDE, a big friendly voxel fish met every 100 s, swims the melody's contour (higher notes lift it); a kick bobs it, the bass beats its tail"
+    "THE GUIDE, a big friendly voxel fish circling over the lane, swims the melody's contour (higher notes lift it); a kick bobs it, the bass beats its tail"
    ],
    [
     "silence",

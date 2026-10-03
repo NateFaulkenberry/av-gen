@@ -39,8 +39,9 @@ DEPTH = 0.8            # the frame's thickness along the corridor (half)
 SIDES = 4              # the portal's polygon order at rest
 HUE_PERIOD = 90.0      # metres for a full turn of the colour wheel
 TRAVEL_PERIOD = 2.6    # seconds for the corridor to advance one spacing (3.5 m/s)
-END_Z = 112.0          # where the corridor's march stops and the light stands (down the axis a ray runs this far)
-MAX_STEPS = 72
+END_Z = 130.0          # where the corridor's march stops and the light stands (down the axis a ray runs this far)
+MAX_STEPS = 72         # with epsilon 0.002 and a 0.95 step: the long lens sends its rays down the open axis (A/B at the
+                       # live floor: 0.7 ms less than 96 steps at 0.0008 and 0.85, nothing visible lost)
 
 DESIGN = {
     "category": "colour field",
@@ -81,7 +82,7 @@ DESIGN = {
         ["mod wheel", "control.modwheel", "the frames thicken"],
         ["silence", "(no input)", "the corridor flows slowly toward the light"],
     ],
-    "tier": "medium: one compiled SDF corridor (72 steps to 112 m), analytic haze, an emissive light, bloom",
+    "tier": "medium: one compiled SDF corridor (72 steps to 130 m), analytic haze, an emissive light, bloom",
 }
 
 
@@ -182,7 +183,7 @@ def build():
                 "edgeColor": hexrgb("#fff1d8")},
           material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 0.85,
                     "metallic": 0.0, "program": "cgSpace"},
-          position=(0.0, 0.0, 0.0), rotation=(-90.0, 0.0, 0.0), max_steps=MAX_STEPS, epsilon=0.0008, step_scale=0.85,
+          position=(0.0, 0.0, 0.0), rotation=(-90.0, 0.0, 0.0), max_steps=MAX_STEPS, epsilon=0.002, step_scale=0.95,
           max_distance=END_Z)
     # THE LIGHT AT THE END: geometry, blinding (the sky's own sun cannot sit at the end of a horizontal corridor, and a
     # point light only lights what it reaches). Down the long lens it is the white square every frame turns round.

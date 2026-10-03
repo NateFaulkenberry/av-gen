@@ -578,7 +578,7 @@ out, rolling a little.
 | velocity | `notes.lastVelocity` | how big the bubble burst a note releases |
 | held | `notes.held` | the kelp glows while notes are held |
 | mod wheel | CC 1 | `[S]` the depth: the water darkens and thickens |
-| pitch | `notes.lastPitch` | THE GUIDE swims the melody's contour: higher notes lift it |
+| pitch | `notes.lastPitch` | THE GUIDE (a big friendly voxel fish circling over the lane) swims the melody's contour: higher notes lift it |
 | kick, bass | `response.kick`, `response.bass` | the guide bobs on the kick; the bass beats its tail (its body's bend, on a spring) |
 | held | `notes.held` | the guide's eyes light while notes are held |
 
@@ -587,10 +587,11 @@ the first looks were pastel and empty, so the palettes were saturated, the shado
 and kelp, brick ledges floated over it, and outlines added for the sprite silhouette.
 
 **The guide (2026-10-03, the review's "it needs a hero").** A big friendly voxel fish (29 m: an orange body, a cream
-belly, coral fins, white eyes with navy pupils, cut from one solid so no face is drawn between two colours) swims the
-ring AGAINST the swim, outside the lane on the right: the swimmer meets it every 100 s (1 / (1/150 + 1/300)), first at
-12 s, 22 degrees ahead at the hero still's 6 s. It sings along: the pitch lifts it, the kick bobs it, the bass beats its
-tail.
+belly, coral fins, white eyes with navy pupils, cut from one solid so no face is drawn between two colours) circling a
+point over the lane just past the arch (a 20 m loop every 16 s at the swimmer's eye level), so every lap begins by
+meeting it, and the hero still (14 s) has it crossing the lane ahead in profile over the coin trail. Tried first:
+swimming the ring against the swim, which a camera looking along the lane sees nose-on (a blob of blocks), and above
+the arch, cut by the frame. It sings along: the pitch lifts it, the kick bobs it, the bass beats its tail.
 
 **Expansion.** A sunken castle level; a night level of glowing jellies; a boss chamber where the guide waits; a lava
 level in the same grammar.

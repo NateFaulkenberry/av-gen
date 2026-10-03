@@ -476,7 +476,7 @@
     },
     {
       "category": "Sonic Abstract",
-      "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure, and a big friendly fish circling over the lane swims the melody. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
       "name": "Sonic Abstract - 8-Bit Ocean",
       "project": "sonic-abstract/bit-ocean.json"
     }
