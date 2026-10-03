@@ -9,6 +9,8 @@ reactive clip with real music, a MIDI clip where it is MIDI-driven, and its modu
     python3 tools/sonic_vfx/abstract.py music                          # cut the real-music excerpts (gitignored)
     python3 tools/sonic_vfx/abstract.py blockout <id> [--at 6] [--projects DIR] [--tag v2]  # silent, 960x540
     python3 tools/sonic_vfx/abstract.py silent <id> [--at 6] [--size 1920x1080]             # the silent still
+    python3 tools/sonic_vfx/abstract.py stills [id ...] [--size 1920x1080] [--tag v3]       # many silent stills,
+                                                                       #   one render queue (one short GPU job)
     python3 tools/sonic_vfx/abstract.py clip <id> [--class allyougot] [--seconds 30] [--size 1920x1080]
     python3 tools/sonic_vfx/abstract.py frame <id> --class allyougot --at 12   # one frame of a reactive clip
     python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the eight
@@ -306,10 +308,44 @@ def write_note(sid):
     print(dst)
 
 
+def stills_queue(ids, at, size, tag, projects=None, tier="realtime"):
+    """Silent stills of several prototypes in ONE engine process (a render queue): one short GPU job instead of one
+    lock hold per still. 1080p stills go to NN-<id>-still.png, other sizes (or a tag) to work/blockout/<id>[-tag].png."""
+    import json
+    work = os.path.join(OUT, "work", "silent")
+    os.makedirs(work, exist_ok=True)
+    w, h = (int(v) for v in size.split("x"))
+    jobs, outs = [], []
+    for sid in ids:
+        proj = make_silent(project_path(sid, projects), os.path.join(work, sid + "--silent.json"))
+        d = os.path.join(work, "%s--%s-q" % (sid, size))
+        shutil.rmtree(d, ignore_errors=True)
+        # a queue job takes no --particle-warmup (the queue copies only codec, quality and a few others), so each still
+        # is the LAST frame of a 3-second pre-roll: the particles have had time to fill
+        jobs.append({"project": proj, "render": {"width": w, "height": h, "fps": 25, "start": max(0.0, at - 3.0),
+                                                 "end": at + 0.02, "output": "png", "path": d, "tier": tier}})
+        if size == "1920x1080" and not tag:
+            dst = os.path.join(OUT, numbered(sid) + "-still.png")
+        else:
+            dst = os.path.join(OUT, "work", "blockout", sid + ("-" + tag if tag else "") + ".png")
+        outs.append((d, dst))
+    qf = os.path.join(work, "queue.json")
+    json.dump({"format": "avgen-render-queue", "jobs": jobs}, open(qf, "w"), indent=1)
+    review.run(["--headless", "--queue", qf, "--particle-warmup", "240"])
+    for d, dst in outs:
+        got = sorted(glob.glob(os.path.join(d, "*.png")))
+        if got:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy(got[-1], dst)
+            print(dst)
+        else:
+            print("no frame for", dst)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=["build", "music", "silent", "blockout", "clip", "frame", "sheet", "maps",
-                                         "tour", "notes"])
+                                         "tour", "notes", "stills"])
     ap.add_argument("scene", nargs="*")
     ap.add_argument("--at", type=float, default=6.0)
     ap.add_argument("--size", default="")
@@ -328,6 +364,9 @@ def main():
         return
     if a.mode == "tour":
         tour(a.cls, a.seconds or 3.6)
+        return
+    if a.mode == "stills":
+        stills_queue(a.scene or scene_ids(), a.at, a.size or "1920x1080", a.tag, a.projects or None, a.tier)
         return
     if a.mode == "notes":
         for sid in (a.scene or scene_ids()):
