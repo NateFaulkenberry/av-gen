@@ -540,7 +540,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm0_in/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -551,7 +551,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm0_mid/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -562,7 +562,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm0_out/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -573,7 +573,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm1_in/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -584,7 +584,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm1_mid/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -595,7 +595,7 @@
   {
    "source": "response.flux",
    "target": "particles/p_arm1_out/turbulence",
-   "amount": 1.4,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

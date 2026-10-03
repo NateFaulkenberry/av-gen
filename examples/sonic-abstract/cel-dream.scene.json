@@ -2555,21 +2555,21 @@
    "procedural": {
     "source": {
      "kind": "sphere",
-     "radius": 13.0,
+     "radius": 19.0,
      "segments": 14,
      "rings": 8
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      9,
+      7,
       1,
-      6
+      5
      ],
      "gridSpacing": [
-      22.0,
+      30.0,
       1.0,
-      24.0
+      32.0
      ]
     },
     "distributionTransform": {
@@ -2640,7 +2640,7 @@
     "sourceTransform": {
      "scale": [
       1.0,
-      0.34,
+      0.32,
       0.85
      ]
     }
@@ -2652,27 +2652,27 @@
    "procedural": {
     "source": {
      "kind": "sphere",
-     "radius": 7.5,
+     "radius": 11.0,
      "segments": 14,
      "rings": 8
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      12,
+      9,
       1,
-      8
+      6
      ],
      "gridSpacing": [
-      16.0,
+      24.0,
       1.0,
-      18.0
+      26.0
      ]
     },
     "distributionTransform": {
      "position": [
       20.0,
-      -14.8,
+      -14.4,
       -70.0
      ],
      "rotation": [
@@ -2737,104 +2737,7 @@
     "sourceTransform": {
      "scale": [
       1.0,
-      0.55,
-      0.85
-     ]
-    }
-   }
-  },
-  {
-   "name": "cloudSea2",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "sphere",
-     "radius": 4.5,
-     "segments": 14,
-     "rings": 8
-    },
-    "distribution": {
-     "kind": "grid",
-     "gridCount": [
-      15,
-      1,
-      10
-     ],
-     "gridSpacing": [
-      13.0,
-      1.0,
-      14.0
-     ]
-    },
-    "distributionTransform": {
-     "position": [
-      20.0,
-      -12.4,
-      -70.0
-     ],
-     "rotation": [
-      0,
-      0,
-      0
-     ],
-     "scale": [
-      1,
-      1,
-      1
-     ]
-    },
-    "material": {
-     "baseColor": [
-      1.0,
-      0.92158,
-      0.95597
-     ],
-     "emissiveColor": [
-      1.0,
-      0.92158,
-      0.95597
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.6,
-     "metallic": 0.0,
-     "toon": {
-      "bands": 1,
-      "softness": 0.015,
-      "terminator": 0.05,
-      "shadowColor": [
-       0.62,
-       0.5,
-       0.95
-      ],
-      "ambient": 0.86,
-      "rimWidth": 0.15,
-      "rimColor": [
-       1.0,
-       0.87137,
-       0.95597
-      ],
-      "rimIntensity": 0.9,
-      "specular": 0.0,
-      "specularSize": 0.12
-     }
-    },
-    "variation": {
-     "seed": 5,
-     "randomScale": [
-      0.35,
-      0.3,
-      0.35
-     ],
-     "randomPosition": [
-      6.0,
-      1.5,
-      7.0
-     ]
-    },
-    "sourceTransform": {
-     "scale": [
-      1.0,
-      0.7,
+      0.5,
       0.85
      ]
     }
@@ -2890,9 +2793,9 @@
     }
    },
    "position": [
-    9.0,
-    19.5,
-    -48.0
+    -3.0,
+    25.0,
+    -50.0
    ],
    "rotation": [
     0.0,
@@ -3696,9 +3599,9 @@
     "seed": 33,
     "shape": "sphere",
     "position": [
-     11.0,
-     26.3,
-     -48.0
+     -1.0,
+     31.8,
+     -50.0
     ],
     "extent": [
      0.3,

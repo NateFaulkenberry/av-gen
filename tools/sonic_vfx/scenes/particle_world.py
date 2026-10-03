@@ -120,7 +120,7 @@ def instrument(s):
     for name in arms + ["xarm%d" % k for k in range(len(EXTRA_ARMS))]:
         s.route(R("audio.mid", "spline/%s/startAngle" % name, 0.9, integrate=True, attackMs=150, decayMs=900))
     for name in arms:
-        s.route(R("flux", "particles/p_%s/turbulence" % name, 1.4, attackMs=40, decayMs=400))
+        s.route(R("flux", "particles/p_%s/turbulence" % name, 0.45, attackMs=40, decayMs=400))
     # ---- CENTROID: a bright sound pushes the arms' rim toward cyan and the points grow
     for name in arms:
         s.route(R("brightness", "particles/p_%s/size" % name, 0.5, **SLOW))

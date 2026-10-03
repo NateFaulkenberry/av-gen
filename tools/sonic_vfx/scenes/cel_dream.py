@@ -196,7 +196,7 @@ def instrument(s):
             R(wheel, "env/sky/horizonColor", 1.0, op="multiply", gain=-0.6, offset=1.0, attackMs=80, decayMs=80))
 
 
-WHALE = (9.0, 19.5, -48.0)      # the sky-whale's home in the open sky, left of the planet
+WHALE = (-3.0, 25.0, -50.0)      # the sky-whale's home in the open sky, left of the planet
 WHALE_SCALE = 3.4
 
 
@@ -283,9 +283,8 @@ def build():
 
     # ---- the sea of clouds far below the islands
     # (three overlapping layers of puffs: a continuous bumpy sea, not separate discs)
-    for k, (r, n, sp, dy, sy, seed) in enumerate(((13.0, (9, 6), (22.0, 24.0), 0.0, 0.34, 3),
-                                                  (7.5, (12, 8), (16.0, 18.0), 3.2, 0.55, 4),
-                                                  (4.5, (15, 10), (13.0, 14.0), 5.6, 0.7, 5))):
+    for k, (r, n, sp, dy, sy, seed) in enumerate(((19.0, (7, 5), (30.0, 32.0), 0.0, 0.32, 3),
+                                                  (11.0, (9, 6), (24.0, 26.0), 3.6, 0.5, 4))):
         s.proc("cloudSea%d" % k, sphere(r, 14, 8),
                distribution={"kind": "grid", "gridCount": [n[0], 1, n[1]], "gridSpacing": [sp[0], 1.0, sp[1]]},
                variation={"seed": seed, "randomScale": [0.35, 0.3, 0.35], "randomPosition": [6.0, 1.5, 7.0]},

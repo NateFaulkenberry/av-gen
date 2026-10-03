@@ -158,7 +158,7 @@ def instrument(s):
         for kind in ("lines_", "fins_"):
             s.route(R(a[0], "procedural/%s%s/%s" % (kind, group, rel), *a[1:], **k))
     # ---- BASS: the near rows swell under the camera; the plain heaves on the kick
-    both("near", "deform/2/amount", "bass", 2.4, attackMs=30, decayMs=380)
+    both("near", "deform/2/amount", "bass", 1.3, attackMs=30, decayMs=380)
     for g in ("near", "mid", "far"):
         both(g, "deform/1/amount", "kick", 1.1, attackMs=0, decayMs=420)
     # ---- BANDS: the middle rows answer the low mids and mids, the far rows the high mids: the spectrum lies across the
@@ -197,7 +197,8 @@ def instrument(s):
                 R("audio.mid", "procedural/circle%d/transform/rotation" % i, (12.0 + 6 * i) * (1 if i % 2 else -1),
                   comp=1, integrate=True, attackMs=200, decayMs=900))
     # ---- CENTROID: the section's accent colour (the whole image's hue turns; the white lines stay white)
-    s.route(R("brightnessSlow", "post/grade/hueShift", 0.42, **VERY_SLOW))
+    # (radians: a dark timbre turns the magenta toward ultramarine, a bright one toward acid yellow)
+    s.route(R("brightnessSlow", "post/grade/hueShift", 4.0, offset=-0.55, **VERY_SLOW))
     # ---- TEMPO: the beat sweep -- a band of light runs down the plain to the camera once per beat, brighter when the
     # music is louder
     s.route(R("beat.phase", "material/beatSweep/op/3/constant/constant", -(SWEEP_NEAR - SWEEP_FAR)),
@@ -206,7 +207,7 @@ def instrument(s):
     for g, extra in (("near", 8.0), ("mid", 10.0)):
         both(g, "distribution/count", "intensity", extra, threshold="binary", thresholdLevel=0.55)
     for g in ("near", "mid", "far"):
-        both(g, "deform/3/amount", "intensity", 2.0, **VERY_SLOW)
+        both(g, "deform/3/amount", "intensity", 1.0, **VERY_SLOW)
     # ---- MIDI: a note raises a peak across the plain at its pitch's place (low left, high right), as tall as its
     # velocity; a held note holds it; a chord turns the horizon circle into a polygon (STRUCTURE)
     s.route(R("lastPitch", "field/notePeak/position", 90.0, comp=0, offset=-0.5, springHz=3.0, springDamping=0.8))
@@ -294,6 +295,9 @@ def build():
                "post/tonemap/operator": 4})
     s.camera = {"mode": 1, "position": CAM, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(CAM, tgt, period=48.0, amp=(1.6, 0.35, 0.0), tamp=(3.0, 0.6, 0.0))
+    # the flight banks into its sway (camera/roll, ADR-1075): the roll follows the drift's lateral swing
+    s.track("camera/roll", [{"time": round(48.0 * i / 8, 3), "value": round(-4.0 * math.sin(2.0 * math.pi * i / 8), 3),
+                             "interp": "smooth"} for i in range(9)], loop=48.0)
     # the flight: the plain's noise travels toward the camera (8 m/s), the peaks' a little faster
     for fld, speed in (("plainNoise", 8.0), ("peakNoise", 9.0)):
         s.track("field/%s/position" % fld, [{"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},

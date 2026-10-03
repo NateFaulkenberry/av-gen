@@ -132,6 +132,8 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
+  "post/display/letterbox": 2.39,
+  "post/display/letterboxAmount": 1.0,
   "post/halation/enabled": false,
   "post/tonemap/operator": 3,
   "scene/volumeAnisotropy": 0.72
@@ -537,62 +539,6 @@
        0.0,
        7.451853448202454,
        -89.84015501089752
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "procedural/barTop/transform/position",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 120.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0,
-       2.0654448504908816,
-       69.01342556413606
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 120.0,
-      "value": [
-       0.0,
-       2.0654448504908816,
-       9.01342556413605
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "procedural/barBottom/transform/position",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 120.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.0,
-       1.6475922184731675,
-       68.989771335646
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 120.0,
-      "value": [
-       0.0,
-       1.6475922184731675,
-       8.989771335646
       ],
       "interp": "smooth"
      }

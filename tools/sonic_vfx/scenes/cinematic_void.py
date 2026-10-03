@@ -9,8 +9,7 @@ Grammar: almost nothing, at enormous scale. Atmosphere, light and the camera car
 in the engine, so the mirror is built: the ring and the figure have twins below the horizon, and the sky's lower
 hemisphere is the plane.
 
-Letterbox: two black unlit bars ride the camera's straight push on the same track (the engine has no output letterbox;
-noted for the coordinator).
+Letterbox: the engine's `post/display/letterbox` (ADR-1075), 2.39:1.
 """
 import math
 
@@ -310,25 +309,8 @@ def build():
     s.track("camera/target", [{"time": 0.0, "value": t0, "interp": "smooth"},
                               {"time": PUSH, "value": t1, "interp": "smooth"}], loop=PUSH)
     s.camera = {"mode": 1, "position": list(CAM0), "target": t0, "fov": 30.0, "orbitSpeed": 0.0}
-    # the bars: 1 m in front of the lens, covering the top and bottom (2.39:1 inside 16:9)
-    fy = math.tan(math.atan(12.0 / FOCAL))       # half-height at 1 m
-    bar_h = fy * (1.0 - (16.0 / 9.0) / 2.39)     # each bar's height at 1 m
-    fwd = look
-    right = [1.0, 0.0, 0.0]
-    up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2],
-          right[0] * fwd[1] - right[1] * fwd[0]]
-    up = [-c for c in up] if up[1] < 0 else up
-    pitch = math.degrees(math.atan2(fwd[1], -fwd[2]))
-    for name, sign in (("barTop", 1.0), ("barBottom", -1.0)):
-        off = [fwd[k] * 1.0 + up[k] * sign * (fy - bar_h * 0.5) for k in range(3)]
-        keys = [{"time": 0.0, "value": [CAM0[k] + off[k] for k in range(3)], "interp": "smooth"},
-                {"time": PUSH, "value": [CAM1[k] + off[k] for k in range(3)], "interp": "smooth"}]
-        s.proc(name, {"kind": "box", "size": [4.0, bar_h * 1.02, 0.01], "subdivisions": 1},
-               material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
-                         "roughness": 1.0, "metallic": 0.0, "unlit": True},
-               transform={"position": keys[0]["value"], "rotation": [pitch, 0.0, 0.0], "scale": [1, 1, 1]})
-        s.track("procedural/%s/transform/position" % name, keys, loop=PUSH)
-
+    # the letterbox (ADR-1075): 2.39:1 inside any frame
+    s.params_({"post/display/letterbox": 2.39, "post/display/letterboxAmount": 1.0})
     s.params_({"camera/lens/focalLength": FOCAL, "post/bloom/intensity": 0.45, "post/bloom/threshold": 1.2,
                "post/bloom/emissionWeight": 0.8, "post/halation/enabled": False,
                "camera/exposure/compensation": -0.6, "post/output/vignette": 0.45, "post/output/grain": 0.03,

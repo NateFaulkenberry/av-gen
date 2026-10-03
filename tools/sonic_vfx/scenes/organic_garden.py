@@ -77,8 +77,8 @@ def jelly_program():
     return {
         "name": "ogJelly",
         "ops": [
-            {"kind": "fresnel", "dst": 0, "value": 2.2},
-            {"kind": "remap", "dst": 0, "srcA": 0, "value": 1, "constant": [0.0, 1.0, 0.16, 1.25]},
+            {"kind": "fresnel", "dst": 0, "value": 1.6},
+            {"kind": "remap", "dst": 0, "srcA": 0, "value": 1, "constant": [0.0, 1.0, 0.04, 1.7]},
             {"kind": "input", "dst": 1, "input": "materialEmission"},
             {"kind": "multiply", "dst": 2, "srcA": 1, "srcB": 0},
         ],
@@ -224,11 +224,11 @@ def build():
            material=jelly(CORAL, 2.2),
            transform=at(BELL[0], BELL[1] + 0.06, BELL[2]),
            extra={"sourceTransform": {"position": [0.0, 0.0, 0.0], "rotation": [52.0, 0.0, 0.0],
-                                      "scale": [0.34, 0.13, 1.0]}})
+                                      "scale": [0.21, 0.09, 1.05]}})
     s.proc("bellInner", {"kind": "sphere", "radius": 0.3, "segments": 16, "rings": 10},
-           distribution={"kind": "radial", "count": 8, "radius": 0.12, "plane": "xz", "orientation": "outward"},
-           material=jelly(ORCHID, 2.4), transform=at(BELL[0], BELL[1] + 0.1, BELL[2]),
-           extra={"sourceTransform": {"rotation": [24.0, 0.0, 0.0], "scale": [0.36, 0.12, 0.85]}})
+           distribution={"kind": "radial", "count": 8, "radius": 0.07, "plane": "xz", "orientation": "outward"},
+           material=jelly(ORCHID, 2.8), transform=at(BELL[0], BELL[1] + 0.06, BELL[2]),
+           extra={"sourceTransform": {"rotation": [30.0, 0.0, 0.0], "scale": [0.2, 0.08, 0.6]}})
     s.proc("heart", {"kind": "sphere", "radius": 0.15, "segments": 16, "rings": 10},
            material=jelly(PEACH, 6.0), transform=at(BELL[0], BELL[1] - 0.06, BELL[2]))
     # seven stamens hang from the heart, each ending in a glowing bead
@@ -242,7 +242,7 @@ def build():
            distribution={"kind": "radial", "count": 7, "radius": 0.18, "plane": "xz", "orientation": "outward"},
            material=jelly("#fff2c8", 7.0), transform=at(BELL[0], BELL[1] - 0.62, BELL[2]))
     s.light("heartLight", "point", position=[BELL[0], BELL[1] - 0.15, BELL[2]], color=hexrgb(PEACH),
-            intensity=6.0, range=6.0, castsShadow=False)
+            intensity=12.0, range=6.0, castsShadow=False)
 
     # ---- tentacle vines: curling tubes round the flower, swaying in the current
     vines = [((-1.8, 0.0, -0.6), (-1.6, 0.6, -0.4), (-1.95, 1.2, -0.5), (-1.55, 1.7, -0.2)),
