@@ -347,7 +347,7 @@ def build():
     s.params_({"camera/lens/focalLength": focal, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.02,
                "post/tonemap/operator": 3, "post/dof/enabled": True, "post/dof/physical": True,
-               "post/dof/maxRadius": 30.0, "camera/lens/aperture": 0.8, "camera/focus/mode": 0,
+               "post/dof/maxRadius": 32.0, "camera/lens/aperture": 0.7, "camera/focus/mode": 0,
                "camera/lens/focusDistance": round(focus, 3)})
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 30.0, "orbitSpeed": 0.0}
     s.drift_camera(cam, tgt, period=48.0, amp=(0.22, 0.06, 0.1), tamp=(0.08, 0.04, 0.0))

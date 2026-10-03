@@ -5,9 +5,9 @@
  "camera": {
   "mode": 1,
   "position": [
-   13.4996,
-   5.0,
-   24.0792
+   12.5319,
+   4.6,
+   20.198
   ],
   "target": [
    6.9703,
@@ -2550,12 +2550,12 @@
    }
   },
   {
-   "name": "cloudSea",
+   "name": "cloudSea0",
    "kind": "procedural",
    "procedural": {
     "source": {
      "kind": "sphere",
-     "radius": 7.0,
+     "radius": 13.0,
      "segments": 14,
      "rings": 8
     },
@@ -2567,15 +2567,15 @@
       6
      ],
      "gridSpacing": [
-      24.0,
+      22.0,
       1.0,
-      26.0
+      24.0
      ]
     },
     "distributionTransform": {
      "position": [
       20.0,
-      -16.0,
+      -18.0,
       -70.0
      ],
      "rotation": [
@@ -2627,21 +2627,215 @@
     "variation": {
      "seed": 3,
      "randomScale": [
-      0.45,
       0.35,
-      0.4
+      0.3,
+      0.35
      ],
      "randomPosition": [
-      7.0,
-      2.0,
-      8.0
+      6.0,
+      1.5,
+      7.0
      ]
     },
     "sourceTransform": {
      "scale": [
       1.0,
-      0.42,
-      0.8
+      0.34,
+      0.85
+     ]
+    }
+   }
+  },
+  {
+   "name": "cloudSea1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 7.5,
+     "segments": 14,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      12,
+      1,
+      8
+     ],
+     "gridSpacing": [
+      16.0,
+      1.0,
+      18.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      20.0,
+      -14.8,
+      -70.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.86,
+      "rimWidth": 0.15,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    },
+    "variation": {
+     "seed": 4,
+     "randomScale": [
+      0.35,
+      0.3,
+      0.35
+     ],
+     "randomPosition": [
+      6.0,
+      1.5,
+      7.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.0,
+      0.55,
+      0.85
+     ]
+    }
+   }
+  },
+  {
+   "name": "cloudSea2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 4.5,
+     "segments": 14,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      15,
+      1,
+      10
+     ],
+     "gridSpacing": [
+      13.0,
+      1.0,
+      14.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      20.0,
+      -12.4,
+      -70.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.95597
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.86,
+      "rimWidth": 0.15,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    },
+    "variation": {
+     "seed": 5,
+     "randomScale": [
+      0.35,
+      0.3,
+      0.35
+     ],
+     "randomPosition": [
+      6.0,
+      1.5,
+      7.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.0,
+      0.7,
+      0.85
      ]
     }
    }

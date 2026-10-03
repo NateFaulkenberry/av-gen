@@ -135,8 +135,8 @@
   "post/tonemap/operator": 3,
   "post/dof/enabled": true,
   "post/dof/physical": true,
-  "post/dof/maxRadius": 30.0,
-  "camera/lens/aperture": 0.8,
+  "post/dof/maxRadius": 32.0,
+  "camera/lens/aperture": 0.7,
   "camera/focus/mode": 0,
   "camera/lens/focusDistance": 2.429
  },

@@ -232,11 +232,15 @@ def build():
            transform=at(28.0, 48.0, -150.0))
 
     # ---- the sea of clouds far below the islands
-    s.proc("cloudSea", sphere(7.0, 14, 8),
-           distribution={"kind": "grid", "gridCount": [9, 1, 6], "gridSpacing": [24.0, 1.0, 26.0]},
-           variation={"seed": 3, "randomScale": [0.45, 0.35, 0.4], "randomPosition": [7.0, 2.0, 8.0]},
-           material=toon(CLOUD, bands=1, ambient=0.86, rim=0.15),
-           transform=at(20.0, -16.0, -70.0), extra={"sourceTransform": {"scale": [1.0, 0.42, 0.8]}})
+    # (three overlapping layers of puffs: a continuous bumpy sea, not separate discs)
+    for k, (r, n, sp, dy, sy, seed) in enumerate(((13.0, (9, 6), (22.0, 24.0), 0.0, 0.34, 3),
+                                                  (7.5, (12, 8), (16.0, 18.0), 3.2, 0.55, 4),
+                                                  (4.5, (15, 10), (13.0, 14.0), 5.6, 0.7, 5))):
+        s.proc("cloudSea%d" % k, sphere(r, 14, 8),
+               distribution={"kind": "grid", "gridCount": [n[0], 1, n[1]], "gridSpacing": [sp[0], 1.0, sp[1]]},
+               variation={"seed": seed, "randomScale": [0.35, 0.3, 0.35], "randomPosition": [6.0, 1.5, 7.0]},
+               material=toon(CLOUD, bands=1, ambient=0.86, rim=0.15),
+               transform=at(20.0, -18.0 + dy, -70.0), extra={"sourceTransform": {"scale": [1.0, sy, 0.85]}})
 
     # ---- the giant flower (left of centre, behind the creatures): a curved stem, eight petals, a butter heart
     stem = {"kind": "tube", "tubeRadius": 0.22, "tubeTaper": 0.7, "tubeSides": 7, "tubeSegments": 20,
@@ -338,7 +342,7 @@ def build():
                "post/outline/amount": 1.0, "post/outline/color": hexrgb(PLUM), "post/outline/intensity": 1.0,
                "post/outline/width": 2.2, "post/outline/depthThreshold": 0.06,
                "post/outline/normalThreshold": 0.4, "post/outline/objectEdges": 1.0})
-    s.arc_camera(focus, radius=31.0, height=5.0, period=90.0, centre_deg=14.0, sweep_deg=26.0, side=-1.0, lift=1.2)
+    s.arc_camera(focus, radius=27.0, height=4.6, period=90.0, centre_deg=14.0, sweep_deg=26.0, side=-1.0, lift=1.2)
     s.region("creatures", box=[0.3, 0.45, 0.7, 0.8])
     s.region("flower", box=[0.25, 0.1, 0.5, 0.45])
     return s

@@ -9,7 +9,7 @@ travel through the colour as they come. The corridor twists about its axis, anch
 
 Construction (one compiled SDF, corridor along local +Y, turned so +Y runs into the screen):
   twist(about Y, anchored at the viewer) . translate(the travel: a sawtooth of one spacing) . repeat(Y, spacing)
-    . union( polarRepeat(n) of a slab = the portal's polygon,  a tilted card = the floating slab )
+    . polarRepeat(n) of a slab = the portal's polygon
 The viewer is still; the corridor flows toward it (a seamless loop of one spacing). The spacing and the travel are
 scaled by the same bass factor, so the corridor breathes like an accordion round the viewer without a jump.
 A material program colours each fragment by its depth (`localPosition.y`) through an OKLCH hue rotation of vermilion,
@@ -70,7 +70,7 @@ DESIGN = {
         ["mids", "audio.mid", "the corridor winds its twist"],
         ["highs", "audio.treble", "a fine light traces every edge"],
         ["brightness", "sonic.brightness.slow", "the colour range cools as the sound brightens"],
-        ["flux", "response.flux", "the floating cards tumble"],
+        ["flux", "response.flux", "the corridor wrings tighter"],
         ["beat", "beat.pulse", "the corridor surges forward on each beat"],
         ["intensity", "response.intensity", "the light at the end grows; the bloom opens"],
         ["note", "notes.lastPitch", "each note recolours the space (the pitch sets the hue)"],
@@ -88,13 +88,9 @@ def corridor():
     half_edge = (APOTHEM + FRAME) * math.tan(math.pi / SIDES)
     slab = sd_move((APOTHEM + FRAME * 0.5, 0.0, 0.0), sd_box((FRAME * 0.5, DEPTH, half_edge), name="slab"))
     portal = sd_polar(SIDES, slab, name="polygon")
-    # a floating card in each bay, tilted, off-axis: the slabs that cross the space
-    card = sd_move((1.9, SPACING * 0.28, -1.4), sd_rot((24.0, 38.0, 12.0), sd_box((0.85, 0.03, 0.5)), name="card"),
-                   m=0)
-    cell = sd_union(portal, card)
-    rep = sd_repeat((0.0, SPACING, 0.0), cell, count=0, name="accordion")
+    rep = sd_repeat((0.0, SPACING, 0.0), portal, count=0, name="accordion")
     travel = sd_move((0.0, 0.0, 0.0), rep, name="travel")
-    return sd_twist(0.012, travel, name="twist")
+    return sd_twist(0.026, travel, name="twist")
 
 
 def colour_program():
@@ -138,9 +134,8 @@ def instrument(s):
             R("hat", "sdf/corridor/look/edge/intensity", 1.2, attackMs=0, decayMs=90))
     # ---- CENTROID: the colour range cools as the sound brightens
     s.route(R("brightnessSlow", HUE, 0.3, **SLOW))
-    # ---- FLUX: the floating cards tumble
-    s.route(R("flux", N % "card" + "rotation", 50.0, comp=0, attackMs=60, decayMs=500),
-            R("flux", N % "card" + "rotation", -35.0, comp=2, attackMs=60, decayMs=500))
+    # ---- FLUX: the corridor wrings tighter (more twist on change)
+    s.route(R("flux", N % "twist" + "amount", 0.02, attackMs=60, decayMs=500))
     # ---- TEMPO: the corridor surges a little on each beat
     s.route(R("beat", N % "travel" + "translation", -1.4, comp=1, attackMs=0, decayMs=260))
     # ---- INTENSITY: the light at the end grows; the bloom opens
@@ -197,9 +192,10 @@ def build():
     s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.5, "post/bloom/threshold": 0.9,
                "post/bloom/emissionWeight": 0.8, "post/output/vignette": 0.35, "post/output/grain": 0.012,
                "post/tonemap/operator": 3, "scene/volumeSteps": 24})
-    cam = [0.55, -0.35, 4.0]
-    s.camera = {"mode": 1, "position": cam, "target": [-0.6, 0.25, -60.0], "fov": 40.0, "orbitSpeed": 0.0}
-    s.drift_camera(cam, [-0.6, 0.25, -60.0], period=40.0, amp=(0.7, 0.45, 0.0), tamp=(2.0, 1.4, 0.0))
+    cam = [1.3, -0.8, 4.0]
+    tgt = [-7.5, 3.2, -60.0]       # the vanishing point off the axis, up and to the right of centre
+    s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
+    s.drift_camera(cam, tgt, period=40.0, amp=(0.7, 0.45, 0.0), tamp=(2.0, 1.4, 0.0))
     instrument(s)
     s.region("vanishing", box=[0.4, 0.35, 0.6, 0.6])
     s.region("near", box=[0.0, 0.0, 1.0, 1.0])
