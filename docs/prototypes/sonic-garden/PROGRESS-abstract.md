@@ -63,15 +63,14 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 
 ## Engine needs (for the coordinator)
 
-1. **An output letterbox** (`post/output/letterbox`, an aspect such as 2.39): the Cinematic Void draws its bars as
-   black geometry riding a straight camera push on the same track, which breaks under any turn, shake or zoom.
-2. **A camera roll parameter** (`camera/roll`): the Impossible Architecture rolls the world by turning the SDF object,
-   which also turns its light relationship; a true roll would keep the light fixed to the world.
+1. ~~An output letterbox~~: landed (ADR-1075, `post/display/letterbox`); the Cinematic Void uses it.
+2. ~~A camera roll parameter~~: landed (ADR-1075, `camera/roll`); the Neon flight banks with it. The Relativity Court
+   keeps rolling the WORLD on purpose (its shadows sweep as the court turns against the sun).
 3. **Translucent procedurals** (Blend draws opaque): lines cannot fade out against what is behind them, only into a
    matching colour (the Sacred Geometry lattice takes the halo's colour to fade).
 4. **A per-instance phase for deformers** (a wave travelling across a distribution's instances): a field of slabs
    flipping in a stadium wave needs one node per row today.
-5. **A BUG: a small uniform scale pops an object back to full size.** `Transform::fromMatrix` (`src/scene/scene.cpp`)
+5. ~~A BUG: a small uniform scale pops an object back to full size~~ (fixed, ADR-1075; the 0.01 parking stays, harmless). `Transform::fromMatrix` (`src/scene/scene.cpp`)
    falls back to the identity (keeping only the position) when `glm::decompose` fails, and it fails when the composed
    matrix's determinant is under float epsilon: a uniform scale below about 0.005 (0.001 cubed is 1e-9). Measured
    2026-10-02 with four tori turned 90 degrees at scales 1, 0.1, 0.01 and 0.001 (a node scale or a distribution

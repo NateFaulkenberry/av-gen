@@ -488,7 +488,7 @@ shake on the kick.
   cube;
 - the mirror as one surface carrying the sun's reflection (the sky's gradient mirrored).
 
-The ring is 200 m across on the horizon, letterboxed by black bars that ride the camera's straight push.
+The ring is 200 m across on the horizon; the letterbox is the engine's `post/display/letterbox` (ADR-1075).
 
 **Expansion.** A glowing sphere over an ocean; a field of suspended monoliths; a distant geometric city on the horizon;
 an eclipse.
