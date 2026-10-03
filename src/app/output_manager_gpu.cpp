@@ -7,6 +7,8 @@
 #include "platform/window.hpp"
 #include "rendering/output_mapper.hpp"
 
+#include <chrono>
+
 namespace avgen::app {
 
 struct OutputRuntime {
@@ -134,7 +136,14 @@ Result<void> OutputManager::presentAll(gpu::Context& context, const wgpu::Textur
         if (rt.window->minimised() || !rt.surface->configured()) {
             continue;
         }
+        // ADR-1089: a slow output is presented to less often rather than allowed to hold the loop.
+        if (!o->pacer.due()) {
+            continue;
+        }
+        const auto acquireStart = std::chrono::steady_clock::now();
         auto target = rt.surface->acquire();
+        o->pacer.acquired(
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - acquireStart).count());
         if (!target) {
             o->lastError = target.error().message;
             if (first) {

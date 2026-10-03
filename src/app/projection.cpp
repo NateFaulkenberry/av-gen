@@ -117,19 +117,15 @@ rendering::OutputMapping projectionMapping(ProjectionScaling scaling, std::uint3
     return m;
 }
 
-Projection::Action Projection::start(bool liveProject) {
+Projection::Action Projection::start() {
     if (state_ != State::Idle) {
         return Action::None;
     }
     message_.clear();
     displayName_.clear();
-    if (liveProject) {
-        state_ = State::Running;
-        windowRequested_ = true;
-        return Action::OpenWindow;
-    }
-    state_ = State::AwaitingProject;
-    return Action::OpenLiveDemo;
+    state_ = State::Running;
+    windowRequested_ = true;
+    return Action::OpenWindow;
 }
 
 Projection::Action Projection::stop() {
@@ -137,26 +133,12 @@ Projection::Action Projection::stop() {
     state_ = State::Idle;
     windowRequested_ = false;
     message_.clear();
-    // A stop while the demo is still loading just means no window follows it; the load itself carries on.
     return was == State::Running ? Action::CloseWindow : Action::None;
 }
 
 Projection::Action Projection::update(const Observed& observed) {
     switch (state_) {
     case State::Idle:
-        return Action::None;
-    case State::AwaitingProject:
-        if (observed.loading) {
-            return Action::None;
-        }
-        if (observed.liveProject) {
-            state_ = State::Running;
-            windowRequested_ = true;
-            return Action::OpenWindow;
-        }
-        // The prompt was cancelled, or the demo failed to load: nothing is projected, and the person is told.
-        state_ = State::Idle;
-        message_ = "Projection not started: the Sonic Live demo did not open.";
         return Action::None;
     case State::Running:
         if (windowRequested_) {
@@ -191,12 +173,6 @@ void Projection::opened(bool ok, const std::string& displayName, const std::stri
     }
     state_ = State::Idle;
     message_ = "Projection failed: " + (error.empty() ? std::string("the window did not open") : error);
-}
-
-void Projection::failed(const std::string& why) {
-    state_ = State::Idle;
-    windowRequested_ = false;
-    message_ = why;
 }
 
 } // namespace avgen::app

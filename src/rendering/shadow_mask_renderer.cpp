@@ -1,4 +1,5 @@
 #include "rendering/shadow_mask_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -73,7 +74,7 @@ Result<void> ShadowMaskRenderer::Impl::createPipeline(const wgpu::ShaderModule& 
 
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline made = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline made = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

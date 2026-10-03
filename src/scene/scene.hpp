@@ -27,6 +27,8 @@
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
+#include <optional>
+#include <unordered_map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -156,6 +158,27 @@ struct Scene {
     // `MeshData::bounds()` instead and cost the Tree of Life 90 ms a frame. A timing test would have
     // caught that only on a quiet machine; a rebuild count catches it anywhere.
     [[nodiscard]] std::uint64_t meshBoundsRebuilds() const { return meshBoundsRebuilds_; }
+    // ADR-1082: a skinned mesh's box in the rig's current pose (model space, unpadded), computed by
+    // CPU-skinning every vertex -- once per pose rather than once per caller. The camera cull, the
+    // renderer's diagnostic and anything else that asks within a frame used to skin the mesh again
+    // each time (up to four times per character per frame, about 3 ms of Glowmere's CPU frame).
+    //
+    // The cache is keyed by (rig, mesh) and is valid while the mesh is at the same `meshVersion`
+    // and the palette holds the same matrices. The palette is compared by content, not by
+    // `SkinnedRig::paletteVersion` alone: `hold()` bumps the version without changing the pose (so
+    // a rate-limited character would recompute for nothing), and a rig rebuilt in place starts its
+    // count again, so an equal version is not proof of an equal pose. Comparing a few dozen
+    // matrices is a few hundred nanoseconds; skinning the mesh is thousands of vertices times four
+    // influences. `std::nullopt` when the rig has no palette or no vertex is weighted (the bind box
+    // is the answer then, as before).
+    struct PosedBox {
+        glm::vec3 min{0.0f};
+        glm::vec3 max{0.0f};
+    };
+    [[nodiscard]] std::optional<PosedBox> posedMeshBounds(MeshId mesh, RigId rig) const;
+    // How many times the posed box was actually computed (cache misses). For the same reason as
+    // `meshBoundsRebuilds`: a count catches a regression on a loaded machine where a timing cannot.
+    [[nodiscard]] std::uint64_t posedBoundsComputes() const { return posedBoundsComputes_; }
     TextureId addTexture(TextureData texture);
     Entity& addEntity(std::string name, MeshId mesh);
     PunctualLight& addLight(PunctualLight light);
@@ -167,6 +190,13 @@ private:
     mutable std::vector<std::pair<glm::vec3, glm::vec3>> meshBoundsCache_;
     mutable std::uint64_t meshBoundsVersion_ = ~0ULL;
     mutable std::uint64_t meshBoundsRebuilds_ = 0;
+    struct PosedBoundsEntry {
+        std::uint64_t meshVersion = ~0ULL;
+        std::vector<glm::mat4> palette;
+        std::optional<PosedBox> box;
+    };
+    mutable std::unordered_map<std::uint64_t, PosedBoundsEntry> posedBoundsCache_; // ADR-1082
+    mutable std::uint64_t posedBoundsComputes_ = 0;
 };
 
 // ---- culling bounds (ADR-046 culling, renderer forensics Phase 5.1) ----------------------------

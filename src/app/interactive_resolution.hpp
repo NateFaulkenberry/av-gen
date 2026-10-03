@@ -61,60 +61,297 @@
 // particle pools. A presentation change that throws away thirty seconds of simulation is not a
 // presentation change. `resetScreenHistory()` is the narrower reset resize now uses.
 
+// ---- ADR-1080..1089: the LIVE quality ladder ------------------------------------------------------
+//
+// The controller above was one lever (the render scale) aimed at one constant (16.67 ms). The live
+// quality work (`docs/live-quality/00-brief.md`) keeps its law -- the median of the last 20 GPU
+// samples, a dwell between decisions, up to two rungs down at once, one rung up only with margin,
+// and the CPU-bound hold -- and changes three things about what it moves and what it aims at:
+//
+//  * **The budget comes from a target frame rate** the performer picks (60, 90 or 120 fps), with 12%
+//    headroom, in one function: `liveBudget()` (ADR-1080). It never reads the display's refresh rate:
+//    that is where the picture is shown, not what the performer asked for.
+//  * **A rung is a bundle of existing `QualitySettings` fields**, not just a scale: the render scale,
+//    the volume march's resolution and step scale, motion blur, depth of field and the shadow
+//    cascades and atlas (ADR-1083). Five named levels -- Ultra, High, Medium, Low, Emergency -- so a
+//    performer can be told which one is in force in a word.
+//  * **The order the levers engage in is the project's** (`live.qualityStrategy`, ADR-1084): pixel-
+//    bound scenes give up resolution first, scenes whose cost is fixed give up effects first. One
+//    table per strategy, chosen by data; no scene is named anywhere in code.
+//
+// And one thing about how it climbs back (ADR-1085): a rung that only switches effects back on has
+// no pixel ratio to predict its cost by, so the controller remembers the cost ratio it *measured*
+// across each step on the way down and uses it on the way up, and it climbs only after the frame
+// has fit comfortably for a sustained stretch (`raiseHoldFrames`), not after one good window.
+//
+// LIVE only. `RenderJob` and the headless runner never construct this, and the Offline tier's
+// promise (`QualityPolicy::assertOfflineIsUncompromised`) includes the two effect gates this adds.
+
+#include "rendering/render_quality.hpp"
+
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
+#include <initializer_list>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace avgen::app {
 
-// The rungs, coarsest last. Linear scale, so the pixel count is the square: 1.00, 0.72, 0.50,
-// 0.34, 0.25 of the canvas. Five rungs rather than a continuous knob because every change
-// reallocates a render target and invalidates the screen-space history, so the set of distinct
-// costs the application can pay should be small and nameable.
-inline constexpr std::array<float, 5> kRenderScaleRungs{1.0f, 0.85f, 0.71f, 0.58f, 0.5f};
+// ---- the budget (ADR-1080) ---------------------------------------------------------------------------
 
-// ADR-1024: the rung nearest a scale, for the "lowest adaptive scale" setting. A scale between two
-// rungs goes to the nearer; outside the ladder it clamps to the end.
-[[nodiscard]] inline std::size_t rungForScale(float scale) {
-    std::size_t best = 0;
-    for (std::size_t i = 1; i < kRenderScaleRungs.size(); ++i) {
-        const float d = kRenderScaleRungs[i] - scale;
-        const float b = kRenderScaleRungs[best] - scale;
-        if ((d < 0 ? -d : d) < (b < 0 ? -b : b)) {
-            best = i;
+// The one place the live frame budget is calculated. `targetFps` is the performer's choice; the GPU
+// budget the controller aims at is the frame it implies minus `kLiveBudgetHeadroom`, which leaves
+// room for the work the GPU timestamps do not cover (the UI, the projector's copy, the compositor)
+// and for the noise a median of twenty frames still carries.
+inline constexpr double kLiveBudgetHeadroom = 0.12;
+inline constexpr int kLiveTargetFpsMin = 24;
+inline constexpr int kLiveTargetFpsMax = 240;
+// The targets the Settings panel offers. Any value in [min, max] loads from a settings file.
+inline constexpr std::array<int, 3> kLiveTargetChoices{60, 90, 120};
+
+struct LiveBudget {
+    double targetFps = 60.0;
+    double targetFrameMs = 1000.0 / 60.0;
+    double qualityBudgetMs = 1000.0 / 60.0 * (1.0 - kLiveBudgetHeadroom);
+};
+
+[[nodiscard]] constexpr LiveBudget liveBudget(double targetFps) {
+    const double fps = targetFps < kLiveTargetFpsMin   ? static_cast<double>(kLiveTargetFpsMin)
+                       : targetFps > kLiveTargetFpsMax ? static_cast<double>(kLiveTargetFpsMax)
+                                                       : targetFps;
+    const double frame = 1000.0 / fps;
+    return {fps, frame, frame * (1.0 - kLiveBudgetHeadroom)};
+}
+
+// ---- the frame cap (ADR-1107) -------------------------------------------------------------------------
+
+// The period the live loop is paced to, in milliseconds; 0 means no cap. Uncapped, a GPU that finishes in
+// 13 ms presents whenever it is done and Fifo lands those frames on alternate 9 and 25 ms intervals; capped,
+// they land on a steady cadence. With the display's refresh known the period is a whole number of vsyncs,
+// the most that is still at least the target rate (60 on 120 Hz: every 2nd vsync; 60 on 144 Hz: every 2nd,
+// 72 fps, rather than an uneven 2-3 alternation). A target above the refresh is not capped: the display
+// is already the lower ceiling. A target equal to it is: measured on this machine, Fifo through the editor
+// and the projection window does not hold the loop at the refresh (72 fps mean on a 60 Hz display).
+// Unknown refresh: the target's own period.
+[[nodiscard]] double liveFrameCapPeriodMs(bool enabled, double targetFps, double refreshHz);
+
+// One step of the pacer: how long to wait now, and the next deadline. Deadlines advance on a fixed grid, so
+// a wake-up that oversleeps does not lengthen the next period; a frame later than half a period restarts
+// the grid from now instead of bursting to catch up. `deadlineMs <= 0` is the first frame (no wait).
+struct LivePaceStep {
+    double waitMs = 0.0;
+    double nextDeadlineMs = 0.0;
+};
+[[nodiscard]] LivePaceStep livePaceStep(double nowMs, double deadlineMs, double periodMs);
+
+// ---- the ladder (ADR-1083, ADR-1084) -------------------------------------------------------------------
+
+enum class LiveQualityLevel : std::uint8_t { Ultra, High, Medium, Low, Emergency };
+inline constexpr std::size_t kLiveQualityLevels = 5;
+
+[[nodiscard]] constexpr const char* liveQualityLevelName(LiveQualityLevel level) {
+    switch (level) {
+    case LiveQualityLevel::Ultra: return "Ultra";
+    case LiveQualityLevel::High: return "High";
+    case LiveQualityLevel::Medium: return "Medium";
+    case LiveQualityLevel::Low: return "Low";
+    case LiveQualityLevel::Emergency: return "Emergency";
+    }
+    return "Ultra";
+}
+// Lower-case tokens for settings files and the command line ("ultra" .. "emergency"). Header-only
+// (like the rest of the names here) because the settings and project code that read them is also
+// compiled into tools that do not link the controller.
+[[nodiscard]] constexpr std::string_view liveQualityLevelToken(LiveQualityLevel level) {
+    switch (level) {
+    case LiveQualityLevel::Ultra: return "ultra";
+    case LiveQualityLevel::High: return "high";
+    case LiveQualityLevel::Medium: return "medium";
+    case LiveQualityLevel::Low: return "low";
+    case LiveQualityLevel::Emergency: return "emergency";
+    }
+    return "ultra";
+}
+[[nodiscard]] constexpr std::optional<LiveQualityLevel> liveQualityLevelFromToken(std::string_view token) {
+    for (std::size_t i = 0; i < kLiveQualityLevels; ++i) {
+        if (token == liveQualityLevelToken(static_cast<LiveQualityLevel>(i))) {
+            return static_cast<LiveQualityLevel>(i);
         }
     }
-    return best;
+    return std::nullopt;
 }
+
+// Which lever a project gives up first. Project data (`live.qualityStrategy`), never inferred from a
+// scene's name.
+enum class LiveQualityStrategy : std::uint8_t {
+    Balanced,        // resolution and the volume march together, then motion blur (the default)
+    ResolutionFirst, // pixel-bound scenes (an SDF march, a volume): resolution carries the ladder
+    EffectsFirst,    // scenes with a large fixed cost: effects go before the picture gets soft
+};
+[[nodiscard]] constexpr std::string_view liveQualityStrategyToken(LiveQualityStrategy strategy) {
+    switch (strategy) {
+    case LiveQualityStrategy::Balanced: return "balanced";
+    case LiveQualityStrategy::ResolutionFirst: return "resolution_first";
+    case LiveQualityStrategy::EffectsFirst: return "effects_first";
+    }
+    return "balanced";
+}
+[[nodiscard]] constexpr std::optional<LiveQualityStrategy> liveQualityStrategyFromToken(std::string_view token) {
+    for (const auto s : {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst,
+                         LiveQualityStrategy::EffectsFirst}) {
+        if (token == liveQualityStrategyToken(s)) {
+            return s;
+        }
+    }
+    return std::nullopt;
+}
+// Plain words for the Live panel ("resolution first").
+[[nodiscard]] constexpr const char* liveQualityStrategyLabel(LiveQualityStrategy strategy) {
+    switch (strategy) {
+    case LiveQualityStrategy::Balanced: return "balanced";
+    case LiveQualityStrategy::ResolutionFirst: return "resolution first";
+    case LiveQualityStrategy::EffectsFirst: return "effects first";
+    }
+    return "balanced";
+}
+
+// One rung: the values it allows, as ceilings on the live tier's own. A rung never *raises* a
+// setting above what the tier (and any quality arm) asked for -- `applyLiveRung` takes the minimum --
+// so Ultra is exactly the tier, and a rung's reductions are the only difference a performer sees.
+struct LiveQualityRung {
+    LiveQualityLevel level = LiveQualityLevel::Ultra;
+    float renderScale = 1.0f;            // QualitySettings::renderScale (clamped up to the floor)
+    float volumeResolutionScale = 1.0f;  // ceiling on QualitySettings::volumeResolutionScale
+    float volumeStepScale = 1.0f;        // ceiling on QualitySettings::volumeStepScale
+    bool motionBlur = true;              // QualitySettings::motionBlur
+    bool depthOfField = true;            // QualitySettings::depthOfField
+    std::uint32_t cascadeCount = 4;      // ceiling on QualitySettings::cascadeCount
+    std::uint32_t shadowResolution = 4096; // ceiling on QualitySettings::shadowResolution
+    bool reducedShadowFiltering = false; // the Preview tier's filtering: no PCSS, 6 PCF taps
+    // ADR-1094..1098 (Stage 2's levers). Ceilings like the rest: each only ever lowers the base's own value. Heroes are
+    // exempt from all of them in the renderer (ADR-1097).
+    float lodBias = 1.0f;               // floor on QualitySettings::lodBias (higher = coarser)
+    float drawDistanceScale = 1.0f;     // ceiling on QualitySettings::drawDistanceScale
+    float shadowCasterMinPixels = 0.0f; // floor on QualitySettings::shadowCasterMinPixels
+    float postEffectQuality = 1.0f;   // ceiling on QualitySettings::postEffectQuality
+    float particleCullDistance = 0.0f;  // QualitySettings::particleCullDistance (0 = none; the nearer limit wins)
+    float particleSpawnScale = 1.0f;    // ceiling on QualitySettings::particleSpawnScale
+    [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
+};
+
+using LiveQualityLadder = std::array<LiveQualityRung, kLiveQualityLevels>;
+[[nodiscard]] const LiveQualityLadder& liveQualityLadder(LiveQualityStrategy strategy);
+
+// ---- ADR-1105: a degradation priority, as data ----------------------------------------------------------------------
+//
+// The brief's §4.3: the order in which lever groups are given up, configurable. A project may name an ordered list of
+// groups (`live.priority`); the ladder is then built from it: High gives up the first group a little, Medium the first
+// fully and the second a little, Low the first two fully and the next two a little, Emergency everything named fully.
+// A group the list does not name is only touched at Emergency, a little -- so "resolution", left out, keeps the output
+// sharp until the last level. Groups: particles, shadows, volumes, post, lod, resolution.
+inline constexpr std::array<std::string_view, 6> kLeverGroups{"particles", "shadows", "volumes", "post", "lod",
+                                                             "resolution"};
+// Empty `error` and a ladder, or an error naming the bad entry.
+[[nodiscard]] std::optional<LiveQualityLadder> ladderFromPriority(const std::vector<std::string>& groups,
+                                                                  std::string& error);
+
+// ---- ADR-1101: an optimization's lever, as a ceiling the project keeps ---------------------------------------------
+// Applies an A/B lever's reduction (`volumequarter`, `castercull`, ...) to a ceiling rung. False for a lever that has no
+// ceiling form (a diagnostic arm such as `noprograms`, or a pass arm).
+[[nodiscard]] bool applyLeverToCeiling(LiveQualityRung& ceiling, std::string_view lever);
+// The ceiling's JSON: only the fields that differ from a neutral rung. And back (unknown keys are an error).
+[[nodiscard]] std::string ceilingJsonText(const LiveQualityRung& ceiling);
+[[nodiscard]] std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std::string& error);
+// The ceiling applied to settings, like a profile.
+[[nodiscard]] rendering::QualitySettings applyCeiling(const rendering::QualitySettings& q, const LiveQualityRung& c);
+
+// The lowest render scale any ladder uses, and the choices the "lowest adaptive scale" setting
+// offers (ADR-1024's floor, extended below 0.5 for pixel-bound scenes, ADR-1083).
+inline constexpr float kLiveScaleFloorMin = 0.38f;
+inline constexpr std::array<float, 6> kLiveScaleFloorChoices{1.0f, 0.85f, 0.71f, 0.5f, 0.42f, 0.38f};
+
+// `base` with every field the ladder owns set from `rung`: the rung's value where it is lower, the
+// base's otherwise; the scale at no less than `scaleFloor`. Fields the ladder does not own are
+// `current`'s, untouched, so a setting written elsewhere (the live antialiasing floor) survives a
+// rung change. Pure; the unit tests and the application share it.
+[[nodiscard]] rendering::QualitySettings applyLiveRung(const rendering::QualitySettings& current,
+                                                       const rendering::QualitySettings& base,
+                                                       const LiveQualityRung& rung, float scaleFloor);
+
+// The rung as the frame will see it: the scale after the floor.
+[[nodiscard]] float effectiveRenderScale(const LiveQualityRung& rung, float scaleFloor);
+
+// ---- ADR-1099: the named profiles, QUALITY / BALANCED / PERFORMANCE ---------------------------------------------------
+//
+// A profile is a row of the same table family as the ladder's rungs (a `LiveQualityRung` of ceilings), applied to the
+// tier BEFORE the ladder: it is the ceiling the live controller works under, so Ultra under PERFORMANCE is the
+// PERFORMANCE picture and the five levels go down from there. QUALITY is the tier exactly. Chosen per project
+// (`live.profile`), from the Live panel, or with `--live-profile --quality <profile>`.
+enum class QualityProfile : std::uint8_t { Quality, Balanced, Performance };
+inline constexpr std::size_t kQualityProfiles = 3;
+[[nodiscard]] std::string_view qualityProfileToken(QualityProfile profile);
+[[nodiscard]] const char* qualityProfileLabel(QualityProfile profile); // "QUALITY", ...
+[[nodiscard]] std::optional<QualityProfile> qualityProfileFromToken(std::string_view token);
+[[nodiscard]] const LiveQualityRung& qualityProfileCeiling(QualityProfile profile);
+// The profile's ceilings applied to `q` (the scale too, which no floor raises).
+[[nodiscard]] rendering::QualitySettings applyQualityProfile(const rendering::QualitySettings& q, QualityProfile profile);
+
+// ---- ADR-1100: the project's live block, beyond the strategy (ADR-1084) --------------------------------------------
+// `"live": {"qualityStrategy", "targetFps", "profile", "minimumLevel", "priority": [...], "overrides": {...}}`. Every
+// field optional and written only when stated, so a project that never chose round-trips unchanged. `overrides` is
+// what the Optimize review applies: ceilings the project keeps, never an edit to the scene.
+struct LiveProjectSettings {
+    std::optional<int> targetFps;
+    std::optional<QualityProfile> profile;
+    std::optional<LiveQualityLevel> minimumLevel;
+    std::vector<std::string> priority;
+    std::optional<LiveQualityRung> overrides;
+    [[nodiscard]] bool operator==(const LiveProjectSettings&) const = default;
+};
+
+// ---- the controller --------------------------------------------------------------------------------------
 
 struct InteractiveResolutionSettings {
     // Off is the honest default for the *type*; the editor turns it on (see `application.cpp`).
     // Every other consumer of a QualitySettings -- the render job, the benchmark harness, the GPU
     // tests -- gets a controller that does nothing unless somebody asked for one.
     bool enabled = false;
-    // The frame the controller is trying to fit the GPU into. 16.67 ms is one frame at 60 Hz;
-    // §3's playhead budget. It is the *GPU* budget, not the wall clock: the wall clock contains
-    // costs a resolution cannot touch, and aiming a resolution controller at them would make it
-    // scale the world down to punish the CPU.
-    double budgetMs = 16.67;
-    // The lowest rung the controller may reach, as an index into `kRenderScaleRungs`.
-    std::size_t floorRung = kRenderScaleRungs.size() - 1;
+    // The GPU frame time the controller aims at (ADR-1080: `liveBudget(targetFps).qualityBudgetMs`).
+    // It is the *GPU* budget, not the wall clock: the wall clock contains costs a quality level
+    // cannot touch, and aiming the ladder at them would degrade the picture to punish the CPU (§8).
+    double budgetMs = liveBudget(60.0).qualityBudgetMs;
+    // The target the budget came from, kept for the status line.
+    double targetFps = 60.0;
+    // Which ladder (ADR-1084).
+    LiveQualityStrategy strategy = LiveQualityStrategy::Balanced;
+    // ADR-1105: a ladder built from the project's degradation priority (`live.priority`), used instead of the
+    // strategy's table when set. Same five levels, same row type.
+    std::optional<LiveQualityLadder> ladder;
+    // ADR-1103: the project's hard minimum (`live.minimumLevel`): the controller never goes below this level.
+    std::size_t lowestLevel = kLiveQualityLevels - 1;
+    // The lowest render scale (ADR-1024's setting). Rungs below it keep their other reductions at
+    // this scale, so a raised floor still lets the effects go.
+    float scaleFloor = kLiveScaleFloorMin;
     // Frames at a rung before another decision may be taken. A decision costs a render-target
     // reallocation and a screen-space history reset, so decisions have to be rare compared to
-    // frames; 30 is half a second at 60 Hz and about six seconds at the 5 fps this is for.
+    // frames; 30 is half a second at 60 Hz.
     int dwellFrames = 30;
     // The decision is taken on the median of this many recent GPU samples, so one stalled frame
     // (a shader compile, another agent's process) cannot move the rung.
     int windowFrames = 20;
-    // A higher rung must be predicted to fit inside `budgetMs * raiseMargin` before the controller
-    // will climb back. Below 1.0 by enough that a frame sitting exactly on the budget does not
-    // oscillate between two rungs for as long as it is watched.
-    double raiseMargin = 0.80;
-    // The GPU must be the binding constraint before a resolution is worth reducing. When the wall
-    // clock is much longer than the GPU frame, the frame is waiting on the main thread and
-    // shrinking the world buys image quality for nothing -- which is the measured situation on
-    // Tree of Life (wall 18.42 ms against a GPU 14.68) and NOT the one on the multicam film.
-    // Expressed as "the GPU must be at least this fraction of the wall clock".
+    // A higher rung must be predicted to fit inside `budgetMs * raiseMargin` ... ADR-1107 raised it from
+    // 0.80: at 0.80 the level that would hold a 60 target sat within 20% of the budget and was never climbed
+    // back to. A raise that then misses is undone by ADR-1104's probation.
+    double raiseMargin = 0.90;
+    // ... for this many consecutive frames before the controller climbs (ADR-1085). Two seconds at
+    // 60 fps: recovering is the cautious direction, degrading the quick one.
+    int raiseHoldFrames = 120;
+    // The GPU must be the binding constraint before quality is worth reducing: when the wall clock
+    // is much longer than the GPU frame, the frame is waiting on the main thread and a smaller,
+    // plainer world buys nothing. "The GPU must be at least this fraction of the wall clock".
     double gpuShareToAct = 0.70;
 };
 
@@ -128,17 +365,35 @@ public:
     };
 
     void configure(const InteractiveResolutionSettings& s);
+    // The ladder in force: the priority-built one when the settings carry it, else the strategy's table.
+    [[nodiscard]] const LiveQualityLadder& ladder() const {
+        return settings_.ladder ? *settings_.ladder : liveQualityLadder(settings_.strategy);
+    }
+    // ADR-1103: at the project's minimum and still over the budget, for at least one decision window. Shown as
+    // "LIVE TARGET UNSUSTAINABLE"; cleared as soon as a window fits.
+    [[nodiscard]] bool unsustainable() const { return unsustainable_; }
     [[nodiscard]] const InteractiveResolutionSettings& settings() const { return settings_; }
 
     // One frame's measurement. `gpuMs < 0` means the GPU timeline had nothing to report (the first
     // frames, or a build without timestamps) and the frame is ignored rather than counted as free.
     Decision note(double gpuMs, double wallMs);
 
-    [[nodiscard]] float scale() const { return kRenderScaleRungs[rung_]; }
+    // The rung in force, its ladder entry, and the scale the frame renders at.
     [[nodiscard]] std::size_t rung() const { return rung_; }
-    // Put the ladder back at the top and forget the history. Used when the controller is switched
-    // off, and when the thing being measured changes underneath it (a new project, a new canvas).
+    [[nodiscard]] const LiveQualityRung& current() const { return ladder()[rung_]; }
+    [[nodiscard]] LiveQualityLevel level() const { return current().level; }
+    [[nodiscard]] float scale() const { return effectiveRenderScale(current(), settings_.scaleFloor); }
+    // The GPU cost a decision now would see (-1 before the first sample): the median timestamp span,
+    // capped by the mean frame interval (ADR-1085).
+    [[nodiscard]] double gpuCostMs() const { return gpuCost(); }
+    // Put the ladder back at the top and forget the history and the learned step costs. Used when
+    // the controller is switched off, and when the thing being measured changes underneath it (a
+    // new project, a new strategy).
     void reset();
+
+    // The cost ratio between rung k-1 and rung k (cost(k-1) / cost(k)) the controller would use to
+    // predict a climb from k: measured on the way down when it has been, the prior otherwise.
+    [[nodiscard]] double stepRatio(std::size_t k) const;
 
     // §42-style counters, so a run can say what the controller did rather than be asked to be
     // believed. Counts, not durations, so they survive a contended machine intact (ADR-170).
@@ -148,20 +403,42 @@ public:
         std::uint64_t framesReduced = 0;// frames rendered below rung 0
         std::uint64_t framesSeen = 0;
         std::uint64_t heldByCpu = 0;    // decisions declined because the GPU was not the binder
+        std::uint64_t reverts = 0;      // ADR-1104: raises undone because the next window missed the budget
     };
     [[nodiscard]] const Stats& stats() const { return stats_; }
 
 private:
     [[nodiscard]] double medianGpu() const;
+    [[nodiscard]] double medianWall() const;
+    [[nodiscard]] double meanWall() const;
+    [[nodiscard]] double gpuCost() const;
+    [[nodiscard]] double priorRatio(std::size_t k) const;
+    void moveTo(std::size_t rung, double medianAtLeave);
 
     InteractiveResolutionSettings settings_{};
     std::size_t rung_ = 0;
     int sinceDecision_ = 0;
+    int raiseStreak_ = 0;
     std::array<double, 64> gpu_{};
     std::array<double, 64> wall_{};
     std::size_t count_ = 0;
     std::size_t cursor_ = 0;
+    // ADR-1085: measured cost ratio across step k (rung k-1 -> k), 0 = not measured. Index 0 unused.
+    std::array<double, kLiveQualityLevels> measuredRatio_{};
+    // The step just taken, waiting for the new rung's window to fill so its ratio can be measured.
+    struct Pending {
+        std::size_t from = 0;
+        std::size_t to = 0;
+        double fromMs = 0.0;
+        bool active = false;
+    };
+    Pending pending_{};
     Stats stats_{};
+    // ADR-1104: recovery. A raise is on probation until the first decision after it; a miss there reverts it and
+    // doubles the hold before the same raise is tried again (up to 8x).
+    bool probation_ = false;
+    std::array<int, kLiveQualityLevels> holdScale_{1, 1, 1, 1, 1};
+    bool unsustainable_ = false;
 };
 
 } // namespace avgen::app

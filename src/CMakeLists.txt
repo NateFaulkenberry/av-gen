@@ -75,6 +75,8 @@ endif()
 if(AVGEN_GPU_SOURCES)
     add_library(avgen_gpu STATIC ${AVGEN_GPU_SOURCES})
     target_link_libraries(avgen_gpu PUBLIC avgen_core dawn::webgpu_dawn)
+    # ADR-1091: subclasses dawn::native::MemoryDump, and the prebuilt Dawn has no RTTI, so its typeinfo does not exist.
+    set_source_files_properties(gpu/resource_stats.cpp PROPERTIES COMPILE_OPTIONS "-fno-rtti")
     if(APPLE)
         set_source_files_properties(${AVGEN_GPU_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
         target_link_libraries(avgen_gpu PRIVATE syphon::syphon

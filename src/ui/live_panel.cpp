@@ -26,6 +26,26 @@ namespace avgen::ui {
 
 namespace {
 
+// The width that leaves a right-hand label room to be read in full: the label's own width plus ImGui's gap
+// between a frame and its label, and a few pixels so the last glyph is not against the edge. A fixed
+// negative width cut "Anti-aliasing" to "Anti-aliasin" at the default font.
+float widthBesideLabel(const char* label) {
+    return -(ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().ItemInnerSpacing.x + 4.0f);
+}
+
+// SameLine, but only when the next item -- a frame `itemWidth` wide with `label` to its right -- fits in what is
+// left of the line; otherwise it starts the next line, so a narrow panel wraps a row rather than clipping it.
+void sameLineIfFits(float itemWidth, const char* label) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float text = label != nullptr ? ImGui::CalcTextSize(label, nullptr, true).x : 0.0f;
+    const float labelWidth = text > 0.0f ? text + style.ItemInnerSpacing.x : 0.0f;
+    // The cursor is at the start of the next line now; that line's start plus what is available is the right edge.
+    const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + itemWidth + labelWidth <= right) {
+        ImGui::SameLine();
+    }
+}
+
 void light(bool on, const char* label) {
     const float h = ImGui::GetTextLineHeight();
     const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -74,7 +94,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, mixColour(base, IM_COL32(255, 255, 255, 255), 0.15f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, mixColour(base, IM_COL32(0, 0, 0, 255), 0.15f));
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
-        const char* label = !active ? "Start projection" : (projection.awaiting ? "Cancel projection" : "Stop projection");
+        const char* label = !active ? "Start projection" : "Stop projection";
         if (ImGui::Button(label, ImVec2(-1, ImGui::GetFrameHeight() * 1.6f))) {
             if (active && onStopProjection) {
                 onStopProjection();
@@ -84,9 +104,9 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
         ImGui::PopStyleColor(4);
         if (ImGui::IsItemHovered()) {
-            tooltip("Opens a clean window with just the picture -- no panels -- for a projector or a second screen. "
-                    "Opens the Sonic Live demo first if this is not a live project, and turns live input on. "
-                    "Esc in the projection window, closing it, or Stop ends it.");
+            tooltip("Opens a clean window with just the picture of this project -- no panels -- for a projector or a "
+                    "second screen. Esc in the projection window, closing it, or Stop ends it. For the Sonic Live "
+                    "demo, open it first (Open live demo, below).");
         }
         if (machine != nullptr) {
             auto& pj = machine->projection;
@@ -115,7 +135,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             for (const auto& l : labels) {
                 names.push_back(l.c_str());
             }
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Display"));
             if (ImGui::Combo("Display", &current, names.data(), static_cast<int>(names.size()))) {
                 if (current == 0) {
                     pj.display.clear();
@@ -190,6 +210,173 @@ void ControlPanel::drawLive(app::Engine& engine) {
     }
     ImGui::Separator();
 
+    // ---- live quality (ADR-1087): what the frame is doing to hold the target, and the two choices ----
+    if (liveQuality.available) {
+        const auto& q = liveQuality;
+        ImGui::TextDisabled("LIVE QUALITY");
+        if (machine != nullptr) {
+            static const char* levels[] = {"Auto", "Ultra", "High", "Medium", "Low", "Emergency"};
+            int current = machine->liveQualityPinned ? 1 + static_cast<int>(*machine->liveQualityPinned) : 0;
+            ImGui::BeginDisabled(q.qualityFromCommandLine);
+            ImGui::SetNextItemWidth(120);
+            if (ImGui::Combo("Quality", &current, levels, 6)) {
+                if (current == 0) {
+                    machine->liveQualityPinned.reset();
+                } else {
+                    machine->liveQualityPinned = static_cast<app::LiveQualityLevel>(current - 1);
+                }
+                if (onLiveQualityChanged) {
+                    onLiveQualityChanged();
+                }
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                tooltip(q.qualityFromCommandLine
+                            ? "Set on the command line for this run (--live-quality or --adaptive-scale)."
+                            : "Auto lowers the picture's quality step by step when the GPU cannot hold the target, and "
+                              "raises it again once the frame has fitted comfortably for a while. Ultra .. Emergency "
+                              "hold that level whatever it costs. Never affects a render.");
+            }
+            sameLineIfFits(90.0f, "Target");
+            char target[32];
+            std::snprintf(target, sizeof(target), "%d fps", machine->liveTargetFps);
+            ImGui::BeginDisabled(q.targetFromCommandLine);
+            ImGui::SetNextItemWidth(90);
+            if (ImGui::BeginCombo("Target", target)) {
+                for (const int fps : app::kLiveTargetChoices) {
+                    char label[16];
+                    std::snprintf(label, sizeof(label), "%d fps", fps);
+                    if (ImGui::Selectable(label, fps == machine->liveTargetFps)) {
+                        machine->liveTargetFps = fps;
+                        if (onLiveQualityChanged) {
+                            onLiveQualityChanged();
+                        }
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                tooltip(q.targetFromCommandLine
+                            ? "Set on the command line for this run (--live-target)."
+                            : "The frame rate the live picture is held to. The GPU budget is that frame minus 12%% "
+                              "headroom. Your choice, not the display's refresh rate: 60 on a 120 Hz screen is fine.");
+            }
+            // ADR-1107: next to Target, because it is about how the target is held.
+            sameLineIfFits(ImGui::GetFrameHeight(), "Cap at target");
+            if (ImGui::Checkbox("Cap at target", &machine->liveFrameCap) && settings.onChanged) {
+                settings.onChanged();
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("Present frames at the target rate, on a whole number of the display's refreshes (60 on a "
+                        "120 Hz screen: every second refresh), rather than as fast as the GPU allows. A steady 60 "
+                        "looks smoother than frames alternating 9 and 25 ms. Off: as fast as possible. Never "
+                        "affects a render (ADR-1107).");
+            }
+        }
+        ImGui::Text("Now: %s%s  scale %.2f  %ux%u into %ux%u", q.level.c_str(), q.automatic ? " (auto)" : "",
+                    static_cast<double>(q.renderScale), q.internalWidth, q.internalHeight, q.outputWidth,
+                    q.outputHeight);
+        if (ImGui::IsItemHovered()) {
+            tooltipUnformatted(("This project gives up " + q.strategy +
+                     (q.strategyStated ? std::string(" (live.qualityStrategy in the project file).")
+                                       : std::string(" (the default; a project can say otherwise with live.qualityStrategy)."))
+                     + " Quality changes this session: " + std::to_string(q.transitions) + ".").c_str());
+        }
+        const bool gpuOver = q.gpuMs > q.budgetMs;
+        if (q.gpuMs >= 0.0) {
+            ImGui::TextColored(gpuOver ? ImVec4(1.0f, 0.6f, 0.3f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                               "GPU %.1f ms of %.1f ms budget", q.gpuMs, q.budgetMs);
+        } else {
+            ImGui::Text("GPU -- of %.1f ms budget", q.budgetMs);
+        }
+        ImGui::SameLine();
+        ImGui::Text("  CPU %.1f ms", q.cpuMs >= 0.0 ? q.cpuMs : 0.0);
+        // ---- ADR-1099..1103: the project's choices, and every lever as the frame uses it ----
+        {
+            static const char* profiles[] = {"Quality", "Balanced", "Performance"};
+            int profile = q.profile == "BALANCED" ? 1 : q.profile == "PERFORMANCE" ? 2 : 0;
+            ImGui::SetNextItemWidth(120);
+            if (ImGui::Combo("Profile", &profile, profiles, 3) && onSetLiveProfile) {
+                onSetLiveProfile(profile);
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("The ceiling the live levels work under, saved with the project. Quality: the picture as set.\n"
+                        "Balanced: small and far things stop casting shadows and far particles stop, fog at half\n"
+                        "resolution at most. Performance: also 85%% resolution, quarter fog, two shadow cascades,\n"
+                        "half the motion-blur and depth-of-field taps, fewer particles, coarser detail sooner.\n"
+                        "Heroes are never reduced by these.");
+            }
+            sameLineIfFits(110.0f, "Lowest");
+            static const char* minimums[] = {"Ultra", "High", "Medium", "Low", "Emergency"};
+            int minimum = 4;
+            for (int k = 0; k < 5; ++k) {
+                if (q.minimumLevel == minimums[k]) {
+                    minimum = k;
+                }
+            }
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("Lowest", &minimum, minimums, 5) && onSetLiveMinimum) {
+                onSetLiveMinimum(minimum);
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("The lowest level Auto may go to, saved with the project. If the frame is still over the\n"
+                        "budget there, the panel says LIVE TARGET UNSUSTAINABLE instead of going lower.");
+            }
+            if (onSaveLiveProfile) {
+                sameLineIfFits(ImGui::CalcTextSize("Save live profile").x + ImGui::GetStyle().FramePadding.x * 2.0f,
+                               nullptr);
+                if (ImGui::Button("Save live profile")) {
+                    onSaveLiveProfile();
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Writes this target, profile, lowest level and the project's strategy into the project's\n"
+                            "live settings, so the project opens with them. The scene itself is not changed.");
+                }
+            }
+            if (q.unsustainable) {
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+                                   "LIVE TARGET UNSUSTAINABLE: at the lowest level (%s) and still %.1f ms over %.1f ms.",
+                                   q.minimumLevel.c_str(), q.gpuMs, q.budgetMs);
+            }
+            if (!q.priority.empty()) {
+                ImGui::TextDisabled("Gives up, in order: %s", q.priority.c_str());
+            }
+            if (!q.overrides.empty()) {
+                ImGui::TextDisabled("Optimize limits in this project: %s", q.overrides.c_str());
+            }
+            if (ImGui::TreeNode("Levers now")) {
+                const auto& s = q.quality;
+                ImGui::Text("Resolution %.0f%%", static_cast<double>(s.renderScale) * 100.0);
+                ImGui::Text("Fog %.0f%% resolution, %.0f%% steps", static_cast<double>(s.volumeResolutionScale) * 100.0,
+                            static_cast<double>(s.volumeStepScale) * 100.0);
+                ImGui::Text("Shadows %u cascades, %u px maps, %s; small casters under %.0f px skipped", s.cascadeCount,
+                            s.shadowResolution, s.softShadows ? "soft" : "plain", static_cast<double>(s.shadowCasterMinPixels));
+                ImGui::Text("Motion blur %s, depth of field %s, effect taps %.0f%%", s.motionBlur ? "on" : "off",
+                            s.depthOfField ? "on" : "off", static_cast<double>(s.postEffectQuality) * 100.0);
+                ImGui::Text("Detail: LOD bias %.2f, draw distance %.0f%%", static_cast<double>(s.lodBias),
+                            static_cast<double>(s.drawDistanceScale) * 100.0);
+                ImGui::Text("Particles %.0f%%, far emitters %s", static_cast<double>(s.particleSpawnScale) * 100.0,
+                            s.particleCullDistance > 0.0f ? (std::to_string(static_cast<int>(s.particleCullDistance)) + " m").c_str()
+                                                          : "kept");
+                if (q.reverts > 0) {
+                    ImGui::TextDisabled("%llu raise(s) undone because the next frames missed the budget",
+                                        static_cast<unsigned long long>(q.reverts));
+                }
+                ImGui::TreePop();
+            }
+        }
+        // The CPU is diagnosed, never acted on (§8): no level of quality makes the main thread faster.
+        if (q.cpuMs > q.targetFrameMs) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),
+                               "The CPU alone (%.1f ms) is longer than a %.0f fps frame: lowering quality cannot reach it.",
+                               q.cpuMs, q.targetFps);
+        } else if (q.atBottom && gpuOver) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "At the lowest quality and still over the budget.");
+        }
+        ImGui::Separator();
+    }
+
     ImGui::TextDisabled("LIVE SONIC INPUT");
     bool enabled = on;
     if (ImGui::Checkbox("Enabled", &enabled)) {
@@ -242,7 +429,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             // quiet interface channel reads as a quiet sound until it is brought up here.
             const float linear = std::max(gain->baseComponent(0), 1e-4f);
             float db = 20.0f * std::log10(linear);
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Sensitivity"));
             if (ImGui::SliderFloat("Sensitivity", &db, -24.0f, 18.0f, "%+.1f dB")) {
                 gain->setBaseComponent(0, std::clamp(std::pow(10.0f, db / 20.0f), 0.0f, 8.0f));
             }
@@ -304,7 +491,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
     // ---- feel and picture ----
     {
         float smoothing = engine.liveSonicSmoothing();
-        ImGui::SetNextItemWidth(-90);
+        ImGui::SetNextItemWidth(widthBesideLabel("Smoothing"));
         if (ImGui::SliderFloat("Smoothing", &smoothing, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic) &&
             onLiveSmoothing) {
             onLiveSmoothing(smoothing);
@@ -316,7 +503,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         if (machine != nullptr) {
             const char* modes[] = {"Off", "FXAA"};
             int mode = machine->liveAntialias ? 1 : 0;
-            ImGui::SetNextItemWidth(-90);
+            ImGui::SetNextItemWidth(widthBesideLabel("Anti-aliasing"));
             if (ImGui::Combo("Anti-aliasing", &mode, modes, 2)) {
                 machine->liveAntialias = mode == 1;
                 if (settings.onChanged) {

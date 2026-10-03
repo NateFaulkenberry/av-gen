@@ -42,6 +42,8 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <string_view>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 #include <span>
 #include <string_view>
@@ -2837,20 +2839,34 @@ void Composition::cullEntityNodes() {
         const CullBounds bounds = entityCullBounds(scene_, entity);
         entity.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
     };
-    for (const auto& entityPtr : entityWorld_.entities()) {
-        const CompositionNode* node = findNode(entityPtr->desc().driven());
-        if (node == nullptr) {
-            continue;
+    // ADR-1082: each entity is culled once. EntityWorld-driven characters go first, over their node
+    // ranges, so those ranges stay authoritative (an invalid mesh there is marked visible); every
+    // other entity -- authored mesh nodes, static glTF objects -- goes through the same box in the
+    // second loop. Before, the second loop re-culled the characters the first had just done, which
+    // CPU-skinned every character twice more per frame, and the first found each node's range by a
+    // linear scan of the node list per character.
+    std::vector<std::uint8_t> done(scene_.entities.size(), 0);
+    if (!entityWorld_.entities().empty()) {
+        // By name, first node of a name wins -- `findNode`'s rule -- built once per call instead of a
+        // scan per character.
+        std::unordered_map<std::string_view, std::size_t> nodeIndex;
+        nodeIndex.reserve(nodes_.size());
+        for (std::size_t i = 0; i < nodes_.size(); ++i) {
+            nodeIndex.emplace(nodes_[i]->name, i);
         }
-        const std::size_t index = static_cast<std::size_t>(node - nodes_.front().get());
-        (void)index;
-        for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
-            if (nodes_[i].get() != node) {
+        for (const auto& entityPtr : entityWorld_.entities()) {
+            const auto at = nodeIndex.find(entityPtr->desc().driven());
+            if (at == nodeIndex.end() || at->second >= ranges_.size()) {
                 continue;
             }
-            const NodeRange& range = ranges_[i];
+            const NodeRange& range = ranges_[at->second];
             for (std::size_t k = 0; k < range.entityCount && range.firstEntity + k < scene_.entities.size(); ++k) {
-                Entity& e = scene_.entities[range.firstEntity + k];
+                const std::size_t index = range.firstEntity + k;
+                if (done[index] != 0) {
+                    continue;
+                }
+                done[index] = 1;
+                Entity& e = scene_.entities[index];
                 if (e.mesh == kInvalidMesh || e.mesh >= scene_.meshes.size()) {
                     e.cameraCulled = false;
                     continue;
@@ -2858,14 +2874,15 @@ void Composition::cullEntityNodes() {
                 const CullBounds bounds = entityCullBounds(scene_, e);
                 e.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
             }
-            break;
         }
     }
     // EntityWorld-driven characters are handled above so their semantic node ranges remain
     // authoritative. Ordinary authored mesh nodes have no EntityWorld entry, but they still need
     // the same camera visibility contract for characters and static glTF objects.
-    for (Entity& entity : scene_.entities) {
-        cullEntity(entity);
+    for (std::size_t i = 0; i < scene_.entities.size(); ++i) {
+        if (done[i] == 0) {
+            cullEntity(scene_.entities[i]);
+        }
     }
 }
 
@@ -2898,6 +2915,7 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
     const std::size_t signalsBefore = bus.size();
     entityWorld_.updateFields(update, *params_);
     if (!fieldRoutesChecked_) {
@@ -3079,6 +3097,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
@@ -6142,6 +6161,14 @@ Composition::lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, c
     return shared;
 }
 
+Importance Composition::importanceOfNode(const CompositionNode& node) const {
+    if (node.importance) {
+        return *node.importance;
+    }
+    const bool hero = std::any_of(heroes_.begin(), heroes_.end(), [&](const world::HeroPoint& h) { return h.name == node.name; });
+    return hero ? Importance::Hero : Importance::Normal;
+}
+
 void Composition::rebuild() {
     ++flattens_;
     // Captured before anything clears the table, because `Scene::addTexture` moves the counter on
@@ -6299,6 +6326,7 @@ void Composition::rebuild() {
         NodeRange range;
         range.firstEntity = scene_.entities.size();
         range.firstParticle = scene_.particles.size();
+        const std::size_t firstProcedural = scene_.procedurals.size(); // ADR-1097
         const Transform nodeT = nodeWorldTransform(node);
         const bool visible = nodeVisible(node);
 
@@ -7348,6 +7376,19 @@ void Composition::rebuild() {
         }
         range.entityCount = scene_.entities.size() - range.firstEntity;
         range.particleCount = scene_.particles.size() - range.firstParticle;
+        // ADR-1097: everything this node put in the scene carries its importance; a hero's is inferred.
+        {
+            const Importance importance = importanceOfNode(node);
+            for (std::size_t e = range.firstEntity; e < scene_.entities.size(); ++e) {
+                scene_.entities[e].importance = importance;
+            }
+            for (std::size_t p = range.firstParticle; p < scene_.particles.size(); ++p) {
+                scene_.particles[p].importance = importance;
+            }
+            for (std::size_t p = firstProcedural; p < scene_.procedurals.size(); ++p) {
+                scene_.procedurals[p].importance = importance;
+            }
+        }
         ranges_.push_back(std::move(range));
     }
 
@@ -10133,6 +10174,9 @@ nlohmann::json Composition::toJson() const {
         if (node.locked) {
             n["locked"] = true;
         }
+        if (node.importance) { // ADR-1097: additive, written only when authored
+            n["importance"] = importanceName(*node.importance);
+        }
         if (!node.tags.empty()) { // ADR-833: additive, written only when authored
             n["tags"] = node.tags;
         }
@@ -11524,6 +11568,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            // ADR-1097: optional; absent = inferred.
+            if (item.contains("importance")) {
+                Importance importance = Importance::Normal;
+                if (!item.at("importance").is_string() ||
+                    !importanceFromName(item.at("importance").get<std::string>(), importance)) {
+                    return fail("node '{}': 'importance' must be one of hero, foreground, normal, background, ambient",
+                                node.name);
+                }
+                node.importance = importance;
+            }
             // ADR-833 (Phase D §25): the node's semantic words.
             if (item.contains("tags")) {
                 if (!item.at("tags").is_array()) {

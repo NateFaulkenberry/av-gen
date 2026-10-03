@@ -55,6 +55,8 @@ class ShaderLibrary;
 namespace avgen::rendering {
 
 struct PostFrameInputs {
+    // ADR-1094: QualitySettings::postEffectQuality (1 = as authored): the depth of field's tap cap scales with it.
+    float effectQuality = 1.0f;
     wgpu::TextureView sceneHdr;
     wgpu::TextureView depth;
     // ADR-035 auxiliary targets, optional. Null (the normal case today) disables the selective
@@ -83,6 +85,7 @@ struct PostFrameInputs {
 
 struct PostStats {
     std::uint32_t passes = 0;
+    std::uint32_t width = 0, height = 0;          // ADR-1091: the size the chain ran at (the internal size)
     double postMs = -1.0;            // GPU time of the whole chain (the "post/" prefix on the timeline)
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;

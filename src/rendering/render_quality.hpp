@@ -309,6 +309,39 @@ struct QualitySettings {
     // default tier.
     float antialiasFloor = 0.0f;
 
+    // ADR-1083: the live quality ladder's gates on two of the scene's own post effects. They are
+    // permissions, not settings: on, the scene's `post.motionBlurAmount` and `post.dofEnabled` run
+    // exactly as authored; off, the frame skips that pass whatever the scene says. Like
+    // `antialiasFloor` they exist for the live editor only -- every tier leaves them on, and an
+    // offline render is asserted to (QualityPolicy::assertOfflineIsUncompromised).
+    bool motionBlur = true;
+    bool depthOfField = true;
+
+    // ---- ADR-1094..1098: the live scalability levers (docs/live-optimizer/02-plan.md, Stage 2) ----
+    //
+    // Each is neutral at its default, so every tier -- and above all Offline (`assertOfflineIsUncompromised`) -- renders
+    // exactly as before. Live levels and the named profiles (app/interactive_resolution.hpp) lower them. Heroes and
+    // nodes marked "hero" are exempt from all of them (ADR-1097).
+    //
+    // Multiplies the LOD switch distances' denominator: 2 = every object reaches its next LOD at half the distance (or
+    // twice the projected size). Entity mesh LOD chains and procedural LodSettings both read it.
+    float lodBias = 1.0f;
+    // Multiplies authored draw distances: procedural `maxDistance` and entity / rig cull distances. 1 = as authored.
+    float drawDistanceScale = 1.0f;
+    // A non-hero shadow caster whose bounding sphere projects to fewer pixels than this (on the camera's view) casts no
+    // shadow. 0 = every caster in the shadow views casts.
+    float shadowCasterMinPixels = 0.0f;
+    // The gather effects' sample budget: motion blur's taps along the smear and depth of field's cap on its spiral taps
+    // (192 at 1) are scaled by it. 0.5 = half the taps. 1 = as authored. (Half-RESOLUTION depth of field and motion
+    // blur would need a CoC-aware composite with the full-resolution frame -- a shader algorithm change, out of this
+    // stream's scope -- so the lever is the taps; see ADR-1094.)
+    float postEffectQuality = 1.0f;
+    // Particle emitters farther than this from the camera (metres) are neither simulated nor drawn. 0 = no limit.
+    float particleCullDistance = 0.0f;
+    // Diagnostic arm only (ADR-1098): material programs bypassed, every program-driven material drawn as its base
+    // material, so a profile can MEASURE what the programs cost. No tier or level sets it.
+    bool materialProgramsOff = false;
+
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.
     [[nodiscard]] std::uint32_t localLightBudget(MaterialTier tier) const {

@@ -6,6 +6,7 @@
 
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
+#include "scene/importance.hpp"
 
 #include <glm/glm.hpp>
 
@@ -123,6 +124,8 @@ constexpr std::uint32_t kMaxScatterAnchors = 64;
 struct ParticleSystem {
     std::string name = "particles";
     bool enabled = true;
+    // ADR-1097: the node's importance (heroes inferred), read only by the live particle cull (ADR-1098).
+    Importance importance = Importance::Normal;
     std::uint32_t capacity = 65536; // pool size; fixed after creation (renderer re-creates on change)
     std::uint32_t seed = 1;
 

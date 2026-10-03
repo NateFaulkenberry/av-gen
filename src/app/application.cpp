@@ -1,6 +1,8 @@
 #include "app/application.hpp"
+#include "app/live_profile_session.hpp"
 #include "app/cli_batch.hpp"
 #include "app/directing_evaluate.hpp"
+#include "app/live_profile_hook.hpp"
 #include "app/directing_plan_file.hpp"
 #include "pathtrace/denoise.hpp"
 #include "app/trace_sequence.hpp"
@@ -257,13 +259,15 @@ std::string usageText() {
            "                      '+seeknow' (the playhead's re-simulation back inside the gesture),\n"
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
-           "  --adaptive-scale <on|off>  let the editor choose the scene's resolution from the GPU\n"
-           "                      frame time, filtering it up into the canvas the person asked for.\n"
-           "                      Overrides the settings file for this run; never applies to a\n"
-           "                      render, where the Offline tier pins the scale to 1\n"
-           "  --adaptive-budget <ms>  the GPU frame time --adaptive-scale aims at (default 16.67)\n"
-           "  --adaptive-floor <s>  the lowest scale --adaptive-scale may reach: 0.5 (default), 0.58,\n"
-           "                      0.71, 0.85 or 1 (ADR-1024)\n"
+           "  --adaptive-scale <on|off>  on: the live quality ladder holds the target frame rate;\n"
+           "                      off: Ultra, always. Overrides the settings file for this run; never\n"
+           "                      applies to a render, where the Offline tier is pinned (ADR-1083)\n"
+           "  --live-quality <auto|ultra|high|medium|low|emergency>  the same, naming the level to pin\n"
+           "  --live-target <fps>  the live frame-rate target; the GPU budget is derived from it with\n"
+           "                      12% headroom (default: the setting, 60) (ADR-1080)\n"
+           "  --live-frame-cap <on|off>  pace the live editor's frames at the target (a whole number of\n"
+           "                      vsyncs) (default: the setting, on) (ADR-1107)\n"
+           "  --adaptive-floor <s>  the lowest scale the ladder may reach, 0.38-1 (ADR-1024/1083)\n"
            "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
            "                      given, it also applies to a headless playback run (ADR-1024)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
@@ -345,10 +349,74 @@ std::string usageText() {
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default: open maximised)\n"
            "  --log <level>       trace|debug|info|warn|error\n"
-           "  --help\n";
+           "  --help\n" +
+           liveProfileUsage();
 }
 
+namespace {
+Result<AppOptions> parseArgsImpl(int argc, char** argv);
+} // namespace
+
+// ADR-1090: `--live-profile` takes its own flags first (app/live_profile.cpp) and maps them onto the options the two
+// loops already read; everything else goes through the ordinary parser unchanged.
 Result<AppOptions> parseArgs(int argc, char** argv) {
+    if (!hasLiveProfileFlag(argc, argv)) {
+        return parseArgsImpl(argc, argv);
+    }
+    std::vector<std::string> all(argv, argv + argc);
+    LiveProfileArgs lp = parseLiveProfileArgs(all);
+    if (!lp.error.empty()) {
+        return fail("--live-profile: {}", lp.error);
+    }
+    std::vector<char*> rest;
+    for (auto& a : lp.rest) {
+        rest.push_back(a.data());
+    }
+    auto parsed = parseArgsImpl(static_cast<int>(rest.size()), rest.data());
+    if (!parsed) {
+        return parsed;
+    }
+    AppOptions options = std::move(*parsed);
+    const LiveProfileOptions& o = lp.options;
+    options.liveProfile = o;
+    options.liveTargetFps = static_cast<int>(std::lround(o.targetFps));
+    if (const auto level = liveQualityLevelFromToken(o.quality)) {
+        options.liveQuality = {true, *level};
+    } else if (o.quality == "auto") {
+        options.liveQuality = {true, std::nullopt};
+    }
+    if (!o.midi.empty()) {
+        options.midi = o.midi;
+    }
+    if (o.mode == LiveProfileMode::Headless) {
+        options.headless = true;
+        options.width = o.outputWidth;
+        options.height = o.outputHeight;
+        options.sizeGiven = true;
+        options.rangeStart = o.startSeconds;
+    } else {
+        if (options.headless) {
+            return fail("--live-profile --mode live cannot be combined with a headless flag");
+        }
+        // The editor window at a fixed size, so two live profiles lay the editor out alike; the projection window
+        // carries the output size (the frame renders for the projector while projecting).
+        options.width = 1440;
+        options.height = 900;
+        options.sizeGiven = true;
+        options.autoplay = true;
+        options.startProjection = true;
+        if (o.capture) {
+            options.capture = *o.capture; // the editor's own end-of-run capture
+        }
+        if (o.startSeconds > 0.0) {
+            options.startAt = o.startSeconds;
+        }
+    }
+    return options;
+}
+
+namespace {
+Result<AppOptions> parseArgsImpl(int argc, char** argv) {
     AppOptions options;
     auto need = [&](int i, const char* flag) -> Result<std::string> {
         if (i + 1 >= argc) {
@@ -818,27 +886,47 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--adaptive-scale");
             if (!v) return std::unexpected(v.error());
             if (*v == "on" || *v == "1" || *v == "true") {
-                options.adaptiveScale = true;
+                options.liveQuality = {true, std::nullopt};
             } else if (*v == "off" || *v == "0" || *v == "false") {
-                options.adaptiveScale = false;
+                options.liveQuality = {true, LiveQualityLevel::Ultra};
             } else {
                 return fail("--adaptive-scale expects on or off, got '{}'", *v);
             }
             ++i;
-        } else if (arg == "--adaptive-budget") {
-            auto v = need(i, "--adaptive-budget");
+        } else if (arg == "--live-quality") {
+            auto v = need(i, "--live-quality");
             if (!v) return std::unexpected(v.error());
-            options.adaptiveBudgetMs = std::strtod(v->c_str(), nullptr);
-            if (options.adaptiveBudgetMs < 4.0 || options.adaptiveBudgetMs > 200.0) {
-                return fail("--adaptive-budget must be between 4 and 200 ms, got '{}'", *v);
+            if (*v == "auto") {
+                options.liveQuality = {true, std::nullopt};
+            } else if (const auto level = liveQualityLevelFromToken(*v)) {
+                options.liveQuality = {true, *level};
+            } else {
+                return fail("--live-quality expects auto, ultra, high, medium, low or emergency, got '{}'", *v);
             }
+            ++i;
+        } else if (arg == "--live-target") {
+            auto v = need(i, "--live-target");
+            if (!v) return std::unexpected(v.error());
+            options.liveTargetFps = std::atoi(v->c_str());
+            if (options.liveTargetFps < kLiveTargetFpsMin || options.liveTargetFps > kLiveTargetFpsMax) {
+                return fail("--live-target must be between {} and {} fps, got '{}'", kLiveTargetFpsMin,
+                            kLiveTargetFpsMax, *v);
+            }
+            ++i;
+        } else if (arg == "--live-frame-cap") {
+            auto v = need(i, "--live-frame-cap");
+            if (!v) return std::unexpected(v.error());
+            if (*v != "on" && *v != "off") {
+                return fail("--live-frame-cap expects on or off, got '{}'", *v);
+            }
+            options.liveFrameCap = *v == "on";
             ++i;
         } else if (arg == "--adaptive-floor") {
             auto v = need(i, "--adaptive-floor");
             if (!v) return std::unexpected(v.error());
             options.adaptiveFloor = std::strtof(v->c_str(), nullptr);
-            if (!(options.adaptiveFloor >= 0.5f) || options.adaptiveFloor > 1.0f) {
-                return fail("--adaptive-floor must be between 0.5 and 1, got '{}'", *v);
+            if (!(options.adaptiveFloor >= kLiveScaleFloorMin) || options.adaptiveFloor > 1.0f) {
+                return fail("--adaptive-floor must be between {} and 1, got '{}'", kLiveScaleFloorMin, *v);
             }
             ++i;
         } else if (arg == "--live-aa") {
@@ -1026,6 +1114,7 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
     }
     return options;
 }
+} // namespace
 
 Application::Application() = default;
 Application::~Application() {
@@ -1219,6 +1308,7 @@ void Application::saveSettings() {
 }
 
 Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
+    initStart_ = std::chrono::steady_clock::now(); // ADR-1090: the profile's load time starts here
     if (!options.headless) {
         recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
         if (auto r = recent_.load(); !r) {
@@ -1495,16 +1585,17 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // controller, and a render job sizes its own targets from `RenderSettings` at the Offline
         // tier, whose `renderScale` is pinned to 1 and tested to be.
         {
-            InteractiveResolutionSettings rs;
-            rs.enabled = options_.adaptiveScale.value_or(settings_.adaptiveCanvasScale);
-            rs.budgetMs = options_.adaptiveBudgetMs > 0.0 ? options_.adaptiveBudgetMs
-                                                          : settings_.adaptiveCanvasBudgetMs;
-            rs.floorRung = rungForScale(options_.adaptiveFloor > 0.0f ? options_.adaptiveFloor
-                                                                      : settings_.adaptiveCanvasFloor);
+            const InteractiveResolutionSettings rs = liveQualitySettings();
             autoResolution_.configure(rs);
-            log::info("adaptive render scale: {} (budget {:.2f} ms GPU, floor {:.2f}x)",
-                      rs.enabled ? "on" : "off", rs.budgetMs,
-                      static_cast<double>(kRenderScaleRungs[rs.floorRung]));
+            // ADR-1081: the live editor's readers of the per-object diagnostic records (the selected
+            // entity's panel and its trail) name the entity, which builds them; nothing else in a
+            // live frame reads them, so the frame does not pay for them.
+            renderer_->setDiagnosticRecords(false);
+            const auto pinned = livePinnedQuality();
+            log::info("live quality: {} (target {:.0f} fps, GPU budget {:.2f} ms, lowest scale {:.2f}x, {})",
+                      pinned ? fmt::format("pinned at {}", liveQualityLevelName(*pinned)) : std::string("automatic"),
+                      rs.targetFps, rs.budgetMs, static_cast<double>(rs.scaleFloor),
+                      liveQualityStrategyLabel(rs.strategy));
         }
         panel_->preview = settings_.preview;
         panel_->renderPreview.enabled = settings_.renderFramePreview || options_.renderPreview; // ADR-320
@@ -1529,6 +1620,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // configured, so `director.evaluate` answers "no evaluator is configured: --critic ..." rather
         // than claiming the whole capability is absent.
         ai_->setEvaluationHook(makeEvaluationHook(evaluatorOptionsFrom(options_.critic, options_.criticUrl)));
+        // ADR-1106: performance.profile_scene runs this executable's --live-profile on a scratch copy.
+        ai_->setProfileHook(makeProfileHook(executablePath, std::filesystem::temp_directory_path() / "avgen-liveprofile"));
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass
@@ -1965,6 +2058,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onStartProjection = [this] { startProjection(); };
         panel_->onStopProjection = [this] { stopProjection(); };
+        panel_->onLiveQualityChanged = [this] { saveSettings(); }; // ADR-1087: serviceLiveQuality applies it
+        wireLivePerformancePanel(); // ADR-1100/1101
         panel_->onProjectionSettingsChanged = [this] {
             saveSettings();
             // A running projection follows the new choice: the window is reopened with it.
@@ -4286,6 +4381,9 @@ int Application::run() {
 }
 
 int Application::runLive() {
+    // ADR-1102: live, an SDF tree variant compiles on Dawn's workers and is drawn interpreted until it exists.
+    renderer_->sdfs().setAsyncCompile(!options_.liveProfile.enabled || options_.liveProfile.prewarm);
+    renderer_->sdfs().setPrewarm(!options_.liveProfile.enabled || options_.liveProfile.prewarm);
     RealtimeClock clock;
     ui::FrameStats stats;
     stats.adapter = context_->capabilities().adapterName;
@@ -4371,7 +4469,13 @@ int Application::runLive() {
     // controller. `scene Mpx` is the pixel count the scene pass actually shaded, which after the
     // adaptive scale is no longer derivable from the canvas size the run logs at frame 60.
     const int kPhSceneMpx = prof.phase("scene Mpx");
-    const int kPhScaleChanges = prof.phase("# render-scale moves");
+    const int kPhScaleChanges = prof.phase("# live quality changes");
+    // ADR-1090: --live-profile --mode live. The loop below is unchanged; each frame is handed to the profile.
+    bool liveProfileRunning = false;
+    if (options_.liveProfile.enabled) {
+        beginLiveProfile();
+        liveProfileRunning = true;
+    }
     std::uint64_t lastProcGen = scene::proceduralRebuildCount();
     std::uint64_t lastEnvBuild = rendering::environmentBuildCount();
     // Seeded from the composition as it stands *after* the load, so the first frame reports the
@@ -4428,9 +4532,51 @@ int Application::runLive() {
                   abGroups.size(), options_.uiAbBlocks, options_.uiAbFrames, options_.uiAbSettle);
     }
 
+    // ADR-1107: the frame cap's grid and the refresh it is aligned to (re-read every couple of seconds:
+    // enumerating the displays is not free, and a window dragged to another display is rare).
+    double paceDeadlineMs = 0.0;
+    double paceRefreshHz = 0.0;
+    int paceRefreshAge = 0;
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
         prof.beginFrame();
+        // ---- the frame cap (ADR-1107) ----------------------------------------------------------------
+        //
+        // Wait for the frame's slot on the target's grid, before the input is read, so the wait costs no
+        // input latency. The wait is inside the frame interval (it is how long the frame took to come
+        // round) but is taken out of what the quality controller reads: a capped interval is not GPU cost.
+        // Live editor only (`runHeadless` never gets here), and never while a render job shares the loop
+        // or an --ui-ab measurement is running.
+        double paceWaitMs = 0.0;
+        {
+            const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !job_ && !abRunning;
+            if (capOn && --paceRefreshAge <= 0) {
+                paceRefreshAge = 120;
+                int index = window_ != nullptr ? window_->displayIndex() : -1;
+                if (projection_.state() == Projection::State::Running) {
+                    if (const Output* out = outputs_.find(kProjectionOutputName); out != nullptr && out->desc.display >= 0) {
+                        index = out->desc.display;
+                    }
+                }
+                paceRefreshHz = 0.0;
+                for (const auto& d : platform::Window::displays()) {
+                    if (d.index == index || (index < 0 && d.primary)) {
+                        paceRefreshHz = d.refreshRate;
+                    }
+                }
+            }
+            const double period = liveFrameCapPeriodMs(capOn, autoResolution_.settings().targetFps, paceRefreshHz);
+            const double nowMs = std::chrono::duration<double, std::milli>(frameStart.time_since_epoch()).count();
+            const LivePaceStep step = livePaceStep(nowMs, paceDeadlineMs, period);
+            paceDeadlineMs = step.nextDeadlineMs;
+            if (step.waitMs > 0.0) {
+                std::this_thread::sleep_until(
+                    frameStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                     std::chrono::duration<double, std::milli>(step.waitMs)));
+                paceWaitMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart)
+                                 .count();
+            }
+        }
         if (abRunning) {
             const int perBlock = std::max(1, options_.uiAbFrames);
             const auto arms = static_cast<int>(abGroups.size());
@@ -4608,31 +4754,6 @@ int Application::runLive() {
                 renderHeight_ = ch;
             }
         }
-        // The Settings panel writes `adaptiveCanvasScale` and the budget straight through, so there
-        // is no hook to set a dirty bit in and the honest thing is to compare -- the same shape
-        // and the same reason as `serviceLayoutStore` and the preview's view state below. Without
-        // this the checkbox would be a setting that does nothing until the next launch, which is
-        // the class of defect ADR-225 exists about. A `--adaptive-scale` on the command line
-        // outranks the file and is not overwritten by it.
-        if (panel_ != nullptr && !options_.adaptiveScale.has_value() &&
-            (autoResolution_.settings().enabled != settings_.adaptiveCanvasScale ||
-             autoResolution_.settings().budgetMs != settings_.adaptiveCanvasBudgetMs)) {
-            InteractiveResolutionSettings rs = autoResolution_.settings();
-            rs.enabled = settings_.adaptiveCanvasScale;
-            rs.budgetMs = settings_.adaptiveCanvasBudgetMs;
-            // Switching it off resets the ladder to rung 0, and the block below then puts the
-            // renderer back to full resolution on the same frame.
-            autoResolution_.configure(rs);
-        }
-        // ADR-1024, the same shape: the lowest scale, and the live antialiasing. Raising the floor
-        // above the current rung pulls the rung up with it (`configure` clamps), and the block below
-        // re-sizes on the same frame.
-        if (panel_ != nullptr && options_.adaptiveFloor <= 0.0f &&
-            autoResolution_.settings().floorRung != rungForScale(settings_.adaptiveCanvasFloor)) {
-            InteractiveResolutionSettings rs = autoResolution_.settings();
-            rs.floorRung = rungForScale(settings_.adaptiveCanvasFloor);
-            autoResolution_.configure(rs);
-        }
         if (panel_ != nullptr && !options_.liveAntialias.has_value()) {
             const float floor = settings_.liveAntialias ? rendering::kLiveAntialiasFloor : 0.0f;
             if (renderer_->qualitySettings().antialiasFloor != floor) {
@@ -4642,26 +4763,16 @@ int Application::runLive() {
                 log::info("live anti-aliasing: {}", settings_.liveAntialias ? "fxaa" : "off");
             }
         }
-        // ---- the adaptive render scale (§15-§17) ------------------------------------------------
+        // ---- the live quality ladder (§15-§17, ADR-1080..1085) ----------------------------------
         //
-        // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the rung is a
+        // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the scale is a
         // fraction *of* the canvas: `setQualitySettings` re-resolves the scene target from the
         // output size the renderer already holds. It is deliberately downstream of the canvas
         // sizing and upstream of everything that reads the frame, so the picture the canvas shows
         // is the output size whatever rung is in force -- that is what makes this a presentation
         // change and not a change to what the frame is *of* (§33/§34).
-        //
-        // Rung 0 is the identity: no call is made at all, and an editor whose GPU keeps up is
-        // byte-identical to one built before this existed.
-        if (renderWidth_ > 0 && autoResolutionRung_ != autoResolution_.rung()) {
-            autoResolutionRung_ = autoResolution_.rung();
-            rendering::QualitySettings q = renderer_->qualitySettings();
-            q.renderScale = autoResolution_.scale();
-            renderer_->setQualitySettings(q);
-            log::info("render scale: rung {} ({:.2f}) -- scene {}x{} into a {}x{} canvas",
-                      autoResolutionRung_, static_cast<double>(q.renderScale),
-                      renderer_->stats().width, renderer_->stats().height, renderWidth_,
-                      renderHeight_);
+        if (panel_ != nullptr) {
+            serviceLiveQuality();
         }
         // The final texture has to exist before the panel draws, because the canvas window shows it
         // and ImGui records the texture id while it lays the frame out -- the drawing into it
@@ -5397,8 +5508,25 @@ int Application::runLive() {
             // Fed the *interval*, not the CPU time: the controller is deciding whether a smaller
             // world would make frames arrive sooner, and `cpuFrameMs` excludes the swapchain wait
             // that a GPU-bound frame spends most of itself in.
-            const auto decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
-            prof.count(kPhScaleChanges, decision.changed ? 1.0 : 0.0);
+            // ADR-1107: less the frame cap's wait, which is idle time, not cost: read with it, a capped
+            // 16.7 ms interval would cap ADR-1085's cost reading and hide that the GPU has room.
+            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs - paceWaitMs));
+            // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
+            // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
+            prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
+            liveTransitionsProfiled_ = liveTransitions_;
+            // ADR-1087: the status line's GPU and CPU, smoothed over about a second so they can be read.
+            const auto smooth = [](double& shown, double sample) {
+                if (sample >= 0.0) {
+                    shown = shown < 0.0 ? sample : shown + (sample - shown) * 0.05;
+                }
+            };
+            // ADR-1085's reading, smoothed: the span, capped by the (smoothed, so mean) frame interval.
+            smooth(liveGpuSpanShown_, stats.gpuFrameMs);
+            smooth(liveIntervalShown_, stats.frameIntervalMs - paceWaitMs);
+            liveGpuMsShown_ = liveIntervalShown_ > 0.0 && liveIntervalShown_ < liveGpuSpanShown_ ? liveIntervalShown_
+                                                                                                 : liveGpuSpanShown_;
+            smooth(liveCpuMsShown_, stats.cpuFrameMs);
         }
         // ---- the interaction log's end of frame -------------------------------------------------
         // Everything this frame caused is attributed to whatever interaction is open, then T6 is
@@ -5429,6 +5557,41 @@ int Application::runLive() {
             // ...and nothing is set when it is not, so `gpu` reports unavailable rather than 0.0 on
             // the first frames, where FrameTimeline genuinely has no completed frame to report.
             core::interactions().markFrameVisible();
+        }
+        bool liveProfileDone = false;
+        if (liveProfileRunning || panel_ != nullptr) {
+            LiveProfileFrame f;
+            f.frameMs = stats.frameIntervalMs;
+            f.gpuMs = stats.gpuFrameMs;
+            f.cpuWorkMs = stats.cpuFrameMs;
+            f.waitMs = prof.current(kPhAcquire) + prof.current(kPhPresent) + paceWaitMs;
+            f.outputsMs = prof.current(kPhOutputs);
+            f.uiMs = prof.current(kPhUi) + prof.current(kPhImgui);
+            f.engineUpdateMs = prof.current(kPhEngine);
+            f.renderRecordMs = prof.current(kPhRecord);
+            f.updControlMs = prof.current(kPhUpdControl);
+            f.updSignalsMs = prof.current(kPhUpdSignals);
+            f.updModulationMs = prof.current(kPhUpdMod);
+            f.updControllerMs = prof.current(kPhUpdCtrl);
+            f.updOtherMs = prof.current(kPhUpdOther);
+            f.analysisCatchupMs = prof.current(kPhCatchup);
+            f.meshUploadMs = prof.current(kPhMeshUp);
+            f.textureUploadMs = prof.current(kPhTexUp);
+            f.environmentMs = prof.current(kPhEnvMs);
+            f.render = renderer_->stats().cpu;
+            for (const auto& entry : renderer_->timeline().passes()) {
+                auto it = std::find_if(f.passes.begin(), f.passes.end(),
+                                       [&](const auto& e) { return e.label == entry.label; });
+                if (it == f.passes.end()) {
+                    f.passes.push_back({entry.label, entry.ms});
+                } else {
+                    it->ms += entry.ms;
+                }
+            }
+            notePerformanceFrame(f); // ADR-1100: the Performance panel's rolling medians
+            if (liveProfileRunning) {
+                liveProfileDone = !noteLiveProfileFrame(f);
+            }
         }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
@@ -5462,6 +5625,9 @@ int Application::runLive() {
         if (options_.frames >= 0 && framesRendered >= options_.frames) {
             break;
         }
+        if (liveProfileDone) {
+            break;
+        }
         if (context_->deviceLost()) {
             log::error("GPU device lost; exiting");
             return 3;
@@ -5473,6 +5639,10 @@ int Application::runLive() {
             log::error("capture: {}", r.error().message);
             return 4;
         }
+    }
+    if (liveProfileRunning) {
+        // ADR-1090: a profile leaves the layout and the settings as it found them.
+        return finishLiveProfile();
     }
     // The throttle means the last few seconds of toggling may not have reached the disk yet.
     // ImGui saves its own ini from DestroyContext, so the two halves of the layout land together.
@@ -5963,6 +6133,9 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
 }
 
 int Application::runHeadless() {
+    if (options_.liveProfile.enabled) {
+        return runLiveProfileHeadless(); // ADR-1090
+    }
     if (options_.queue) {
         return runQueue(*options_.queue);
     }
@@ -6173,6 +6346,9 @@ int Application::runHeadless() {
         frameStats.reserve(static_cast<std::size_t>(frames));
         for (int i = 0; i < frames; ++i) {
             const auto frameStart = std::chrono::steady_clock::now();
+            // ADR-1090: cleared per frame as the live loop does. Without it the `cpu(update)` line below printed the
+            // stages' running totals since the process started, not the frame's.
+            probe2::frame().clear();
             time = engine_->tick(clock);
             const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
             if (discontinuity != lastTransportDiscontinuity_) {
@@ -6685,30 +6861,15 @@ std::vector<ProjectionDisplay> connectedProjectionDisplays() {
 }
 } // namespace
 
-bool Application::projectIsLive() const {
-    const sonic::SonicSetup* setup = engine_->sonicSetup();
-    return setup != nullptr && setup->live;
-}
-
 void Application::startProjection() {
     if (panel_ == nullptr || !context_ || !shaders_) {
         return;
     }
-    switch (projection_.start(projectIsLive())) {
-    case Projection::Action::OpenLiveDemo:
-        if (liveDemoPath_.empty()) {
-            projection_.failed("Projection not started: the Sonic Live example was not found.");
-            return;
-        }
-        log::info("projection: opening the Sonic Live demo first");
-        // Through the unsaved-changes prompt; a Cancel there leaves the projection idle (Projection::update).
-        loadAny(liveDemoPath_);
-        break;
-    case Projection::Action::OpenWindow:
+    // ADR-1088: the open project, as it is. No project is swapped in and no input is switched on: a
+    // general audiovisual engine projects what it is showing. (A `sonic.live` project turns its own live
+    // input on when it loads, ADR-1025, and "Open live demo" in the Live panel is still the way to the demo.)
+    if (projection_.start() == Projection::Action::OpenWindow) {
         openProjectionWindow();
-        break;
-    default:
-        break;
     }
 }
 
@@ -6720,15 +6881,16 @@ void Application::stopProjection() {
 }
 
 void Application::openProjectionWindow() {
-    // The projection is of the live world: live input on, whichever way the project arrived.
-    if (engine_->mode() == EngineMode::Live && !engine_->liveSonic()) {
-        if (auto r = engine_->setLiveSonic(true); !r) {
-            log::warn("projection: live input: {}", r.error().message);
-        }
-    }
     projectionDisplays_ = connectedProjectionDisplays();
     projectionLastScan_ = std::chrono::steady_clock::now();
-    const OutputDesc desc = makeProjectionOutput(settings_.projection, projectionDisplays_);
+    // ADR-1090: a live profile sizes the window to its output (never written to the settings file).
+    AppSettings::Projection projection = settings_.projection;
+    if (projectionWidthOverride_ > 0 && projectionHeightOverride_ > 0) {
+        projection.windowWidth = projectionWidthOverride_;
+        projection.windowHeight = projectionHeightOverride_;
+        projection.fullscreen = false;
+    }
+    const OutputDesc desc = makeProjectionOutput(projection, projectionDisplays_);
     const ProjectionDisplayChoice choice = chooseProjectionDisplay(projectionDisplays_, settings_.projection.display);
     outputs_.remove(kProjectionOutputName);
     auto added = outputs_.add(desc);
@@ -6767,8 +6929,6 @@ void Application::serviceProjection() {
         projectionLastScan_ = now;
     }
     Projection::Observed observed;
-    observed.loading = pendingOpen_.has_value() || closeGate_.busy() || panel_->loading.active;
-    observed.liveProject = projectIsLive();
     {
         const Output* out = outputs_.find(kProjectionOutputName);
         observed.windowOpen = out != nullptr && out->open();
@@ -6793,16 +6953,173 @@ void Application::serviceProjection() {
     }
     auto& view = panel_->projection;
     view.active = projection_.active();
-    view.awaiting = projection_.state() == Projection::State::AwaitingProject;
-    if (view.awaiting) {
-        view.status = "Opening the Sonic Live demo...";
-    } else if (out != nullptr && out->open()) {
+    if (out != nullptr && out->open()) {
         view.status = fmt::format("Projecting on {}: {}x{} px, the picture {}x{}. Esc in that window, or Stop, ends it.",
                                   projection_.displayName().empty() ? "the default display" : projection_.displayName(),
                                   out->pixelWidth(), out->pixelHeight(), renderWidth_, renderHeight_);
+        // ADR-1089: said in words when it is happening, because it is visible in the projection.
+        if (out->pacer.interval() > 1) {
+            view.status += fmt::format(" The projection window is slow to take frames ({:.0f} ms), so it shows every "
+                                       "{} frame and the show keeps its pace.",
+                                       out->pacer.lastAcquireMs(),
+                                       out->pacer.interval() == 2 ? std::string("2nd") : fmt::format("{}th", out->pacer.interval()));
+        }
     } else {
         view.status = projection_.message();
     }
+}
+
+// ---- ADR-1080..1085: the live quality ladder ----------------------------------------------------------------------
+
+std::optional<LiveQualityLevel> Application::livePinnedQuality() const {
+    return options_.liveQuality.given ? options_.liveQuality.pinned : settings_.liveQualityPinned;
+}
+
+std::optional<QualityProfile> Application::liveQualityProfile() const {
+    // ADR-1099: `--live-profile --quality <profile>` for the run, else the project's `live.profile`.
+    if (options_.liveProfile.enabled) {
+        if (const auto p = qualityProfileFromToken(options_.liveProfile.quality)) {
+            return p;
+        }
+    }
+    return engine_ != nullptr ? engine_->liveSettings().profile : std::nullopt;
+}
+
+InteractiveResolutionSettings Application::liveQualitySettings() const {
+    InteractiveResolutionSettings rs = autoResolution_.settings(); // the law's constants stay as they are
+    // ADR-1100: the run's flag, then the project's target, then this machine's setting.
+    const LiveProjectSettings& project = engine_ != nullptr ? engine_->liveSettings() : LiveProjectSettings{};
+    const int targetFps = options_.liveTargetFps > 0 ? options_.liveTargetFps
+                          : project.targetFps        ? *project.targetFps
+                                                     : settings_.liveTargetFps;
+    const LiveBudget budget = liveBudget(targetFps);
+    // ADR-1105: a ladder from the project's priority, when it names one.
+    rs.ladder.reset();
+    if (!project.priority.empty()) {
+        std::string error;
+        rs.ladder = ladderFromPriority(project.priority, error);
+    }
+    // ADR-1103: the project's hard minimum.
+    rs.lowestLevel = project.minimumLevel ? static_cast<std::size_t>(*project.minimumLevel) : kLiveQualityLevels - 1;
+    rs.enabled = !livePinnedQuality().has_value();
+    rs.targetFps = budget.targetFps;
+    rs.budgetMs = budget.qualityBudgetMs;
+    rs.strategy = engine_ != nullptr ? engine_->liveQualityStrategy() : LiveQualityStrategy::Balanced;
+    rs.scaleFloor = std::clamp(options_.adaptiveFloor > 0.0f ? options_.adaptiveFloor : settings_.adaptiveCanvasFloor,
+                               kLiveScaleFloorMin, 1.0f);
+    return rs;
+}
+
+void Application::serviceLiveQuality() {
+    // The Settings and Live panels write the settings straight through and a project load changes the
+    // hint, so there is no hook to set a dirty bit in and the honest thing is to compare -- the same
+    // shape and reason as `serviceLayoutStore`. Without it a choice would do nothing until the next
+    // launch, the class of defect ADR-225 is about.
+    const InteractiveResolutionSettings want = liveQualitySettings();
+    const InteractiveResolutionSettings& have = autoResolution_.settings();
+    if (want.enabled != have.enabled || want.budgetMs != have.budgetMs || want.strategy != have.strategy ||
+        want.scaleFloor != have.scaleFloor || want.ladder != have.ladder || want.lowestLevel != have.lowestLevel) {
+        autoResolution_.configure(want);
+        const auto pinned = livePinnedQuality();
+        log::info("live quality: {} (target {:.0f} fps, GPU budget {:.2f} ms, lowest scale {:.2f}x, {})",
+                  pinned ? fmt::format("pinned at {}", liveQualityLevelName(*pinned)) : std::string("automatic"),
+                  want.targetFps, want.budgetMs, static_cast<double>(want.scaleFloor),
+                  liveQualityStrategyLabel(want.strategy));
+    }
+    if (renderWidth_ == 0 || renderHeight_ == 0) {
+        return;
+    }
+    if (!haveLiveQualityBase_) {
+        // Ultra is the tier exactly as the run configured it (tier, quality arms): captured once, before
+        // any rung has touched a field the ladder owns.
+        liveTierBase_ = renderer_->qualitySettings();
+        haveLiveQualityBase_ = true;
+        liveSettingsRevisionApplied_ = ~0ull;
+    }
+    // ADR-1099/1100: the profile and the project's ceilings sit between the tier and the ladder. Recomputed when the
+    // project's live block (or the run's profile) changes, and the level re-applied on top.
+    const std::optional<QualityProfile> profile = liveQualityProfile();
+    if (liveSettingsRevisionApplied_ != engine_->liveSettingsRevision() || liveProfileApplied_ != profile) {
+        rendering::QualitySettings base = liveTierBase_;
+        if (profile) {
+            base = applyQualityProfile(base, *profile);
+        }
+        if (engine_->liveSettings().overrides) {
+            base = applyCeiling(base, *engine_->liveSettings().overrides);
+        }
+        liveQualityBase_ = base;
+        liveSettingsRevisionApplied_ = engine_->liveSettingsRevision();
+        liveProfileApplied_ = profile;
+        appliedLiveQuality_.valid = false;
+    }
+    const auto pinned = livePinnedQuality();
+    const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
+    const AppliedLiveQuality now{true, rung, want.strategy, want.scaleFloor};
+    const bool moved = !appliedLiveQuality_.valid || appliedLiveQuality_.rung != now.rung ||
+                       appliedLiveQuality_.strategy != now.strategy || appliedLiveQuality_.scaleFloor != now.scaleFloor;
+    if (moved) {
+        const LiveQualityRung& r = autoResolution_.ladder()[rung];
+        const rendering::QualitySettings q =
+            applyLiveRung(renderer_->qualitySettings(), liveQualityBase_, r, want.scaleFloor);
+        // ADR-1086: the whole cost of a transition on the CPU is this call (a render-target
+        // reallocation when the scale moved; nothing at all when only an effect did), and the
+        // history it invalidates is exactly the screen-space history `resize` resets.
+        const auto start = std::chrono::steady_clock::now();
+        renderer_->setQualitySettings(q);
+        // ADR-1094: the draw-distance lever's CPU half (entity bands, rig rates) rides on the engine's detail limits.
+        if (engine_->detailLimits().distanceScale != q.drawDistanceScale) {
+            scene::DetailLimits limits = engine_->detailLimits();
+            limits.distanceScale = q.drawDistanceScale;
+            engine_->setDetailLimits(limits);
+        }
+        const double applyMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        if (appliedLiveQuality_.valid) {
+            ++liveTransitions_;
+        }
+        appliedLiveQuality_ = now;
+        log::info("live quality: {} ({}) -- scene {}x{} into {}x{} (scale {:.2f}); volumes {:.2f}x res {:.2f}x steps, "
+                  "motion blur {}, depth of field {}, cascades <= {}, shadow atlas {}{}; applied in {:.2f} ms",
+                  liveQualityLevelName(r.level), liveQualityStrategyLabel(want.strategy), renderer_->stats().width,
+                  renderer_->stats().height, renderWidth_, renderHeight_, static_cast<double>(q.renderScale),
+                  static_cast<double>(q.volumeResolutionScale), static_cast<double>(q.volumeStepScale),
+                  q.motionBlur ? "on" : "off", q.depthOfField ? "on" : "off", q.cascadeCount, q.shadowResolution,
+                  q.softShadows ? "" : ", plain filtering", applyMs);
+    }
+    // ---- the Live panel's status (ADR-1087) ----
+    auto& view = panel_->liveQuality;
+    const LiveQualityRung& r = autoResolution_.ladder()[rung];
+    view.profile = profile ? qualityProfileLabel(*profile) : "QUALITY";
+    view.profileStated = engine_->liveSettings().profile.has_value();
+    view.minimumLevel = liveQualityLevelName(static_cast<LiveQualityLevel>(want.lowestLevel));
+    view.unsustainable = !pinned && autoResolution_.unsustainable();
+    view.priority.clear();
+    for (const auto& g : engine_->liveSettings().priority) {
+        view.priority += (view.priority.empty() ? "" : ", ") + g;
+    }
+    view.reverts = autoResolution_.stats().reverts;
+    view.overrides = engine_->liveSettings().overrides ? ceilingJsonText(*engine_->liveSettings().overrides) : std::string();
+    view.quality = renderer_->qualitySettings();
+    view.available = true;
+    view.automatic = !pinned.has_value();
+    view.level = liveQualityLevelName(r.level);
+    view.targetFps = want.targetFps;
+    view.targetFrameMs = 1000.0 / want.targetFps;
+    view.budgetMs = want.budgetMs;
+    view.gpuMs = liveGpuMsShown_;
+    view.cpuMs = liveCpuMsShown_;
+    view.renderScale = renderer_->qualitySettings().renderScale;
+    view.internalWidth = renderer_->stats().width;
+    view.internalHeight = renderer_->stats().height;
+    view.outputWidth = renderWidth_;
+    view.outputHeight = renderHeight_;
+    view.strategy = liveQualityStrategyLabel(want.strategy);
+    view.strategyStated = engine_->liveQualityStrategyStated();
+    view.transitions = liveTransitions_;
+    view.heldByCpu = autoResolution_.stats().heldByCpu;
+    view.atBottom = !pinned && rung >= want.lowestLevel;
+    view.qualityFromCommandLine = options_.liveQuality.given;
+    view.targetFromCommandLine = options_.liveTargetFps > 0;
 }
 
 // ---- ADR-1025: live Sonic input --------------------------------------------------------------------------------

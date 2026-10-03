@@ -2472,6 +2472,27 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         doc["sonic"] = std::move(block);
     }
+    // ADR-1084: the live quality hint, when the project stated one (an unstated hint stays unstated,
+    // so the default can move without rewriting every project that never chose).
+    if (liveQualityStrategy_) {
+        doc["live"]["qualityStrategy"] = std::string(liveQualityStrategyToken(*liveQualityStrategy_));
+    }
+    // ADR-1100: the rest of the live block, each field only when stated.
+    if (liveSettings_.targetFps) {
+        doc["live"]["targetFps"] = *liveSettings_.targetFps;
+    }
+    if (liveSettings_.profile) {
+        doc["live"]["profile"] = std::string(qualityProfileToken(*liveSettings_.profile));
+    }
+    if (liveSettings_.minimumLevel) {
+        doc["live"]["minimumLevel"] = std::string(liveQualityLevelToken(*liveSettings_.minimumLevel));
+    }
+    if (!liveSettings_.priority.empty()) {
+        doc["live"]["priority"] = liveSettings_.priority;
+    }
+    if (liveSettings_.overrides) {
+        doc["live"]["overrides"] = nlohmann::json::parse(ceilingJsonText(*liveSettings_.overrides));
+    }
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
@@ -2770,6 +2791,75 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         return path; // still missing: the loader reports it
     };
 
+    // ADR-1084: the live quality hint. Absent means the default (balanced), not the last project's.
+    liveQualityStrategy_.reset();
+    {
+        // ADR-1100: absent fields are unset, never the last project's.
+        LiveProjectSettings ls;
+        if (const auto live = doc.find("live"); live != doc.end() && live->is_object()) {
+            if (const auto v = live->find("targetFps"); v != live->end()) {
+                if (v->is_number_integer() && v->get<int>() >= kLiveTargetFpsMin && v->get<int>() <= kLiveTargetFpsMax) {
+                    ls.targetFps = v->get<int>();
+                } else {
+                    warn(fmt::format("live.targetFps must be an integer from {} to {}", kLiveTargetFpsMin,
+                                     kLiveTargetFpsMax));
+                }
+            }
+            if (const auto v = live->find("profile"); v != live->end()) {
+                const auto p = v->is_string() ? qualityProfileFromToken(v->get<std::string>()) : std::nullopt;
+                if (p) {
+                    ls.profile = *p;
+                } else {
+                    warn("live.profile must be quality, balanced or performance");
+                }
+            }
+            if (const auto v = live->find("minimumLevel"); v != live->end()) {
+                const auto l = v->is_string() ? liveQualityLevelFromToken(v->get<std::string>()) : std::nullopt;
+                if (l) {
+                    ls.minimumLevel = *l;
+                } else {
+                    warn("live.minimumLevel must be ultra, high, medium, low or emergency");
+                }
+            }
+            if (const auto v = live->find("priority"); v != live->end()) {
+                std::vector<std::string> groups;
+                if (v->is_array()) {
+                    for (const auto& g : *v) {
+                        groups.push_back(g.is_string() ? g.get<std::string>() : std::string("?"));
+                    }
+                }
+                std::string error;
+                if (v->is_array() && ladderFromPriority(groups, error)) {
+                    ls.priority = std::move(groups);
+                } else {
+                    warn("live.priority: " + (error.empty() ? std::string("must be an array of group names") : error));
+                }
+            }
+            if (const auto v = live->find("overrides"); v != live->end()) {
+                std::string error;
+                if (auto c = ceilingFromJsonText(v->dump(), error)) {
+                    ls.overrides = *c;
+                } else {
+                    warn("live.overrides: " + error);
+                }
+            }
+        }
+        setLiveSettings(std::move(ls));
+    }
+    if (const auto live = doc.find("live"); live != doc.end()) {
+        if (!live->is_object()) {
+            warn("live: must be an object");
+        } else if (const auto hint = live->find("qualityStrategy"); hint != live->end()) {
+            const std::string token = hint->is_string() ? hint->get<std::string>() : std::string{};
+            if (const auto strategy = liveQualityStrategyFromToken(token)) {
+                liveQualityStrategy_ = *strategy;
+            } else {
+                warn(fmt::format("live.qualityStrategy '{}' is not one of resolution_first, balanced, effects_first; "
+                                 "using balanced",
+                                 token));
+            }
+        }
+    }
     // ADR-1020: the Sonic Garden block, read before the audio so that loading the audio analyses its timbre
     // once. Absent means the subsystem is off, not inherited from the last project.
     {

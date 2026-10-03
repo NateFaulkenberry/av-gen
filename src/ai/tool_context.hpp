@@ -147,6 +147,19 @@ struct EvaluationRequest {
 using EvaluationHook =
     std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, const EvaluationRequest& request)>;
 
+// ADR-1106: profiling the project for live performance -- `avgen --live-profile` on a scratch copy, in a child
+// process, off the main thread (the way an evaluation runs the Critic). Its answer is the avgen.liveprofile/1 record.
+struct ProfileRequest {
+    std::string mode = "headless"; // headless | live
+    double targetFps = 60.0;
+    std::uint32_t width = 1920, height = 1080;
+    double start = 0.0;
+    std::string quality = "auto";
+    bool deep = false;
+    int verifyCandidates = 0;
+};
+using ProfileHook = std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, const ProfileRequest& request)>;
+
 // Main thread: starts recording `compilation`'s live performances against the engine's project.
 using RecordingHook =
     std::function<Result<std::shared_ptr<RecordingHandle>>(app::Engine&, const directing::Compilation&)>;
@@ -243,6 +256,8 @@ public:
     // rather than passing anything silently.
     void setEvaluationHook(EvaluationHook hook) { evaluationHook_ = std::move(hook); }
     [[nodiscard]] const EvaluationHook& evaluationHook() const { return evaluationHook_; }
+    void setProfileHook(ProfileHook hook) { profileHook_ = std::move(hook); } // ADR-1106
+    [[nodiscard]] const ProfileHook& profileHook() const { return profileHook_; }
     void deferResult(std::shared_ptr<DeferredResult> handle) { deferredResult_ = std::move(handle); }
     [[nodiscard]] const std::shared_ptr<DeferredResult>& deferredResult() const { return deferredResult_; }
     // The last observation this task's watch returned (its `observation` object), attached to a plan
@@ -288,6 +303,7 @@ private:
     std::shared_ptr<RecordingHandle> deferred_;
     WatchHook watchHook_;
     EvaluationHook evaluationHook_;
+    ProfileHook profileHook_;
     std::shared_ptr<DeferredResult> deferredResult_;
     nlohmann::json observation_;
     ChangeLog changes_;

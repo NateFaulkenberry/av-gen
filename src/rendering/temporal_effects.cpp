@@ -1,4 +1,5 @@
 #include "rendering/temporal_effects.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
@@ -82,7 +83,7 @@ Result<wgpu::RenderPipeline> TemporalEffects::Impl::makePipeline(const char* ent
     desc.fragment = &fragment;
 
     context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = context.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context.device(), &desc);
     std::string error;
     auto future = context.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

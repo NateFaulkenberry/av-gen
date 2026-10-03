@@ -39,6 +39,8 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1000-1019 | proto/procedural-space |
 | 1020-1039 | proto/sonic-garden |
 | 1040-1059 | proto/liminal-space |
+| 1080-1089 | live/quality -- the live adaptive quality system |
+| 1090-1109 | live/optimizer -- the live scene profiler, scalability levers, panel and runtime gaps |
 | 701+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -636,4 +638,32 @@ confirm the citation you are about to change is your own.
 | [1056](ADR-1056-structural-containment-and-text-validation.md) | The spatial validator learns architecture (openings measured against the cut geometry: alignment per edge, sills, trim/decor crossing openings; stairs, roofs and railings connected; containment, room kinds, against-wall, chair spacing; text off-wall per edge, through geometry, overlapping text; critical/warning/info tiers; the Markdown Scene Validation Report. proto/liminal-space) | Accepted |
 | [1057](ADR-1057-film-pass-camera-and-build-lock.md) | The validator's film pass (`--validate-space <project> --film`: plays the project offline and checks the real camera against the live SDF -- inside, crossing between frames, near-plane clipping, close-up distortion, early entry -- and build-lock: structural transforms that wobble after they are built. proto/liminal-space) | Accepted |
 | [1058](ADR-1058-near-plane-for-a-walking-camera.md) | The near plane (`camera/near`, scene `camera.near`; a journey camera's automatic near plane is at most 5 cm; the cause of the ~2:15 artifact. proto/liminal-space) | Accepted |
+| [1080](ADR-1080-the-live-budget-comes-from-a-target-frame-rate.md) | The live budget comes from a target frame rate the performer picks (60/90/120, `general.liveTargetFps`), with 12% headroom, in one function (`liveBudget`); never from the display refresh. live/quality | Accepted |
+| [1081](ADR-1081-per-object-diagnostics-are-built-only-for-a-reader.md) | Per-object renderer diagnostics are built only when something reads them (`setDiagnosticRecords`; the live editor off, a named entity on). live/quality | Accepted |
+| [1082](ADR-1082-posed-skinned-bounds-are-computed-once-per-pose.md) | A skinned mesh's posed bounds are computed once per pose (`Scene::posedMeshBounds`, keyed by palette contents and `meshVersion`), and the camera cull visits each entity once. live/quality | Accepted |
+| [1083](ADR-1083-a-live-quality-level-is-a-bundle-of-existing-quality-settings.md) | A live quality level (Ultra..Emergency) is a bundle of ceilings on existing `QualitySettings` fields plus two gates (`motionBlur`, `depthOfField`); LIVE only; floor down to 0.38; `general.liveQuality` auto or pinned. live/quality | Accepted |
+| [1084](ADR-1084-the-live-quality-strategy-is-project-data.md) | Which lever a project gives up first is project data: `live.qualityStrategy` (resolution_first, balanced, effects_first). live/quality | Accepted |
+| [1085](ADR-1085-the-live-controller-learns-each-step-and-climbs-slowly.md) | The live controller measures each step's cost ratio on the way down, climbs only after a sustained fit, and reads min(median GPU span, mean interval). live/quality | Accepted |
+| [1086](ADR-1086-a-quality-change-keeps-the-resize-path.md) | A quality change keeps the existing resize path: measured, it costs at most one vsync, not an allocation hitch; history is reset exactly as a resize resets it. live/quality | Accepted |
+| [1087](ADR-1087-the-live-panel-shows-the-quality-in-force.md) | The Live panel shows target, budget, GPU, CPU, level and scale, with the Quality and Target choices beside them. live/quality | Accepted |
+| [1088](ADR-1088-start-projection-projects-the-open-project.md) | Start projection projects the open project as it is; no Sonic Live swap, no live-input switch (supersedes ADR-1026 decision 3 in part). live/quality | Accepted |
+| [1089](ADR-1089-a-slow-output-is-paced-not-waited-for.md) | A slow output is paced, not waited for: an output whose acquire blocks is presented to every 2nd/4th/8th frame until it recovers (`PresentPacer`). live/quality | Accepted |
+| [1090](ADR-1090-the-live-profile-is-one-command-with-two-loops-and-one-record.md) | The live profile is one command with two loops and one record. live/optimizer | Accepted |
+| [1091](ADR-1091-resource-accounting-reads-dawn-and-counts-pipelines-at-creation.md) | Resource accounting reads Dawn's own memory figures and counts pipelines at creation. live/optimizer | Accepted |
+| [1092](ADR-1092-gpu-categories-come-from-one-label-table-and-the-verdict-from-shares.md) | GPU categories come from one label table; the critical path from the measured shares. live/optimizer | Accepted |
+| [1093](ADR-1093-candidates-are-rules-over-existing-levers-and-are-measured-with-the-ab-machinery.md) | Optimization candidates are rules over existing levers, measured only with the A/B machinery. live/optimizer | Accepted |
+| [1094](ADR-1094-lod-bias-draw-distance-and-post-taps-are-live-levers.md) | LOD bias, draw distance and the post effects' taps are live levers. live/optimizer | Accepted |
+| [1095](ADR-1095-a-small-non-hero-caster-casts-no-shadow-under-the-floor.md) | Under the caster floor, a small non-hero object casts no shadow. live/optimizer | Accepted |
+| [1096](ADR-1096-nothing-lit-renders-no-shadow-maps.md) | When nothing visible is lit, no shadow map is rendered. live/optimizer | Accepted |
+| [1097](ADR-1097-importance-is-inferred-and-heroes-are-exempt.md) | Importance is inferred, and heroes are exempt from every live lever. live/optimizer | Accepted |
+| [1098](ADR-1098-far-emitters-stop-and-material-programs-can-be-measured.md) | Far emitters stop, and material programs can be measured. live/optimizer | Accepted |
+| [1099](ADR-1099-profiles-are-ceilings-in-the-ladders-table-family.md) | QUALITY / BALANCED / PERFORMANCE are ceilings in the ladder's table family. live/optimizer | Accepted |
+| [1100](ADR-1100-the-projects-live-block-holds-target-profile-minimum-priority-and-ceilings.md) | The project's live block holds the target, profile, minimum, priority and Optimize's ceilings. live/optimizer | Accepted |
+| [1101](ADR-1101-optimize-applies-ticked-levers-as-project-ceilings-with-an-undo.md) | Optimize applies only ticked levers, as project ceilings, with an Undo. live/optimizer | Accepted |
+| [1102](ADR-1102-sdf-variants-are-prewarmed-and-compile-on-dawns-workers-live.md) | SDF variants are pre-warmed, and compile on Dawn's workers live. live/optimizer | Accepted |
+| [1103](ADR-1103-a-project-minimum-level-and-live-target-unsustainable.md) | A project minimum level, and "LIVE TARGET UNSUSTAINABLE". live/optimizer | Accepted |
+| [1104](ADR-1104-a-raise-that-does-not-hold-is-reverted.md) | A raise that does not hold is reverted, and waits longer next time. live/optimizer | Accepted |
+| [1105](ADR-1105-a-degradation-priority-is-data.md) | A degradation priority is data. live/optimizer | Accepted |
+| [1106](ADR-1106-performance-tools-for-agents.md) | Agents profile with performance.profile_scene and read/set live quality. live/optimizer | Accepted |
+| [1107](ADR-1107-the-live-loop-is-capped-at-the-target-and-climbs-back-at-90-percent.md) | The live loop is capped at the target (whole vsyncs, `general.liveFrameCap`), and climbs back at 90% of the budget. live/optimizer | Accepted |
 | [1026](ADR-1026-the-live-projection-is-a-machine-output.md) | The live projection is an output that belongs to the machine (the Live panel's Start projection opens the Sonic Live demo when the project is not live, turns live input on and opens an `OutputManager` output flagged `projection`: never saved to the project, kept across loads, Esc closes it; display by name else the first non-primary, fullscreen on another display, Fit/Fill/Stretch; per-machine `settings.json`; stops on close or unplug) | Accepted |

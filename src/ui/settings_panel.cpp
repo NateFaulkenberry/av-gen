@@ -139,40 +139,60 @@ void SettingsPanel::drawRendering() {
     // This is the same lever driven by the frame time instead of by a person.
     if (settings != nullptr) {
         ImGui::Spacing();
-        propertyLabel("Adapt automatically", "Keep the frame rate up on heavy scenes");
-        bool adaptive = settings->adaptiveCanvasScale;
-        if (ImGui::Checkbox("##adaptive-canvas-scale", &adaptive)) {
-            settings->adaptiveCanvasScale = adaptive;
+        // ADR-1080/1083: the same two choices the Live panel shows, kept in the same settings.
+        propertyLabel("Live quality", "Auto holds the target frame rate");
+        static const char* levels[] = {"Auto", "Ultra", "High", "Medium", "Low", "Emergency"};
+        int level = settings->liveQualityPinned ? 1 + static_cast<int>(*settings->liveQualityPinned) : 0;
+        if (ImGui::Combo("##live-quality", &level, levels, 6)) {
+            if (level == 0) {
+                settings->liveQualityPinned.reset();
+            } else {
+                settings->liveQualityPinned = static_cast<app::LiveQualityLevel>(level - 1);
+            }
             if (onChanged) {
                 onChanged();
             }
         }
         ImGui::TextWrapped(
-            "When the GPU cannot keep up, render the world at a lower resolution and sharpen it "
-            "back up into the viewport, down to half size. It only engages on a frame that is "
-            "missing its budget and that the GPU -- not the interface -- is what is holding up; "
-            "it never changes a render, and it goes back to full resolution when the scene gets "
-            "cheaper. The status bar shows the resolution it settled on.");
-        ImGui::BeginDisabled(!adaptive);
-        propertyLabel("Frame budget", "The GPU time it aims at");
-        auto budget = static_cast<float>(settings->adaptiveCanvasBudgetMs);
-        if (ImGui::SliderFloat("##adaptive-canvas-budget", &budget, 8.0f, 50.0f, "%.1f ms")) {
-            settings->adaptiveCanvasBudgetMs = budget;
-            if (onChanged) {
-                onChanged();
-            }
-        }
-        // ADR-1024. The rungs themselves, so the choice is one the ladder can actually hold.
-        propertyLabel("Lowest scale", "How far it may go");
-        const std::size_t floorRung = app::rungForScale(settings->adaptiveCanvasFloor);
-        char current[16];
-        std::snprintf(current, sizeof(current), "%.2fx", static_cast<double>(app::kRenderScaleRungs[floorRung]));
-        if (ImGui::BeginCombo("##adaptive-canvas-floor", current)) {
-            for (std::size_t i = 0; i < app::kRenderScaleRungs.size(); ++i) {
+            "When the GPU cannot hold the target, Auto lowers the live picture step by step -- resolution, "
+            "then the fog's detail, motion blur, depth of field and shadow detail, in the order the project "
+            "asks for -- and raises it again once the frame has fitted comfortably for a couple of seconds. "
+            "It only acts on a frame the GPU, not the interface, is holding up, and it never changes a "
+            "render. Ultra .. Emergency hold one level. The Live panel shows the level in force.");
+        const bool automatic = !settings->liveQualityPinned.has_value();
+        propertyLabel("Target frame rate", "What Auto aims at");
+        char target[16];
+        std::snprintf(target, sizeof(target), "%d fps", settings->liveTargetFps);
+        if (ImGui::BeginCombo("##live-target", target)) {
+            for (const int fps : app::kLiveTargetChoices) {
                 char label[16];
-                std::snprintf(label, sizeof(label), "%.2fx", static_cast<double>(app::kRenderScaleRungs[i]));
-                if (ImGui::Selectable(label, i == floorRung)) {
-                    settings->adaptiveCanvasFloor = app::kRenderScaleRungs[i];
+                std::snprintf(label, sizeof(label), "%d fps", fps);
+                if (ImGui::Selectable(label, fps == settings->liveTargetFps)) {
+                    settings->liveTargetFps = fps;
+                    if (onChanged) {
+                        onChanged();
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+        {
+            const app::LiveBudget b = app::liveBudget(settings->liveTargetFps);
+            ImGui::TextWrapped("A %.1f ms frame; the GPU is given %.1f ms of it (12%% is kept for the interface and "
+                               "the projector). The display's refresh rate does not set this.",
+                               b.targetFrameMs, b.qualityBudgetMs);
+        }
+        ImGui::BeginDisabled(!automatic);
+        // ADR-1024/1083. The ladder's own scales, so the choice is one it can actually hold.
+        propertyLabel("Lowest scale", "How far Auto may go");
+        char current[16];
+        std::snprintf(current, sizeof(current), "%.2fx", static_cast<double>(settings->adaptiveCanvasFloor));
+        if (ImGui::BeginCombo("##adaptive-canvas-floor", current)) {
+            for (const float choice : app::kLiveScaleFloorChoices) {
+                char label[16];
+                std::snprintf(label, sizeof(label), "%.2fx", static_cast<double>(choice));
+                if (ImGui::Selectable(label, std::abs(choice - settings->adaptiveCanvasFloor) < 1e-3f)) {
+                    settings->adaptiveCanvasFloor = choice;
                     if (onChanged) {
                         onChanged();
                     }
@@ -183,7 +203,7 @@ void SettingsPanel::drawRendering() {
         ImGui::TextWrapped(
             "Below about 0.7x, thin geometry -- rings, wires, tubes a few pixels wide -- breaks up "
             "into dots, and no antialiasing can put it back. Raise this when edges matter more than "
-            "frame rate; 1.00x keeps full resolution whatever the frame costs.");
+            "frame rate; the lower levels then keep their other reductions at this scale.");
         ImGui::EndDisabled();
     }
 

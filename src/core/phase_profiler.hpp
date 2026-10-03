@@ -58,6 +58,12 @@ public:
     // Per-frame counter rather than a duration (allocations, draw calls, events). Reported the same
     // way; a distribution of counts answers "does this spike allocate?" directly.
     void count(int phaseIndex, double n) { add(phaseIndex, n); }
+    // This frame's value so far (before `endFrame` files it). ADR-1090: the live profile reads the frame it is in.
+    [[nodiscard]] double current(int phaseIndex) const {
+        return phaseIndex >= 0 && static_cast<std::size_t>(phaseIndex) < count_
+                   ? current_[static_cast<std::size_t>(phaseIndex)]
+                   : 0.0;
+    }
 
     class Scope {
     public:

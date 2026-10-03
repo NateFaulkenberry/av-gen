@@ -169,48 +169,82 @@ TEST_CASE("Suspending the viewport during a render is remembered", "[settings][v
 // ADR-225 again: a setting the application does not keep is not a setting. This one is a checkbox
 // and a slider that a person reaches for precisely when the editor is unusable, so "it was off
 // again after a restart" is the worst possible failure for it.
-TEST_CASE("the adaptive render scale round-trips, and its budget is clamped rather than refused",
-          "[app][settings][ui][resolution]") {
+TEST_CASE("the live quality and target round-trip; the target is clamped, an unknown level refused",
+          "[app][settings][ui][resolution][live-quality]") {
     app::AppSettings settings;
-    // The default is on, which is the whole point of ADR-480: the manual lever it replaces was a
-    // slider nobody ever moved.
-    CHECK(settings.adaptiveCanvasScale);
+    // Automatic at 60 fps by default (ADR-1080/1083): the manual lever it replaces was a slider
+    // nobody ever moved.
+    CHECK_FALSE(settings.liveQualityPinned.has_value());
+    CHECK(settings.liveTargetFps == 60);
+    CHECK(settings.toJson().at("general").at("liveQuality") == "auto");
 
-    settings.adaptiveCanvasScale = false;
-    settings.adaptiveCanvasBudgetMs = 33.3;
+    settings.liveQualityPinned = app::LiveQualityLevel::Low;
+    settings.liveTargetFps = 120;
     const auto document = settings.toJson();
-    REQUIRE(document.at("general").at("adaptiveCanvasScale") == false);
+    REQUIRE(document.at("general").at("liveQuality") == "low");
+    REQUIRE(document.at("general").at("liveTargetFps") == 120);
     const auto loaded = app::AppSettings::fromJson(document);
     REQUIRE(loaded.has_value());
-    CHECK_FALSE(loaded->adaptiveCanvasScale);
-    CHECK(loaded->adaptiveCanvasBudgetMs == 33.3);
+    REQUIRE(loaded->liveQualityPinned.has_value());
+    CHECK(*loaded->liveQualityPinned == app::LiveQualityLevel::Low);
+    CHECK(loaded->liveTargetFps == 120);
 
-    // A settings file from a future build, or a hand-edited one. A budget of zero would pin the
-    // ladder at its floor for ever and a budget of an hour would make the controller dead weight;
-    // neither is worth refusing the whole file over, so both are clamped into the range.
     {
+        // A level this build does not know is refused, as the antialiasing mode is.
         auto doc = document;
-        doc["general"]["adaptiveCanvasBudgetMs"] = 0.0;
-        const auto out = app::AppSettings::fromJson(doc);
-        REQUIRE(out.has_value());
-        CHECK(out->adaptiveCanvasBudgetMs == 4.0);
+        doc["general"]["liveQuality"] = "potato";
+        CHECK_FALSE(app::AppSettings::fromJson(doc).has_value());
     }
     {
+        // A hand-edited target: clamped, not refused.
         auto doc = document;
-        doc["general"]["adaptiveCanvasBudgetMs"] = 5000.0;
+        doc["general"]["liveTargetFps"] = 1000;
         const auto out = app::AppSettings::fromJson(doc);
         REQUIRE(out.has_value());
-        CHECK(out->adaptiveCanvasBudgetMs == 200.0);
+        CHECK(out->liveTargetFps == app::kLiveTargetFpsMax);
+        doc["general"]["liveTargetFps"] = 0;
+        const auto low = app::AppSettings::fromJson(doc);
+        REQUIRE(low.has_value());
+        CHECK(low->liveTargetFps == app::kLiveTargetFpsMin);
     }
-    // A file written before this existed: the defaults are the answer, not a refusal.
+    {
+        // A file written before this existed: the defaults are the answer, not a refusal.
+        auto doc = document;
+        doc["general"].erase("liveQuality");
+        doc["general"].erase("liveTargetFps");
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK_FALSE(out->liveQualityPinned.has_value());
+        CHECK(out->liveTargetFps == 60);
+    }
+}
+
+// ADR-1107: the live frame cap is on by default, round-trips, and a file without it (every file written
+// before it existed) gets the default.
+TEST_CASE("the live frame cap round-trips and defaults on", "[app][settings][live-quality]") {
+    app::AppSettings settings;
+    CHECK(settings.liveFrameCap);
+    CHECK(settings.toJson().at("general").at("liveFrameCap") == true);
+    settings.liveFrameCap = false;
+    const auto document = settings.toJson();
+    REQUIRE(document.at("general").at("liveFrameCap") == false);
+    const auto loaded = app::AppSettings::fromJson(document);
+    REQUIRE(loaded.has_value());
+    CHECK_FALSE(loaded->liveFrameCap);
     {
         auto doc = document;
-        doc["general"].erase("adaptiveCanvasScale");
-        doc["general"].erase("adaptiveCanvasBudgetMs");
+        doc["general"].erase("liveFrameCap");
         const auto out = app::AppSettings::fromJson(doc);
         REQUIRE(out.has_value());
-        CHECK(out->adaptiveCanvasScale);
-        CHECK(out->adaptiveCanvasBudgetMs == app::AppSettings{}.adaptiveCanvasBudgetMs);
+        CHECK(out->liveFrameCap);
+    }
+    {
+        // Not a bool: the default stands and the rest of the file still loads.
+        auto doc = document;
+        doc["general"]["liveFrameCap"] = "yes";
+        const auto out = app::AppSettings::fromJson(doc);
+        REQUIRE(out.has_value());
+        CHECK(out->liveFrameCap);
     }
 }
 
@@ -218,7 +252,7 @@ TEST_CASE("the adaptive render scale round-trips, and its budget is clamped rath
 TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[unit][settings][adr1024]") {
     app::AppSettings settings;
     CHECK(settings.liveAntialias);             // FXAA by default
-    CHECK(settings.adaptiveCanvasFloor == 0.5f); // the ladder's own floor by default
+    CHECK(settings.adaptiveCanvasFloor == app::kLiveScaleFloorMin); // the ladder's own floor by default
 
     settings.liveAntialias = false;
     settings.adaptiveCanvasFloor = 0.85f;
@@ -241,7 +275,7 @@ TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[un
         doc["general"]["adaptiveCanvasFloor"] = 0.1;
         const auto out = app::AppSettings::fromJson(doc);
         REQUIRE(out.has_value());
-        CHECK(out->adaptiveCanvasFloor == 0.5f);
+        CHECK(out->adaptiveCanvasFloor == app::kLiveScaleFloorMin);
     }
     {
         // A file written before this existed.
@@ -251,6 +285,6 @@ TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[un
         const auto out = app::AppSettings::fromJson(doc);
         REQUIRE(out.has_value());
         CHECK(out->liveAntialias);
-        CHECK(out->adaptiveCanvasFloor == 0.5f);
+        CHECK(out->adaptiveCanvasFloor == app::kLiveScaleFloorMin);
     }
 }

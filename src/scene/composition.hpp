@@ -290,6 +290,9 @@ struct CompositionNode {
     // working, not an edit to the work. It is saved with the scene, because which things you had
     // put out of the way is worth keeping between sessions.
     bool locked = false;
+    // ADR-1097: the node's visual importance for the live scalability levers, when authored. Unset (the default, and
+    // what every existing scene has): inferred at flatten -- Hero when the node is a hero in `heroes()`, else Normal.
+    std::optional<Importance> importance;
     // ADR-833 (Phase D §25): what this thing IS, in the world's semantic words ("ufo", "rock",
     // "world_effect"), for the characters' perception. Authored as `"tags"`; a generated
     // procedural adds its generator's name ("mushroom") by itself -- see `semanticTagsOf`.
@@ -958,6 +961,8 @@ public:
     // not be able to move, resize or relight anything. A rebuild triggered from here would be a
     // rebuild that only risks changing a frame.
     [[nodiscard]] const std::vector<world::HeroPoint>& heroes() const { return heroes_; }
+    // ADR-1097: the node's importance as the live levers read it (authored, else Hero for a hero, else Normal).
+    [[nodiscard]] Importance importanceOfNode(const CompositionNode& node) const;
     // The same heroes with their **authored** positions rather than their live ones, which is what
     // every serialiser wants and what `heroes()` cannot give it.
     //

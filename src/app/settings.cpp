@@ -54,8 +54,10 @@ json AppSettings::toJson() const {
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
     doc["general"] = json{{"canvasRenderScale", canvasRenderScale},
-                          {"adaptiveCanvasScale", adaptiveCanvasScale},
-                          {"adaptiveCanvasBudgetMs", adaptiveCanvasBudgetMs},
+                          {"liveQuality", liveQualityPinned ? std::string(liveQualityLevelToken(*liveQualityPinned))
+                                                            : std::string("auto")},
+                          {"liveTargetFps", liveTargetFps},
+                          {"liveFrameCap", liveFrameCap},
                           {"adaptiveCanvasFloor", adaptiveCanvasFloor},
                           {"liveAntialias", liveAntialias ? "fxaa" : "off"},
                           {"appearance", appearanceThemeName(appearance)},
@@ -105,16 +107,29 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
     AppSettings out;
     if (const auto general = doc.find("general"); general != doc.end() && general->is_object()) {
         out.canvasRenderScale = std::clamp(general->value("canvasRenderScale", 1.0f), 0.25f, 2.0f);
-        out.adaptiveCanvasScale = general->value("adaptiveCanvasScale", out.adaptiveCanvasScale);
-        // Clamped rather than refused: a budget of zero would pin the ladder at its floor forever
-        // and a budget of a second would make the controller dead weight, and neither is worth
-        // refusing a settings file over. 4 ms is below the measured fixed cost of a frame, so the
-        // bottom of the range is already "as fast as the resolution can make it".
-        out.adaptiveCanvasBudgetMs =
-            std::clamp(general->value("adaptiveCanvasBudgetMs", out.adaptiveCanvasBudgetMs), 4.0, 200.0);
-        // Clamped into the ladder's range; the application snaps it to the nearest rung.
+        // ADR-1083: "auto" or a level's token. Anything else is refused rather than guessed at.
+        if (const auto quality = general->find("liveQuality"); quality != general->end()) {
+            const std::string name = quality->is_string() ? quality->get<std::string>() : std::string{};
+            if (name == "auto") {
+                out.liveQualityPinned.reset();
+            } else if (const auto level = liveQualityLevelFromToken(name)) {
+                out.liveQualityPinned = *level;
+            } else {
+                return fail("general.liveQuality must be \"auto\", \"ultra\", \"high\", \"medium\", \"low\" or "
+                            "\"emergency\"");
+            }
+        }
+        // ADR-1080. Clamped rather than refused, like the scale: a hand-edited 1000 fps is "as fast as
+        // it can", not a reason to lose the rest of the file.
+        out.liveTargetFps =
+            std::clamp(general->value("liveTargetFps", out.liveTargetFps), kLiveTargetFpsMin, kLiveTargetFpsMax);
+        // ADR-1107. Not a bool is not a reason to lose the rest of the file: the default stands.
+        if (const auto cap = general->find("liveFrameCap"); cap != general->end() && cap->is_boolean()) {
+            out.liveFrameCap = cap->get<bool>();
+        }
+        // Clamped into the ladder's range (ADR-1024, ADR-1083).
         out.adaptiveCanvasFloor =
-            std::clamp(general->value("adaptiveCanvasFloor", out.adaptiveCanvasFloor), 0.5f, 1.0f);
+            std::clamp(general->value("adaptiveCanvasFloor", out.adaptiveCanvasFloor), kLiveScaleFloorMin, 1.0f);
         if (const auto aa = general->find("liveAntialias"); aa != general->end()) {
             const std::string name = aa->is_string() ? aa->get<std::string>() : std::string{};
             if (name != "fxaa" && name != "off") {

@@ -713,6 +713,65 @@ TEST_CASE("cull bounds contain a pose that reaches outside the bind pose", "[sce
     CHECK(bent.min.x < bindLo.x - bindPad.x);
 }
 
+// ADR-1082: the posed box is computed once per pose, however many callers ask in a frame, and a
+// changed pose is never answered from the cache -- including one whose `paletteVersion` did not move
+// (the case above writes the palette directly, which is exactly what a version-keyed cache would
+// have answered wrongly).
+TEST_CASE("posed cull bounds are skinned once per pose and follow every pose change", "[scene][skeleton][culling]") {
+    scene::Scene scene;
+    const auto mesh = scene.addMesh(reachingBar());
+    scene::SkinnedRig rig;
+    scene::Joint root;
+    root.name = "root";
+    root.parent = -1;
+    rig.skeleton.joints.push_back(root);
+    scene::Joint tip;
+    tip.name = "tip";
+    tip.parent = 0;
+    tip.rest.position = {0.0f, 1.5f, 0.0f};
+    rig.skeleton.joints.push_back(tip);
+    rig.skeleton.palette = {0, 1};
+    scene.rigs.push_back(rig);
+    auto& entity = scene.addEntity("bar", mesh);
+    entity.rig = 0;
+
+    scene.rigs[0].palette = barPalette(0.0f);
+    const std::uint64_t before = scene.posedBoundsComputes();
+    const scene::CullBounds first = scene::entityCullBounds(scene, entity);
+    const scene::CullBounds unpadded = scene::entityCullBounds(scene, entity, 0.0f, 0.0f);
+    const scene::CullBounds again = scene::entityCullBounds(scene, entity);
+    // Three askers, one skinning -- the cull, the diagnostic's true box and its margin box.
+    CHECK(scene.posedBoundsComputes() == before + 1);
+    CHECK(first.posed);
+    CHECK(again.min == first.min);
+    CHECK(again.max == first.max);
+    CHECK(unpadded.min.x > first.min.x);
+
+    // `hold()` bumps the version and leaves the pose: no recompute.
+    scene.rigs[0].previousPalette = scene.rigs[0].palette;
+    ++scene.rigs[0].paletteVersion;
+    static_cast<void>(scene::entityCullBounds(scene, entity));
+    CHECK(scene.posedBoundsComputes() == before + 1);
+
+    // A new pose with the version left alone: recomputed, and the box follows it.
+    scene.rigs[0].palette = barPalette(1.5707963f);
+    const scene::CullBounds bent = scene::entityCullBounds(scene, entity);
+    CHECK(scene.posedBoundsComputes() == before + 2);
+    CHECK(bent.min.x < first.min.x - 1.0f);
+
+    // Back to the first pose: the box is the first one again (no stale bent box).
+    scene.rigs[0].palette = barPalette(0.0f);
+    const scene::CullBounds back = scene::entityCullBounds(scene, entity);
+    CHECK(back.min == first.min);
+    CHECK(back.max == first.max);
+
+    // A mesh edit (meshVersion) invalidates even an identical palette.
+    const std::uint64_t computes = scene.posedBoundsComputes();
+    ++scene.meshVersion;
+    static_cast<void>(scene::entityCullBounds(scene, entity));
+    CHECK(scene.posedBoundsComputes() == computes + 1);
+}
+
 TEST_CASE("an unskinned entity uses its mesh bounds and says so", "[scene][skeleton][culling]") {
     scene::Scene scene;
     const auto mesh = scene.addMesh(reachingBar());

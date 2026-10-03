@@ -1,4 +1,5 @@
 #include "rendering/shader_layer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "gpu/frame_timeline.hpp"
 
@@ -161,7 +162,7 @@ Result<wgpu::RenderPipeline> ShaderLayerGpu::pipelineFor(wgpu::TextureFormat for
     desc.fragment = &fragment;
 
     context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
     std::string error;
     auto future = context_.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

@@ -1,5 +1,7 @@
 #include "scene/scene.hpp"
 
+#include <cstring>
+
 #include <atomic>
 
 #include "core/log.hpp"
@@ -171,6 +173,55 @@ const std::pair<glm::vec3, glm::vec3>& Scene::meshBounds(MeshId mesh) const {
     return meshBoundsCache_[mesh];
 }
 
+std::optional<Scene::PosedBox> Scene::posedMeshBounds(MeshId meshId, RigId rigId) const {
+    if (meshId >= meshes.size() || rigId >= rigs.size()) {
+        return std::nullopt;
+    }
+    const MeshData& mesh = meshes[meshId];
+    const SkinnedRig& rig = rigs[rigId];
+    if (!mesh.skinned() || rig.palette.empty() || rig.skeleton.palette.empty()) {
+        return std::nullopt;
+    }
+    PosedBoundsEntry& entry = posedBoundsCache_[(static_cast<std::uint64_t>(rigId) << 32) | meshId];
+    const std::size_t bytes = rig.palette.size() * sizeof(glm::mat4);
+    if (entry.meshVersion == meshVersion && entry.palette.size() == rig.palette.size() &&
+        std::memcmp(entry.palette.data(), rig.palette.data(), bytes) == 0) {
+        return entry.box;
+    }
+    ++posedBoundsComputes_;
+    // Every vertex is transformed by its own weighted joints -- the same arithmetic the skinning
+    // shader does -- so the box is the geometry the frame will actually draw rather than the
+    // geometry the asset was authored in.
+    glm::vec3 posedLo(std::numeric_limits<float>::max());
+    glm::vec3 posedHi(std::numeric_limits<float>::lowest());
+    bool any = false;
+    for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
+        glm::vec3 position(0.0f);
+        float weightSum = 0.0f;
+        const SkinInfluence& influence = mesh.skin[i];
+        for (std::size_t j = 0; j < kJointInfluences; ++j) {
+            const float weight = influence.weights[j];
+            if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
+                continue;
+            }
+            position += glm::vec3(rig.palette[influence.joints[j]] * glm::vec4(mesh.vertices[i].position, 1.0f)) *
+                        weight;
+            weightSum += weight;
+        }
+        if (weightSum <= 1e-6f) {
+            continue; // an unweighted vertex is not posed by anything; the bind box covers it
+        }
+        position /= weightSum;
+        posedLo = glm::min(posedLo, position);
+        posedHi = glm::max(posedHi, position);
+        any = true;
+    }
+    entry.meshVersion = meshVersion;
+    entry.palette = rig.palette;
+    entry.box = any ? std::optional<PosedBox>(PosedBox{posedLo, posedHi}) : std::nullopt;
+    return entry.box;
+}
+
 std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
@@ -228,6 +279,7 @@ void Scene::clear() {
     // on this one's identity must be told so rather than inferring it from a counter that also
     // moves for an ordinary edit.
     identity = mintSceneIdentity();
+    posedBoundsCache_.clear(); // ADR-1082: content-keyed, so this is memory, not correctness
 }
 
 CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padFraction,
@@ -254,42 +306,13 @@ CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padF
     // Fixing that would make this loop nine times cheaper; caching it makes it free.
     auto [lo, hi] = scene.meshBounds(entity.mesh);
 
-    // The posed box, when there is a palette to pose with. Every vertex is transformed by its own
-    // weighted joints -- the same arithmetic the skinning shader does -- so the box is the geometry
-    // the frame will actually draw rather than the geometry the asset was authored in.
+    // The posed box, when there is a palette to pose with (ADR-1082: once per pose, cached on the
+    // scene; see `Scene::posedMeshBounds`).
     if (entity.rig != kInvalidRig && entity.rig < scene.rigs.size() && mesh.skinned()) {
-        const SkinnedRig& rig = scene.rigs[entity.rig];
-        if (!rig.palette.empty() && !rig.skeleton.palette.empty()) {
-            glm::vec3 posedLo(std::numeric_limits<float>::max());
-            glm::vec3 posedHi(std::numeric_limits<float>::lowest());
-            bool any = false;
-            for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
-                glm::vec3 position(0.0f);
-                float weightSum = 0.0f;
-                const SkinInfluence& influence = mesh.skin[i];
-                for (std::size_t j = 0; j < kJointInfluences; ++j) {
-                    const float weight = influence.weights[j];
-                    if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
-                        continue;
-                    }
-                    position += glm::vec3(rig.palette[influence.joints[j]] *
-                                          glm::vec4(mesh.vertices[i].position, 1.0f)) *
-                                weight;
-                    weightSum += weight;
-                }
-                if (weightSum <= 1e-6f) {
-                    continue; // an unweighted vertex is not posed by anything; the bind box covers it
-                }
-                position /= weightSum;
-                posedLo = glm::min(posedLo, position);
-                posedHi = glm::max(posedHi, position);
-                any = true;
-            }
-            if (any) {
-                lo = posedLo;
-                hi = posedHi;
-                out.posed = true;
-            }
+        if (const auto posed = scene.posedMeshBounds(entity.mesh, entity.rig); posed.has_value()) {
+            lo = posed->min;
+            hi = posed->max;
+            out.posed = true;
         }
     }
 
@@ -392,6 +415,44 @@ std::optional<SurfaceClass> surfaceClassFromName(std::string_view name) {
         }
     }
     return std::nullopt;
+}
+
+} // namespace avgen::scene
+
+namespace avgen::scene {
+
+// ADR-1097.
+const char* importanceName(Importance importance) {
+    switch (importance) {
+    case Importance::Hero: return "hero";
+    case Importance::Foreground: return "foreground";
+    case Importance::Normal: return "normal";
+    case Importance::Background: return "background";
+    case Importance::Ambient: return "ambient";
+    }
+    return "normal";
+}
+
+bool importanceFromName(std::string_view name, Importance& out) {
+    for (const auto i : {Importance::Hero, Importance::Foreground, Importance::Normal, Importance::Background,
+                         Importance::Ambient}) {
+        if (name == importanceName(i)) {
+            out = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+float importanceLeverWeight(Importance importance) {
+    switch (importance) {
+    case Importance::Hero: return 0.0f;       // exempt
+    case Importance::Foreground: return 0.5f; // half as hard
+    case Importance::Normal: return 1.0f;
+    case Importance::Background: return 1.5f;
+    case Importance::Ambient: return 2.0f;
+    }
+    return 1.0f;
 }
 
 } // namespace avgen::scene

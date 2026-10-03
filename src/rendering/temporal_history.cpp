@@ -1,4 +1,5 @@
 #include "rendering/temporal_history.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -277,7 +278,7 @@ Result<void> TemporalHistory::reload() {
     desc.fragment = &fragment;
 
     im.context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = im.context.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(im.context.device(), &desc);
     std::string error;
     auto future = im.context.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

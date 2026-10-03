@@ -1,4 +1,5 @@
 #include "rendering/debug_draw.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 
@@ -76,7 +77,7 @@ Result<void> DebugDraw::init(wgpu::TextureFormat colorFormat, wgpu::TextureForma
         desc.primitive.cullMode = wgpu::CullMode::None;
         desc.depthStencil = &depth;
         desc.fragment = &fragment;
-        return context_.device().CreateRenderPipeline(&desc);
+        return gpu::createRenderPipeline(context_.device(), &desc);
     };
     linePipeline_ = makePipeline("debug-lines", "vs_lines", wgpu::PrimitiveTopology::LineList, true);
     linePipelineNoDepth_ = makePipeline("debug-lines-overlay", "vs_lines", wgpu::PrimitiveTopology::LineList, false);

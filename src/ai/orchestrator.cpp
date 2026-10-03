@@ -175,6 +175,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (evaluationHook_) {
                 ctx.setEvaluationHook(evaluationHook_);
             }
+            if (profileHook_) {
+                ctx.setProfileHook(profileHook_); // ADR-1106
+            }
             ctx.setObservation(task.observation());
             ctx.onProgress = [&task, &call](float fraction, const std::string& note) {
                 Activity a;

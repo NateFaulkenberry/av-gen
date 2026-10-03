@@ -327,6 +327,7 @@ struct EntityUpdate {
     // where the budget that made the bands worth having does not apply, and where a motionless far
     // herd is a visible defect rather than a saving.
     bool distanceDetail = true;
+    float distanceScale = 1.0f; // ADR-1094: scene::DetailLimits::distanceScale
 };
 
 // What the field pass needs. The bus is not const here because a field *publishes*: occupancy and
@@ -338,6 +339,7 @@ struct FieldUpdate {
     signals::SignalBus* bus = nullptr;
     glm::vec3 viewPosition{0.0f}; // the same three-band behaviour LOD the behaviour pass uses
     bool distanceDetail = true;   // ADR-186; see EntityUpdate
+    float distanceScale = 1.0f;   // ADR-1094; see EntityUpdate
 };
 
 // ---- the Director tier's hold on a body (ADR-210) ----------------------------------------------

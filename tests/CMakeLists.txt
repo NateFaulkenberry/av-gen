@@ -36,6 +36,9 @@ target_sources(avgen_tests PRIVATE
     # takes a GPU time and a wall time per frame and returns a rung -- so the control law can be
     # checked for the thing a benchmark cannot show it: that it settles instead of oscillating.
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
+    # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
+    "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/live_profile_hook.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
     # The example index is JSON and paths. It is here so the menu the application builds is the one
     # the test reads: checking the raw JSON instead passed on an index the application then refused.
@@ -183,7 +186,9 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp"
         # ADR-764: a proposed plan's preview stills, rendered from a scratch copy.
-        "${CMAKE_SOURCE_DIR}/src/app/director_stills.cpp")
+        "${CMAKE_SOURCE_DIR}/src/app/director_stills.cpp"
+        # ADR-1100: the engine reads and writes the project's live block through these.
+        "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     # Output windows need the platform layer (SDL); the window smoke test enumerates displays.
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu avgen_platform Catch2::Catch2WithMain)

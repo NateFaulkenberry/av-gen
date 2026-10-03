@@ -3344,6 +3344,150 @@ void registerPerformanceTools(ToolRegistry& registry) {
                                   fmt::format("{:.1f} fps, {} draws", snapshot.fps,
                                               snapshot.drawCalls));
         });
+
+    // ---- ADR-1106: the live profiler, and the project's live quality settings ----
+    ToolAnnotations profiles;
+    profiles.readOnly = true;   // a scratch copy is profiled; the project is not touched
+    profiles.expensive = true;  // a child process renders seconds of the scene
+    profiles.idempotent = false;
+    add(registry, "performance.profile_scene", "Profile the scene for live performance",
+        "Run the live scene profiler (avgen --live-profile) on a scratch copy of the project, in a child process, and "
+        "return its record (schema avgen.liveprofile/1): frame statistics against the target's budget, the critical path "
+        "(GPU, CPU or sync), GPU time by category, CPU time by stage, resources, and optimization candidates with "
+        "ESTIMATED savings (and MEASURED ones when verifyCandidates > 0). Headless by default (deterministic, no present); "
+        "\"live\" opens windows and measures the real loop. Seconds to minutes. The editor keeps rendering meanwhile, so "
+        "the GPU is shared and the numbers are contended: for numbers to quote, run the command with the editor closed.",
+        schema::object({{"mode", schema::string("headless (default) or live", {"headless", "live"})},
+                        {"targetFps", schema::number("the live target, 24..240 (default 60)", 24.0, 240.0)},
+                        {"width", schema::integer("the output width in pixels (default 1920)", 16.0, 7680.0)},
+                        {"height", schema::integer("the output height in pixels (default 1080)", 16.0, 4320.0)},
+                        {"start", schema::number("seconds into the piece to measure from (default 0)", 0.0)},
+                        {"quality", schema::string("auto, a level (ultra..emergency) or a profile (quality, balanced, "
+                                                   "performance); default auto")},
+                        {"deep", schema::boolean("the deep mode: 5 s warm-up cap and 20 s measured (default false)")},
+                        {"verifyCandidates", schema::integer("measure the top N candidates' savings by A/B (0-8)", 0.0, 8.0)}}),
+        profiles, [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (!ctx.profileHook()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "profiling is not available in this session (the host installed no profiler)");
+            }
+            ProfileRequest request;
+            request.mode = args.value("mode", std::string("headless"));
+            request.targetFps = args.value("targetFps", 60.0);
+            request.width = static_cast<std::uint32_t>(args.value("width", 1920));
+            request.height = static_cast<std::uint32_t>(args.value("height", 1080));
+            request.start = args.value("start", 0.0);
+            request.quality = args.value("quality", std::string("auto"));
+            request.deep = args.value("deep", false);
+            request.verifyCandidates = std::clamp(args.value("verifyCandidates", 0), 0, 8);
+            if (request.mode != "headless" && request.mode != "live") {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "mode must be headless or live");
+            }
+            auto handle = ctx.profileHook()(ctx.engine(), request);
+            if (!handle) {
+                return ToolResult::failure(ToolErrorCode::Internal, "the profile did not start: " + handle.error().message);
+            }
+            ctx.deferResult(std::move(*handle));
+            return ToolResult::ok(json{{"profiling", true}}, "profiling");
+        });
+    add(registry, "performance.get_live_quality", "Read the live quality settings",
+        "The project's live block (ADR-1084/1100): target frame rate, profile (QUALITY/BALANCED/PERFORMANCE), the "
+        "strategy, the lowest level the controller may use, the degradation priority, and the ceilings the Optimize "
+        "review applied. Unset fields are reported as null and mean the machine's or the default.",
+        noArgs(), readOnly(), [](const json&, ToolContext& ctx) -> ToolResult {
+            const app::Engine& e = ctx.engine();
+            const app::LiveProjectSettings& s = e.liveSettings();
+            json j;
+            j["targetFps"] = s.targetFps ? json(*s.targetFps) : json(nullptr);
+            j["profile"] = s.profile ? json(std::string(app::qualityProfileToken(*s.profile))) : json(nullptr);
+            j["strategy"] = std::string(app::liveQualityStrategyToken(e.liveQualityStrategy()));
+            j["strategyStated"] = e.liveQualityStrategyStated();
+            j["minimumLevel"] =
+                s.minimumLevel ? json(std::string(app::liveQualityLevelToken(*s.minimumLevel))) : json(nullptr);
+            j["priority"] = s.priority;
+            j["overrides"] = s.overrides ? json::parse(app::ceilingJsonText(*s.overrides)) : json(nullptr);
+            return ToolResult::ok(std::move(j), "live quality settings");
+        });
+    ToolAnnotations liveWrite = sessionWrite();
+    add(registry, "performance.set_live_quality", "Change the live quality settings",
+        "Change the project's live block. Only the fields given change; null clears one. \"applyLevers\" adds A/B "
+        "levers (the candidates' \"lever\" names: volumequarter, posttaps, castercull, lodbias2, ...) to the project's "
+        "ceilings -- what the Optimize review's Apply does. Never edits the scene; the quality only ever lowers what the "
+        "scene asks for, and heroes are exempt. Save the project to keep it.",
+        schema::object({{"targetFps", schema::integer("24..240, or null to clear", 24.0, 240.0)},
+                        {"profile", schema::string("quality, balanced, performance (or null)")},
+                        {"strategy", schema::string("resolution_first, balanced, effects_first")},
+                        {"minimumLevel", schema::string("ultra, high, medium, low, emergency (or null)")},
+                        {"priority", schema::array(schema::string("a lever group"),
+                                                   "particles, shadows, volumes, post, lod, resolution, in the order "
+                                                   "to give them up; [] clears")},
+                        {"applyLevers", schema::array(schema::string("an A/B lever"), "levers to add as ceilings")},
+                        {"clearOverrides", schema::boolean("remove every ceiling Optimize applied")}}),
+        liveWrite, [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& e = ctx.engine();
+            app::LiveProjectSettings s = e.liveSettings();
+            if (args.contains("targetFps")) {
+                if (args["targetFps"].is_null()) s.targetFps.reset();
+                else s.targetFps = std::clamp(args["targetFps"].get<int>(), app::kLiveTargetFpsMin, app::kLiveTargetFpsMax);
+            }
+            if (args.contains("profile")) {
+                if (args["profile"].is_null()) {
+                    s.profile.reset();
+                } else if (const auto p = app::qualityProfileFromToken(args["profile"].get<std::string>())) {
+                    s.profile = *p;
+                } else {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               "profile must be quality, balanced or performance");
+                }
+            }
+            if (args.contains("strategy")) {
+                const auto st = app::liveQualityStrategyFromToken(args.value("strategy", std::string()));
+                if (!st) {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               "strategy must be resolution_first, balanced or effects_first");
+                }
+                e.setLiveQualityStrategy(*st);
+            }
+            if (args.contains("minimumLevel")) {
+                if (args["minimumLevel"].is_null()) {
+                    s.minimumLevel.reset();
+                } else if (const auto l = app::liveQualityLevelFromToken(args["minimumLevel"].get<std::string>())) {
+                    s.minimumLevel = *l;
+                } else {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               "minimumLevel must be ultra, high, medium, low or emergency");
+                }
+            }
+            if (args.contains("priority")) {
+                std::vector<std::string> groups = args["priority"].get<std::vector<std::string>>();
+                std::string error;
+                if (!groups.empty() && !app::ladderFromPriority(groups, error)) {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments, "priority: " + error);
+                }
+                s.priority = std::move(groups);
+            }
+            if (args.value("clearOverrides", false)) {
+                s.overrides.reset();
+            }
+            std::vector<std::string> applied;
+            if (args.contains("applyLevers")) {
+                app::LiveQualityRung c = s.overrides.value_or(app::LiveQualityRung{});
+                for (const std::string& lever : args["applyLevers"].get<std::vector<std::string>>()) {
+                    if (!app::applyLeverToCeiling(c, lever)) {
+                        return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                                   "'" + lever + "' has no form the project can keep");
+                    }
+                    applied.push_back(lever);
+                }
+                s.overrides = c;
+            }
+            e.setLiveSettings(s);
+            ctx.changes().note("live", "live quality settings changed");
+            json out;
+            out["overrides"] = s.overrides ? json::parse(app::ceilingJsonText(*s.overrides)) : json(nullptr);
+            out["applied"] = applied;
+            return ToolResult::ok(std::move(out), "live quality settings changed");
+        });
 }
 
 } // namespace

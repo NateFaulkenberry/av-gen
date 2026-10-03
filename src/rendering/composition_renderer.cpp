@@ -1,4 +1,5 @@
 #include "rendering/composition_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -190,7 +191,7 @@ Result<wgpu::RenderPipeline> CompositionRenderer::pipelineFor(wgpu::TextureForma
     desc.primitive.cullMode = wgpu::CullMode::None;
     desc.multisample.count = 1; // Apple TBDR: no MSAA anywhere. Text edges come from the field.
     desc.fragment = &fragment;
-    wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
     if (pipeline == nullptr) {
         return fail("cannot create the composition pipeline");
     }

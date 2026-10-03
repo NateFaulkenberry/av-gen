@@ -9,6 +9,7 @@
 #include "app/engine.hpp"
 #include "app/interactive_resolution.hpp"
 #include "app/viewport_camera.hpp"
+#include "app/live_profile.hpp"
 #include "scene/camera_rig.hpp"
 #include "app/placement.hpp"
 #include "app/viewport_pick.hpp"
@@ -73,6 +74,10 @@ namespace avgen::ui {
 class ImGuiLayer;
 class ControlPanel;
 } // namespace avgen::ui
+
+namespace avgen::rendering {
+struct RenderStats;
+} // namespace avgen::rendering
 
 namespace avgen::app {
 
@@ -147,15 +152,21 @@ struct AppOptions {
     std::string aiPrompt;
     std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
-    // --adaptive-scale on|off: override the settings file's `adaptiveCanvasScale` for this run.
+    // --adaptive-scale on|off, --live-quality <auto|ultra|high|medium|low|emergency> (ADR-1083):
+    // override this machine's live quality setting for the run (`on` is auto, `off` pins Ultra).
     // Unset means "whatever this machine's settings say", which is what a person launching the
-    // editor gets; a benchmark arm has to be able to state which of the two it is measuring
-    // without depending on how a settings file happens to be left (the reason `--preview-mode`
-    // exists and is written the same way).
-    std::optional<bool> adaptiveScale;
-    // --adaptive-budget <ms>: the GPU frame time the controller aims at. 0 = use the setting.
-    double adaptiveBudgetMs = 0.0;
-    // --adaptive-floor <scale>: the lowest scale the controller may reach (ADR-1024). 0 = use the
+    // editor gets; a benchmark arm has to be able to state which mode it is measuring without
+    // depending on how a settings file happens to be left (the reason `--preview-mode` exists).
+    struct LiveQualityOverride {
+        bool given = false;
+        std::optional<LiveQualityLevel> pinned; // nullopt = automatic
+    };
+    LiveQualityOverride liveQuality;
+    // --live-target <fps> (ADR-1080): the live frame-rate target for the run. 0 = use the setting.
+    int liveTargetFps = 0;
+    // --live-frame-cap <on|off> (ADR-1107): pace the live loop at the target. Unset = the setting.
+    std::optional<bool> liveFrameCap;
+    // --adaptive-floor <scale>: the lowest scale the ladder may reach (ADR-1024). 0 = use the
     // setting.
     float adaptiveFloor = 0.0f;
     // --live-aa <fxaa|off> (ADR-1024): the live viewport's FXAA floor. Unset = the setting in the
@@ -323,6 +334,8 @@ struct AppOptions {
     bool sizeGiven = false;
     log::Level logLevel = log::Level::Info;
     bool showHelp = false;
+    // ADR-1090: `--live-profile` and its own flags (app/live_profile.hpp). Enabled = profile and exit.
+    LiveProfileOptions liveProfile;
 };
 
 Result<AppOptions> parseArgs(int argc, char** argv);
@@ -339,6 +352,31 @@ private:
     double lastEngineUpdateMs_ = 0.0; // CPU cost of rebuilding the scene, per frame
     int runLive();
     int runHeadless();
+    // ADR-1090: `--live-profile`. Headless: its own fixed-step loop (app/live_profile_run.cpp). Live: the editor loop
+    // runs as always and hands each frame to `noteLiveProfileFrame`, which ends the run when measurement is done.
+    int runLiveProfileHeadless();
+    struct LiveProfileSession;
+    std::unique_ptr<LiveProfileSession> liveProfileSession_;
+    void beginLiveProfile();
+    // Returns false when the profile is finished and the loop should end.
+    bool noteLiveProfileFrame(const LiveProfileFrame& frame);
+    int finishLiveProfile();
+    void fillLiveProfileResources(LiveProfileRecord& record, const std::vector<rendering::RenderStats>& stats);
+    void fillLiveProfileConditions(LiveProfileRecord& record, bool live);
+    // Stage 5 groundwork (data only): per-entity projected area, distance and hero flag.
+    void fillLiveProfileEntities(LiveProfileRecord& record);
+    int writeLiveProfile(LiveProfileRecord& record);
+    std::chrono::steady_clock::time_point initStart_{};
+    // ADR-1100/1101: the Performance panel's Live Performance section, fed from the frames the editor rendered.
+    void wireLivePerformancePanel();
+    void notePerformanceFrame(const LiveProfileFrame& frame);
+    std::deque<LiveProfileFrame> perfFrames_;
+    std::deque<rendering::RenderStats> perfStats_;
+    std::uint64_t perfFramesSeen_ = 0;
+    LiveProfileRecord perfRecord_;
+    std::optional<LiveProjectSettings> optimizationUndo_;
+    // ADR-1090: the profile's output size for the projection window, in points (never written to the settings file).
+    std::uint32_t projectionWidthOverride_ = 0, projectionHeightOverride_ = 0;
     void loadAudio(const std::filesystem::path& path);
     // Asks for `path` to be opened at the top of the next frame, so the canvas can say so first.
     // See the note at the definition for why the load itself stays on the main thread.
@@ -469,13 +507,19 @@ private:
     void applyOutputsFromProject();
     void storeOutputsToProject();
     // ADR-1026: the Live panel's projection. Start/stop from the panel; serviceProjection once per frame before the
-    // outputs present (it opens the window once the demo has loaded, keeps the picture's scaling, and stops when the
-    // window is closed or its display is unplugged).
+    // outputs present (it keeps the picture's scaling, and stops when the window is closed or its display is
+    // unplugged). ADR-1088: it projects the open project; nothing is loaded or switched on for it.
     void startProjection();
     void stopProjection();
     void openProjectionWindow();
     void serviceProjection();
-    [[nodiscard]] bool projectIsLive() const;
+    // ADR-1080/1083: the live quality ladder. `liveQualitySettings` is what the controller should be
+    // configured with now (this machine's settings, the run's flags, the project's hint);
+    // `serviceLiveQuality` reconfigures it when that moved and applies the rung in force.
+    [[nodiscard]] InteractiveResolutionSettings liveQualitySettings() const;
+    [[nodiscard]] std::optional<LiveQualityLevel> livePinnedQuality() const;
+    [[nodiscard]] std::optional<QualityProfile> liveQualityProfile() const;
+    void serviceLiveQuality();
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
     std::vector<ProjectionDisplay> projectionDisplays_;
@@ -608,7 +652,30 @@ private:
     // thing the frame is waiting for. Live editor only -- `runHeadless` and `RenderJob` never
     // construct a decision, and the Offline tier pins `renderScale` to 1 regardless.
     InteractiveResolution autoResolution_;
-    std::size_t autoResolutionRung_ = 0; // the rung currently applied to the renderer
+    // ADR-1083: the ladder rung last applied to the renderer, and what it was applied under. A
+    // change in any of them re-applies; nothing else touches the ladder's fields.
+    struct AppliedLiveQuality {
+        bool valid = false;
+        std::size_t rung = 0;
+        LiveQualityStrategy strategy = LiveQualityStrategy::Balanced;
+        float scaleFloor = 1.0f;
+    };
+    AppliedLiveQuality appliedLiveQuality_;
+    // The live tier's own settings (and any quality arm), captured once before the ladder first
+    // touches them: what Ultra is, and what every rung's ceilings are ceilings on.
+    rendering::QualitySettings liveQualityBase_;
+    rendering::QualitySettings liveTierBase_; // ADR-1099: the tier before the profile and the project's ceilings
+    std::uint64_t liveSettingsRevisionApplied_ = ~0ull;
+    std::optional<QualityProfile> liveProfileApplied_;
+    bool haveLiveQualityBase_ = false;
+    // Smoothed for the Live panel's status line (an exponential average over about a second), so
+    // the numbers can be read rather than watched flicker.
+    double liveGpuMsShown_ = -1.0;
+    double liveGpuSpanShown_ = -1.0;
+    double liveIntervalShown_ = -1.0;
+    double liveCpuMsShown_ = -1.0;
+    std::uint64_t liveTransitions_ = 0;
+    std::uint64_t liveTransitionsProfiled_ = 0;
 
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};

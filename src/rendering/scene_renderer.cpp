@@ -1,4 +1,5 @@
 #include "rendering/scene_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
 #include "rendering/environment.hpp"
@@ -777,7 +778,7 @@ Result<void> SceneRenderer::createLightResources() {
         desc.compute.module = clusterModule_;
         desc.compute.entryPoint = "cs_build";
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
-        clusterPipeline_ = device.CreateComputePipeline(&desc);
+        clusterPipeline_ = gpu::createComputePipeline(device, &desc);
         std::string error;
         auto future = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
                                            [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -1139,7 +1140,7 @@ Result<void> SceneRenderer::createPipelines() {
 Result<wgpu::RenderPipeline> SceneRenderer::finishPipeline(const wgpu::RenderPipelineDescriptor& desc,
                                                           const char* label) {
     context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
     std::string error;
     auto future = context_.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -1825,6 +1826,26 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // the live picture's FXAA without the editor.
         {"liveaa", [](QualitySettings& q) { q.antialiasFloor = kLiveAntialiasFloor; },
          "antialiasFloor=0.75 (the live editor's FXAA floor, ADR-1024)"},
+        // ---- ADR-1094..1098: the live scalability levers, each as an arm so a profile can measure it ----
+        {"nomotionblur", [](QualitySettings& q) { q.motionBlur = false; },
+         "motionBlur=false (the live gate closed, ADR-1083)"},
+        {"nodof", [](QualitySettings& q) { q.depthOfField = false; },
+         "depthOfField=false (the live gate closed, ADR-1083)"},
+        {"posttaps", [](QualitySettings& q) { q.postEffectQuality = 0.5f; },
+         "postEffectQuality=0.5 (half the motion-blur samples and the depth-of-field tap cap)"},
+        {"lodbias2", [](QualitySettings& q) { q.lodBias = 2.0f; },
+         "lodBias=2 (every LOD switch at half the distance / twice the projected size; heroes exempt)"},
+        {"drawdist75", [](QualitySettings& q) { q.drawDistanceScale = 0.75f; },
+         "drawDistanceScale=0.75 (authored draw and entity/rig distances at three quarters; heroes exempt)"},
+        {"castercull", [](QualitySettings& q) { q.shadowCasterMinPixels = 24.0f; },
+         "shadowCasterMinPixels=24 (non-hero casters smaller than 24 px on screen cast no shadow)"},
+        {"particlelod", [](QualitySettings& q) {
+             q.particleSpawnScale = std::min(q.particleSpawnScale, 0.7f);
+             q.particleCullDistance = 60.0f;
+         },
+         "particleSpawnScale<=0.7, particleCullDistance=60 m (non-hero emitters beyond it skipped)"},
+        {"noprograms", [](QualitySettings& q) { q.materialProgramsOff = true; },
+         "materialProgramsOff (programs bypassed: what they cost, a diagnostic arm only)"},
     };
     return kArms;
 }
@@ -2380,7 +2401,9 @@ const gpu::GpuTexture& SceneRenderer::textureOrDefault(const scene::TextureRef& 
 const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& material) {
     // The program slot is part of the key: the same textures with a different program need their
     // own group (it binds a different 16-byte region of the select buffer).
-    const int programSlot = materialPrograms_->slotOf(material.program);
+    // ADR-1098: the `noprograms` diagnostic arm draws every program-driven material as its base material, so the live
+    // profiler can MEASURE what the programs cost. Part of the key below, so both states keep their own groups.
+    const int programSlot = qualitySettings_.materialProgramsOff ? -1 : materialPrograms_->slotOf(material.program);
     const std::uint64_t key = materialKey(material) * 31ull + static_cast<std::uint64_t>(programSlot + 1);
     if (auto it = materialBindGroups_.find(key); it != materialBindGroups_.end()) {
         return it->second;
@@ -2809,11 +2832,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     diagnosticFrame_.viewportWidth = hdr_.width();
     diagnosticFrame_.viewportHeight = hdr_.height();
     const FrustumPlanes diagnosticPlanes = frustumPlanes(diagnosticFrame_.viewProjection);
-    diagnosticFrame_.objects.reserve(scene.entities.size());
+    // ADR-1081: the per-object records only when something will read them. The finiteness check
+    // below is not a diagnostic -- it refuses the frame -- so it runs either way.
+    diagnosticRecordsBuilt_ = diagnosticRecords_ || !diagnosticEntity_.empty();
+    if (diagnosticRecordsBuilt_) {
+        diagnosticFrame_.objects.reserve(scene.entities.size());
+    }
     for (const scene::Entity& entity : scene.entities) {
         const glm::mat4 model = entity.transform.matrix();
         if (!finiteMatrix(model)) {
             return fail("scene render: entity '{}' produced a non-finite model matrix", entity.name);
+        }
+        if (!diagnosticRecordsBuilt_) {
+            continue;
         }
         RenderObjectDiagnostic diagnostic;
         diagnostic.name = entity.name;
@@ -3262,7 +3293,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Each cascade's own frustum, built once: the entity loop uses it to decide whether an
     // off-screen caster is worth a slot, and the passes below reuse it per view.
     const auto& shadowViewList = shadows_->views();
-    const std::uint32_t shadowViews = toggles_.shadows ? std::min(shadows_->stats().views, kMaxShadowViews) : 0;
+    std::uint32_t shadowViews = toggles_.shadows ? std::min(shadows_->stats().views, kMaxShadowViews) : 0;
     std::vector<FrustumPlanes> cascadePlanes(shadowViews);
     for (std::uint32_t v = 0; v < shadowViews && v < shadowViewList.size(); ++v) {
         cascadePlanes[v] = frustumPlanes(shadowViewList[v].viewProj);
@@ -3363,6 +3394,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         in.radius = radius;
         in.surfaceArea = chain.rungs.front().surfaceArea * areaScale;
         in.triangles = chain.rungs.front().triangles;
+        // ADR-1097: a hero (inferred from Composition::heroes(), or a node marked so) keeps the policy's hero floor.
+        in.hero = entity.importance == scene::Importance::Hero;
         const ImportanceRecord record =
             ImportanceEvaluator::evaluate(lodView, in, static_cast<std::uint32_t>(thisEntity));
         // The rungs, at this instance's scale. Rebuilt per entity because two instances of one mesh
@@ -3383,6 +3416,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         policy.hysteresis = chain.hysteresis;
         if (chain.maxScreenError >= 0.0f) {
             policy.maxScreenError = chain.maxScreenError;
+        }
+        // ADR-1094: the live LOD bias. More screen error allowed is a coarser rung sooner; a hero is exempt, a
+        // background node takes it harder (scene::importanceLeverWeight).
+        if (qualitySettings_.lodBias != 1.0f) {
+            const float weight = scene::importanceLeverWeight(entity.importance);
+            policy.maxScreenError *= std::max(0.25f, 1.0f + (qualitySettings_.lodBias - 1.0f) * weight);
         }
         const RepresentationChoice choice = representation_.select(record, rungs, policy);
         // The kinds that are not built map to the coarsest rung rather than to nothing. They cannot
@@ -3517,11 +3556,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
-        RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
-        diagnostic.objectSlot = objectIndex;
-        diagnostic.bufferOffset = offset;
-        diagnostic.submitted = true;
-        diagnostic.cullReason = "submitted";
+        if (diagnosticRecordsBuilt_) {
+            RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
+            diagnostic.objectSlot = objectIndex;
+            diagnostic.bufferOffset = offset;
+            diagnostic.submitted = true;
+            diagnostic.cullReason = "submitted";
+        }
         ++objectIndex;
         DrawItem out{offset, &entity, depth, skin};
         out.fxTwoSided = fxTwoSided;
@@ -3546,6 +3587,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return out;
     };
     std::size_t entityIndex = 0;
+    // ADR-1095: the shadow-caster floor. A non-hero caster whose bounding sphere is smaller on the camera's view than
+    // `shadowCasterMinPixels` (scaled by its importance) is not offered to the shadow views. Off by default (0).
+    const auto belowCasterFloor = [&](const scene::Entity& entity) {
+        const float floorPx = qualitySettings_.shadowCasterMinPixels * scene::importanceLeverWeight(entity.importance);
+        if (floorPx <= 0.0f || entity.mesh >= meshes_.size()) {
+            return false;
+        }
+        const auto& [lo, hi] = scene.meshBounds(entity.mesh);
+        const glm::mat4 model = entity.transform.matrix();
+        const glm::vec3 centre = glm::vec3(model * glm::vec4((lo + hi) * 0.5f, 1.0f));
+        const float scale = std::max({std::abs(entity.transform.scale.x), std::abs(entity.transform.scale.y),
+                                      std::abs(entity.transform.scale.z)});
+        const float radius = glm::length(hi - lo) * 0.5f * scale;
+        const float distance = glm::length(centre - lodView.cameraPosition);
+        if (distance <= radius) {
+            return false; // the camera is inside it
+        }
+        const bool below = radius * lodView.pixelsPerUnitAt(distance) < floorPx;
+        if (below) {
+            ++stats_.shadows.castersBelowFloor;
+        }
+        return below;
+    };
+    stats_.shadows.castersBelowFloor = 0;
     for (const auto& entity : scene.entities) {
         const std::size_t thisEntity = entityIndex++;
         // A frozen view cannot trust a cull decided against a camera that has since moved: the
@@ -3602,12 +3667,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             // files is how a diagnostic and the pass it describes come to disagree about one
             // entity. A body at zero opacity comes back excluded, which is right twice over --
             // there is nothing to cast, and the dither would discard every fragment anyway.
-            if (casts(casterEligibility(entity))) {
+            if (casts(casterEligibility(entity)) && !belowCasterFloor(entity)) {
                 shadowCasters.push_back(*item);
             }
         } else {
             opaque.push_back(*item);
-            if (entity.castsShadow) {
+            if (entity.castsShadow && !belowCasterFloor(entity)) {
                 shadowCasters.push_back(*item);
             }
         }
@@ -3622,6 +3687,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             continue;
         }
         const CasterState state = casterState(entity, scene.meshBounds(entity.mesh), viewPlanes);
+        if (casts(state) && belowCasterFloor(entity)) {
+            continue;
+        }
         if (!casts(state)) {
             // Only the second cull's own rejections are counted here. An entity the scene already
             // said does not cast was never a candidate, and counting it as "culled by a cascade"
@@ -3636,6 +3704,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             break; // the camera's own entities have the slots; nothing more to say about it
         }
         shadowCasters.push_back(*item);
+    }
+    // ADR-1096: nothing visible is lit, so nothing reads a shadow map. A scene with no authored light gets the default
+    // key light (scene::defaultKeyLight), and it casts: an all-unlit scene paid 1-3 ms for cascades no pixel sampled
+    // (the Sonic Abstract art pass's finding). Skipped only when every camera-visible entity, every procedural and
+    // every SDF material is unlit AND the volume did not march last frame (the march reads the key light's shadow for
+    // its shafts). The light keeps its slot; the next frame with anything lit renders the views again.
+    stats_.shadows.skippedNothingLit = false;
+    if (shadowViews > 0) {
+        const auto litItem = [](const DrawItem& d) { return d.entity != nullptr && !d.entity->material.unlit; };
+        bool anyLit = std::any_of(opaque.begin(), opaque.end(), litItem) ||
+                      std::any_of(blended.begin(), blended.end(), litItem) ||
+                      std::any_of(grid.begin(), grid.end(), litItem) || !water.empty() || stats_.volume.steps > 0 ||
+                      VolumeRenderer::enabled(scene);
+        for (const auto& p : scene.procedurals) {
+            anyLit = anyLit || !p.material.unlit;
+        }
+        for (const auto& s : scene.sdfs) {
+            anyLit = anyLit || !s.material.unlit;
+        }
+        if (!anyLit) {
+            shadowViews = 0;
+            shadowCasters.clear();
+            stats_.shadows.skippedNothingLit = true;
+        }
     }
     stats_.shadowCasters = static_cast<std::uint32_t>(shadowCasters.size());
     hashDiagnosticFrame(diagnosticFrame_);
@@ -3751,6 +3843,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // the branch it fell from are reading one description of the air.
         particleFrame.wind = wind::packWind(scene.environment.wind);
         particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
+        particleFrame.cullDistance = std::max(qualitySettings_.particleCullDistance, 0.0f); // ADR-1098
         particleFrame.warmUpFrames = particleWarmUpFrames_; // ADR-360, 0 unless asked
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
@@ -3811,6 +3904,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // not get one. Applied per frame rather than at setQualitySettings, because the tier can
         // change between frames and the cull pass reads this on every one.
         procedurals_->setLodHysteresisAllowed(qualitySettings_.lodHysteresisAllowed);
+        procedurals_->setLiveLevers(qualitySettings_.lodBias, qualitySettings_.drawDistanceScale); // ADR-1094
         // ADR-155: per-rung material tier for the scatter. Distant rungs shade flat; the foreground
         // is rung 0 and is untouched.
         procedurals_->setFlatTierFromRung(qualitySettings_.materialTiers ? qualitySettings_.flatTierFromRung
@@ -4429,6 +4523,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         // ADR-1024: the live floor on the scene's FXAA. 0 everywhere but the live editor.
         postSettings.antialias = std::max(postSettings.antialias, qualitySettings_.antialiasFloor);
+        // ADR-1083: the live ladder's gates. Closed, the pass is skipped as though the scene had not
+        // asked for it (amount 0 / disabled are the post chain's own "off"); open, nothing changes.
+        if (!qualitySettings_.motionBlur) {
+            postSettings.motionBlurAmount = 0.0f;
+        }
+        if (!qualitySettings_.depthOfField) {
+            postSettings.dofEnabled = false;
+        }
+        // ADR-1094: the gather effects' taps. Motion blur's samples here; depth of field's cap in the post chain.
+        if (qualitySettings_.postEffectQuality < 0.999f) {
+            const float q = std::clamp(qualitySettings_.postEffectQuality, 0.125f, 1.0f);
+            postSettings.motionBlurSamples = std::max<std::uint32_t>(
+                4u, static_cast<std::uint32_t>(std::lround(static_cast<float>(postSettings.motionBlurSamples) * q)));
+        }
+        postIn.effectQuality = qualitySettings_.postEffectQuality;
         postIn.settings = &postSettings;
         postIn.antialias = toggles_.antialias; // ADR-187
         postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite

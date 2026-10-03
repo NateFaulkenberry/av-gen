@@ -1,4 +1,5 @@
 #include "rendering/sdf_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -16,6 +17,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -99,6 +101,10 @@ struct SdfRenderer::Impl {
         wgpu::RenderPipeline depth;
         wgpu::RenderPipeline shadow;
         bool failed = false;
+        // ADR-1102: pipelines still being created on Dawn's worker threads. Usable once 0 and not failed.
+        int pending = 0;
+        std::chrono::steady_clock::time_point started{};
+        std::string name;
     };
     struct RaymarchItem {
         std::size_t objectIndex; // into scene.sdfs
@@ -119,6 +125,8 @@ struct SdfRenderer::Impl {
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     Result<void> createRaymarchPipeline(const wgpu::ShaderModule& module);
     Result<Pipelines> buildPipelines(const wgpu::ShaderModule& module);
+    // ADR-1102: the same three pipelines, created asynchronously into `slot` (kept alive by the shared pointer).
+    void buildPipelinesAsync(const wgpu::ShaderModule& module, const std::shared_ptr<Pipelines>& slot);
     const Pipelines* compiledPipelines(const scene::SdfObject& object, const spatial::FieldSet* fields);
     void ensureNodeBuffer(std::uint64_t bytes);
     void rebuildGroups();
@@ -175,7 +183,10 @@ struct SdfRenderer::Impl {
     std::vector<MeshItem> meshItems;
     std::set<std::string> warnedObjects;
     // ADR-1003: compiled variants by spatial::sdfCompileKey, and the resolved pass source they splice.
-    std::map<std::uint64_t, Pipelines> compiledVariants;
+    std::map<std::uint64_t, std::shared_ptr<Pipelines>> compiledVariants;
+    bool asyncCompile = false; // ADR-1102: off by default (offline renders and tests compile before drawing)
+    bool prewarm = true;       // ADR-1102: every compile-flagged object compiled as soon as the scene has it
+    double pieceSeconds = 0.0; // the frame's render time, for the compile log
     std::string raymarchSource;
     std::vector<spatial::SdfNodeGpu> compileScratch;
     std::uint32_t compilesThisFrame = 0;
@@ -314,7 +325,7 @@ Result<void> SdfRenderer::reload() {
 Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelineDescriptor& desc, const char* label) {
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -387,6 +398,69 @@ Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgp
     return out;
 }
 
+void SdfRenderer::Impl::buildPipelinesAsync(const wgpu::ShaderModule& module, const std::shared_ptr<Pipelines>& slot) {
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, nullptr);
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_sdf";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::LessEqual;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "sdf-raymarch";
+    desc.layout = raymarchLayout;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_sdf";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    wgpu::FragmentState depthFragment{};
+    depthFragment.module = module;
+    depthFragment.entryPoint = "fs_sdf_depth";
+    wgpu::DepthStencilState depthOnly = depth;
+    depthOnly.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor depthDesc = desc;
+    depthDesc.label = "sdf-raymarch-depth";
+    depthDesc.fragment = &depthFragment;
+    depthDesc.depthStencil = &depthOnly;
+    wgpu::FragmentState shadowFragment = depthFragment;
+    shadowFragment.entryPoint = "fs_sdf_shadow";
+    wgpu::RenderPipelineDescriptor shadowDesc = depthDesc;
+    shadowDesc.label = "sdf-raymarch-shadow";
+    shadowDesc.fragment = &shadowFragment;
+    slot->pending = 3;
+    const auto& device = context.device();
+    const auto make = [&](const wgpu::RenderPipelineDescriptor& d, wgpu::RenderPipeline Pipelines::* member) {
+        static_cast<void>(gpu::pipelineCountersNoteAsync());
+        device.CreateRenderPipelineAsync(
+            &d, wgpu::CallbackMode::AllowProcessEvents,
+            [slot, member](wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline, wgpu::StringView msg) {
+                if (status == wgpu::CreatePipelineAsyncStatus::Success && pipeline) {
+                    (*slot).*member = std::move(pipeline);
+                } else {
+                    slot->failed = true;
+                    log::warn("sdf '{}': compiling the tree failed, drawing it interpreted: {}", slot->name,
+                              gpu::Context::toString(msg));
+                }
+                if (--slot->pending == 0 && !slot->failed) {
+                    log::info("sdf '{}': compiled tree variant ready after {:.1f} ms (on Dawn's workers)", slot->name,
+                              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - slot->started)
+                                  .count());
+                }
+            });
+    };
+    make(desc, &Pipelines::lit);
+    make(depthDesc, &Pipelines::depth);
+    make(shadowDesc, &Pipelines::shadow);
+}
+
 Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module) {
     auto built = buildPipelines(module);
     if (!built) {
@@ -411,13 +485,15 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     }
     const std::uint64_t key = spatial::sdfCompileKey(object.tree);
     if (auto it = compiledVariants.find(key); it != compiledVariants.end()) {
-        return it->second.failed ? nullptr : &it->second;
+        return it->second->failed || it->second->pending > 0 ? nullptr : it->second.get();
     }
     constexpr std::string_view kBegin = "// @@SDF_FIELD_BEGIN@@";
     constexpr std::string_view kEnd = "// @@SDF_FIELD_END@@";
     const auto b = raymarchSource.find(kBegin);
     const auto e = raymarchSource.find(kEnd);
-    Pipelines& slot = compiledVariants[key];
+    auto slotPtr = std::make_shared<Pipelines>();
+    compiledVariants[key] = slotPtr;
+    Pipelines& slot = *slotPtr;
     if (b == std::string::npos || e == std::string::npos || e < b) {
         slot.failed = true;
         log::warn("sdf '{}': the raymarch shader has no sdfField markers; drawing it interpreted", object.name);
@@ -427,6 +503,16 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     const std::string field = spatial::sdfCompileWgsl(object.tree, compileScratch, fields);
     const std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
     auto module = shaders.compile(source, "sdf-raymarch-compiled");
+    // ADR-1102: live, a tree the interpreter can also draw compiles on Dawn's workers and is drawn interpreted until
+    // its pipelines exist -- no main-thread stall mid-performance. A tree the interpreter cannot draw (ADR-1005) still
+    // compiles here and now, because drawing nothing would be worse than a hitch; so does every offline render.
+    if (asyncCompile && module && object.tree.validate(spatial::SdfEvaluator::Interpreter)) {
+        slot.name = object.name;
+        slot.started = start;
+        buildPipelinesAsync(*module, slotPtr);
+        ++compilesThisFrame;
+        return nullptr;
+    }
     Result<Pipelines> built = module ? buildPipelines(*module) : Result<Pipelines>(std::unexpected(module.error()));
     ++compilesThisFrame;
     if (!built) {
@@ -434,9 +520,11 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
         log::warn("sdf '{}': compiling the tree failed, drawing it interpreted: {}", object.name, built.error().message);
         return nullptr;
     }
-    slot = *built;
-    log::info("sdf '{}': compiled tree variant {:016x} ({} node records) in {:.1f} ms", object.name, key,
-              compileScratch.size(),
+    slot.lit = built->lit;
+    slot.depth = built->depth;
+    slot.shadow = built->shadow;
+    log::info("sdf '{}': compiled tree variant {:016x} ({} node records) at t={:.2f} s in {:.1f} ms on the main thread",
+              object.name, key, compileScratch.size(), pieceSeconds,
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     return &slot;
 }
@@ -569,6 +657,26 @@ bool SdfRenderer::hasRaymarchWork() const {
     return !impl_->raymarchItems.empty();
 }
 
+std::size_t SdfRenderer::compiledVariantCount() const {
+    std::size_t n = 0;
+    for (const auto& [key, variant] : impl_->compiledVariants) {
+        n += variant->failed || variant->pending > 0 ? 0 : 1;
+    }
+    return n;
+}
+
+std::size_t SdfRenderer::pendingCompiles() const {
+    std::size_t n = 0;
+    for (const auto& [key, variant] : impl_->compiledVariants) {
+        n += variant->pending > 0 ? 1 : 0;
+    }
+    return n;
+}
+
+void SdfRenderer::setAsyncCompile(bool async) { impl_->asyncCompile = async; }
+
+void SdfRenderer::setPrewarm(bool prewarm) { impl_->prewarm = prewarm; }
+
 void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const glm::mat4& viewProj,
                          const FieldUniforms* fields) {
     const auto start = std::chrono::steady_clock::now();
@@ -582,7 +690,16 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         return;
     }
     ++im.frame;
+    im.pieceSeconds = time.renderTime;
     collectTimings();
+    // ADR-1102: the pre-warm. Every object that asks for compilation is compiled as soon as the scene has it --
+    // visible or not, on screen or not -- so the variant exists before the frame that first shows it. Live, these
+    // compile on Dawn's workers (above); a map lookup per object per frame otherwise.
+    for (const scene::SdfObject& object : scene.sdfs) {
+        if (im.prewarm && object.compile && object.renderMode == scene::SdfRenderMode::Raymarch) {
+            static_cast<void>(im.compiledPipelines(object, &scene.fields));
+        }
+    }
     const auto& queue = im.context.queue();
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.sdfs.size(); ++i) {
