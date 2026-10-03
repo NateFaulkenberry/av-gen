@@ -34,9 +34,9 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   its shadow (`kit.Scene.unshadowed_key`): a scene with no light gets a key that CASTS, and its shadow passes cost 1-3 ms
   for nothing (engine need 13). Chromatic Topography's land is a grid that follows the valley (`meshes.heightfield_path`)
   with a 24-op program; Glitch Signal's pixel program is 20 ops for the same picture. A/B at the live floor, same
-  session, interleaved: Chromatic 18.3 to 14.5 ms, Neon 14.1 to 12.0, Glitch 14.2 to 13.0 (the media of those three are
-  from before round 2; the pictures are pixel-identical (Glitch, Neon) or nearly (Chromatic's valley floor edge is
-  cleaner), so they were not re-rendered).
+  session, interleaved: Chromatic 18.3 to 14.5 ms, Neon 14.1 to 12.0, Glitch 14.2 to 13.0 (Glitch's and the unlit
+  scenes' pictures are pixel-identical, so their media stand; Chromatic's (its valley floor's edge is crisper) and
+  Neon's (its horizon line now full length) media were re-rendered at 03:45).
 - **Generated meshes:** 6, 7 and 9 instance GLB meshes written by `tools/sonic_vfx/meshes.py` into
   `examples/sonic-abstract/meshes/` at build time (deterministic; committed, about 12 MB; no `assets/`).
 - **Two look rounds (02:30-02:57, `34427b53`, `f094f565`), built and committed.**
