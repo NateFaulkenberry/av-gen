@@ -47,6 +47,37 @@ def fbm(x, y, seed=1, octaves=4, ridged=False):
     return s / norm
 
 
+def value_noise_p(x, y, seed=1, px=0, py=0):
+    """Value noise, periodic with integer periods px, py (0 = not periodic) in lattice units."""
+    ix, iy = math.floor(x), math.floor(y)
+    fx, fy = x - ix, y - iy
+    ux, uy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+
+    def h(a, b):
+        if px:
+            a %= px
+        if py:
+            b %= py
+        return _hash(a, b, seed)
+    a, b, c, d = h(ix, iy), h(ix + 1, iy), h(ix, iy + 1), h(ix + 1, iy + 1)
+    return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
+
+
+def fbm_p(x, y, seed=1, octaves=4, py=0, ridged=False):
+    """fbm periodic in y with an integer lattice period `py` at the first octave (each octave doubles it)."""
+    s, amp, norm = 0.0, 1.0, 0.0
+    for o in range(octaves):
+        n = value_noise_p(x, y, seed + 17 * o, 0, py * (2 ** o))
+        if ridged:
+            n = 1.0 - abs(2.0 * n - 1.0)
+            n = n * n
+        s += amp * n
+        norm += amp
+        amp *= 0.5
+        x, y = x * 2.0 + 11.7, y * 2.0
+    return s / norm
+
+
 def smooth(e0, e1, x):
     t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
     return t * t * (3 - 2 * t)
@@ -164,6 +195,104 @@ def clip_above(tris, y0=0.0):
             out.append((poly[0], poly[k], poly[k + 1]))
     return [t for t in out if abs(cross(sub(t[1], t[0]), sub(t[2], t[0]))[1]) > 1e-6 or
             sum(abs(c) for c in cross(sub(t[1], t[0]), sub(t[2], t[0]))) > 1e-4]
+
+
+def heightfield(x0, x1, z0, z1, nx, nz, height, normal_eps=2.0):
+    """A smooth-shaded grid between x0..x1 and z0..z1 (nx, nz cells): shared vertices, normals from the height
+    function's own finite differences (so two tiles of a periodic field meet without a seam). Returns
+    (positions, normals, indices)."""
+    verts, norms = [], []
+    for j in range(nz + 1):
+        z = z0 + (z1 - z0) * j / nz
+        for i in range(nx + 1):
+            x = x0 + (x1 - x0) * i / nx
+            y = height(x, z)
+            hx = height(x + normal_eps, z) - height(x - normal_eps, z)
+            hz = height(x, z + normal_eps) - height(x, z - normal_eps)
+            verts.append((x, y, z))
+            norms.append(unit((-hx, 2.0 * normal_eps, -hz)))
+    idx = []
+    w = nx + 1
+    for j in range(nz):
+        for i in range(nx):
+            a, b, c, d = j * w + i, j * w + i + 1, (j + 1) * w + i + 1, (j + 1) * w + i
+            idx += [a, d, c, a, c, b]
+    return verts, norms, idx
+
+
+def ribbon(path, width, y_of, z0, z1, n, lift=0.4):
+    """A flat strip along x = path(z) from z0 to z1 (n segments), at height y_of(z) + lift, facing up."""
+    verts, norms, idx = [], [], []
+    for j in range(n + 1):
+        z = z0 + (z1 - z0) * j / n
+        x = path(z)
+        dx = (path(z + 1.0) - path(z - 1.0)) / 2.0
+        side = unit((1.0, 0.0, -dx))
+        y = y_of(z) + lift
+        for s in (-1.0, 1.0):
+            verts.append((x + side[0] * width * 0.5 * s, y, z + side[2] * width * 0.5 * s))
+            norms.append((0.0, 1.0, 0.0))
+    for j in range(n):
+        a, b, c, d = 2 * j, 2 * j + 1, 2 * j + 3, 2 * j + 2
+        idx += [a, d, c, a, c, b]
+    return verts, norms, idx
+
+
+def cone(base, radius, height, sides=6, seed=0):
+    """A faceted cone (a stylised conifer), apex up, its base centre at `base`."""
+    tris = []
+    apex = (base[0], base[1] + height, base[2])
+    a0 = _hash(seed, 3, 7) * 6.283
+    ring = [(base[0] + radius * math.cos(a0 + 2 * math.pi * k / sides), base[1],
+             base[2] + radius * math.sin(a0 + 2 * math.pi * k / sides)) for k in range(sides)]
+    for k in range(sides):
+        tris.append((ring[k], apex, ring[(k + 1) % sides]))
+    return tris
+
+
+def ball(centre, radius, seg=8, rings=6):
+    """A low-poly ball (faceted), for the round trees and the bubbles."""
+    tris = []
+    pts = []
+    for i in range(rings + 1):
+        ph = math.pi * i / rings
+        row = []
+        for j in range(seg):
+            th = 2 * math.pi * j / seg
+            row.append((centre[0] + radius * math.sin(ph) * math.cos(th), centre[1] + radius * math.cos(ph),
+                        centre[2] + radius * math.sin(ph) * math.sin(th)))
+        pts.append(row)
+    for i in range(rings):
+        for j in range(seg):
+            j1 = (j + 1) % seg
+            a, b, c, d = pts[i][j], pts[i][j1], pts[i + 1][j1], pts[i + 1][j]
+            if i > 0:
+                tris.append((a, b, c))
+            if i < rings - 1:
+                tris.append((a, c, d))
+    return tris
+
+
+def prism(base, radius, height, sides=6, tip=0.35, seed=0, lean=(0.0, 0.0)):
+    """A crystal: a faceted prism with a pointed tip, leaning."""
+    tris = []
+    a0 = _hash(seed, 5, 11) * 6.283
+    lx, lz = lean
+    def at(r, y, k):
+        a = a0 + 2 * math.pi * k / sides
+        return (base[0] + r * math.cos(a) + lx * y, base[1] + y, base[2] + r * math.sin(a) + lz * y)
+    top = height * (1.0 - tip)
+    apex = (base[0] + lx * height, base[1] + height, base[2] + lz * height)
+    for k in range(sides):
+        k1 = (k + 1) % sides
+        b0, b1 = at(radius, 0.0, k), at(radius, 0.0, k1)
+        t0, t1 = at(radius, top, k), at(radius, top, k1)
+        tris += [(b0, t0, t1), (b0, t1, b1), (t0, apex, t1)]
+    return tris
+
+
+def write_indexed(path, verts, norms, idx, name="mesh"):
+    return write_glb(path, verts, norms, idx, name)
 
 
 def translate(tris, off):
