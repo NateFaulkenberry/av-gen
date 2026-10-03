@@ -1,5 +1,6 @@
-"""The one-page note of each Sonic Abstract prototype (04-brief-abstract-direction.md, step 3): what it is, what drives
-what, and what would expand it into more scenes, with the review's honest verdict. `abstract.py notes` writes them to
+"""The one-page note of each Sonic Abstract prototype (04-brief-abstract-direction.md, step 3, and the owner's briefs
+05-08 that made the set nine): what it is, what drives what, and what would expand it into more scenes, with the
+review's honest verdict. `abstract.py notes` writes them to
 the review folder as NN-<id>-note.md, beside the still, the clips and the generated modulation map.
 
 The verdicts are written after looking at the stills and clips (the gate: would someone see a screenshot and think
@@ -7,32 +8,29 @@ The verdicts are written after looking at the stills and clips (the gate: would 
 """
 
 NOTES = {
-    "sacred-geometry": {
-        "working_title": "The Armillary",
-        "language": "A giant living geometric diagram: gold and ivory linework on ultramarine black, every element a "
-                    "circle or a regular polygon about one centre, nested layers that are also a well receding into "
-                    "the depth. Self-luminous lines, bloom, one vermilion accent.",
+    "sacred-flight": {
+        "working_title": "The Golden Passage",
+        "language": "A flight down the axis of an endless luminous sculpture of sacred geometry: a procession of "
+                    "colossal gates drawn in gold light (hexagram stars and six-circle rose windows, double rims, "
+                    "pearls) strung on twelve helical rails, rifling as they come, towards a gold light at the "
+                    "vanishing point against which the far gates stand dark. Indigo air, symmetric, deep.",
         "drives": [
-            "Bass breathes the diagram radially, the inner layers most, like a pulse from the centre.",
-            "The kick snaps the armillary rings open about their diameters, a ripple inward, and a loose spring rings "
-            "them back flat.",
-            "Mids speed the differential rotation (ring k gains k times the turn), so a busy middle spins the "
-            "pattern into new alignments.",
-            "Each spectral band lights its own layer, the seed (bass) out to the crown (treble).",
-            "The snare flashes the star and fires sparks off the crown; the hats run beads along the rings.",
-            "MIDI: the twelve pitch classes are a clock of diamonds and spokes, so a chord draws its own polygon; the "
-            "number of notes sets the sides of a polygon in the heart; held notes keep the armillary open; the mod "
-            "wheel opens it into a sphere by hand.",
-            "Structure: intensity doubles the crown's petals (24 to 48) and deepens the well.",
+            "The bass widens and narrows the whole passage; the enormous outer rings expand.",
+            "The kick sends a wave of light from the camera down the passage to the far end.",
+            "The snare blooms the gates (the stars and roses swell past the rim and ring back) and fires sparks.",
+            "Mids turn the whole lattice; the hats glint the pearls; the highs stream sparks past the walls.",
+            "MIDI: the twelve rails are the twelve pitch classes (C at the top, a clock), so a chord lights its own "
+            "polygon of rails down the whole passage; the chord's size is a vermilion polygon in every rose's heart; "
+            "the pitch colours the sun; held notes light the outer rings; the mod wheel tightens the helix.",
+            "Structure: intensity doubles the gates (every gate both a star and a rose, a rim every 7 m).",
         ],
-        "expand": ["Kepler's nested Platonic solids", "a garden of small armillaries on a dark mirror",
-                   "a flower-of-life tessellation flown over", "Islamic star tilings as a floor that the chords "
-                   "rebuild", "a tunnel of mandalas for a build-up"],
-        "verdict": ('Holy shit: yes, as a still. A gold diagram fills the frame on ultramarine: intricate, symmetric '
-                    "and illuminated, unlike anything else in the set. It's the most instrument-like of the eight, "
-                    "because the music's structure becomes the drawing's structure: a chord draws its own polygon, "
-                    'the beat turns the rings into alignment, the kick opens the armillary. Risk: fine lines shimmer '
-                    'at a low adaptive scale.'),
+        "expand": ["a passage of Platonic solids", "a Metatron's-cube lattice flown between",
+                   "a flower-of-life floor under a nave of rings", "a mandala well that is also a tunnel"],
+        "verdict": ("Holy shit: yes. The flat mandala became a place: you are inside a cathedral of gold light that "
+                    "rushes past and converges on a glowing core, every line on one twelve-fold grid. The chord "
+                    "lighting its own polygon of rails down the whole passage is the clearest picture of harmony in "
+                    "the set. Risk: in a dense passage the near gates' lines cross a lot; the symmetric camera is "
+                    "hypnotic but less varied than the landscapes."),
     },
     "neon-vector": {
         "working_title": "Pulsar Plain",
@@ -118,77 +116,109 @@ NOTES = {
             "MIDI: six flowers along the meadow are six voices (a held note opens its flower); a chord multiplies the "
             "lantern's petals; a note's release drops petals, more for a long note; the mod wheel turns the season.",
             "Structure: intensity grows the mushroom cluster and the jelly-trees' tendrils.",
+            "The radiolarians: the hats light their lattices, the treble thickens their lines, the bass swells them, "
+            "the kick lights their cores.",
         ],
         "expand": ["a jellyfish cathedral", "a coral forest that branches per phrase", "a radiolarian sky",
                    "a seed bank that grows one plant per note"],
-        "verdict": ('Not yet. A glowing coral lily-lantern with luminous stamens in macro focus, translucent jelly-'
-                    "trees as soft backlight, spore bokeh. It's pretty and alive (it breathes, blooms, sways and "
-                    "grows), but it's the closest of the eight to familiar 'bioluminescent alien flora', and the "
-                    "jelly doesn't read as jelly yet (no real translucency in the engine)."),
+        "verdict": ('Nearly. A glowing coral lily-lantern with luminous stamens in macro focus, translucent jelly-'
+                    "trees as soft backlight, spore bokeh, and three radiolarians (wire-line lattice organisms) "
+                    "drifting through the depth of field. It's pretty and alive (it breathes, blooms, sways and "
+                    "grows), but it's the closest of the set to familiar 'bioluminescent alien flora', and the jelly "
+                    "doesn't read as jelly yet (no real translucency in the engine)."),
     },
-    "particle-world": {
-        "working_title": "Galaxy Engine",
-        "language": "Particles are the forms: a vast spiral of points whose arms are rivers of light flowing into a "
-                    "white-hot core, dust curtains, a stream arcing over the camera; feedback turns points into silk.",
+    "digital-alpine": {
+        "working_title": "Glass Caldera",
+        "language": "A digital painting flown through: four rings of flat-faceted low-poly ranges round a caldera lake, "
+                    "each paler than the last, a low sun behind the peaks, and a mirror lake that doubles everything "
+                    "(every landform has a twin below the waterline; the sky is painted mirrored below the horizon, "
+                    "broken by ripples and the sun's path). Violet, indigo, rose and peach; no lines, no neon.",
         "drives": [
-            "Bass is the pull: the arms contract toward the core and bloom out again; the core flares.",
-            "The kick explodes the core (a burst and a shock ring) and the arms reform round it.",
-            "The snare runs a flare along an arm with a split; the hats glitter the disc.",
-            "Mids turn the galaxy faster; flux frays the arms with turbulence; the centroid shifts the colour and "
-            "grows the points.",
-            "MIDI: each note launches a comet from the rim at its pitch's angle; a chord lights more arms (up to six); "
-            "held notes thicken the halo; the mod wheel tilts the galaxy.",
-            "Structure: intensity multiplies the points.",
+            "AUDIO TOPOGRAPHY: the level raises waves that roll out from the island through every range and its "
+            "reflection, as tall as the music is strong.",
+            "Spectral depth: the bass lights the shore range, the low mids the main range, the mids the far range, "
+            "the high mids the distant peaks; the highs scatter glints on the water and brighten the sun.",
+            "The kick sends a band of light out through the ranges and drops rings of light on the water; the snare "
+            "flashes the horizon; the mids deepen the ripples.",
+            "MIDI: twelve lanterns round the shore are the pitch classes (with their reflections); the chord raises "
+            "the waterline mist; the mod wheel lifts the sun from dusk to afternoon.",
+            "Structure: intensity raises the ranges as a piece builds.",
         ],
-        "expand": ["a ring vortex (a smoke ring of light)", "a river of light over a dark sea", "a particle flower "
-                   "that blooms per chord", "a murmuration of dark points against a sunset"],
-        "verdict": ('Close to yes. A luminous galaxy built only of points, with gold arms flowing into a white core '
-                    "and a fine dust disc. It's the most familiar subject in the set (galaxy screensavers exist), so "
-                    'its distinction is the motion: arms that flow, chords that add arms, the kick that explodes it '
-                    'and lets it reform.'),
+        "expand": ["a fjord at dawn", "an archipelago of faceted islands", "a crater lake at night with the "
+                   "lanterns lit", "a waterfall of facets"],
+        "verdict": ("Holy shit: yes, as a still: a low-poly sunset fjord with a perfect reflection and the sun's path "
+                    "on the water, and, half a circuit later, coral alpenglow over deep blue water: two palettes, one "
+                    "world. The audio is restrained by design (the brief asks for breathing, not bouncing), so the "
+                    "topography waves read best in loud passages. Risk: the faceted lake view is the most "
+                    "'wallpaper-like' of the set; it is beautiful rather than strange."),
     },
-    "impossible-architecture": {
-        "working_title": "Relativity Court",
-        "language": "Escher's Relativity built like Manifold Garden: a staircase module in three gravities repeated "
-                    "forever in every direction, rooms inside rooms at its heart, in de Chirico's light (a low "
-                    "golden sun, long hard shadows, warm flat colour, ink edges).",
+    "chromatic-topography": {
+        "working_title": "Contour Valley",
+        "language": "A landscape as a sculptural colour field: smooth sculpted hills coloured by their height in seven "
+                    "hard bands (indigo, violet, magenta, coral, orange, gold, cream) ruled with contour lines, a "
+                    "turquoise river glowing down a winding valley, teal and cobalt groves, cyan crystals on the "
+                    "crests, cream haze under a cobalt sky.",
         "drives": [
-            "Bass breathes the lattice apart and together round the viewer.",
-            "The kick slides a flight two steps; the snare folds another flight over into a new gravity and swings it "
-            "back.",
-            "Mids sweep the sun, so the long shadows move; highs sharpen the ink; the centroid moves the sky and "
-            "haze from teal dusk to gold noon.",
-            "MIDI: a note lights the doorways of the flight at its register; a chord twists the nested rooms; held "
-            "notes warm the sun; the mod wheel rolls the world.",
-            "Structure: intensity nests more rooms inside the room.",
+            "The mids make the contour lines flow up the slopes; the beat pulses them; the highs brighten them.",
+            "The bass raises the river up its banks and brightens it; the level makes the land breathe.",
+            "The kick sends a band of light out across the land; the snare blooms the groves' colours.",
+            "MIDI: twelve families of crystals on the crests are the pitch classes; the chord widens the river's "
+            "glow; the mod wheel sets the contour spacing (survey lines to broad terraces).",
+            "Structure: intensity raises the land as a piece builds.",
         ],
-        "expand": ["Penrose stairs in an isometric diorama", "a monastery of folding staircases", "endless arcades at "
-                   "noon", "rooms inside rooms as a zoom"],
-        "verdict": ("Yes. An Escher lattice in de Chirico's colours, inked: three gravities of stairs and rooms "
-                    "inside rooms, repeating into teal space. It's busy, but it reads, and the slow roll makes it "
-                    "hypnotic. Risk: it's the most expensive scene (one SDF repeated in three axes with a shadow "
-                    'march).'),
+        "expand": ["a delta of glowing rivers seen from above", "terraced islands in a colour-field sea",
+                   "a night valley drawn in contour lines of light"],
+        "verdict": ("Yes. Distinct from everything else in the set: a map you can fly, saturated and graphic, and the "
+                    "flowing contour lines are a new kind of audio response (the music re-surveys the land). The "
+                    "glide's rise over the hills is the money shot; down in the valley it reads more like a painted "
+                    "canyon. Risk: the river's flowing stripes are a little 'neon tube'."),
     },
-    "cinematic-void": {
-        "working_title": "The Gate",
-        "language": "One colossal object, one horizon, one light: a segmented ring 200 m across standing on a mirror "
-                    "plane with a low sun burning inside it, amber haze against teal, one tiny figure, letterboxed "
-                    "2.39:1, a majestic slow push.",
+    "glitch-signal": {
+        "working_title": "Pixel Canyon",
+        "language": "A flight down a canyon made of a broken signal: walls and floor of thousands of pixel blocks lit "
+                    "in a data pattern, scanlines, data ribbons, falling pixels, a white-hot horizon. Almost "
+                    "monochrome at rest (cyan and white on blue-black); the music corrupts it, at three scales.",
         "drives": [
-            "Bass breathes the haze and swells the sun's glow; sustain brightens the sun.",
-            "The kick sends a pulse of light round the ring's segments; the snare bursts dust in the light; the "
-            "hats glitter it.",
-            "Mids turn the ring slowly; the centroid grades the sky from amber to rose and teal; the beat breathes "
-            "the ring's radius.",
-            "MIDI: the segment at the note's angle lights (a beacon round the ring); a chord multiplies the segments; "
-            "held notes drift them outward; the mod wheel raises the sun inside the ring.",
-            "Structure: intensity parts the ring (its segments move apart as the piece builds).",
+            "MACRO, the signature: a strong event (a hard kick at a moment of large spectral change, or a "
+            "full-velocity note) stages a collapse -- RGB parts, the rows drift, the walls fragment into blocks, the "
+            "frame is all but corrupted, a wave of colour runs through the camera -- and the world rebuilds in a NEW "
+            "CONFIGURATION: turned about the flight, recoloured, re-patterned, re-staggered.",
+            "MESO: snares tear the frame and shear the rows; onsets swap channels.",
+            "MICRO: scanlines, a pixel of split and a flicker of blocks always; the hats flicker blocks; the highs "
+            "deepen the scanlines and thicken the pixel rain.",
+            "The bass widens the split and pushes the walls apart; the kick sends a wave of light down the canyon; "
+            "the mids stream the data faster.",
+            "MIDI: velocity is how hard a note glitches the frame; pitch lifts the fragments; held notes keep them "
+            "lit; the mod wheel is corruption by hand.",
         ],
-        "expand": ["a glowing sphere over an ocean", "a field of suspended monoliths", "a distant geometric city on "
-                   "the horizon", "an eclipse"],
-        "verdict": ('Yes, and the strongest single image. A black ring 200 m across with the sun burning inside it, '
-                    'its perfect reflection, an orange-and-teal sky, a tiny figure, letterboxed: almost nothing at '
-                    "enormous scale. As an instrument it's restrained by design (slow light and air, segments that "
-                    'part as a piece builds).'),
+        "expand": ["a datamosh river", "a pixel-sorted waterfall", "a signal tower that collapses into a city of "
+                   "blocks and rebuilds as a forest"],
+        "verdict": ("Holy shit: yes, in motion. The canyon is a strong still, and the collapse is a real event: you "
+                    "watch the world shatter into RGB blocks and come back turned and recoloured, and the next "
+                    "configuration is a new place. Risk: a dense, loud passage can chain collapses (the engine has no "
+                    "refractory period for a trigger), which reads as continuous corruption."),
+    },
+    "bit-ocean": {
+        "working_title": "Bubble Reef",
+        "language": "A lost underwater game level grown into 3D and swum through for ever: a ring round a deep basin "
+                    "in three areas with their own palettes (sunny shallows, flower ruins, pipe deep), voxel floors, "
+                    "kelp, coral and rocks, chunky columns, arches and pipes, a trail of coins, a house-sized shell, "
+                    "fish schools, bubbles, caustics, two-band toon light and thin navy outlines.",
+        "drives": [
+            "THE LIVING LEVEL: the bass bends every kelp plant at once and pulses the coral; a melody rings a row of "
+            "twelve bell flowers note by note (one row per area: a xylophone); a chord blooms every brain coral; "
+            "the snare bursts bubbles round you and turns the schools; the kick flashes the coins and gems.",
+            "The mids speed the fish and thicken the bubble streams; the highs swarm sparkles; the beat pumps the "
+            "jellies and the caustics; the brightness clears the water.",
+            "MIDI: velocity sizes a note's bubble burst; held notes light the kelp; the mod wheel takes the level "
+            "deeper (darker, thicker water).",
+            "Structure: intensity grows the coral.",
+        ],
+        "expand": ["a sunken castle level", "a night level of glowing jellies", "a boss chamber with a giant friendly "
+                   "fish", "a lava level in the same grammar"],
+        "verdict": ("Charming, not yet stunning. It reads instantly as a game water level (the checker floors, coin "
+                    "trail, arches, pipes and voxel kelp do the work) and the three palettes give the lap a story. "
+                    "But the light is flat and the blue haze softens it; it needs denser set dressing near the lane "
+                    "and stronger colour contrast to reach the gate."),
     },
 }

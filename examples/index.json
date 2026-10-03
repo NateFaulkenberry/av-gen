@@ -428,6 +428,12 @@
     },
     {
       "category": "Sonic Abstract",
+      "description": "The Golden Passage: you fly through an endless luminous sculpture of sacred geometry, rose-window gates strung on twelve helical rails; a chord lights its own polygon of rails down the whole passage, the kick sends a wave of light ahead of you, the bass widens the passage. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Sacred Geometry Flight",
+      "project": "sonic-abstract/sacred-flight.json"
+    },
+    {
+      "category": "Sonic Abstract",
       "description": "Pulsar Plain: a poster you can fly through. Hidden-line ridgelines ripple to the horizon under a colossal outline circle; the drums build flat blocks of one bold colour. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
       "name": "Sonic Abstract - Neon Vector World",
       "project": "sonic-abstract/neon-vector.json"
@@ -449,6 +455,30 @@
       "description": "Lantern Reef: a macro view into a twilight meadow of translucent organisms that breathe, bloom and sway with the music; the notes open flowers, the kick blooms the lantern, held sound makes it grow. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
       "name": "Sonic Abstract - Organic Digital Garden",
       "project": "sonic-abstract/organic-garden.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Glass Caldera: a digital painting of faceted mountains round a mirror lake, flown through at dusk. The music raises slow waves of topography that roll out from the island through every range; onsets drop rings of light on the water and send light out through the ranges. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Digital Alpine",
+      "project": "sonic-abstract/digital-alpine.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Contour Valley: a landscape as a sculptural colour field. You skim a glowing river down a winding valley between smooth hills coloured by their height in hard bands, ruled with contour lines that flow up the slopes with the music; the river rises and brightens with the bass. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Chromatic Topography",
+      "project": "sonic-abstract/chromatic-topography.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Pixel Canyon: you fly down a canyon built of a broken signal, walls and floor of blocks lit in a data pattern, towards a white-hot horizon. A strong event collapses it (RGB parts, rows drift, the walls shatter into blocks, a wave of colour passes through you) and it rebuilds turned a quarter turn, recoloured and re-patterned. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - Glitch Signal",
+      "project": "sonic-abstract/glitch-signal.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
+      "name": "Sonic Abstract - 8-Bit Ocean",
+      "project": "sonic-abstract/bit-ocean.json"
     }
   ]
 }

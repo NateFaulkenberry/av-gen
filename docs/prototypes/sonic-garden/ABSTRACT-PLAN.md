@@ -1,43 +1,62 @@
-# Sonic Abstract: eight visual languages (the plan)
+# Sonic Abstract: nine visual languages (the plan)
 
-The art agent, 2026-10-02, under `04-brief-abstract-direction.md` (the owner's words govern). This is the plan written
-before the build. It is a living document: each section gets an "as built" note when its prototype changes from what is
-written here. Progress and resume notes: `PROGRESS-abstract.md`.
+The art agent, 2026-10-02/03, under `04-brief-abstract-direction.md` as amended by the owner's four later briefs
+(`05-brief-direction-correction.md`, `06-brief-glitch-signal.md`, `07-brief-digital-alpine.md`,
+`08-brief-8bit-ocean.md`; the owner's words govern). This is the plan written before each build, with an "as built" note
+where the prototype differs from it. Progress and resume notes: `PROGRESS-abstract.md`.
 
-**Its own project** (the owner's decision, 2026-10-02): the eight prototypes are "Sonic Abstract" (a working title),
-separate from Sonic Garden, whose live scene and Sonic VFX set stay as they are. The projects live in
-`examples/sonic-abstract/`, listed under their own index category, "Sonic Abstract". They are built by
-`tools/sonic_vfx/abstract.py build` from the modules in `tools/sonic_vfx/scenes/` named in `scenes.ABSTRACT`.
+**Its own project** (the owner's decision, 2026-10-02): the prototypes are "Sonic Abstract" (a working title), separate
+from Sonic Garden, whose live scene and Sonic VFX set stay as they are. The projects live in `examples/sonic-abstract/`
+(generated meshes in `examples/sonic-abstract/meshes/`), listed under their own index category, "Sonic Abstract". They
+are built by `tools/sonic_vfx/abstract.py build` from the modules in `tools/sonic_vfx/scenes/` named in
+`scenes.ABSTRACT`.
+
+**The set of nine** (the owner's order):
+1. Sacred Geometry Flight (replaces the flat Sacred Geometry Garden)
+2. Neon Vector World
+3. Cel-Shaded Dream World
+4. Infinite Color Geometry
+5. Organic Digital Garden
+6. Digital Alpine (replaces Particle/VFX World)
+7. Chromatic Topography (new)
+8. Glitch Signal (new)
+9. 8-Bit Ocean (new)
+
+Removed outright, with no replacement in their spirit (05): Impossible Architecture and Abstract Cinematic Void. Cut
+(07): Particle/VFX World. Their modules and projects are deleted; the last commit that has them is `fc6f8030^`.
 
 ## What every prototype obeys
 
-1. **Simple things arranged in extremely cool ways.** Primitives (rings, slabs, tubes, spheres, lines, particles), no
-   scanned assets, no textures, no realism. Each prototype is a visual GRAMMAR: a short list of rules that the scene
-   follows everywhere, so it can grow into more scenes.
+1. **Simple things arranged in extremely cool ways.** Primitives (rings, slabs, tubes, spheres, lines, particles) and
+   meshes generated from code (facets, voxels, heightfields), no scanned assets, no textures, no realism. Each prototype
+   is a visual GRAMMAR: a short list of rules that the scene follows everywhere, so it can grow into more scenes.
 2. **The still frame works frozen.** The silent render (`variant.make_silent`: no routes, no interpret sources, no
    triggers, no audio) must already pass the gate: "would someone see this screenshot and think 'holy shit, that's
    cool'?" When it does not, the design is changed, not the polish.
-3. **Eight artists, not eight presets.** Each prototype has its own palette family, light model, line or surface
+3. **Nine artists, not nine presets.** Each prototype has its own palette family, light model, line or surface
    vocabulary, camera language and motion character (table below). No two read as variations of one look.
-4. **Instruments, not visualizers.** Audio drives the structure of the artwork (counts, orders, spacing, recursion
-   depth), not only its brightness. Every audio dimension has a different job in each prototype: bass is never only
-   "scale everything", highs are never only "sparkle". Post effects are punctuation.
+4. **Instruments, not visualizers.** Audio drives the structure of the artwork (counts, orders, spacing, configuration),
+   not only its brightness. Every audio dimension has a different job in each prototype. Post effects are punctuation
+   (except in Glitch Signal, where the post vocabulary is the subject).
 5. **Live first.** Everything is built on the live bus (`response.*`, `notes.*`, `audio.*` bands, `beat.*`), so a
    keyboard and a synth play it exactly as a recording does. Each prototype must hold 60 fps live at the editor's
    adaptive scale.
+6. **Places, not objects (05).** "No random shapes spinning around": every prototype is an environment with near, mid and
+   far, a direction of travel, and a camera moving through it.
 
-## How the eight differ (by construction)
+## How the nine differ (by construction)
 
 | # | prototype | the artist it could be | palette family | surface and line vocabulary | light model | camera language | motion character |
 |---|---|---|---|---|---|---|---|
-| 1 | Sacred Geometry Garden: *The Armillary* | a sacred-geometry illuminator; John Whitney's differential motion | gold and ivory on ultramarine black, one vermilion accent | fine emissive lines, beads, nested rings and polygons | self-luminous lines, bloom, faint indigo haze between layers | locked frontal, perfect symmetry, slow breath | hypnotic differential rotation; rings opening into a sphere |
+| 1 | Sacred Geometry Flight: *The Golden Passage* | a sacred-geometry illuminator building a cathedral of light | gold and ivory on indigo, vermilion only for chords | fine emissive lines, beads; gates of hexagrams and six-circle roses on helical rails | self-luminous lines, a gold light at the vanishing point, the far gates dark against it | down the axis of a passage, symmetric, banking | a seamless flight; the lattice rifling as it comes |
 | 2 | Neon Vector World: *Pulsar Plain* | a motion designer (Unknown Pleasures, oscilloscope music, Swiss posters) | black, white line, ONE flat accent colour per section | hidden-line ridgelines, outline primitives, flat colour blocks | none: lines and blocks are their own light | low, fast, forward flight over the lines | rippling lines, beat-built blocks, speed |
 | 3 | Cel-Shaded Dream World: *Candy Archipelago* | an indie game art director (Wind Waker, A Short Hike, Monument Valley) | pastel candy daylight: peach sky, mint, lilac, butter; plum outlines | low-poly toy forms, 2-3 flat shade bands, outlines | one hard key light, tinted graphic shadows | a slow orbit round a toy diorama | bouncy, squash and stretch, creatures that dance |
 | 4 | Infinite Color Geometry: *Chromatic Corridor* | a light-and-space installation artist (Turrell, Rothko, Cruz-Diez) | full-frame saturated gradient: vermilion, magenta, violet, cobalt, teal | monumental planes and portals of pure colour, no lines | coloured fog, a blinding light at the end, gradients | gliding forward through it | a corridor that breathes, twists and recolours |
-| 5 | Organic Digital Garden: *Lantern Reef* | a generative biologist (Haeckel, teamLab) shot by a macro photographer | deep teal and emerald dark, coral, peach and lime glow | translucent jelly (fresnel rims), tubes, radial petals, polka dots | glow from within, soft bokeh, shallow depth of field | macro: slow lateral slide, focus pulls | breathing, blooming, swaying, growing |
-| 6 | Particle / VFX World: *Galaxy Engine* | a generative particle artist | violet black, iridescent spectrum (cyan, magenta, gold) | particles only: arms, streams, ribbons, curtains | particles are the light; feedback silk; chromatic fringe | a slow orbit at three quarters | flowing, orbiting, exploding and reforming |
-| 7 | Impossible Architecture: *Relativity Court* | a surrealist painter (de Chirico's light, Escher's topology) | terracotta, ochre, cream; deep green-teal sky | architectural primitives (stairs, arches, slabs) with ink edge lines | low raking sun, long hard shadows, warm haze | a slow drift through an infinite lattice; the world rolls | slow, inevitable; gravity changes |
-| 8 | Abstract Cinematic Void: *The Gate* | a film cinematographer (Deakins, Villeneuve) | amber haze and teal shadow, one white-gold light | one colossal segmented ring, a mirror plane, a tiny figure | volumetric haze, a sun inside the ring, god rays | a majestic slow push, letterboxed | almost still; the ring's segments drift and close |
+| 5 | Organic Digital Garden: *Lantern Reef* | a generative biologist (Haeckel, teamLab) shot by a macro photographer | deep teal and emerald dark, coral, peach and lime glow | translucent jelly (fresnel rims), tubes, radial petals, polka dots, wire-line radiolarians | glow from within, soft bokeh, shallow depth of field | macro: slow lateral slide, focus pulls | breathing, blooming, swaying, growing |
+| 6 | Digital Alpine: *Glass Caldera* | a digital landscape painter (low-poly art, Firewatch's layered ranges) | violet and indigo ranges, a rose and peach sky, deep blue water | flat-faceted low-poly ranges and their mirror twins; no lines | painted per facet (sun, sky, shadow), aerial haze in the sky's own colour | a low glide round a lake, banking | slow; waves of topography rolling through the ranges |
+| 7 | Chromatic Topography: *Contour Valley* | a cartographer turned colour-field painter (hypsometric maps, Rothko) | seven hard warm bands by height, a turquoise river, cobalt sky | smooth sculpted hills, contour lines, cone and lollipop groves, crystals | flat light from the left, colour by height, cream haze | a glide down a winding valley that rises over the hills | contour lines flowing up the slopes |
+| 8 | Glitch Signal: *Pixel Canyon* | a glitch artist (Ikeda's data, Menkman's corruption) | cyan and white on blue-black at rest; magenta, acid green, orange in corruption | a canyon of pixel blocks, scanlines, data ribbons, falling pixels | self-luminous data, a white-hot horizon | fast and straight down the canyon; turned after each collapse | stable, then a staged collapse and a rebuild in a new configuration |
+| 9 | 8-Bit Ocean: *Bubble Reef* | a pixel artist who grew up on underwater game levels | three area palettes (blue, cyan, yellow / purple, pink, turquoise / deep blue, orange, green) | voxel floors, rocks, kelp and coral; chunky low-segment ruins, pipes, coins; navy outlines | two-band toon light from the surface, blue depth, caustics | a playful swim round a ring-shaped level | swaying, bobbing, schools circling; the level playing along |
 
 Signals named below (all on the live bus): `response.bass`, `response.kick|snare|hat|low|onset` (events, with `...Env`
 envelopes), `response.sustain`, `response.flux`, `response.melodic`, `response.intensity` (12 s), `response.level`; bands
@@ -45,72 +64,63 @@ envelopes), `response.sustain`, `response.flux`, `response.melodic`, `response.i
 `sonic.brightness.slow`; tempo `beat.phase|pulse|bar`, `beat.bpm`; MIDI `notes.lastPitch|lastVelocity|interval|
 polyphony|chord|tension|held|density`, the voice slots `notes.voice.<0..7>.{held,velocity,pitch}`, the pitch-class lanes
 `notes.class.<0..11>`, `response.note|noteEnv`, `notes.release`; the mod wheel (CC 1) through the project's control map.
-`[S]` marks a STRUCTURAL target: a count, order, spacing or depth that rebuilds the artwork.
+`[S]` marks a STRUCTURAL target: a count, order, spacing, depth or configuration that rebuilds the artwork.
 
 ---
 
-## 1. Sacred Geometry Garden: *The Armillary*
+## 1. Sacred Geometry Flight: *The Golden Passage*
 
-**Grammar.** Everything is a circle or a regular polygon, all sharing one centre, drawn as fine lines of light with beads
-where lines meet. Nested layers recede in depth, so the diagram is also a well. Motion is differential rotation (John
-Whitney): ring k turns at k times a base rate, so the pattern dissolves and re-forms, re-aligning on the bar. At rest the
-rings are coplanar, a flat mandala; energy opens them about their own diameters into a 3D armillary sphere, and they close
-again.
+**Grammar (05).** One module, the pair of bays, repeated along the flight axis: a STAR gate (a hexagram inscribed in a
+double rim, its inner circle, twelve spokes, twelve beads) and 14 m on a ROSE gate (six tangent circles of radius R/3
+inside the rim round an open heart, the rose window's tracery, twelve beads). Every element sits on one twelve-fold
+radial grid: twelve helical rails run the whole passage through the gates' bead points. A world twist about the axis
+turns the grid with depth, so the rails are helices and the gates, travelling towards the camera along them, rifle as
+they come. The flight is a seamless sawtooth (the gates advance one pair of bays and jump back by it, which leaves every
+position and rotation where it was). Outside, enormous rings stand in the haze; at the vanishing point burns a gold light
+against which the far gates stand dark. Coherent, symmetric, deep; no shape that is not on the grid.
 
-**Hero frame.** Perfectly frontal and centred, filling the frame edge to edge on an ultramarine-black void. The outermost
-layer is a crown of 24 vesica petals and a ring of 48 beads. Inside it is a 12-pointed star from two hexagrams, then
-nested squares and hexagons. Each of these is turned a little more than the one outside it, so together they spiral
-inward like a golden-ratio construction. At the centre is a seed of life (7 circles) around a white-hot core. Gold lines
-of two weights, ivory beads, and one vermilion accent ring. Faint indigo haze lies between the layers, so the deeper
-rings dim. A dim flower-of-life lattice fills the whole background like a watermark.
+**Hero frame.** Down the axis: the nearest star gate's rim and pearls sweep the frame's edge, the hexagram's lines cross
+the frame, the rose gates' six circles nest inside one another receding, the rails spiral to the centre, and the
+centre is a gold glow with a dense filigree of far gates in front of it. Indigo air.
 
-**Palette.** Ground `#05061a` to `#0d1240`. Lines gold `#f2b84b`, pale gold `#ffd98a`, ivory `#fff1d0`. Accent
-vermilion `#ff4a24`, used only on the core and the chord's ring.
+**Palette.** Air `#0f0c33` to ink `#06061c`; lines gold `#f2b84b`, pale gold `#ffd98a`, ivory `#fff1d0`; the sun
+`#ffb54a`; vermilion `#ff4a24` only for the chord's polygon.
 
-**Technique.** Procedural tori with low `majorSegments` (polygons) and thin `minorRadius` (lines), unlit and emissive.
-Radial distributions for petals, beads and spokes. One node per ring, each with its own rotation track and routes, at
-staggered depths. Bloom at a low threshold for the glow. `temporal/feedback` is held at zoom 1, so rotating rings leave
-woven light trails (long exposure). Particles ride circular splines as beads (`shape: spline`). Tonemap 4 (clamp) keeps
-the flat gold.
+**Technique.** Thin unlit tori (low `majorSegments` = polygons) on linear distributions; the twelve spokes, the twelve
+beads and the rose's six circles are templates composed onto the gates by reference (ADR-029); one world twist
+deformer shared by every part; one material program (`sgfWave`: the line's own emission plus a band of light whose depth
+the kick carries); the light at the end a fogged radial disc; analytic fog; depth of field; bloom.
 
-**Camera.** Locked frontal (50 mm), with a 4-degree breathing arc over 64 s and a slow push-in while sound is
-sustained.
+**Camera.** On the axis (the symmetry is the point), drifting a metre about it, banking ±10 degrees over 36 s; 20 mm.
 
 **Modulation map.**
 
 | dimension | signals | drives |
 |---|---|---|
-| bass | `response.bass` | geometry: the whole diagram's radial breathing (each layer's scale, deeper layers less); light: the core's glow |
-| kick | `response.kick` | geometry: the rings snap OPEN about their axes (a spring chain, so they ring and settle back flat); VFX: a bead flash running outward |
-| snare | `response.snare` | colour: the star flashes vermilion; VFX: the petals fire sparks outward |
-| highs | `audio.treble`, `response.hat` | VFX: bead particles released along the ring paths; geometry: the fine outer ring of 48 beads shimmers (scale) |
-| mids | `audio.mid`, `response.melodic` | geometry: the differential rotation rate (k x base), so a busy middle spins the pattern faster |
-| centroid | `sonic.brightness` | colour: gold (dark timbre) through to ivory and pale cyan-white (bright); line weight thins as the sound brightens |
-| bands | `audio.bass` / `lowMid` / `mid` / `highMid` / `treble` | each band owns one LAYER of the well, from the core (bass) outward to the crown (treble) |
-| sustain | `response.sustain` | camera: the slow push into the well; VFX: the feedback trails lengthen |
-| tempo | `beat.phase`, `beat.bar` | geometry: the base rotation is locked to the bar, so the rings re-align into the flat mandala on each downbeat |
-| intensity | `response.intensity` | `[S]` ring count (inner layers switch on as a piece builds), `[S]` petal count 12, 24, 48 |
-| MIDI notes | `notes.class.<k>`, `response.note` | geometry: the 12 pitch classes are 12 points on the outer circle; a sounding class lights its petal and spoke, so a chord draws its own polygon |
-| MIDI chords | `notes.polyphony` | `[S]` the polygon order of the inner star: 3 notes give a triangle, 4 a square, 6 a hexagram |
-| MIDI pitch | `notes.lastPitch` | geometry: which nested layer answers the note (low notes deep, high notes at the crown) |
-| velocity | `notes.lastVelocity` | light: how hard a note flares its ring |
-| sustained notes | `notes.held` | geometry: the armillary stays open while a note is held |
-| mod wheel | CC 1 | geometry: opens the whole armillary into a sphere by hand |
+| bass | `response.bass` | `[S]` the passage widens and narrows (every part scaled about the axis); the enormous outer rings expand |
+| kick | `response.kick` | light: a wave of light runs from the camera to the far end (the band in `sgfWave`); a radial burst; a lens punch |
+| snare | `response.snare` | geometry: the stars' triangles and the roses' circles swell past the rim and ring back (a bloom), and flash; sparks |
+| hat | `response.hat` | the beads glint |
+| highs | `audio.treble`, `audio.highMid` | sparks stream past the walls; the inner circles brighten |
+| mids | `audio.mid` | geometry: the whole lattice turns (the twist's phase, integrated) |
+| centroid | `sonic.brightness` | colour: gold towards ivory |
+| tempo | `beat.pulse` | the rails pulse |
+| intensity | `response.intensity` | `[S]` the gates double: a rim every 7 m, and every gate both a star and a rose |
+| pitch class | `notes.class.<k>` | the twelve rails are the twelve pitch classes (C at the top, clockwise): a chord lights its own polygon of rails down the whole passage |
+| chord | `notes.polyphony` | `[S]` every rose's open heart becomes a vermilion polygon with as many sides as notes sounding |
+| pitch | `notes.lastPitch` | the sun's colour, deep orange to white gold |
+| velocity | `notes.lastVelocity` | how hard a note flares the gates' circles |
+| held | `notes.held` | the enormous outer rings glow |
+| mod wheel | CC 1 | `[S]` the helix tightens (the twist's rate) |
 
-**Structural parameters.** Ring count, petal count (symmetry order), each ring's polygon order, bead count, the inner
-spiral's turn per layer, and the layers' depth spacing.
+**Structural parameters.** Gate spacing (count), the passage's width, the helix's pitch, the chord polygon's order.
 
-**As built (2026-10-02).** As planned, with these differences:
-- the armillary is four rings (a circle, a 12-gon, a circle, a hexagon);
-- the inner star is four triangles (a 12-pointed star);
-- the twelve pitch classes are a clock of diamonds and spokes round the crown;
-- a polygon in the heart has as many sides as notes sounding;
-- the light trails are `temporal/feedback` at zoom 1.
+**As built (2026-10-02).** As planned. Found on the way: a template must stay VISIBLE (a hidden one composes nothing)
+and untransformed (its distribution transform reaches the copies), so the three templates stand in the camera's own
+plane where the near plane clips them; the sky's sun glows only above its horizon, so the light at the end is geometry.
 
-The lattice fades into the halo's colour, because opaque lines cannot fade to nothing.
-
-**Expansion.** Kepler's nested Platonic solids; a garden of small armillaries on a dark plane; a flower-of-life
-tessellation flown over; Islamic star-pattern tilings; a tunnel of mandalas.
+**Expansion.** A passage of Platonic solids; a Metatron's-cube lattice flown between; a flower-of-life floor under a nave
+of rings; a mandala well that is also a tunnel.
 
 ---
 
@@ -332,173 +342,237 @@ to the flower over 20 s, and a breathing focus on the kick.
 **As built (2026-10-02).** Recomposed as a true macro: a close camera just under the lantern (now with an inner ring
 of upright petals and seven hanging stamens with glowing beads), f/0.8 depth of field, the jelly-trees behind as soft
 backlight. Six voice flowers stand in the middle ground (closed buds at rest). The floor is 900 m wide, so its edge is
-lost in haze.
+lost in haze. Late in the pass three radiolarians joined it (wire-line lattice spheres, ADR-1073: the hats light
+their lattices, the treble thickens their lines, the bass swells them, the kick lights their cores).
 
 **Expansion.** A jellyfish cathedral; a coral forest; a radiolarian sky; a seed bank that grows a tree per phrase.
 
 ---
 
-## 6. Particle / VFX World: *Galaxy Engine*
+## 6. Digital Alpine: *Glass Caldera*
 
-**Grammar.** Particles are the forms; there is almost no geometry. Large structures are made of points: spiral arms,
-streams, a ring vortex, curtains. Motion is orbit and flow, explosions reform into the structure, and the feedback turns
-points into silk.
+**Grammar (07).** The land is FACETS: four rings of irregular flat triangles round a caldera lake (a jittered polar grid,
+ridged noise for the crests, generated into GLB meshes), each ring farther, higher and paler, separated by arms of water,
+plus an island and rocks. No textures, no lines, no outlines, no neon. The facets are coloured by a painter's rule (an
+unlit material program): warm where they face the low sun, lilac where they face the sky, indigo in shadow, mist at the
+waterline, and with distance the colour of the sky behind them (warm towards the sun, cool away). The water is not a
+surface: every landform has a mirrored TWIN below the waterline, drawn darker and bluer by the same program, and the sky
+is a dome whose program paints the sky above the horizon and its mirror image below it, with ripples and the sun's
+broken path where each view ray meets the water. So the lake reflects mountains and sky exactly, for nothing.
 
-**Hero frame.** A vast two-armed spiral of luminous points at three quarters. The arms shade from deep blue at the
-rim through magenta to gold at the core, around a white-hot core. Ribbon trails flow along the arms. A halo of dust
-curtains sits round it, and one stream of particles arcs over the camera. A violet-black ground carries faint nebular
-colour from feedback smears, with a chromatic fringe at the edges.
+**Hero frame.** A low sun just behind a violet peak, its glow over the ridge and its reflection broken on the water;
+dark faceted ranges in layers, each paler than the last; the far peaks almost the colour of the sky; streaky blue
+water below a perfect mirror image.
 
-**Palette.** Ground `#05020c`. Points from `#2b6bff` (rim) through `#ff3fb4` to `#ffc35a` (core). Core `#fff6e0`.
+**Palette.** Blue and violet with a peach sun: zenith `#0e1840`, violet `#4d4386`, horizon `#f4c0a0` (towards the sun)
+and `#a985b4` (away); shadow facets `#160f38`, sky-lit `#2f2a6e`, sun-lit `#e0785e`; the water keeps (0.36, 0.45, 0.86)
+of what it reflects.
 
-**Technique.** Particle systems with an attractor and orbit (rotation), emitted along spiral splines (arms) and a disc
-(the halo). The arms' splines are modulatable (`spline/<arm>/turns`, `radius`). Trails make the ribbons. Velocity stretch
-makes the streaks. `temporal/feedback` (decay 0.85, a slight zoom and turn) makes the silk. Bloom, split and shock are
-used on hits.
+**Technique.** `meshes.py` (polar ranges, rocks, clipping at the waterline, mirroring); procedural Mesh sources; two
+unlit programs (`daRock` with distances in decametres -- a material op's constants are clamped to ±1000 --, `daSky`);
+a travelling-wave field (`swell`) on every landform through a field deformer; splash-ring particles; glints.
 
-**Camera.** A slow orbit at 30 degrees elevation, about 60 s a turn, with shake on the kick.
+**Camera.** A low glide round the lake (radius 320 m, 170 s a circuit), banking into the turn, the view swinging twice a
+circuit between looking ahead along the glide and looking in across the water at the island. As the circuit turns, the
+light turns from backlit dusk (violet silhouettes and a gold path) to front-lit alpenglow (coral facets, deep blue water):
+two coherent palette states, one world.
 
 **Modulation map.**
 
 | dimension | signals | drives |
 |---|---|---|
-| bass | `response.bass` | VFX: the attractor's pull (the galaxy contracts and blooms out); light: the core's brightness |
-| kick | `response.kick` | VFX: an explosion; a radial burst from the core and a shock ring; the arms reform after it |
-| snare | `response.snare` | VFX: a flare runs along an arm (a burst on the arm's spline) |
-| highs | `audio.treble`, `response.hat` | VFX: glitter (tiny fast sparks); colour: the rim's sparkle |
-| mids | `audio.mid` | VFX: the orbit speed (the galaxy turns); the curl turbulence |
-| flux | `response.flux` | VFX: turbulence; the arms fray into swirls |
-| centroid | `sonic.brightness` | colour: the arms' gradient (warm to cool); particle size |
-| tempo | `beat.phase` | `[S]` the spiral's turns step on the bar |
-| intensity | `response.intensity` | `[S]` particle count (spawn rate) and `[S]` trail length |
-| MIDI notes | `notes.lastPitch`, `response.note` | VFX: each note launches a comet from the rim at its pitch's angle; velocity is its brightness |
-| MIDI chords | `notes.polyphony` | `[S]` the number of arms (2 to 6 arm emitters) |
-| sustained notes | `notes.held` | VFX: the halo curtains form |
-| mod wheel | CC 1 | geometry: the galaxy's tilt |
+| level | `response.level` | AUDIO TOPOGRAPHY: a travelling sine wave field rolls out from the island through every range (and, mirrored, every twin), as tall as the music is strong |
+| bass | `response.bass` | the shore range lights from within (spectral depth); the waterline mist glows; the sun's path on the water brightens |
+| low mids / mids / high mids | `audio.lowMid`, `audio.mid`, `audio.highMid` | SPECTRAL DEPTH: the main, far and distant ranges each light with their own band |
+| kick | `response.kick` | a band of light runs out through the ranges (a distance band in `daRock`); rings of light land on the water (splash particles) |
+| snare | `response.snare` | a flash along the horizon |
+| mids | `audio.mid` | the water's ripples deepen |
+| highs | `audio.treble` | glints scatter on the water; the sun's glow brightens |
+| tempo | `beat.phase` | the ripples drift |
+| centroid | `sonic.brightness.slow` | the palette drifts warmer or cooler (hue) |
+| intensity | `response.intensity` | `[S]` the ranges rise as the piece builds |
+| pitch class | `notes.class.<k>` | twelve lanterns round the shore, one per pitch class, with their reflections |
+| chord | `notes.polyphony` | `[S]` the waterline mist rises with the chord's size |
+| velocity | `notes.lastVelocity` | how bright a lantern flares |
+| mod wheel | CC 1 | `[S]` the sun climbs (dusk to afternoon): its glow, its path on the water, the light on every facet |
 
-**Structural parameters.** Arm count, spiral turns, particle count, trail length, and halo size.
+**Structural parameters.** The ranges' heights, the swell's height, the mist's height, the sun's elevation.
 
-**As built (2026-10-02).** Two arms of three spiral segments each (gold, magenta, blue), whose splines turn (the
-galaxy rotates while its points flow inward); a fine-dust halo; four extra arms that chords light; comets from a short
-spiral arc whose start angle the pitch sets; a blast system and a screen shock for the kick.
+**As built (2026-10-02).** First built from boxes (a cube on its corner is a peak), which read as a pile of slabs; rebuilt
+from generated faceted meshes. Engine facts found: material op constants clamp to ±1000; the engine water reflects only
+the sky, hence the twins.
 
-**Expansion.** A ring vortex (a smoke ring of light); a river of light over a dark sea; a particle flower that blooms
-per chord; a murmuration (dark particles against a sunset).
+**Expansion.** A fjord flown at dawn; an archipelago of faceted islands; a crater lake at night with the lanterns lit; a
+waterfall of facets.
 
 ---
 
-## 7. Impossible Architecture: *Relativity Court*
+## 7. Chromatic Topography: *Contour Valley*
 
-**Grammar.** A few architectural primitives (stairs, arches, slabs, columns, doorways) arranged in a space with three
-gravities, as in Escher's *Relativity*. One module repeats forever in every direction (*Manifold Garden*), and rooms sit
-inside rooms. Painted in de Chirico's light: low raking sun, long hard shadows, warm flat colours, and ink edge lines on
-every crease.
+**Grammar (05).** SMOOTH FORM + COLOUR BY HEIGHT: one smooth-shaded heightfield (a sculpted winding valley, rounded
+hills, ridged crests; periodic along the flight, so three copies and a sawtooth make an endless valley), coloured by an
+unlit program: its height quantised into seven hard hypsometric bands, fine contour lines every 22 m that flow up the
+slopes with the music, soft light from the left, the river's turquoise glow where the land meets the valley floor, cream
+haze with distance. Groves (teal cones, cobalt lollipop trees) and cyan crystals are baked onto the slopes and crests
+from the same height function. Distinct from Digital Alpine: smooth, saturated, graphic, map-like.
 
-**Hero frame.** A cubic courtyard seen from inside one of its stairways. Stairs climb its floor, its walls and its
-ceiling, each flight in its own gravity, with arches and doorways on every face. Through the openings the same court
-repeats in all directions into a warm haze. A low golden sun throws long, hard shadows across the terracotta and cream
-surfaces. In the gaps, the sky is deep green-teal. One doorway glows.
+**Hero frame.** From a glide above the river: the valley winding away between banded hills -- indigo floor, violet,
+magenta, coral, orange, gold, cream crests -- each ruled with contour lines, the turquoise river glowing down the
+middle, groves dotting the slopes, the far hills fading into a cream horizon under a cobalt sky.
 
-**Palette.** Terracotta `#c8553d`, ochre `#e0a458`, cream `#f3e3c3`, ink `#2a1b14`. Sky `#1f6f6a` to `#0d3b3a`. Sun
-`#ffd08a`.
+**Palette.** Bands `#1d2a72`, `#5a2a92`, `#b0308c`, `#ec4f66`, `#f68f4c`, `#fbd36a`, `#fff3cf`; river `#39f2dc`;
+groves `#0d5f73` and `#2346b8`; crystals `#9ff6ff`; sky `#ffe3c6` to `#86d4ea` to `#2448a8`.
 
-**Technique.** One compiled SDF: the `stairs` primitive (ADR-1040), arches (box minus cylinders), `rotate` for the three
-gravities and `repeat` (infinite) in three axes. A `recurse` gives the room inside the room. Look: SDF shadows toward the
-sun (a penumbra march), ambient occlusion and ink edge lines (`edgePixels`). Fog fades the repetitions, and surfaces use
-the line look.
+**Technique.** `meshes.heightfield` (periodic noise), `ribbon`, `cone`, `ball`, `prism`; four unlit programs
+(`ctLand`, `ctFlat`, `ctRiver`, `ctSky`); seven bands from thresholds and two three-stop ramps; the contour lines a cosine
+palette whose phase is routable; a sine wave field for the land's breathing.
 
-**Camera.** A slow drift through the lattice. The world rolls (the SDF's rotation) a quarter turn per phrase, so "up"
-changes and the shadows sweep.
+**Camera.** The land slides towards the camera (20 m/s); the camera steers to stay over the river, looking at the next
+bend and banking into it, and twice a period rises from 64 m to over 300 m above the hills and dives back.
 
 **Modulation map.**
 
 | dimension | signals | drives |
 |---|---|---|
-| bass | `response.bass` | `[S]` the lattice's spacing (`repeat` size): the courts breathe apart and together |
-| kick | `response.kick` | geometry: a stair module slides one step (a translation impulse with a spring); light: a doorway flashes |
-| snare | `response.snare` | geometry: a flight of stairs folds over to a new gravity (a 90-degree turn on a spring) |
-| highs | `audio.treble`, `response.hat` | light: the ink lines sharpen and the edge intensity rises; VFX: dust motes in the light |
-| mids | `audio.mid` | light: the sun's direction sweeps, so the shadows move |
-| centroid | `sonic.brightness.slow` | colour: the sky and haze colour (teal dusk to gold noon); the light's warmth |
-| tempo | `beat.bar` | camera: the world's roll steps a quarter turn per phrase |
-| intensity | `response.intensity` | `[S]` how many rooms sit inside the room (`recurse` count) |
-| MIDI notes | `notes.lastPitch`, `response.note` | light: a doorway at the pitch's height lights up (low notes low, high notes high) |
-| MIDI chords | `notes.polyphony` | `[S]` the stairs' step count per flight |
-| velocity | `notes.lastVelocity` | light: how bright the doorway glows |
-| sustained notes | `notes.held` | geometry: the space unfolds (a fold plane opens the court) |
-| mod wheel | CC 1 | camera and geometry: the world's roll by hand |
+| bass | `response.bass` | the river rises up its banks (the glow's height) and brightens |
+| kick | `response.kick` | a band of light runs out across the land from the camera |
+| snare | `response.snare` | the groves bloom (their colours flare) |
+| mids | `audio.mid` | the contour lines flow up the slopes (the lines' phase, integrated) |
+| low mids | `audio.lowMid` | the round trees glow |
+| highs | `audio.treble` | pollen sparks over the river; the contour lines brighten |
+| tempo | `beat.pulse` | the contour lines pulse |
+| centroid | `sonic.brightness.slow` | the palette drifts (hue) and the haze warms |
+| intensity | `response.intensity` | `[S]` the land rises (the hills grow taller as the piece builds) |
+| level | `response.level` | the land breathes (a slow wave rolls through it) |
+| pitch class | `notes.class.<k>` | twelve families of crystals on the crests, one per pitch class |
+| chord | `notes.polyphony` | the river's glow widens with the chord |
+| velocity | `notes.lastVelocity` | how bright a crystal flares |
+| mod wheel | CC 1 | `[S]` the contour spacing, from fine survey lines to broad terraces |
 
-**Structural parameters.** Lattice spacing, room recursion depth, step count, and arch count per face.
+**Structural parameters.** Band count and heights, contour spacing, the land's vertical scale, the river's level.
 
-**As built (2026-10-02).** One compiled SDF: three flights (the same flight under the two cyclic axis permutations)
-round nested open cubes (`recurse`), repeated forever in three axes with an 18 m period; cel lighting on the SDF, its
-own shadow march toward the sun, the ink outline fading with distance. The world rolls a full turn in four minutes.
+**As built (2026-10-03).** As planned; the first look was a canyon (walls everywhere), so the outer walls were lowered and
+the glide given its rise over the hills.
 
-**Expansion.** Penrose stairs in an isometric diorama; a monastery of folding staircases; endless arcades at noon;
-rooms inside rooms as a zoom.
+**Expansion.** A delta of glowing rivers seen from above; terraced islands in a colour-field sea; a night version with
+contour lines of light.
 
 ---
 
-## 8. Abstract Cinematic Void: *The Gate*
+## 8. Glitch Signal: *Pixel Canyon*
 
-**Grammar.** One colossal object, one horizon, one light. The ring is 64 segments that can part. A perfect mirror
-plane lies beneath it. A tiny figure gives the scale. Atmosphere does the rest: haze, god rays and dust. Framing is
-letterboxed 2.39:1, the camera is slow and majestic, and the colour story is amber against teal.
+**Grammar (06).** Everything is a BLOCK on one 6 m grid: a canyon whose walls and floor are grids of thousands of dark
+blocks, some lit cyan and white in a data pattern, ruled with scanlines, streaked with flowing data ribbons, rained on by
+falling pixels, with floating fragments of the signal at the sides and a white-hot horizon where the signal comes from.
+The blocks' colours come from each block's own centre (a noise sampled on a cylinder round the flight axis, so the pattern
+is periodic and rides with the blocks through the seamless sawtooth). Damage is deformers (a row shear for drifting
+sections, a block-scale noise for fragmentation) and the post-glitch vocabulary. Not a city, not Tron: a broken signal.
 
-**Hero frame.** A colossal ring 300 m across stands on the horizon of a perfect mirror plane. A low sun sits exactly
-inside it, so its opening is a white-gold disc of light, and god rays stream through it toward the camera across thick
-amber haze. The ring is a silhouette of dark segments with thin gaps of light between them. Its reflection lies in the
-plane below. In the foreground, small on the lower third, stands one human figure as a simple silhouette. The sky grades
-from deep teal at the top to amber at the horizon, inside black letterbox bars.
+**Hero frame.** Down the canyon: walls of blue-black blocks with lit cyan pixels converging on a white diamond of light,
+the floor tiles lit in a pattern, pixel rain falling, thin data ribbons streaking along the walls; scanlines over all.
 
-**Palette.** Teal `#0e2a33`, `#1d4a52`. Amber `#ff9a3c`, `#ffcf86`. Light `#fff4dc`. Silhouette `#0a0a0c`.
+**Palette.** Blue-black `#020309`, dim `#0b1c5a`, lit `#9ef6ff`, white; in corruption magenta `#ff2bd6`, acid green,
+orange `#ff5a1f`; after each collapse the whole palette moves round the hue circle.
 
-**Technique.** A radial distribution of 64 box segments (the ring), dark and lit from behind. A mirror twin below the
-plane, since the engine has no planar reflection: there is no floor geometry, and the sky's lower hemisphere is the
-plane. Volumetric fog with the sun's volumetric light, a `lightBeam` through the ring, and dust particles in the beams.
-A tiny figure is a capsule silhouette. Letterbox bars are black slabs in front of the lens, or the render size for review
-clips.
+**Glitch at three scales.** MICRO, always: scanlines (0.22), 1.4 px of RGB split, a 1.5% flicker of glitch blocks, the
+hats' block flicker. MESO: snares tear the frame and shear the rows, onsets swap channels. MACRO, the signature: a STRONG
+EVENT (a hard kick at a moment of large spectral change: the kick's envelope times the flux above 0.62, measured on the
+review music at three to five times in thirty seconds; or a note at full velocity) sets off the staged COLLAPSE --
+0 ms RGB separation begins and grows spectral; 250 ms the rows drift and the frame tears; 520 ms the walls fragment into
+blocks; 820 ms all but total corruption (blocks, channel swaps, pixel sort, mosaic, saturation); 1000 ms a wave of colour
+runs through the camera (a shock ring closing on the centre, a hue flash); 1120 ms RECONSTRUCTION in a NEW
+CONFIGURATION, integrated so it stays: the world turned about the flight (walls become floor and sky), the palette moved
+round the hue circle, the data pattern and the row stagger re-drawn. Reactivity continues from the new state.
 
-**Camera.** A very slow push toward the ring from far away (120 s), low (1.7 m), on a long lens (85 mm), with a slight
-shake on the kick.
+**Technique.** Grid distributions of boxes; `gsPixel` (centre = world - local - the sawtooth offset; a periodic noise;
+three levels; scanlines; the kick's band; a fade into the dark); `gsRibbon`; sine and noise deformers; route chains with
+delays, peak-hold envelopes, springs and integration staging one trigger into the six stages.
+
+**Camera.** Down the middle of the canyon at 30 m/s (the world slides), drifting; after each collapse a new roll.
 
 **Modulation map.**
 
 | dimension | signals | drives |
 |---|---|---|
-| bass | `response.bass` | VFX: the haze density breathes; light: the sun's bloom swells |
-| kick | `response.kick` | light: a pulse of light runs round the ring's gaps; camera: a slight shake |
-| snare | `response.snare` | VFX: dust bursts in the beams |
-| highs | `audio.treble`, `response.hat` | VFX: the dust glitters; light: specular glints on the segments' edges |
-| mids | `audio.mid` | geometry: the ring turns slowly about its axis |
-| centroid | `sonic.brightness.slow` | colour: the sky's grade (amber to rose to teal) |
-| sustain | `response.sustain` | light: the sun inside the ring brightens; VFX: the god rays lengthen |
-| tempo | `beat.bar` | geometry: the segments step apart and back on the phrase |
-| intensity | `response.intensity` | `[S]` the gaps between segments (the ring parts as the piece builds); `[S]` concentric rings appear |
-| MIDI notes | `notes.lastPitch`, `response.note` | light: a segment lights at the pitch's angle round the ring |
-| MIDI chords | `notes.polyphony` | `[S]` the segment count (32 to 96) |
-| sustained notes | `notes.held` | camera: the push holds; geometry: the ring's segments drift outward |
-| mod wheel | CC 1 | light: the sun's height inside the ring (a sunrise by hand) |
+| strong event | `visual.collapse` (`kickEnv` x `flux`, or a full-velocity note) | MACRO: the staged collapse and `[S]` the reconstruction in a new configuration (roll, palette, pattern, stagger) |
+| bass | `response.bass` | the RGB split widens; the walls push apart; the horizon flares |
+| kick | `response.kick` | a wave of light runs down the canyon towards the camera |
+| snare | `response.snare` | MESO: the frame tears; the rows shear sideways |
+| hat | `response.hat` | MICRO: glitch blocks flicker |
+| onset | `response.onset` | MESO: channels swap in the glitch blocks |
+| mids | `audio.mid` | the data ribbons stream faster; the rows' stagger drifts |
+| highs | `audio.treble` | the scanlines deepen; the pixel rain thickens |
+| brightness | `sonic.brightness` | the lit pixels brighten |
+| tempo | `beat.pulse` | the lit pixels pulse |
+| intensity | `response.intensity` | `[S]` more of the pattern lights as the piece builds |
+| pitch | `notes.lastPitch` | the fragments rise with the pitch |
+| velocity | `notes.lastVelocity` | how hard a note glitches the frame |
+| held | `notes.held` | the fragments hold their light |
+| mod wheel | CC 1 | corruption by hand: blocks, split and sort |
 
-**Structural parameters.** Segment count, gap size, ring count, and segment depth.
+**Engine needs.** None for the collapse: it is built from what exists (route delays, envelopes, springs, integration, the
+post-glitch pass). Two notes for the coordinator in `PROGRESS-abstract.md`: a route's delay stage interpolates between
+frames (a one-frame event delayed can fall below its threshold: trigger from envelopes), and there is no way to give a
+trigger a refractory period (a strong passage can chain collapses; the threshold was measured so it rarely does).
 
-**As built (2026-10-02).** Rebuilt after review:
-- almost no air: beyond the march the density is surface fog, which had turned the ring into fog colour;
-- a geometric sun disc whose rim is the sky's own gradient, because the sky's sun renders blocky from the lighting
-  cube;
-- the mirror as one surface carrying the sun's reflection (the sky's gradient mirrored).
+**Expansion.** A datamosh river; a pixel-sorted waterfall; a signal tower that collapses into a city of blocks and
+rebuilds as a forest.
 
-The ring is 200 m across on the horizon; the letterbox is the engine's `post/display/letterbox` (ADR-1075).
+---
 
-**Expansion.** A glowing sphere over an ocean; a field of suspended monoliths; a distant geometric city on the horizon;
-an eclipse.
+## 9. 8-Bit Ocean: *Bubble Reef*
+
+**Grammar (08).** The 8-BIT BLOCK and the CHUNKY PRIMITIVE: voxel floors, rock walls, kelp, branch coral, rocks, ledges
+and fish (generated meshes, only the faces between a block and water), with low-segment primitives for the rest
+(eight-sided columns, ten-sided pipes, low-poly balls, a spiral shell); two-band toon light from the surface, thin navy
+outlines, blue depth haze, caustics crawling over the floor. The level is a RING round a deep basin with a giant coral
+tower, so the swim never ends: three areas with their own palettes -- SUNNY SHALLOWS (blue, cyan, yellow: brain coral,
+cyan kelp, a trail of spinning coins, the coral arch you enter by), FLOWER RUINS (purple, pink, turquoise: a colonnade
+and arches, enormous pink flowers, jellies, gems), PIPE DEEP (deep blue, orange, green: green pipes, orange branch coral,
+the house-sized shell) -- and the water's colour changes as you pass from one to the next. Original shapes throughout.
+
+**Hero frame.** Low over the golden checker floor of the shallows, the coral arch ahead with a trail of coins leading
+through it, cyan kelp stacks either side, brick ledges floating overhead, light shafts from the surface, bubbles rising.
+
+**Palette.** Per area (floor, rock, kelp, coral, water): shallows `#f7c548` `#3d6fd6` `#22d8ff` `#ffcf1f` `#0e58c8`;
+ruins `#8a52e0` `#5b34b0` `#18e6c8` `#ff4fb0` `#2f22a8`; deep `#2648c8` `#1a2c86` `#4fe03a` `#ff7a1a` `#06206e`;
+outlines `#081a52`.
+
+**Camera.** A playful swim round the ring (150 s a lap, about 5 m/s), bobbing, weaving across the lane, glancing in and
+out, rolling a little.
+
+**Modulation map (THE LIVING LEVEL).**
+
+| dimension | signals | drives |
+|---|---|---|
+| bass | `response.bass` | every kelp plant bends at once (a bend about each plant's base, on a loose spring); the brain coral pulses; the sunlight swells |
+| kick | `response.kick` | the coins and gems flash (treasure); a ring ripples out through the water |
+| snare | `response.snare` | a swarm of bubbles bursts round the swimmer; the fish schools turn and dart |
+| hat | `response.hat` | sparkles glint |
+| mids | `audio.mid` | the fish swim faster (integrated); the bubble streams thicken |
+| highs | `audio.treble` | tiny sparkling creatures swarm |
+| tempo | `beat.pulse` | the caustics pulse; the jellies pump |
+| brightness | `sonic.brightness.slow` | the water clears |
+| intensity | `response.intensity` | `[S]` the coral grows as the piece builds |
+| pitch class | `notes.class.<k>` | a row of twelve bell flowers in each area, one per pitch class: a melody rings them note by note (a xylophone) |
+| chord | `notes.polyphony` | a chord blooms every brain coral and lights it |
+| velocity | `notes.lastVelocity` | how big the bubble burst a note releases |
+| held | `notes.held` | the kelp glows while notes are held |
+| mod wheel | CC 1 | `[S]` the depth: the water darkens and thickens |
+
+**As built (2026-10-03).** The radial distribution's angle convention (angle e at (cos e, 0, -sin e)) cost one round;
+the first looks were pastel and empty, so the palettes were saturated, the shadows deepened, the lane lined with coral
+and kelp, brick ledges floated over it, and outlines added for the sprite silhouette.
+
+**Expansion.** A sunken castle level; a night level of glowing jellies; a boss chamber with a giant friendly fish; a lava
+level in the same grammar.
 
 ---
 
 ## The set list
 
-`examples/index.json`, category "Sonic Abstract", in this order: 1 Sacred Geometry Garden, 2 Neon Vector World,
-3 Cel-Shaded Dream World, 4 Infinite Color Geometry, 5 Organic Digital Garden, 6 Particle / VFX World, 7 Impossible
-Architecture, 8 Abstract Cinematic Void. Entries are named "Sonic Abstract - <direction>", so the owner can say
-"number three" and be understood. The live switcher (ADR-1063) steps through the Sonic VFX set; the engineer is
-making it step through the set the open project belongs to. Until that lands, each prototype is opened directly.
+`examples/index.json`, category "Sonic Abstract", in this order: 1 Sacred Geometry Flight, 2 Neon Vector World,
+3 Cel-Shaded Dream World, 4 Infinite Color Geometry, 5 Organic Digital Garden, 6 Digital Alpine, 7 Chromatic Topography,
+8 Glitch Signal, 9 8-Bit Ocean. Entries are named "Sonic Abstract - <direction>", so the owner can say "number seven" and
+be understood. The live switcher (ADR-1074) steps through the set the open project belongs to: the nine, program n =
+scene n mod 9.
