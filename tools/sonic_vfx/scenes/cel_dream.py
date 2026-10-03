@@ -331,7 +331,7 @@ def build():
                 speedMax=0.2, gravity=[0, 0, 0], drag=1.0, sizeStart=0.09, sizeEnd=0.0,
                 colorStart=hexrgb("#ffffff") + [1.0], colorEnd=hexrgb(BUTTER) + [0.0], emissive=5.0,
                 blend="additive")
-    s.places("sing", "lastPitch", [0.36, 0.5, 0.64], 0.07, event="noteOn")
+    s.places("sing", "lastPitch", [0.15, 0.45, 0.68], 0.13, event="noteOn")   # low, middle, high registers
     instrument(s)
 
     # ---- camera: a slow arc round the diorama from slightly above; the creatures and flower left of centre

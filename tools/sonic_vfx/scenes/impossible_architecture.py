@@ -204,7 +204,7 @@ def build():
     tgt = [-6.0, -2.0, -14.0]
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 50.0, "orbitSpeed": 0.0}
     s.drift_camera(cam, tgt, period=56.0, amp=(1.0, 0.6, 1.2), tamp=(2.0, 1.4, 0.0))
-    s.places("door", "lastPitch", [0.36, 0.5, 0.64], 0.07, event="noteOn")
+    s.places("door", "lastPitch", [0.15, 0.45, 0.68], 0.13, event="noteOn")   # low, middle, high registers
     instrument(s, sun_dir)
     s.region("rooms", centre=[0.0, 0.0, 0.0], radius=2.5)
     s.region("lattice", box=[0.0, 0.0, 1.0, 1.0])
