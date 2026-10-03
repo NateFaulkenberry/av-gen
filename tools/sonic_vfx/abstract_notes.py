@@ -28,7 +28,11 @@ NOTES = {
         "expand": ["Kepler's nested Platonic solids", "a garden of small armillaries on a dark mirror",
                    "a flower-of-life tessellation flown over", "Islamic star tilings as a floor that the chords "
                    "rebuild", "a tunnel of mandalas for a build-up"],
-        "verdict": "",
+        "verdict": ('Holy shit: yes, as a still. A gold diagram fills the frame on ultramarine: intricate, symmetric '
+                    "and illuminated, unlike anything else in the set. It's the most instrument-like of the eight, "
+                    "because the music's structure becomes the drawing's structure: a chord draws its own polygon, "
+                    'the beat turns the rings into alignment, the kick opens the armillary. Risk: fine lines shimmer '
+                    'at a low adaptive scale.'),
     },
     "neon-vector": {
         "working_title": "Pulsar Plain",
@@ -50,7 +54,10 @@ NOTES = {
         "expand": ["a vector city drawn only in outlines (with the engineer's wireframe lines)",
                    "an oscilloscope room where Lissajous figures are the architecture",
                    "a Bauhaus field of flat primitives", "a line-drawn ocean"],
-        "verdict": "",
+        "verdict": ('Close to yes. It reads as a poster you can fly through: hidden-line ridges, a magenta triangle, '
+                    "an outline circle, wireframe monoliths. The flight (the plain's shapes advancing), the beat "
+                    'sweep and the beat-built shapes carry the energy. Not quite: the left foreground is empty black,'
+                    ' and the accent colour lives on one object.'),
     },
     "cel-dream": {
         "working_title": "Candy Archipelago",
@@ -126,7 +133,10 @@ NOTES = {
         ],
         "expand": ["a ring vortex (a smoke ring of light)", "a river of light over a dark sea", "a particle flower "
                    "that blooms per chord", "a murmuration of dark points against a sunset"],
-        "verdict": "",
+        "verdict": ('Close to yes. A luminous galaxy built only of points, with gold arms flowing into a white core '
+                    "and a fine dust disc. It's the most familiar subject in the set (galaxy screensavers exist), so "
+                    'its distinction is the motion: arms that flow, chords that add arms, the kick that explodes it '
+                    'and lets it reform.'),
     },
     "impossible-architecture": {
         "working_title": "Relativity Court",
@@ -145,7 +155,10 @@ NOTES = {
         ],
         "expand": ["Penrose stairs in an isometric diorama", "a monastery of folding staircases", "endless arcades at "
                    "noon", "rooms inside rooms as a zoom"],
-        "verdict": "",
+        "verdict": ("Yes. An Escher lattice in de Chirico's colours, inked: three gravities of stairs and rooms "
+                    "inside rooms, repeating into teal space. It's busy, but it reads, and the slow roll makes it "
+                    "hypnotic. Risk: it's the most expensive scene (one SDF repeated in three axes with a shadow "
+                    'march).'),
     },
     "cinematic-void": {
         "working_title": "The Gate",
@@ -164,6 +177,9 @@ NOTES = {
         ],
         "expand": ["a glowing sphere over an ocean", "a field of suspended monoliths", "a distant geometric city on "
                    "the horizon", "an eclipse"],
-        "verdict": "",
+        "verdict": ('Yes, and the strongest single image. A black ring 200 m across with the sun burning inside it, '
+                    'its perfect reflection, an orange-and-teal sky, a tiny figure, letterboxed: almost nothing at '
+                    "enormous scale. As an instrument it's restrained by design (slow light and air, segments that "
+                    'part as a piece builds).'),
     },
 }
