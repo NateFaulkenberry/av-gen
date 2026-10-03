@@ -14,6 +14,7 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -54,11 +55,67 @@ bool operator==(const OutputDesc& a, const OutputDesc& b);
 
 struct OutputRuntime; // window + surface; defined in output_manager_gpu.cpp
 
+// ADR-1089: how often an output is presented to, decided from how long its swapchain acquire took.
+//
+// Every output's acquire is a second (third, ...) Fifo `GetCurrentTexture` on the main thread, and
+// WebGPU has no "try": when the window's display is not taking frames -- a projector that is slow,
+// mis-clocked or asleep, or a window macOS throttles because it is covered -- the acquire blocks the
+// whole loop until a drawable comes back. Measured on 2026-10-02: 14.8 ms per frame for a covered
+// 960x540 projection window, capping the editor and the performance at 60 fps.
+//
+// The policy is the smallest that bounds it: an acquire slower than `slowAcquireMs` doubles the
+// interval at which this output is presented to (every 2nd, 4th, then 8th frame -- the window shows
+// its last frame in between), and `recoverAfter` fast acquires in a row halve it again. A healthy
+// output never leaves interval 1 and costs nothing; a stuck one costs the loop one blocked acquire in
+// eight frames instead of every frame. Pure and clockless, so the CPU suite checks it.
+class PresentPacer {
+public:
+    static constexpr double kSlowAcquireMs = 4.0;
+    static constexpr std::uint32_t kMaxInterval = 8;
+    static constexpr std::uint32_t kRecoverAfter = 8;
+
+    // Called once per frame before presenting: whether this frame presents to the output.
+    [[nodiscard]] bool due() {
+        ++frame_;
+        if (interval_ <= 1 || frame_ >= interval_) {
+            frame_ = 0;
+            return true;
+        }
+        ++skipped_;
+        return false;
+    }
+    // After a present: how long its acquire blocked.
+    void acquired(double ms) {
+        lastAcquireMs_ = ms;
+        if (ms > kSlowAcquireMs) {
+            fastStreak_ = 0;
+            interval_ = std::min(kMaxInterval, interval_ * 2);
+            ++slowAcquires_;
+        } else if (interval_ > 1 && ++fastStreak_ >= kRecoverAfter) {
+            fastStreak_ = 0;
+            interval_ /= 2;
+        }
+    }
+    [[nodiscard]] std::uint32_t interval() const { return interval_; }
+    [[nodiscard]] std::uint64_t skipped() const { return skipped_; }
+    [[nodiscard]] std::uint64_t slowAcquires() const { return slowAcquires_; }
+    [[nodiscard]] double lastAcquireMs() const { return lastAcquireMs_; }
+
+private:
+    std::uint32_t interval_ = 1;
+    std::uint32_t frame_ = 0;
+    std::uint32_t fastStreak_ = 0;
+    std::uint64_t skipped_ = 0;
+    std::uint64_t slowAcquires_ = 0;
+    double lastAcquireMs_ = 0.0;
+};
+
 struct Output {
     OutputDesc desc;
     std::shared_ptr<OutputRuntime> runtime; // null while closed
     std::uint64_t framesPresented = 0;
     std::string lastError;
+    PresentPacer pacer; // ADR-1089
     // ADR-1026: the Live panel's projection. This machine's rather than the project's: toJson leaves it out,
     // fromJson (a project load) keeps it and its open window, and Esc in its window closes it like the close button.
     bool projection = false;

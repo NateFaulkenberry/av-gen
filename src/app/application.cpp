@@ -257,13 +257,13 @@ std::string usageText() {
            "                      '+seeknow' (the playhead's re-simulation back inside the gesture),\n"
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
-           "  --adaptive-scale <on|off>  let the editor choose the scene's resolution from the GPU\n"
-           "                      frame time, filtering it up into the canvas the person asked for.\n"
-           "                      Overrides the settings file for this run; never applies to a\n"
-           "                      render, where the Offline tier pins the scale to 1\n"
-           "  --adaptive-budget <ms>  the GPU frame time --adaptive-scale aims at (default 16.67)\n"
-           "  --adaptive-floor <s>  the lowest scale --adaptive-scale may reach: 0.5 (default), 0.58,\n"
-           "                      0.71, 0.85 or 1 (ADR-1024)\n"
+           "  --adaptive-scale <on|off>  on: the live quality ladder holds the target frame rate;\n"
+           "                      off: Ultra, always. Overrides the settings file for this run; never\n"
+           "                      applies to a render, where the Offline tier is pinned (ADR-1083)\n"
+           "  --live-quality <auto|ultra|high|medium|low|emergency>  the same, naming the level to pin\n"
+           "  --live-target <fps>  the live frame-rate target; the GPU budget is derived from it with\n"
+           "                      12% headroom (default: the setting, 60) (ADR-1080)\n"
+           "  --adaptive-floor <s>  the lowest scale the ladder may reach, 0.38-1 (ADR-1024/1083)\n"
            "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
            "                      given, it also applies to a headless playback run (ADR-1024)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
@@ -818,27 +818,39 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--adaptive-scale");
             if (!v) return std::unexpected(v.error());
             if (*v == "on" || *v == "1" || *v == "true") {
-                options.adaptiveScale = true;
+                options.liveQuality = {true, std::nullopt};
             } else if (*v == "off" || *v == "0" || *v == "false") {
-                options.adaptiveScale = false;
+                options.liveQuality = {true, LiveQualityLevel::Ultra};
             } else {
                 return fail("--adaptive-scale expects on or off, got '{}'", *v);
             }
             ++i;
-        } else if (arg == "--adaptive-budget") {
-            auto v = need(i, "--adaptive-budget");
+        } else if (arg == "--live-quality") {
+            auto v = need(i, "--live-quality");
             if (!v) return std::unexpected(v.error());
-            options.adaptiveBudgetMs = std::strtod(v->c_str(), nullptr);
-            if (options.adaptiveBudgetMs < 4.0 || options.adaptiveBudgetMs > 200.0) {
-                return fail("--adaptive-budget must be between 4 and 200 ms, got '{}'", *v);
+            if (*v == "auto") {
+                options.liveQuality = {true, std::nullopt};
+            } else if (const auto level = liveQualityLevelFromToken(*v)) {
+                options.liveQuality = {true, *level};
+            } else {
+                return fail("--live-quality expects auto, ultra, high, medium, low or emergency, got '{}'", *v);
+            }
+            ++i;
+        } else if (arg == "--live-target") {
+            auto v = need(i, "--live-target");
+            if (!v) return std::unexpected(v.error());
+            options.liveTargetFps = std::atoi(v->c_str());
+            if (options.liveTargetFps < kLiveTargetFpsMin || options.liveTargetFps > kLiveTargetFpsMax) {
+                return fail("--live-target must be between {} and {} fps, got '{}'", kLiveTargetFpsMin,
+                            kLiveTargetFpsMax, *v);
             }
             ++i;
         } else if (arg == "--adaptive-floor") {
             auto v = need(i, "--adaptive-floor");
             if (!v) return std::unexpected(v.error());
             options.adaptiveFloor = std::strtof(v->c_str(), nullptr);
-            if (!(options.adaptiveFloor >= 0.5f) || options.adaptiveFloor > 1.0f) {
-                return fail("--adaptive-floor must be between 0.5 and 1, got '{}'", *v);
+            if (!(options.adaptiveFloor >= kLiveScaleFloorMin) || options.adaptiveFloor > 1.0f) {
+                return fail("--adaptive-floor must be between {} and 1, got '{}'", kLiveScaleFloorMin, *v);
             }
             ++i;
         } else if (arg == "--live-aa") {
@@ -1495,16 +1507,17 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // controller, and a render job sizes its own targets from `RenderSettings` at the Offline
         // tier, whose `renderScale` is pinned to 1 and tested to be.
         {
-            InteractiveResolutionSettings rs;
-            rs.enabled = options_.adaptiveScale.value_or(settings_.adaptiveCanvasScale);
-            rs.budgetMs = options_.adaptiveBudgetMs > 0.0 ? options_.adaptiveBudgetMs
-                                                          : settings_.adaptiveCanvasBudgetMs;
-            rs.floorRung = rungForScale(options_.adaptiveFloor > 0.0f ? options_.adaptiveFloor
-                                                                      : settings_.adaptiveCanvasFloor);
+            const InteractiveResolutionSettings rs = liveQualitySettings();
             autoResolution_.configure(rs);
-            log::info("adaptive render scale: {} (budget {:.2f} ms GPU, floor {:.2f}x)",
-                      rs.enabled ? "on" : "off", rs.budgetMs,
-                      static_cast<double>(kRenderScaleRungs[rs.floorRung]));
+            // ADR-1081: the live editor's readers of the per-object diagnostic records (the selected
+            // entity's panel and its trail) name the entity, which builds them; nothing else in a
+            // live frame reads them, so the frame does not pay for them.
+            renderer_->setDiagnosticRecords(false);
+            const auto pinned = livePinnedQuality();
+            log::info("live quality: {} (target {:.0f} fps, GPU budget {:.2f} ms, lowest scale {:.2f}x, {})",
+                      pinned ? fmt::format("pinned at {}", liveQualityLevelName(*pinned)) : std::string("automatic"),
+                      rs.targetFps, rs.budgetMs, static_cast<double>(rs.scaleFloor),
+                      liveQualityStrategyLabel(rs.strategy));
         }
         panel_->preview = settings_.preview;
         panel_->renderPreview.enabled = settings_.renderFramePreview || options_.renderPreview; // ADR-320
@@ -1965,6 +1978,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onStartProjection = [this] { startProjection(); };
         panel_->onStopProjection = [this] { stopProjection(); };
+        panel_->onLiveQualityChanged = [this] { saveSettings(); }; // ADR-1087: serviceLiveQuality applies it
         panel_->onProjectionSettingsChanged = [this] {
             saveSettings();
             // A running projection follows the new choice: the window is reopened with it.
@@ -4608,31 +4622,6 @@ int Application::runLive() {
                 renderHeight_ = ch;
             }
         }
-        // The Settings panel writes `adaptiveCanvasScale` and the budget straight through, so there
-        // is no hook to set a dirty bit in and the honest thing is to compare -- the same shape
-        // and the same reason as `serviceLayoutStore` and the preview's view state below. Without
-        // this the checkbox would be a setting that does nothing until the next launch, which is
-        // the class of defect ADR-225 exists about. A `--adaptive-scale` on the command line
-        // outranks the file and is not overwritten by it.
-        if (panel_ != nullptr && !options_.adaptiveScale.has_value() &&
-            (autoResolution_.settings().enabled != settings_.adaptiveCanvasScale ||
-             autoResolution_.settings().budgetMs != settings_.adaptiveCanvasBudgetMs)) {
-            InteractiveResolutionSettings rs = autoResolution_.settings();
-            rs.enabled = settings_.adaptiveCanvasScale;
-            rs.budgetMs = settings_.adaptiveCanvasBudgetMs;
-            // Switching it off resets the ladder to rung 0, and the block below then puts the
-            // renderer back to full resolution on the same frame.
-            autoResolution_.configure(rs);
-        }
-        // ADR-1024, the same shape: the lowest scale, and the live antialiasing. Raising the floor
-        // above the current rung pulls the rung up with it (`configure` clamps), and the block below
-        // re-sizes on the same frame.
-        if (panel_ != nullptr && options_.adaptiveFloor <= 0.0f &&
-            autoResolution_.settings().floorRung != rungForScale(settings_.adaptiveCanvasFloor)) {
-            InteractiveResolutionSettings rs = autoResolution_.settings();
-            rs.floorRung = rungForScale(settings_.adaptiveCanvasFloor);
-            autoResolution_.configure(rs);
-        }
         if (panel_ != nullptr && !options_.liveAntialias.has_value()) {
             const float floor = settings_.liveAntialias ? rendering::kLiveAntialiasFloor : 0.0f;
             if (renderer_->qualitySettings().antialiasFloor != floor) {
@@ -4642,26 +4631,16 @@ int Application::runLive() {
                 log::info("live anti-aliasing: {}", settings_.liveAntialias ? "fxaa" : "off");
             }
         }
-        // ---- the adaptive render scale (§15-§17) ------------------------------------------------
+        // ---- the live quality ladder (§15-§17, ADR-1080..1085) ----------------------------------
         //
-        // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the rung is a
+        // Applied here, after `renderWidth_`/`renderHeight_` are settled, because the scale is a
         // fraction *of* the canvas: `setQualitySettings` re-resolves the scene target from the
         // output size the renderer already holds. It is deliberately downstream of the canvas
         // sizing and upstream of everything that reads the frame, so the picture the canvas shows
         // is the output size whatever rung is in force -- that is what makes this a presentation
         // change and not a change to what the frame is *of* (§33/§34).
-        //
-        // Rung 0 is the identity: no call is made at all, and an editor whose GPU keeps up is
-        // byte-identical to one built before this existed.
-        if (renderWidth_ > 0 && autoResolutionRung_ != autoResolution_.rung()) {
-            autoResolutionRung_ = autoResolution_.rung();
-            rendering::QualitySettings q = renderer_->qualitySettings();
-            q.renderScale = autoResolution_.scale();
-            renderer_->setQualitySettings(q);
-            log::info("render scale: rung {} ({:.2f}) -- scene {}x{} into a {}x{} canvas",
-                      autoResolutionRung_, static_cast<double>(q.renderScale),
-                      renderer_->stats().width, renderer_->stats().height, renderWidth_,
-                      renderHeight_);
+        if (panel_ != nullptr) {
+            serviceLiveQuality();
         }
         // The final texture has to exist before the panel draws, because the canvas window shows it
         // and ImGui records the texture id while it lays the frame out -- the drawing into it
@@ -5449,6 +5428,17 @@ int Application::runLive() {
             // that a GPU-bound frame spends most of itself in.
             const auto decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
             prof.count(kPhScaleChanges, decision.changed ? 1.0 : 0.0);
+            // ADR-1087: the status line's GPU and CPU, smoothed over about a second so they can be read.
+            const auto smooth = [](double& shown, double sample) {
+                if (sample >= 0.0) {
+                    shown = shown < 0.0 ? sample : shown + (sample - shown) * 0.05;
+                }
+            };
+            // The controller's own reading of the GPU (ADR-1085: the span, but never more than the interval).
+            smooth(liveGpuMsShown_, stats.gpuFrameMs >= 0.0 && stats.frameIntervalMs > 0.0
+                                        ? std::min(stats.gpuFrameMs, stats.frameIntervalMs)
+                                        : stats.gpuFrameMs);
+            smooth(liveCpuMsShown_, stats.cpuFrameMs);
         }
         // ---- the interaction log's end of frame -------------------------------------------------
         // Everything this frame caused is attributed to whatever interaction is open, then T6 is
@@ -6748,33 +6738,15 @@ std::vector<ProjectionDisplay> connectedProjectionDisplays() {
 }
 } // namespace
 
-bool Application::projectIsLive() const {
-    const sonic::SonicSetup* setup = engine_->sonicSetup();
-    return setup != nullptr && setup->live;
-}
-
 void Application::startProjection() {
     if (panel_ == nullptr || !context_ || !shaders_) {
         return;
     }
-    // TEMPORARY (live-projection investigation): AVGEN_X_PROJECT_ANY projects the open project as it is,
-    // instead of swapping in the Sonic Live demo, so a non-Sonic scene can be measured through the real output.
-    static const bool probeProjectAny = std::getenv("AVGEN_X_PROJECT_ANY") != nullptr;
-    switch (projection_.start(projectIsLive() || probeProjectAny)) {
-    case Projection::Action::OpenLiveDemo:
-        if (liveDemoPath_.empty()) {
-            projection_.failed("Projection not started: the Sonic Live example was not found.");
-            return;
-        }
-        log::info("projection: opening the Sonic Live demo first");
-        // Through the unsaved-changes prompt; a Cancel there leaves the projection idle (Projection::update).
-        loadAny(liveDemoPath_);
-        break;
-    case Projection::Action::OpenWindow:
+    // ADR-1088: the open project, as it is. No project is swapped in and no input is switched on: a
+    // general audiovisual engine projects what it is showing. (A `sonic.live` project turns its own live
+    // input on when it loads, ADR-1025, and "Open live demo" in the Live panel is still the way to the demo.)
+    if (projection_.start() == Projection::Action::OpenWindow) {
         openProjectionWindow();
-        break;
-    default:
-        break;
     }
 }
 
@@ -6786,13 +6758,6 @@ void Application::stopProjection() {
 }
 
 void Application::openProjectionWindow() {
-    // The projection is of the live world: live input on, whichever way the project arrived.
-    if (engine_->mode() == EngineMode::Live && !engine_->liveSonic() &&
-        std::getenv("AVGEN_X_PROJECT_ANY") == nullptr) { // TEMPORARY: live-projection investigation
-        if (auto r = engine_->setLiveSonic(true); !r) {
-            log::warn("projection: live input: {}", r.error().message);
-        }
-    }
     projectionDisplays_ = connectedProjectionDisplays();
     projectionLastScan_ = std::chrono::steady_clock::now();
     AppSettings::Projection probeProjection = settings_.projection; // TEMPORARY: live-projection investigation
@@ -6839,8 +6804,6 @@ void Application::serviceProjection() {
         projectionLastScan_ = now;
     }
     Projection::Observed observed;
-    observed.loading = pendingOpen_.has_value() || closeGate_.busy() || panel_->loading.active;
-    observed.liveProject = projectIsLive();
     {
         const Output* out = outputs_.find(kProjectionOutputName);
         observed.windowOpen = out != nullptr && out->open();
@@ -6865,16 +6828,116 @@ void Application::serviceProjection() {
     }
     auto& view = panel_->projection;
     view.active = projection_.active();
-    view.awaiting = projection_.state() == Projection::State::AwaitingProject;
-    if (view.awaiting) {
-        view.status = "Opening the Sonic Live demo...";
-    } else if (out != nullptr && out->open()) {
+    if (out != nullptr && out->open()) {
         view.status = fmt::format("Projecting on {}: {}x{} px, the picture {}x{}. Esc in that window, or Stop, ends it.",
                                   projection_.displayName().empty() ? "the default display" : projection_.displayName(),
                                   out->pixelWidth(), out->pixelHeight(), renderWidth_, renderHeight_);
+        // ADR-1089: said in words when it is happening, because it is visible in the projection.
+        if (out->pacer.interval() > 1) {
+            view.status += fmt::format(" The projection window is slow to take frames ({:.0f} ms), so it shows every "
+                                       "{} frame and the show keeps its pace.",
+                                       out->pacer.lastAcquireMs(),
+                                       out->pacer.interval() == 2 ? std::string("2nd") : fmt::format("{}th", out->pacer.interval()));
+        }
     } else {
         view.status = projection_.message();
     }
+}
+
+// ---- ADR-1080..1085: the live quality ladder ----------------------------------------------------------------------
+
+std::optional<LiveQualityLevel> Application::livePinnedQuality() const {
+    return options_.liveQuality.given ? options_.liveQuality.pinned : settings_.liveQualityPinned;
+}
+
+InteractiveResolutionSettings Application::liveQualitySettings() const {
+    InteractiveResolutionSettings rs = autoResolution_.settings(); // the law's constants stay as they are
+    const LiveBudget budget = liveBudget(options_.liveTargetFps > 0 ? options_.liveTargetFps : settings_.liveTargetFps);
+    rs.enabled = !livePinnedQuality().has_value();
+    rs.targetFps = budget.targetFps;
+    rs.budgetMs = budget.qualityBudgetMs;
+    rs.strategy = engine_ != nullptr ? engine_->liveQualityStrategy() : LiveQualityStrategy::Balanced;
+    rs.scaleFloor = std::clamp(options_.adaptiveFloor > 0.0f ? options_.adaptiveFloor : settings_.adaptiveCanvasFloor,
+                               kLiveScaleFloorMin, 1.0f);
+    return rs;
+}
+
+void Application::serviceLiveQuality() {
+    // The Settings and Live panels write the settings straight through and a project load changes the
+    // hint, so there is no hook to set a dirty bit in and the honest thing is to compare -- the same
+    // shape and reason as `serviceLayoutStore`. Without it a choice would do nothing until the next
+    // launch, the class of defect ADR-225 is about.
+    const InteractiveResolutionSettings want = liveQualitySettings();
+    const InteractiveResolutionSettings& have = autoResolution_.settings();
+    if (want.enabled != have.enabled || want.budgetMs != have.budgetMs || want.strategy != have.strategy ||
+        want.scaleFloor != have.scaleFloor) {
+        autoResolution_.configure(want);
+        const auto pinned = livePinnedQuality();
+        log::info("live quality: {} (target {:.0f} fps, GPU budget {:.2f} ms, lowest scale {:.2f}x, {})",
+                  pinned ? fmt::format("pinned at {}", liveQualityLevelName(*pinned)) : std::string("automatic"),
+                  want.targetFps, want.budgetMs, static_cast<double>(want.scaleFloor),
+                  liveQualityStrategyLabel(want.strategy));
+    }
+    if (renderWidth_ == 0 || renderHeight_ == 0) {
+        return;
+    }
+    if (!haveLiveQualityBase_) {
+        // Ultra is the tier exactly as the run configured it (tier, quality arms): captured once, before
+        // any rung has touched a field the ladder owns.
+        liveQualityBase_ = renderer_->qualitySettings();
+        haveLiveQualityBase_ = true;
+    }
+    const auto pinned = livePinnedQuality();
+    const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
+    const AppliedLiveQuality now{true, rung, want.strategy, want.scaleFloor};
+    const bool moved = !appliedLiveQuality_.valid || appliedLiveQuality_.rung != now.rung ||
+                       appliedLiveQuality_.strategy != now.strategy || appliedLiveQuality_.scaleFloor != now.scaleFloor;
+    if (moved) {
+        const LiveQualityRung& r = liveQualityLadder(want.strategy)[rung];
+        const rendering::QualitySettings q =
+            applyLiveRung(renderer_->qualitySettings(), liveQualityBase_, r, want.scaleFloor);
+        // ADR-1086: the whole cost of a transition on the CPU is this call (a render-target
+        // reallocation when the scale moved; nothing at all when only an effect did), and the
+        // history it invalidates is exactly the screen-space history `resize` resets.
+        const auto start = std::chrono::steady_clock::now();
+        renderer_->setQualitySettings(q);
+        const double applyMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        if (appliedLiveQuality_.valid) {
+            ++liveTransitions_;
+        }
+        appliedLiveQuality_ = now;
+        log::info("live quality: {} ({}) -- scene {}x{} into {}x{} (scale {:.2f}); volumes {:.2f}x res {:.2f}x steps, "
+                  "motion blur {}, depth of field {}, cascades <= {}, shadow atlas {}{}; applied in {:.2f} ms",
+                  liveQualityLevelName(r.level), liveQualityStrategyLabel(want.strategy), renderer_->stats().width,
+                  renderer_->stats().height, renderWidth_, renderHeight_, static_cast<double>(q.renderScale),
+                  static_cast<double>(q.volumeResolutionScale), static_cast<double>(q.volumeStepScale),
+                  q.motionBlur ? "on" : "off", q.depthOfField ? "on" : "off", q.cascadeCount, q.shadowResolution,
+                  q.softShadows ? "" : ", plain filtering", applyMs);
+    }
+    // ---- the Live panel's status (ADR-1087) ----
+    auto& view = panel_->liveQuality;
+    const LiveQualityRung& r = liveQualityLadder(want.strategy)[rung];
+    view.available = true;
+    view.automatic = !pinned.has_value();
+    view.level = liveQualityLevelName(r.level);
+    view.targetFps = want.targetFps;
+    view.targetFrameMs = 1000.0 / want.targetFps;
+    view.budgetMs = want.budgetMs;
+    view.gpuMs = liveGpuMsShown_;
+    view.cpuMs = liveCpuMsShown_;
+    view.renderScale = renderer_->qualitySettings().renderScale;
+    view.internalWidth = renderer_->stats().width;
+    view.internalHeight = renderer_->stats().height;
+    view.outputWidth = renderWidth_;
+    view.outputHeight = renderHeight_;
+    view.strategy = liveQualityStrategyLabel(want.strategy);
+    view.strategyStated = engine_->liveQualityStrategyStated();
+    view.transitions = liveTransitions_;
+    view.heldByCpu = autoResolution_.stats().heldByCpu;
+    view.atBottom = !pinned && rung + 1 == kLiveQualityLevels;
+    view.qualityFromCommandLine = options_.liveQuality.given;
+    view.targetFromCommandLine = options_.liveTargetFps > 0;
 }
 
 // ---- ADR-1025: live Sonic input --------------------------------------------------------------------------------

@@ -23,10 +23,8 @@ ProjectionDisplay projector() {
     return {.index = 1, .name = "EPSON PJ", .width = 1920, .height = 1080, .primary = false};
 }
 
-Projection::Observed seen(bool loading, bool live, bool windowOpen, std::vector<ProjectionDisplay> displays = {}) {
+Projection::Observed seen(bool windowOpen, std::vector<ProjectionDisplay> displays = {}) {
     Projection::Observed o;
-    o.loading = loading;
-    o.liveProject = live;
     o.windowOpen = windowOpen;
     o.displays = std::move(displays);
     return o;
@@ -149,26 +147,24 @@ TEST_CASE("projection scaling fits, fills or stretches the frame onto the window
     CHECK(app::projectionMapping(ProjectionScaling::Fit, 1920, 1080, 0, 0).isIdentity());
 }
 
-TEST_CASE("projection start opens the demo first when the project is not live", "[projection][app]") {
+// ADR-1088: Start projects the open project, whatever it is -- there is no "is this a live project" input to the
+// decision any more, and so no path that swaps another project in.
+TEST_CASE("projection start opens the window at once on the open project", "[projection][app]") {
     Projection p;
     CHECK_FALSE(p.active());
-    REQUIRE(p.start(/*liveProject=*/false) == Projection::Action::OpenLiveDemo);
-    CHECK(p.state() == Projection::State::AwaitingProject);
-    CHECK(p.active());
-    CHECK(p.start(false) == Projection::Action::None); // a second press while waiting does nothing
-
-    // The load is pending (or the unsaved-changes prompt is up): wait.
-    CHECK(p.update(seen(true, false, false)) == Projection::Action::None);
-    CHECK(p.state() == Projection::State::AwaitingProject);
-    // The demo is in: open the window.
-    REQUIRE(p.update(seen(false, true, false)) == Projection::Action::OpenWindow);
+    REQUIRE(p.start() == Projection::Action::OpenWindow);
     CHECK(p.state() == Projection::State::Running);
+    CHECK(p.active());
+    CHECK(p.start() == Projection::Action::None); // a second press while running does nothing
     // Until the host reports the open, a closed window is not a reason to stop.
-    CHECK(p.update(seen(false, true, false)) == Projection::Action::None);
+    CHECK(p.update(seen(false)) == Projection::Action::None);
     p.opened(true, "EPSON PJ", {});
     CHECK(p.displayName() == "EPSON PJ");
-    CHECK(p.update(seen(false, true, true, {laptop(), projector()})) == Projection::Action::None);
+    CHECK(p.update(seen(true, {laptop(), projector()})) == Projection::Action::None);
     CHECK(p.state() == Projection::State::Running);
+    // Opening another project does not stop a running projection: the window shows what renders.
+    CHECK(p.update(seen(true, {laptop(), projector()})) == Projection::Action::None);
+    CHECK(p.active());
 
     // Stop closes it.
     CHECK(p.stop() == Projection::Action::CloseWindow);
@@ -177,68 +173,42 @@ TEST_CASE("projection start opens the demo first when the project is not live", 
     CHECK(p.stop() == Projection::Action::None);
 }
 
-TEST_CASE("projection start on a live project opens the window at once", "[projection][app]") {
-    Projection p;
-    REQUIRE(p.start(true) == Projection::Action::OpenWindow);
-    CHECK(p.state() == Projection::State::Running);
-    p.opened(true, "Built-in Retina Display", {});
-    CHECK(p.update(seen(false, true, true, {laptop()})) == Projection::Action::None);
-    // Opening another (non-live) project does not stop a running projection: the window shows what renders.
-    CHECK(p.update(seen(false, false, true, {laptop()})) == Projection::Action::None);
-    CHECK(p.active());
-}
-
 TEST_CASE("projection ends cleanly on every way out", "[projection][app]") {
-    SECTION("the unsaved-changes prompt is cancelled") {
-        Projection p;
-        REQUIRE(p.start(false) == Projection::Action::OpenLiveDemo);
-        CHECK(p.update(seen(true, false, false)) == Projection::Action::None);
-        CHECK(p.update(seen(false, false, false)) == Projection::Action::None);
-        CHECK_FALSE(p.active());
-        CHECK_FALSE(p.message().empty());
-    }
-    SECTION("the demo is missing") {
-        Projection p;
-        REQUIRE(p.start(false) == Projection::Action::OpenLiveDemo);
-        p.failed("not found");
-        CHECK_FALSE(p.active());
-        CHECK(p.message() == "not found");
-    }
     SECTION("the window does not open") {
         Projection p;
-        REQUIRE(p.start(true) == Projection::Action::OpenWindow);
+        REQUIRE(p.start() == Projection::Action::OpenWindow);
         p.opened(false, {}, "SDL_CreateWindow failed");
         CHECK_FALSE(p.active());
         CHECK(p.message().find("SDL_CreateWindow failed") != std::string::npos);
     }
     SECTION("the person closes the window (close button or Esc)") {
         Projection p;
-        REQUIRE(p.start(true) == Projection::Action::OpenWindow);
+        REQUIRE(p.start() == Projection::Action::OpenWindow);
         p.opened(true, "EPSON PJ", {});
-        CHECK(p.update(seen(false, true, false, {laptop(), projector()})) == Projection::Action::CloseWindow);
+        CHECK(p.update(seen(false, {laptop(), projector()})) == Projection::Action::CloseWindow);
         CHECK_FALSE(p.active());
         CHECK_FALSE(p.message().empty());
     }
     SECTION("the projector is unplugged") {
         Projection p;
-        REQUIRE(p.start(true) == Projection::Action::OpenWindow);
+        REQUIRE(p.start() == Projection::Action::OpenWindow);
         p.opened(true, "EPSON PJ", {});
-        CHECK(p.update(seen(false, true, true, {laptop()})) == Projection::Action::CloseWindow);
+        CHECK(p.update(seen(true, {laptop()})) == Projection::Action::CloseWindow);
         CHECK_FALSE(p.active());
         CHECK(p.message().find("EPSON PJ") != std::string::npos);
     }
     SECTION("an empty display list (no video subsystem) is not an unplug") {
         Projection p;
-        REQUIRE(p.start(true) == Projection::Action::OpenWindow);
+        REQUIRE(p.start() == Projection::Action::OpenWindow);
         p.opened(true, "EPSON PJ", {});
-        CHECK(p.update(seen(false, true, true, {})) == Projection::Action::None);
+        CHECK(p.update(seen(true, {})) == Projection::Action::None);
         CHECK(p.active());
     }
-    SECTION("Stop while the demo is still loading: no window follows") {
+    SECTION("Stop before the window reported its open: nothing is left running") {
         Projection p;
-        REQUIRE(p.start(false) == Projection::Action::OpenLiveDemo);
-        CHECK(p.stop() == Projection::Action::None);
-        CHECK(p.update(seen(false, true, false)) == Projection::Action::None);
+        REQUIRE(p.start() == Projection::Action::OpenWindow);
+        CHECK(p.stop() == Projection::Action::CloseWindow);
+        CHECK(p.update(seen(false)) == Projection::Action::None);
         CHECK_FALSE(p.active());
     }
 }
@@ -302,4 +272,41 @@ TEST_CASE("the projection output never enters the project and survives a project
     clash.push_back(nlohmann::json{{"name", app::kProjectionOutputName}});
     CHECK_FALSE(manager.fromJson(clash).has_value());
     CHECK(manager.outputs().size() == 2);
+}
+
+// ADR-1089: a slow output is presented to less often, never allowed to hold the loop every frame; a healthy one is
+// untouched; a recovered one comes back.
+TEST_CASE("a slow output is paced down and a recovered one comes back", "[projection][outputs][live-quality]") {
+    app::PresentPacer pacer;
+    // Healthy: every frame presents, whatever the count.
+    for (int i = 0; i < 100; ++i) {
+        REQUIRE(pacer.due());
+        pacer.acquired(0.05);
+    }
+    CHECK(pacer.interval() == 1);
+    CHECK(pacer.skipped() == 0);
+
+    // The measured case: every acquire blocks 14.8 ms. Count the frames that pay a blocked acquire.
+    int blocked = 0;
+    for (int i = 0; i < 800; ++i) {
+        if (pacer.due()) {
+            pacer.acquired(14.8);
+            ++blocked;
+        }
+    }
+    CHECK(pacer.interval() == app::PresentPacer::kMaxInterval);
+    // At most one blocked acquire in eight frames once paced (plus the few on the way down).
+    CHECK(blocked <= 800 / static_cast<int>(app::PresentPacer::kMaxInterval) + 4);
+    CHECK(pacer.skipped() >= 690u);
+
+    // The display recovers: fast acquires walk the interval back to every frame.
+    for (int i = 0; i < 2000 && pacer.interval() > 1; ++i) {
+        if (pacer.due()) {
+            pacer.acquired(0.05);
+        }
+    }
+    CHECK(pacer.interval() == 1);
+    // One slow acquire among fast ones costs a step, not the projection.
+    pacer.acquired(20.0);
+    CHECK(pacer.interval() == 2);
 }

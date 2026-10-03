@@ -214,12 +214,35 @@ public:
     // projection reopens with them).
     struct ProjectionView {
         bool active = false;      // the button says Stop
-        bool awaiting = false;    // opening the demo first
         std::string status;       // where it is projecting, or why it stopped
     } projection;
     std::function<void()> onStartProjection;
     std::function<void()> onStopProjection;
     std::function<void()> onProjectionSettingsChanged;
+    // ADR-1087: the live quality, as the host applied it this frame. The Quality and Target choices
+    // are written straight into `settings.settings` (liveQualityPinned, liveTargetFps) and announced
+    // with onLiveQualityChanged (saved); the host picks them up on its next frame.
+    struct LiveQualityView {
+        bool available = false;    // the live editor has applied a rung
+        bool automatic = true;     // the ladder is free to move; false = pinned at `level`
+        std::string level;         // "Ultra" .. "Emergency"
+        double targetFps = 60.0;
+        double targetFrameMs = 16.67;
+        double budgetMs = 14.67;   // the GPU budget the target implies
+        double gpuMs = -1.0;       // smoothed; -1 = no timing yet
+        double cpuMs = -1.0;       // the main thread's work, smoothed
+        float renderScale = 1.0f;
+        std::uint32_t internalWidth = 0, internalHeight = 0;
+        std::uint32_t outputWidth = 0, outputHeight = 0;
+        std::string strategy;      // "resolution first", ...
+        bool strategyStated = false; // the project says so (live.qualityStrategy); else the default
+        std::uint64_t transitions = 0;
+        std::uint64_t heldByCpu = 0;
+        bool atBottom = false;     // automatic and at Emergency: nothing left to give
+        bool qualityFromCommandLine = false; // --live-quality / --adaptive-scale outrank the setting
+        bool targetFromCommandLine = false;  // --live-target
+    } liveQuality;
+    std::function<void()> onLiveQualityChanged;
     // Outputs (1.2): the host owns the OutputManager; the tab edits descriptors and asks to reopen.
     app::OutputManager* outputs = nullptr;
     std::function<void()> onOutputsChanged; // re-open windows after add/remove/edit

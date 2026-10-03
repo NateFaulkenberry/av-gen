@@ -74,7 +74,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, mixColour(base, IM_COL32(255, 255, 255, 255), 0.15f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, mixColour(base, IM_COL32(0, 0, 0, 255), 0.15f));
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
-        const char* label = !active ? "Start projection" : (projection.awaiting ? "Cancel projection" : "Stop projection");
+        const char* label = !active ? "Start projection" : "Stop projection";
         if (ImGui::Button(label, ImVec2(-1, ImGui::GetFrameHeight() * 1.6f))) {
             if (active && onStopProjection) {
                 onStopProjection();
@@ -84,9 +84,9 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
         ImGui::PopStyleColor(4);
         if (ImGui::IsItemHovered()) {
-            tooltip("Opens a clean window with just the picture -- no panels -- for a projector or a second screen. "
-                    "Opens the Sonic Live demo first if this is not a live project, and turns live input on. "
-                    "Esc in the projection window, closing it, or Stop ends it.");
+            tooltip("Opens a clean window with just the picture of this project -- no panels -- for a projector or a "
+                    "second screen. Esc in the projection window, closing it, or Stop ends it. For the Sonic Live "
+                    "demo, open it first (Open live demo, below).");
         }
         if (machine != nullptr) {
             auto& pj = machine->projection;
@@ -189,6 +189,88 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
     }
     ImGui::Separator();
+
+    // ---- live quality (ADR-1087): what the frame is doing to hold the target, and the two choices ----
+    if (liveQuality.available) {
+        const auto& q = liveQuality;
+        ImGui::TextDisabled("LIVE QUALITY");
+        if (machine != nullptr) {
+            static const char* levels[] = {"Auto", "Ultra", "High", "Medium", "Low", "Emergency"};
+            int current = machine->liveQualityPinned ? 1 + static_cast<int>(*machine->liveQualityPinned) : 0;
+            ImGui::BeginDisabled(q.qualityFromCommandLine);
+            ImGui::SetNextItemWidth(120);
+            if (ImGui::Combo("Quality", &current, levels, 6)) {
+                if (current == 0) {
+                    machine->liveQualityPinned.reset();
+                } else {
+                    machine->liveQualityPinned = static_cast<app::LiveQualityLevel>(current - 1);
+                }
+                if (onLiveQualityChanged) {
+                    onLiveQualityChanged();
+                }
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                tooltip(q.qualityFromCommandLine
+                            ? "Set on the command line for this run (--live-quality or --adaptive-scale)."
+                            : "Auto lowers the picture's quality step by step when the GPU cannot hold the target, and "
+                              "raises it again once the frame has fitted comfortably for a while. Ultra .. Emergency "
+                              "hold that level whatever it costs. Never affects a render.");
+            }
+            ImGui::SameLine();
+            char target[32];
+            std::snprintf(target, sizeof(target), "%d fps", machine->liveTargetFps);
+            ImGui::BeginDisabled(q.targetFromCommandLine);
+            ImGui::SetNextItemWidth(90);
+            if (ImGui::BeginCombo("Target", target)) {
+                for (const int fps : app::kLiveTargetChoices) {
+                    char label[16];
+                    std::snprintf(label, sizeof(label), "%d fps", fps);
+                    if (ImGui::Selectable(label, fps == machine->liveTargetFps)) {
+                        machine->liveTargetFps = fps;
+                        if (onLiveQualityChanged) {
+                            onLiveQualityChanged();
+                        }
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                tooltip(q.targetFromCommandLine
+                            ? "Set on the command line for this run (--live-target)."
+                            : "The frame rate the live picture is held to. The GPU budget is that frame minus 12%% "
+                              "headroom. Your choice, not the display's refresh rate: 60 on a 120 Hz screen is fine.");
+            }
+        }
+        ImGui::Text("Now: %s%s  scale %.2f  %ux%u into %ux%u", q.level.c_str(), q.automatic ? " (auto)" : "",
+                    static_cast<double>(q.renderScale), q.internalWidth, q.internalHeight, q.outputWidth,
+                    q.outputHeight);
+        if (ImGui::IsItemHovered()) {
+            tooltipUnformatted(("This project gives up " + q.strategy +
+                     (q.strategyStated ? std::string(" (live.qualityStrategy in the project file).")
+                                       : std::string(" (the default; a project can say otherwise with live.qualityStrategy)."))
+                     + " Quality changes this session: " + std::to_string(q.transitions) + ".").c_str());
+        }
+        const bool gpuOver = q.gpuMs > q.budgetMs;
+        if (q.gpuMs >= 0.0) {
+            ImGui::TextColored(gpuOver ? ImVec4(1.0f, 0.6f, 0.3f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                               "GPU %.1f ms of %.1f ms budget", q.gpuMs, q.budgetMs);
+        } else {
+            ImGui::Text("GPU -- of %.1f ms budget", q.budgetMs);
+        }
+        ImGui::SameLine();
+        ImGui::Text("  CPU %.1f ms", q.cpuMs >= 0.0 ? q.cpuMs : 0.0);
+        // The CPU is diagnosed, never acted on (§8): no level of quality makes the main thread faster.
+        if (q.cpuMs > q.targetFrameMs) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),
+                               "The CPU alone (%.1f ms) is longer than a %.0f fps frame: lowering quality cannot reach it.",
+                               q.cpuMs, q.targetFps);
+        } else if (q.atBottom && gpuOver) {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "At the lowest quality and still over the budget.");
+        }
+        ImGui::Separator();
+    }
 
     ImGui::TextDisabled("LIVE SONIC INPUT");
     bool enabled = on;

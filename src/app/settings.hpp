@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/interactive_resolution.hpp"
+
 // Application settings (ADR-094, spec §7).
 //
 // ## Why this exists now
@@ -59,29 +61,26 @@ struct AppSettings {
     // (ADR-084). It lives here because it is a property of this machine and this display, not of
     // the project: the same project on a laptop and on a workstation wants different answers.
     float canvasRenderScale = 1.0f;
-    // §15-§17. Whether the editor is allowed to lower the *scene's* resolution on its own when the
-    // GPU cannot hold the budget, filtering the result back up into the canvas the person asked
-    // for (`app::InteractiveResolution`). On by default, which needs the justification it gets in
-    // that header: at rung 0 it changes nothing at all, and it only leaves rung 0 on a frame that
-    // would otherwise be missing the budget by a factor of two or more. It lives here rather than
-    // in the project for `canvasRenderScale`'s reason -- it is a property of this machine and this
-    // display, and opening somebody else's project must not change how you are watching yours.
-    //
-    // The two are separate levers on purpose. `canvasRenderScale` is a manual reduction of the
-    // *canvas target*, which the person chooses and the application never overrides; this one moves
-    // `QualitySettings::renderScale`, the renderer's own scene-below-output scale, and the two
-    // compose rather than fight.
-    bool adaptiveCanvasScale = true;
-    // The GPU frame time the controller aims at, in milliseconds. One frame at 60 Hz (§3's
-    // playhead budget). Nothing below about 8 ms is reachable on the content this was measured on,
-    // because the frame has a ~4.6 ms floor that no resolution can touch.
-    double adaptiveCanvasBudgetMs = 16.67;
-    // ADR-1024. The lowest scale the controller may reach, one of `kRenderScaleRungs`. 0.5 is the
-    // ladder's own floor and the default. Raising it is the trade the adaptive scale cannot make for
-    // you: measured on the Sonic Garden (AA-RESEARCH.md), thin geometry -- 4-5 px rings -- beads at
-    // 0.71 and breaks into dots at 0.5, while the frame gets 38% cheaper rather than 75%, because
-    // a third of it (shadows) does not scale with resolution. A per-machine choice, like the budget.
-    float adaptiveCanvasFloor = 0.5f;
+    // §15-§17 and ADR-1080..1085: whether the editor may lower the *scene's* quality on its own when
+    // the GPU cannot hold the budget (`app::InteractiveResolution`). It is a separate lever from
+    // `canvasRenderScale` on purpose: that one is a manual reduction of the *canvas target*, which
+    // the person chooses and the application never overrides; the ladder moves
+    // `QualitySettings::renderScale` and the effect settings, and the two compose rather than fight.
+    // ADR-1080/1083: the live quality. Automatic (`nullopt`, the default) lets the controller move
+    // through the ladder to hold the target below; a level pins it there, which is how a performer
+    // says "this look, whatever it costs" -- and what the old "Adapt automatically" off meant (Ultra).
+    // A property of this machine, like the scale above: opening someone else's project must not
+    // change how you are watching yours.
+    std::optional<LiveQualityLevel> liveQualityPinned;
+    // ADR-1080. The frame rate the live picture is held to; the GPU budget is derived from it
+    // (`liveBudget`). The performer's choice, not the display's refresh: a 120 Hz screen does not
+    // mean the show wants 120 fps.
+    int liveTargetFps = 60;
+    // ADR-1024, widened by ADR-1083. The lowest render scale the ladder may reach. Its own lowest is
+    // 0.38 (pixel-bound scenes at Emergency); raising it is the trade the ladder cannot make for you:
+    // measured on the Sonic Garden (AA-RESEARCH.md), thin geometry -- 4-5 px rings -- beads at 0.71
+    // and breaks into dots at 0.5. Rungs below it keep their other reductions at this scale.
+    float adaptiveCanvasFloor = kLiveScaleFloorMin;
     // ADR-1024. Edge antialiasing for the live viewport: FXAA at no less than `kLiveAntialiasFloor`,
     // or off (the scene's own `post/output/antialias` only). A render never sees it.
     bool liveAntialias = true;

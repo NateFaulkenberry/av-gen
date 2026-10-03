@@ -1,6 +1,9 @@
 {
  "format": "avgen-project",
  "version": 4,
+ "live": {
+  "qualityStrategy": "effects_first"
+ },
  "app": {
   "name": "Sonic Live"
  },

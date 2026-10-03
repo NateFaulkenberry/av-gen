@@ -147,15 +147,19 @@ struct AppOptions {
     std::string aiPrompt;
     std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
-    // --adaptive-scale on|off: override the settings file's `adaptiveCanvasScale` for this run.
+    // --adaptive-scale on|off, --live-quality <auto|ultra|high|medium|low|emergency> (ADR-1083):
+    // override this machine's live quality setting for the run (`on` is auto, `off` pins Ultra).
     // Unset means "whatever this machine's settings say", which is what a person launching the
-    // editor gets; a benchmark arm has to be able to state which of the two it is measuring
-    // without depending on how a settings file happens to be left (the reason `--preview-mode`
-    // exists and is written the same way).
-    std::optional<bool> adaptiveScale;
-    // --adaptive-budget <ms>: the GPU frame time the controller aims at. 0 = use the setting.
-    double adaptiveBudgetMs = 0.0;
-    // --adaptive-floor <scale>: the lowest scale the controller may reach (ADR-1024). 0 = use the
+    // editor gets; a benchmark arm has to be able to state which mode it is measuring without
+    // depending on how a settings file happens to be left (the reason `--preview-mode` exists).
+    struct LiveQualityOverride {
+        bool given = false;
+        std::optional<LiveQualityLevel> pinned; // nullopt = automatic
+    };
+    LiveQualityOverride liveQuality;
+    // --live-target <fps> (ADR-1080): the live frame-rate target for the run. 0 = use the setting.
+    int liveTargetFps = 0;
+    // --adaptive-floor <scale>: the lowest scale the ladder may reach (ADR-1024). 0 = use the
     // setting.
     float adaptiveFloor = 0.0f;
     // --live-aa <fxaa|off> (ADR-1024): the live viewport's FXAA floor. Unset = the setting in the
@@ -469,13 +473,18 @@ private:
     void applyOutputsFromProject();
     void storeOutputsToProject();
     // ADR-1026: the Live panel's projection. Start/stop from the panel; serviceProjection once per frame before the
-    // outputs present (it opens the window once the demo has loaded, keeps the picture's scaling, and stops when the
-    // window is closed or its display is unplugged).
+    // outputs present (it keeps the picture's scaling, and stops when the window is closed or its display is
+    // unplugged). ADR-1088: it projects the open project; nothing is loaded or switched on for it.
     void startProjection();
     void stopProjection();
     void openProjectionWindow();
     void serviceProjection();
-    [[nodiscard]] bool projectIsLive() const;
+    // ADR-1080/1083: the live quality ladder. `liveQualitySettings` is what the controller should be
+    // configured with now (this machine's settings, the run's flags, the project's hint);
+    // `serviceLiveQuality` reconfigures it when that moved and applies the rung in force.
+    [[nodiscard]] InteractiveResolutionSettings liveQualitySettings() const;
+    [[nodiscard]] std::optional<LiveQualityLevel> livePinnedQuality() const;
+    void serviceLiveQuality();
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
     std::vector<ProjectionDisplay> projectionDisplays_;
@@ -608,7 +617,24 @@ private:
     // thing the frame is waiting for. Live editor only -- `runHeadless` and `RenderJob` never
     // construct a decision, and the Offline tier pins `renderScale` to 1 regardless.
     InteractiveResolution autoResolution_;
-    std::size_t autoResolutionRung_ = 0; // the rung currently applied to the renderer
+    // ADR-1083: the ladder rung last applied to the renderer, and what it was applied under. A
+    // change in any of them re-applies; nothing else touches the ladder's fields.
+    struct AppliedLiveQuality {
+        bool valid = false;
+        std::size_t rung = 0;
+        LiveQualityStrategy strategy = LiveQualityStrategy::Balanced;
+        float scaleFloor = 1.0f;
+    };
+    AppliedLiveQuality appliedLiveQuality_;
+    // The live tier's own settings (and any quality arm), captured once before the ladder first
+    // touches them: what Ultra is, and what every rung's ceilings are ceilings on.
+    rendering::QualitySettings liveQualityBase_;
+    bool haveLiveQualityBase_ = false;
+    // Smoothed for the Live panel's status line (an exponential average over about a second), so
+    // the numbers can be read rather than watched flicker.
+    double liveGpuMsShown_ = -1.0;
+    double liveCpuMsShown_ = -1.0;
+    std::uint64_t liveTransitions_ = 0;
 
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};

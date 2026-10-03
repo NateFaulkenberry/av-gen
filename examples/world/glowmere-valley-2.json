@@ -1,4 +1,7 @@
 {
+  "live": {
+    "qualityStrategy": "balanced"
+  },
   "app": {
     "name": "avgen",
     "version": "0.1.0"

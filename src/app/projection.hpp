@@ -1,14 +1,16 @@
 #pragma once
 
-// ADR-1026: the Live panel's "Start projection". One button that gets the live picture onto a projector: it opens the
-// Sonic Live demo when the open project is not a live one, turns live input on, and opens a clean output window --
-// an `OutputManager` output like any other, flagged as this machine's projection.
+// ADR-1026: the Live panel's "Start projection". One button that gets the live picture onto a projector: a clean
+// output window -- an `OutputManager` output like any other, flagged as this machine's projection -- showing the
+// project that is open. ADR-1088: it projects the open project as it is configured, whatever it is; it no longer
+// swaps in the Sonic Live demo or turns live input on (a `sonic.live` project turns its own input on at load, and
+// "Open live demo" is still the way to the demo).
 //
 // This file is the decisions, with no window, device or ImGui in it, so they can be checked in the CPU suite:
 //   * which display (the remembered one by name, else the first non-primary display, else the primary);
 //   * fullscreen (remembered, else on exactly when the display is not the primary);
 //   * the window's size and how the frame meets a screen of another shape;
-//   * the state machine: Idle -> (AwaitingProject) -> Running -> Idle, and every way out of Running.
+//   * the state machine: Idle -> Running -> Idle, and every way out of Running.
 // The host (Application) does what the actions say and reports what it observes each frame.
 
 #include "app/output_manager.hpp"
@@ -67,18 +69,15 @@ struct ProjectionDisplayChoice {
 
 class Projection {
 public:
-    enum class State : std::uint8_t { Idle, AwaitingProject, Running };
+    enum class State : std::uint8_t { Idle, Running };
     enum class Action : std::uint8_t {
         None,
-        OpenLiveDemo, // open the Sonic Live demo (through the unsaved-changes prompt); the window follows its load
-        OpenWindow,   // turn live input on, add the projection output and open it, then call opened()
+        OpenWindow,   // add the projection output and open it, then call opened()
         CloseWindow,  // remove the projection output
     };
 
     // What the host sees this frame.
     struct Observed {
-        bool loading = false;      // a project open is pending, loading or waiting on the unsaved-changes prompt
-        bool liveProject = false;  // the open project is a live sonic project (`sonic.live`)
         bool windowOpen = false;   // the projection output exists and its window is open
         // Connected displays; empty means "unknown" (no video subsystem), which never stops a projection.
         std::vector<ProjectionDisplay> displays;
@@ -92,16 +91,14 @@ public:
     // The display the running projection opened on.
     [[nodiscard]] const std::string& displayName() const { return displayName_; }
 
-    // The Start button. Not live: the demo opens first. Live: the window opens now. Ignored while active.
-    [[nodiscard]] Action start(bool liveProject);
+    // The Start button: the window opens now, on whatever project is open. Ignored while active.
+    [[nodiscard]] Action start();
     // The Stop button (and quitting). Closes the window when one is open or about to be.
     [[nodiscard]] Action stop();
     // Every frame.
     [[nodiscard]] Action update(const Observed& observed);
     // After OpenWindow: whether the window opened, on which display, and the error when it did not.
     void opened(bool ok, const std::string& displayName, const std::string& error);
-    // After OpenLiveDemo when the demo cannot even be asked for (not found): back to Idle with the reason.
-    void failed(const std::string& why);
 
 private:
     State state_ = State::Idle;

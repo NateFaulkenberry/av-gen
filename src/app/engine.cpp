@@ -2472,6 +2472,11 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         doc["sonic"] = std::move(block);
     }
+    // ADR-1084: the live quality hint, when the project stated one (an unstated hint stays unstated,
+    // so the default can move without rewriting every project that never chose).
+    if (liveQualityStrategy_) {
+        doc["live"]["qualityStrategy"] = std::string(liveQualityStrategyToken(*liveQualityStrategy_));
+    }
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
@@ -2770,6 +2775,22 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         return path; // still missing: the loader reports it
     };
 
+    // ADR-1084: the live quality hint. Absent means the default (balanced), not the last project's.
+    liveQualityStrategy_.reset();
+    if (const auto live = doc.find("live"); live != doc.end()) {
+        if (!live->is_object()) {
+            warn("live: must be an object");
+        } else if (const auto hint = live->find("qualityStrategy"); hint != live->end()) {
+            const std::string token = hint->is_string() ? hint->get<std::string>() : std::string{};
+            if (const auto strategy = liveQualityStrategyFromToken(token)) {
+                liveQualityStrategy_ = *strategy;
+            } else {
+                warn(fmt::format("live.qualityStrategy '{}' is not one of resolution_first, balanced, effects_first; "
+                                 "using balanced",
+                                 token));
+            }
+        }
+    }
     // ADR-1020: the Sonic Garden block, read before the audio so that loading the audio analyses its timbre
     // once. Absent means the subsystem is off, not inherited from the last project.
     {

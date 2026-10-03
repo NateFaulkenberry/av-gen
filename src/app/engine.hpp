@@ -10,6 +10,7 @@
 #include "analysis/analysis_runner.hpp"
 #include "app/camera_director.hpp"
 #include "app/control_hub.hpp"
+#include "app/interactive_resolution.hpp"
 #include "app/music_runtime.hpp"
 #include "sonic/live.hpp"
 #include "sonic/sonic_runtime.hpp"
@@ -977,6 +978,13 @@ public:
     [[nodiscard]] const MusicRuntime& music() const { return clock_.music; }
     // ADR-1020: the Sonic Garden subsystem. Null when the project has no `sonic` block, and then it does nothing.
     [[nodiscard]] const sonic::SonicSetup* sonicSetup() const { return sonic_.get(); }
+    // ADR-1084: the project's live quality hint (`live.qualityStrategy`): which lever the live ladder
+    // gives up first. Data, read from the project, written back only when the project stated it.
+    [[nodiscard]] LiveQualityStrategy liveQualityStrategy() const {
+        return liveQualityStrategy_.value_or(LiveQualityStrategy::Balanced);
+    }
+    [[nodiscard]] bool liveQualityStrategyStated() const { return liveQualityStrategy_.has_value(); }
+    void setLiveQualityStrategy(std::optional<LiveQualityStrategy> strategy) { liveQualityStrategy_ = strategy; }
     // The runtime the bus is fed from: the live session's while live input is on, else the file walk's.
     [[nodiscard]] const sonic::SonicRuntime& sonicRuntime() const {
         return liveSonic_.running() ? liveSonic_.runtime() : clock_.sonic;
@@ -1329,6 +1337,7 @@ private:
     SignalClock clock_; // ADR-870: the live signal pipeline's carried state
     // ADR-1020: the Sonic Garden's setup (character spec, notes, timbre track) and the audio it analysed.
     std::shared_ptr<sonic::SonicSetup> sonic_;
+    std::optional<LiveQualityStrategy> liveQualityStrategy_; // ADR-1084
     std::uint64_t sonicRevision_ = 0;
     void refreshSonicTimbre();
     // ADR-1025: live Sonic input.

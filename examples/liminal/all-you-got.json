@@ -1,6 +1,9 @@
 {
  "format": "avgen-project",
  "version": 4,
+ "live": {
+  "qualityStrategy": "resolution_first"
+ },
  "app": {
   "name": "avgen",
   "version": "0.1.0"
