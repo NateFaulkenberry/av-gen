@@ -128,6 +128,11 @@ public:
     [[nodiscard]] bool hasRaymarchWork() const;
     // ADR-1091: compiled tree variants alive (ADR-1003), failed ones excluded. For the live profiler's shader count.
     [[nodiscard]] std::size_t compiledVariantCount() const;
+    // ADR-1102: variants still compiling on Dawn's workers, and the switch that allows it (the live editor and the live
+    // profile turn it on; offline renders and tests keep the synchronous compile so no frame draws a stand-in).
+    [[nodiscard]] std::size_t pendingCompiles() const;
+    void setAsyncCompile(bool async);
+    void setPrewarm(bool prewarm); // default on; off = compile at first use only (the pre-ADR-1102 behaviour)
     // Encodes the raymarch render pass onto `color`/`depth` (both loaded and stored) with the
     // frame/IBL bind groups given; one draw per Raymarch object. Call between the lit pass's
     // opaque phase and its transparent phase.

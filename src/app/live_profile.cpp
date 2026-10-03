@@ -47,7 +47,9 @@ std::string liveProfileUsage() {
            "                        --capture <png>        the last measured frame\n"
            "                        --json <file>          the record (avgen.liveprofile/1)\n"
            "                        --text / --no-text     the human report on stdout (default on)\n"
-           "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n";
+           "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n"
+           "                        --no-prewarm           SDF variants compiled at first use on the main thread (the\n"
+           "                                               behaviour before ADR-1102), for before/after measurements\n";
 }
 
 LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
@@ -151,6 +153,8 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
             o.text = true;
         } else if (a == "--no-text") {
             o.text = false;
+        } else if (a == "--no-prewarm") {
+            o.prewarm = false;
         } else if (a == "--verify-candidates") {
             double n = 0.0;
             if (!number(i, "--verify-candidates", n)) return out;
@@ -672,6 +676,13 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
         "The ImGui UI and the output/projection copies are not GPU-timed; in live mode their cost is inside the frame "
         "interval and the waits.",
     };
+    if (live && refresh > 0.0 && record.frameMs.valid() && record.frameMs.p50 < 0.75 * refresh) {
+        record.limits.push_back(fmt::format(
+            "The loop ran faster than the display refreshes (median interval {:.1f} ms, a refresh every {:.1f} ms): with "
+            "the editor and the projection both presenting, intervals alternate short and long, and a frame over a "
+            "refresh is a frame the display showed twice. Deadline misses count those long intervals.",
+            record.frameMs.p50, refresh));
+    }
     if (!live) {
         record.limits.push_back("Headless has no present, no Fifo and no UI: it cannot show deadline misses. Use "
                                 "--mode live for a touring prediction.");

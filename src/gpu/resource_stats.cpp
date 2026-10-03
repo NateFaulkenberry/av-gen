@@ -39,6 +39,8 @@ PipelineCounters pipelineCounters() {
 
 void noteShaderModuleCreated() { gShaderModules.fetch_add(1, std::memory_order_relaxed); }
 
+std::uint64_t pipelineCountersNoteAsync() { return gRenderPipelines.fetch_add(1, std::memory_order_relaxed) + 1; }
+
 wgpu::RenderPipeline createRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc) {
     gRenderPipelines.fetch_add(1, std::memory_order_relaxed);
     return device.CreateRenderPipeline(desc);

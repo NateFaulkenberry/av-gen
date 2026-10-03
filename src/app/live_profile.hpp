@@ -54,6 +54,8 @@ struct LiveProfileOptions {
     std::optional<std::filesystem::path> json;    // the record, avgen.liveprofile/1
     bool text = true;                              // the human report on stdout
     int verifyCandidates = 0;                      // measure the top N candidates' savings (A/B), 0 = estimate only
+    bool prewarm = true; // --no-prewarm: the pre-ADR-1102 behaviour (SDF variants compiled on the main thread at first
+                         // use), kept so a before/after can be measured in one build
 };
 
 // Splits a command line into the profiler's own flags and everything else, which the ordinary parser then reads

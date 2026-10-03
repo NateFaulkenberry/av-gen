@@ -365,6 +365,14 @@ private:
     void fillLiveProfileEntities(LiveProfileRecord& record);
     int writeLiveProfile(LiveProfileRecord& record);
     std::chrono::steady_clock::time_point initStart_{};
+    // ADR-1100/1101: the Performance panel's Live Performance section, fed from the frames the editor rendered.
+    void wireLivePerformancePanel();
+    void notePerformanceFrame(const LiveProfileFrame& frame);
+    std::deque<LiveProfileFrame> perfFrames_;
+    std::deque<rendering::RenderStats> perfStats_;
+    std::uint64_t perfFramesSeen_ = 0;
+    LiveProfileRecord perfRecord_;
+    std::optional<LiveProjectSettings> optimizationUndo_;
     // ADR-1090: the profile's output size for the projection window, in points (never written to the settings file).
     std::uint32_t projectionWidthOverride_ = 0, projectionHeightOverride_ = 0;
     void loadAudio(const std::filesystem::path& path);
@@ -508,6 +516,7 @@ private:
     // `serviceLiveQuality` reconfigures it when that moved and applies the rung in force.
     [[nodiscard]] InteractiveResolutionSettings liveQualitySettings() const;
     [[nodiscard]] std::optional<LiveQualityLevel> livePinnedQuality() const;
+    [[nodiscard]] std::optional<QualityProfile> liveQualityProfile() const;
     void serviceLiveQuality();
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
@@ -653,6 +662,9 @@ private:
     // The live tier's own settings (and any quality arm), captured once before the ladder first
     // touches them: what Ultra is, and what every rung's ceilings are ceilings on.
     rendering::QualitySettings liveQualityBase_;
+    rendering::QualitySettings liveTierBase_; // ADR-1099: the tier before the profile and the project's ceilings
+    std::uint64_t liveSettingsRevisionApplied_ = ~0ull;
+    std::optional<QualityProfile> liveProfileApplied_;
     bool haveLiveQualityBase_ = false;
     // Smoothed for the Live panel's status line (an exponential average over about a second), so
     // the numbers can be read rather than watched flicker.

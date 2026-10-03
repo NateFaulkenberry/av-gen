@@ -2586,6 +2586,8 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
                           "one process. These figures are for finding the big thing, not for\n"
                           "reporting it.");
     }
+    // ADR-1100: target, budget, headroom, the graph, GPU by category, resources and Optimize.
+    drawLivePerformance(stats);
 
     // ---- where the GPU time goes ----------------------------------------------------------------
     //

@@ -1,5 +1,7 @@
 #include "app/interactive_resolution.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -208,7 +210,10 @@ const LiveQualityRung& qualityProfileCeiling(QualityProfile profile) {
 }
 
 rendering::QualitySettings applyQualityProfile(const rendering::QualitySettings& q, QualityProfile profile) {
-    const LiveQualityRung& c = qualityProfileCeiling(profile);
+    return applyCeiling(q, qualityProfileCeiling(profile));
+}
+
+rendering::QualitySettings applyCeiling(const rendering::QualitySettings& q, const LiveQualityRung& c) {
     rendering::QualitySettings out = q;
     out.renderScale = std::min(q.renderScale > 0.0f ? q.renderScale : 1.0f, c.renderScale);
     out.volumeResolutionScale = std::min(q.volumeResolutionScale, c.volumeResolutionScale);
@@ -241,7 +246,8 @@ void InteractiveResolution::configure(const InteractiveResolutionSettings& s) {
     settings_.dwellFrames = std::max({1, settings_.dwellFrames, settings_.windowFrames});
     settings_.raiseHoldFrames = std::max(1, settings_.raiseHoldFrames);
     settings_.scaleFloor = std::clamp(settings_.scaleFloor, kLiveScaleFloorMin, 1.0f);
-    if (!settings_.enabled || settings_.strategy != before.strategy) {
+    settings_.lowestLevel = std::min(settings_.lowestLevel, kLiveQualityLevels - 1);
+    if (!settings_.enabled || settings_.strategy != before.strategy || settings_.ladder != before.ladder) {
         // A different ladder: rung k means something else, and what was learned about it does not
         // carry over.
         reset();
@@ -260,6 +266,9 @@ void InteractiveResolution::reset() {
     cursor_ = 0;
     measuredRatio_.fill(0.0);
     pending_ = {};
+    probation_ = false;
+    holdScale_.fill(1);
+    unsustainable_ = false;
 }
 
 double InteractiveResolution::medianGpu() const {
@@ -325,7 +334,7 @@ double InteractiveResolution::priorRatio(std::size_t k) const {
     // The pixel ratio between two rungs. `renderScale` is linear, so the ratio of pixels is the
     // ratio of the squares; `SceneRenderer::resize` rounds each axis to even, which moves this by
     // well under a percent and is not worth modelling here.
-    const LiveQualityLadder& ladder = liveQualityLadder(settings_.strategy);
+    const LiveQualityLadder& ladder = this->ladder();
     const double a = effectiveRenderScale(ladder[k - 1], settings_.scaleFloor);
     const double b = effectiveRenderScale(ladder[k], settings_.scaleFloor);
     return (a * a) / (b * b);
@@ -343,7 +352,7 @@ double InteractiveResolution::stepRatio(std::size_t k) const {
     // direction -- and a quarter more for each effect the climb turns back on, since a rung that only
     // switches effects on has no pixel ratio to be careful with. In practice every rung above the
     // current one was left on the way down, so this is the case only after a reset or a 2-rung drop.
-    const LiveQualityLadder& ladder = liveQualityLadder(settings_.strategy);
+    const LiveQualityLadder& ladder = this->ladder();
     return priorRatio(k) * (1.0 + 0.25 * effectChanges(ladder[k - 1], ladder[k]));
 }
 
@@ -404,12 +413,30 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
         return d;
     }
     const double budget = settings_.budgetMs;
-    const std::size_t last = kLiveQualityLevels - 1;
+    // ADR-1103: the project's minimum is the bottom of the ladder.
+    const std::size_t last = settings_.lowestLevel;
+    // ADR-1104: the first decision after a raise is the raise's measurement.
+    const bool onProbation = probation_;
+    probation_ = false;
 
     if (gpu > budget) {
         raiseStreak_ = 0;
         if (rung_ >= last) {
+            unsustainable_ = true; // at the minimum and still over: said, never pushed past (ADR-1103)
+            if (rung_ > last) {
+                moveTo(last, gpu); // the minimum was raised under us
+                return {rung_, true};
+            }
             return d; // the bottom of the ladder: nothing left to give
+        }
+        unsustainable_ = false;
+        if (onProbation) {
+            // The raise did not hold: back down one level, and wait twice as long before trying it again.
+            holdScale_[rung_] = std::min(8, holdScale_[rung_] * 2);
+            moveTo(rung_ + 1, gpu);
+            ++stats_.reverts;
+            ++stats_.drops;
+            return {rung_, true};
         }
         // The GPU has to be what the frame is waiting for (§8: a CPU-bound frame is a warning, not
         // a reason to degrade the picture).
@@ -441,21 +468,193 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
         return {rung_, true};
     }
 
+    unsustainable_ = false;
+    if (rung_ > last) {
+        moveTo(last, gpu); // a minimum raised above the level in force: go up to it
+        return {rung_, true};
+    }
     if (rung_ > 0) {
         // One rung at a time on the way up, only when the higher rung is predicted to fit with
-        // margin, and only once that has been true for `raiseHoldFrames` frames in a row (ADR-1085).
+        // margin, and only once that has been true for `raiseHoldFrames` frames in a row (ADR-1085),
+        // longer for a raise that has already failed (ADR-1104).
         if (gpu * stepRatio(rung_) <= budget * settings_.raiseMargin) {
             ++raiseStreak_;
         } else {
             raiseStreak_ = 0;
         }
-        if (raiseStreak_ >= settings_.raiseHoldFrames) {
+        if (raiseStreak_ >= settings_.raiseHoldFrames * holdScale_[rung_ - 1]) {
             moveTo(rung_ - 1, gpu);
             ++stats_.raises;
+            probation_ = true;
             return {rung_, true};
         }
     }
     return d;
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+// ---- ADR-1105 ----------------------------------------------------------------------------------------------------
+
+namespace {
+void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
+    if (depth <= 0) {
+        return;
+    }
+    const bool full = depth >= 2;
+    if (group == "particles") {
+        r.particleCullDistance = full ? 50.0f : 80.0f;
+        r.particleSpawnScale = full ? 0.6f : 0.85f;
+    } else if (group == "shadows") {
+        r.shadowCasterMinPixels = full ? 24.0f : 12.0f;
+        r.cascadeCount = 2;
+        if (full) {
+            r.shadowResolution = 1024;
+            r.reducedShadowFiltering = true;
+        }
+    } else if (group == "volumes") {
+        r.volumeResolutionScale = 0.25f;
+        r.volumeStepScale = full ? 0.5f : 1.0f;
+    } else if (group == "post") {
+        r.postEffectQuality = 0.5f;
+        if (full) {
+            r.motionBlur = false;
+            r.depthOfField = false;
+        }
+    } else if (group == "lod") {
+        r.lodBias = full ? 2.0f : 1.5f;
+        r.drawDistanceScale = full ? 0.75f : 0.9f;
+    } else if (group == "resolution") {
+        r.renderScale = full ? 0.5f : 0.71f;
+    }
+}
+} // namespace
+
+std::optional<LiveQualityLadder> ladderFromPriority(const std::vector<std::string>& groups, std::string& error) {
+    error.clear();
+    std::vector<std::string> order;
+    for (const std::string& g : groups) {
+        if (std::find(kLeverGroups.begin(), kLeverGroups.end(), g) == kLeverGroups.end()) {
+            error = "'" + g + "' is not a lever group (particles, shadows, volumes, post, lod, resolution)";
+            return std::nullopt;
+        }
+        if (std::find(order.begin(), order.end(), g) != order.end()) {
+            error = "'" + g + "' is named twice";
+            return std::nullopt;
+        }
+        order.push_back(g);
+    }
+    if (order.empty()) {
+        error = "the priority names no group";
+        return std::nullopt;
+    }
+    // depth[level][i]: how far group i (in priority order) is given up at that level.
+    const auto depthAt = [&](std::size_t level, std::size_t i) -> int {
+        switch (level) {
+        case 1: return i == 0 ? 1 : 0;
+        case 2: return i == 0 ? 2 : i == 1 ? 1 : 0;
+        case 3: return i <= 1 ? 2 : i <= 3 ? 1 : 0;
+        case 4: return 2;
+        default: return 0;
+        }
+    };
+    LiveQualityLadder ladder{};
+    for (std::size_t level = 0; level < kLiveQualityLevels; ++level) {
+        LiveQualityRung& r = ladder[level];
+        r.level = static_cast<LiveQualityLevel>(level);
+        for (std::size_t i = 0; i < order.size(); ++i) {
+            giveUp(r, order[i], depthAt(level, i));
+        }
+        if (level + 1 == kLiveQualityLevels) {
+            for (const std::string_view g : kLeverGroups) {
+                if (std::find(order.begin(), order.end(), g) == order.end()) {
+                    giveUp(r, g, 1); // unnamed: a little, and only at the last level
+                }
+            }
+            if (std::find(order.begin(), order.end(), "resolution") != order.end()) {
+                r.renderScale = 0.38f; // named: the full ladder's last step
+            }
+        }
+    }
+    return ladder;
+}
+
+// ---- ADR-1101 ----------------------------------------------------------------------------------------------------
+
+bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
+    if (lever == "volumequarter") c.volumeResolutionScale = std::min(c.volumeResolutionScale, 0.25f);
+    else if (lever == "volumesteps") c.volumeStepScale = std::min(c.volumeStepScale, 0.5f);
+    else if (lever == "volumepreview") { c.volumeResolutionScale = std::min(c.volumeResolutionScale, 0.25f); c.volumeStepScale = std::min(c.volumeStepScale, 0.5f); }
+    else if (lever == "posttaps") c.postEffectQuality = std::min(c.postEffectQuality, 0.5f);
+    else if (lever == "nomotionblur") c.motionBlur = false;
+    else if (lever == "nodof") c.depthOfField = false;
+    else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
+    else if (lever == "shadowatlas1k") c.shadowResolution = std::min<std::uint32_t>(c.shadowResolution, 1024u);
+    else if (lever == "lodbias2") c.lodBias = std::max(c.lodBias, 2.0f);
+    else if (lever == "drawdist75") c.drawDistanceScale = std::min(c.drawDistanceScale, 0.75f);
+    else if (lever == "particlelod") {
+        c.particleSpawnScale = std::min(c.particleSpawnScale, 0.7f);
+        c.particleCullDistance = c.particleCullDistance > 0.0f ? std::min(c.particleCullDistance, 60.0f) : 60.0f;
+    } else if (lever == "scale85") c.renderScale = std::min(c.renderScale, 0.85f);
+    else if (lever == "scale71") c.renderScale = std::min(c.renderScale, 0.71f);
+    else if (lever == "pcss") c.reducedShadowFiltering = true;
+    else return false;
+    return true;
+}
+
+std::string ceilingJsonText(const LiveQualityRung& c) {
+    const LiveQualityRung n{};
+    nlohmann::json j = nlohmann::json::object();
+    if (c.renderScale != n.renderScale) j["renderScale"] = c.renderScale;
+    if (c.volumeResolutionScale != n.volumeResolutionScale) j["volumeResolutionScale"] = c.volumeResolutionScale;
+    if (c.volumeStepScale != n.volumeStepScale) j["volumeStepScale"] = c.volumeStepScale;
+    if (c.motionBlur != n.motionBlur) j["motionBlur"] = c.motionBlur;
+    if (c.depthOfField != n.depthOfField) j["depthOfField"] = c.depthOfField;
+    if (c.cascadeCount != n.cascadeCount) j["cascadeCount"] = c.cascadeCount;
+    if (c.shadowResolution != n.shadowResolution) j["shadowResolution"] = c.shadowResolution;
+    if (c.reducedShadowFiltering != n.reducedShadowFiltering) j["reducedShadowFiltering"] = c.reducedShadowFiltering;
+    if (c.lodBias != n.lodBias) j["lodBias"] = c.lodBias;
+    if (c.drawDistanceScale != n.drawDistanceScale) j["drawDistanceScale"] = c.drawDistanceScale;
+    if (c.shadowCasterMinPixels != n.shadowCasterMinPixels) j["shadowCasterMinPixels"] = c.shadowCasterMinPixels;
+    if (c.postEffectQuality != n.postEffectQuality) j["postEffectQuality"] = c.postEffectQuality;
+    if (c.particleCullDistance != n.particleCullDistance) j["particleCullDistance"] = c.particleCullDistance;
+    if (c.particleSpawnScale != n.particleSpawnScale) j["particleSpawnScale"] = c.particleSpawnScale;
+    return j.dump();
+}
+
+std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std::string& error) {
+    error.clear();
+    const nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
+    if (!j.is_object()) {
+        error = "must be an object";
+        return std::nullopt;
+    }
+    LiveQualityRung c{};
+    for (const auto& [key, v] : j.items()) {
+        const bool num = v.is_number();
+        const bool flag = v.is_boolean();
+        if (key == "renderScale" && num) c.renderScale = std::clamp(v.get<float>(), kLiveScaleFloorMin, 1.0f);
+        else if (key == "volumeResolutionScale" && num) c.volumeResolutionScale = std::clamp(v.get<float>(), 0.1f, 1.0f);
+        else if (key == "volumeStepScale" && num) c.volumeStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f);
+        else if (key == "motionBlur" && flag) c.motionBlur = v.get<bool>();
+        else if (key == "depthOfField" && flag) c.depthOfField = v.get<bool>();
+        else if (key == "cascadeCount" && num) c.cascadeCount = std::clamp(v.get<std::uint32_t>(), 1u, 4u);
+        else if (key == "shadowResolution" && num) c.shadowResolution = std::clamp(v.get<std::uint32_t>(), 256u, 4096u);
+        else if (key == "reducedShadowFiltering" && flag) c.reducedShadowFiltering = v.get<bool>();
+        else if (key == "lodBias" && num) c.lodBias = std::clamp(v.get<float>(), 1.0f, 8.0f);
+        else if (key == "drawDistanceScale" && num) c.drawDistanceScale = std::clamp(v.get<float>(), 0.05f, 1.0f);
+        else if (key == "shadowCasterMinPixels" && num) c.shadowCasterMinPixels = std::clamp(v.get<float>(), 0.0f, 512.0f);
+        else if (key == "postEffectQuality" && num) c.postEffectQuality = std::clamp(v.get<float>(), 0.125f, 1.0f);
+        else if (key == "particleCullDistance" && num) c.particleCullDistance = std::max(v.get<float>(), 0.0f);
+        else if (key == "particleSpawnScale" && num) c.particleSpawnScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
+        else {
+            error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
+            return std::nullopt;
+        }
+    }
+    return c;
 }
 
 } // namespace avgen::app

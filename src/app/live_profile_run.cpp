@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <ctime>
 #include <fstream>
+#include <thread>
 #include <unistd.h>
 
 namespace avgen::app {
@@ -344,8 +345,11 @@ int Application::runLiveProfileHeadless() {
     if (!options_.liveAntialias.has_value()) {
         base.antialiasFloor = rendering::kLiveAntialiasFloor;
     }
-    if (const auto profile = qualityProfileFromToken(o.quality)) {
+    if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);
+    }
+    if (engine_->liveSettings().overrides) {
+        base = applyCeiling(base, *engine_->liveSettings().overrides); // ADR-1100: what Optimize applied
     }
     renderer_->setQualitySettings(base);
     InteractiveResolutionSettings rs = liveQualitySettings();
@@ -354,7 +358,7 @@ int Application::runLiveProfileHeadless() {
     rs.enabled = automatic;
     InteractiveResolution controller;
     controller.configure(rs);
-    const LiveQualityLadder& ladder = liveQualityLadder(rs.strategy);
+    const LiveQualityLadder& ladder = controller.ladder();
     std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : 0;
     const auto applyRung = [&](std::size_t k) {
         const rendering::QualitySettings q = applyLiveRung(renderer_->qualitySettings(), base, ladder[k], rs.scaleFloor);
@@ -365,6 +369,9 @@ int Application::runLiveProfileHeadless() {
     };
     applyRung(rung);
 
+    // ADR-1102: as live -- SDF variants compile on Dawn's workers.
+    renderer_->sdfs().setAsyncCompile(o.prewarm);
+    renderer_->sdfs().setPrewarm(o.prewarm);
     FixedStepClock clock(o.targetFps);
     clock.restartAt(o.startSeconds);
     renderer_->resetTemporalHistory();
@@ -398,6 +405,7 @@ int Application::runLiveProfileHeadless() {
             log::error("render: {}", r.error().message);
             return false;
         }
+        context_->processEvents(); // async pipeline callbacks (ADR-1102), as the live loop pumps them
         const rendering::RenderStats& st = renderer_->stats();
         f.frameMs = msSince(start);
         f.gpuMs = st.gpuFrameMs;
@@ -412,7 +420,7 @@ int Application::runLiveProfileHeadless() {
 
     LiveProfileRecord record;
     // ---- warm-up: until the frame settles, or the cap ----
-    const auto warmStart = Clock::now();
+    auto warmStart = Clock::now();
     SteadyStateDetector steady(20, 0.05, 2, 40);
     int warmFrames = 0;
     while (true) {
@@ -423,6 +431,18 @@ int Application::runLiveProfileHeadless() {
         if (warmFrames == 0) {
             record.cold.firstFrameMs = f.frameMs;
             record.cold.loadMs = std::chrono::duration<double, std::milli>(warmStart - initStart_).count();
+            // ADR-1102: the pre-warm. The first frame asked for every variant the scene holds; wait for them here,
+            // before warm-up, and report the wait apart from the frames.
+            const auto prewarmStart = Clock::now();
+            const std::size_t variantsBefore = renderer_->sdfs().compiledVariantCount();
+            while (renderer_->sdfs().pendingCompiles() > 0 && msSince(prewarmStart) < 60000.0) {
+                context_->processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            record.cold.prewarmMs = msSince(prewarmStart);
+            record.cold.prewarmVariants =
+                static_cast<int>(renderer_->sdfs().compiledVariantCount() - std::min(variantsBefore, renderer_->sdfs().compiledVariantCount()));
+            warmStart = Clock::now(); // the warm-up cap counts from here, not from before the pre-warm
         }
         ++warmFrames;
         const double cost = std::max(f.gpuMs, f.cpuWorkMs);
@@ -478,7 +498,7 @@ int Application::runLiveProfileHeadless() {
     fillLiveProfileConditions(record, false);
     record.conditions.startSeconds = measureStartPiece;
     record.conditions.liveLevel = liveQualityLevelName(ladder[rung].level);
-    record.conditions.profile = qualityProfileFromToken(o.quality) ? o.quality : std::string();
+    record.conditions.profile = liveQualityProfile() ? qualityProfileLabel(*liveQualityProfile()) : std::string();
     record.conditions.renderScale = renderer_->qualitySettings().renderScale;
     record.conditions.internalWidth = renderer_->stats().width;
     record.conditions.internalHeight = renderer_->stats().height;
@@ -558,20 +578,15 @@ void Application::beginLiveProfile() {
     liveProfileSession_ = std::make_unique<LiveProfileSession>();
     const LiveProfileOptions& o = options_.liveProfile;
     // The projection window at the output size, in points on its display (never written to the settings file).
-    float scale = 1.0f;
+    // The editor window's backing scale: the display list's content scale reads 1 on this 5K display.
+    const float scale = window_ != nullptr && window_->pixelScale() > 0.0f ? window_->pixelScale() : 1.0f;
     for (const auto& d : platform::Window::displays()) {
         if (d.primary) {
-            scale = d.scale > 0.0f ? d.scale : 1.0f;
             liveProfileSession_->record.conditions.displayRefreshHz = d.refreshRate;
         }
     }
     projectionWidthOverride_ = static_cast<std::uint32_t>(std::lround(o.outputWidth / scale));
     projectionHeightOverride_ = static_cast<std::uint32_t>(std::lround(o.outputHeight / scale));
-    if (const auto profile = qualityProfileFromToken(o.quality)) {
-        rendering::QualitySettings q = applyQualityProfile(renderer_->qualitySettings(), *profile);
-        renderer_->setQualitySettings(q);
-        haveLiveQualityBase_ = false; // the profile is the ceiling the live levels work under
-    }
     if (!o.audio) {
         engine_->setVolume(0.0f);
     }
@@ -592,6 +607,14 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             s.record.cold.firstFrameMs = frame.frameMs;
             s.record.cold.loadMs = std::chrono::duration<double, std::milli>(Clock::now() - initStart_).count() -
                                    frame.frameMs;
+        }
+        // ADR-1102: wait for the pre-warm (variants compiling on Dawn's workers) too, and time it.
+        if (renderer_->sdfs().pendingCompiles() > 0 && s.waitFrames < 3000) {
+            return true;
+        }
+        if (s.record.cold.prewarmMs < 0.0) {
+            s.record.cold.prewarmMs = msSince(s.phaseStart);
+            s.record.cold.prewarmVariants = static_cast<int>(renderer_->sdfs().compiledVariantCount());
         }
         if ((out != nullptr && out->open()) || s.waitFrames > 300) {
             if (out == nullptr || !out->open()) {
@@ -617,7 +640,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             s.phase = P::Measure;
             s.measureStart = Clock::now();
             s.compilesBefore = gpu::pipelineCounters();
-            s.record.conditions.startSeconds = engine_->timelineClock().seconds;
+            s.record.conditions.startSeconds = engine_->positionSeconds();
             cpuProfile_.setFrameGroup(core::PhaseProfiler::kMaxGroups - 1);
             cpuProfile_.nameGroup(core::PhaseProfiler::kMaxGroups - 1, "live-profile");
         }
@@ -636,8 +659,10 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             static_cast<int>(gpu::pipelineCounters().compiles() - s.compilesBefore.compiles());
         LiveProfileRecord& r = s.record;
         const double refresh = r.conditions.displayRefreshHz;
+        const double measuredFrom = r.conditions.startSeconds;
         fillLiveProfileConditions(r, true);
         r.conditions.displayRefreshHz = refresh;
+        r.conditions.startSeconds = measuredFrom; // where the playhead was when measurement began
         const Output* out = outputs_.find(kProjectionOutputName);
         if (out != nullptr && out->open()) {
             r.conditions.window = out->desc.fullscreen ? "fullscreen" : "windowed (projection)";
@@ -650,8 +675,8 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         }
         const auto pinned = livePinnedQuality();
         const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
-        r.conditions.liveLevel = liveQualityLevelName(liveQualityLadder(engine_->liveQualityStrategy())[rung].level);
-        r.conditions.profile = qualityProfileFromToken(o.quality) ? o.quality : std::string();
+        r.conditions.liveLevel = liveQualityLevelName(autoResolution_.ladder()[rung].level);
+        r.conditions.profile = liveQualityProfile() ? qualityProfileLabel(*liveQualityProfile()) : std::string();
         buildLiveProfile(r, s.frames, true);
         fillLiveProfileResources(r, s.stats);
         fillLiveProfileEntities(r);

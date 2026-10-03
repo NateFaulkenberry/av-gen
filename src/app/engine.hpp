@@ -985,6 +985,16 @@ public:
     }
     [[nodiscard]] bool liveQualityStrategyStated() const { return liveQualityStrategy_.has_value(); }
     void setLiveQualityStrategy(std::optional<LiveQualityStrategy> strategy) { liveQualityStrategy_ = strategy; }
+    // ADR-1100: the rest of the project's live block (target, profile, minimum, priority, Optimize's ceilings). The
+    // revision moves on every change, so the live loop can notice one without comparing every field each frame.
+    [[nodiscard]] const LiveProjectSettings& liveSettings() const { return liveSettings_; }
+    void setLiveSettings(LiveProjectSettings settings) {
+        if (!(settings == liveSettings_)) {
+            liveSettings_ = std::move(settings);
+            ++liveSettingsRevision_;
+        }
+    }
+    [[nodiscard]] std::uint64_t liveSettingsRevision() const { return liveSettingsRevision_; }
     // The runtime the bus is fed from: the live session's while live input is on, else the file walk's.
     [[nodiscard]] const sonic::SonicRuntime& sonicRuntime() const {
         return liveSonic_.running() ? liveSonic_.runtime() : clock_.sonic;
@@ -1338,6 +1348,8 @@ private:
     // ADR-1020: the Sonic Garden's setup (character spec, notes, timbre track) and the audio it analysed.
     std::shared_ptr<sonic::SonicSetup> sonic_;
     std::optional<LiveQualityStrategy> liveQualityStrategy_; // ADR-1084
+    LiveProjectSettings liveSettings_;                        // ADR-1100
+    std::uint64_t liveSettingsRevision_ = 0;
     std::uint64_t sonicRevision_ = 0;
     void refreshSonicTimbre();
     // ADR-1025: live Sonic input.

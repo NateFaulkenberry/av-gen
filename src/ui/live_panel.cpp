@@ -261,6 +261,79 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
         ImGui::SameLine();
         ImGui::Text("  CPU %.1f ms", q.cpuMs >= 0.0 ? q.cpuMs : 0.0);
+        // ---- ADR-1099..1103: the project's choices, and every lever as the frame uses it ----
+        {
+            static const char* profiles[] = {"Quality", "Balanced", "Performance"};
+            int profile = q.profile == "BALANCED" ? 1 : q.profile == "PERFORMANCE" ? 2 : 0;
+            ImGui::SetNextItemWidth(120);
+            if (ImGui::Combo("Profile", &profile, profiles, 3) && onSetLiveProfile) {
+                onSetLiveProfile(profile);
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("The ceiling the live levels work under, saved with the project. Quality: the picture as set.\n"
+                        "Balanced: small and far things stop casting shadows and far particles stop, fog at half\n"
+                        "resolution at most. Performance: also 85%% resolution, quarter fog, two shadow cascades,\n"
+                        "half the motion-blur and depth-of-field taps, fewer particles, coarser detail sooner.\n"
+                        "Heroes are never reduced by these.");
+            }
+            ImGui::SameLine();
+            static const char* minimums[] = {"Ultra", "High", "Medium", "Low", "Emergency"};
+            int minimum = 4;
+            for (int k = 0; k < 5; ++k) {
+                if (q.minimumLevel == minimums[k]) {
+                    minimum = k;
+                }
+            }
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("Lowest", &minimum, minimums, 5) && onSetLiveMinimum) {
+                onSetLiveMinimum(minimum);
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("The lowest level Auto may go to, saved with the project. If the frame is still over the\n"
+                        "budget there, the panel says LIVE TARGET UNSUSTAINABLE instead of going lower.");
+            }
+            if (onSaveLiveProfile) {
+                ImGui::SameLine();
+                if (ImGui::Button("Save live profile")) {
+                    onSaveLiveProfile();
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Writes this target, profile, lowest level and the project's strategy into the project's\n"
+                            "live settings, so the project opens with them. The scene itself is not changed.");
+                }
+            }
+            if (q.unsustainable) {
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+                                   "LIVE TARGET UNSUSTAINABLE: at the lowest level (%s) and still %.1f ms over %.1f ms.",
+                                   q.minimumLevel.c_str(), q.gpuMs, q.budgetMs);
+            }
+            if (!q.priority.empty()) {
+                ImGui::TextDisabled("Gives up, in order: %s", q.priority.c_str());
+            }
+            if (!q.overrides.empty()) {
+                ImGui::TextDisabled("Optimize limits in this project: %s", q.overrides.c_str());
+            }
+            if (ImGui::TreeNode("Levers now")) {
+                const auto& s = q.quality;
+                ImGui::Text("Resolution %.0f%%", static_cast<double>(s.renderScale) * 100.0);
+                ImGui::Text("Fog %.0f%% resolution, %.0f%% steps", static_cast<double>(s.volumeResolutionScale) * 100.0,
+                            static_cast<double>(s.volumeStepScale) * 100.0);
+                ImGui::Text("Shadows %u cascades, %u px maps, %s; small casters under %.0f px skipped", s.cascadeCount,
+                            s.shadowResolution, s.softShadows ? "soft" : "plain", static_cast<double>(s.shadowCasterMinPixels));
+                ImGui::Text("Motion blur %s, depth of field %s, effect taps %.0f%%", s.motionBlur ? "on" : "off",
+                            s.depthOfField ? "on" : "off", static_cast<double>(s.postEffectQuality) * 100.0);
+                ImGui::Text("Detail: LOD bias %.2f, draw distance %.0f%%", static_cast<double>(s.lodBias),
+                            static_cast<double>(s.drawDistanceScale) * 100.0);
+                ImGui::Text("Particles %.0f%%, far emitters %s", static_cast<double>(s.particleSpawnScale) * 100.0,
+                            s.particleCullDistance > 0.0f ? (std::to_string(static_cast<int>(s.particleCullDistance)) + " m").c_str()
+                                                          : "kept");
+                if (q.reverts > 0) {
+                    ImGui::TextDisabled("%llu raise(s) undone because the next frames missed the budget",
+                                        static_cast<unsigned long long>(q.reverts));
+                }
+                ImGui::TreePop();
+            }
+        }
         // The CPU is diagnosed, never acted on (§8): no level of quality makes the main thread faster.
         if (q.cpuMs > q.targetFrameMs) {
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),

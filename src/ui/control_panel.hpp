@@ -241,8 +241,48 @@ public:
         bool atBottom = false;     // automatic and at Emergency: nothing left to give
         bool qualityFromCommandLine = false; // --live-quality / --adaptive-scale outrank the setting
         bool targetFromCommandLine = false;  // --live-target
+        // ADR-1099..1105
+        std::string profile = "QUALITY";   // the profile in force
+        bool profileStated = false;        // the project chose it (live.profile)
+        std::string minimumLevel;          // the lowest level the project allows
+        bool unsustainable = false;        // at the minimum and still over the budget
+        std::string priority;              // the project's degradation order, "" = the strategy's table
+        std::uint64_t reverts = 0;         // raises undone by the recovery rule
+        std::string overrides;             // the project's Optimize ceilings as JSON, "" = none
+        rendering::QualitySettings quality; // every lever as the frame uses it
     } liveQuality;
     std::function<void()> onLiveQualityChanged;
+    // ---- ADR-1100..1102: the Live Performance section of the Performance panel, and the Live panel's choices ----
+    // Filled by the host about twice a second from the frames it rendered (rolling medians), never by the panel.
+    struct PerformanceInsight {
+        bool available = false;
+        double targetFps = 60.0;
+        double budgetMs = 16.67;        // the frame budget (1000 / target)
+        double medianFrameMs = -1.0;    // over the last ~2 s
+        double medianGpuMs = -1.0;      // the span, capped by the interval (ADR-1085)
+        double medianCpuMs = -1.0;
+        std::vector<std::pair<std::string, double>> gpuCategories; // rolling medians, the profiler's categories
+        // The resource inspector: a heading, then its lines, in plain words.
+        std::vector<std::pair<std::string, std::vector<std::string>>> resources;
+    } perfInsight;
+    // The Optimize review's rows, from the host (the live profiler's rules over the rolling medians). Estimated only.
+    struct OptimizeCandidateView {
+        std::string id, title, suggestion, lever, risk, basis;
+        double costMs = 0.0, lowMs = 0.0, highMs = 0.0;
+        bool applicable = false; // has a form the project can keep (a ceiling); a diagnostic arm does not
+    };
+    std::function<std::vector<OptimizeCandidateView>()> onOptimizeReview;
+    // Writes the chosen levers into the project's live.overrides (undoable with onUndoOptimization).
+    std::function<void(const std::vector<std::string>& levers)> onApplyOptimization;
+    std::function<void()> onUndoOptimization;
+    bool canUndoOptimization = false;
+    std::string optimizationStatus;
+    // The Live panel's project choices (live.profile, live.minimumLevel) and Save live profile (ADR-1100).
+    std::function<void(int profile)> onSetLiveProfile;   // -1 = unset, else QualityProfile
+    std::function<void(int minimum)> onSetLiveMinimum;   // -1 = unset, else LiveQualityLevel
+    std::function<void()> onSaveLiveProfile;
+    std::function<void()> onMeasureMemory;
+    std::string memoryReport;
     // Outputs (1.2): the host owns the OutputManager; the tab edits descriptors and asks to reopen.
     app::OutputManager* outputs = nullptr;
     std::function<void()> onOutputsChanged; // re-open windows after add/remove/edit
@@ -295,6 +335,20 @@ public:
     // whatever this frame happened to be. A single sample of a frame time says very little on this
     // machine -- the same scene reads 10.9 ms and 13.7 ms in consecutive runs.
     static constexpr std::size_t kPerfHistory = 180;
+    // ADR-1100: the Live Performance graph's own history, by time (up to 30 s at any frame rate).
+    struct PerfSample {
+        double t = 0.0, frameMs = 0.0, gpuMs = -1.0, cpuMs = 0.0;
+    };
+    std::vector<PerfSample> perfTimeline_;
+    std::size_t perfTimelineHead_ = 0;
+    double perfClock_ = 0.0;
+    int perfGraphSeries_ = 0; // 0 frame, 1 gpu, 2 cpu
+    float perfGraphSeconds_ = 10.0f;
+    bool optimizeOpen_ = false;
+    std::vector<OptimizeCandidateView> optimizeRows_;
+    std::vector<char> optimizeTicks_;
+    void drawLivePerformance(const FrameStats& stats);
+    void drawOptimizeReview();
     std::array<float, kPerfHistory> frameMsHistory_{};
     std::array<float, kPerfHistory> gpuMsHistory_{};
     std::size_t perfCursor_ = 0;

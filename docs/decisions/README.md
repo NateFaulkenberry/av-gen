@@ -40,6 +40,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1020-1039 | proto/sonic-garden |
 | 1040-1059 | proto/liminal-space |
 | 1080-1089 | live/quality -- the live adaptive quality system |
+| 1090-1109 | live/optimizer -- the live scene profiler, scalability levers, panel and runtime gaps |
 | 701+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -647,4 +648,21 @@ confirm the citation you are about to change is your own.
 | [1087](ADR-1087-the-live-panel-shows-the-quality-in-force.md) | The Live panel shows target, budget, GPU, CPU, level and scale, with the Quality and Target choices beside them. live/quality | Accepted |
 | [1088](ADR-1088-start-projection-projects-the-open-project.md) | Start projection projects the open project as it is; no Sonic Live swap, no live-input switch (supersedes ADR-1026 decision 3 in part). live/quality | Accepted |
 | [1089](ADR-1089-a-slow-output-is-paced-not-waited-for.md) | A slow output is paced, not waited for: an output whose acquire blocks is presented to every 2nd/4th/8th frame until it recovers (`PresentPacer`). live/quality | Accepted |
+| [1090](ADR-1090-the-live-profile-is-one-command-with-two-loops-and-one-record.md) | The live profile is one command with two loops and one record. live/optimizer | Accepted |
+| [1091](ADR-1091-resource-accounting-reads-dawn-and-counts-pipelines-at-creation.md) | Resource accounting reads Dawn's own memory figures and counts pipelines at creation. live/optimizer | Accepted |
+| [1092](ADR-1092-gpu-categories-come-from-one-label-table-and-the-verdict-from-shares.md) | GPU categories come from one label table; the critical path from the measured shares. live/optimizer | Accepted |
+| [1093](ADR-1093-candidates-are-rules-over-existing-levers-and-are-measured-with-the-ab-machinery.md) | Optimization candidates are rules over existing levers, measured only with the A/B machinery. live/optimizer | Accepted |
+| [1094](ADR-1094-lod-bias-draw-distance-and-post-taps-are-live-levers.md) | LOD bias, draw distance and the post effects' taps are live levers. live/optimizer | Accepted |
+| [1095](ADR-1095-a-small-non-hero-caster-casts-no-shadow-under-the-floor.md) | Under the caster floor, a small non-hero object casts no shadow. live/optimizer | Accepted |
+| [1096](ADR-1096-nothing-lit-renders-no-shadow-maps.md) | When nothing visible is lit, no shadow map is rendered. live/optimizer | Accepted |
+| [1097](ADR-1097-importance-is-inferred-and-heroes-are-exempt.md) | Importance is inferred, and heroes are exempt from every live lever. live/optimizer | Accepted |
+| [1098](ADR-1098-far-emitters-stop-and-material-programs-can-be-measured.md) | Far emitters stop, and material programs can be measured. live/optimizer | Accepted |
+| [1099](ADR-1099-profiles-are-ceilings-in-the-ladders-table-family.md) | QUALITY / BALANCED / PERFORMANCE are ceilings in the ladder's table family. live/optimizer | Accepted |
+| [1100](ADR-1100-the-projects-live-block-holds-target-profile-minimum-priority-and-ceilings.md) | The project's live block holds the target, profile, minimum, priority and Optimize's ceilings. live/optimizer | Accepted |
+| [1101](ADR-1101-optimize-applies-ticked-levers-as-project-ceilings-with-an-undo.md) | Optimize applies only ticked levers, as project ceilings, with an Undo. live/optimizer | Accepted |
+| [1102](ADR-1102-sdf-variants-are-prewarmed-and-compile-on-dawns-workers-live.md) | SDF variants are pre-warmed, and compile on Dawn's workers live. live/optimizer | Accepted |
+| [1103](ADR-1103-a-project-minimum-level-and-live-target-unsustainable.md) | A project minimum level, and "LIVE TARGET UNSUSTAINABLE". live/optimizer | Accepted |
+| [1104](ADR-1104-a-raise-that-does-not-hold-is-reverted.md) | A raise that does not hold is reverted, and waits longer next time. live/optimizer | Accepted |
+| [1105](ADR-1105-a-degradation-priority-is-data.md) | A degradation priority is data. live/optimizer | Accepted |
+| [1106](ADR-1106-performance-tools-for-agents.md) | Agents profile with performance.profile_scene and read/set live quality. live/optimizer | Accepted |
 | [1026](ADR-1026-the-live-projection-is-a-machine-output.md) | The live projection is an output that belongs to the machine (the Live panel's Start projection opens the Sonic Live demo when the project is not live, turns live input on and opens an `OutputManager` output flagged `projection`: never saved to the project, kept across loads, Esc closes it; display by name else the first non-primary, fullscreen on another display, Fit/Fill/Stretch; per-machine `settings.json`; stops on close or unplug) | Accepted |

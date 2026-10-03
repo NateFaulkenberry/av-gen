@@ -2,6 +2,7 @@
 #include "app/live_profile_session.hpp"
 #include "app/cli_batch.hpp"
 #include "app/directing_evaluate.hpp"
+#include "app/live_profile_hook.hpp"
 #include "app/directing_plan_file.hpp"
 #include "pathtrace/denoise.hpp"
 #include "app/trace_sequence.hpp"
@@ -1609,6 +1610,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // configured, so `director.evaluate` answers "no evaluator is configured: --critic ..." rather
         // than claiming the whole capability is absent.
         ai_->setEvaluationHook(makeEvaluationHook(evaluatorOptionsFrom(options_.critic, options_.criticUrl)));
+        // ADR-1106: performance.profile_scene runs this executable's --live-profile on a scratch copy.
+        ai_->setProfileHook(makeProfileHook(executablePath, std::filesystem::temp_directory_path() / "avgen-liveprofile"));
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass
@@ -2046,6 +2049,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onStartProjection = [this] { startProjection(); };
         panel_->onStopProjection = [this] { stopProjection(); };
         panel_->onLiveQualityChanged = [this] { saveSettings(); }; // ADR-1087: serviceLiveQuality applies it
+        wireLivePerformancePanel(); // ADR-1100/1101
         panel_->onProjectionSettingsChanged = [this] {
             saveSettings();
             // A running projection follows the new choice: the window is reopened with it.
@@ -4367,6 +4371,9 @@ int Application::run() {
 }
 
 int Application::runLive() {
+    // ADR-1102: live, an SDF tree variant compiles on Dawn's workers and is drawn interpreted until it exists.
+    renderer_->sdfs().setAsyncCompile(!options_.liveProfile.enabled || options_.liveProfile.prewarm);
+    renderer_->sdfs().setPrewarm(!options_.liveProfile.enabled || options_.liveProfile.prewarm);
     RealtimeClock clock;
     ui::FrameStats stats;
     stats.adapter = context_->capabilities().adapterName;
@@ -5498,7 +5505,7 @@ int Application::runLive() {
             core::interactions().markFrameVisible();
         }
         bool liveProfileDone = false;
-        if (liveProfileRunning) {
+        if (liveProfileRunning || panel_ != nullptr) {
             LiveProfileFrame f;
             f.frameMs = stats.frameIntervalMs;
             f.gpuMs = stats.gpuFrameMs;
@@ -5527,7 +5534,10 @@ int Application::runLive() {
                     it->ms += entry.ms;
                 }
             }
-            liveProfileDone = !noteLiveProfileFrame(f);
+            notePerformanceFrame(f); // ADR-1100: the Performance panel's rolling medians
+            if (liveProfileRunning) {
+                liveProfileDone = !noteLiveProfileFrame(f);
+            }
         }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
@@ -6911,9 +6921,32 @@ std::optional<LiveQualityLevel> Application::livePinnedQuality() const {
     return options_.liveQuality.given ? options_.liveQuality.pinned : settings_.liveQualityPinned;
 }
 
+std::optional<QualityProfile> Application::liveQualityProfile() const {
+    // ADR-1099: `--live-profile --quality <profile>` for the run, else the project's `live.profile`.
+    if (options_.liveProfile.enabled) {
+        if (const auto p = qualityProfileFromToken(options_.liveProfile.quality)) {
+            return p;
+        }
+    }
+    return engine_ != nullptr ? engine_->liveSettings().profile : std::nullopt;
+}
+
 InteractiveResolutionSettings Application::liveQualitySettings() const {
     InteractiveResolutionSettings rs = autoResolution_.settings(); // the law's constants stay as they are
-    const LiveBudget budget = liveBudget(options_.liveTargetFps > 0 ? options_.liveTargetFps : settings_.liveTargetFps);
+    // ADR-1100: the run's flag, then the project's target, then this machine's setting.
+    const LiveProjectSettings& project = engine_ != nullptr ? engine_->liveSettings() : LiveProjectSettings{};
+    const int targetFps = options_.liveTargetFps > 0 ? options_.liveTargetFps
+                          : project.targetFps        ? *project.targetFps
+                                                     : settings_.liveTargetFps;
+    const LiveBudget budget = liveBudget(targetFps);
+    // ADR-1105: a ladder from the project's priority, when it names one.
+    rs.ladder.reset();
+    if (!project.priority.empty()) {
+        std::string error;
+        rs.ladder = ladderFromPriority(project.priority, error);
+    }
+    // ADR-1103: the project's hard minimum.
+    rs.lowestLevel = project.minimumLevel ? static_cast<std::size_t>(*project.minimumLevel) : kLiveQualityLevels - 1;
     rs.enabled = !livePinnedQuality().has_value();
     rs.targetFps = budget.targetFps;
     rs.budgetMs = budget.qualityBudgetMs;
@@ -6931,7 +6964,7 @@ void Application::serviceLiveQuality() {
     const InteractiveResolutionSettings want = liveQualitySettings();
     const InteractiveResolutionSettings& have = autoResolution_.settings();
     if (want.enabled != have.enabled || want.budgetMs != have.budgetMs || want.strategy != have.strategy ||
-        want.scaleFloor != have.scaleFloor) {
+        want.scaleFloor != have.scaleFloor || want.ladder != have.ladder || want.lowestLevel != have.lowestLevel) {
         autoResolution_.configure(want);
         const auto pinned = livePinnedQuality();
         log::info("live quality: {} (target {:.0f} fps, GPU budget {:.2f} ms, lowest scale {:.2f}x, {})",
@@ -6945,8 +6978,25 @@ void Application::serviceLiveQuality() {
     if (!haveLiveQualityBase_) {
         // Ultra is the tier exactly as the run configured it (tier, quality arms): captured once, before
         // any rung has touched a field the ladder owns.
-        liveQualityBase_ = renderer_->qualitySettings();
+        liveTierBase_ = renderer_->qualitySettings();
         haveLiveQualityBase_ = true;
+        liveSettingsRevisionApplied_ = ~0ull;
+    }
+    // ADR-1099/1100: the profile and the project's ceilings sit between the tier and the ladder. Recomputed when the
+    // project's live block (or the run's profile) changes, and the level re-applied on top.
+    const std::optional<QualityProfile> profile = liveQualityProfile();
+    if (liveSettingsRevisionApplied_ != engine_->liveSettingsRevision() || liveProfileApplied_ != profile) {
+        rendering::QualitySettings base = liveTierBase_;
+        if (profile) {
+            base = applyQualityProfile(base, *profile);
+        }
+        if (engine_->liveSettings().overrides) {
+            base = applyCeiling(base, *engine_->liveSettings().overrides);
+        }
+        liveQualityBase_ = base;
+        liveSettingsRevisionApplied_ = engine_->liveSettingsRevision();
+        liveProfileApplied_ = profile;
+        appliedLiveQuality_.valid = false;
     }
     const auto pinned = livePinnedQuality();
     const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
@@ -6954,7 +7004,7 @@ void Application::serviceLiveQuality() {
     const bool moved = !appliedLiveQuality_.valid || appliedLiveQuality_.rung != now.rung ||
                        appliedLiveQuality_.strategy != now.strategy || appliedLiveQuality_.scaleFloor != now.scaleFloor;
     if (moved) {
-        const LiveQualityRung& r = liveQualityLadder(want.strategy)[rung];
+        const LiveQualityRung& r = autoResolution_.ladder()[rung];
         const rendering::QualitySettings q =
             applyLiveRung(renderer_->qualitySettings(), liveQualityBase_, r, want.scaleFloor);
         // ADR-1086: the whole cost of a transition on the CPU is this call (a render-target
@@ -6984,7 +7034,18 @@ void Application::serviceLiveQuality() {
     }
     // ---- the Live panel's status (ADR-1087) ----
     auto& view = panel_->liveQuality;
-    const LiveQualityRung& r = liveQualityLadder(want.strategy)[rung];
+    const LiveQualityRung& r = autoResolution_.ladder()[rung];
+    view.profile = profile ? qualityProfileLabel(*profile) : "QUALITY";
+    view.profileStated = engine_->liveSettings().profile.has_value();
+    view.minimumLevel = liveQualityLevelName(static_cast<LiveQualityLevel>(want.lowestLevel));
+    view.unsustainable = !pinned && autoResolution_.unsustainable();
+    view.priority.clear();
+    for (const auto& g : engine_->liveSettings().priority) {
+        view.priority += (view.priority.empty() ? "" : ", ") + g;
+    }
+    view.reverts = autoResolution_.stats().reverts;
+    view.overrides = engine_->liveSettings().overrides ? ceilingJsonText(*engine_->liveSettings().overrides) : std::string();
+    view.quality = renderer_->qualitySettings();
     view.available = true;
     view.automatic = !pinned.has_value();
     view.level = liveQualityLevelName(r.level);
@@ -7002,7 +7063,7 @@ void Application::serviceLiveQuality() {
     view.strategyStated = engine_->liveQualityStrategyStated();
     view.transitions = liveTransitions_;
     view.heldByCpu = autoResolution_.stats().heldByCpu;
-    view.atBottom = !pinned && rung + 1 == kLiveQualityLevels;
+    view.atBottom = !pinned && rung >= want.lowestLevel;
     view.qualityFromCommandLine = options_.liveQuality.given;
     view.targetFromCommandLine = options_.liveTargetFps > 0;
 }

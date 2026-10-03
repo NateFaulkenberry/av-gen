@@ -46,6 +46,7 @@ target_link_libraries(avgen_sonic_probe PRIVATE avgen_core miniaudio::miniaudio)
 if(TARGET avgen_platform)
     add_executable(avgen_overlay_shot overlay_shot.cpp
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
@@ -126,6 +127,7 @@ if(APPLE)
     # load a project has to name them.
     add_executable(avgen_metal_rt_probe metal_rt_probe.mm
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
@@ -180,6 +182,7 @@ target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
 # the same engine, so the list is named once.
 set(AVGEN_OFFLINE_ENGINE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
     "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"

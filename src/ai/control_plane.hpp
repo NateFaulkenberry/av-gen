@@ -120,6 +120,8 @@ public:
     void setWatchHook(WatchHook hook);
     // ADR-931: the host's evaluator, for `director.evaluate`. Unset: the tool says it is unavailable.
     void setEvaluationHook(EvaluationHook hook);
+    // ADR-1106: the host's live profiler, for `performance.profile_scene`.
+    void setProfileHook(ProfileHook hook);
     // Where projects live, for the project life-cycle tools.
     void setProjectsRoot(std::filesystem::path root);
     // Directories the assistant may read content from.
