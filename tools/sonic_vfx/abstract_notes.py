@@ -81,25 +81,29 @@ NOTES = {
     },
     "color-geometry": {
         "working_title": "Chromatic Corridor",
-        "language": "Space is the subject: a procession of monumental portals of pure flat colour that flows toward "
-                    "you forever through coloured haze, toward a blinding light. The colour lives in the space (warm "
-                    "near, cool far), so the frames travel through it.",
+        "language": "Space is the subject: a procession of monumental portals of pure colour that flows toward you "
+                    "forever, seen down a long lens so the frames stack into one spiral of the whole colour wheel "
+                    "round a blinding light. The colour lives in the space (the hue turns with depth), so the frames "
+                    "travel through the colour as they come.",
         "drives": [
             "Bass breathes the corridor like an accordion (its spacing and its travel scaled together round the "
-            "viewer) and thickens the haze.",
-            "The kick punches a zoom toward the light; the snare jumps the whole colour sequence a step round the "
-            "wheel and leaves it there.",
-            "Mids wind the corridor's twist; highs trace the frames' edges in light; flux tumbles the floating "
-            "cards; the beat surges it forward.",
-            "MIDI: each note recolours the space (the pitch sets the hue's phase); a chord sets the portal's polygon "
+            "viewer).",
+            "The kick punches a zoom toward the light and flares it; the snare jumps the whole colour sequence a "
+            "step round the wheel and leaves it there.",
+            "Mids wind the corridor's twist; flux wrings it tighter; highs trace the frames' edges in light; the "
+            "beat surges it forward; intensity grows the light.",
+            "MIDI: each note recolours the space (the pitch sets the hue's phase); a chord sets the portals' polygon "
             "(a triangle, square, hexagon); velocity flares the light; the mod wheel thickens the frames.",
         ],
         "expand": ["nested colour rooms (Turrell's Ganzfeld)", "a colour-field staircase", "a sky of floating "
                    "slabs", "a portal sequence over still water"],
-        "verdict": ('Close. Monumental colour frames in a luminous haze, twisted into a spiral and flowing at you: '
-                    "Albers' squares in depth. As a still it's a flat pink wall with a spiral hole. It lives in "
-                    'motion: the accordion on the bass, the colour jumps on the snare, the polygon order on chords. '
-                    'Needs a second element (light, or a figure) for scale.'),
+        "verdict": ("Yes now, as a graphic. The look round turned 'a pink wall with a hole in it' (a wide lens at the "
+                    "corridor's mouth, a pastel haze, a grey box at the end) into a full-frame spiral of saturated "
+                    "colour round a white light: a long lens down the axis, a thinner haze, full chroma, the light as "
+                    "geometry. In motion the frames flow at you, the snare jumps the colours round the wheel, the "
+                    "bass breathes the spacing, a chord changes the polygon. Risk: a rainbow tunnel is a familiar "
+                    "op-art (and screensaver) image; its claim to be Sonic Garden's own is the music playing its "
+                    "structure."),
     },
     "organic-garden": {
         "working_title": "Lantern Reef",
@@ -219,6 +223,9 @@ NOTES = {
             "jellies and the caustics; the brightness clears the water.",
             "MIDI: velocity sizes a note's bubble burst; held notes light the kelp; the mod wheel takes the level "
             "deeper (darker, thicker water).",
+            "THE GUIDE, a big friendly voxel fish that swims the ring against you (you meet it every 100 s): it swims "
+            "the melody's contour (higher notes lift it), bobs on the kick, beats its tail on the bass, and its eyes "
+            "light while notes are held.",
             "Structure: intensity grows the coral.",
         ],
         "expand": ["a sunken castle level", "a night level of glowing jellies", "a boss chamber with a giant friendly "

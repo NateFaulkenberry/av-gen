@@ -17,6 +17,7 @@ media: each a still, reactive clips with real music, a MIDI clip, and its modula
     python3 tools/sonic_vfx/abstract.py sheet [--blockouts]                     # contact sheet of the nine
     python3 tools/sonic_vfx/abstract.py maps [id ...]                           # each one's as-built modulation map
     python3 tools/sonic_vfx/abstract.py tour [--class allyougot] [--seconds 3.6] # one piece of music, nine worlds
+                                                                       #   (each cut at most the clip's length / 9)
     python3 tools/sonic_vfx/abstract.py notes [id ...]                          # each one's one-page note
 
 Files go to ~/Desktop/av-gen-review/28-sonic-abstract/, named by set-list position (`01-sacred-geometry-still.png`,
@@ -272,15 +273,27 @@ def tour(cls, seg):
     excerpt's own audio underneath, each segment captioned with its prototype."""
     work = os.path.join(OUT, "work", "tour-" + cls)
     os.makedirs(work, exist_ok=True)
+    ids = scene_ids()
+    first = os.path.join(OUT, "%s-%s.mp4" % (numbered(ids[0]), cls))
+    if os.path.exists(first):
+        # every world gets the same share: nine 3.6 s cuts of a 30 s clip left the last one 1.2 s
+        probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", first],
+                               capture_output=True, text=True)
+        try:
+            seg = min(seg, float(probe.stdout.strip()) / len(ids))
+        except ValueError:
+            pass
     parts = []
-    for k, sid in enumerate(scene_ids()):
+    for k, sid in enumerate(ids):
         src = os.path.join(OUT, "%s-%s.mp4" % (numbered(sid), cls))
         if not os.path.exists(src):
             print("missing", src)
             continue
         part = os.path.join(work, "%02d.mp4" % k)
         caption = os.path.join(work, "%02d-caption.png" % k)
-        make_caption(numbered(sid).split("-", 1)[0] + "   " + sid.replace("-", " ").upper(), caption)
+        import json
+        title = json.load(open(project_path(sid))).get("sonicScene", {}).get("title", sid.replace("-", " "))
+        make_caption(numbered(sid).split("-", 1)[0] + "   " + title.upper(), caption)
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", "%.3f" % (k * seg), "-t", "%.3f" % seg, "-i", src,
                         "-i", caption, "-filter_complex", "[0:v]scale=1920:1080[b];[b][1:v]overlay=0:0", "-an",
                         "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "30", part], check=True)

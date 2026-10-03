@@ -7341,6 +7341,456 @@
    }
   },
   {
+   "name": "guideBody",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-guide-body.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "tangent",
+     "startAngle": -0.7498327729253689,
+     "endAngle": -0.7498327729253689
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      19.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.19462,
+      0.02315
+     ],
+     "emissiveColor": [
+      1.0,
+      0.19462,
+      0.02315
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "guideBelly",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-guide-belly.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "tangent",
+     "startAngle": -0.7498327729253689,
+     "endAngle": -0.7498327729253689
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      19.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.80695,
+      0.47932
+     ],
+     "emissiveColor": [
+      1.0,
+      0.80695,
+      0.47932
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "guideFins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-guide-fins.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "tangent",
+     "startAngle": -0.7498327729253689,
+     "endAngle": -0.7498327729253689
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      19.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.06848,
+      0.14413
+     ],
+     "emissiveColor": [
+      1.0,
+      0.06848,
+      0.14413
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "guideEyes",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-guide-eyes.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "tangent",
+     "startAngle": -0.7498327729253689,
+     "endAngle": -0.7498327729253689
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      19.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 0.25,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.95,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "guidePupils",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-guide-pupils.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "tangent",
+     "startAngle": -0.7498327729253689,
+     "endAngle": -0.7498327729253689
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      19.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00304,
+      0.01033,
+      0.06848
+     ],
+     "emissiveColor": [
+      0.00304,
+      0.01033,
+      0.06848
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
    "name": "laneRing",
    "kind": "spline",
    "spline": {

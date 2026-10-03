@@ -290,6 +290,14 @@ cream haze that the far frames dissolve into: Albers' squares in depth rather th
 rotation of vermilion by depth (one program); the travel is a sawtooth of one spacing; the accordion scales the spacing
 and the travel together.
 
+**Look round (2026-10-03).** The first still failed the gate: a 24 mm lens at the corridor's mouth saw one pink frame
+with a small spiral in it, the haze washed every colour to pastel, and the far opening showed the sky's dark ground
+hemisphere as a grey box. Now: an 85 mm lens down the axis from just inside, so the frames 20 to 110 m away stack into
+one spiral of the whole colour wheel round the light; the haze a third as thick; the colour's chroma pushed (a
+`saturate` op after the hue rotation) and tonemap 4 (clamp) to keep it flat and pure; a uniform sky; and the light at
+the end as geometry (an emissive sphere the kick, the notes and the intensity flare). The kick's zoom punch is 10 mm at
+the long lens. The march stops at the light (112 m, 72 steps): the open axis is where a long lens sends its rays.
+
 **Expansion.** Nested colour rooms (Turrell's Ganzfeld); a colour-field staircase; a sky of floating slabs; a portal
 sequence over water.
 
@@ -382,25 +390,27 @@ two coherent palette states, one world.
 | dimension | signals | drives |
 |---|---|---|
 | level | `response.level` | AUDIO TOPOGRAPHY: a travelling sine wave field rolls out from the island through every range (and, mirrored, every twin), as tall as the music is strong |
-| bass | `response.bass` | the shore range lights from within (spectral depth); the waterline mist glows; the sun's path on the water brightens |
+| bass | `response.bass` | the shore range lights from within (spectral depth); the sun's path on the water brightens |
 | low mids / mids / high mids | `audio.lowMid`, `audio.mid`, `audio.highMid` | SPECTRAL DEPTH: the main, far and distant ranges each light with their own band |
-| kick | `response.kick` | a band of light runs out through the ranges (a distance band in `daRock`); rings of light land on the water (splash particles) |
-| snare | `response.snare` | a flash along the horizon |
+| kick | `response.kick` | the low sun flares across every facet that faces it (the sunlit colour in `daRock`); rings of light land on the water (splash particles) |
+| snare | `response.snare` | a flash along the horizon, in the sky and in the lake |
 | mids | `audio.mid` | the water's ripples deepen |
 | highs | `audio.treble` | glints scatter on the water; the sun's glow brightens |
 | tempo | `beat.phase` | the ripples drift |
 | centroid | `sonic.brightness.slow` | the palette drifts warmer or cooler (hue) |
 | intensity | `response.intensity` | `[S]` the ranges rise as the piece builds |
 | pitch class | `notes.class.<k>` | twelve lanterns round the shore, one per pitch class, with their reflections |
-| chord | `notes.polyphony` | `[S]` the waterline mist rises with the chord's size |
+| chord | `notes.polyphony` | a bigger chord lays a brighter path of light on the water |
 | velocity | `notes.lastVelocity` | how bright a lantern flares |
-| mod wheel | CC 1 | `[S]` the sun climbs (dusk to afternoon): its glow, its path on the water, the light on every facet |
+| mod wheel | CC 1 | `[S]` night falls: the sky and the lake darken, the sun's light leaves the facets, the haze dims, the lanterns come up |
 
-**Structural parameters.** The ranges' heights, the swell's height, the mist's height, the sun's elevation.
+**Structural parameters.** The ranges' heights, the swell's height, day to night.
 
-**As built (2026-10-02).** First built from boxes (a cube on its corner is a peak), which read as a pile of slabs; rebuilt
-from generated faceted meshes. Engine facts found: material op constants clamp to ±1000; the engine water reflects only
-the sky, hence the twins.
+**As built (2026-10-02/03).** First built from boxes (a cube on its corner is a peak), which read as a pile of slabs;
+rebuilt from generated faceted meshes. Engine facts found: material op constants clamp to ±1000; the engine water
+reflects only the sky, hence the twins. For the live frame rate (the map above is as built): the waterline mist and the
+kick's distance band went (each was ops on every rock fragment); the kick became the sun's flare; the sky is a short dome
+program and the lake a disc with the water's program behind the twins; the default key is authored without its shadow.
 
 **Expansion.** A fjord flown at dawn; an archipelago of faceted islands; a crater lake at night with the lanterns lit; a
 waterfall of facets.
@@ -435,7 +445,7 @@ bend and banking into it, and twice a period rises from 64 m to over 300 m above
 | dimension | signals | drives |
 |---|---|---|
 | bass | `response.bass` | the river rises up its banks (the glow's height) and brightens |
-| kick | `response.kick` | a band of light runs out across the land from the camera |
+| kick | `response.kick` | the contour lines flash white across the land; the river surges (as built: a band of light was ops on every land fragment) |
 | snare | `response.snare` | the groves bloom (their colours flare) |
 | mids | `audio.mid` | the contour lines flow up the slopes (the lines' phase, integrated) |
 | low mids | `audio.lowMid` | the round trees glow |
@@ -501,7 +511,7 @@ delays, peak-hold envelopes, springs and integration staging one trigger into th
 |---|---|---|
 | strong event | `visual.collapse` (`kickEnv` x `flux`, or a full-velocity note) | MACRO: the staged collapse and `[S]` the reconstruction in a new configuration (roll, palette, pattern, stagger) |
 | bass | `response.bass` | the RGB split widens; the walls push apart; the horizon flares |
-| kick | `response.kick` | a wave of light runs down the canyon towards the camera |
+| kick | `response.kick` | a ring of distortion comes out of the horizon through the frame (post shock); the lit pixels flash (as built: the wave of light was ops on every block fragment) |
 | snare | `response.snare` | MESO: the frame tears; the rows shear sideways |
 | hat | `response.hat` | MICRO: glitch blocks flicker |
 | onset | `response.onset` | MESO: channels swap in the glitch blocks |
@@ -568,12 +578,21 @@ out, rolling a little.
 | velocity | `notes.lastVelocity` | how big the bubble burst a note releases |
 | held | `notes.held` | the kelp glows while notes are held |
 | mod wheel | CC 1 | `[S]` the depth: the water darkens and thickens |
+| pitch | `notes.lastPitch` | THE GUIDE swims the melody's contour: higher notes lift it |
+| kick, bass | `response.kick`, `response.bass` | the guide bobs on the kick; the bass beats its tail (its body's bend, on a spring) |
+| held | `notes.held` | the guide's eyes light while notes are held |
 
 **As built (2026-10-03).** The radial distribution's angle convention (angle e at (cos e, 0, -sin e)) cost one round;
 the first looks were pastel and empty, so the palettes were saturated, the shadows deepened, the lane lined with coral
 and kelp, brick ledges floated over it, and outlines added for the sprite silhouette.
 
-**Expansion.** A sunken castle level; a night level of glowing jellies; a boss chamber with a giant friendly fish; a lava
+**The guide (2026-10-03, the review's "it needs a hero").** A big friendly voxel fish (29 m: an orange body, a cream
+belly, coral fins, white eyes with navy pupils, cut from one solid so no face is drawn between two colours) swims the
+ring AGAINST the swim, outside the lane on the right: the swimmer meets it every 100 s (1 / (1/150 + 1/300)), first at
+12 s, 22 degrees ahead at the hero still's 6 s. It sings along: the pitch lifts it, the kick bobs it, the bass beats its
+tail.
+
+**Expansion.** A sunken castle level; a night level of glowing jellies; a boss chamber where the guide waits; a lava
 level in the same grammar.
 
 ---

@@ -273,8 +273,9 @@ def build():
                                 "majorSegments": 256, "minorSegments": 4},
                material=line_mat(5.0 if i else 7.0),
                transform={"position": ring_c, "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
-    s.proc("horizon", {"kind": "box", "size": [1400.0, 0.25, 0.25], "subdivisions": 1}, material=line_mat(6.0),
-           transform={"position": [0.0, 0.0, cz], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
+    # (a box is at most 1000 m on a side: the hairline's 1400 m is its scale)
+    s.proc("horizon", {"kind": "box", "size": [1000.0, 0.25, 0.25], "subdivisions": 1}, material=line_mat(6.0),
+           transform={"position": [0.0, 0.0, cz], "rotation": [0, 0, 0], "scale": [1.4, 1, 1]})
 
     # ---- the colour block: a flat magenta triangle standing in the plain on the left third, pointing up, with an
     # offset hairline outline

@@ -1116,6 +1116,212 @@
    }
   },
   {
+   "source": "notes.lastPitch",
+   "target": "procedural/guideBody/transform/position",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/guideBody/transform/position",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/guideBody/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 500,
+    "springHz": 1.4,
+    "springDamping": 0.5
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "procedural/guideBelly/transform/position",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/guideBelly/transform/position",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/guideBelly/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 500,
+    "springHz": 1.4,
+    "springDamping": 0.5
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "procedural/guideFins/transform/position",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/guideFins/transform/position",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/guideFins/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 500,
+    "springHz": 1.4,
+    "springDamping": 0.5
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "procedural/guideEyes/transform/position",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/guideEyes/transform/position",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/guideEyes/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 500,
+    "springHz": 1.4,
+    "springDamping": 0.5
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "procedural/guidePupils/transform/position",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/guidePupils/transform/position",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350,
+    "springHz": 2.2,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/guidePupils/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 500,
+    "springHz": 1.4,
+    "springDamping": 0.5
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/guideEyes/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "control.modwheel",
    "target": "scene/volumeDensity",
    "amount": 0.02,
@@ -1221,6 +1427,146 @@
       "value": [
        0.0,
        360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "procedural/guideBody/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 300.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 300.0,
+      "value": [
+       0.0,
+       -360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "procedural/guideBelly/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 300.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 300.0,
+      "value": [
+       0.0,
+       -360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "procedural/guideFins/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 300.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 300.0,
+      "value": [
+       0.0,
+       -360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "procedural/guideEyes/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 300.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 300.0,
+      "value": [
+       0.0,
+       -360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "procedural/guidePupils/transform/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "add",
+    "loopLength": 300.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 300.0,
+      "value": [
+       0.0,
+       -360.0,
        0.0
       ],
       "interp": "linear"
@@ -3955,6 +4301,11 @@
     "mod wheel",
     "control.modwheel",
     "STRUCTURE: the depth -- the water darkens and thickens"
+   ],
+   [
+    "pitch",
+    "notes.lastPitch",
+    "THE GUIDE, a big friendly voxel fish met every 100 s, swims the melody's contour (higher notes lift it); a kick bobs it, the bass beats its tail"
    ],
    [
     "silence",
