@@ -29,7 +29,10 @@
    0.69387,
    0.56471
   ],
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.00085,
+  "volumeMaxDistance": 0.0,
+  "fogSky": 1.0,
+  "fogSkyDistance": 900.0,
   "skyIntensity": 1.0,
   "sky": {
    "enabled": true,
@@ -48,7 +51,7 @@
     0.76815,
     0.56471
    ],
-   "haze": 0.3,
+   "haze": 0.42,
    "sunIntensity": 0.0,
    "intensity": 1.0,
    "background": true,
@@ -56,56 +59,6 @@
   }
  },
  "nodes": [
-  {
-   "name": "dome",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "sphere",
-     "radius": 1000.0,
-     "segments": 64,
-     "rings": 32
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "distributionTransform": {
-     "position": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "rotation": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "scale": [
-      6.0,
-      6.0,
-      6.0
-     ]
-    },
-    "material": {
-     "baseColor": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "emissiveColor": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 1.0,
-     "metallic": 0.0,
-     "unlit": true,
-     "program": "ctSky",
-     "doubleSided": true
-    }
-   }
-  },
   {
    "name": "swell",
    "kind": "field",
@@ -1067,27 +1020,6 @@
      "input": "normal"
     },
     {
-     "kind": "input",
-     "dst": 2,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.1,
-      0.1,
-      0.1,
-      0.1
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
      "kind": "swizzle",
      "dst": 3,
      "srcA": 0,
@@ -1177,21 +1109,25 @@
      "srcB": 6
     },
     {
-     "kind": "remap",
+     "kind": "constant",
      "dst": 6,
-     "srcA": 5,
-     "value": 1.0,
      "constant": [
-      0.0,
-      3.0,
-      0.0,
-      1.0
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666
      ]
     },
     {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
      "kind": "ramp",
-     "dst": 6,
-     "srcA": 6,
+     "dst": 5,
+     "srcA": 5,
      "constant": [
       0.01229,
       0.02315,
@@ -1199,65 +1135,17 @@
       1.0
      ],
      "constant2": [
-      0.10224,
-      0.02315,
-      0.28744,
-      1.0
-     ],
-     "constant3": [
-      0.43415,
-      0.02956,
-      0.26225,
-      1.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 7,
-     "srcA": 5,
-     "value": 1.0,
-     "constant": [
-      3.0,
-      6.0,
-      0.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "ramp",
-     "dst": 7,
-     "srcA": 7,
-     "constant": [
       0.43415,
       0.02956,
       0.26225,
       1.0
      ],
-     "constant2": [
-      0.92158,
-      0.27468,
-      0.07227,
-      1.0
-     ],
      "constant3": [
-      1.0,
-      0.89627,
-      0.62396,
+      0.96469,
+      0.65141,
+      0.14413,
       1.0
      ]
-    },
-    {
-     "kind": "threshold",
-     "dst": 5,
-     "srcA": 5,
-     "value": 3.0
-    },
-    {
-     "kind": "mixBy",
-     "dst": 5,
-     "srcA": 6,
-     "srcB": 7,
-     "srcC": 5
     },
     {
      "kind": "gradient",
@@ -1384,96 +1272,6 @@
      "dst": 5,
      "srcA": 5,
      "srcB": 6
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 2,
-     "constant": [
-      20.0,
-      260.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "power",
-     "dst": 6,
-     "srcA": 6,
-     "value": 0.75
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.92158,
-      0.69387,
-      0.56471,
-      1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      -900.0,
-      -900.0,
-      -900.0,
-      -900.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 7,
-     "srcC": 6
-    },
-    {
-     "kind": "add",
-     "dst": 6,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.7,
-      0.62155,
-      0.44153,
-      1.0
-     ]
-    },
-    {
-     "kind": "gradient",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      0.0,
-      0.0,
-      1.0
-     ],
-     "value": -0.012345679012345678
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 7
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6
     }
    ],
    "baseColor": -1,
@@ -1513,61 +1311,6 @@
      "dst": 0,
      "srcA": 0,
      "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.1,
-      0.1,
-      0.1,
-      0.1
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      20.0,
-      260.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "power",
-     "dst": 3,
-     "srcA": 3,
-     "value": 0.75
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.92158,
-      0.69387,
-      0.56471,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 0,
-     "srcA": 0,
-     "srcB": 4,
-     "srcC": 3
     }
    ],
    "baseColor": -1,
@@ -1679,129 +1422,12 @@
      "dst": 0,
      "srcA": 0,
      "srcB": 1
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.1,
-      0.1,
-      0.1,
-      0.1
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      20.0,
-      260.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.92158,
-      0.69387,
-      0.56471,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 0,
-     "srcA": 0,
-     "srcB": 4,
-     "srcC": 3
     }
    ],
    "baseColor": -1,
    "metallic": -1,
    "roughness": -1,
    "emission": 0,
-   "emissionIntensity": 1.0,
-   "opacity": -1
-  },
-  {
-   "name": "ctSky",
-   "ops": [
-    {
-     "kind": "input",
-     "dst": 0,
-     "input": "viewDirection"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 1,
-     "srcA": 0,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 1,
-     "srcA": 1,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      -0.6,
-      0.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "power",
-     "dst": 1,
-     "srcA": 1,
-     "value": 0.6
-    },
-    {
-     "kind": "ramp",
-     "dst": 2,
-     "srcA": 1,
-     "constant": [
-      1.0,
-      0.76815,
-      0.56471,
-      1.0
-     ],
-     "constant2": [
-      0.2384,
-      0.65837,
-      0.82279,
-      1.0
-     ],
-     "constant3": [
-      0.01764,
-      0.0648,
-      0.39157,
-      1.0
-     ]
-    }
-   ],
-   "baseColor": -1,
-   "metallic": -1,
-   "roughness": -1,
-   "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": -1
   }

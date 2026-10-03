@@ -82,7 +82,7 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the river rises up its banks and brightens"],
-        ["kick", "response.kick", "a band of light runs out across the land from the camera"],
+        ["kick", "response.kick", "the contour lines flash white across the land; the river surges"],
         ["snare", "response.snare", "the groves bloom (their colours flare)"],
         ["mids", "audio.mid", "the contour lines flow up the slopes"],
         ["low mids", "audio.lowMid", "the round trees glow"],
@@ -165,72 +165,52 @@ def generate_meshes():
 
 
 # ================================================================================================ programs
-HZ0, HZ1, HZ_CURVE = 20.0, 260.0, 0.75    # haze, decametres (a material op's constants are clamped to +-1000)
+# Every program here is short on purpose: a material program is interpreted per fragment, and the land covers most of
+# the frame (the first version's 47-op land program cost 14 ms at 1080p). The air is the engine's analytic fog taking
+# the sky's own colour with distance (fogSky), not a program.
 GLOW_H = 1.6                              # the river's glow up the banks (metres)
-BAND_REST = -900.0                        # the light band parked far off (decametres)
-BAND_W = 9.0
 
 
 def land_program():
-    """The land, unlit. Ops (1-based): 7 the height's ramp (y0, y1), 8-18 the seven bands (thresholds), 20/22 the
-    low and high colour ramps, 25 the light, 27 the contour lines (palette: value = their phase, constant3 =
-    1/spacing), 30 the lines' tint, 33 the river's glow height, 34 its colour, 39 the haze colour, 40 minus the light
-    band's distance, 44 the band's colour."""
+    """The land, unlit. Ops (1-based): 4 the height's ramp (y0, y1), 5-15 the seven bands (thresholds), 18 the colour
+    ramp (constant, constant2, constant3), 19 the light, 21 the contour lines (palette: value = their phase,
+    constant3 = 1/spacing), 24 the lines' tint, 27 the river's glow height, 28 its colour."""
     return {
         "name": "ctLand",
         "ops": [
             {"kind": "input", "dst": 0, "input": "worldPosition"},                                     # 1
             {"kind": "input", "dst": 1, "input": "normal"},                                            # 2
-            {"kind": "input", "dst": 2, "input": "cameraDistance"},                                    # 3
-            {"kind": "constant", "dst": 3, "constant": [0.1, 0.1, 0.1, 0.1]},                          # 4
-            {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},                                      # 5 decametres
-            {"kind": "swizzle", "dst": 3, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},               # 6 y
-            {"kind": "remap", "dst": 4, "srcA": 3, "value": 1.0, "constant": [0.0, Y_TOP, 0.0, 1.0]},  # 7 t
-            {"kind": "threshold", "dst": 5, "srcA": 4, "value": 0.07},                                 # 8
-            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.17},                                 # 9
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 10
-            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.3},                                  # 11
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 12
-            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.45},                                 # 13
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 14
-            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.62},                                 # 15
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 16
-            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.8},                                  # 17
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 18 band 0..6
-            {"kind": "remap", "dst": 6, "srcA": 5, "value": 1.0, "constant": [0.0, 3.0, 0.0, 1.0]},    # 19 low half
-            {"kind": "ramp", "dst": 6, "srcA": 6, "constant": hexrgb(BANDS[0]) + [1.0],
-             "constant2": hexrgb(BANDS[1]) + [1.0], "constant3": hexrgb(BANDS[2]) + [1.0]},            # 20 low ramp
-            {"kind": "remap", "dst": 7, "srcA": 5, "value": 1.0, "constant": [3.0, 6.0, 0.0, 1.0]},    # 21 high half
-            {"kind": "ramp", "dst": 7, "srcA": 7, "constant": hexrgb(BANDS[2]) + [1.0],
-             "constant2": hexrgb(BANDS[4]) + [1.0], "constant3": hexrgb(BANDS[6]) + [1.0]},            # 22 high ramp
-            {"kind": "threshold", "dst": 5, "srcA": 5, "value": 3.0},                                  # 23
-            {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 7, "srcC": 5},                              # 24 colour
-            {"kind": "gradient", "dst": 6, "srcA": 1, "constant": list(L) + [0.62], "value": 0.45},    # 25 light
-            {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                                      # 26
+            {"kind": "swizzle", "dst": 3, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},               # 3 y
+            {"kind": "remap", "dst": 4, "srcA": 3, "value": 1.0, "constant": [0.0, Y_TOP, 0.0, 1.0]},  # 4 t
+            {"kind": "threshold", "dst": 5, "srcA": 4, "value": 0.07},                                 # 5
+            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.17},                                 # 6
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 7
+            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.3},                                  # 8
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 9
+            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.45},                                 # 10
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 11
+            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.62},                                 # 12
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 13
+            {"kind": "threshold", "dst": 6, "srcA": 4, "value": 0.8},                                  # 14
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 15 band 0..6
+            {"kind": "constant", "dst": 6, "constant": [1.0 / 6.0] * 4},                               # 16
+            {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                                      # 17
+            {"kind": "ramp", "dst": 5, "srcA": 5, "constant": hexrgb(BANDS[0]) + [1.0],
+             "constant2": hexrgb(BANDS[2]) + [1.0], "constant3": hexrgb(BANDS[5]) + [1.0]},            # 18 colour
+            {"kind": "gradient", "dst": 6, "srcA": 1, "constant": list(L) + [0.62], "value": 0.45},    # 19 light
+            {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                                      # 20
             {"kind": "palette", "dst": 6, "srcA": 3, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.5],
              "constant2": [0.5, 0.5, 0.5, 0.5], "constant3": [1.0 / CONTOUR] * 4,
-             "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 27 lines
-            {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.93, 0.995, 0.0, 0.0]},          # 28
-            {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [0.0, 0.0, 0.0, 0.0]},               # 29
-            {"kind": "constant", "dst": 7, "constant": [0.58, 0.5, 0.66, 1.0]},                        # 30
-            {"kind": "multiply", "dst": 7, "srcA": 5, "srcB": 7},                                      # 31 line tint
-            {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 7, "srcC": 6},                              # 32 (lines)
-            {"kind": "smoothstep", "dst": 6, "srcA": 3, "constant": [GLOW_H, -0.5, 0.0, 0.0]},         # 33 river glow
-            {"kind": "constant", "dst": 7, "constant": hexrgb(RIVER, 0.8) + [1.0]},                    # 34
-            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},                                      # 35
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 36
-            {"kind": "smoothstep", "dst": 6, "srcA": 2, "constant": [HZ0, HZ1, 0.0, 0.0]},             # 37 haze
-            {"kind": "power", "dst": 6, "srcA": 6, "value": HZ_CURVE},                                 # 38
-            {"kind": "constant", "dst": 7, "constant": hexrgb(HAZE) + [1.0]},                          # 39
-            {"kind": "constant", "dst": 4, "constant": [BAND_REST] * 4},                              # 40 -band dist.
-            {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 7, "srcC": 6},                              # 41 hazed
-            {"kind": "add", "dst": 6, "srcA": 2, "srcB": 4},                                           # 42
-            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 6},                                      # 43
-            {"kind": "constant", "dst": 7, "constant": hexrgb("#fff2d0", 0.7) + [1.0]},                # 44 band
-            {"kind": "gradient", "dst": 6, "srcA": 6, "constant": [1.0, 0.0, 0.0, 1.0],
-             "value": -1.0 / (BAND_W * BAND_W)},                                                        # 45
-            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},                                      # 46
-            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 47
+             "constant4": [0.0, 0.0, 0.0, 0.0]},                                                        # 21 lines
+            {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.93, 0.995, 0.0, 0.0]},          # 22
+            {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [0.0, 0.0, 0.0, 0.0]},               # 23
+            {"kind": "constant", "dst": 7, "constant": [0.58, 0.5, 0.66, 1.0]},                        # 24 line tint
+            {"kind": "multiply", "dst": 7, "srcA": 5, "srcB": 7},                                      # 25
+            {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 7, "srcC": 6},                              # 26 (lines)
+            {"kind": "smoothstep", "dst": 6, "srcA": 3, "constant": [GLOW_H, -0.5, 0.0, 0.0]},         # 27 river glow
+            {"kind": "constant", "dst": 7, "constant": hexrgb(RIVER, 0.8) + [1.0]},                    # 28
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},                                      # 29
+            {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                                           # 30
         ],
         "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 5, "emissionIntensity": 1.0, "opacity": -1,
     }
@@ -238,7 +218,7 @@ def land_program():
 
 def flat_program(name):
     """Trees and crystals, unlit: the material's own emission (its colour x intensity) as the colour, lit softly from
-    the left, hazed with distance."""
+    the left."""
     return {
         "name": name,
         "ops": [
@@ -246,21 +226,14 @@ def flat_program(name):
             {"kind": "input", "dst": 1, "input": "normal"},                                            # 2
             {"kind": "gradient", "dst": 2, "srcA": 1, "constant": list(L) + [0.45], "value": 0.7},     # 3
             {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},                                      # 4
-            {"kind": "input", "dst": 3, "input": "cameraDistance"},                                    # 5
-            {"kind": "constant", "dst": 4, "constant": [0.1, 0.1, 0.1, 0.1]},                          # 6
-            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},                                      # 7
-            {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [HZ0, HZ1, 0.0, 0.0]},             # 8
-            {"kind": "power", "dst": 3, "srcA": 3, "value": HZ_CURVE},                                 # 9
-            {"kind": "constant", "dst": 4, "constant": hexrgb(HAZE) + [1.0]},                          # 10
-            {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 4, "srcC": 3},                              # 11
         ],
         "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1,
     }
 
 
 def river_program():
-    """The river: turquoise light flowing towards the camera (bands of brightness along z, moving with time), hazed.
-    Ops: 4 the flow's speed (the time's multiplier), 7 the bands' frequency, 9 the colour."""
+    """The river: turquoise light flowing towards the camera (bands of brightness along z, moving with time). Ops:
+    4 the flow's speed (the time's multiplier), 7 the bands' frequency, 9 the colour."""
     return {
         "name": "ctRiver",
         "ops": [
@@ -276,30 +249,8 @@ def river_program():
             {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [0.0, 0.0, 0.0, 0.0]},               # 8
             {"kind": "constant", "dst": 1, "constant": hexrgb(RIVER, 2.4) + [1.0]},                    # 9
             {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},                                      # 10
-            {"kind": "input", "dst": 3, "input": "cameraDistance"},                                    # 11
-            {"kind": "constant", "dst": 4, "constant": [0.1, 0.1, 0.1, 0.1]},                          # 12
-            {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},                                      # 13
-            {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [HZ0, HZ1, 0.0, 0.0]},             # 14
-            {"kind": "constant", "dst": 4, "constant": hexrgb(HAZE) + [1.0]},                          # 15
-            {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 4, "srcC": 3},                              # 16
         ],
         "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1,
-    }
-
-
-def sky_program():
-    """The dome: cream at the horizon, sky cyan, cobalt at the zenith (by the view's elevation)."""
-    return {
-        "name": "ctSky",
-        "ops": [
-            {"kind": "input", "dst": 0, "input": "viewDirection"},                                     # 1
-            {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},               # 2 v.y
-            {"kind": "remap", "dst": 1, "srcA": 1, "value": 1.0, "constant": [0.0, -0.6, 0.0, 1.0]},   # 3 elevation
-            {"kind": "power", "dst": 1, "srcA": 1, "value": 0.6},                                      # 4
-            {"kind": "ramp", "dst": 2, "srcA": 1, "constant": hexrgb(SKY_HORIZON) + [1.0],
-             "constant2": hexrgb(SKY_MID) + [1.0], "constant3": hexrgb(SKY_ZENITH) + [1.0]},           # 5
-        ],
-        "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": -1,
     }
 
 
@@ -322,25 +273,25 @@ def instrument(s):
     """The modulation map (ABSTRACT-PLAN.md section 7)."""
     P = "procedural/%s/"
     # ---- BASS: the river rises up its banks (the glow's height, op 33) and brightens (op 34)
-    s.route(R("bass", "material/ctLand/op/33/smoothstep/constant", 5.0, comp=0, attackMs=40, decayMs=500),
-            R("bass", "material/ctLand/op/34/constant/constant", 0.35, attackMs=30, decayMs=500),
+    s.route(R("bass", "material/ctLand/op/27/smoothstep/constant", 5.0, comp=0, attackMs=40, decayMs=500),
+            R("bass", "material/ctLand/op/28/constant/constant", 0.35, attackMs=30, decayMs=500),
             R("bass", "material/ctRiver/op/9/constant/constant", 1.2, attackMs=30, decayMs=400))
-    # ---- KICK: a band of light runs out across the land (op 40: minus its distance, decametres)
-    s.route(R("kick", "material/ctLand/op/40/constant/constant", -BAND_REST, threshold="binary", thresholdLevel=0.3,
-              envelope="linearfall", envelopeHoldMs=0, envelopeFallPerSecond=0.9))
+    # ---- KICK: the contour lines flash white across the whole land, the river surges
+    s.route(R("kick", "material/ctLand/op/24/constant/constant", 1.6, attackMs=0, decayMs=240),
+            R("kick", "material/ctRiver/op/9/constant/constant", 1.6, attackMs=0, decayMs=300))
     # ---- SNARE: the groves bloom (their colour flares); LOW MIDS: the round trees glow
     s.route(R("snare", P % "cones" + "material/emissive", 1.4, attackMs=0, decayMs=320),
             R("snare", P % "balls" + "material/emissive", 1.4, attackMs=0, decayMs=320),
             R("audio.lowMid", P % "balls" + "material/emissive", 0.8, attackMs=120, decayMs=700))
     # ---- MIDS: the contour lines flow up the slopes (the palette's phase, integrated)
-    s.route(R("audio.mid", "material/ctLand/op/27/palette/value", 30.0, integrate=True, attackMs=80, decayMs=600))
+    s.route(R("audio.mid", "material/ctLand/op/21/palette/value", 30.0, integrate=True, attackMs=80, decayMs=600))
     # ---- HIGHS: pollen sparks over the river; the contour lines brighten (their tint towards white); BEAT pulses them
     s.route(R("audio.treble", "particles/pollen/spawnRate", 700.0, attackMs=20, decayMs=250),
-            R("audio.treble", "material/ctLand/op/30/constant/constant", 0.9, attackMs=30, decayMs=300),
-            R("beat", "material/ctLand/op/30/constant/constant", 0.35, attackMs=0, decayMs=160))
+            R("audio.treble", "material/ctLand/op/24/constant/constant", 0.9, attackMs=30, decayMs=300),
+            R("beat", "material/ctLand/op/24/constant/constant", 0.35, attackMs=0, decayMs=160))
     # ---- CENTROID: the palette drifts and the haze warms, very slowly
     s.route(R("brightnessSlow", "post/grade/hueShift", 0.6, offset=-0.4, **VERY_SLOW),
-            R("brightnessSlow", "material/ctLand/op/39/constant/constant", 0.12, comp=0, **SLOW))
+            R("brightnessSlow", "scene/fogColor", 0.12, comp=0, **SLOW))
     # ---- INTENSITY: STRUCTURE -- the land rises as the piece builds
     for node in ("land", "cones", "balls") + tuple("crystal%d" % k for k in range(12)):
         s.route(R("intensity", P % node + "transform/scale", 0.3, comp=1, **VERY_SLOW))
@@ -351,10 +302,10 @@ def instrument(s):
     for k in range(12):
         s.route(R("notes.class.%d" % k, P % ("crystal%d" % k) + "material/emissive", 3.2, depth="lastVelocity",
                   attackMs=0, decayMs=900))
-    s.route(R("polyphony", "material/ctLand/op/33/smoothstep/constant", 9.0, comp=0, **MEDIUM))
+    s.route(R("polyphony", "material/ctLand/op/27/smoothstep/constant", 9.0, comp=0, **MEDIUM))
     # ---- MOD WHEEL: STRUCTURE -- the contour spacing, from fine survey lines to broad terraces
     wheel = s.modwheel()
-    s.route(R(wheel, "material/ctLand/op/27/palette/constant3", -1.0 / CONTOUR * 0.7, attackMs=200, decayMs=200))
+    s.route(R(wheel, "material/ctLand/op/21/palette/constant3", -1.0 / CONTOUR * 0.7, attackMs=200, decayMs=200))
 
 
 def camera_track(s):
@@ -390,18 +341,15 @@ def build():
     s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(SKY_HORIZON), "fogColor": hexrgb(HAZE), "volumeDensity": 0.0,
+        "intensity": 0.0, "background": hexrgb(SKY_HORIZON), "fogColor": hexrgb(HAZE), "volumeDensity": 0.00085,
+        "volumeMaxDistance": 0.0, "fogSky": 1.0, "fogSkyDistance": 900.0,
         "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb(SKY_ZENITH), "horizonColor": hexrgb(SKY_HORIZON),
-                "groundColor": hexrgb(SKY_HORIZON), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": hexrgb(SKY_HORIZON), "haze": 0.42, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    for prog in (land_program(), flat_program("ctFlat"), river_program(), sky_program()):
+    for prog in (land_program(), flat_program("ctFlat"), river_program()):
         s.program(prog)
-
-    s.proc("dome", {"kind": "sphere", "radius": 1000.0, "segments": 64, "rings": 32},
-           material=unlit("#000000", 0.0, "ctSky", double=True),
-           transform={"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [6.0, 6.0, 6.0]})
 
     # the land breathes: a slow swell rolling outward from the camera (a sine train, 700 m long, at 90 m/s)
     s.nodes.append({"name": "swell", "kind": "field", "field": {
