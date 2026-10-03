@@ -35,7 +35,7 @@ ABSTRACT = [
     "cel_dream",                # 3 Cel-Shaded Dream World: Candy Archipelago
     "color_geometry",           # 4 Infinite Color Geometry: Chromatic Corridor
     "organic_garden",           # 5 Organic Digital Garden: Lantern Reef
-    # 6 digital_alpine           Digital Alpine (07-brief-digital-alpine.md): being built
+    "digital_alpine",           # 6 Digital Alpine: Glass Caldera (07-brief-digital-alpine.md)
     # 7 chromatic_topography     Chromatic Topography (05-brief-direction-correction.md): being built
     # 8 glitch_signal            Glitch Signal (06-brief-glitch-signal.md): being built
     # 9 bit_ocean                8-Bit Ocean (08-brief-8bit-ocean.md): being built
