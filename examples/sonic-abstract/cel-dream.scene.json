@@ -2841,6 +2841,906 @@
    }
   },
   {
+   "name": "whale",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 24,
+     "rings": 14
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.5,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    9.0,
+    19.5,
+    -48.0
+   ],
+   "rotation": [
+    0.0,
+    -24.0,
+    4.0
+   ],
+   "scale": [
+    14.96,
+    6.8,
+    7.14
+   ]
+  },
+  {
+   "name": "whaleBelly",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 22,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.05,
+    -0.2,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.93,
+    0.78,
+    0.92
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleTail",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 10
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    -0.92,
+    0.12,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    8.0
+   ],
+   "scale": [
+    0.42,
+    0.42,
+    0.42
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleFluke",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveColor": [
+      0.47353,
+      0.38133,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    -1.22,
+    0.24,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    14.0
+   ],
+   "scale": [
+    0.2,
+    0.08,
+    0.95
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleFinL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 14,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.15,
+    -0.55,
+    0.78
+   ],
+   "rotation": [
+    24.0,
+    0.0,
+    -18.0
+   ],
+   "scale": [
+    0.26,
+    0.07,
+    0.3
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleFinR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 14,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveColor": [
+      1.0,
+      0.69387,
+      0.80695
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.15,
+    -0.55,
+    -0.78
+   ],
+   "rotation": [
+    -24.0,
+    0.0,
+    -18.0
+   ],
+   "scale": [
+    0.26,
+    0.07,
+    0.3
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleEyeL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.62,
+    0.12,
+    0.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.075,
+    0.16,
+    0.16
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleEyeR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.73791
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.62,
+    0.12,
+    -0.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.075,
+    0.16,
+    0.16
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleBlushL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 12,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.72,
+    -0.12,
+    0.72
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.06,
+    0.06,
+    0.1
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleBlushR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 12,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveColor": [
+      1.0,
+      0.34191,
+      0.55201
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.72,
+    -0.12,
+    -0.72
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.06,
+    0.06,
+    0.1
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whaleMouth",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 14,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.10224,
+      0.02315,
+      0.10224
+     ],
+     "emissiveColor": [
+      0.10224,
+      0.02315,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.72,
+      "rimWidth": 0.12,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.9,
+      "specular": 0.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.86,
+    -0.26,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    -10.0
+   ],
+   "scale": [
+    0.12,
+    0.02,
+    0.5
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whalePupilL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02624,
+      0.00802,
+      0.05127
+     ],
+     "emissiveColor": [
+      0.02624,
+      0.00802,
+      0.05127
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.9,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 1.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.64,
+    0.12,
+    0.86
+   ],
+   "scale": [
+    0.04,
+    0.085,
+    0.085
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "whalePupilR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02624,
+      0.00802,
+      0.05127
+     ],
+     "emissiveColor": [
+      0.02624,
+      0.00802,
+      0.05127
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 1,
+      "softness": 0.015,
+      "terminator": 0.05,
+      "shadowColor": [
+       0.62,
+       0.5,
+       0.95
+      ],
+      "ambient": 0.9,
+      "rimWidth": 0.0,
+      "rimColor": [
+       1.0,
+       0.87137,
+       0.95597
+      ],
+      "rimIntensity": 0.0,
+      "specular": 1.0,
+      "specularSize": 0.12
+     }
+    }
+   },
+   "position": [
+    0.64,
+    0.12,
+    -0.86
+   ],
+   "scale": [
+    0.04,
+    0.085,
+    0.085
+   ],
+   "parent": "whale"
+  },
+  {
+   "name": "spout",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 1500,
+    "seed": 33,
+    "shape": "sphere",
+    "position": [
+     11.0,
+     26.3,
+     -48.0
+    ],
+    "extent": [
+     0.3,
+     0.3,
+     0.3
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 1.0,
+    "lifetimeMax": 1.6,
+    "spread": 0.25,
+    "speedMin": 6.0,
+    "speedMax": 9.0,
+    "gravity": [
+     0,
+     -7.0,
+     0
+    ],
+    "drag": 0.6,
+    "sizeStart": 0.35,
+    "sizeEnd": 0.15,
+    "colorStart": [
+     1.0,
+     1.0,
+     1.0,
+     0.95
+    ],
+    "colorEnd": [
+     0.50888,
+     0.80695,
+     1.0,
+     0.0
+    ],
+    "emissive": 1.0,
+    "blend": "alpha"
+   }
+  },
+  {
    "name": "stem",
    "kind": "procedural",
    "procedural": {

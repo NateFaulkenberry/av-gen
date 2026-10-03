@@ -1107,6 +1107,41 @@
    }
   },
   {
+   "source": "response.bass",
+   "target": "nodes/whale/scale",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/spout/burst",
+   "amount": 160.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "nodes/whaleMouth/scale",
+   "amount": 0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "control.modwheel",
    "target": "lights/sun/intensity",
    "amount": -2.4,
@@ -1149,6 +1184,133 @@
   "enabled": true,
   "cues": [],
   "tracks": [
+   {
+    "target": "nodes/whale/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "interp": "smooth",
+      "value": [
+       9.0,
+       19.5,
+       -48.0
+      ]
+     },
+     {
+      "time": 7.5,
+      "interp": "smooth",
+      "value": [
+       13.5,
+       21.405,
+       -47.196
+      ]
+     },
+     {
+      "time": 15.0,
+      "interp": "smooth",
+      "value": [
+       16.794,
+       21.405,
+       -45.0
+      ]
+     },
+     {
+      "time": 22.5,
+      "interp": "smooth",
+      "value": [
+       18.0,
+       19.5,
+       -42.0
+      ]
+     },
+     {
+      "time": 30.0,
+      "interp": "smooth",
+      "value": [
+       16.794,
+       17.595,
+       -39.0
+      ]
+     },
+     {
+      "time": 37.5,
+      "interp": "smooth",
+      "value": [
+       13.5,
+       17.595,
+       -36.804
+      ]
+     },
+     {
+      "time": 45.0,
+      "interp": "smooth",
+      "value": [
+       9.0,
+       19.5,
+       -36.0
+      ]
+     },
+     {
+      "time": 52.5,
+      "interp": "smooth",
+      "value": [
+       4.5,
+       21.405,
+       -36.804
+      ]
+     },
+     {
+      "time": 60.0,
+      "interp": "smooth",
+      "value": [
+       1.206,
+       21.405,
+       -39.0
+      ]
+     },
+     {
+      "time": 67.5,
+      "interp": "smooth",
+      "value": [
+       0.0,
+       19.5,
+       -42.0
+      ]
+     },
+     {
+      "time": 75.0,
+      "interp": "smooth",
+      "value": [
+       1.206,
+       17.595,
+       -45.0
+      ]
+     },
+     {
+      "time": 82.5,
+      "interp": "smooth",
+      "value": [
+       4.5,
+       17.595,
+       -47.196
+      ]
+     },
+     {
+      "time": 90.0,
+      "interp": "smooth",
+      "value": [
+       9.0,
+       19.5,
+       -48.0
+      ]
+     }
+    ]
+   },
    {
     "target": "camera/position",
     "component": -1,

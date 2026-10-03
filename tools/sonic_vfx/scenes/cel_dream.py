@@ -185,11 +185,61 @@ def instrument(s):
         s.route(R("polyphony", "procedural/%s/distribution/count" % node, 16.0, attackMs=0, decayMs=900))
     for k in range(len(RAINBOW)):
         s.route(R("held", "procedural/rainbow%d/transform/scale" % k, 1.0, delayMs=60 * k, **MEDIUM))
+    # ---- THE SKY-WHALE: it breathes on the bass, spouts on the snare, sings while notes are held
+    s.route(R("bass", "nodes/whale/scale", 0.5, comp=1, attackMs=60, decayMs=500),
+            R("snare", "particles/spout/burst", 160.0, threshold="binary", thresholdLevel=0.05),
+            R("held", "nodes/whaleMouth/scale", 0.16, comp=1, **MEDIUM))
     # ---- MOD WHEEL: day to night
     wheel = s.modwheel()
     s.route(R(wheel, "lights/sun/intensity", -2.4, attackMs=80, decayMs=80),
             R(wheel, "env/sky/zenithColor", 1.0, op="multiply", gain=-0.75, offset=1.0, attackMs=80, decayMs=80),
             R(wheel, "env/sky/horizonColor", 1.0, op="multiply", gain=-0.6, offset=1.0, attackMs=80, decayMs=80))
+
+
+WHALE = (9.0, 19.5, -48.0)      # the sky-whale's home in the open sky, left of the planet
+WHALE_SCALE = 3.4
+
+
+def sky_whale(s):
+    """A pastel sky-whale (a strange creature at sky scale): a body node and its belly, tail, flukes, fins, eyes,
+    blush and mouth as children, so one node moves, turns and breathes the whole whale. It faces +X."""
+    body_col, belly_col = "#b7a6ff", "#ffd9e8"
+    s.proc("whale", sphere(1.0, 24, 14), material=toon(body_col, rim=0.2, spec=0.5),
+           position=WHALE, rotation=(0.0, -24.0, 4.0), scale=(WHALE_SCALE * 4.4, WHALE_SCALE * 2.0, WHALE_SCALE * 2.1))
+    # children are in the body's unit-sphere frame (its scale divides them back): offsets as fractions of the body
+    kids = [
+        ("whaleBelly", sphere(1.0, 22, 12), belly_col, (0.05, -0.2, 0.0), (0.0, 0.0, 0.0), (0.93, 0.78, 0.92)),
+        ("whaleTail", sphere(1.0, 16, 10), body_col, (-0.92, 0.12, 0.0), (0.0, 0.0, 8.0), (0.42, 0.42, 0.42)),
+        ("whaleFluke", sphere(1.0, 16, 8), body_col, (-1.22, 0.24, 0.0), (0.0, 0.0, 14.0), (0.2, 0.08, 0.95)),
+        ("whaleFinL", sphere(1.0, 14, 8), belly_col, (0.15, -0.55, 0.78), (24.0, 0.0, -18.0), (0.26, 0.07, 0.3)),
+        ("whaleFinR", sphere(1.0, 14, 8), belly_col, (0.15, -0.55, -0.78), (-24.0, 0.0, -18.0), (0.26, 0.07, 0.3)),
+        ("whaleEyeL", sphere(1.0, 12, 8), CREAM, (0.62, 0.12, 0.8), (0.0, 0.0, 0.0), (0.075, 0.16, 0.16)),
+        ("whaleEyeR", sphere(1.0, 12, 8), CREAM, (0.62, 0.12, -0.8), (0.0, 0.0, 0.0), (0.075, 0.16, 0.16)),
+        ("whaleBlushL", sphere(1.0, 12, 6), "#ff9ec4", (0.72, -0.12, 0.72), (0.0, 0.0, 0.0), (0.06, 0.06, 0.1)),
+        ("whaleBlushR", sphere(1.0, 12, 6), "#ff9ec4", (0.72, -0.12, -0.72), (0.0, 0.0, 0.0), (0.06, 0.06, 0.1)),
+        ("whaleMouth", sphere(1.0, 14, 6), "#5a2a5a", (0.86, -0.26, 0.0), (0.0, 0.0, -10.0), (0.12, 0.02, 0.5)),
+    ]
+    for name, src, col, pos, rot, sc in kids:
+        s.proc(name, src, material=toon(col, rim=0.12, ambient=0.72), position=pos, rotation=rot, scale=sc,
+               parent="whale")
+    for side in ("L", "R"):
+        s.proc("whalePupil" + side, sphere(1.0, 10, 6), material=toon("#2d1640", bands=1, ambient=0.9, spec=1.0),
+               position=(0.64, 0.12, 0.86 if side == "L" else -0.86), scale=(0.04, 0.085, 0.085), parent="whale")
+    # it swims a slow loop through the sky (a minute and a half), rising and dipping
+    keys = []
+    for i in range(13):
+        u = i / 12.0
+        a = 2.0 * math.pi * u
+        keys.append({"time": round(90.0 * u, 3), "interp": "smooth",
+                     "value": [round(WHALE[0] + 9.0 * math.sin(a), 3), round(WHALE[1] + 2.2 * math.sin(2.0 * a), 3),
+                               round(WHALE[2] + 6.0 * (1.0 - math.cos(a)), 3)]})
+    s.track("nodes/whale/position", keys, loop=90.0)
+    # the spout (the snare)
+    s.particles("spout", capacity=1500, seed=33, shape="sphere", position=[WHALE[0] + 2.0, WHALE[1] + 6.8, WHALE[2]],
+                extent=[0.3, 0.3, 0.3], direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=1.0, lifetimeMax=1.6,
+                spread=0.25, speedMin=6.0, speedMax=9.0, gravity=[0, -7.0, 0], drag=0.6, sizeStart=0.35,
+                sizeEnd=0.15, colorStart=hexrgb("#ffffff") + [0.95], colorEnd=hexrgb("#bde8ff") + [0.0], emissive=1.0,
+                blend="alpha")
 
 
 def build():
@@ -241,6 +291,8 @@ def build():
                variation={"seed": seed, "randomScale": [0.35, 0.3, 0.35], "randomPosition": [6.0, 1.5, 7.0]},
                material=toon(CLOUD, bands=1, ambient=0.86, rim=0.15),
                transform=at(20.0, -18.0 + dy, -70.0), extra={"sourceTransform": {"scale": [1.0, sy, 0.85]}})
+
+    sky_whale(s)
 
     # ---- the giant flower (left of centre, behind the creatures): a curved stem, eight petals, a butter heart
     stem = {"kind": "tube", "tubeRadius": 0.22, "tubeTaper": 0.7, "tubeSides": 7, "tubeSegments": 20,
