@@ -6887,7 +6887,18 @@ void Application::serviceLiveQuality() {
         liveQualityBase_ = renderer_->qualitySettings();
         haveLiveQualityBase_ = true;
     }
-    const auto pinned = livePinnedQuality();
+    auto pinned = livePinnedQuality();
+    // TEMPORARY (live-quality measurement, not for main): AVGEN_X_LQ_SWEEP=<n> pins the ladder and walks
+    // it 0,1,2,3,4,3,2,1,0,... every n frames, so each rung's cost and each transition's hitch can be read
+    // off one run's per-frame CSV.
+    {
+        static const int probeSweep = std::getenv("AVGEN_X_LQ_SWEEP") != nullptr ? std::atoi(std::getenv("AVGEN_X_LQ_SWEEP")) : 0;
+        static std::uint64_t probeFrame = 0;
+        if (probeSweep > 0) {
+            static constexpr int kWalk[] = {0, 1, 2, 3, 4, 3, 2, 1};
+            pinned = static_cast<LiveQualityLevel>(kWalk[(probeFrame++ / static_cast<std::uint64_t>(probeSweep)) % 8]);
+        }
+    }
     const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
     const AppliedLiveQuality now{true, rung, want.strategy, want.scaleFloor};
     const bool moved = !appliedLiveQuality_.valid || appliedLiveQuality_.rung != now.rung ||
