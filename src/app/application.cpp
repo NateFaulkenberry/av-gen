@@ -6757,7 +6757,10 @@ void Application::startProjection() {
     if (panel_ == nullptr || !context_ || !shaders_) {
         return;
     }
-    switch (projection_.start(projectIsLive())) {
+    // TEMPORARY (live-projection investigation): AVGEN_X_PROJECT_ANY projects the open project as it is,
+    // instead of swapping in the Sonic Live demo, so a non-Sonic scene can be measured through the real output.
+    static const bool probeProjectAny = std::getenv("AVGEN_X_PROJECT_ANY") != nullptr;
+    switch (projection_.start(projectIsLive() || probeProjectAny)) {
     case Projection::Action::OpenLiveDemo:
         if (liveDemoPath_.empty()) {
             projection_.failed("Projection not started: the Sonic Live example was not found.");
@@ -6784,14 +6787,20 @@ void Application::stopProjection() {
 
 void Application::openProjectionWindow() {
     // The projection is of the live world: live input on, whichever way the project arrived.
-    if (engine_->mode() == EngineMode::Live && !engine_->liveSonic()) {
+    if (engine_->mode() == EngineMode::Live && !engine_->liveSonic() &&
+        std::getenv("AVGEN_X_PROJECT_ANY") == nullptr) { // TEMPORARY: live-projection investigation
         if (auto r = engine_->setLiveSonic(true); !r) {
             log::warn("projection: live input: {}", r.error().message);
         }
     }
     projectionDisplays_ = connectedProjectionDisplays();
     projectionLastScan_ = std::chrono::steady_clock::now();
-    const OutputDesc desc = makeProjectionOutput(settings_.projection, projectionDisplays_);
+    AppSettings::Projection probeProjection = settings_.projection; // TEMPORARY: live-projection investigation
+    if (const char* w = std::getenv("AVGEN_X_PROJ_W"), *h = std::getenv("AVGEN_X_PROJ_H"); w != nullptr && h != nullptr) {
+        probeProjection.windowWidth = static_cast<std::uint32_t>(std::atoi(w));  // points
+        probeProjection.windowHeight = static_cast<std::uint32_t>(std::atoi(h));
+    }
+    const OutputDesc desc = makeProjectionOutput(probeProjection, projectionDisplays_);
     const ProjectionDisplayChoice choice = chooseProjectionDisplay(projectionDisplays_, settings_.projection.display);
     outputs_.remove(kProjectionOutputName);
     auto added = outputs_.add(desc);
