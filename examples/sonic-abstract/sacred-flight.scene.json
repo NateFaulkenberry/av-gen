@@ -20,9 +20,9 @@
  "environment": {
   "intensity": 0.0,
   "background": [
-   0.00182,
-   0.00182,
-   0.01161
+   0.00478,
+   0.00368,
+   0.0331
   ],
   "fogColor": [
    0.00478,
@@ -35,19 +35,19 @@
   "sky": {
    "enabled": true,
    "zenithColor": [
-    0.00182,
-    0.00182,
-    0.01161
+    0.00478,
+    0.00368,
+    0.0331
    ],
    "horizonColor": [
-    0.00182,
-    0.00182,
-    0.01161
+    0.00478,
+    0.00368,
+    0.0331
    ],
    "groundColor": [
-    0.00182,
-    0.00182,
-    0.01161
+    0.00478,
+    0.00368,
+    0.0331
    ],
    "haze": 0.35,
    "sunIntensity": 0.0,
@@ -65,16 +65,16 @@
      "kind": "torus",
      "majorRadius": 9.0,
      "minorRadius": 0.1,
-     "majorSegments": 192,
-     "minorSegments": 6
+     "majorSegments": 128,
+     "minorSegments": 5
     },
     "distribution": {
      "kind": "linear",
-     "count": 27,
+     "count": 23,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -135,16 +135,16 @@
      "kind": "torus",
      "majorRadius": 9.7,
      "minorRadius": 0.035,
-     "majorSegments": 192,
-     "minorSegments": 4
+     "majorSegments": 128,
+     "minorSegments": 3
     },
     "distribution": {
      "kind": "linear",
-     "count": 27,
+     "count": 23,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -210,11 +210,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -280,11 +280,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -345,16 +345,16 @@
      "kind": "torus",
      "majorRadius": 4.5,
      "minorRadius": 0.035,
-     "majorSegments": 128,
-     "minorSegments": 4
+     "majorSegments": 96,
+     "minorSegments": 3
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -415,16 +415,16 @@
      "kind": "torus",
      "majorRadius": 3.0,
      "minorRadius": 0.035,
-     "majorSegments": 128,
-     "minorSegments": 4
+     "majorSegments": 96,
+     "minorSegments": 3
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -322.0
+      -266.0
      ],
      "end": [
       0.0,
@@ -523,8 +523,8 @@
     "source": {
      "kind": "sphere",
      "radius": 0.2,
-     "segments": 12,
-     "rings": 8
+     "segments": 8,
+     "rings": 5
     },
     "distribution": {
      "kind": "radial",
@@ -560,8 +560,8 @@
      "kind": "torus",
      "majorRadius": 3.0,
      "minorRadius": 0.045,
-     "majorSegments": 128,
-     "minorSegments": 4
+     "majorSegments": 72,
+     "minorSegments": 3
     },
     "distribution": {
      "kind": "radial",
@@ -601,11 +601,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -661,11 +661,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 14,
+     "count": 12,
      "start": [
       0.0,
       0.0,
-      -322.0
+      -266.0
      ],
      "end": [
       0.0,
@@ -721,11 +721,11 @@
     },
     "distribution": {
      "kind": "linear",
-     "count": 27,
+     "count": 23,
      "start": [
       0.0,
       0.0,
-      -336.0
+      -280.0
      ],
      "end": [
       0.0,
@@ -780,7 +780,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -790,7 +790,7 @@
       "start": [
        5.51091059616309e-16,
        9.0,
-       -356.0
+       -300.0
       ],
       "end": [
        5.51091059616309e-16,
@@ -855,7 +855,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -865,7 +865,7 @@
       "start": [
        4.500000000000001,
        7.794228634059947,
-       -356.0
+       -300.0
       ],
       "end": [
        4.500000000000001,
@@ -930,7 +930,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -940,7 +940,7 @@
       "start": [
        7.794228634059948,
        4.499999999999999,
-       -356.0
+       -300.0
       ],
       "end": [
        7.794228634059948,
@@ -1005,7 +1005,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1015,7 +1015,7 @@
       "start": [
        9.0,
        0.0,
-       -356.0
+       -300.0
       ],
       "end": [
        9.0,
@@ -1080,7 +1080,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1090,7 +1090,7 @@
       "start": [
        7.794228634059948,
        -4.499999999999999,
-       -356.0
+       -300.0
       ],
       "end": [
        7.794228634059948,
@@ -1155,7 +1155,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1165,7 +1165,7 @@
       "start": [
        4.500000000000001,
        -7.794228634059947,
-       -356.0
+       -300.0
       ],
       "end": [
        4.500000000000001,
@@ -1230,7 +1230,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1240,7 +1240,7 @@
       "start": [
        5.51091059616309e-16,
        -9.0,
-       -356.0
+       -300.0
       ],
       "end": [
        5.51091059616309e-16,
@@ -1305,7 +1305,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1315,7 +1315,7 @@
       "start": [
        -4.499999999999998,
        -7.794228634059948,
-       -356.0
+       -300.0
       ],
       "end": [
        -4.499999999999998,
@@ -1380,7 +1380,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1390,7 +1390,7 @@
       "start": [
        -7.794228634059948,
        -4.499999999999999,
-       -356.0
+       -300.0
       ],
       "end": [
        -7.794228634059948,
@@ -1455,7 +1455,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1465,7 +1465,7 @@
       "start": [
        -9.0,
        -1.102182119232618e-15,
-       -356.0
+       -300.0
       ],
       "end": [
        -9.0,
@@ -1530,7 +1530,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1540,7 +1540,7 @@
       "start": [
        -7.794228634059947,
        4.500000000000001,
-       -356.0
+       -300.0
       ],
       "end": [
        -7.794228634059947,
@@ -1605,7 +1605,7 @@
      "tubeRadius": 0.04,
      "tubeTaper": 1.0,
      "tubeSides": 5,
-     "tubeSegments": 400,
+     "tubeSegments": 260,
      "tubeTwist": 0.0,
      "tubeCaps": false,
      "curve": {
@@ -1615,7 +1615,7 @@
       "start": [
        -4.5000000000000036,
        7.794228634059945,
-       -356.0
+       -300.0
       ],
       "end": [
        -4.5000000000000036,
@@ -1679,16 +1679,16 @@
      "kind": "torus",
      "majorRadius": 34.0,
      "minorRadius": 0.3,
-     "majorSegments": 256,
-     "minorSegments": 6
+     "majorSegments": 160,
+     "minorSegments": 4
     },
     "distribution": {
      "kind": "linear",
-     "count": 7,
+     "count": 6,
      "start": [
       0.0,
       0.0,
-      -308.0
+      -252.0
      ],
      "end": [
       0.0,
@@ -1747,7 +1747,7 @@
    "procedural": {
     "source": {
      "kind": "cylinder",
-     "radius": 700.0,
+     "radius": 120.0,
      "height": 1.0,
      "radialSegments": 128,
      "caps": true
@@ -1759,7 +1759,7 @@
      "position": [
       0.0,
       0.0,
-      -366.0
+      -310.0
      ],
      "rotation": [
       90.0,
@@ -1871,10 +1871,10 @@
      "kind": "constant",
      "dst": 2,
      "constant": [
-      396.0,
-      396.0,
-      396.0,
-      396.0
+      340.0,
+      340.0,
+      340.0,
+      340.0
      ]
     },
     {
@@ -1960,7 +1960,7 @@
       1.0,
       0.0
      ],
-     "value": 2.040816326530612e-06
+     "value": 6.944444444444444e-05
     },
     {
      "kind": "power",
@@ -1984,7 +1984,7 @@
      "kind": "power",
      "dst": 2,
      "srcA": 1,
-     "value": 45.0
+     "value": 8.0
     },
     {
      "kind": "constant",
@@ -2006,7 +2006,7 @@
      "kind": "power",
      "dst": 4,
      "srcA": 1,
-     "value": 600.0
+     "value": 100.0
     },
     {
      "kind": "constant",
@@ -2034,7 +2034,7 @@
      "kind": "power",
      "dst": 4,
      "srcA": 1,
-     "value": 7.0
+     "value": 1.4
     },
     {
      "kind": "constant",

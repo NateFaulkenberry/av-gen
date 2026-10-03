@@ -496,17 +496,6 @@
   },
   {
    "source": "beat.pulse",
-   "target": "material/boFloor/op/10/constant/constant",
-   "amount": 0.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 220
-   }
-  },
-  {
-   "source": "beat.pulse",
    "target": "procedural/jellies/transform/scale",
    "amount": 0.14,
    "op": "add",
@@ -3864,7 +3853,7 @@
     "bell flowers",
     "the coin trail"
    ],
-   "atmosphere": "blue depth haze in each area's own water colour; caustics on the floor; light shafts",
+   "atmosphere": "blue depth haze in each area's own water colour; light shafts; bubbles",
    "post": "a soft bloom; nothing pixelated",
    "camera": "a playful swim along the ring, bobbing and swaying"
   },
@@ -3930,7 +3919,7 @@
    [
     "beat",
     "beat.pulse",
-    "the caustics pulse; the jellies pump"
+    "the jellies pump"
    ],
    [
     "brightness",

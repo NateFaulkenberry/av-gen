@@ -291,9 +291,11 @@ def prism(base, radius, height, sides=6, tip=0.35, seed=0, lean=(0.0, 0.0)):
     return tris
 
 
-def voxels(cells, size=1.0, origin=(0.0, 0.0, 0.0)):
+def voxels(cells, size=1.0, origin=(0.0, 0.0, 0.0), keep=None):
     """Integer cells {(i, j, k)} -> the faceted faces between a filled cell and an empty neighbour (the 8-bit block
-    look: every face flat, nothing hidden drawn). A cell spans [i, i+1] x [j, j+1] x [k, k+1] times `size`."""
+    look: every face flat, nothing hidden drawn). A cell spans [i, i+1] x [j, j+1] x [k, k+1] times `size`. `keep`
+    (i, j, k) -> bool emits only some cells' faces while every cell still hides its neighbours' (a checker split into
+    two meshes without doubling the faces between them)."""
     cells = set(cells)
     ox, oy, oz = origin
     s = size
@@ -305,6 +307,8 @@ def voxels(cells, size=1.0, origin=(0.0, 0.0, 0.0)):
              ((0, 0, 1), [(0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)]),
              ((0, 0, -1), [(1, 0, 0), (0, 0, 0), (0, 1, 0), (1, 1, 0)])]
     for (i, j, k) in cells:
+        if keep is not None and not keep(i, j, k):
+            continue
         for (dx, dy, dz), quad in faces:
             if (i + dx, j + dy, k + dz) in cells:
                 continue

@@ -672,7 +672,7 @@
   {
    "source": "response.kick",
    "target": "material/sgfWave/op/3/constant/constant",
-   "amount": -396.0,
+   "amount": -340.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1648,7 +1648,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/gateCircle/distribution/count",
-   "amount": 26.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1659,7 +1659,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/gateRim/distribution/count",
-   "amount": 26.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1670,7 +1670,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/beads/distribution/count",
-   "amount": 26.0,
+   "amount": 22.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1681,7 +1681,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/starTriA/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1692,7 +1692,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/starTriB/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1703,7 +1703,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/starInner/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1714,7 +1714,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/spokes/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1725,7 +1725,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/roseInner/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1736,7 +1736,7 @@
   {
    "source": "response.intensity",
    "target": "procedural/roses/distribution/count",
-   "amount": 13.0,
+   "amount": 11.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {

@@ -38,7 +38,7 @@ VERMILION = "#ff4a24"
 SUN = "#ffb54a"
 
 BAY = 14.0                 # metres between gates
-BAYS = 26                  # bays from the far end to the near end (even: the gates alternate star and rose)
+BAYS = 22                  # bays from the far end to the near end (even: the gates alternate star and rose)
 BAY_SECONDS = 1.9          # the flight: one bay every 1.9 s (7.4 m/s)
 PAIR = 2.0 * BAY           # the repeating module: a star gate and a rose gate
 PERIOD = 2.0 * BAY_SECONDS
@@ -172,14 +172,14 @@ def end_light_program(radius):
             {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [1.0, 0.0, 1.0, 0.0], "value": 1.0 / radius ** 2},
             {"kind": "power", "dst": 1, "srcA": 1, "value": 0.5},
             {"kind": "remap", "dst": 1, "srcA": 1, "value": 1, "constant": [0.0, 1.0, 1.0, 0.0]},   # 1 centre, 0 rim
-            {"kind": "power", "dst": 2, "srcA": 1, "value": 45.0},
+            {"kind": "power", "dst": 2, "srcA": 1, "value": 8.0},
             {"kind": "constant", "dst": 3, "constant": hexrgb(SUN, 24.0) + [1.0]},
             {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
-            {"kind": "power", "dst": 4, "srcA": 1, "value": 600.0},
+            {"kind": "power", "dst": 4, "srcA": 1, "value": 100.0},
             {"kind": "constant", "dst": 5, "constant": hexrgb("#fff6e6", 300.0) + [1.0]},
             {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
             {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
-            {"kind": "power", "dst": 4, "srcA": 1, "value": 7.0},
+            {"kind": "power", "dst": 4, "srcA": 1, "value": 1.4},
             {"kind": "constant", "dst": 5, "constant": hexrgb("#7a3a8c", 1.4) + [1.0]},
             {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
             {"kind": "add", "dst": 2, "srcA": 2, "srcB": 4},
@@ -194,12 +194,12 @@ def end_light_program(radius):
 # two triangles have their six vertices on the rim at 30 + 60k degrees and its inner circle touches the hexagon their
 # crossings make; the rose's inner circle is the open heart its six circles leave.
 GATE = [
-    ("gateCircle", torus(R_OUT, 0.1, 192, 6), GOLD, 2.4, 0.0, gates),
-    ("gateRim", torus(R_OUT + 0.7, 0.035, 192, 4), PALE_GOLD, 1.2, 0.0, gates),
+    ("gateCircle", torus(R_OUT, 0.1, 128, 5), GOLD, 2.4, 0.0, gates),
+    ("gateRim", torus(R_OUT + 0.7, 0.035, 128, 3), PALE_GOLD, 1.2, 0.0, gates),
     ("starTriA", torus(R_OUT, 0.05, 3, 4), GOLD, 1.8, 90.0, stars),
     ("starTriB", torus(R_OUT, 0.05, 3, 4), GOLD, 1.8, 30.0, stars),
-    ("starInner", torus(R_CORE, 0.035, 128, 4), PALE_GOLD, 1.0, 0.0, stars),
-    ("roseInner", torus(R_ROSE, 0.035, 128, 4), PALE_GOLD, 1.0, 0.0, roses),
+    ("starInner", torus(R_CORE, 0.035, 96, 3), PALE_GOLD, 1.0, 0.0, stars),
+    ("roseInner", torus(R_ROSE, 0.035, 96, 3), PALE_GOLD, 1.0, 0.0, roses),
 ]
 GATE_PARTS = [g[0] for g in GATE] + ["spokes", "beads", "roses"]
 STAR_PARTS = ["starTriA", "starTriB", "starInner", "spokes"]
@@ -292,10 +292,10 @@ def build():
     # a uniform dark sky (the sky's own sun glows only above its horizon, which drew a horizon across the passage); the
     # light at the end is geometry. The fog dims the far gates, so near the end they stand dark against the light.
     s.environment = {
-        "intensity": 0.0, "background": hexrgb(INK), "fogColor": hexrgb(HAZE), "volumeDensity": 0.0042,
+        "intensity": 0.0, "background": hexrgb(HAZE), "fogColor": hexrgb(HAZE), "volumeDensity": 0.0042,
         "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb(INK), "horizonColor": hexrgb(INK),
-                "groundColor": hexrgb(INK), "haze": 0.35, "sunIntensity": 0.0, "intensity": 1.0,
+        "sky": {"enabled": True, "zenithColor": hexrgb(HAZE), "horizonColor": hexrgb(HAZE),
+                "groundColor": hexrgb(HAZE), "haze": 0.35, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     s.program(wave_program())
@@ -311,10 +311,10 @@ def build():
            distribution={"kind": "radial", "count": 12, "radius": (R_OUT + R_CORE) * 0.5, "plane": "xy",
                          "orientation": "outward"},
            material=glow(PALE_GOLD, 1.2))
-    s.proc("beadRing", {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
+    s.proc("beadRing", {"kind": "sphere", "radius": 0.2, "segments": 8, "rings": 5},
            distribution={"kind": "radial", "count": 12, "radius": R_OUT, "plane": "xy", "orientation": "outward"},
            material=glow(IVORY, 3.0))
-    s.proc("roseRing", torus(R_ROSE, 0.045, 128, 4),
+    s.proc("roseRing", torus(R_ROSE, 0.045, 72, 3),
            distribution={"kind": "radial", "count": 6, "radius": 2.0 * R_ROSE, "plane": "xy", "orientation": "outward",
                          "startAngle": math.pi / 6.0, "endAngle": math.pi / 6.0 + 2.0 * math.pi},
            material=glow(GOLD, 1.8))
@@ -330,7 +330,7 @@ def build():
         a = rail_angle(k)
         x, y = R_OUT * math.cos(a), R_OUT * math.sin(a)
         s.proc("rail%d" % k, {"kind": "tube", "tubeRadius": 0.04, "tubeTaper": 1.0, "tubeSides": 5,
-                              "tubeSegments": 400, "tubeTwist": 0.0, "tubeCaps": False,
+                              "tubeSegments": 260, "tubeTwist": 0.0, "tubeCaps": False,
                               "curve": {"kind": "polyline", "generator": "line", "count": 2,
                                         "start": [x, y, Z_FAR - 20.0], "end": [x, y, Z_NEAR + 20.0],
                                         "samplesPerSegment": 64, "up": [0.0, 1.0, 0.0]}},
@@ -339,12 +339,12 @@ def build():
     # ---- outside: enormous rings standing in the haze every RING_EVERY bays (their own seamless sawtooth)
     span = RING_EVERY * BAY
     n_rings = int((Z_NEAR - Z_FAR) // span) + 1
-    s.proc("outerRings", torus(34.0, 0.3, 256, 6),
+    s.proc("outerRings", torus(34.0, 0.3, 160, 4),
            distribution=gates(n_rings, Z_NEAR - (n_rings - 1) * span, Z_NEAR),
            material=glow(GOLD, 1.1), deformers=twist(), extra=facing(0.0))
     # the light at the end: a disc just beyond the last gate, a soft gold glow fading to the haze's colour at its rim
     # (opaque, so its rim must match what is around it), with a white-hot core
-    end_r = 700.0
+    end_r = 120.0         # a full-frame disc ran its program on every pixel (10 ms at 1080p); this one covers the glow
     s.program(end_light_program(end_r))
     s.proc("endLight", {"kind": "cylinder", "radius": end_r, "height": 1.0, "radialSegments": 128, "caps": True},
            material=glow(INK, 1.0, program="sgfEnd"),
