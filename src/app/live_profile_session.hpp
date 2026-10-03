@@ -20,6 +20,8 @@ struct Application::LiveProfileSession {
     SteadyStateDetector steady{30, 0.05, 2, 60};
     std::chrono::steady_clock::time_point phaseStart = std::chrono::steady_clock::now();
     int warmFrames = 0;
+    std::uint64_t transitionsSeen = 0; // live level changes already accounted for by the warm-up
+    int lastChangeFrame = 0;
     int waitFrames = 0;
     LiveProfileRecord record;
     std::vector<LiveProfileFrame> frames;

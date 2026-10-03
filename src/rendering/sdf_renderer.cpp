@@ -186,6 +186,7 @@ struct SdfRenderer::Impl {
     std::map<std::uint64_t, std::shared_ptr<Pipelines>> compiledVariants;
     bool asyncCompile = false; // ADR-1102: off by default (offline renders and tests compile before drawing)
     bool prewarm = true;       // ADR-1102: every compile-flagged object compiled as soon as the scene has it
+    double pieceSeconds = 0.0; // the frame's render time, for the compile log
     std::string raymarchSource;
     std::vector<spatial::SdfNodeGpu> compileScratch;
     std::uint32_t compilesThisFrame = 0;
@@ -522,8 +523,8 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     slot.lit = built->lit;
     slot.depth = built->depth;
     slot.shadow = built->shadow;
-    log::info("sdf '{}': compiled tree variant {:016x} ({} node records) in {:.1f} ms", object.name, key,
-              compileScratch.size(),
+    log::info("sdf '{}': compiled tree variant {:016x} ({} node records) at t={:.2f} s in {:.1f} ms on the main thread",
+              object.name, key, compileScratch.size(), pieceSeconds,
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     return &slot;
 }
@@ -689,6 +690,7 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         return;
     }
     ++im.frame;
+    im.pieceSeconds = time.renderTime;
     collectTimings();
     // ADR-1102: the pre-warm. Every object that asks for compilation is compiled as soon as the scene has it --
     // visible or not, on screen or not -- so the variant exists before the frame that first shows it. Live, these

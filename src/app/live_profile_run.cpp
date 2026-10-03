@@ -423,6 +423,7 @@ int Application::runLiveProfileHeadless() {
     auto warmStart = Clock::now();
     SteadyStateDetector steady(20, 0.05, 2, 40);
     int warmFrames = 0;
+    int lastChange = 0;
     while (true) {
         LiveProfileFrame f;
         if (!step(f, nullptr)) {
@@ -453,11 +454,15 @@ int Application::runLiveProfileHeadless() {
                 rung = decision.rung;
                 applyRung(rung);
                 steady = SteadyStateDetector(20, 0.05, 2, 40); // the level moved, so the frame did
+                lastChange = warmFrames;
             }
         }
         const bool settled = steady.note(cost);
         const double elapsed = msSince(warmStart) / 1000.0;
-        if ((settled && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= o.warmupSeconds) {
+        // Auto: still settling if the level moved in the last 60 frames; the cap stretches to three times.
+        const bool moving = automatic && lastChange > 0 && warmFrames - lastChange < 60;
+        const double cap = moving ? 3.0 * o.warmupSeconds : o.warmupSeconds;
+        if ((settled && !moving && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= cap) {
             record.cold.steadyReached = settled;
             break;
         }
@@ -630,10 +635,16 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         const bool settled = s.steady.note(frame.frameMs);
         const double elapsed = msSince(s.phaseStart) / 1000.0;
         // A live level change restarts the settling: the frame moved because the picture did.
-        if (liveTransitions_ != liveTransitionsProfiled_) {
+        if (liveTransitions_ != s.transitionsSeen) {
+            s.transitionsSeen = liveTransitions_;
             s.steady = SteadyStateDetector(30, 0.05, 2, 60);
+            s.lastChangeFrame = s.warmFrames;
         }
-        if ((settled && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= o.warmupSeconds) {
+        // Auto: a level that moved in the last 60 frames is still settling, so the cap stretches (to three times)
+        // rather than measure across a level change.
+        const bool moving = !livePinnedQuality() && s.lastChangeFrame > 0 && s.warmFrames - s.lastChangeFrame < 60;
+        const double cap = moving ? 3.0 * o.warmupSeconds : o.warmupSeconds;
+        if ((settled && !moving && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= cap) {
             s.record.cold.steadyReached = settled;
             s.record.cold.warmupFrames = s.warmFrames;
             s.record.cold.warmupSeconds = elapsed;
@@ -681,10 +692,10 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         fillLiveProfileResources(r, s.stats);
         fillLiveProfileEntities(r);
         r.candidates = optimizationCandidates(candidateInputs(r, renderer_->qualitySettings()));
-        if (liveTransitions_ > 0) {
-            r.notes.push_back(fmt::format("the live level changed {} time(s) during the run; the level at the end "
-                                          "is the one reported",
-                                          liveTransitions_));
+        if (liveTransitions_ > s.transitionsSeen) {
+            r.notes.push_back(fmt::format("the live level changed {} time(s) WHILE MEASURING; the statistics mix "
+                                          "levels and the level at the end is the one reported",
+                                          liveTransitions_ - s.transitionsSeen));
         }
         if (o.verifyCandidates <= 0) {
             s.phase = P::Done;

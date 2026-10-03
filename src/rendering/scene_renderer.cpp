@@ -3715,7 +3715,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const auto litItem = [](const DrawItem& d) { return d.entity != nullptr && !d.entity->material.unlit; };
         bool anyLit = std::any_of(opaque.begin(), opaque.end(), litItem) ||
                       std::any_of(blended.begin(), blended.end(), litItem) ||
-                      std::any_of(grid.begin(), grid.end(), litItem) || !water.empty() || stats_.volume.steps > 0;
+                      std::any_of(grid.begin(), grid.end(), litItem) || !water.empty() || stats_.volume.steps > 0 ||
+                      VolumeRenderer::enabled(scene);
         for (const auto& p : scene.procedurals) {
             anyLit = anyLit || !p.material.unlit;
         }

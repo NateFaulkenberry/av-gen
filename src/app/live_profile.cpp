@@ -517,8 +517,9 @@ std::vector<LiveProfileCandidate> optimizationCandidates(const CandidateInputs& 
             const bool blur = std::string_view(id) == "motion-blur";
             add({std::string(id) + "-taps", title, cost,
                  "half the gather taps (postEffectQuality 0.5): motion blur's samples, depth of field's tap cap",
-                 "posttaps", blur ? cost * 0.25 : 0.0, blur ? cost * 0.45 : cost * 0.4,
-                 blur ? "the reconstruction's gather is most of the pass; its tile passes are not touched"
+                 "posttaps", 0.0, blur ? cost * 0.1 : cost * 0.4,
+                 blur ? "measured on Liminal at 1080p: half the samples saved 0.2 of 4.7 ms (inside the noise); the "
+                        "pass is bound by its tile and bandwidth work, not its taps"
                       : "only the physical defocus scales its taps with the blur; a plain disc keeps 24",
                  "low"});
         }
@@ -649,6 +650,9 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
         }
         record.passMedians.clear();
         for (auto& [label, v] : byLabel) {
+            // A frame without the label paid 0 for it (the pass did not run): a median over only the frames that ran
+            // it would report a pass the level switched off as if it still cost what it did before.
+            v.resize(frames.size(), 0.0);
             record.passMedians.push_back({label, medianOf(v)});
         }
         std::stable_sort(record.passMedians.begin(), record.passMedians.end(),
