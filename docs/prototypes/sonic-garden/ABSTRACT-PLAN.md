@@ -452,7 +452,12 @@ bend and banking into it, and twice a period rises from 64 m to over 300 m above
 **Structural parameters.** Band count and heights, contour spacing, the land's vertical scale, the river's level.
 
 **As built (2026-10-03).** As planned; the first look was a canyon (walls everywhere), so the outer walls were lowered and
-the glide given its rise over the hills.
+the glide given its rise over the hills. For the live frame rate (the land covers the frame and every pixel of it runs
+the program): the air is the engine's analytic fog taking the sky's colour (`fogSky`), not a program; the land is a
+grid that follows the valley (dense on the floor and banks, 75 m apart on the far hills: half the triangles of a
+uniform grid); the bands are found four thresholds at a time (a 24-op program); and the default key light is authored
+without its shadow (every material is unlit). At the live floor (1366x988) the last two steps took it from 18.3 ms to
+14.5.
 
 **Expansion.** A delta of glowing rivers seen from above; terraced islands in a colour-field sea; a night version with
 contour lines of light.
@@ -509,6 +514,10 @@ delays, peak-hold envelopes, springs and integration staging one trigger into th
 | velocity | `notes.lastVelocity` | how hard a note glitches the frame |
 | held | `notes.held` | the fragments hold their light |
 | mod wheel | CC 1 | corruption by hand: blocks, split and sort |
+
+**As built (2026-10-03).** As planned. The block program is 20 ops (one palette op makes the whole noise cylinder, the
+sawtooth rides in its value, the three colours are one ramp), the air is analytic fog, and the default key is authored
+without its shadow: 13.0 ms at the live floor.
 
 **Engine needs.** None for the collapse: it is built from what exists (route delays, envelopes, springs, integration, the
 post-glitch pass). Two notes for the coordinator in `PROGRESS-abstract.md`: a route's delay stage interpolates between

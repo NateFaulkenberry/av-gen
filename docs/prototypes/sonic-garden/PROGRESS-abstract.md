@@ -7,30 +7,39 @@ Brief: `04-brief-abstract-direction.md` (the owner's words govern). Plan: `ABSTR
 (`git commit -- <paths>`), never `assets/`. Push after milestones (`git push origin proto/sonic-garden`). Review media:
 `~/Desktop/av-gen-review/28-sonic-abstract/`.
 
-**Its own project** (the owner's decision, 2026-10-02 18:40): the eight prototypes are "Sonic Abstract", separate from
+**Its own project** (the owner's decision, 2026-10-02 18:40): the prototypes are "Sonic Abstract", separate from
 Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries of the index; the old tooling defaults
 (`kit.OUT_DIR` = `examples/sonic-vfx`, `scenes.SCENES` = the old 16) stay as they were.
 
 ## Resume here (cold)
 
-- **State (2026-10-03 00:30): the set of NINE is built and committed** (briefs 05-08 amended 04; see `ABSTRACT-PLAN.md`
-  for the set, the designs and every modulation map):
+- **State (2026-10-03 02:20): the set of NINE is built, produced and committed**; the deliverables are done except
+  where noted below (see `ABSTRACT-PLAN.md` for the set, the designs and every modulation map):
   1 Sacred Geometry Flight `sacred_flight.py`, 2 Neon Vector `neon_vector.py`, 3 Cel Dream `cel_dream.py`, 4 Color
-  Geometry `color_geometry.py`, 5 Organic Garden `organic_garden.py` (now with three radiolarians), 6 Digital Alpine
+  Geometry `color_geometry.py`, 5 Organic Garden `organic_garden.py` (with three radiolarians), 6 Digital Alpine
   `digital_alpine.py`, 7 Chromatic Topography `chromatic_topography.py`, 8 Glitch Signal `glitch_signal.py`,
   9 8-Bit Ocean `bit_ocean.py`. `scenes.ABSTRACT` lists them in that order; the index's "Sonic Abstract" category lists
   the nine. Removed (modules, projects, index entries, review media moved to `28-sonic-abstract/work/removed/`):
   Impossible Architecture, Abstract Cinematic Void, Particle/VFX World and the flat Sacred Geometry Garden.
+- **Review folder** `~/Desktop/av-gen-review/28-sonic-abstract/`: per prototype `NN-<id>-still.png` (silent, 1080p),
+  `-allyougot.mp4` and `-rebuild.mp4` (the owner's tracks), `-full.mp4` (synthesized MIDI material), `-modulation.md`
+  (generated from the project), `-note.md` (generated from `abstract_notes.py`); `00-contact-sheet.jpg` (3 x 3),
+  `00-tour-allyougot.mp4`, `perf-realtime-1080p.md`, `perf-realtime-live-floor.md`, `live/sacred-flight--tour--nocap/`
+  (the live tour: `tour.md`). The harness refuses a REPORT.md from a subagent: the report is in the hand-back message.
+- **The live tour passes** (02:17, `live/sacred-flight--tour--nocap/tour.md`): all nine above 60 fps at the adaptive
+  floor; Alpine and Chromatic nearest the line (65 fps). Numbers in the log.
+- **Live frame cost, round 2 (02:00, `f6cf1b91`):** the five all-unlit prototypes author the default key light without
+  its shadow (`kit.Scene.unshadowed_key`): a scene with no light gets a key that CASTS, and its shadow passes cost 1-3 ms
+  for nothing (engine need 13). Chromatic Topography's land is a grid that follows the valley (`meshes.heightfield_path`)
+  with a 24-op program; Glitch Signal's pixel program is 20 ops for the same picture. A/B at the live floor, same
+  session, interleaved: Chromatic 18.3 to 14.5 ms, Neon 14.1 to 12.0, Glitch 14.2 to 13.0 (the media of those three are
+  from before round 2; the pictures are pixel-identical (Glitch, Neon) or nearly (Chromatic's valley floor edge is
+  cleaner), so they were not re-rendered).
 - **Generated meshes:** 6, 7 and 9 instance GLB meshes written by `tools/sonic_vfx/meshes.py` into
   `examples/sonic-abstract/meshes/` at build time (deterministic; committed, about 12 MB; no `assets/`).
-- **Next:** (a) a last look round on 8-Bit Ocean (its verdict is "charming, not yet stunning": denser set dressing near
-  the lane, stronger colour contrast); (b) the FINAL PRODUCTION for all nine on the pin: `abstract.py stills` (1080p
-  silent stills, one queued job), `clips --class allyougot --seconds 30`, `clips --class full`, optionally `clips
-  --class rebuild --seconds 30`, perf (`perf.py <the nine ids> --projects examples/sonic-abstract --class allyougot
-  --size 1920x1080 --tier realtime --frames 150 --work $OUT/work/perf --md $OUT/perf-realtime-1080p.md`), `tour --class
-  allyougot --seconds 3.6`, `notes`, `maps`, `sheet`; (c) the live tour (`live.py sacred-flight --abstract --scenario
-  tour --no-capture`, 60 fps check); (d) `[sonic]` and `[sdf]` on both test binaries under the lock; (e) the report and
-  the hand-back. `$S/abs/batch3.sh` is the old production script (update its id list).
+- **Next:** nothing required. Optional: a look round on Infinite Color Geometry's still (its weakest frame: the end of
+  the corridor shows the sky's dark ground hemisphere as a grey box; variants `cg-a..d` in `$S/abs/cg/`: a uniform sky,
+  an emissive light at the end, tonemap 4, thinner haze); 8-Bit Ocean wants a hero per area.
 - **The scratchpad is WIPED when a session restarts**: the pin and `avgen.sh` must be rebuilt (steps below).
   `review.py` refuses to render without the pin.
 - **The pin is `8982404a`** (the engineer's last hand-back: cel lighting ADR-1071, outline ADR-1072, wire lines ADR-1073,
@@ -105,6 +114,21 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
 11. **Planar reflection for a flat water plane** (optional): the engine's water reflects only the environment (sky), so
     Digital Alpine reflects its mountains with mirrored twin meshes and paints the sky's mirror image in a dome's
     program. That works and is cheap; a real planar reflection would let ripples distort the mountains' reflection too.
+12. **The procedural fragment path is expensive per pixel, and a material program costs a fixed amount on top**
+    (GPU frame totals at the live floor, 1366x988, one session, interleaved repeats): Chromatic's sky alone 1.2 ms; one
+    unlit two-triangle plane over the lower half of the frame 4.7 ms; the same plane as a 100 x 168 grid 7.5-8.1 ms
+    (sub-pixel slivers at a grazing view); that grid with a 30-op program 12.3-12.5 ms. Glitch Signal without its block
+    program 7.7-8.3 ms, with 33 ops 14.1-15.6, with 20 ops 12.8-13.2: about 0.09 ms an op plus a fixed ~3 ms for having
+    a program at all (the interpreter's register file -- three dynamic reads and a write per op, select trees over eight
+    vec4 registers -- and the occupancy that costs the whole shader). `unlit` does not make a procedural cheap. What
+    would help most: an unlit fast path (skip lighting, shadow mask, IBL), and a program compiled to WGSL per scene
+    instead of interpreted. Chromatic Topography (land over the whole frame) and Glitch Signal are the prototypes
+    nearest the 60 fps line because of it.
+13. **A scene with no authored light gets a key that casts** (composition.cpp `defaultKeyLight`, ADR-034): in a scene
+    whose materials are all unlit that is a shadow pass over every procedural and a shadow mask for nothing (Neon
+    Vector 2.1 ms, Chromatic Topography 2.0 ms, Glitch Signal 0.6 ms at the live floor). Worked around by authoring
+    the same key with `castsShadow: false` (`kit.Scene.unshadowed_key`). Worth a rule in the engine: no shadow pass
+    when no visible material is lit.
 
 ## Engine facts learned this pass
 - **A material op's constants and `value` are clamped to ±1000** (they are registered as parameters with that hard
@@ -173,3 +197,25 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   falls below the cold intensity follower; kick envelope x flux above 0.62 is the strong event); `5f6c986a`.
 - 00:05-00:25 8-Bit Ocean: voxel level on a ring, three areas; the radial angle convention; outlines; `f043d4c6`.
 - 00:30 `ABSTRACT-PLAN.md` rewritten for the nine (designs and modulation maps), notes for the nine, the index rebuilt.
+- 00:30-00:50 8-Bit Ocean look round (the lane dressed, outlines block by block, clearer water) `9df212d4`; a module's
+  HERO_AT sets its hero still's second `0132ff7e`; review-clip fixes `26e0a91f`.
+- 00:50-01:15 live frame cost round 1: Sacred's end light covers only its glow and its geometry is lighter, 8-Bit's
+  floor checker is geometry (`b290747e`); Chromatic's land program 30 ops with the engine's fog taking the sky's colour
+  (`9eef1d01`); Alpine's sky split into a dome and a lake disc, Glitch's program 33 ops (`8826a374`); live.py points
+  the editor at this tree's examples index (`9de37305`).
+- 01:15-01:20 batch 7, the final production: nine stills, the allyougot, rebuild and full clips, both perf tables, the
+  tour. The live tour: Sacred 80 fps, Neon 60, Cel 86, Color 71, Organic 89, Alpine 63, Chromatic 55 (failing), Glitch
+  62, 8-Bit 87 (frames over the 17 s after each switch's 3 s load; GPU p50 11.5, 16.2, 10.4, 13.4, 10.0, 15.5, 17.6,
+  15.0, 10.0 ms).
+- 01:20-01:30 the tests: `[sonic]` and `[sdf]` on both binaries (exit codes in the hand-back).
+- 01:30-02:00 live frame cost round 2 (`f6cf1b91`): measured by elimination (sky only, land only, one copy, no program,
+  no trees, a flat plane, a two-triangle plane) that the land's cost is the procedural path itself and the program on
+  top (engine need 12), and that the five all-unlit prototypes paid for a casting default key (engine need 13).
+  Chromatic 18.3 to 14.5 ms, Neon 14.1 to 12.0, Glitch 14.2 to 13.0 at the live floor.
+- 02:00-02:20 the contact sheet (3 x 3), the maps and notes regenerated (the multiply routes described with their real
+  effect, `response.level` its own dimension, the verdicts revised), this document; the live tour re-run after round 2:
+  every prototype now above 60 fps (frames in the 17 s after each switch's 3 s load; 120 Hz display): Sacred 1365 (80
+  fps, GPU p50 11.2 ms), Neon 1172 (69, 13.8), Cel 1451 (85, 10.6), Color 1184 (70, 13.7), Organic 1479 (87, 10.2),
+  Alpine 1097 (65, 14.8), Chromatic 1100 (65, 14.7), Glitch 1190 (70, 13.0), 8-Bit 1472 (87, 10.1). Alpine and
+  Chromatic are the two nearest the line (GPU p95 16.4 and 16.5 ms). Every scene's p99 interval is about 26 ms (three
+  vsyncs), the same at 87 fps as at 65: not a scene's cost.

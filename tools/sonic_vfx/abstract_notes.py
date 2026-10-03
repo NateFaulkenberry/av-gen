@@ -138,10 +138,12 @@ NOTES = {
             "reflection, as tall as the music is strong.",
             "Spectral depth: the bass lights the shore range, the low mids the main range, the mids the far range, "
             "the high mids the distant peaks; the highs scatter glints on the water and brighten the sun.",
-            "The kick sends a band of light out through the ranges and drops rings of light on the water; the snare "
-            "flashes the horizon; the mids deepen the ripples.",
-            "MIDI: twelve lanterns round the shore are the pitch classes (with their reflections); the chord raises "
-            "the waterline mist; the mod wheel lifts the sun from dusk to afternoon.",
+            "The kick flares the low sun across every facet that faces it and drops rings of light on the water; the "
+            "snare flashes the horizon in the sky and in the lake; the mids deepen the ripples; the bass brightens the "
+            "sun's path on the water.",
+            "MIDI: twelve lanterns round the shore are the pitch classes (with their reflections), as bright as the "
+            "velocity; a bigger chord lays a brighter path of light on the water; the mod wheel brings the night (the "
+            "sky and the lake darken, the sun leaves the facets, the lanterns come up).",
             "Structure: intensity raises the ranges as a piece builds.",
         ],
         "expand": ["a fjord at dawn", "an archipelago of faceted islands", "a crater lake at night with the "
@@ -161,17 +163,20 @@ NOTES = {
         "drives": [
             "The mids make the contour lines flow up the slopes; the beat pulses them; the highs brighten them.",
             "The bass raises the river up its banks and brightens it; the level makes the land breathe.",
-            "The kick sends a band of light out across the land; the snare blooms the groves' colours.",
+            "The kick flashes the contour lines white across the land and surges the river; the snare blooms the "
+            "groves' colours; the low mids light the round trees.",
             "MIDI: twelve families of crystals on the crests are the pitch classes; the chord widens the river's "
             "glow; the mod wheel sets the contour spacing (survey lines to broad terraces).",
             "Structure: intensity raises the land as a piece builds.",
         ],
         "expand": ["a delta of glowing rivers seen from above", "terraced islands in a colour-field sea",
                    "a night valley drawn in contour lines of light"],
-        "verdict": ("Yes. Distinct from everything else in the set: a map you can fly, saturated and graphic, and the "
-                    "flowing contour lines are a new kind of audio response (the music re-surveys the land). The "
-                    "glide's rise over the hills is the money shot; down in the valley it reads more like a painted "
-                    "canyon. Risk: the river's flowing stripes are a little 'neon tube'."),
+        "verdict": ("Yes from above, close down in the valley. Distinct from everything else in the set: a map you "
+                    "can fly, saturated and graphic, and the flowing contour lines are a new kind of audio response "
+                    "(the music re-surveys the land). The glide's rise over the hills, the bands stacked to the "
+                    "horizon, is the money shot; down on the river it reads as a soft painted canyon. Risk: the "
+                    "river's flowing stripes are a little 'neon tube', and it is the most expensive of the nine live "
+                    "(the land covers the frame)."),
     },
     "glitch-signal": {
         "working_title": "Pixel Canyon",
@@ -186,8 +191,9 @@ NOTES = {
             "MESO: snares tear the frame and shear the rows; onsets swap channels.",
             "MICRO: scanlines, a pixel of split and a flicker of blocks always; the hats flicker blocks; the highs "
             "deepen the scanlines and thicken the pixel rain.",
-            "The bass widens the split and pushes the walls apart; the kick sends a wave of light down the canyon; "
-            "the mids stream the data faster.",
+            "The bass widens the split, pushes the walls apart and flares the horizon; the kick sends a ring of "
+            "distortion out of the horizon through the frame and flashes the lit pixels; the mids stream the data "
+            "faster; the brightness lifts the lit pixels and the beat pulses them.",
             "MIDI: velocity is how hard a note glitches the frame; pitch lifts the fragments; held notes keep them "
             "lit; the mod wheel is corruption by hand.",
         ],
@@ -207,7 +213,8 @@ NOTES = {
         "drives": [
             "THE LIVING LEVEL: the bass bends every kelp plant at once and pulses the coral; a melody rings a row of "
             "twelve bell flowers note by note (one row per area: a xylophone); a chord blooms every brain coral; "
-            "the snare bursts bubbles round you and turns the schools; the kick flashes the coins and gems.",
+            "the snare bursts bubbles round you and turns the schools; the kick flashes the coins and gems and sends "
+            "a ring rippling out through the water.",
             "The mids speed the fish and thicken the bubble streams; the highs swarm sparkles; the beat pumps the "
             "jellies and the caustics; the brightness clears the water.",
             "MIDI: velocity sizes a note's bubble burst; held notes light the kelp; the mod wheel takes the level "
@@ -216,9 +223,11 @@ NOTES = {
         ],
         "expand": ["a sunken castle level", "a night level of glowing jellies", "a boss chamber with a giant friendly "
                    "fish", "a lava level in the same grammar"],
-        "verdict": ("Charming, not yet stunning. It reads instantly as a game water level (the checker floors, coin "
-                    "trail, arches, pipes and voxel kelp do the work) and the three palettes give the lap a story. "
-                    "But the light is flat and the blue haze softens it; it needs denser set dressing near the lane "
-                    "and stronger colour contrast to reach the gate."),
+        "verdict": ("Charming, not yet stunning. It reads instantly as a game water level: the outlined checker "
+                    "floors, the coin trail through an arch, voxel kelp, brain coral, bubbles and light shafts, and "
+                    "the three palettes give the lap a story. The look round (the lane dressed, outlines block by "
+                    "block, clearer water, deeper toon shadows) took it from flat to crisp. What it lacks for the gate "
+                    "is a hero: one striking thing per area (a giant fish, a sunken castle) instead of a lap of "
+                    "even dressing."),
     },
 }
