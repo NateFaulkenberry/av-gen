@@ -92,7 +92,7 @@ def line_mat(intensity, program=None):
 
 
 SWEEP_FAR = -175.0                  # where the band rests: beyond the plain's far edge (silence shows no band)
-SWEEP_NEAR = 2.0
+SWEEP_NEAR = 11.0                    # where the band ends: past the nearest row
 SWEEP_WIDTH = 6.0
 
 
