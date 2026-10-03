@@ -100,6 +100,15 @@ sustained.
 **Structural parameters.** Ring count, petal count (symmetry order), each ring's polygon order, bead count, the inner
 spiral's turn per layer, and the layers' depth spacing.
 
+**As built (2026-10-02).** As planned, with these differences:
+- the armillary is four rings (a circle, a 12-gon, a circle, a hexagon);
+- the inner star is four triangles (a 12-pointed star);
+- the twelve pitch classes are a clock of diamonds and spokes round the crown;
+- a polygon in the heart has as many sides as notes sounding;
+- the light trails are `temporal/feedback` at zoom 1.
+
+The lattice fades into the halo's colour, because opaque lines cannot fade to nothing.
+
 **Expansion.** Kepler's nested Platonic solids; a garden of small armillaries on a dark plane; a flower-of-life
 tessellation flown over; Islamic star-pattern tilings; a tunnel of mandalas.
 
@@ -152,6 +161,14 @@ side-to-side yaw carves the flight.
 **Structural parameters.** Row count, row spacing, the horizon's ring count, wireframe segments, and the number of
 blocks built.
 
+**As built (2026-10-02).** As planned, plus:
+- the beat sweep (a band of light down the plain once per beat, a material program);
+- two rows of wireframe monoliths (ADR-1073 wire lines, lines only) that the fins hide;
+- three flat shapes the snare builds in the sky.
+
+The terrain's flight is a noise FIELD travelling toward the camera through static rows. The far rows open out with
+distance, so they don't merge into a band.
+
 **Expansion.** A vector city drawn only in outlines; an oscilloscope room (Lissajous figures as architecture); a
 flat-colour Bauhaus field of primitives; a line-drawn ocean.
 
@@ -203,6 +220,11 @@ bass.
 
 **Structural parameters.** Creature count, flower count, petal count, tree count, island count, and cloud count.
 
+**As built (2026-10-02).** Cel lighting (ADR-1071) and the plum outline (ADR-1072) on every surface. The frame was
+recomposed after review into a wide diorama: the hero island, a chain of five islands fading into pink haze, a ringed
+pastel planet, a moon, a sea of clouds. The creatures are parented rigs (node scale squashes the whole creature). The
+two extra creatures wait under the lawn and pop up.
+
 **Expansion.** A candy village; an underwater cel reef; a sky-train between islands; creature choirs.
 
 ---
@@ -253,6 +275,11 @@ the view looks slightly off-axis.
 
 **Structural parameters.** Portal spacing, polygon order, twist rate, frame thickness, and slab count.
 
+**As built (2026-10-02).** The frames became monumental (7 m wide, mitred in the polygon's wedges) in a luminous
+cream haze that the far frames dissolve into: Albers' squares in depth rather than outlines. Colour is an OKLCH hue
+rotation of vermilion by depth (one program); the travel is a sawtooth of one spacing; the accordion scales the spacing
+and the travel together.
+
 **Expansion.** Nested colour rooms (Turrell's Ganzfeld); a colour-field staircase; a sky of floating slabs; a portal
 sequence over water.
 
@@ -302,6 +329,11 @@ to the flower over 20 s, and a breathing focus on the kick.
 
 **Structural parameters.** Petal count, tentacle count, organism count, branch recursion depth, and dot density.
 
+**As built (2026-10-02).** Recomposed as a true macro: a close camera just under the lantern (now with an inner ring
+of upright petals and seven hanging stamens with glowing beads), f/0.8 depth of field, the jelly-trees behind as soft
+backlight. Six voice flowers stand in the middle ground (closed buds at rest). The floor is 900 m wide, so its edge is
+lost in haze.
+
 **Expansion.** A jellyfish cathedral; a coral forest; a radiolarian sky; a seed bank that grows a tree per phrase.
 
 ---
@@ -345,6 +377,10 @@ used on hits.
 | mod wheel | CC 1 | geometry: the galaxy's tilt |
 
 **Structural parameters.** Arm count, spiral turns, particle count, trail length, and halo size.
+
+**As built (2026-10-02).** Two arms of three spiral segments each (gold, magenta, blue), whose splines turn (the
+galaxy rotates while its points flow inward); a fine-dust halo; four extra arms that chords light; comets from a short
+spiral arc whose start angle the pitch sets; a blast system and a screen shock for the kick.
 
 **Expansion.** A ring vortex (a smoke ring of light); a river of light over a dark sea; a particle flower that blooms
 per chord; a murmuration (dark particles against a sunset).
@@ -394,6 +430,10 @@ changes and the shadows sweep.
 
 **Structural parameters.** Lattice spacing, room recursion depth, step count, and arch count per face.
 
+**As built (2026-10-02).** One compiled SDF: three flights (the same flight under the two cyclic axis permutations)
+round nested open cubes (`recurse`), repeated forever in three axes with an 18 m period; cel lighting on the SDF, its
+own shadow march toward the sun, the ink outline fading with distance. The world rolls a full turn in four minutes.
+
 **Expansion.** Penrose stairs in an isometric diorama; a monastery of folding staircases; endless arcades at noon;
 rooms inside rooms as a zoom.
 
@@ -441,6 +481,14 @@ shake on the kick.
 | mod wheel | CC 1 | light: the sun's height inside the ring (a sunrise by hand) |
 
 **Structural parameters.** Segment count, gap size, ring count, and segment depth.
+
+**As built (2026-10-02).** Rebuilt after review:
+- almost no air: beyond the march the density is surface fog, which had turned the ring into fog colour;
+- a geometric sun disc whose rim is the sky's own gradient, because the sky's sun renders blocky from the lighting
+  cube;
+- the mirror as one surface carrying the sun's reflection (the sky's gradient mirrored).
+
+The ring is 200 m across on the horizon, letterboxed by black bars that ride the camera's straight push.
 
 **Expansion.** A glowing sphere over an ocean; a field of suspended monoliths; a distant geometric city on the horizon;
 an eclipse.
