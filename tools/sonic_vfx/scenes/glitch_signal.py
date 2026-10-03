@@ -77,13 +77,13 @@ DESIGN = {
         ["onset", "response.onset", "MESO: channels swap in the glitch blocks"],
         ["mids", "audio.mid", "the data ribbons stream faster; the rows' stagger drifts"],
         ["highs", "audio.treble", "the scanlines deepen; the pixel rain thickens"],
-        ["brightness", "sonic.brightness", "the lit pixels brighten; the haze thins"],
+        ["brightness", "sonic.brightness", "the lit pixels brighten"],
         ["tempo", "beat.pulse", "the lit pixels pulse on the beat"],
         ["intensity", "response.intensity", "STRUCTURE: more of the pattern lights as the piece builds"],
         ["strong event", "visual.collapse", "MACRO, the signature: a hard kick at a moment of large spectral change "
          "(or a note at full velocity) collapses the world and rebuilds it in a new configuration (turned about the "
          "flight, a new palette, a new pattern, a new stagger)"],
-        ["pitch", "notes.lastPitch", "which row of the walls a note lights (low notes low, high notes high)"],
+        ["pitch", "notes.lastPitch", "the floating fragments rise with the pitch"],
         ["velocity", "notes.lastVelocity", "how hard a note glitches the frame; a note at full velocity collapses it"],
         ["held", "notes.held", "the fragments hold their light while notes are held"],
         ["mod wheel", "control.modwheel", "corruption by hand: blocks, split and sort"],

@@ -489,7 +489,7 @@ def build():
                   "space": "local"}]
     d, v = sector(0, 34, RC, jitter=(0.0, 0.0, 0.0), seed=1, margin=14.0)
     v = {"seed": 3, "randomPosition": [0.0, 0.0, 0.0]}
-    s.proc("coins", {"kind": "cylinder", "radius": 1.6, "height": 0.35, "radialSegments": 8, "caps": True},
+    s.proc("coins", {"kind": "cylinder", "radius": 1.15, "height": 0.3, "radialSegments": 8, "caps": True},
            distribution=d, material=toon("#ffd23a", ambient=0.8, spec=0.8, emissive=0.45, emissive_col="#ffe066"),
            deformers=coin_spin + [{"kind": "sine", "amount": 3.0, "frequency": 0.09, "speed": 0.0, "phase": 0.0,
                                    "axis": [1.0, 0.0, 0.0], "displacementAxis": [0.0, 1.0, 0.0], "space": "world"}],

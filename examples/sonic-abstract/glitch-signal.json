@@ -1421,7 +1421,7 @@
    [
     "brightness",
     "sonic.brightness",
-    "the lit pixels brighten; the haze thins"
+    "the lit pixels brighten"
    ],
    [
     "tempo",
@@ -1441,7 +1441,7 @@
    [
     "pitch",
     "notes.lastPitch",
-    "which row of the walls a note lights (low notes low, high notes high)"
+    "the floating fragments rise with the pitch"
    ],
    [
     "velocity",

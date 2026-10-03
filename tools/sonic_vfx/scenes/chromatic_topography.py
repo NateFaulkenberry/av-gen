@@ -322,9 +322,9 @@ def instrument(s):
     """The modulation map (ABSTRACT-PLAN.md section 7)."""
     P = "procedural/%s/"
     # ---- BASS: the river rises up its banks (the glow's height, op 33) and brightens (op 34)
-    s.route(R("bass", "material/ctLand/op/33/smoothstep/constant", 16.0, comp=0, attackMs=40, decayMs=500),
-            R("bass", "material/ctLand/op/34/constant/constant", 0.9, attackMs=30, decayMs=500),
-            R("bass", "material/ctRiver/op/9/constant/constant", 2.0, attackMs=30, decayMs=400))
+    s.route(R("bass", "material/ctLand/op/33/smoothstep/constant", 5.0, comp=0, attackMs=40, decayMs=500),
+            R("bass", "material/ctLand/op/34/constant/constant", 0.35, attackMs=30, decayMs=500),
+            R("bass", "material/ctRiver/op/9/constant/constant", 1.2, attackMs=30, decayMs=400))
     # ---- KICK: a band of light runs out across the land (op 40: minus its distance, decametres)
     s.route(R("kick", "material/ctLand/op/40/constant/constant", -BAND_REST, threshold="binary", thresholdLevel=0.3,
               envelope="linearfall", envelopeHoldMs=0, envelopeFallPerSecond=0.9))
@@ -351,7 +351,7 @@ def instrument(s):
     for k in range(12):
         s.route(R("notes.class.%d" % k, P % ("crystal%d" % k) + "material/emissive", 3.2, depth="lastVelocity",
                   attackMs=0, decayMs=900))
-    s.route(R("polyphony", "material/ctLand/op/33/smoothstep/constant", 30.0, comp=0, **MEDIUM))
+    s.route(R("polyphony", "material/ctLand/op/33/smoothstep/constant", 9.0, comp=0, **MEDIUM))
     # ---- MOD WHEEL: STRUCTURE -- the contour spacing, from fine survey lines to broad terraces
     wheel = s.modwheel()
     s.route(R(wheel, "material/ctLand/op/27/palette/constant3", -1.0 / CONTOUR * 0.7, attackMs=200, decayMs=200))

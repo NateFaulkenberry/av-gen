@@ -139,7 +139,7 @@
   {
    "source": "response.bass",
    "target": "material/ctLand/op/33/smoothstep/constant",
-   "amount": 16.0,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -151,7 +151,7 @@
   {
    "source": "response.bass",
    "target": "material/ctLand/op/34/constant/constant",
-   "amount": 0.9,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -162,7 +162,7 @@
   {
    "source": "response.bass",
    "target": "material/ctRiver/op/9/constant/constant",
-   "amount": 2.0,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -778,7 +778,7 @@
   {
    "source": "notes.polyphony",
    "target": "material/ctLand/op/33/smoothstep/constant",
-   "amount": 30.0,
+   "amount": 9.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
