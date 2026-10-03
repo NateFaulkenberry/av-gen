@@ -286,8 +286,9 @@ public:
     [[nodiscard]] const LiveQualityRung& current() const { return liveQualityLadder(settings_.strategy)[rung_]; }
     [[nodiscard]] LiveQualityLevel level() const { return current().level; }
     [[nodiscard]] float scale() const { return effectiveRenderScale(current(), settings_.scaleFloor); }
-    // The median GPU time the last decision saw (-1 before the first): the status line's "GPU".
-    [[nodiscard]] double medianGpuMs() const { return medianGpu(); }
+    // The GPU cost a decision now would see (-1 before the first sample): the median timestamp span,
+    // capped by the mean frame interval (ADR-1085).
+    [[nodiscard]] double gpuCostMs() const { return gpuCost(); }
     // Put the ladder back at the top and forget the history and the learned step costs. Used when
     // the controller is switched off, and when the thing being measured changes underneath it (a
     // new project, a new strategy).
@@ -311,6 +312,8 @@ public:
 private:
     [[nodiscard]] double medianGpu() const;
     [[nodiscard]] double medianWall() const;
+    [[nodiscard]] double meanWall() const;
+    [[nodiscard]] double gpuCost() const;
     [[nodiscard]] double priorRatio(std::size_t k) const;
     void moveTo(std::size_t rung, double medianAtLeave);
 

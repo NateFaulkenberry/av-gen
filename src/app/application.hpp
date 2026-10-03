@@ -633,8 +633,11 @@ private:
     // Smoothed for the Live panel's status line (an exponential average over about a second), so
     // the numbers can be read rather than watched flicker.
     double liveGpuMsShown_ = -1.0;
+    double liveGpuSpanShown_ = -1.0;
+    double liveIntervalShown_ = -1.0;
     double liveCpuMsShown_ = -1.0;
     std::uint64_t liveTransitions_ = 0;
+    std::uint64_t liveTransitionsProfiled_ = 0;
 
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};

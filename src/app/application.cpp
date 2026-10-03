@@ -4385,7 +4385,7 @@ int Application::runLive() {
     // controller. `scene Mpx` is the pixel count the scene pass actually shaded, which after the
     // adaptive scale is no longer derivable from the canvas size the run logs at frame 60.
     const int kPhSceneMpx = prof.phase("scene Mpx");
-    const int kPhScaleChanges = prof.phase("# render-scale moves");
+    const int kPhScaleChanges = prof.phase("# live quality changes");
     std::uint64_t lastProcGen = scene::proceduralRebuildCount();
     std::uint64_t lastEnvBuild = rendering::environmentBuildCount();
     // Seeded from the composition as it stands *after* the load, so the first frame reports the
@@ -5426,18 +5426,22 @@ int Application::runLive() {
             // Fed the *interval*, not the CPU time: the controller is deciding whether a smaller
             // world would make frames arrive sooner, and `cpuFrameMs` excludes the swapchain wait
             // that a GPU-bound frame spends most of itself in.
-            const auto decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
-            prof.count(kPhScaleChanges, decision.changed ? 1.0 : 0.0);
+            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
+            // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
+            // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
+            prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
+            liveTransitionsProfiled_ = liveTransitions_;
             // ADR-1087: the status line's GPU and CPU, smoothed over about a second so they can be read.
             const auto smooth = [](double& shown, double sample) {
                 if (sample >= 0.0) {
                     shown = shown < 0.0 ? sample : shown + (sample - shown) * 0.05;
                 }
             };
-            // The controller's own reading of the GPU (ADR-1085: the span, but never more than the interval).
-            smooth(liveGpuMsShown_, stats.gpuFrameMs >= 0.0 && stats.frameIntervalMs > 0.0
-                                        ? std::min(stats.gpuFrameMs, stats.frameIntervalMs)
-                                        : stats.gpuFrameMs);
+            // ADR-1085's reading, smoothed: the span, capped by the (smoothed, so mean) frame interval.
+            smooth(liveGpuSpanShown_, stats.gpuFrameMs);
+            smooth(liveIntervalShown_, stats.frameIntervalMs);
+            liveGpuMsShown_ = liveIntervalShown_ > 0.0 && liveIntervalShown_ < liveGpuSpanShown_ ? liveIntervalShown_
+                                                                                                 : liveGpuSpanShown_;
             smooth(liveCpuMsShown_, stats.cpuFrameMs);
         }
         // ---- the interaction log's end of frame -------------------------------------------------

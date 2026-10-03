@@ -344,11 +344,28 @@ TEST_CASE("frames that overlap on the GPU are not read as over budget", "[unit][
     app::InteractiveResolution c;
     c.configure(fast(LiveQualityStrategy::ResolutionFirst, 60));
     CHECK(feed(c, 400, 16.0, 9.0) == 0);
-    CHECK(c.medianGpuMs() == 9.0);
+    CHECK(c.gpuCostMs() == 9.0);
     // The control: the same span with frames arriving at it is over budget and moves.
     app::InteractiveResolution d;
     d.configure(fast(LiveQualityStrategy::ResolutionFirst, 60));
     CHECK(feed(d, 400, 16.0, 16.7) > 0);
+}
+
+TEST_CASE("vsync-quantised intervals do not hide a GPU-bound frame", "[unit][resolution][live-quality]") {
+    // Measured on Sonic at Medium: a 13.6 ms span while the intervals alternated 8.3 and 25 ms (a
+    // 9.3 ms median, a 14.5 ms mean). The cost is the span; a median interval would read it as 9 ms
+    // and hold a 90 fps target it is missing by half.
+    app::InteractiveResolution c;
+    app::InteractiveResolutionSettings s = fast(LiveQualityStrategy::EffectsFirst, 90);
+    s.windowFrames = 21; // the production window is 20; a multiple of the 3-frame pattern keeps the mean exact
+    s.dwellFrames = 21;
+    c.configure(s);
+    int i = 0;
+    for (; i < 400 && c.rung() == 0; ++i) {
+        c.note(13.6, i % 3 == 2 ? 25.0 : 8.3);
+    }
+    CHECK(c.rung() > 0);
+    CHECK(c.gpuCostMs() == 13.6);
 }
 
 TEST_CASE("one stalled frame does not move the ladder", "[unit][resolution]") {

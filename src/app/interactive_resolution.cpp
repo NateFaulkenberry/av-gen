@@ -175,6 +175,34 @@ double InteractiveResolution::medianGpu() const {
     return v[n / 2];
 }
 
+double InteractiveResolution::meanWall() const {
+    const std::size_t n = std::min(count_, static_cast<std::size_t>(settings_.windowFrames));
+    double sum = 0.0;
+    std::size_t used = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        const double w = wall_[(cursor_ + wall_.size() - 1 - i) % wall_.size()];
+        if (w > 0.0) {
+            sum += w;
+            ++used;
+        }
+    }
+    return used > 0 ? sum / static_cast<double>(used) : -1.0;
+}
+
+double InteractiveResolution::gpuCost() const {
+    // ADR-1085: the GPU timestamp span (first pass begins to last pass ends) over-states a frame's
+    // cost when consecutive frames overlap on the GPU -- measured on Liminal at Low: an 11-12 ms span
+    // median while frames arrived at about 110 fps, which walked the ladder to Emergency. Frames
+    // that arrive at a mean interval of T cannot be costing the GPU more than T each, so the cost is
+    // the smaller of the two. The *mean* interval, not the median: under Fifo the intervals are
+    // vsync multiples, and a GPU-bound 14 ms frame on a 120 Hz display alternates 8.3 and 25 ms --
+    // a median of 8.3 would under-read it by half. A stall only raises the mean, so it can never
+    // make this smaller than the span says.
+    const double span = medianGpu();
+    const double interval = meanWall();
+    return interval > 0.0 && interval < span ? interval : span;
+}
+
 double InteractiveResolution::medianWall() const {
     const std::size_t n = std::min(count_, static_cast<std::size_t>(settings_.windowFrames));
     if (n == 0) {
@@ -237,14 +265,7 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     if (!(gpuMs >= 0.0)) {
         return d;
     }
-    // ADR-1085: the GPU timestamp span (first pass begins to last pass ends) over-states a frame's
-    // cost when consecutive frames overlap on the GPU -- measured on Liminal at Low: an 11-12 ms span
-    // median at a 9.0 ms frame interval, which walked the ladder to Emergency on frames that were
-    // arriving at 110 fps. A frame that arrives within its interval cannot be costing the GPU more
-    // than that interval, so the sample is the smaller of the two. GPU-bound frames are unchanged
-    // (span and interval agree); only the overlap is taken out.
-    const double sample = wallMs > 0.0 && wallMs < gpuMs ? wallMs : gpuMs;
-    gpu_[cursor_] = sample;
+    gpu_[cursor_] = gpuMs;
     wall_[cursor_] = wallMs;
     cursor_ = (cursor_ + 1) % gpu_.size();
     ++count_;
@@ -254,7 +275,7 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     if (count_ < window) {
         return d;
     }
-    const double gpu = medianGpu();
+    const double gpu = gpuCost();
     if (!(gpu > 0.0)) {
         return d;
     }
