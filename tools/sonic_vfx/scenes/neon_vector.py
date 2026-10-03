@@ -31,12 +31,13 @@ HALF_W = 70.0          # the lines run from x = -70 to 70
 SPACING = 2.2          # metres between rows
 # (name, nearest z, rows, row spacing, line radius, line intensity): the rows open out with distance, so the far plain
 # keeps separate lines on screen instead of merging into a white band
+NEAR_Z = 2.0 + 3 * SPACING      # the nearest row: close enough that the ridges reach the bottom of the frame
 GROUPS = [
-    ("near", 2.0, 16, SPACING, 0.022, 2.2),
-    ("mid", 2.0 - 16 * SPACING, 18, SPACING * 1.45, 0.034, 1.6),
-    ("far", 2.0 - 16 * SPACING - 18 * SPACING * 1.45, 18, SPACING * 2.4, 0.05, 0.75),
+    ("near", NEAR_Z, 19, SPACING, 0.022, 2.2),
+    ("mid", NEAR_Z - 19 * SPACING, 18, SPACING * 1.45, 0.034, 1.6),
+    ("far", NEAR_Z - 19 * SPACING - 18 * SPACING * 1.45, 18, SPACING * 2.4, 0.05, 0.75),
 ]
-CAM = [0.0, 6.5, 14.0]
+CAM = [0.0, 5.0, 14.0]
 
 DESIGN = {
     "category": "vector",
