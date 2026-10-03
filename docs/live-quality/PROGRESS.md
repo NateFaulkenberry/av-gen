@@ -32,17 +32,28 @@ here, and every Glowmere number from this worktree describes the scene without i
    before 4.74 / 5.64 ms CPU work p50, after 5.25 / 5.35 ms -- inside the run-to-run noise, as expected with no rigged
    characters loaded. The diagnostic timer fell from 0.042-0.053 ms to 0.005 ms.
 
-## Done
-- §9.1 `SceneRenderer::setDiagnosticRecords` (live editor off; a named entity turns it on). GPU test
-  `[live-quality]` in `tests/rendering/test_gpu.cpp`.
-- §9.2 `Scene::posedMeshBounds` cache (content-keyed palette + meshVersion), `cullEntityNodes` culls each entity once
-  with a name index. Unit test in `tests/unit/test_skeleton.cpp`.
+## Done (all committed and pushed)
+- §9.1 `SceneRenderer::setDiagnosticRecords` (ADR-1081). §9.2 `Scene::posedMeshBounds` + cull once (ADR-1082).
+- §3-4 `liveBudget(targetFps)`, `general.liveTargetFps`, `--live-target` (ADR-1080).
+- §5-7 the ladder: `LiveQualityRung`/`liveQualityLadder`/`applyLiveRung` in `src/app/interactive_resolution.*`,
+  `QualitySettings::motionBlur/depthOfField` gates, `general.liveQuality` (auto|level), `--live-quality`,
+  `live.qualityStrategy` project key in the three baseline projects (ADR-1083, ADR-1084).
+- §13-14 controller: learned step ratios, `raiseHoldFrames`, cost = min(median span, mean interval) (ADR-1085).
+- §10-11 investigated and measured: transitions within normal jitter; resize path kept (ADR-1086).
+- §12 Live panel status + Settings (ADR-1087). §18 projection projects the open project (ADR-1088).
+- §17 `PresentPacer` in `OutputManager::presentAll` (ADR-1089, numbers pending the stall run).
+- Tests: `tests/unit/test_interactive_resolution.cpp` (rewritten), `test_app_settings.cpp`, `test_projection.cpp`,
+  `test_skeleton.cpp`; GPU `[live-quality]` in `test_gpu.cpp` (records gate, round trip) and `test_post_gpu.cpp` (gates).
+
+## Measurement state (2026-10-03 ~02:30)
+- Binaries in scratch `bin/`: `avgen-before` (main + probes), `avgen-after` (feature, commit 1c8fe689 + probes).
+- `lq/matrix.sh` (running, nohup) = per scene `lq/mscene.sh` (native + before/after x 60/90/120 x 2), then
+  `lq/stall.sh` (Sonic, 480x270 pt window, before/after x2), then `lq/cpu2.sh` (22 x imported/alien.gltf, §9 A/B).
+  Progress: `lq/data/runs.txt`. Tabulate: `python3 lq/matrix.py lq/data <sonic|glow|lim> 240`,
+  `python3 lq/trans2.py lq/data <tags>`, `python3 lq/cpu.py lq/data <tags>`, `python3 lq/sweep.py lq/data sweep-*`.
+- Sweeps done (`sweep-sonic/glow/lim`): per-level costs and 27 transitions (worst +0.9 ms over steady max).
 
 ## Next
-- Controller + ladder (written in `src/app/interactive_resolution.*`, not yet wired into application/settings/UI).
-- §18 projection project selection, §17 acquire stall, §12 status, settings.
-
-## Commands
-- Build: `cmake --build build/release -j 10` (reconfigure after adding test files).
-- CPU tests: `tools/gpu-lock.sh ./build/release/tests/avgen_tests "[resolution]"`.
-- GPU tests: `tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[live-quality]"`.
+1. Finish the matrix, stall and a22 runs; write ADR-1089's numbers; write REPORT.md (both locations).
+2. Remove the TEMPORARY probes: commits 7a67ace1, b0c652e1, 299e7a99 (by hand where they conflict).
+3. Reconfigure CMake, full suites once each under the lock: `avgen_tests` then `avgen_render_tests` (nohup, poll).
