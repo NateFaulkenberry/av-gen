@@ -527,7 +527,9 @@ fn defocusTaps(coc: f32) -> u32 {
     if (post.params3.w < 0.5) {
         return 24u;
     }
-    return clamp(u32(coc * coc * 0.5), 24u, 192u);
+    // ADR-1094: params4.z is the live tap cap (0 = the full 192).
+    let cap = select(192u, max(24u, u32(post.params4.z)), post.params4.z > 0.5);
+    return clamp(u32(coc * coc * 0.5), 24u, cap);
 }
 
 @fragment

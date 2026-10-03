@@ -208,6 +208,14 @@ struct LiveQualityRung {
     std::uint32_t cascadeCount = 4;      // ceiling on QualitySettings::cascadeCount
     std::uint32_t shadowResolution = 4096; // ceiling on QualitySettings::shadowResolution
     bool reducedShadowFiltering = false; // the Preview tier's filtering: no PCSS, 6 PCF taps
+    // ADR-1094..1098 (Stage 2's levers). Ceilings like the rest: each only ever lowers the base's own value. Heroes are
+    // exempt from all of them in the renderer (ADR-1097).
+    float lodBias = 1.0f;               // floor on QualitySettings::lodBias (higher = coarser)
+    float drawDistanceScale = 1.0f;     // ceiling on QualitySettings::drawDistanceScale
+    float shadowCasterMinPixels = 0.0f; // floor on QualitySettings::shadowCasterMinPixels
+    float postEffectQuality = 1.0f;   // ceiling on QualitySettings::postEffectQuality
+    float particleCullDistance = 0.0f;  // QualitySettings::particleCullDistance (0 = none; the nearer limit wins)
+    float particleSpawnScale = 1.0f;    // ceiling on QualitySettings::particleSpawnScale
 };
 
 using LiveQualityLadder = std::array<LiveQualityRung, kLiveQualityLevels>;
@@ -228,6 +236,21 @@ inline constexpr std::array<float, 6> kLiveScaleFloorChoices{1.0f, 0.85f, 0.71f,
 
 // The rung as the frame will see it: the scale after the floor.
 [[nodiscard]] float effectiveRenderScale(const LiveQualityRung& rung, float scaleFloor);
+
+// ---- ADR-1099: the named profiles, QUALITY / BALANCED / PERFORMANCE ---------------------------------------------------
+//
+// A profile is a row of the same table family as the ladder's rungs (a `LiveQualityRung` of ceilings), applied to the
+// tier BEFORE the ladder: it is the ceiling the live controller works under, so Ultra under PERFORMANCE is the
+// PERFORMANCE picture and the five levels go down from there. QUALITY is the tier exactly. Chosen per project
+// (`live.profile`), from the Live panel, or with `--live-profile --quality <profile>`.
+enum class QualityProfile : std::uint8_t { Quality, Balanced, Performance };
+inline constexpr std::size_t kQualityProfiles = 3;
+[[nodiscard]] std::string_view qualityProfileToken(QualityProfile profile);
+[[nodiscard]] const char* qualityProfileLabel(QualityProfile profile); // "QUALITY", ...
+[[nodiscard]] std::optional<QualityProfile> qualityProfileFromToken(std::string_view token);
+[[nodiscard]] const LiveQualityRung& qualityProfileCeiling(QualityProfile profile);
+// The profile's ceilings applied to `q` (the scale too, which no floor raises).
+[[nodiscard]] rendering::QualitySettings applyQualityProfile(const rendering::QualitySettings& q, QualityProfile profile);
 
 // ---- the controller --------------------------------------------------------------------------------------
 

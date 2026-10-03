@@ -100,7 +100,12 @@ struct QualityPolicy {
                settings.forcedMaterialTier == MaterialTier::Full && settings.renderScale == 1.0f &&
                settings.shadowMaskScale == 1.0f && settings.aoResolutionScale == 1.0f &&
                settings.antialiasFloor == 0.0f && // ADR-1024: a render is exactly as authored
-               settings.motionBlur && settings.depthOfField; // ADR-1083: the live gates are open
+               settings.motionBlur && settings.depthOfField && // ADR-1083: the live gates are open
+               // ADR-1094..1098: every Stage 2 lever neutral
+               settings.lodBias == 1.0f && settings.drawDistanceScale == 1.0f &&
+               settings.shadowCasterMinPixels == 0.0f && settings.postEffectQuality == 1.0f &&
+               settings.particleCullDistance == 0.0f && settings.particleSpawnScale == 1.0f &&
+               !settings.materialProgramsOff;
     }
 };
 

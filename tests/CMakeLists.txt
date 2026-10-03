@@ -36,6 +36,8 @@ target_sources(avgen_tests PRIVATE
     # takes a GPU time and a wall time per frame and returns a rung -- so the control law can be
     # checked for the thing a benchmark cannot show it: that it settles instead of oscillating.
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
+    # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
+    "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
     # The example index is JSON and paths. It is here so the menu the application builds is the one
     # the test reads: checking the raw JSON instead passed on an index the application then refused.

@@ -10,6 +10,7 @@
 
 
 #include "core/wind.hpp"
+#include "scene/importance.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -322,6 +323,7 @@ constexpr RigId kInvalidRig = 0xFFFFFFFFu;
 // exactly what the other two values of this enum decide.
 enum class MeshStyle : std::uint8_t { Lit, Grid, Water };
 
+
 struct Entity {
     std::string name;
     Transform transform; // world space (hierarchies are flattened on import in 0.2)
@@ -345,6 +347,8 @@ struct Entity {
     // on screen and casts nothing anyone can see, and one behind the camera is off screen and may
     // cast across the whole frame. Terrain sets this per chunk from its own shadow distance.
     bool castsShadow = true;
+    // ADR-1097: copied from the node at flatten (heroes inferred). Read only by the live scalability levers.
+    Importance importance = Importance::Normal;
     // Set per frame by whatever culls against the *camera* frustum (terrain does, per chunk).
     // "Off screen" and "not in the scene" are different claims, and only the second is a reason to
     // stop casting: a hill behind the camera throws its shadow across the whole frame. An entity

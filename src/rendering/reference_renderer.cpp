@@ -1,4 +1,5 @@
 #include "rendering/reference_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/readback.hpp"
@@ -149,7 +150,7 @@ Result<void> ReferenceRenderer::init() {
     desc.primitive.cullMode = wgpu::CullMode::None;
     desc.depthStencil = &depth;
     desc.fragment = &fragment;
-    impl_->pipeline = device.CreateRenderPipeline(&desc);
+    impl_->pipeline = gpu::createRenderPipeline(device, &desc);
     if (impl_->pipeline == nullptr) {
         return fail("the reference pipeline could not be created");
     }

@@ -49,30 +49,57 @@ constexpr LiveQualityRung plainShadows(LiveQualityRung r) {
     r.reducedShadowFiltering = true;
     return r;
 }
+// ADR-1094..1098: the background levers -- small casters stop casting, far emitters stop, LOD comes sooner. The brief's
+// "first" group (background shadows, background particles); heroes are exempt in the renderer. Only on the two lowest
+// levels, where the picture is already being traded, so the levels a 60 target settles on are unchanged.
+constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
+    r.shadowCasterMinPixels = casterPixels;
+    r.particleCullDistance = particleMetres;
+    r.lodBias = lod;
+    return r;
+}
 
 constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
     volumes(rung(L::Medium, 0.71f), 0.25f),
-    cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2),
-    plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+    background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f),
+    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
     noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)),
-    cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2),
-    plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+    background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f),
+    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
     cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2),
     plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)),
-    plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)),
-    plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+               80.0f, 1.5f),
+    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f),
 };
+
+// ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
+// (the background levers, and a quarter-resolution fog). PERFORMANCE adds the half-resolution post effects, fewer
+// particles, two cascades in a 1024 atlas and an 85% scale.
+constexpr LiveQualityRung kProfileQuality = rung(L::Ultra, 1.0f);
+constexpr LiveQualityRung kProfileBalanced = background(volumes(rung(L::Ultra, 1.0f), 0.5f), 8.0f, 120.0f, 1.25f);
+constexpr LiveQualityRung profilePerformance() {
+    LiveQualityRung r = background(plainShadows(cascades(volumes(rung(L::Ultra, 0.85f), 0.25f), 2)), 24.0f, 60.0f, 2.0f);
+    r.postEffectQuality = 0.5f;
+    r.particleSpawnScale = 0.7f;
+    r.drawDistanceScale = 0.8f;
+    return r;
+}
+constexpr LiveQualityRung kProfilePerformance = profilePerformance();
 
 // The number of effect levers (everything but the scale) that differ between two rungs.
 int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
@@ -80,7 +107,12 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.volumeStepScale != b.volumeStepScale ? 1 : 0) + (a.motionBlur != b.motionBlur ? 1 : 0) +
            (a.depthOfField != b.depthOfField ? 1 : 0) + (a.cascadeCount != b.cascadeCount ? 1 : 0) +
            (a.shadowResolution != b.shadowResolution ? 1 : 0) +
-           (a.reducedShadowFiltering != b.reducedShadowFiltering ? 1 : 0);
+           (a.reducedShadowFiltering != b.reducedShadowFiltering ? 1 : 0) + (a.lodBias != b.lodBias ? 1 : 0) +
+           (a.drawDistanceScale != b.drawDistanceScale ? 1 : 0) +
+           (a.shadowCasterMinPixels != b.shadowCasterMinPixels ? 1 : 0) +
+           (a.postEffectQuality != b.postEffectQuality ? 1 : 0) +
+           (a.particleCullDistance != b.particleCullDistance ? 1 : 0) +
+           (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0);
 }
 } // namespace
 
@@ -96,6 +128,22 @@ const LiveQualityLadder& liveQualityLadder(LiveQualityStrategy strategy) {
 float effectiveRenderScale(const LiveQualityRung& rung, float scaleFloor) {
     return std::clamp(std::max(rung.renderScale, scaleFloor), kLiveScaleFloorMin, 1.0f);
 }
+
+namespace {
+// The Stage 2 levers as ceilings over `base`: never a better value than the base asked for.
+void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::QualitySettings& base,
+                           const LiveQualityRung& rung) {
+    q.lodBias = std::max(base.lodBias, rung.lodBias);
+    q.drawDistanceScale = std::min(base.drawDistanceScale, rung.drawDistanceScale);
+    q.shadowCasterMinPixels = std::max(base.shadowCasterMinPixels, rung.shadowCasterMinPixels);
+    q.postEffectQuality = std::min(base.postEffectQuality, rung.postEffectQuality);
+    q.particleCullDistance = base.particleCullDistance <= 0.0f   ? rung.particleCullDistance
+                             : rung.particleCullDistance <= 0.0f ? base.particleCullDistance
+                                                                 : std::min(base.particleCullDistance,
+                                                                            rung.particleCullDistance);
+    q.particleSpawnScale = std::min(base.particleSpawnScale, rung.particleSpawnScale);
+}
+} // namespace
 
 rendering::QualitySettings applyLiveRung(const rendering::QualitySettings& current,
                                          const rendering::QualitySettings& base, const LiveQualityRung& rung,
@@ -119,7 +167,63 @@ rendering::QualitySettings applyLiveRung(const rendering::QualitySettings& curre
         q.shadowPcfTaps = base.shadowPcfTaps;
         q.pcssBlockerTaps = base.pcssBlockerTaps;
     }
+    applyStageTwoCeilings(q, base, rung);
     return q;
+}
+
+std::string_view qualityProfileToken(QualityProfile profile) {
+    switch (profile) {
+    case QualityProfile::Quality: return "quality";
+    case QualityProfile::Balanced: return "balanced";
+    case QualityProfile::Performance: return "performance";
+    }
+    return "quality";
+}
+
+const char* qualityProfileLabel(QualityProfile profile) {
+    switch (profile) {
+    case QualityProfile::Quality: return "QUALITY";
+    case QualityProfile::Balanced: return "BALANCED";
+    case QualityProfile::Performance: return "PERFORMANCE";
+    }
+    return "QUALITY";
+}
+
+std::optional<QualityProfile> qualityProfileFromToken(std::string_view token) {
+    for (const auto p : {QualityProfile::Quality, QualityProfile::Balanced, QualityProfile::Performance}) {
+        if (token == qualityProfileToken(p)) {
+            return p;
+        }
+    }
+    return std::nullopt;
+}
+
+const LiveQualityRung& qualityProfileCeiling(QualityProfile profile) {
+    switch (profile) {
+    case QualityProfile::Quality: return kProfileQuality;
+    case QualityProfile::Balanced: return kProfileBalanced;
+    case QualityProfile::Performance: return kProfilePerformance;
+    }
+    return kProfileQuality;
+}
+
+rendering::QualitySettings applyQualityProfile(const rendering::QualitySettings& q, QualityProfile profile) {
+    const LiveQualityRung& c = qualityProfileCeiling(profile);
+    rendering::QualitySettings out = q;
+    out.renderScale = std::min(q.renderScale > 0.0f ? q.renderScale : 1.0f, c.renderScale);
+    out.volumeResolutionScale = std::min(q.volumeResolutionScale, c.volumeResolutionScale);
+    out.volumeStepScale = std::min(q.volumeStepScale, c.volumeStepScale);
+    out.motionBlur = q.motionBlur && c.motionBlur;
+    out.depthOfField = q.depthOfField && c.depthOfField;
+    out.cascadeCount = std::min(q.cascadeCount, c.cascadeCount);
+    out.shadowResolution = std::min(q.shadowResolution, c.shadowResolution);
+    if (c.reducedShadowFiltering) {
+        out.softShadows = false;
+        out.shadowPcfTaps = std::min(q.shadowPcfTaps, 6u);
+        out.pcssBlockerTaps = std::min(q.pcssBlockerTaps, 6u);
+    }
+    applyStageTwoCeilings(out, q, c);
+    return out;
 }
 
 // ---- the controller ------------------------------------------------------------------------------

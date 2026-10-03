@@ -1,4 +1,5 @@
 #include "rendering/skinning.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -199,7 +200,7 @@ Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module)
         desc.fragment = &fragment;
 
         context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+        wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
         std::string error;
         auto future = context_.device().PopErrorScope(
             wgpu::CallbackMode::WaitAnyOnly,

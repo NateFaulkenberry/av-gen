@@ -1,4 +1,5 @@
 #include "rendering/simulation.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "rendering/field_uniforms.hpp"
 
@@ -177,7 +178,7 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         desc.compute.module = module;
         desc.compute.entryPoint = entry;
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::ComputePipeline pipeline = device.CreateComputePipeline(&desc);
+        wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
         std::string error;
         auto future = device.PopErrorScope(
             wgpu::CallbackMode::WaitAnyOnly,

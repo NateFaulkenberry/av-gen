@@ -54,6 +54,11 @@ struct ShadowStats {
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
     std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
     std::uint32_t entitiesCulled = 0; // casters a cascade's own frustum rejected (ADR-055)
+    // ADR-1095: casters the projected-size floor (QualitySettings::shadowCasterMinPixels) kept out of every view.
+    std::uint32_t castersBelowFloor = 0;
+    // ADR-1096: the shadow pass did not run because nothing visible in the frame is lit (all-unlit scenes keep their
+    // default key light, which would otherwise render cascades nothing reads).
+    bool skippedNothingLit = false;
     // Shadow Lab (§15). The eight things §15 asks a shadow diagnostic to expose, per view, taken
     // from the fit rather than re-derived from it. `views` entries 0..`views - 1` are live.
     //

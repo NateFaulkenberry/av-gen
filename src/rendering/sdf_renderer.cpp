@@ -1,4 +1,5 @@
 #include "rendering/sdf_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -314,7 +315,7 @@ Result<void> SdfRenderer::reload() {
 Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelineDescriptor& desc, const char* label) {
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -567,6 +568,14 @@ void SdfRenderer::collectTimings() {
 
 bool SdfRenderer::hasRaymarchWork() const {
     return !impl_->raymarchItems.empty();
+}
+
+std::size_t SdfRenderer::compiledVariantCount() const {
+    std::size_t n = 0;
+    for (const auto& [key, variant] : impl_->compiledVariants) {
+        n += variant.failed ? 0 : 1;
+    }
+    return n;
 }
 
 void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const glm::mat4& viewProj,

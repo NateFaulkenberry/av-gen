@@ -1,4 +1,5 @@
 #include "rendering/ribbon_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
@@ -130,7 +131,7 @@ Result<void> RibbonRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
         desc.fragment = &fragment;
 
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+        wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
         std::string error;
         auto future = device.PopErrorScope(
             wgpu::CallbackMode::WaitAnyOnly,

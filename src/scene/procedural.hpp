@@ -538,6 +538,8 @@ struct GenerationContext {
 
 struct ProceduralGeometry {
     std::string name = "procedural";
+    // ADR-1097: the node's importance (heroes inferred); read only by the live levers (ADR-1094).
+    Importance importance = Importance::Normal;
     // ADR-108. Non-empty: this object is one material part of the object named here, and the two
     // share ONE spatial instance set -- the same cloud, the same seed, the same placements. Only
     // the mesh, the material and the per-instance colour differ. The renderer culls the lead's

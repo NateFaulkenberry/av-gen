@@ -126,6 +126,8 @@ public:
     // True when this frame's update() found Raymarch objects to draw (the caller splits the lit
     // pass around encodeRaymarchPass only then, keeping the no-SDF frame unchanged).
     [[nodiscard]] bool hasRaymarchWork() const;
+    // ADR-1091: compiled tree variants alive (ADR-1003), failed ones excluded. For the live profiler's shader count.
+    [[nodiscard]] std::size_t compiledVariantCount() const;
     // Encodes the raymarch render pass onto `color`/`depth` (both loaded and stored) with the
     // frame/IBL bind groups given; one draw per Raymarch object. Call between the lit pass's
     // opaque phase and its transparent phase.

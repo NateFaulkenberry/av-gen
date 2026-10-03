@@ -1,4 +1,5 @@
 #include "rendering/post_processor.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -232,7 +233,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
     context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
     std::string error;
     auto future = context_.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -510,6 +511,8 @@ PostProcessor::PyramidResult PostProcessor::buildPyramid(wgpu::CommandEncoder& e
 
 wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool) {
     stats_ = PostStats{};
+    stats_.width = in.width; // ADR-1091
+    stats_.height = in.height;
     stage_ = "post"; // each stage names itself below; nothing inherits the previous frame's label
     slot_ = 0;
     output_ = nullptr;
@@ -612,7 +615,9 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params2 = glm::vec4(s.tiltShiftCentre, std::cos(rotation), std::sin(rotation));
         u.params3 = glm::vec4(std::max(s.tiltShiftBandWidth, 0.0f) * 0.5f, std::max(s.tiltShiftFalloff, 1e-4f),
                               s.tiltShiftMaxRadius * pixelScale, tiltShiftOn ? 1.0f : 0.0f);
-        u.params4 = glm::vec4(dofOn ? 1.0f : 0.0f, base.outputSize.x / std::max(base.outputSize.y, 1.0f), 0.0f, 0.0f);
+        // ADR-1094: z = the physical defocus's tap cap (0 = the shader's own 192).
+        const float tapCap = in.effectQuality < 0.999f ? std::max(24.0f, std::round(192.0f * in.effectQuality)) : 0.0f;
+        u.params4 = glm::vec4(dofOn ? 1.0f : 0.0f, base.outputSize.x / std::max(base.outputSize.y, 1.0f), tapCap, 0.0f);
         stage_ = "post/dof";
         // The depth view is still bound when only the band is running: binding the placeholder
         // instead would cost a bind group rebuild for a texture the shader never reads.

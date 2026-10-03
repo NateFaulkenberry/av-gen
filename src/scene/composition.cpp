@@ -2915,6 +2915,7 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
     const std::size_t signalsBefore = bus.size();
     entityWorld_.updateFields(update, *params_);
     if (!fieldRoutesChecked_) {
@@ -3096,6 +3097,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
@@ -6159,6 +6161,14 @@ Composition::lodChainsFor(const assets::SceneAsset& asset, const NodeLod& lod, c
     return shared;
 }
 
+Importance Composition::importanceOfNode(const CompositionNode& node) const {
+    if (node.importance) {
+        return *node.importance;
+    }
+    const bool hero = std::any_of(heroes_.begin(), heroes_.end(), [&](const world::HeroPoint& h) { return h.name == node.name; });
+    return hero ? Importance::Hero : Importance::Normal;
+}
+
 void Composition::rebuild() {
     ++flattens_;
     // Captured before anything clears the table, because `Scene::addTexture` moves the counter on
@@ -6316,6 +6326,7 @@ void Composition::rebuild() {
         NodeRange range;
         range.firstEntity = scene_.entities.size();
         range.firstParticle = scene_.particles.size();
+        const std::size_t firstProcedural = scene_.procedurals.size(); // ADR-1097
         const Transform nodeT = nodeWorldTransform(node);
         const bool visible = nodeVisible(node);
 
@@ -7365,6 +7376,19 @@ void Composition::rebuild() {
         }
         range.entityCount = scene_.entities.size() - range.firstEntity;
         range.particleCount = scene_.particles.size() - range.firstParticle;
+        // ADR-1097: everything this node put in the scene carries its importance; a hero's is inferred.
+        {
+            const Importance importance = importanceOfNode(node);
+            for (std::size_t e = range.firstEntity; e < scene_.entities.size(); ++e) {
+                scene_.entities[e].importance = importance;
+            }
+            for (std::size_t p = range.firstParticle; p < scene_.particles.size(); ++p) {
+                scene_.particles[p].importance = importance;
+            }
+            for (std::size_t p = firstProcedural; p < scene_.procedurals.size(); ++p) {
+                scene_.procedurals[p].importance = importance;
+            }
+        }
         ranges_.push_back(std::move(range));
     }
 
@@ -10150,6 +10174,9 @@ nlohmann::json Composition::toJson() const {
         if (node.locked) {
             n["locked"] = true;
         }
+        if (node.importance) { // ADR-1097: additive, written only when authored
+            n["importance"] = importanceName(*node.importance);
+        }
         if (!node.tags.empty()) { // ADR-833: additive, written only when authored
             n["tags"] = node.tags;
         }
@@ -11541,6 +11568,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            // ADR-1097: optional; absent = inferred.
+            if (item.contains("importance")) {
+                Importance importance = Importance::Normal;
+                if (!item.at("importance").is_string() ||
+                    !importanceFromName(item.at("importance").get<std::string>(), importance)) {
+                    return fail("node '{}': 'importance' must be one of hero, foreground, normal, background, ambient",
+                                node.name);
+                }
+                node.importance = importance;
+            }
             // ADR-833 (Phase D §25): the node's semantic words.
             if (item.contains("tags")) {
                 if (!item.at("tags").is_array()) {

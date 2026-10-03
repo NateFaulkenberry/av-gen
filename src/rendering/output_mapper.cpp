@@ -1,4 +1,5 @@
 #include "rendering/output_mapper.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -94,7 +95,7 @@ Result<wgpu::RenderPipeline> OutputMapper::pipelineFor(wgpu::TextureFormat forma
     desc.fragment = &fragment;
 
     context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = context_.device().CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
     std::string error;
     auto future = context_.device().PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "app/live_profile_session.hpp"
 #include "app/cli_batch.hpp"
 #include "app/directing_evaluate.hpp"
 #include "app/directing_plan_file.hpp"
@@ -345,10 +346,74 @@ std::string usageText() {
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default: open maximised)\n"
            "  --log <level>       trace|debug|info|warn|error\n"
-           "  --help\n";
+           "  --help\n" +
+           liveProfileUsage();
 }
 
+namespace {
+Result<AppOptions> parseArgsImpl(int argc, char** argv);
+} // namespace
+
+// ADR-1090: `--live-profile` takes its own flags first (app/live_profile.cpp) and maps them onto the options the two
+// loops already read; everything else goes through the ordinary parser unchanged.
 Result<AppOptions> parseArgs(int argc, char** argv) {
+    if (!hasLiveProfileFlag(argc, argv)) {
+        return parseArgsImpl(argc, argv);
+    }
+    std::vector<std::string> all(argv, argv + argc);
+    LiveProfileArgs lp = parseLiveProfileArgs(all);
+    if (!lp.error.empty()) {
+        return fail("--live-profile: {}", lp.error);
+    }
+    std::vector<char*> rest;
+    for (auto& a : lp.rest) {
+        rest.push_back(a.data());
+    }
+    auto parsed = parseArgsImpl(static_cast<int>(rest.size()), rest.data());
+    if (!parsed) {
+        return parsed;
+    }
+    AppOptions options = std::move(*parsed);
+    const LiveProfileOptions& o = lp.options;
+    options.liveProfile = o;
+    options.liveTargetFps = static_cast<int>(std::lround(o.targetFps));
+    if (const auto level = liveQualityLevelFromToken(o.quality)) {
+        options.liveQuality = {true, *level};
+    } else if (o.quality == "auto") {
+        options.liveQuality = {true, std::nullopt};
+    }
+    if (!o.midi.empty()) {
+        options.midi = o.midi;
+    }
+    if (o.mode == LiveProfileMode::Headless) {
+        options.headless = true;
+        options.width = o.outputWidth;
+        options.height = o.outputHeight;
+        options.sizeGiven = true;
+        options.rangeStart = o.startSeconds;
+    } else {
+        if (options.headless) {
+            return fail("--live-profile --mode live cannot be combined with a headless flag");
+        }
+        // The editor window at a fixed size, so two live profiles lay the editor out alike; the projection window
+        // carries the output size (the frame renders for the projector while projecting).
+        options.width = 1440;
+        options.height = 900;
+        options.sizeGiven = true;
+        options.autoplay = true;
+        options.startProjection = true;
+        if (o.capture) {
+            options.capture = *o.capture; // the editor's own end-of-run capture
+        }
+        if (o.startSeconds > 0.0) {
+            options.startAt = o.startSeconds;
+        }
+    }
+    return options;
+}
+
+namespace {
+Result<AppOptions> parseArgsImpl(int argc, char** argv) {
     AppOptions options;
     auto need = [&](int i, const char* flag) -> Result<std::string> {
         if (i + 1 >= argc) {
@@ -1038,6 +1103,7 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
     }
     return options;
 }
+} // namespace
 
 Application::Application() = default;
 Application::~Application() {
@@ -1231,6 +1297,7 @@ void Application::saveSettings() {
 }
 
 Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
+    initStart_ = std::chrono::steady_clock::now(); // ADR-1090: the profile's load time starts here
     if (!options.headless) {
         recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
         if (auto r = recent_.load(); !r) {
@@ -4386,6 +4453,12 @@ int Application::runLive() {
     // adaptive scale is no longer derivable from the canvas size the run logs at frame 60.
     const int kPhSceneMpx = prof.phase("scene Mpx");
     const int kPhScaleChanges = prof.phase("# live quality changes");
+    // ADR-1090: --live-profile --mode live. The loop below is unchanged; each frame is handed to the profile.
+    bool liveProfileRunning = false;
+    if (options_.liveProfile.enabled) {
+        beginLiveProfile();
+        liveProfileRunning = true;
+    }
     std::uint64_t lastProcGen = scene::proceduralRebuildCount();
     std::uint64_t lastEnvBuild = rendering::environmentBuildCount();
     // Seeded from the composition as it stands *after* the load, so the first frame reports the
@@ -5424,6 +5497,38 @@ int Application::runLive() {
             // the first frames, where FrameTimeline genuinely has no completed frame to report.
             core::interactions().markFrameVisible();
         }
+        bool liveProfileDone = false;
+        if (liveProfileRunning) {
+            LiveProfileFrame f;
+            f.frameMs = stats.frameIntervalMs;
+            f.gpuMs = stats.gpuFrameMs;
+            f.cpuWorkMs = stats.cpuFrameMs;
+            f.waitMs = prof.current(kPhAcquire) + prof.current(kPhPresent);
+            f.outputsMs = prof.current(kPhOutputs);
+            f.uiMs = prof.current(kPhUi) + prof.current(kPhImgui);
+            f.engineUpdateMs = prof.current(kPhEngine);
+            f.renderRecordMs = prof.current(kPhRecord);
+            f.updControlMs = prof.current(kPhUpdControl);
+            f.updSignalsMs = prof.current(kPhUpdSignals);
+            f.updModulationMs = prof.current(kPhUpdMod);
+            f.updControllerMs = prof.current(kPhUpdCtrl);
+            f.updOtherMs = prof.current(kPhUpdOther);
+            f.analysisCatchupMs = prof.current(kPhCatchup);
+            f.meshUploadMs = prof.current(kPhMeshUp);
+            f.textureUploadMs = prof.current(kPhTexUp);
+            f.environmentMs = prof.current(kPhEnvMs);
+            f.render = renderer_->stats().cpu;
+            for (const auto& entry : renderer_->timeline().passes()) {
+                auto it = std::find_if(f.passes.begin(), f.passes.end(),
+                                       [&](const auto& e) { return e.label == entry.label; });
+                if (it == f.passes.end()) {
+                    f.passes.push_back({entry.label, entry.ms});
+                } else {
+                    it->ms += entry.ms;
+                }
+            }
+            liveProfileDone = !noteLiveProfileFrame(f);
+        }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();
@@ -5456,6 +5561,9 @@ int Application::runLive() {
         if (options_.frames >= 0 && framesRendered >= options_.frames) {
             break;
         }
+        if (liveProfileDone) {
+            break;
+        }
         if (context_->deviceLost()) {
             log::error("GPU device lost; exiting");
             return 3;
@@ -5467,6 +5575,10 @@ int Application::runLive() {
             log::error("capture: {}", r.error().message);
             return 4;
         }
+    }
+    if (liveProfileRunning) {
+        // ADR-1090: a profile leaves the layout and the settings as it found them.
+        return finishLiveProfile();
     }
     // The throttle means the last few seconds of toggling may not have reached the disk yet.
     // ImGui saves its own ini from DestroyContext, so the two halves of the layout land together.
@@ -5957,6 +6069,9 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
 }
 
 int Application::runHeadless() {
+    if (options_.liveProfile.enabled) {
+        return runLiveProfileHeadless(); // ADR-1090
+    }
     if (options_.queue) {
         return runQueue(*options_.queue);
     }
@@ -6167,6 +6282,9 @@ int Application::runHeadless() {
         frameStats.reserve(static_cast<std::size_t>(frames));
         for (int i = 0; i < frames; ++i) {
             const auto frameStart = std::chrono::steady_clock::now();
+            // ADR-1090: cleared per frame as the live loop does. Without it the `cpu(update)` line below printed the
+            // stages' running totals since the process started, not the frame's.
+            probe2::frame().clear();
             time = engine_->tick(clock);
             const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
             if (discontinuity != lastTransportDiscontinuity_) {
@@ -6701,7 +6819,14 @@ void Application::stopProjection() {
 void Application::openProjectionWindow() {
     projectionDisplays_ = connectedProjectionDisplays();
     projectionLastScan_ = std::chrono::steady_clock::now();
-    const OutputDesc desc = makeProjectionOutput(settings_.projection, projectionDisplays_);
+    // ADR-1090: a live profile sizes the window to its output (never written to the settings file).
+    AppSettings::Projection projection = settings_.projection;
+    if (projectionWidthOverride_ > 0 && projectionHeightOverride_ > 0) {
+        projection.windowWidth = projectionWidthOverride_;
+        projection.windowHeight = projectionHeightOverride_;
+        projection.fullscreen = false;
+    }
+    const OutputDesc desc = makeProjectionOutput(projection, projectionDisplays_);
     const ProjectionDisplayChoice choice = chooseProjectionDisplay(projectionDisplays_, settings_.projection.display);
     outputs_.remove(kProjectionOutputName);
     auto added = outputs_.add(desc);
@@ -6837,6 +6962,12 @@ void Application::serviceLiveQuality() {
         // history it invalidates is exactly the screen-space history `resize` resets.
         const auto start = std::chrono::steady_clock::now();
         renderer_->setQualitySettings(q);
+        // ADR-1094: the draw-distance lever's CPU half (entity bands, rig rates) rides on the engine's detail limits.
+        if (engine_->detailLimits().distanceScale != q.drawDistanceScale) {
+            scene::DetailLimits limits = engine_->detailLimits();
+            limits.distanceScale = q.drawDistanceScale;
+            engine_->setDetailLimits(limits);
+        }
         const double applyMs =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         if (appliedLiveQuality_.valid) {

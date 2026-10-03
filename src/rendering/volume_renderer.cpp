@@ -1,4 +1,5 @@
 #include "rendering/volume_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/vortex.hpp"
 
@@ -215,7 +216,7 @@ Result<wgpu::RenderPipeline> VolumeRenderer::Impl::finish(const wgpu::RenderPipe
                                                           const char* label) {
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {

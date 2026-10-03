@@ -418,3 +418,41 @@ std::optional<SurfaceClass> surfaceClassFromName(std::string_view name) {
 }
 
 } // namespace avgen::scene
+
+namespace avgen::scene {
+
+// ADR-1097.
+const char* importanceName(Importance importance) {
+    switch (importance) {
+    case Importance::Hero: return "hero";
+    case Importance::Foreground: return "foreground";
+    case Importance::Normal: return "normal";
+    case Importance::Background: return "background";
+    case Importance::Ambient: return "ambient";
+    }
+    return "normal";
+}
+
+bool importanceFromName(std::string_view name, Importance& out) {
+    for (const auto i : {Importance::Hero, Importance::Foreground, Importance::Normal, Importance::Background,
+                         Importance::Ambient}) {
+        if (name == importanceName(i)) {
+            out = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+float importanceLeverWeight(Importance importance) {
+    switch (importance) {
+    case Importance::Hero: return 0.0f;       // exempt
+    case Importance::Foreground: return 0.5f; // half as hard
+    case Importance::Normal: return 1.0f;
+    case Importance::Background: return 1.5f;
+    case Importance::Ambient: return 2.0f;
+    }
+    return 1.0f;
+}
+
+} // namespace avgen::scene

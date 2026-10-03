@@ -1,4 +1,5 @@
 #include "gpu/shader_library.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -149,6 +150,7 @@ Result<wgpu::ShaderModule> ShaderLibrary::compile(const std::string& source, con
     // scope so this call's failures are attributed to this shader.
     context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
     wgpu::ShaderModule module = context_.device().CreateShaderModule(&desc);
+    noteShaderModuleCreated(); // ADR-1091
 
     std::string scopeError;
     auto scopeFuture = context_.device().PopErrorScope(

@@ -117,6 +117,10 @@ struct ParticleFrameContext {
     // not scaled -- changing it destroys and recreates the pool (ADR-015), so a tier change would
     // empty every system mid-shot.
     float spawnScale = 1.0f;
+    // ADR-1098: QualitySettings::particleCullDistance. A system whose emitter is farther than this from the camera
+    // (scaled down by its importance; a hero's never) is skipped for the frame and its pool emptied, like a disabled
+    // one. 0 = no limit. Spline- and scatter-anchored emitters are never culled: they have no single position.
+    float cullDistance = 0.0f;
     glm::mat4 prevViewProj{1.0f};   // ADR-035, for the velocity target
     glm::vec3 cameraPosition{0.0f}; // ribbons face it; the fog coupling marches from it
     float shutterSeconds = 0.0f;    // shutterAngle / 360 * frame duration (ADR-037)
@@ -159,6 +163,8 @@ struct ParticleStats {
     std::uint64_t trailBytes = 0;       // history rings currently allocated
     std::uint32_t dispatches = 0;       // compute passes encoded this frame (one per enabled system)
     std::uint32_t anchors = 0;          // scatter anchors in use this frame, over every anchored system
+    std::uint32_t simulationSteps = 0;  // ADR-1091: simulation steps run this frame, over every system
+    std::uint32_t culledByDistance = 0; // ADR-1098: systems beyond QualitySettings::particleCullDistance
     double simulateMs = -1.0;           // GPU time of the compute passes (emit..compaction) of the last measured frame; -1 = none / unavailable
 };
 

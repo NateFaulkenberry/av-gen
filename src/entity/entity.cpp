@@ -2665,7 +2665,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running() ||
                                  entity.director_.active;
         if (!first && !underOrders && ctx.distanceDetail && entity.desc_.cullDistance > 0.0f &&
-            distance > entity.desc_.cullDistance) {
+            distance > entity.desc_.cullDistance * ctx.distanceScale) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
             // update: no update, and no parameter write either, so the node stays exactly where
             // the scene put it.
@@ -2676,7 +2676,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
 
         double dt = ctx.dt;
         if (!first && ctx.distanceDetail && entity.desc_.fullDetailDistance > 0.0f &&
-            distance > entity.desc_.fullDetailDistance) {
+            distance > entity.desc_.fullDetailDistance * ctx.distanceScale) {
             entity.coarseAccum_ += ctx.dt;
             if (entity.coarseAccum_ < static_cast<double>(entity.desc_.coarseInterval)) {
                 ++counts_.skipped;
@@ -3455,11 +3455,11 @@ void EntityWorld::updateFields(const FieldUpdate& ctx, params::ParameterSet& par
         ++fieldCounts_.governed;
         const glm::vec3 here = e.fieldPosition();
         const float distance = glm::length(here - ctx.viewPosition);
-        if (ctx.distanceDetail && e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance) {
+        if (ctx.distanceDetail && e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance * ctx.distanceScale) {
             continue;
         }
         if (ctx.distanceDetail && e.desc().fullDetailDistance > 0.0f &&
-            distance > e.desc().fullDetailDistance) {
+            distance > e.desc().fullDetailDistance * ctx.distanceScale) {
             e.fieldAccum_ += ctx.dt;
             if (e.fieldAccum_ < static_cast<double>(e.desc().coarseInterval)) {
                 continue;

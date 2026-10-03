@@ -1,4 +1,5 @@
 #include "rendering/procedural_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
@@ -729,7 +730,7 @@ Result<wgpu::ComputePipeline> ProceduralRenderer::Impl::makeCompute(const wgpu::
     desc.compute.entryPoint = entry;
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::ComputePipeline pipeline = device.CreateComputePipeline(&desc);
+    wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -804,7 +805,7 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
 
     const auto& device = context.device();
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -1264,6 +1265,11 @@ void ProceduralRenderer::setFlatTierFromRung(int rung) { flatTierFromRung_ = run
 
 void ProceduralRenderer::setLodHysteresisAllowed(bool allowed) { lodHysteresisAllowed_ = allowed; }
 
+void ProceduralRenderer::setLiveLevers(float lodBias, float drawDistanceScale) {
+    liveLodBias_ = std::max(lodBias, 0.25f);
+    liveDrawDistance_ = std::clamp(drawDistanceScale, 0.05f, 1.0f);
+}
+
 void ProceduralRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
 
 void ProceduralRenderer::collectTimings() {
@@ -1462,7 +1468,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             continue;
         }
         // ---- culling / LOD (ADR-029) ----
-        const scene::LodSettings& lodSettings = object.lod;
+        // ADR-1094: the live levers on the authored ladder, weighted by the object's importance. A copy, so the scene's
+        // own settings (and what an offline render reads) are untouched; at 1, 1 it is the authored ladder exactly.
+        scene::LodSettings liveLod = object.lod;
+        if (liveLodBias_ != 1.0f || liveDrawDistance_ != 1.0f) {
+            const float weight = scene::importanceLeverWeight(object.importance);
+            const float bias = std::max(0.25f, 1.0f + (liveLodBias_ - 1.0f) * weight);
+            const float reach = std::clamp(1.0f - (1.0f - liveDrawDistance_) * weight, 0.05f, 1.0f);
+            if (liveLod.maxDistance > 0.0f) {
+                liveLod.maxDistance *= reach;
+            }
+            for (float& d : liveLod.lodDistances) {
+                // Screen-size thresholds are radii in pixels: a larger one switches sooner. Distances: a smaller one.
+                d = liveLod.lodByScreenSize ? d * bias : d / bias;
+            }
+        }
+        const scene::LodSettings& lodSettings = liveLod;
         const std::uint32_t lodCount =
             static_cast<std::uint32_t>(std::clamp(lodSettings.lodCount, 1, scene::kMaxLodLevels));
         const std::uint32_t instanceCount = static_cast<std::uint32_t>(object.instances.size());

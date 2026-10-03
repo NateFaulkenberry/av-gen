@@ -1,4 +1,5 @@
 #include "rendering/particle_renderer.hpp"
+#include "gpu/resource_stats.hpp"
 
 #include "rendering/scene_targets.hpp" // the five colour targets of the scene pass (ADR-035)
 
@@ -204,7 +205,7 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         desc.compute.module = module;
         desc.compute.entryPoint = entry;
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::ComputePipeline pipeline = device.CreateComputePipeline(&desc);
+        wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
         std::string error;
         auto future = device.PopErrorScope(
             wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -252,7 +253,7 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         desc.multisample.mask = 0xFFFFFFFFu;
         desc.fragment = &fragment;
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+        wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
         std::string error;
         auto future = device.PopErrorScope(
             wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -532,7 +533,18 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         if (pool.needsReset) {
             resetPool(pool);
         }
-        if (!sys.enabled) {
+        // ADR-1098: the live distance cull, treated exactly as a disabled system (the reasons are the comment below).
+        bool culled = false;
+        if (frame_.cullDistance > 0.0f && sys.shape != scene::EmitterShape::Spline &&
+            !sys.scatterAnchor.active()) {
+            const float weight = scene::importanceLeverWeight(sys.importance);
+            const float reach = std::max({sys.extent.x, sys.extent.y, sys.extent.z, 0.0f});
+            if (weight > 0.0f && glm::length(sys.position - frame_.cameraPosition) - reach > frame_.cullDistance / weight) {
+                culled = true;
+                ++stats_.culledByDistance;
+            }
+        }
+        if (!sys.enabled || culled) {
             // Emptied on the frame it goes off, not on the frame it comes back. A pool that is
             // merely skipped keeps its particles at the age and the position they had when the
             // system was disabled, and the next enabled frame resumes them wherever the emitter
@@ -754,6 +766,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         cdesc.timestampWrites = (timeline_ != nullptr && !warming_) ? timeline_->mark("particles") : nullptr;
         ++encoded;
         ++stats_.dispatches;
+        ++stats_.simulationSteps; // ADR-1091: one emit-and-simulate step per enabled system per frame
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
         cp.SetBindGroup(0, pool.computeGroup);
         if (emitCount > 0) {

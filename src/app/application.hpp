@@ -9,6 +9,7 @@
 #include "app/engine.hpp"
 #include "app/interactive_resolution.hpp"
 #include "app/viewport_camera.hpp"
+#include "app/live_profile.hpp"
 #include "scene/camera_rig.hpp"
 #include "app/placement.hpp"
 #include "app/viewport_pick.hpp"
@@ -73,6 +74,10 @@ namespace avgen::ui {
 class ImGuiLayer;
 class ControlPanel;
 } // namespace avgen::ui
+
+namespace avgen::rendering {
+struct RenderStats;
+} // namespace avgen::rendering
 
 namespace avgen::app {
 
@@ -327,6 +332,8 @@ struct AppOptions {
     bool sizeGiven = false;
     log::Level logLevel = log::Level::Info;
     bool showHelp = false;
+    // ADR-1090: `--live-profile` and its own flags (app/live_profile.hpp). Enabled = profile and exit.
+    LiveProfileOptions liveProfile;
 };
 
 Result<AppOptions> parseArgs(int argc, char** argv);
@@ -343,6 +350,23 @@ private:
     double lastEngineUpdateMs_ = 0.0; // CPU cost of rebuilding the scene, per frame
     int runLive();
     int runHeadless();
+    // ADR-1090: `--live-profile`. Headless: its own fixed-step loop (app/live_profile_run.cpp). Live: the editor loop
+    // runs as always and hands each frame to `noteLiveProfileFrame`, which ends the run when measurement is done.
+    int runLiveProfileHeadless();
+    struct LiveProfileSession;
+    std::unique_ptr<LiveProfileSession> liveProfileSession_;
+    void beginLiveProfile();
+    // Returns false when the profile is finished and the loop should end.
+    bool noteLiveProfileFrame(const LiveProfileFrame& frame);
+    int finishLiveProfile();
+    void fillLiveProfileResources(LiveProfileRecord& record, const std::vector<rendering::RenderStats>& stats);
+    void fillLiveProfileConditions(LiveProfileRecord& record, bool live);
+    // Stage 5 groundwork (data only): per-entity projected area, distance and hero flag.
+    void fillLiveProfileEntities(LiveProfileRecord& record);
+    int writeLiveProfile(LiveProfileRecord& record);
+    std::chrono::steady_clock::time_point initStart_{};
+    // ADR-1090: the profile's output size for the projection window, in points (never written to the settings file).
+    std::uint32_t projectionWidthOverride_ = 0, projectionHeightOverride_ = 0;
     void loadAudio(const std::filesystem::path& path);
     // Asks for `path` to be opened at the top of the next frame, so the canvas can say so first.
     // See the note at the definition for why the load itself stays on the main thread.

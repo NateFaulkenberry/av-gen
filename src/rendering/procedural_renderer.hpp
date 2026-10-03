@@ -325,6 +325,9 @@ public:
     // A static_assert in the .cpp pins it to `MaterialTier::Flat`.
     static constexpr int MaterialTierFlatValue = 2;
     void setLodHysteresisAllowed(bool allowed);
+    // ADR-1094: the live LOD bias and draw-distance scale (QualitySettings::lodBias / drawDistanceScale), applied to each
+    // object's authored LodSettings weighted by its importance (a hero's are left as authored). 1, 1 = as authored.
+    void setLiveLevers(float lodBias, float drawDistanceScale);
     void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
@@ -392,6 +395,8 @@ private:
     std::size_t cacheFrames_ = 120;
     // ADR-146: false forces the cull ladder's dead zone to zero whatever the scene authored.
     bool lodHysteresisAllowed_ = true;
+    float liveLodBias_ = 1.0f;
+    float liveDrawDistance_ = 1.0f;
     int flatTierFromRung_ = -1; // ADR-155
 };
 

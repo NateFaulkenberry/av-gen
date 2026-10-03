@@ -49,6 +49,11 @@ struct DetailLimits {
     // the far herd is motionless is the artifact this removes -- but it does mean a render with
     // this lifted is not frame-identical to a preview with it in force.
     bool entityDistanceCull = true;
+    // ADR-1094: the live draw-distance lever (QualitySettings::drawDistanceScale) on the CPU side -- the entity bands
+    // (`cullDistance`, `fullDetailDistance`) and the rig rates' distances are measured as if everything were
+    // 1/distanceScale further away. 1 = as authored; only the live editor and a live profile move it, and an offline
+    // render's limits (`offlineDefault`, `unlimited`) leave it at 1. Like the bands it scales, it moves the simulation.
+    float distanceScale = 1.0f;
 
     // Everything lifted. What `--render-limits unlimited` means, and not what the offline tier
     // takes -- see `offlineDefault` for why.
