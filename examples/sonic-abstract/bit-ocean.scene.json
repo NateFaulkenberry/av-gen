@@ -29,7 +29,7 @@
    0.09759,
    0.57758
   ],
-  "volumeDensity": 0.007,
+  "volumeDensity": 0.0052,
   "volumeMaxDistance": 0.0,
   "skyIntensity": 1.0,
   "sky": {
@@ -1848,6 +1848,522 @@
    }
   },
   {
+   "name": "laneCoralshallows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-coral.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 22,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.5184364492350666,
+     "endAngle": 0.47123889803846897
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      1.5,
+      1.5
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.10224,
+      0.19462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.10224,
+      0.19462
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.5,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 170,
+     "randomPosition": [
+      13.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "laneBrainshallows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.8,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 18,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4835298641951802,
+     "endAngle": 0.43633231299858233
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.62396,
+      0.0137
+     ],
+     "emissiveColor": [
+      1.0,
+      0.62396,
+      0.0137
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 180,
+     "randomPosition": [
+      14.0,
+      0.0,
+      12.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "laneCoralruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-coral.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 22,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.5759586531581289,
+     "endAngle": 2.5656340004316647
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      1.5,
+      1.5
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.5,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 171,
+     "randomPosition": [
+      13.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "laneBrainruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.8,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 18,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6108652381980155,
+     "endAngle": 2.5307274153917776
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.07819,
+      0.43415
+     ],
+     "emissiveColor": [
+      1.0,
+      0.07819,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 181,
+     "randomPosition": [
+      14.0,
+      0.0,
+      12.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "laneCoraldeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-coral.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 22,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.670353755551324,
+     "endAngle": 4.6600291028248595
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      1.5,
+      1.5
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.32314,
+      0.02315
+     ],
+     "emissiveColor": [
+      1.0,
+      0.32314,
+      0.02315
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.5,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 172,
+     "randomPosition": [
+      13.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "laneBraindeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.8,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 18,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7052603405912112,
+     "endAngle": 4.625122517784973
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.19462,
+      0.01033
+     ],
+     "emissiveColor": [
+      1.0,
+      0.19462,
+      0.01033
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 182,
+     "randomPosition": [
+      14.0,
+      0.0,
+      12.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
    "name": "arch",
    "kind": "procedural",
    "procedural": {
@@ -2084,8 +2600,8 @@
    "procedural": {
     "source": {
      "kind": "cylinder",
-     "radius": 1.0,
-     "height": 0.25,
+     "radius": 1.6,
+     "height": 0.35,
      "radialSegments": 8,
      "caps": true
     },
@@ -2126,7 +2642,7 @@
       0.7454,
       0.13287
      ],
-     "emissiveIntensity": 0.15,
+     "emissiveIntensity": 0.45,
      "roughness": 0.7,
      "metallic": 0.0,
      "toon": {
@@ -2138,7 +2654,7 @@
        0.1,
        0.32
       ],
-      "ambient": 0.75,
+      "ambient": 0.8,
       "rimWidth": 0.0,
       "rimColor": [
        0.80695,
@@ -6684,47 +7200,75 @@
    }
   },
   {
+   "name": "laneRing",
+   "kind": "spline",
+   "spline": {
+    "kind": "catmullRom",
+    "generator": "circle",
+    "closed": true,
+    "count": 64,
+    "radius": 118.0,
+    "center": [
+     0.0,
+     3.0,
+     0.0
+    ],
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "samplesPerSegment": 8
+   }
+  },
+  {
    "name": "bubbles",
    "kind": "particles",
    "particles": {
     "enabled": true,
-    "capacity": 6000,
+    "capacity": 9000,
     "seed": 3,
-    "shape": "disc",
+    "shape": "spline",
+    "spline": "laneRing",
     "position": [
      0.0,
-     0.5,
+     0.0,
      0.0
     ],
     "extent": [
-     188.0,
+     16.0,
      0.5,
-     188.0
+     16.0
     ],
     "direction": [
      0.0,
      1.0,
      0.0
     ],
-    "spawnRate": 260.0,
-    "lifetimeMin": 9.0,
-    "lifetimeMax": 14.0,
-    "spread": 0.08,
-    "speedMin": 2.0,
-    "speedMax": 3.4,
+    "spawnRate": 520.0,
+    "lifetimeMin": 5.0,
+    "lifetimeMax": 8.0,
+    "spread": 0.06,
+    "speedMin": 2.4,
+    "speedMax": 4.0,
     "gravity": [
      0,
      0,
      0
     ],
     "drag": 0.0,
-    "sizeStart": 0.45,
-    "sizeEnd": 0.65,
+    "sizeStart": 0.55,
+    "sizeEnd": 0.85,
     "colorStart": [
-     0.80695,
-     0.96469,
      1.0,
-     0.85
+     1.0,
+     1.0,
+     0.9
     ],
     "colorEnd": [
      0.521,
@@ -6732,10 +7276,10 @@
      1.0,
      0.0
     ],
-    "emissive": 1.4,
+    "emissive": 1.6,
     "blend": "additive",
-    "turbulence": 0.4,
-    "turbulenceScale": 0.1
+    "turbulence": 0.5,
+    "turbulenceScale": 0.12
    }
   },
   {
@@ -6862,16 +7406,16 @@
    "name": "sun",
    "type": "directional",
    "direction": [
-    0.25,
-    -0.92,
-    -0.3
+    0.3,
+    -0.88,
+    -0.36
    ],
    "color": [
-    0.80695,
-    0.96469,
-    1.0
+    1.0,
+    0.93869,
+    0.80695
    ],
-   "intensity": 3.0,
+   "intensity": 3.6,
    "castsShadow": false
   }
  ],

@@ -261,6 +261,39 @@
   },
   {
    "source": "response.bass",
+   "target": "procedural/laneBrainshallows/transform/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/laneBrainruins/transform/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/laneBraindeep/transform/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
    "target": "lights/sun/intensity",
    "amount": 1.2,
    "op": "add",
@@ -520,6 +553,39 @@
   {
    "source": "response.intensity",
    "target": "procedural/braindeep/transform/scale",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/laneBrainshallows/transform/scale",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/laneBrainruins/transform/scale",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/laneBraindeep/transform/scale",
    "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -908,6 +974,72 @@
   {
    "source": "notes.polyphony",
    "target": "procedural/braindeep/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBrainshallows/transform/scale",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBrainshallows/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBrainruins/transform/scale",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBrainruins/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBraindeep/transform/scale",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/laneBraindeep/material/emissive",
    "amount": 1.6,
    "op": "add",
    "polarity": "unipolar",

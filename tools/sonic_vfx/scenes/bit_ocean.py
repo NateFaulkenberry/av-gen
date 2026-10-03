@@ -41,6 +41,7 @@ AREAS = [
 ]
 SHADOW = (0.06, 0.1, 0.32)
 BRICKS = ["#ff8a3a", "#ff6fb0", "#56d85a"]     # the ledges' bricks, per area
+LANE_CORAL = ["#ff5a7a", "#2fe8d0", "#ff9a2a"]  # the low coral in the lane, per area
 
 DESIGN = {
     "category": "game world",
@@ -105,7 +106,8 @@ def floor_height(x, z):
     r, th = polar(x, z)
     d = abs(r - RC)
     n = mx.fbm(x / 26.0, z / 26.0, 3, 3)
-    h = 1.0 + 2.2 * n + 2.5 * mx.smooth(LANE + 4.0, 58.0, d)
+    side = mx.smooth(LANE + 4.0, 58.0, d)
+    h = 1.0 + (1.0 if n > 0.64 else 0.0) * (1.0 - side) + (2.0 + 2.6 * n) * side   # the lane one block deep
     if r > RC + 48.0:
         h += 5.0 * mx.smooth(RC + 48.0, RC + 70.0, r) * (0.6 + 0.8 * mx.fbm(x / 14.0, z / 14.0, 9, 2))
     if r < RC - 48.0:
@@ -224,7 +226,7 @@ def generate_meshes():
 
 
 # ================================================================================================ materials, programs
-def toon(hexc, bands=2, ambient=0.5, emissive=0.0, rim=0.0, spec=0.0, program=None, emissive_col=None):
+def toon(hexc, bands=2, ambient=0.44, emissive=0.0, rim=0.0, spec=0.0, program=None, emissive_col=None):
     m = {"baseColor": hexrgb(hexc), "emissiveColor": hexrgb(emissive_col or hexc), "emissiveIntensity": float(emissive),
          "roughness": 0.7, "metallic": 0.0,
          "toon": {"bands": bands, "softness": 0.02, "terminator": 0.08, "shadowColor": list(SHADOW),
@@ -301,7 +303,7 @@ def lane_angle(arc_m):
 
 # ================================================================================================ the instrument
 KELP = ["kelp%s%d" % (a[0], k) for a in AREAS for k in range(2)]
-BRAIN = ["brain" + a[0] for a in AREAS]
+BRAIN = ["brain" + a[0] for a in AREAS] + ["laneBrain" + a[0] for a in AREAS]
 
 
 def instrument(s):
@@ -407,12 +409,12 @@ def build():
                   "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
     s.environment = {
         "intensity": 0.55, "background": hexrgb(AREAS[0][8]), "fogColor": hexrgb(AREAS[0][8]),
-        "volumeDensity": 0.007, "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
+        "volumeDensity": 0.0052, "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
         "sky": {"enabled": True, "zenithColor": hexrgb("#2aa4f4"), "horizonColor": hexrgb("#0d4ab0"),
                 "groundColor": hexrgb("#062a6e"), "haze": 0.5, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    s.light("sun", "directional", direction=[0.25, -0.92, -0.3], color=hexrgb("#e8fbff"), intensity=3.0,
+    s.light("sun", "directional", direction=[0.3, -0.88, -0.36], color=hexrgb("#fff8e8"), intensity=3.6,
             castsShadow=False)
     s.program(floor_program())
 
@@ -457,6 +459,17 @@ def build():
                variation=v, material=toon(area[6], ambient=0.62, rim=0.25, emissive_col=area[6]),
                transform={"position": [0, 4.5, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
+    # ---- low set dressing scattered in the lane itself (the swim passes over it): the foreground's parallax
+    for a, area in enumerate(AREAS):
+        d, v = sector(a, 22, RC, jitter=(13.0, 0.0, 10.0), seed=170 + a, margin=3.0)
+        s.proc("laneCoral" + area[0], {"kind": "mesh", "asset": "meshes/bo-coral.glb"}, distribution=d, variation=v,
+               material=toon(LANE_CORAL[a], ambient=0.5, rim=0.25),
+               transform={"position": [0.0, 3.0, 0.0], "rotation": [0, 0, 0], "scale": [1.5, 1.5, 1.5]})
+        d, v = sector(a, 18, RC, jitter=(14.0, 0.0, 12.0), seed=180 + a, margin=5.0)
+        s.proc("laneBrain" + area[0], {"kind": "sphere", "radius": 1.8, "segments": 8, "rings": 6}, distribution=d,
+               variation=v, material=toon(area[6], ambient=0.55, rim=0.3, emissive_col=area[6]),
+               transform={"position": [0.0, 3.6, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
+
     # ---- AREA 1, SUNNY SHALLOWS: the coral arch you enter by, branch coral, the coin trail
     arch_deg = lane_angle(70.0)
     s.proc("arch", {"kind": "torus", "majorRadius": 21.0, "minorRadius": 2.8, "majorSegments": 12, "minorSegments": 5},
@@ -476,8 +489,8 @@ def build():
                   "space": "local"}]
     d, v = sector(0, 34, RC, jitter=(0.0, 0.0, 0.0), seed=1, margin=14.0)
     v = {"seed": 3, "randomPosition": [0.0, 0.0, 0.0]}
-    s.proc("coins", {"kind": "cylinder", "radius": 1.0, "height": 0.25, "radialSegments": 8, "caps": True},
-           distribution=d, material=toon("#ffd23a", ambient=0.75, spec=0.8, emissive=0.15, emissive_col="#ffe066"),
+    s.proc("coins", {"kind": "cylinder", "radius": 1.6, "height": 0.35, "radialSegments": 8, "caps": True},
+           distribution=d, material=toon("#ffd23a", ambient=0.8, spec=0.8, emissive=0.45, emissive_col="#ffe066"),
            deformers=coin_spin + [{"kind": "sine", "amount": 3.0, "frequency": 0.09, "speed": 0.0, "phase": 0.0,
                                    "axis": [1.0, 0.0, 0.0], "displacementAxis": [0.0, 1.0, 0.0], "space": "world"}],
            transform={"position": [0.0, 8.0, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
@@ -585,12 +598,15 @@ def build():
             loop=PERIOD * 0.6, mode="add")
 
     # ---- bubbles everywhere (rising), a burst round the swimmer (drums, notes), sparkles (highs)
-    s.particles("bubbles", capacity=6000, seed=3, shape="disc", position=[0.0, 0.5, 0.0],
-                extent=[RC + 70.0, 0.5, RC + 70.0], direction=[0.0, 1.0, 0.0], spawnRate=260.0, lifetimeMin=9.0,
-                lifetimeMax=14.0, spread=0.08, speedMin=2.0, speedMax=3.4, gravity=[0, 0, 0], drag=0.0,
-                sizeStart=0.45, sizeEnd=0.65, colorStart=hexrgb("#e8fbff") + [0.85],
-                colorEnd=hexrgb("#bff4ff") + [0.0], emissive=1.4, blend="additive", turbulence=0.4,
-                turbulenceScale=0.1)
+    s.nodes.append({"name": "laneRing", "kind": "spline", "spline": {
+        "kind": "catmullRom", "generator": "circle", "closed": True, "count": 64, "radius": RC,
+        "center": [0.0, 3.0, 0.0], "axis": [0.0, 1.0, 0.0], "up": [0.0, 0.0, 1.0], "samplesPerSegment": 8}})
+    s.particles("bubbles", capacity=9000, seed=3, shape="spline", spline="laneRing", position=[0.0, 0.0, 0.0],
+                extent=[16.0, 0.5, 16.0], direction=[0.0, 1.0, 0.0], spawnRate=520.0, lifetimeMin=5.0,
+                lifetimeMax=8.0, spread=0.06, speedMin=2.4, speedMax=4.0, gravity=[0, 0, 0], drag=0.0,
+                sizeStart=0.55, sizeEnd=0.85, colorStart=hexrgb("#ffffff") + [0.9],
+                colorEnd=hexrgb("#bff4ff") + [0.0], emissive=1.6, blend="additive", turbulence=0.5,
+                turbulenceScale=0.12)
     s.particles("burst", capacity=4000, seed=7, shape="sphere", position=[0.0, 8.0, 0.0], extent=[6.0, 6.0, 6.0],
                 direction=[0.0, 1.0, 0.0], spawnRate=0.0, lifetimeMin=2.0, lifetimeMax=3.5, spread=0.5,
                 speedMin=3.0, speedMax=7.0, gravity=[0.0, 2.5, 0.0], drag=0.6, sizeStart=0.35, sizeEnd=0.9,
