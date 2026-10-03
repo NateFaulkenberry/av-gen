@@ -42,6 +42,8 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <string_view>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 #include <span>
 #include <string_view>
@@ -2837,20 +2839,34 @@ void Composition::cullEntityNodes() {
         const CullBounds bounds = entityCullBounds(scene_, entity);
         entity.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
     };
-    for (const auto& entityPtr : entityWorld_.entities()) {
-        const CompositionNode* node = findNode(entityPtr->desc().driven());
-        if (node == nullptr) {
-            continue;
+    // ADR-1082: each entity is culled once. EntityWorld-driven characters go first, over their node
+    // ranges, so those ranges stay authoritative (an invalid mesh there is marked visible); every
+    // other entity -- authored mesh nodes, static glTF objects -- goes through the same box in the
+    // second loop. Before, the second loop re-culled the characters the first had just done, which
+    // CPU-skinned every character twice more per frame, and the first found each node's range by a
+    // linear scan of the node list per character.
+    std::vector<std::uint8_t> done(scene_.entities.size(), 0);
+    if (!entityWorld_.entities().empty()) {
+        // By name, first node of a name wins -- `findNode`'s rule -- built once per call instead of a
+        // scan per character.
+        std::unordered_map<std::string_view, std::size_t> nodeIndex;
+        nodeIndex.reserve(nodes_.size());
+        for (std::size_t i = 0; i < nodes_.size(); ++i) {
+            nodeIndex.emplace(nodes_[i]->name, i);
         }
-        const std::size_t index = static_cast<std::size_t>(node - nodes_.front().get());
-        (void)index;
-        for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
-            if (nodes_[i].get() != node) {
+        for (const auto& entityPtr : entityWorld_.entities()) {
+            const auto at = nodeIndex.find(entityPtr->desc().driven());
+            if (at == nodeIndex.end() || at->second >= ranges_.size()) {
                 continue;
             }
-            const NodeRange& range = ranges_[i];
+            const NodeRange& range = ranges_[at->second];
             for (std::size_t k = 0; k < range.entityCount && range.firstEntity + k < scene_.entities.size(); ++k) {
-                Entity& e = scene_.entities[range.firstEntity + k];
+                const std::size_t index = range.firstEntity + k;
+                if (done[index] != 0) {
+                    continue;
+                }
+                done[index] = 1;
+                Entity& e = scene_.entities[index];
                 if (e.mesh == kInvalidMesh || e.mesh >= scene_.meshes.size()) {
                     e.cameraCulled = false;
                     continue;
@@ -2858,14 +2874,15 @@ void Composition::cullEntityNodes() {
                 const CullBounds bounds = entityCullBounds(scene_, e);
                 e.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
             }
-            break;
         }
     }
     // EntityWorld-driven characters are handled above so their semantic node ranges remain
     // authoritative. Ordinary authored mesh nodes have no EntityWorld entry, but they still need
     // the same camera visibility contract for characters and static glTF objects.
-    for (Entity& entity : scene_.entities) {
-        cullEntity(entity);
+    for (std::size_t i = 0; i < scene_.entities.size(); ++i) {
+        if (done[i] == 0) {
+            cullEntity(scene_.entities[i]);
+        }
     }
 }
 

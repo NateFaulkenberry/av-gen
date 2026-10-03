@@ -296,6 +296,41 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1081: the live editor turns the per-object records off; a named entity turns them back on
+// for its frames, and the picture does not depend on either.
+TEST_CASE("SceneRenderer builds per-object diagnostics only for a consumer when records are off",
+          "[gpu][renderer][forensics][live-quality]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto scene = cubeScene();
+    FrameTime time{};
+
+    CHECK(renderer.diagnosticRecords()); // the default every existing reader relies on
+    auto withRecords = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(withRecords.has_value());
+    CHECK(renderer.diagnosticRecordsBuilt());
+    CHECK(renderer.diagnosticFrame().objects.size() == scene.entities.size());
+
+    renderer.setDiagnosticRecords(false);
+    auto without = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(without.has_value());
+    CHECK_FALSE(renderer.diagnosticRecordsBuilt());
+    CHECK(renderer.diagnosticFrame().objects.empty());
+    CHECK(renderer.diagnosticObject("cube") == nullptr);
+    // The frame-level fields are still there; only the per-object loop is skipped.
+    CHECK(renderer.diagnosticFrame().cameraPosition == scene.camera.position);
+    CHECK(gpu::hashImage(*withRecords) == gpu::hashImage(*without));
+
+    renderer.setDiagnosticEntity("cube"); // a consumer: the selected-entity panel and its trail
+    REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+    CHECK(renderer.diagnosticRecordsBuilt());
+    REQUIRE(renderer.diagnosticObject("cube") != nullptr);
+    CHECK(renderer.diagnosticObject("cube")->submitted);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SceneRenderer does not reuse same-version meshes across scenes", "[gpu][renderer][forensics]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

@@ -575,6 +575,18 @@ public:
     // retain references into it across renders.
     void setDiagnosticEntity(std::string name) { diagnosticEntity_ = std::move(name); }
     [[nodiscard]] const std::string& diagnosticEntity() const { return diagnosticEntity_; }
+    // ADR-1081: whether the per-object records (`diagnosticFrame().objects`) are built when nothing
+    // has named a diagnostic entity. On by default, so a test, a probe or a tool that reads the
+    // records off a renderer it made gets them exactly as before. The live editor turns it off: the
+    // records cost 1.5 ms of a Glowmere frame (two posed-bounds evaluations per skinned entity, a
+    // name copy and a material hash, for every entity) and their only live readers are the selected
+    // entity's panel and its trail, which name the entity -- and a named entity turns the records
+    // back on for that frame whatever this says. The frame-level fields (camera, matrices, planes,
+    // viewport) are always filled; they are a few dozen bytes and the aux debug view reads them.
+    void setDiagnosticRecords(bool on) { diagnosticRecords_ = on; }
+    [[nodiscard]] bool diagnosticRecords() const { return diagnosticRecords_; }
+    // True when the last render built the per-object records.
+    [[nodiscard]] bool diagnosticRecordsBuilt() const { return diagnosticRecordsBuilt_; }
     [[nodiscard]] const RendererDiagnosticFrame& diagnosticFrame() const { return diagnosticFrame_; }
     [[nodiscard]] const RenderObjectDiagnostic* diagnosticObject(std::string_view name) const;
 
@@ -1167,6 +1179,8 @@ private:
     bool haveFrozenCamera_ = false;
 
     std::string diagnosticEntity_;
+    bool diagnosticRecords_ = true;       // ADR-1081
+    bool diagnosticRecordsBuilt_ = false; // ADR-1081: this frame's records exist
     RendererDiagnosticFrame diagnosticFrame_;
     std::optional<RenderObjectDiagnostic> previousDiagnosticObject_;
     RendererDiagnosticFrame previousDiagnosticFrame_;

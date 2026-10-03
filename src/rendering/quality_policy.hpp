@@ -99,7 +99,8 @@ struct QualityPolicy {
                !materialTier.enabled && !settings.materialTiers &&
                settings.forcedMaterialTier == MaterialTier::Full && settings.renderScale == 1.0f &&
                settings.shadowMaskScale == 1.0f && settings.aoResolutionScale == 1.0f &&
-               settings.antialiasFloor == 0.0f; // ADR-1024: a render is exactly as authored
+               settings.antialiasFloor == 0.0f && // ADR-1024: a render is exactly as authored
+               settings.motionBlur && settings.depthOfField; // ADR-1083: the live gates are open
     }
 };
 

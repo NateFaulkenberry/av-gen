@@ -309,6 +309,14 @@ struct QualitySettings {
     // default tier.
     float antialiasFloor = 0.0f;
 
+    // ADR-1083: the live quality ladder's gates on two of the scene's own post effects. They are
+    // permissions, not settings: on, the scene's `post.motionBlurAmount` and `post.dofEnabled` run
+    // exactly as authored; off, the frame skips that pass whatever the scene says. Like
+    // `antialiasFloor` they exist for the live editor only -- every tier leaves them on, and an
+    // offline render is asserted to (QualityPolicy::assertOfflineIsUncompromised).
+    bool motionBlur = true;
+    bool depthOfField = true;
+
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.
     [[nodiscard]] std::uint32_t localLightBudget(MaterialTier tier) const {

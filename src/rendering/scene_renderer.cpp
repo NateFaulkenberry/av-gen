@@ -2810,11 +2810,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     diagnosticFrame_.viewportWidth = hdr_.width();
     diagnosticFrame_.viewportHeight = hdr_.height();
     const FrustumPlanes diagnosticPlanes = frustumPlanes(diagnosticFrame_.viewProjection);
-    diagnosticFrame_.objects.reserve(scene.entities.size());
+    // ADR-1081: the per-object records only when something will read them. The finiteness check
+    // below is not a diagnostic -- it refuses the frame -- so it runs either way.
+    diagnosticRecordsBuilt_ = diagnosticRecords_ || !diagnosticEntity_.empty();
+    if (diagnosticRecordsBuilt_) {
+        diagnosticFrame_.objects.reserve(scene.entities.size());
+    }
     for (const scene::Entity& entity : scene.entities) {
         const glm::mat4 model = entity.transform.matrix();
         if (!finiteMatrix(model)) {
             return fail("scene render: entity '{}' produced a non-finite model matrix", entity.name);
+        }
+        if (!diagnosticRecordsBuilt_) {
+            continue;
         }
         RenderObjectDiagnostic diagnostic;
         diagnostic.name = entity.name;
@@ -3526,11 +3534,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
-        RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
-        diagnostic.objectSlot = objectIndex;
-        diagnostic.bufferOffset = offset;
-        diagnostic.submitted = true;
-        diagnostic.cullReason = "submitted";
+        if (diagnosticRecordsBuilt_) {
+            RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
+            diagnostic.objectSlot = objectIndex;
+            diagnostic.bufferOffset = offset;
+            diagnostic.submitted = true;
+            diagnostic.cullReason = "submitted";
+        }
         ++objectIndex;
         DrawItem out{offset, &entity, depth, skin};
         out.fxTwoSided = fxTwoSided;
@@ -4441,6 +4451,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         // ADR-1024: the live floor on the scene's FXAA. 0 everywhere but the live editor.
         postSettings.antialias = std::max(postSettings.antialias, qualitySettings_.antialiasFloor);
+        // ADR-1083: the live ladder's gates. Closed, the pass is skipped as though the scene had not
+        // asked for it (amount 0 / disabled are the post chain's own "off"); open, nothing changes.
+        if (!qualitySettings_.motionBlur) {
+            postSettings.motionBlurAmount = 0.0f;
+        }
+        if (!qualitySettings_.depthOfField) {
+            postSettings.dofEnabled = false;
+        }
         postIn.settings = &postSettings;
         postIn.antialias = toggles_.antialias; // ADR-187
         postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite
