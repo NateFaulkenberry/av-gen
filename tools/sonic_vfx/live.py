@@ -114,6 +114,9 @@ def main():
     with open(script, "w") as f:
         f.write("set -e\n")
         f.write("export AVGEN_SHADER_DIR=%s/shaders\n" % b)
+        # the switcher's sets come from the examples index; a pinned binary would otherwise find the index of the
+        # commit it was built from (its AVGEN_SOURCE_DIR), not this tree's (ADR-1074)
+        f.write("export AVGEN_EXAMPLES_DIR=%s\n" % os.path.join(REPO, "examples"))
         # The editor first, listening to every MIDI source: a source that appears later connects on arrival only
         # without a name filter (with one, a source missing at start-up is never retried). Then the probe, whose
         # virtual source appears and connects, with a lead-in while the editor finishes starting.
