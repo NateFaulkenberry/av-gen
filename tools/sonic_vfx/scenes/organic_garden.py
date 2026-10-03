@@ -119,7 +119,8 @@ def at(x, y, z, rot=(0, 0, 0), sc=(1, 1, 1)):
 
 VOICES = 6
 BUD_REST = 0.32       # a closed bud at rest; a held note opens it to full size
-BUDS = [(-2.9, 0.0, -1.9), (-2.1, 0.0, -2.6), (-1.2, 0.0, -2.9), (2.3, 0.0, -2.2), (3.0, 0.0, -1.3), (2.6, 0.0, -0.4)]
+BUDS = [(-2.1, 0.0, -2.6), (-1.2, 0.0, -3.1), (-0.2, 0.0, -2.9), (0.55, 0.0, -2.3), (0.95, 0.0, -3.4),
+        (0.15, 0.0, -1.5)]
 BUD_COLS = [CORAL, ORCHID, PEACH, CYAN, LIME, ORCHID]
 
 
@@ -218,8 +219,22 @@ def build():
            transform=at(BELL[0], BELL[1] + 0.06, BELL[2]),
            extra={"sourceTransform": {"position": [0.0, 0.0, 0.0], "rotation": [52.0, 0.0, 0.0],
                                       "scale": [0.34, 0.13, 1.0]}})
+    s.proc("bellInner", {"kind": "sphere", "radius": 0.3, "segments": 16, "rings": 10},
+           distribution={"kind": "radial", "count": 8, "radius": 0.12, "plane": "xz", "orientation": "outward"},
+           material=jelly(ORCHID, 2.4), transform=at(BELL[0], BELL[1] + 0.1, BELL[2]),
+           extra={"sourceTransform": {"rotation": [24.0, 0.0, 0.0], "scale": [0.36, 0.12, 0.85]}})
     s.proc("heart", {"kind": "sphere", "radius": 0.15, "segments": 16, "rings": 10},
            material=jelly(PEACH, 6.0), transform=at(BELL[0], BELL[1] - 0.06, BELL[2]))
+    # seven stamens hang from the heart, each ending in a glowing bead
+    s.proc("stamens", tube([(0.0, 0.0, 0.0), (0.0, -0.17, 0.06), (0.0, -0.36, 0.11), (0.0, -0.52, 0.13)], 0.012,
+                           taper=0.5, sides=6, segments=14),
+           distribution={"kind": "radial", "count": 7, "radius": 0.05, "plane": "xz", "orientation": "outward"},
+           material=jelly(PEACH, 2.0), transform=at(BELL[0], BELL[1] - 0.1, BELL[2]),
+           deformers=[{"kind": "sine", "amount": 0.025, "frequency": 4.0, "speed": 1.6, "axis": [0.0, 1.0, 0.0],
+                       "displacementAxis": [1.0, 0.0, 0.0], "space": "local"}])
+    s.proc("stamenTips", {"kind": "sphere", "radius": 0.028, "segments": 10, "rings": 6},
+           distribution={"kind": "radial", "count": 7, "radius": 0.18, "plane": "xz", "orientation": "outward"},
+           material=jelly("#fff2c8", 7.0), transform=at(BELL[0], BELL[1] - 0.62, BELL[2]))
     s.light("heartLight", "point", position=[BELL[0], BELL[1] - 0.15, BELL[2]], color=hexrgb(PEACH),
             intensity=6.0, range=6.0, castsShadow=False)
 
@@ -245,7 +260,7 @@ def build():
     shroom_dist = {"kind": "spiral", "count": 7, "radius": 0.25, "radiusGrowth": 0.55, "turns": 1.15,
                    "plane": "xz", "center": [0.0, 0.0, 0.0]}
     shroom_var = {"seed": 31, "randomScale": [0.0, 0.0, 0.0], "uniformScale": 0.45, "randomRotation": [0.12, 3.1, 0.12]}
-    shroom_at = at(1.25, 0.0, 0.35)
+    shroom_at = {"position": [0.62, 0.0, -1.75], "rotation": [0, 0, 0], "scale": [2.1, 2.1, 2.1]}
     s.proc("stems", {"kind": "cylinder", "radius": 0.07, "height": 0.62, "radialSegments": 12, "caps": True},
            distribution=shroom_dist, variation=shroom_var, material=jelly(MINT, 0.9), transform=shroom_at,
            extra={"sourceTransform": {"position": [0.0, 0.31, 0.0]}})
@@ -285,7 +300,7 @@ def build():
 
     # ---- six voice flowers along the meadow (closed at rest: their petals at scale 0)
     for k, (x, y, z) in enumerate(BUDS):
-        h = 0.7 + 0.15 * (k % 3)
+        h = 1.45 + 0.28 * (k % 3)
         s.proc("budStalk%d" % k, tube([(x, 0.0, z), (x + 0.05, h * 0.5, z), (x - 0.04, h, z)], 0.025, taper=0.6,
                                       sides=6, segments=12), material=jelly(MINT, 0.5))
         s.proc("budPetals%d" % k, {"kind": "sphere", "radius": 0.2, "segments": 12, "rings": 8},
@@ -301,7 +316,7 @@ def build():
                 spread=0.8, speedMin=0.3, speedMax=0.9, gravity=[0, -0.05, 0], drag=1.2, turbulence=0.3,
                 turbulenceScale=1.5, sizeStart=0.02, sizeEnd=0.008, colorStart=hexrgb(PEACH) + [1.0],
                 colorEnd=hexrgb(CORAL) + [0.0], emissive=5.0, blend="additive")
-    s.particles("mushSpores", capacity=2500, seed=37, shape="sphere", position=[1.25, 0.8, 0.35],
+    s.particles("mushSpores", capacity=2500, seed=37, shape="sphere", position=[0.62, 1.5, -1.75],
                 extent=[0.6, 0.15, 0.6], direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=2.0, lifetimeMax=4.0,
                 spread=0.5, speedMin=0.3, speedMax=0.8, gravity=[0, -0.02, 0], drag=0.8, turbulence=0.35,
                 turbulenceScale=1.0, sizeStart=0.015, sizeEnd=0.006, colorStart=hexrgb(LIME) + [1.0],
@@ -319,16 +334,17 @@ def build():
             castsShadow=False)
 
     # ---- camera: a macro slide past the flower; focus on the bell
-    cam = [0.35, 1.25, 4.7]
-    tgt = [-0.05, 1.32, 0.0]
+    cam = [0.42, 1.72, 2.25]
+    focal = 38.0
+    tgt = kit.aim(cam, list(BELL), 0.37, 0.4, focal)
     focus = math.dist(cam, BELL)
-    s.params_({"camera/lens/focalLength": 40.0, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
+    s.params_({"camera/lens/focalLength": focal, "post/bloom/intensity": 0.6, "post/bloom/threshold": 0.7,
                "post/bloom/emissionWeight": 1.0, "post/output/vignette": 0.5, "post/output/grain": 0.02,
                "post/tonemap/operator": 3, "post/dof/enabled": True, "post/dof/physical": True,
-               "post/dof/maxRadius": 26.0, "camera/lens/aperture": 0.9, "camera/focus/mode": 0,
+               "post/dof/maxRadius": 30.0, "camera/lens/aperture": 0.8, "camera/focus/mode": 0,
                "camera/lens/focusDistance": round(focus, 3)})
     s.camera = {"mode": 1, "position": cam, "target": tgt, "fov": 30.0, "orbitSpeed": 0.0}
-    s.drift_camera(cam, tgt, period=48.0, amp=(0.35, 0.08, 0.15), tamp=(0.12, 0.05, 0.0))
+    s.drift_camera(cam, tgt, period=48.0, amp=(0.22, 0.06, 0.1), tamp=(0.08, 0.04, 0.0))
     s.region("flower", centre=list(BELL), radius=0.7)
     s.region("mushrooms", centre=[1.25, 0.6, 0.35], radius=0.9)
     return s

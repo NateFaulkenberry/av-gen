@@ -20,7 +20,7 @@ from ..kit import R, M, hexrgb, scale3, SLOW, MEDIUM, FAST, HIT, VERY_SLOW
 ID = "cinematic-void"
 TITLE = "Abstract Cinematic Void"
 
-TEAL = "#2b7488"
+TEAL = "#3a8aa0"
 TEAL_MID = "#1d4a52"
 AMBER = "#ff9a3c"
 AMBER_PALE = "#ffcf86"
@@ -35,7 +35,7 @@ PUSH = 120.0                       # seconds for the push
 CAM0 = (0.0, 1.8, 70.0)
 CAM1 = (0.0, 1.8, 10.0)
 FIGURE = (7.5, 0.0, -32.0)
-HAZE_W = 0.16                      # the sky's haze width: amber in a band at the horizon, teal above
+HAZE_W = 0.07                      # the sky's haze width: amber in a narrow band at the horizon, teal above
 HORIZON_Y = CAM1[1]                # a backdrop's top edge at eye height reads as the horizon at any distance
 MIRROR_Z = -1700.0
 MIRROR_H = 900.0                   # (a procedural box is at most 1000 m: the width comes from the transform's scale)
