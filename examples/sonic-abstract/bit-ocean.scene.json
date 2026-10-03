@@ -1,0 +1,7118 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "bit-ocean",
+ "camera": {
+  "mode": 1,
+  "position": [
+   7.269,
+   12.5,
+   121.003
+  ],
+  "target": [
+   47.677,
+   5.0,
+   107.939
+  ],
+  "fov": 55.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.55,
+  "background": [
+   0.00439,
+   0.09759,
+   0.57758
+  ],
+  "fogColor": [
+   0.00439,
+   0.09759,
+   0.57758
+  ],
+  "volumeDensity": 0.007,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.02315,
+    0.37124,
+    0.90466
+   ],
+   "horizonColor": [
+    0.00402,
+    0.06848,
+    0.43415
+   ],
+   "groundColor": [
+    0.00182,
+    0.02315,
+    0.15593
+   ],
+   "haze": 0.5,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "floorshallows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-floor-shallows.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.93011,
+      0.55834,
+      0.0648
+     ],
+     "emissiveColor": [
+      0.93011,
+      0.55834,
+      0.0648
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     },
+     "program": "boFloor"
+    }
+   }
+  },
+  {
+   "name": "floorruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-floor-ruins.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.25415,
+      0.08438,
+      0.7454
+     ],
+     "emissiveColor": [
+      0.25415,
+      0.08438,
+      0.7454
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     },
+     "program": "boFloor"
+    }
+   }
+  },
+  {
+   "name": "floordeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-floor-deep.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.01938,
+      0.0648,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.01938,
+      0.0648,
+      0.57758
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     },
+     "program": "boFloor"
+    }
+   }
+  },
+  {
+   "name": "tower",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-tower.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -16.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.19462,
+      0.10702
+     ],
+     "emissiveColor": [
+      1.0,
+      0.19462,
+      0.10702
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "kelpshallows0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp0.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 26,
+     "radius": 93.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4660765716752369,
+     "endAngle": 0.41887902047863923
+    },
+    "material": {
+     "baseColor": [
+      0.016,
+      0.68669,
+      1.0
+     ],
+     "emissiveColor": [
+      0.016,
+      0.68669,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 40,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "kelpshallows1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp1.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 28,
+     "radius": 144.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4660765716752369,
+     "endAngle": 0.41887902047863923
+    },
+    "material": {
+     "baseColor": [
+      0.016,
+      0.68669,
+      1.0
+     ],
+     "emissiveColor": [
+      0.016,
+      0.68669,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 41,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "kelpruins0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp1.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 26,
+     "radius": 93.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6283185307179586,
+     "endAngle": 2.5132741228718345
+    },
+    "material": {
+     "baseColor": [
+      0.00913,
+      0.7913,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.00913,
+      0.7913,
+      0.57758
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 45,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "kelpruins1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp2.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 28,
+     "radius": 144.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6283185307179586,
+     "endAngle": 2.5132741228718345
+    },
+    "material": {
+     "baseColor": [
+      0.00913,
+      0.7913,
+      0.57758
+     ],
+     "emissiveColor": [
+      0.00913,
+      0.7913,
+      0.57758
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 46,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "kelpdeep0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp2.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 26,
+     "radius": 93.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7227136331111543,
+     "endAngle": 4.60766922526503
+    },
+    "material": {
+     "baseColor": [
+      0.07819,
+      0.7454,
+      0.04231
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.7454,
+      0.04231
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 50,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "kelpdeep1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-kelp0.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 28,
+     "radius": 144.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7227136331111543,
+     "endAngle": 4.60766922526503
+    },
+    "material": {
+     "baseColor": [
+      0.07819,
+      0.7454,
+      0.04231
+     ],
+     "emissiveColor": [
+      0.07819,
+      0.7454,
+      0.04231
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 51,
+     "randomPosition": [
+      5.0,
+      0.0,
+      10.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.35,
+      0.0
+     ]
+    },
+    "sourceTransform": {
+     "scale": [
+      1.3,
+      1.6,
+      1.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "ledgeshallows0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 96.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.3962634015954636,
+     "endAngle": 0.34906585039886595
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      21.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.25415,
+      0.04231
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.04231
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 150,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "ledgeshallows1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 141.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.3962634015954636,
+     "endAngle": 0.34906585039886595
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      25.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.25415,
+      0.04231
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.04231
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 151,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "ledgeruins0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 96.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6981317007977319,
+     "endAngle": 2.443460952792061
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      21.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.43415
+     ],
+     "emissiveColor": [
+      1.0,
+      0.15896,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 153,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "ledgeruins1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 141.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6981317007977319,
+     "endAngle": 2.443460952792061
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      25.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.43415
+     ],
+     "emissiveColor": [
+      1.0,
+      0.15896,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 154,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "ledgedeep0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 96.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      21.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.09306,
+      0.68669,
+      0.10224
+     ],
+     "emissiveColor": [
+      0.09306,
+      0.68669,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 156,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "ledgedeep1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-ledge.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 141.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      25.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.09306,
+      0.68669,
+      0.10224
+     ],
+     "emissiveColor": [
+      0.09306,
+      0.68669,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.55,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 157,
+     "randomPosition": [
+      3.0,
+      4.0,
+      18.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.25,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "rocksshallows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-rock.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 94.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4660765716752369,
+     "endAngle": 0.41887902047863923
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      3.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.04667,
+      0.15896,
+      0.67244
+     ],
+     "emissiveColor": [
+      0.04667,
+      0.15896,
+      0.67244
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 60,
+     "randomPosition": [
+      10.0,
+      0.0,
+      30.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "rocksruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-rock.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 142.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6283185307179586,
+     "endAngle": 2.5132741228718345
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      3.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.10462,
+      0.03434,
+      0.43415
+     ],
+     "emissiveColor": [
+      0.10462,
+      0.03434,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 61,
+     "randomPosition": [
+      10.0,
+      0.0,
+      30.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "rocksdeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-rock.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 14,
+     "radius": 94.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7227136331111543,
+     "endAngle": 4.60766922526503
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      3.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01033,
+      0.02519,
+      0.2384
+     ],
+     "emissiveColor": [
+      0.01033,
+      0.02519,
+      0.2384
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 62,
+     "randomPosition": [
+      10.0,
+      0.0,
+      30.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "brainshallows",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 3.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 20,
+     "radius": 133.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4660765716752369,
+     "endAngle": 0.41887902047863923
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      4.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.62396,
+      0.0137
+     ],
+     "emissiveColor": [
+      1.0,
+      0.62396,
+      0.0137
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 70,
+     "randomPosition": [
+      4.0,
+      0.0,
+      14.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "brainruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 3.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 20,
+     "radius": 103.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6283185307179586,
+     "endAngle": 2.5132741228718345
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      4.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.07819,
+      0.43415
+     ],
+     "emissiveColor": [
+      1.0,
+      0.07819,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 71,
+     "randomPosition": [
+      4.0,
+      0.0,
+      14.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "braindeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 3.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 20,
+     "radius": 133.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7227136331111543,
+     "endAngle": 4.60766922526503
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      4.5,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.19462,
+      0.01033
+     ],
+     "emissiveColor": [
+      1.0,
+      0.19462,
+      0.01033
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 72,
+     "randomPosition": [
+      4.0,
+      0.0,
+      14.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "arch",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 21.0,
+     "minorRadius": 2.8,
+     "majorSegments": 12,
+     "minorSegments": 5
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      71.71413690572975,
+      0.0,
+      93.7074306971771
+     ],
+     "rotation": [
+      0.0,
+      37.42676851583377,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.27468,
+      0.10224
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      90.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "archStuds",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.8,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 21.0,
+     "plane": "yz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      71.71413690572975,
+      0.0,
+      93.7074306971771
+     ],
+     "rotation": [
+      0.0,
+      37.42676851583377,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.64448,
+      0.04231
+     ],
+     "emissiveColor": [
+      1.0,
+      0.64448,
+      0.04231
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "coralA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-coral.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 96.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.4660765716752369,
+     "endAngle": 0.41887902047863923
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      3.0,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      2.2,
+      2.2,
+      2.2
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.14703,
+      0.14703
+     ],
+     "emissiveColor": [
+      1.0,
+      0.14703,
+      0.14703
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 81,
+     "randomPosition": [
+      10.0,
+      0.0,
+      30.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "coins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.0,
+     "height": 0.25,
+     "radialSegments": 8,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 34,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -1.3264502315156905,
+     "endAngle": 0.27925268031909267
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.64448,
+      0.04231
+     ],
+     "emissiveColor": [
+      1.0,
+      0.7454,
+      0.13287
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.75,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.8,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.0,
+      "speed": 2.6,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 3.0,
+      "frequency": 0.09,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     }
+    ],
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "columnIn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.7,
+     "height": 16.0,
+     "radialSegments": 8,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 100.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.7330382858376185,
+     "endAngle": 2.408554367752175
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.45641,
+      0.26225,
+      0.87137
+     ],
+     "emissiveColor": [
+      0.45641,
+      0.26225,
+      0.87137
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.15,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "capitalIn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.6,
+      1.6,
+      4.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 100.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.7330382858376185,
+     "endAngle": 2.408554367752175
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      16.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.67244,
+      0.47932,
+      1.0
+     ],
+     "emissiveColor": [
+      0.67244,
+      0.47932,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "columnOut",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.7,
+     "height": 16.0,
+     "radialSegments": 8,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 136.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.7330382858376185,
+     "endAngle": 2.408554367752175
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.45641,
+      0.26225,
+      0.87137
+     ],
+     "emissiveColor": [
+      0.45641,
+      0.26225,
+      0.87137
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.15,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "capitalOut",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.6,
+      1.6,
+      4.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 136.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.7330382858376185,
+     "endAngle": 2.408554367752175
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      16.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.67244,
+      0.47932,
+      1.0
+     ],
+     "emissiveColor": [
+      0.67244,
+      0.47932,
+      1.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "ruinArch0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 24.0,
+     "minorRadius": 2.0,
+     "majorSegments": 8,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      58.99999999999999,
+      0.0,
+      -102.19099764656377
+     ],
+     "rotation": [
+      0.0,
+      150.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.15,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      90.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "ruinArch1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 24.0,
+     "minorRadius": 2.0,
+     "majorSegments": 8,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      1.4450832229938766e-14,
+      0.0,
+      -118.0
+     ],
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.15,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      90.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "ruinArch2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 24.0,
+     "minorRadius": 2.0,
+     "majorSegments": 8,
+     "minorSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -59.000000000000014,
+      0.0,
+      -102.19099764656376
+     ],
+     "rotation": [
+      0.0,
+      210.0,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveColor": [
+      0.32778,
+      0.17465,
+      0.7913
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.15,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      90.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "stem0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.0,
+     "height": 30.0,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      49.20897550542573,
+      15.0,
+      -72.95530638484367
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "petals0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 6.0,
+     "segments": 8,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 7.2,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      49.20897550542573,
+      30.0,
+      -72.95530638484367
+     ],
+     "rotation": [
+      0,
+      0.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "scale": [
+      0.75,
+      0.32,
+      1.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "bloom0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 4.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      49.20897550542573,
+      30.8,
+      -72.95530638484367
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "stem1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.0,
+     "height": 38.0,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      10.46347106161883,
+      19.0,
+      -149.63460753897363
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "petals1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 6.0,
+     "segments": 8,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 7.2,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      10.46347106161883,
+      38.0,
+      -149.63460753897363
+     ],
+     "rotation": [
+      0,
+      15.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "scale": [
+      0.75,
+      0.32,
+      1.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "bloom1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 4.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      10.46347106161883,
+      38.8,
+      -149.63460753897363
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "stem2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.0,
+     "height": 26.0,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -39.015032064227896,
+      13.0,
+      -79.99267012062586
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "petals2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 6.0,
+     "segments": 8,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 7.2,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -39.015032064227896,
+      26.0,
+      -79.99267012062586
+     ],
+     "rotation": [
+      0,
+      30.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "scale": [
+      0.75,
+      0.32,
+      1.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "bloom2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 4.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -39.015032064227896,
+      26.8,
+      -79.99267012062586
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "stem3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 1.0,
+     "height": 34.0,
+     "radialSegments": 6,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -110.72857899613176,
+      17.0,
+      -99.70046034746986
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "petals3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 6.0,
+     "segments": 8,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 7.2,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "distributionTransform": {
+     "position": [
+      -110.72857899613176,
+      34.0,
+      -99.70046034746986
+     ],
+     "rotation": [
+      0,
+      45.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.63076
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.65,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "sourceTransform": {
+     "scale": [
+      0.75,
+      0.32,
+      1.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "bloom3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 4.2,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -110.72857899613176,
+      34.8,
+      -99.70046034746986
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.5,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "jellies",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 2.4,
+     "segments": 8,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 7,
+     "radius": 124.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.6283185307179586,
+     "endAngle": 2.5132741228718345
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      17.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      0.7,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.43415,
+      0.87137
+     ],
+     "emissiveColor": [
+      1.0,
+      0.27468,
+      0.63076
+     ],
+     "emissiveIntensity": 0.35,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.75,
+      "rimWidth": 0.4,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 91,
+     "randomPosition": [
+      14.0,
+      0.0,
+      20.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "gemsruins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.4,
+     "segments": 4,
+     "rings": 2
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 0.8028514559173918,
+     "endAngle": 2.3387411976724017
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      10.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.11444,
+      0.92158,
+      1.0
+     ],
+     "emissiveColor": [
+      0.11444,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.3,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.75,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 1.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.0,
+      "speed": 1.8,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 5,
+     "randomPosition": [
+      6.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "gemsdeep",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.4,
+     "segments": 4,
+     "rings": 2
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 118.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.897246558310587,
+     "endAngle": 4.4331363000655974
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      10.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.5,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.10224,
+      0.04231
+     ],
+     "emissiveColor": [
+      1.0,
+      0.10224,
+      0.04231
+     ],
+     "emissiveIntensity": 0.3,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.75,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 1.0,
+      "specularSize": 0.14
+     }
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.0,
+      "speed": 1.8,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "local"
+     }
+    ],
+    "variation": {
+     "seed": 5,
+     "randomPosition": [
+      6.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pipeIn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.0,
+     "height": 14.0,
+     "radialSegments": 10,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 92.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      7.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.04971,
+      0.68669,
+      0.10224
+     ],
+     "emissiveColor": [
+      0.04971,
+      0.68669,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 111,
+     "randomPosition": [
+      4.0,
+      0.0,
+      16.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.45,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pipeRimIn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.8,
+     "height": 2.2,
+     "radialSegments": 10,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 92.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      14.2,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.19462,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      0.19462,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 111,
+     "randomPosition": [
+      4.0,
+      0.0,
+      16.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.45,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pipeOut",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.0,
+     "height": 14.0,
+     "radialSegments": 10,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 145.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      7.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.04971,
+      0.68669,
+      0.10224
+     ],
+     "emissiveColor": [
+      0.04971,
+      0.68669,
+      0.10224
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.6,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 113,
+     "randomPosition": [
+      4.0,
+      0.0,
+      16.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.45,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "pipeRimOut",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.8,
+     "height": 2.2,
+     "radialSegments": 10,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 6,
+     "radius": 145.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7925268031909276,
+     "endAngle": 4.537856055185257
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      14.2,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.19462,
+      0.87137,
+      0.19462
+     ],
+     "emissiveColor": [
+      0.19462,
+      0.87137,
+      0.19462
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.2,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 113,
+     "randomPosition": [
+      4.0,
+      0.0,
+      16.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25,
+     "randomScale": [
+      0.0,
+      0.45,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "coralC",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-coral.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 12,
+     "radius": 140.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": 2.7227136331111543,
+     "endAngle": 4.60766922526503
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      3.0,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      2.6,
+      2.6,
+      2.6
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.25415,
+      0.02315
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.02315
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.62,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 121,
+     "randomPosition": [
+      8.0,
+      0.0,
+      26.0
+     ],
+     "randomRotation": [
+      0.0,
+      3.141592653589793,
+      0.0
+     ],
+     "randomUniformScale": 0.25
+    }
+   }
+  },
+  {
+   "name": "shell",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 5.2,
+     "tubeTaper": 0.08,
+     "tubeSides": 9,
+     "tubeSegments": 160,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         9.6,
+         1.5,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         8.151464489765177,
+         1.8555158174534805,
+         4.619102930136752
+        ]
+       },
+       {
+        "position": [
+         4.696134864105979,
+         2.262064837317075,
+         7.839502320177547
+        ]
+       },
+       {
+        "position": [
+         0.2152432075649314,
+         2.69039832778631,
+         8.905091386960489
+        ]
+       },
+       {
+        "position": [
+         -4.0941253670283055,
+         3.1335217387369565,
+         7.650302710474636
+        ]
+       },
+       {
+        "position": [
+         -7.138605491746819,
+         3.587978068741401,
+         4.514180592987121
+        ]
+       },
+       {
+        "position": [
+         -8.205790909668652,
+         4.051674675137894,
+         0.3969129948710872
+        ]
+       },
+       {
+        "position": [
+         -7.128886763081284,
+         4.523199255443621,
+         -3.5962558806905163
+        ]
+       },
+       {
+        "position": [
+         -4.301312225810925,
+         5.001530500108828,
+         -6.4514218055870645
+        ]
+       },
+       {
+        "position": [
+         -0.5449325735246392,
+         5.485893479920527,
+         -7.503314926140602
+        ]
+       },
+       {
+        "position": [
+         3.126158063154577,
+         5.975678968869628,
+         -6.5882385539280195
+        ]
+       },
+       {
+        "position": [
+         5.779030637339796,
+         6.47039474689756,
+         -4.058094421828425
+        ]
+       },
+       {
+        "position": [
+         6.7988807048405535,
+         6.969634403677425,
+         -0.6592643213237622
+        ]
+       },
+       {
+        "position": [
+         6.029400020441168,
+         7.473056398938414,
+         2.6844618443002783
+        ]
+       },
+       {
+        "position": [
+         3.7851258198766735,
+         7.980369467887907,
+         5.122491885734803
+        ]
+       },
+       {
+        "position": [
+         0.7399097757211354,
+         8.491322128190506,
+         6.093705242540362
+        ]
+       },
+       {
+        "position": [
+         -2.271762916447607,
+         9.005694936556155,
+         5.4534320985797855
+        ]
+       },
+       {
+        "position": [
+         -4.482844963989071,
+         9.52329464608746,
+         3.483038422145182
+        ]
+       },
+       {
+        "position": [
+         -5.389004083164186,
+         10.043949712550518,
+         0.7869095930385228
+        ]
+       },
+       {
+        "position": [
+         -4.861413674299068,
+         10.5675067799495,
+         -1.8886221892502904
+        ]
+       },
+       {
+        "position": [
+         -3.152496949121576,
+         11.093827891332538,
+         -3.861107809725537
+        ]
+       },
+       {
+        "position": [
+         -0.8003434734805456,
+         11.622788246168014,
+         -4.68599013858277
+        ]
+       },
+       {
+        "position": [
+         1.5355652753247588,
+         12.1542743761092,
+         -4.254440519890695
+        ]
+       },
+       {
+        "position": [
+         3.2582759142137085,
+         12.688182645520705,
+         -2.7941981662542488
+        ]
+       },
+       {
+        "position": [
+         3.9858725123200793,
+         13.224418007273973,
+         -0.7803300520212125
+        ]
+       },
+       {
+        "position": [
+         3.6336242160744496,
+         13.762892961479944,
+         1.2130820070241015
+        ]
+       },
+       {
+        "position": [
+         2.408870182891893,
+         14.303526677229573,
+         2.675321371718617
+        ]
+       },
+       {
+        "position": [
+         0.7270267552638401,
+         14.84624424650983,
+         3.28985532713247
+        ]
+       },
+       {
+        "position": [
+         -0.9216259847419759,
+         15.390976046225397,
+         3.000091060726449
+        ]
+       },
+       {
+        "position": [
+         -2.1131919497291096,
+         15.937657189346137,
+         1.9972717240809024
+        ]
+       },
+       {
+        "position": [
+         -2.5991365574174314,
+         16.48622705007469,
+         0.640629624400538
+        ]
+       },
+       {
+        "position": [
+         -2.3549809651393363,
+         17.03662885090883,
+         -0.6616141571071903
+        ]
+       },
+       {
+        "position": [
+         -1.5601913758230435,
+         17.588809301787826,
+         -1.5728101808197454
+        ]
+       },
+       {
+        "position": [
+         -0.5213731044248923,
+         18.14271828332625,
+         -1.9149068674048935
+        ]
+       },
+       {
+        "position": [
+         0.43342643340440573,
+         18.69830856757212,
+         -1.69944633871955
+        ]
+       },
+       {
+        "position": [
+         1.0550724768838504,
+         19.255535570868364,
+         -1.098446804415964
+        ]
+       },
+       {
+        "position": [
+         1.2383484560795381,
+         19.81435713431247,
+         -0.36952979977676503
+        ]
+       },
+       {
+        "position": [
+         1.0346509630355012,
+         20.374733328049544,
+         0.23740532853151022
+        ]
+       },
+       {
+        "position": [
+         0.612883950519542,
+         20.93662627623558,
+         0.5608482664575681
+        ]
+       },
+       {
+        "position": [
+         0.1854101966249689,
+         21.5,
+         0.5706339097770919
+        ]
+       }
+      ],
+      "samplesPerSegment": 16,
+      "up": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -67.54998149518622,
+      0.0,
+      39.00000000000001
+     ],
+     "rotation": [
+      0,
+      30.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.68669,
+      0.43415
+     ],
+     "emissiveColor": [
+      1.0,
+      0.68669,
+      0.43415
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.68,
+      "rimWidth": 0.25,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.6632251157578452,
+     "endAngle": 5.619960191421741
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      7.5,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.10224,
+      0.4452
+     ],
+     "emissiveColor": [
+      1.0,
+      0.10224,
+      0.4452
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 7.0,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.6632251157578452,
+     "endAngle": 5.619960191421741
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.5,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.6178465552059926,
+     "endAngle": 5.665338751973594
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      7.85,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.9131,
+      0.16827,
+      0.49693
+     ],
+     "emissiveColor": [
+      0.9131,
+      0.16827,
+      0.49693
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 7.35,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.6178465552059926,
+     "endAngle": 5.665338751973594
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.675,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.57246799465414,
+     "endAngle": 5.710717312525446
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.2,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.83077,
+      0.23455,
+      0.54572
+     ],
+     "emissiveColor": [
+      0.83077,
+      0.23455,
+      0.54572
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 7.7,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.57246799465414,
+     "endAngle": 5.710717312525446
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      3.85,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.5270894341022876,
+     "endAngle": 5.756095873077299
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.55,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.7454,
+      0.30499,
+      0.59062
+     ],
+     "emissiveColor": [
+      0.7454,
+      0.30499,
+      0.59062
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 8.05,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.5270894341022876,
+     "endAngle": 5.756095873077299
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.025,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.48171087355043496,
+     "endAngle": 5.801474433629151
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      8.9,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.66539,
+      0.37124,
+      0.64448
+     ],
+     "emissiveColor": [
+      0.66539,
+      0.37124,
+      0.64448
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 8.4,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.48171087355043496,
+     "endAngle": 5.801474433629151
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.2,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.43633231299858233,
+     "endAngle": 5.846852994181004
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      9.25,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.57758,
+      0.43966,
+      0.69387
+     ],
+     "emissiveColor": [
+      0.57758,
+      0.43966,
+      0.69387
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 8.75,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.43633231299858233,
+     "endAngle": 5.846852994181004
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.375,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.3909537524467299,
+     "endAngle": 5.892231554732856
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      9.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.49693,
+      0.50888,
+      0.7454
+     ],
+     "emissiveColor": [
+      0.49693,
+      0.50888,
+      0.7454
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 9.1,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.3909537524467299,
+     "endAngle": 5.892231554732856
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.55,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.34557519189487707,
+     "endAngle": 5.937610115284709
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      9.95,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.41789,
+      0.57758,
+      0.7913
+     ],
+     "emissiveColor": [
+      0.41789,
+      0.57758,
+      0.7913
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 9.45,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.34557519189487707,
+     "endAngle": 5.937610115284709
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.725,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.30019663134302466,
+     "endAngle": 5.982988675836562
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      10.3,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.33716,
+      0.65141,
+      0.84687
+     ],
+     "emissiveColor": [
+      0.33716,
+      0.65141,
+      0.84687
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 9.8,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.30019663134302466,
+     "endAngle": 5.982988675836562
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      4.9,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.254818070791172,
+     "endAngle": 6.028367236388414
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      10.65,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.25818,
+      0.72306,
+      0.89627
+     ],
+     "emissiveColor": [
+      0.25818,
+      0.72306,
+      0.89627
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 10.15,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.254818070791172,
+     "endAngle": 6.028367236388414
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      5.075,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.20943951023931962,
+     "endAngle": 6.073745796940266
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      11.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.18116,
+      0.7913,
+      0.94731
+     ],
+     "emissiveColor": [
+      0.18116,
+      0.7913,
+      0.94731
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 10.5,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.20943951023931962,
+     "endAngle": 6.073745796940266
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      5.25,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bell11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.3,
+     "segments": 6,
+     "rings": 4
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.16406094968746698,
+     "endAngle": 6.119124357492119
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      11.35,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.25,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.10224,
+      0.86316,
+      1.0
+     ],
+     "emissiveColor": [
+      0.10224,
+      0.86316,
+      1.0
+     ],
+     "emissiveIntensity": 0.15,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.8,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "bellStem11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.25,
+     "height": 10.85,
+     "radialSegments": 5,
+     "caps": false
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 3,
+     "radius": 107.0,
+     "plane": "xz",
+     "orientation": "outward",
+     "startAngle": -0.16406094968746698,
+     "endAngle": 6.119124357492119
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      5.425,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveColor": [
+      0.02843,
+      0.80695,
+      0.35153
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.0,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.0,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    }
+   }
+  },
+  {
+   "name": "schoolA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-fish.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 46,
+     "radius": 128.0,
+     "plane": "xz",
+     "orientation": "tangent"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      13.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.6,
+      1.6,
+      1.6
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.25415,
+      0.02315
+     ],
+     "emissiveColor": [
+      1.0,
+      0.25415,
+      0.02315
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 131,
+     "randomPosition": [
+      5.0,
+      4.0,
+      3.0
+     ],
+     "randomUniformScale": 0.3
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "schoolB",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-fish.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 38,
+     "radius": 110.0,
+     "plane": "xz",
+     "orientation": "tangent"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      18.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.6,
+      1.6,
+      1.6
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.7454,
+      0.13287
+     ],
+     "emissiveColor": [
+      1.0,
+      0.7454,
+      0.13287
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 133,
+     "randomPosition": [
+      5.0,
+      4.0,
+      3.0
+     ],
+     "randomUniformScale": 0.3
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      180.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "schoolC",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/bo-fish.glb"
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 30,
+     "radius": 144.0,
+     "plane": "xz",
+     "orientation": "tangent"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      9.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.6,
+      1.6,
+      1.6
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveColor": [
+      1.0,
+      0.15896,
+      0.521
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "toon": {
+      "bands": 2,
+      "softness": 0.02,
+      "terminator": 0.08,
+      "shadowColor": [
+       0.06,
+       0.1,
+       0.32
+      ],
+      "ambient": 0.7,
+      "rimWidth": 0.3,
+      "rimColor": [
+       0.80695,
+       0.96469,
+       1.0
+      ],
+      "rimIntensity": 0.8,
+      "specular": 0.0,
+      "specularSize": 0.14
+     }
+    },
+    "variation": {
+     "seed": 137,
+     "randomPosition": [
+      5.0,
+      4.0,
+      3.0
+     ],
+     "randomUniformScale": 0.3
+    },
+    "sourceTransform": {
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "bubbles",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 6000,
+    "seed": 3,
+    "shape": "disc",
+    "position": [
+     0.0,
+     0.5,
+     0.0
+    ],
+    "extent": [
+     188.0,
+     0.5,
+     188.0
+    ],
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spawnRate": 260.0,
+    "lifetimeMin": 9.0,
+    "lifetimeMax": 14.0,
+    "spread": 0.08,
+    "speedMin": 2.0,
+    "speedMax": 3.4,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.45,
+    "sizeEnd": 0.65,
+    "colorStart": [
+     0.80695,
+     0.96469,
+     1.0,
+     0.85
+    ],
+    "colorEnd": [
+     0.521,
+     0.90466,
+     1.0,
+     0.0
+    ],
+    "emissive": 1.4,
+    "blend": "additive",
+    "turbulence": 0.4,
+    "turbulenceScale": 0.1
+   }
+  },
+  {
+   "name": "burst",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 4000,
+    "seed": 7,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     8.0,
+     0.0
+    ],
+    "extent": [
+     6.0,
+     6.0,
+     6.0
+    ],
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 3.5,
+    "spread": 0.5,
+    "speedMin": 3.0,
+    "speedMax": 7.0,
+    "gravity": [
+     0.0,
+     2.5,
+     0.0
+    ],
+    "drag": 0.6,
+    "sizeStart": 0.35,
+    "sizeEnd": 0.9,
+    "colorStart": [
+     1.0,
+     1.0,
+     1.0,
+     0.9
+    ],
+    "colorEnd": [
+     0.521,
+     0.90466,
+     1.0,
+     0.0
+    ],
+    "emissive": 1.8,
+    "blend": "additive",
+    "turbulence": 0.5,
+    "volumeFollow": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  {
+   "name": "sparkle",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 3000,
+    "seed": 11,
+    "shape": "box",
+    "position": [
+     0.0,
+     9.0,
+     0.0
+    ],
+    "extent": [
+     28.0,
+     10.0,
+     28.0
+    ],
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spawnRate": 30.0,
+    "lifetimeMin": 0.25,
+    "lifetimeMax": 0.6,
+    "spread": 1.0,
+    "speedMin": 0.2,
+    "speedMax": 0.8,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.16,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.93011,
+     0.52712,
+     1.0
+    ],
+    "colorEnd": [
+     0.21223,
+     0.92158,
+     1.0,
+     0.0
+    ],
+    "emissive": 8.0,
+    "blend": "additive",
+    "volumeFollow": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "sun",
+   "name": "sun",
+   "type": "directional",
+   "direction": [
+    0.25,
+    -0.92,
+    -0.3
+   ],
+   "color": [
+    0.80695,
+    0.96469,
+    1.0
+   ],
+   "intensity": 3.0,
+   "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "boFloor",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "time"
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.085,
+      0.0,
+      0.085,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 0,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.0,
+      0.32,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
+    },
+    {
+     "kind": "voronoiEdge",
+     "dst": 4,
+     "srcA": 3,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 5
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.07,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.13734,
+      0.19294,
+      0.2,
+      1.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "swizzle",
+     "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 5,
+     "srcA": 5,
+     "value": -1.5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "constant3": [
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 6,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 6,
+     "srcA": 6,
+     "value": -1.5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "constant3": [
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "threshold",
+     "dst": 5,
+     "srcA": 5,
+     "value": 0.0
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      0.86,
+      1.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 5
+    }
+   ],
+   "baseColor": 6,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}
