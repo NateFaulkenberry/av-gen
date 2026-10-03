@@ -30,7 +30,7 @@ SKY = "#1f6f6a"
 HAZE = "#e8b98a"
 SUN = "#ffd08a"
 
-CELL = 14.0
+CELL = 18.0           # the lattice's period: wide enough that the near court reads alone before the next one
 RUN, RISE, STEPS = 0.45, 0.32, 14
 OFFSET = 3.6              # each flight's distance from the cell's centre line
 # Cost (a ray marches the whole cell at every step, plus a shadow march): the rooms' recursion depth at rest, the

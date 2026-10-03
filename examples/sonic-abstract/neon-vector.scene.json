@@ -1526,6 +1526,200 @@
    }
   },
   {
+   "name": "monolithL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.0,
+      1.0,
+      5.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -36.0,
+      0.0,
+      -22.0
+     ],
+     "end": [
+      -45.0,
+      0.0,
+      -150.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 30.0,
+      "color": [
+       0.90466,
+       0.90466,
+       0.87137
+      ],
+      "intensity": 2.2,
+      "opacity": 1.0,
+      "width": 1.6,
+      "fill": 0,
+      "occlude": 1
+     }
+    },
+    "variation": {
+     "seed": 5,
+     "randomScale": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "uniformScale": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      9.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      18.0,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "monolithR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.0,
+      1.0,
+      5.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      36.0,
+      0.0,
+      -22.0
+     ],
+     "end": [
+      45.0,
+      0.0,
+      -150.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 30.0,
+      "color": [
+       0.90466,
+       0.90466,
+       0.87137
+      ],
+      "intensity": 2.2,
+      "opacity": 1.0,
+      "width": 1.6,
+      "fill": 0,
+      "occlude": 1
+     }
+    },
+    "variation": {
+     "seed": 9,
+     "randomScale": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "uniformScale": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      9.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      18.0,
+      1.0
+     ]
+    }
+   }
+  },
+  {
    "name": "buildBar",
    "kind": "procedural",
    "procedural": {

@@ -173,6 +173,15 @@ def instrument(s):
         s.route(R("snare", "procedural/%s/transform/scale" % name, 1.0, attackMs=0, decayMs=650, delayMs=90 * k))
     for g in ("near", "mid", "far"):
         s.route(R("snare", "procedural/lines_%s/material/emissive" % g, 2.5, attackMs=0, decayMs=160))
+    # ---- WIRE: the kick flashes the monoliths' lines, the high mids thicken them, the bass stretches them taller,
+    # and STRUCTURE: the rows grow longer (5 to 9 monoliths) as the piece builds
+    for side in ("L", "R"):
+        s.route(R("kick", "procedural/monolith%s/wire/intensity" % side, 4.0, attackMs=0, decayMs=220),
+                R("audio.highMid", "procedural/monolith%s/wire/width" % side, 1.4, attackMs=30, decayMs=300),
+                R("bass", "procedural/monolith%s/source/scale" % side, 6.0, comp=1, attackMs=40, decayMs=400),
+                R("bass", "procedural/monolith%s/source/position" % side, 3.0, comp=1, attackMs=40, decayMs=400),
+                R("intensity", "procedural/monolith%s/distribution/count" % side, 4.0, threshold="binary",
+                  thresholdLevel=0.5))
     # ---- ONSET: the hairline outlines flash
     s.route(R("onset", "procedural/blockEdge/material/emissive", 6.0, attackMs=0, decayMs=200))
     # ---- MIDS: the horizon circle breathes and turns
@@ -283,6 +292,19 @@ def build():
         s.track("field/%s/position" % fld, [{"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
                                             {"time": 600.0, "value": [0.0, 0.0, 600.0 * speed], "interp": "linear"}],
                 loop=600.0)
+
+    # ---- wireframe monoliths (ADR-1073 wire lines, lines only): two rows standing in the plain, receding to the
+    # horizon, hidden by the ridge fins in front of them like every other line
+    for side, x in (("L", -36.0), ("R", 36.0)):
+        s.proc("monolith" + side, {"kind": "box", "size": [5.0, 1.0, 5.0], "subdivisions": 1},
+               distribution={"kind": "linear", "count": 5, "start": [x, 0.0, -22.0], "end": [x * 1.25, 0.0, -150.0]},
+               variation={"seed": 5 if side == "L" else 9, "randomScale": [0.0, 0.0, 0.0], "uniformScale": 0.0},
+               material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
+                         "roughness": 1.0, "metallic": 0.0, "unlit": True,
+                         "wire": {"mode": "feature", "crease": 30.0, "color": hexrgb(WHITE), "intensity": 2.2,
+                                  "opacity": 1.0, "width": 1.6, "fill": 0, "occlude": 1}},
+               transform={"position": [0.0, 0.0, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+               extra={"sourceTransform": {"position": [0.0, 9.0, 0.0], "scale": [1.0, 18.0, 1.0]}})
 
     # ---- construction: three flat shapes the snare builds, PARKED at scale 0.01 at rest (not 0.001: below a uniform
     # scale of about 0.005 the composed transform's determinant is under float epsilon, glm::decompose fails and the

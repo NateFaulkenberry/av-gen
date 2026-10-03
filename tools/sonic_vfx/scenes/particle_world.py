@@ -183,15 +183,15 @@ def build():
                      "roughness": 1.0, "metallic": 0.0, "unlit": True})
 
     # ---- the halo: faint dust curtains, a wide disc of large soft points that orbits
-    s.particles("halo", capacity=9000, seed=21, shape="disc", position=[0.0, 0.0, 0.0], extent=[15.0, 0.6, 15.0],
-                direction=[0, 1, 0], spawnRate=1100.0, lifetimeMin=5.0, lifetimeMax=8.0, spread=1.0, speedMin=0.0,
+    s.particles("halo", capacity=20000, seed=21, shape="disc", position=[0.0, 0.0, 0.0], extent=[15.0, 0.6, 15.0],
+                direction=[0, 1, 0], spawnRate=2600.0, lifetimeMin=5.0, lifetimeMax=8.0, spread=1.0, speedMin=0.0,
                 speedMax=0.1, gravity=[0, 0, 0], drag=0.2, turbulence=0.25, turbulenceScale=0.15,
                 turbulenceSpeed=0.1, attractorPosition=[0, 0, 0], attractorStrength=0.02, attractorRadius=20.0,
-                orbit=0.35, sizeStart=0.16, sizeEnd=0.26, sizeVariance=0.6, colorStart=hexrgb("#3b2a9a") + [0.0],
+                orbit=0.35, sizeStart=0.045, sizeEnd=0.07, sizeVariance=0.6, colorStart=hexrgb("#3b2a9a") + [0.0],
                 colorEnd=hexrgb(CYAN) + [0.0],
                 colorCurve=[{"t": 0.0, "color": hexrgb("#4a2ab8")}, {"t": 0.5, "color": hexrgb("#2b6bff")},
                             {"t": 1.0, "color": hexrgb("#ff3fb4")}],
-                opacityCurve=[{"t": 0.0, "value": 0.0}, {"t": 0.3, "value": 0.1}, {"t": 0.7, "value": 0.1},
+                opacityCurve=[{"t": 0.0, "value": 0.0}, {"t": 0.3, "value": 0.55}, {"t": 0.7, "value": 0.55},
                               {"t": 1.0, "value": 0.0}], emissive=1.2, blend="additive")
 
     # ---- the stream: points flung from the rim, arcing over toward the camera's side and falling back

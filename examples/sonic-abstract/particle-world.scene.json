@@ -738,7 +738,7 @@
    "kind": "particles",
    "particles": {
     "enabled": true,
-    "capacity": 9000,
+    "capacity": 20000,
     "seed": 21,
     "shape": "disc",
     "position": [
@@ -756,7 +756,7 @@
      1,
      0
     ],
-    "spawnRate": 1100.0,
+    "spawnRate": 2600.0,
     "lifetimeMin": 5.0,
     "lifetimeMax": 8.0,
     "spread": 1.0,
@@ -779,8 +779,8 @@
     "attractorStrength": 0.02,
     "attractorRadius": 20.0,
     "orbit": 0.35,
-    "sizeStart": 0.16,
-    "sizeEnd": 0.26,
+    "sizeStart": 0.045,
+    "sizeEnd": 0.07,
     "sizeVariance": 0.6,
     "colorStart": [
      0.04374,
@@ -827,11 +827,11 @@
      },
      {
       "t": 0.3,
-      "value": 0.1
+      "value": 0.55
      },
      {
       "t": 0.7,
-      "value": 0.1
+      "value": 0.55
      },
      {
       "t": 1.0,
