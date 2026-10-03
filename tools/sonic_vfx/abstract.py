@@ -54,6 +54,16 @@ def scene_ids():
     return [importlib.import_module("tools.sonic_vfx.scenes." + n).ID for n in ABSTRACT]
 
 
+def hero_at(sid, default):
+    """A module's HERO_AT (the second its hero still is taken at), else `default`."""
+    from tools.sonic_vfx.scenes import ABSTRACT
+    for n in ABSTRACT:
+        m = importlib.import_module("tools.sonic_vfx.scenes." + n)
+        if m.ID == sid:
+            return float(getattr(m, "HERO_AT", default))
+    return default
+
+
 def build(modules, out_dir=None):
     from tools.sonic_vfx.scenes import ABSTRACT
     names = modules or ABSTRACT
@@ -323,8 +333,9 @@ def stills_queue(ids, at, size, tag, projects=None, tier="realtime"):
         shutil.rmtree(d, ignore_errors=True)
         # a queue job takes no --particle-warmup (the queue copies only codec, quality and a few others), so each still
         # is the LAST frame of a 3-second pre-roll: the particles have had time to fill
-        jobs.append({"project": proj, "render": {"width": w, "height": h, "fps": 25, "start": max(0.0, at - 3.0),
-                                                 "end": at + 0.02, "output": "png", "path": d, "tier": tier}})
+        t_at = hero_at(sid, at) if not tag else at
+        jobs.append({"project": proj, "render": {"width": w, "height": h, "fps": 25, "start": max(0.0, t_at - 3.0),
+                                                 "end": t_at + 0.02, "output": "png", "path": d, "tier": tier}})
         if size == "1920x1080" and not tag:
             dst = os.path.join(OUT, numbered(sid) + "-still.png")
         else:

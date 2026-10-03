@@ -46,6 +46,7 @@ CAM_UP = 64.0             # the glide's height over the river
 
 MESH_DIR = os.path.join(kit.ABSTRACT_DIR, "meshes")
 LIGHT = (-0.55, 0.62, 0.25)
+HERO_AT = 50.0            # the hero still: high over the hills, the river winding away
 
 
 def unit(v):
