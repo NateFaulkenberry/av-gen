@@ -319,6 +319,22 @@
    "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
   },
   {
+   "command": "live.previous-scene",
+   "keys": "Pageup",
+   "context": "General",
+   "description": "Open the previous live scene (Sonic Live and the Sonic VFX examples), while live input runs or a live scene is open (ADR-1063).",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "live.next-scene",
+   "keys": "Pagedown",
+   "context": "General",
+   "description": "Open the next live scene (Sonic Live and the Sonic VFX examples), while live input runs or a live scene is open (ADR-1063).",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
    "command": "transport.previous-marker",
    "keys": "Up",
    "context": "General",

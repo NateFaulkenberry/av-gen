@@ -182,6 +182,9 @@ std::string usageText() {
            "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
            "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
            "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
+           "  --live-sky-rate <hz>  editor: the procedural sky's lighting rebuilds a second, at most, its\n"
+           "                      background drawn from the current sky every frame (ADR-1070; default 2,\n"
+           "                      0 = the ADR-233 deferral, the background from the lighting cube)\n"
            "  --live-capture <d>  with live Sonic input: every 2nd frame (--live-capture-every <n>) re-rendered\n"
            "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
            "                      review clip; costs frame time\n"
@@ -488,6 +491,11 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             auto v = need(i, "--live-capture-every");
             if (!v) return std::unexpected(v.error());
             options.liveCaptureEvery = std::max(1, std::atoi(v->c_str()));
+            ++i;
+        } else if (arg == "--live-sky-rate") {
+            auto v = need(i, "--live-sky-rate");
+            if (!v) return std::unexpected(v.error());
+            options.liveSkyRateHz = std::max(0.0, std::atof(v->c_str()));
             ++i;
         } else if (arg == "--sonic-live-log") {
             auto v = need(i, "--sonic-live-log");
@@ -2047,7 +2055,13 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                     liveDemoPath_ = ex.file;
                 }
             }
+            // ADR-1063/1074: the scenes a performer steps through -- the set the open project belongs to,
+            // chosen again whenever the open project changes (refreshLiveScenes).
+            liveExamples_ = *examples;
+            liveScenesFor_.reset();
+            refreshLiveScenes();
         }
+        panel_->onLiveScene = [this](int index) { switchLiveScene(index); };
         panel_->onOpenLiveDemo = [this] {
             if (liveDemoPath_.empty()) {
                 panel_->setStatus("the Sonic Live example was not found");
@@ -2421,6 +2435,60 @@ void Application::loadAny(const std::filesystem::path& path) {
     beginOpen(path);
 }
 
+// ---- ADR-1063: the live scene switcher ------------------------------------------------------------------------
+
+// ADR-1074: the list follows the open project's set. Recomputed only when the project changes.
+void Application::refreshLiveScenes() {
+    const std::filesystem::path project = engine_ != nullptr ? engine_->projectPath() : std::filesystem::path{};
+    if (liveScenesFor_ && *liveScenesFor_ == project) {
+        return;
+    }
+    liveScenesFor_ = project;
+    liveScenes_ = liveSceneListFor(liveExamples_, project);
+    if (panel_ != nullptr) {
+        panel_->liveScenes.clear();
+        for (const ExampleInfo& scene : liveScenes_) {
+            panel_->liveScenes.push_back(liveSceneLabel(scene));
+        }
+    }
+}
+
+void Application::switchLiveScene(int index) {
+    refreshLiveScenes();
+    if (engine_ == nullptr || index < 0 || index >= static_cast<int>(liveScenes_.size())) {
+        return;
+    }
+    const std::filesystem::path& target = liveScenes_[static_cast<std::size_t>(index)].file;
+    const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
+    if (current == index) {
+        return;
+    }
+    if (current >= 0 && panel_ != nullptr) {
+        // From one live scene to another: straight in, with the performer's response carried. A performer mid-set is
+        // not asked whether to save an example; anything else goes through the prompt, as every open does (ADR-440).
+        carryResponse_ = captureResponse(engine_->params());
+        beginOpen(target);
+        return;
+    }
+    loadAny(target);
+}
+
+void Application::serviceLiveScenes() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    refreshLiveScenes();
+    if (panel_ != nullptr) {
+        panel_->liveSceneCurrent = liveSceneIndex(liveScenes_, engine_->projectPath());
+    }
+    if (const auto program = engine_->control().takeProgramChange()) {
+        const int index = liveSceneForProgram(*program, static_cast<int>(liveScenes_.size()));
+        if (index >= 0) {
+            switchLiveScene(index);
+        }
+    }
+}
+
 void Application::beginOpen(const std::filesystem::path& path) {
     pendingOpen_ = path;
     panel_->loading = ui::ControlPanel::Loading{
@@ -2630,6 +2698,14 @@ void Application::servicePendingOpen() {
 
 void Application::performOpen(const std::filesystem::path& path) {
     auto r = openAny(path);
+    // ADR-1063: a switch between live scenes keeps the performer's response, as offsets from the new scene's own
+    // defaults. Applied before the dirty baseline restarts, so it is part of what the scene opened as.
+    if (carryResponse_) {
+        if (r && engine_ != nullptr) {
+            applyResponse(*carryResponse_, engine_->params());
+        }
+        carryResponse_.reset();
+    }
     // Whatever happens below, the attribution window starts again here: a load resets the engine's
     // baseline, and the click that asked for the load is not an edit to what just arrived.
     dirtySchedule_.restart(dirtyClockMs());
@@ -3764,6 +3840,20 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
     case SDLK_DOWN:
         engine_->stepMarkers(1);
         return true;
+    case SDLK_PAGEUP:
+    case SDLK_PAGEDOWN: {
+        // ADR-1063: the previous / next live scene, while live input runs or a live scene is open.
+        refreshLiveScenes();
+        const int count = static_cast<int>(liveScenes_.size());
+        const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
+        if (count == 0 || (current < 0 && !engine_->liveSonic())) {
+            return false;
+        }
+        if (!event.key.repeat) {
+            switchLiveScene(steppedLiveScene(current, event.key.key == SDLK_PAGEDOWN ? 1 : -1, count));
+        }
+        return true;
+    }
     case SDLK_L:
         if (!event.key.repeat) {
             const bool wanted = !transport.loop().enabled;
@@ -4506,6 +4596,9 @@ int Application::runLive() {
     // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
     // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
     renderer_->setInteractiveEnvironmentBudget(2.0);
+    // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
+    // and rebuilds its lighting at a capped rate, spread across frames.
+    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
     // ---- the interleaved arms (--ui-ab) ---------------------------------------------------------
     //
     // One process, several interactions, cycled in blocks. The first `uiAbSettle` frames of a block
@@ -4605,6 +4698,8 @@ int Application::runLive() {
                     comp->setLegacyProceduralGeneration(spec.legacyProcGen);
                 }
                 renderer_->setInteractiveEnvironmentBudget(spec.eagerSky ? 0.0 : 2.0);
+                renderer_->setLiveSkyLighting(
+                    {.enabled = !spec.eagerSky && options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
                 // The seek deferral's before and after, as two blocks of one process. A shell loop
                 // over two builds would compare two runs, which §3 of
                 // docs/application-performance.md forbids, and on a machine whose load average
@@ -5432,6 +5527,7 @@ int Application::runLive() {
                                                                        presentStart).count());
         const auto outputsStart = std::chrono::steady_clock::now();
         serviceProjection();
+        serviceLiveScenes();
         if (outputs_.openCount() > 0) {
             if (auto r = outputs_.presentAll(*context_, finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("outputs: {}", r.error().message);
@@ -5731,6 +5827,11 @@ int Application::runLive() {
               static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, renderer_->stats().triangles,
               renderer_->stats().drawCalls);
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
+    if (renderer_ && renderer_->liveSkyBuilds() > 0) {
+        // ADR-1070: how often the live schedule rebuilt the sky's lighting, for a measurement to read.
+        log::info("live sky: {} lighting builds spread across frames (at most {:.1f} a second)",
+                  renderer_->liveSkyBuilds(), renderer_->liveSkyLighting().maxRateHz);
+    }
     if (uiScript_.failedChecks() > 0) {
         log::error("ui script: {} check(s) failed", uiScript_.failedChecks());
         return 8;
@@ -7169,7 +7270,7 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
             const auto& info = bus.info(id);
             const std::string& name = info.name;
             if (name.starts_with("sonic.") || name.starts_with("timbre.") || name.starts_with("notes.") ||
-                name.starts_with("visual.")) {
+                name.starts_with("visual.") || name.starts_with("response.")) { // ADR-1062
                 liveLogColumns_.emplace_back(name, id);
             }
         }

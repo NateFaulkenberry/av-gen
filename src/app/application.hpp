@@ -21,6 +21,7 @@
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
+#include "app/live_scenes.hpp"
 #include "app/projection.hpp"
 #include "app/render_settings.hpp"
 #include "app/render_state.hpp"
@@ -300,6 +301,9 @@ struct AppOptions {
     bool startProjection = false;
     std::optional<std::string> midi;
     std::optional<std::string> sonicLiveLog;
+    // ADR-1070: the live sky's lighting rebuilds a second, at most (0 = the ADR-233 deferral alone,
+    // the behaviour before; the background then reads the cube).
+    double liveSkyRateHz = 2.0;
     // --live-capture <dir>: every Nth live frame re-rendered at a small size into <dir> as PPM, with frames.csv
     // (frame, host ns). For review clips of a live session; it costs frame time, so not in a latency run.
     std::optional<std::string> liveCapture;
@@ -522,6 +526,13 @@ private:
     void serviceLiveQuality();
     Projection projection_;
     std::filesystem::path liveDemoPath_;           // the Sonic Live example, resolved at start-up
+    std::vector<ExampleInfo> liveScenes_;           // ADR-1063/1074: the open project's live scene set
+    std::vector<ExampleInfo> liveExamples_;         // ADR-1074: the whole examples index the sets come from
+    std::optional<std::filesystem::path> liveScenesFor_; // the project `liveScenes_` was chosen for
+    std::optional<ResponseCarry> carryResponse_;    // ADR-1063: the performer's response, across a switch
+    void switchLiveScene(int index);
+    void refreshLiveScenes(); // ADR-1074: choose the open project's set
+    void serviceLiveScenes();
     std::vector<ProjectionDisplay> projectionDisplays_;
     std::chrono::steady_clock::time_point projectionLastScan_{};
     void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"

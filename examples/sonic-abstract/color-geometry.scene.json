@@ -1,0 +1,383 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "color-geometry",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.8,
+   -0.5,
+   4.0
+  ],
+  "target": [
+   -1.5,
+   0.8,
+   -60.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   1.0,
+   0.87137,
+   0.76052
+  ],
+  "fogColor": [
+   1.0,
+   0.87137,
+   0.76052
+  ],
+  "volumeDensity": 0.005,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    1.0,
+    0.87137,
+    0.76052
+   ],
+   "horizonColor": [
+    1.0,
+    0.87137,
+    0.76052
+   ],
+   "groundColor": [
+    1.0,
+    0.87137,
+    0.76052
+   ],
+   "haze": 0.5,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "corridor",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "twist",
+      "amount": 0.026,
+      "children": [
+       {
+        "kind": "translate",
+        "translation": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "children": [
+         {
+          "kind": "repeat",
+          "size": [
+           0.0,
+           9.0,
+           0.0
+          ],
+          "count": 0,
+          "children": [
+           {
+            "kind": "polarRepeat",
+            "count": 4,
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               7.7,
+               0.0,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 3.5,
+                 0.8,
+                 11.199999999999998
+                ],
+                "name": "slab"
+               }
+              ]
+             }
+            ],
+            "name": "polygon"
+           }
+          ],
+          "name": "accordion"
+         }
+        ],
+        "name": "travel"
+       }
+      ],
+      "name": "twist"
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.85,
+     "metallic": 0.0,
+     "program": "cgSpace"
+    },
+    "boundsMin": [
+     -23.399999999999995,
+     -16.0,
+     -23.399999999999995
+    ],
+    "boundsMax": [
+     23.399999999999995,
+     135.0,
+     23.399999999999995
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 72,
+    "epsilon": 0.002,
+    "stepScale": 0.95,
+    "normalEpsilon": 0.002,
+    "maxDistance": 130.0,
+    "surfaces": [
+     {
+      "color": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "emission": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "edge": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     }
+    ],
+    "look": {
+     "edgeIntensity": 0.0,
+     "edgePixels": 1.4,
+     "edgeThreshold": 0.03,
+     "edgeSoftness": 0.25,
+     "edgeColor": [
+      1.0,
+      0.87962,
+      0.68669
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    -90.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "endLight",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 8.0
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.89627,
+      0.65837
+     ],
+     "emissiveIntensity": 40.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    -128.0
+   ]
+  }
+ ],
+ "lights": [
+  {
+   "id": "end",
+   "name": "end",
+   "type": "point",
+   "position": [
+    0.0,
+    0.0,
+    -118.0
+   ],
+   "color": [
+    1.0,
+    0.89627,
+    0.65837
+   ],
+   "intensity": 9000.0,
+   "range": 260.0,
+   "volumetric": 0.7,
+   "castsShadow": false
+  },
+  {
+   "id": "near",
+   "name": "near",
+   "type": "point",
+   "position": [
+    0.0,
+    1.0,
+    14.0
+   ],
+   "color": [
+    1.0,
+    0.02624,
+    0.25415
+   ],
+   "intensity": 300.0,
+   "range": 60.0,
+   "volumetric": 0.4,
+   "castsShadow": false
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "direction": [
+    -0.3,
+    -0.6,
+    -0.7
+   ],
+   "color": [
+    1.0,
+    0.63076,
+    0.80695
+   ],
+   "intensity": 0.3,
+   "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "cgSpace",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "localPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      -0.011111111111111112,
+      -0.011111111111111112,
+      -0.011111111111111112,
+      -0.011111111111111112
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      1.0,
+      0.04374,
+      0.0137,
+      1.0
+     ]
+    },
+    {
+     "kind": "hueShift",
+     "dst": 4,
+     "srcA": 3,
+     "srcB": 1,
+     "value": 0.0
+    },
+    {
+     "kind": "saturate",
+     "dst": 4,
+     "srcA": 4,
+     "value": 1.6
+    },
+    {
+     "kind": "input",
+     "dst": 5,
+     "input": "normal"
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 5,
+     "constant": [
+      0.35,
+      0.8,
+      -0.45,
+      0.62
+     ],
+     "value": 0.42
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 4,
+     "srcB": 6
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 7,
+   "emissionIntensity": 0.95,
+   "opacity": -1
+  }
+ ]
+}

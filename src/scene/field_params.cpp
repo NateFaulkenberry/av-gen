@@ -163,6 +163,9 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
         case world::TriggerSource::TimelineMarker:
         case world::TriggerSource::Proximity:
             break;
+        case world::TriggerSource::Signal:
+            r.f("trigger/threshold", "fires on events stronger than", t.threshold, 0.0f, 1.0f, 0.0f, 1.0f);
+            break;
         }
     }
     return p;

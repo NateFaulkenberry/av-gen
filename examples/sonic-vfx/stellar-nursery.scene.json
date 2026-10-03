@@ -1,0 +1,1154 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "stellar-nursery",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -6.0,
+   6.0,
+   30.0
+  ],
+  "target": [
+   4.0,
+   14.0,
+   -70.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.00061,
+   0.00121,
+   0.00182
+  ],
+  "fogColor": [
+   0,
+   0,
+   0
+  ],
+  "volumeDensity": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00061,
+    0.00121,
+    0.00182
+   ],
+   "horizonColor": [
+    0.00091,
+    0.00212,
+    0.00304
+   ],
+   "groundColor": [
+    0.00061,
+    0.00091,
+    0.00152
+   ],
+   "haze": 0.5,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "nebula",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1000.0,
+      700.0,
+      1.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      120.0,
+      -420.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "program": "snNebula",
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "pillars",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "displaceNoise",
+        "amount": 2.2800000000000002,
+        "frequency": 0.1,
+        "speed": 0.0,
+        "seed": 3,
+        "children": [
+         {
+          "kind": "smoothUnion",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             -15.0,
+             -17.240000000000002,
+             -60.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 9.0
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.746653321243533,
+             -10.186666666666667,
+             -60.60581532551983
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 5.7,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -16.333218219679484,
+             -4.053333333333333,
+             -60.368799443974105
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 5.1000000000000005,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.45017619272426,
+             2.080000000000002,
+             -58.902740222117615
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.5,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -12.878498617065704,
+             8.213333333333331,
+             -61.09335631426161
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.900000000000001,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.508052027211226,
+             14.346666666666671,
+             -59.640305588067584
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.3000000000000003,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.813178262032643,
+             20.479999999999997,
+             -59.38595520905622
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.7,
+              "height": 8.28
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -14.0,
+             25.0,
+             -60.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 3.4799999999999995
+             }
+            ]
+           }
+          ],
+          "smooth": 3.3000000000000003
+         }
+        ]
+       },
+       {
+        "kind": "displaceNoise",
+        "amount": 1.9,
+        "frequency": 0.12,
+        "speed": 0.0,
+        "seed": 7,
+        "children": [
+         {
+          "kind": "smoothUnion",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             14.0,
+             -21.84,
+             -92.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 7.5
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             14.751788803954042,
+             -16.32,
+             -91.81348763057743
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             14.550933759824952,
+             -11.52,
+             -91.39164868546774
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 4.25,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             12.340216913642934,
+             -6.719999999999999,
+             -92.99717215619638
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             12.326829558220638,
+             -1.9200000000000017,
+             -91.27956752100916
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.250000000000001,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             13.443508475694019,
+             2.8800000000000026,
+             -91.96284161520917
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.75,
+              "height": 6.4799999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             11.758084352422246,
+             7.68,
+             -92.76994796054207
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.2500000000000004,
+              "height": 6.4799999999999995
+             }
+            ]
+           }
+          ],
+          "smooth": 2.75
+         }
+        ]
+       },
+       {
+        "kind": "displaceNoise",
+        "amount": 1.596,
+        "frequency": 0.14285714285714285,
+        "speed": 0.0,
+        "seed": 11,
+        "children": [
+         {
+          "kind": "smoothUnion",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             34.0,
+             -24.2,
+             -130.0
+            ],
+            "children": [
+             {
+              "kind": "sphere",
+              "radius": 6.300000000000001
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             32.97778806089954,
+             -19.6,
+             -129.8711659558882
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.9900000000000007,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             34.25100475460205,
+             -15.6,
+             -130.70482008442423
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.5700000000000007,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             35.263940665376744,
+             -11.6,
+             -129.18962460097524
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 3.1500000000000004,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             34.043269456401234,
+             -7.600000000000001,
+             -130.3750473087863
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.730000000000001,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             33.783882155984585,
+             -3.599999999999998,
+             -130.31060534164507
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 2.3100000000000005,
+              "height": 5.3999999999999995
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             35.635816863205584,
+             0.3999999999999986,
+             -129.21105490877463
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 1.8900000000000003,
+              "height": 5.3999999999999995
+             }
+            ]
+           }
+          ],
+          "smooth": 2.3100000000000005
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "renderMode": "mesh",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      0.02315,
+      0.00802,
+      0.00402
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.95,
+     "metallic": 0.0
+    },
+    "boundsMin": [
+     -30.0,
+     -30.0,
+     -140.0
+    ],
+    "boundsMax": [
+     44.0,
+     40.0,
+     -50.0
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 96,
+    "epsilon": 0.002,
+    "stepScale": 0.9,
+    "normalEpsilon": 0.002,
+    "maxDistance": 400.0,
+    "resolution": 128,
+    "look": {
+     "aoStrength": 0.6,
+     "aoDistance": 3.0
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "star0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -17.38289343482927,
+      26.424304607605862,
+      -58.16872748402759
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -16.618545109662975,
+      27.496151876871544,
+      -56.929530103672555
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -15.425887157740965,
+      28.431633671794188,
+      -56.09442201523101
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -14.0,
+      28.8,
+      -55.8
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.574112842259035,
+      28.431633671794188,
+      -56.09442201523101
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.381454890337025,
+      27.496151876871544,
+      -56.929530103672555
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "star6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.75,
+     "segments": 24,
+     "rings": 12
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.61710656517073,
+      26.424304607605862,
+      -58.16872748402759
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.12,
+    -0.45,
+    0.885
+   ],
+   "color": [
+    1.0,
+    0.07819,
+    0.35153
+   ],
+   "intensity": 14.0,
+   "castsShadow": false
+  },
+  {
+   "id": "rim2",
+   "name": "rim2",
+   "type": "directional",
+   "direction": [
+    -0.55,
+    -0.3,
+    0.78
+   ],
+   "color": [
+    1.0,
+    0.19462,
+    0.47932
+   ],
+   "intensity": 6.0,
+   "castsShadow": false
+  },
+  {
+   "id": "nebulaFill",
+   "name": "nebulaFill",
+   "type": "directional",
+   "direction": [
+    0.0,
+    0.1,
+    1.0
+   ],
+   "color": [
+    0.0137,
+    0.15896,
+    0.17144
+   ],
+   "intensity": 0.6,
+   "castsShadow": false
+  },
+  {
+   "id": "nest",
+   "name": "nest",
+   "type": "point",
+   "position": [
+    -14.0,
+    27.5,
+    -55.5
+   ],
+   "color": [
+    0.521,
+    0.7454,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 24.0,
+   "radius": 2.0,
+   "castsShadow": false,
+   "volumetric": 0.0
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "snNebula",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 0,
+     "value": 0.012,
+     "seed": 21,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      60.0,
+      80.0,
+      40.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 1,
+     "value": 0.008,
+     "seed": 5
+    },
+    {
+     "kind": "noise",
+     "dst": 4,
+     "srcA": 1,
+     "value": 0.03,
+     "seed": 9
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.35,
+      0.78,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.4,
+      0.62,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.5
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
+     "kind": "ramp",
+     "dst": 6,
+     "srcA": 5,
+     "constant": [
+      0.00061,
+      0.00152,
+      0.00182,
+      1.0
+     ],
+     "constant2": [
+      0.00617,
+      0.07153,
+      0.07715,
+      1.0
+     ],
+     "constant3": [
+      0.26049,
+      0.09722,
+      0.03888,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 7,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "constant",
+     "dst": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 0,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "nest",
+    "position": [
+     -14.0,
+     26.0,
+     -60.0
+    ],
+    "radius": 5.0,
+    "weight": 1.0
+   }
+  ],
+  "layers": [
+   {
+    "name": "dust",
+    "start": 0.0,
+    "end": 20.0,
+    "contrast": 0.8,
+    "saturation": 0.8
+   },
+   {
+    "name": "pillars",
+    "start": 20.0,
+    "end": 160.0,
+    "contrast": 1.0,
+    "saturation": 1.0
+   },
+   {
+    "name": "nebula",
+    "start": 160.0,
+    "end": 2000.0,
+    "contrast": 0.8,
+    "saturation": 0.85
+   }
+  ]
+ }
+}

@@ -1,0 +1,1410 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "event-horizon.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.55,
+   "attack": 1.2,
+   "release": 1.5
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.45,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/emissionWeight": 0.8,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.55,
+  "post/output/grain": 0.022,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.4,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 38.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.25,
+  "post/halation/warmth": 0.6,
+  "post/anamorphic/enabled": true,
+  "post/anamorphic/intensity": 0.08,
+  "post/anamorphic/stretch": 0.7,
+  "post/lens/chromaticAberration": 0.02,
+  "post/grade/contrast": 1.12,
+  "post/grade/saturation": 1.05,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "camera/lens/aperture": 2.8,
+  "camera/focus/mode": 0,
+  "camera/lens/focusDistance": 34.0,
+  "post/shock/amount": 0.0,
+  "post/shock/radius": 1.4,
+  "post/shock/width": 0.07,
+  "post/shock/chroma": 0.5,
+  "post/shock/centerX": 0.644,
+  "post/shock/centerY": 0.562
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "orbit",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.7142857142857143,
+      "gain": 2.380952380952381
+     },
+     {
+      "name": "heat",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "response.sustain",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.energy",
+        "weight": 0.6
+       }
+      ]
+     },
+     {
+      "name": "churn",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.density",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.rhythm",
+        "weight": 0.6
+       }
+      ],
+      "gain": 1.4
+     },
+     {
+      "name": "grit",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "sonic.roughness",
+        "weight": 1.0
+       },
+       {
+        "signal": "sonic.energy",
+        "weight": 0.4
+       },
+       {
+        "signal": "sonic.inharmonicity",
+        "weight": 2.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.3,
+      "gain": 6.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "fx/bh/einsteinRadius",
+   "amount": 1.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/bh/horizonScale",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band0/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band1/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band2/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band3/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band4/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band5/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band6/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band7/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band8/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band9/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band10/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band11/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band12/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "procedural/band13/material/emissive",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "particles/gasInner/spawnRate",
+   "amount": 2200.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "particles/gasInner/emissive",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.heat",
+   "target": "particles/beaming/emissive",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "material/ehDisk/op/18/ramp/constant",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "material/ehDisk/op/18/ramp/constant",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "material/ehDisk/op/18/ramp/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "material/ehDisk/op/12/noise/value",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "particles/gasInner/turbulence",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band0/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band1/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band2/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band3/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band4/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band5/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band6/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band7/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band8/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band9/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band10/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band11/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band12/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.grit",
+   "target": "procedural/band13/deform/2/amount",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.churn",
+   "target": "material/ehDisk/op/9/constant/constant",
+   "amount": 22.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.churn",
+   "target": "particles/gasInner/orbit",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.orbit",
+   "target": "particles/stars/position",
+   "amount": -9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/stars/extent",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "particles/stars/extent",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/stars/burst",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "fx/bh/photonRing",
+   "amount": 22.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/jetUp/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/jetDown/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/jetUp/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/jetDown/emissive",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "post/shock/amount",
+   "amount": 34.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "post/shock/radius",
+   "amount": -1.4,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "offset": -1.0,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/flare/burst",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "post/bloom/intensity",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/sparks/burst",
+   "amount": 45.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 30
+   }
+  },
+  {
+   "source": "notes.tension",
+   "target": "fx/bh/chroma",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 160.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.7319,
+       2.6,
+       33.6691
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       -1.1137,
+       2.8475,
+       33.9818
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       1.9653,
+       2.95,
+       33.9432
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       4.0152,
+       2.8475,
+       33.7621
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       4.7319,
+       2.6,
+       33.6691
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       4.0152,
+       2.3525,
+       33.7621
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.9653,
+       2.25,
+       33.9432
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -1.1137,
+       2.3525,
+       33.9818
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -4.7319,
+       2.6,
+       33.6691
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -8.2961,
+       2.8475,
+       32.9723
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       -11.2452,
+       2.95,
+       32.0865
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       -13.1657,
+       2.8475,
+       31.3475
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       -13.829,
+       2.6,
+       31.0605
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 130.0,
+      "value": [
+       -13.1657,
+       2.3525,
+       31.3475
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 140.0,
+      "value": [
+       -11.2452,
+       2.25,
+       32.0865
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 150.0,
+      "value": [
+       -8.2961,
+       2.3525,
+       32.9723
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 160.0,
+      "value": [
+       -4.7319,
+       2.6,
+       33.6691
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 160.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -5.9416,
+       1.4,
+       -0.835
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       -5.9968,
+       1.4,
+       -0.1965
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       -5.99,
+       1.4,
+       0.3468
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -5.958,
+       1.4,
+       0.7086
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       -5.9416,
+       1.4,
+       0.835
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       -5.958,
+       1.4,
+       0.7086
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -5.99,
+       1.4,
+       0.3468
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -5.9968,
+       1.4,
+       -0.1965
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -5.9416,
+       1.4,
+       -0.835
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -5.8186,
+       1.4,
+       -1.464
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       -5.6623,
+       1.4,
+       -1.9844
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       -5.5319,
+       1.4,
+       -2.3234
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       -5.4813,
+       1.4,
+       -2.4404
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 130.0,
+      "value": [
+       -5.5319,
+       1.4,
+       -2.3234
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 140.0,
+      "value": [
+       -5.6623,
+       1.4,
+       -1.9844
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 150.0,
+      "value": [
+       -5.8186,
+       1.4,
+       -1.464
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 160.0,
+      "value": [
+       -5.9416,
+       1.4,
+       -0.835
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-event-horizon.mp4"
+ },
+ "sonicScene": {
+  "category": "cosmic",
+  "thesis": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky.",
+  "composition": {
+   "background": "a desaturated star field and the galaxy's dust band, lensed into arcs round the shadow",
+   "midground": "the accretion disk on a shallow diagonal, hot white-gold at its inner edge, ember-red outside; its far side is bent up over the shadow",
+   "foreground": "a basalt fragment drifting out of focus in the lower left; fine dust",
+   "focal": "the shadow and its photon ring, on the right third",
+   "secondary": [
+    "relativistic jets, faint, above and below",
+    "note-stars spiralling in",
+    "the hot spot"
+   ],
+   "atmosphere": "none (vacuum); glowing gas and dust only",
+   "post": "bloom and warm halation on the inner disk, a whisper of anamorphic streak, edge chromatic aberration, grain, a heavy vignette",
+   "camera": "a 40-degree arc swept back and forth over 160 s, 9 degrees above the disk plane"
+  },
+  "palette": {
+   "dominant": "#04030a",
+   "secondary": "#ff7a2a",
+   "accent": "#6aa8ff",
+   "highlight": "#fff3dc",
+   "background_value": "very dark (L about 0.03)",
+   "saturation": "highest in the inner disk; stars and dust desaturated"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's arc",
+    "the lensed star field drifting"
+   ],
+   "medium": [
+    "the disk's rotation (inner bands faster: Keplerian)",
+    "the gas spiralling inward"
+   ],
+   "fast": [
+    "note-stars spiralling in over 2-4 s",
+    "the hot spot's flare"
+   ],
+   "extremely_fast": [
+    "the photon ring flash (kick)",
+    "sparks in the disk (hat)",
+    "the lens chroma tick"
+   ]
+  },
+  "vocabulary": [
+   [
+    "sustained",
+    "response.sustain",
+    "the disk heats: every band brighter, the gas denser and whiter"
+   ],
+   [
+    "melodic",
+    "response.note",
+    "a star is born at the orbit set by its pitch (low notes far and slow, high notes close and fast) and spirals in, trailing light"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how many stars and how bright"
+   ],
+   [
+    "polyphony",
+    "notes.polyphony",
+    "a chord releases a cluster: the birthplace spreads"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the hole's mass: the Einstein radius and the shadow swell, the sky bends more"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "the photon ring flashes, the jets pulse and a ripple races out from the hole"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a flare erupts from the hot spot on the approaching side"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "sparks across the disk"
+   ],
+   [
+    "density",
+    "notes.density",
+    "busy playing churns the gas (turbulence)"
+   ],
+   [
+    "tension",
+    "notes.tension",
+    "dissonance splits the lens's colours"
+   ],
+   [
+    "brightness",
+    "sonic.brightness",
+    "a bright timbre turns the inner edge from gold to blue-white"
+   ]
+  ],
+  "tier": "live: no fog march; one DF lens, two light beams, four particle systems",
+  "id": "event-horizon",
+  "title": "Event Horizon",
+  "regions": [
+   {
+    "id": "horizon",
+    "box": [
+     0.537,
+     0.355,
+     0.776,
+     0.78
+    ]
+   },
+   {
+    "id": "disk",
+    "box": [
+     0.244,
+     0.53,
+     1.0,
+     0.667
+    ]
+   },
+   {
+    "id": "lensed",
+    "box": [
+     0.445,
+     0.188,
+     0.872,
+     0.941
+    ]
+   },
+   {
+    "id": "background",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.2
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "bh",
+   "name": "bh",
+   "type": "gravLens",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "einsteinRadius": 6.0,
+    "mode": 1,
+    "horizonScale": 0.42,
+    "chroma": 0.003,
+    "ringColor": [
+     1.0,
+     0.76052,
+     0.47932
+    ],
+    "photonRing": 4.0,
+    "ringWidth": 0.045,
+    "falloffRadius": 3.2,
+    "feather": 0.55,
+    "offsetX": 0.0,
+    "offsetY": 0.0,
+    "offsetZ": 0.0
+   }
+  },
+  {
+   "id": "stars",
+   "name": "stars",
+   "type": "stars",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "brightness": 6.0,
+    "density": 0.08,
+    "magnitudeSlope": 5.5,
+    "colorSpread": 0.55,
+    "twinkle": 0.1,
+    "twinkleRate": 3.0,
+    "horizonFade": 0.05,
+    "band": 1.8,
+    "bandTilt": 0.45,
+    "daylight": 0.0
+   }
+  }
+ ]
+}

@@ -1,0 +1,2780 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "storm-cell",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   1.65,
+   8.0
+  ],
+  "target": [
+   0.0,
+   16.849999999999998,
+   -82.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.6,
+  "background": [
+   0.00335,
+   0.00439,
+   0.00368
+  ],
+  "fogColor": [
+   0.04667,
+   0.06125,
+   0.03689
+  ],
+  "volumeDensity": 0.00045,
+  "volumeMaxDistance": 0.0,
+  "volumeAnisotropy": 0.05,
+  "volumeNoise": 0.0,
+  "volumeLocalLights": 1.0,
+  "volumeShadowStrength": 0.0,
+  "fogSky": 1.0,
+  "fogSkyDistance": 1800.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00152,
+    0.00212,
+    0.00182
+   ],
+   "horizonColor": [
+    0.39157,
+    0.45641,
+    0.25415
+   ],
+   "groundColor": [
+    0.00368,
+    0.00439,
+    0.00335
+   ],
+   "haze": 0.05,
+   "sunIntensity": 0.0,
+   "sunColor": [
+    1,
+    1,
+    1
+   ],
+   "sunSize": 0.01,
+   "sunGlow": 0.1,
+   "intensity": 0.8,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1000.0,
+      0.4,
+      1000.0
+     ],
+     "subdivisions": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.2,
+      -2500.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      8.0,
+      1.0,
+      8.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "program": "scGround"
+    }
+   }
+  },
+  {
+   "name": "pole0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -27.038,
+      5.25,
+      -29.215
+     ],
+     "rotation": [
+      -1.7999999999999998,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -27.038,
+      9.8,
+      -29.215
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -2.6999999999999997
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -16.61742687541222,
+      5.25,
+      -80.16018285132677
+     ],
+     "rotation": [
+      -0.6,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -16.61742687541222,
+      9.8,
+      -80.16018285132677
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -0.8999999999999999
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.196853750824438,
+      5.25,
+      -131.10536570265353
+     ],
+     "rotation": [
+      0.6,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.196853750824438,
+      9.8,
+      -131.10536570265353
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.8999999999999999
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.223719373763341,
+      5.25,
+      -182.0505485539803
+     ],
+     "rotation": [
+      1.7999999999999998,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      4.223719373763341,
+      9.8,
+      -182.0505485539803
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      2.6999999999999997
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      14.644292498351124,
+      5.25,
+      -232.99573140530705
+     ],
+     "rotation": [
+      -1.2,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      14.644292498351124,
+      9.8,
+      -232.99573140530705
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -1.7999999999999998
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      25.064865622938907,
+      5.25,
+      -283.9409142566338
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      25.064865622938907,
+      9.8,
+      -283.9409142566338
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      35.485438747526686,
+      5.25,
+      -334.88609710796055
+     ],
+     "rotation": [
+      1.2,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      35.485438747526686,
+      9.8,
+      -334.88609710796055
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      1.7999999999999998
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      45.906011872114476,
+      5.25,
+      -385.8312799592873
+     ],
+     "rotation": [
+      -1.7999999999999998,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      45.906011872114476,
+      9.8,
+      -385.8312799592873
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -2.6999999999999997
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      56.32658499670225,
+      5.25,
+      -436.7764628106141
+     ],
+     "rotation": [
+      -0.6,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      56.32658499670225,
+      9.8,
+      -436.7764628106141
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -0.8999999999999999
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      66.74715812129003,
+      5.25,
+      -487.72164566194084
+     ],
+     "rotation": [
+      0.6,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      66.74715812129003,
+      9.8,
+      -487.72164566194084
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.8999999999999999
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      77.16773124587782,
+      5.25,
+      -538.6668285132677
+     ],
+     "rotation": [
+      1.7999999999999998,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      77.16773124587782,
+      9.8,
+      -538.6668285132677
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      2.6999999999999997
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      87.5883043704656,
+      5.25,
+      -589.6120113645944
+     ],
+     "rotation": [
+      -1.2,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      87.5883043704656,
+      9.8,
+      -589.6120113645944
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -1.7999999999999998
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole12",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      98.00887749505337,
+      5.25,
+      -640.5571942159212
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm12",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      98.00887749505337,
+      9.8,
+      -640.5571942159212
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole13",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      108.42945061964114,
+      5.25,
+      -691.502377067248
+     ],
+     "rotation": [
+      1.2,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm13",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      108.42945061964114,
+      9.8,
+      -691.502377067248
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      1.7999999999999998
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "pole14",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.14,
+     "height": 10.5,
+     "segments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      118.85002374422895,
+      5.25,
+      -742.4475599185747
+     ],
+     "rotation": [
+      -1.7999999999999998,
+      168.43990424458923,
+      0.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "arm14",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      0.14,
+      0.14
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      118.85002374422895,
+      9.8,
+      -742.4475599185747
+     ],
+     "rotation": [
+      0.0,
+      168.43990424458923,
+      -2.6999999999999997
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.01096,
+      0.00857,
+      0.00605
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "wire0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.03,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 200,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         -28.164672313058187,
+         9.9,
+         -29.445454982563
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -22.954385750764295,
+         8.5,
+         -54.91804640822638
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -17.744099188470408,
+         9.9,
+         -80.39063783388977
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -12.533812626176518,
+         8.5,
+         -105.86322925955315
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -7.3235260638826265,
+         9.9,
+         -131.33582068521653
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -2.1132395015887364,
+         8.5,
+         -156.8084121108799
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         3.0970470607051532,
+         9.9,
+         -182.2810035365433
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         8.307333622999044,
+         8.5,
+         -207.75359496220668
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         13.517620185292936,
+         9.9,
+         -233.22618638787006
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         18.72790674758683,
+         8.5,
+         -258.6987778135334
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         23.93819330988072,
+         9.9,
+         -284.1713692391968
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00368,
+      0.00368,
+      0.00368
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "wire1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.03,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 200,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         -27.038,
+         10.55,
+         -29.215
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -21.82771343770611,
+         9.15,
+         -54.687591425663385
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -16.61742687541222,
+         10.55,
+         -80.16018285132677
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -11.40714031311833,
+         9.15,
+         -105.63277427699015
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -6.196853750824438,
+         10.55,
+         -131.10536570265353
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -0.9865671885305485,
+         9.15,
+         -156.5779571283169
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         4.223719373763341,
+         10.55,
+         -182.0505485539803
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         9.434005936057233,
+         9.15,
+         -207.52313997964367
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         14.644292498351124,
+         10.55,
+         -232.99573140530705
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         19.854579060645015,
+         9.15,
+         -258.4683228309704
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         25.064865622938907,
+         10.55,
+         -283.9409142566338
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00368,
+      0.00368,
+      0.00368
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "wire2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.03,
+     "tubeTaper": 1.0,
+     "tubeSides": 4,
+     "tubeSegments": 200,
+     "tubeTwist": 0.0,
+     "tubeCaps": false,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         -25.911327686941814,
+         9.9,
+         -28.984545017437
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -20.701041124647922,
+         8.5,
+         -54.45713644310039
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -15.490754562354033,
+         9.9,
+         -79.92972786876376
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -10.280468000060141,
+         8.5,
+         -105.40231929442714
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         -5.07018143776625,
+         9.9,
+         -130.87491072009053
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.14010512452763946,
+         8.5,
+         -156.3475021457539
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         5.3503916868215295,
+         9.9,
+         -181.8200935714173
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         10.560678249115421,
+         8.5,
+         -207.29268499708067
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         15.770964811409312,
+         9.9,
+         -232.76527642274405
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         20.981251373703202,
+         8.5,
+         -258.2378678484074
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         26.191537935997093,
+         9.9,
+         -283.7104592740708
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00368,
+      0.00368,
+      0.00368
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "house",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      9.0,
+      5.0,
+      7.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -157.537,
+      2.5,
+      -403.336
+     ],
+     "rotation": [
+      0,
+      24,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0075,
+      0.00651,
+      0.00478
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "roof",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.4,
+      6.4,
+      7.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -157.537,
+      5.0,
+      -403.336
+     ],
+     "rotation": [
+      0,
+      24,
+      45
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0075,
+      0.00651,
+      0.00478
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "barn",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      14.0,
+      8.0,
+      10.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -129.537,
+      4.0,
+      -411.336
+     ],
+     "rotation": [
+      0,
+      18,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0075,
+      0.00651,
+      0.00478
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "lampPost",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.12,
+     "height": 8.0,
+     "segments": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -143.537,
+      4.0,
+      -397.336
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0075,
+      0.00651,
+      0.00478
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "lamp",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.45,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -143.537,
+      8.2,
+      -397.336
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.36131,
+      0.06848
+     ],
+     "emissiveIntensity": 60.0,
+     "roughness": 1.0,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "wheat",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.017,
+     "tubeTaper": 1.0,
+     "tubeSides": 5,
+     "tubeSegments": 10,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 0.41176,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.78,
+         0.0
+        ],
+        "scale": 0.35294,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.84,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.93,
+         0.0
+        ],
+        "scale": 0.94118,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.99,
+         0.0
+        ],
+        "scale": 0.23529,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 2
+     }
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      100,
+      1,
+      44
+     ],
+     "gridSpacing": [
+      0.22,
+      1.0,
+      0.24
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.4,
+      0.0,
+      0.20000000000000018
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.04231,
+      0.03689,
+      0.01938
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": 0.25,
+      "axis": [
+       0,
+       1,
+       0
+      ],
+      "displacementAxis": [
+       1.0,
+       0.0,
+       0.35
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "falloff": 0.0
+     },
+     {
+      "kind": "noise",
+      "amount": 0.14,
+      "scale": 0.35,
+      "speed": 0.7,
+      "seed": 3,
+      "axisMask": [
+       1.0,
+       0.0,
+       0.6
+      ],
+      "axis": [
+       0,
+       1,
+       0
+      ],
+      "center": [
+       0,
+       0,
+       0
+      ],
+      "falloff": 1.0,
+      "space": "world"
+     }
+    ],
+    "variation": {
+     "seed": 11,
+     "position": [
+      0.1,
+      0.0,
+      0.11
+     ],
+     "rotation": [
+      0.12,
+      3.14,
+      0.12
+     ],
+     "scale": [
+      0.0,
+      0.18,
+      0.0
+     ],
+     "uniformScale": 0.1
+    }
+   }
+  },
+  {
+   "name": "rain",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 24000,
+    "seed": 31,
+    "shape": "box",
+    "position": [
+     2.0,
+     9.0,
+     -4.0
+    ],
+    "extent": [
+     18.0,
+     1.0,
+     16.0
+    ],
+    "direction": [
+     0.22,
+     -1.0,
+     -0.08
+    ],
+    "spawnRate": 1600.0,
+    "lifetimeMin": 0.7,
+    "lifetimeMax": 0.9,
+    "spread": 0.02,
+    "speedMin": 11.0,
+    "speedMax": 13.0,
+    "gravity": [
+     0,
+     -2.0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.006,
+    "sizeEnd": 0.006,
+    "colorStart": [
+     0.58408,
+     0.67244,
+     0.57758,
+     0.22
+    ],
+    "colorEnd": [
+     0.58408,
+     0.67244,
+     0.57758,
+     0.16
+    ],
+    "emissive": 0.35,
+    "blend": "additive",
+    "velocityStretch": 1.0,
+    "stretchMax": 0.9
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "sodium",
+   "name": "sodium",
+   "type": "point",
+   "position": [
+    -143.537,
+    8.0,
+    -397.336
+   ],
+   "color": [
+    1.0,
+    0.36131,
+    0.06848
+   ],
+   "intensity": 5000.0,
+   "range": 90.0,
+   "radius": 0.5,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "slot",
+   "name": "slot",
+   "type": "directional",
+   "direction": [
+    -0.27497,
+    -0.06976,
+    0.95892
+   ],
+   "color": [
+    0.47932,
+    0.57758,
+    0.35153
+   ],
+   "intensity": 1.1,
+   "castsShadow": false
+  },
+  {
+   "id": "cloud0",
+   "name": "cloud0",
+   "type": "point",
+   "position": [
+    -625.0,
+    740.0,
+    -1074.532
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud1",
+   "name": "cloud1",
+   "type": "point",
+   "position": [
+    -386.271,
+    740.0,
+    -1180.821
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud2",
+   "name": "cloud2",
+   "type": "point",
+   "position": [
+    -130.661,
+    740.0,
+    -1235.152
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud3",
+   "name": "cloud3",
+   "type": "point",
+   "position": [
+    108.945,
+    740.0,
+    -1237.243
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud4",
+   "name": "cloud4",
+   "type": "point",
+   "position": [
+    302.402,
+    740.0,
+    -1204.87
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud5",
+   "name": "cloud5",
+   "type": "point",
+   "position": [
+    508.421,
+    740.0,
+    -1133.932
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "cloud6",
+   "name": "cloud6",
+   "type": "point",
+   "position": [
+    698.991,
+    740.0,
+    -1028.297
+   ],
+   "color": [
+    0.62396,
+    0.68669,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 520.0,
+   "radius": 40.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  },
+  {
+   "id": "thunder",
+   "name": "thunder",
+   "type": "point",
+   "position": [
+    146.34,
+    840.0,
+    -1384.331
+   ],
+   "color": [
+    0.57758,
+    0.63076,
+    1.0
+   ],
+   "intensity": 0.0,
+   "range": 900.0,
+   "radius": 80.0,
+   "castsShadow": false,
+   "volumetric": 1.0
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "scGround",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 0,
+     "value": 0.08,
+     "seed": 4
+    },
+    {
+     "kind": "microDetail",
+     "dst": 2,
+     "srcA": 0,
+     "value": 2.5,
+     "seed": 5
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 1,
+     "constant": [
+      0.007,
+      0.00802,
+      0.00561,
+      1.0
+     ],
+     "constant2": [
+      0.01938,
+      0.02315,
+      0.01229,
+      1.0
+     ],
+     "constant3": [
+      0.04231,
+      0.04231,
+      0.01938,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 3,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": -1,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "funnel",
+    "position": [
+     316.983,
+     60.0,
+     -1097.451
+    ],
+    "radius": 80.0,
+    "weight": 1.0
+   },
+   {
+    "name": "farm",
+    "position": [
+     -143.537,
+     6.0,
+     -397.336
+    ],
+    "radius": 10.0,
+    "weight": 0.4
+   }
+  ],
+  "layers": [
+   {
+    "name": "field",
+    "start": 0.0,
+    "end": 40.0,
+    "contrast": 1.0,
+    "saturation": 0.8
+   },
+   {
+    "name": "prairie",
+    "start": 40.0,
+    "end": 900.0,
+    "contrast": 0.85,
+    "saturation": 0.7
+   },
+   {
+    "name": "storm",
+    "start": 900.0,
+    "end": 9000.0,
+    "contrast": 0.75,
+    "saturation": 0.6
+   }
+  ]
+ }
+}

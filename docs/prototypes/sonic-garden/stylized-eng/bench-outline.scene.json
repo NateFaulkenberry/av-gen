@@ -1,0 +1,211 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "stylized-bench",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0,
+   6,
+   22
+  ],
+  "target": [
+   0,
+   1.5,
+   0
+  ],
+  "fov": 45.0
+ },
+ "environment": {
+  "background": [
+   0.05,
+   0.05,
+   0.08
+  ],
+  "intensity": 0.2
+ },
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.6,
+    -0.7,
+    -0.4
+   ],
+   "color": [
+    1,
+    0.95,
+    0.9
+   ],
+   "intensity": 3.0,
+   "castsShadow": true
+  },
+  {
+   "id": "glow",
+   "name": "glow",
+   "type": "point",
+   "position": [
+    0,
+    3,
+    4
+   ],
+   "color": [
+    0.4,
+    0.6,
+    1.0
+   ],
+   "intensity": 40.0,
+   "range": 15.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      60,
+      0.5,
+      60
+     ],
+     "subdivisions": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      -0.25,
+      0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.55
+     ],
+     "roughness": 0.8
+    }
+   }
+  },
+  {
+   "name": "field",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.6,
+     "segments": 32,
+     "rings": 16
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridSpacing": [
+      1.6,
+      1,
+      1.6
+     ],
+     "gridCount": [
+      20,
+      1,
+      20
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0.6,
+      -6
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.9,
+      0.4,
+      0.3
+     ],
+     "roughness": 0.5
+    }
+   }
+  },
+  {
+   "name": "towers",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1,
+      4,
+      1
+     ]
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 24,
+     "radius": 12
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      2,
+      0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.6,
+      0.9
+     ],
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "name": "orb",
+   "kind": "sdf",
+   "position": [
+    0,
+    3,
+    2
+   ],
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "sphere",
+      "radius": 1.6
+     }
+    },
+    "boundsMin": [
+     -2,
+     -2,
+     -2
+    ],
+    "boundsMax": [
+     2,
+     2,
+     2
+    ],
+    "material": {
+     "baseColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "roughness": 0.5
+    }
+   }
+  }
+ ],
+ "post": {
+  "outlineAmount": 1.0,
+  "outlineWidth": 2.0
+ }
+}

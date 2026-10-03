@@ -1,0 +1,2505 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "tesla-choir.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.65,
+   "sustain": 0.45,
+   "attack": 0.7,
+   "release": 0.8
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.42,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/emissionWeight": 0.8,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.5,
+  "post/output/grain": 0.03,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 30.0,
+  "scene/volumeSteps": 16,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.12,
+  "post/halation/warmth": 0.4,
+  "post/lens/chromaticAberration": 0.02,
+  "post/grade/contrast": 1.18,
+  "post/grade/saturation": 0.95,
+  "scene/volumeAnisotropy": 0.35
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "anyHeld",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.active",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "jag",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "notes.tension",
+        "weight": 0.6
+       },
+       {
+        "signal": "sonic.roughness",
+        "weight": 0.8
+       }
+      ]
+     },
+     {
+      "name": "arc0",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.0",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc1",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.7",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc2",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.2",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc3",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.9",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc4",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.4",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc5",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.11",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc6",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.6",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc7",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.1",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc8",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.8",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc9",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.3",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc10",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.10",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "arc11",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.class.5",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.arc0",
+   "target": "fx/arc0/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc0",
+   "target": "fx/arc0/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc0",
+   "target": "fx/arc0/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc0/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc0/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc1",
+   "target": "fx/arc1/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc1",
+   "target": "fx/arc1/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc1",
+   "target": "fx/arc1/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc1/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc1/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc2",
+   "target": "fx/arc2/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc2",
+   "target": "fx/arc2/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc2",
+   "target": "fx/arc2/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc2/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc2/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc3",
+   "target": "fx/arc3/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc3",
+   "target": "fx/arc3/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc3",
+   "target": "fx/arc3/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc3/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc3/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc4",
+   "target": "fx/arc4/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc4",
+   "target": "fx/arc4/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc4",
+   "target": "fx/arc4/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc4/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc4/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc5",
+   "target": "fx/arc5/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc5",
+   "target": "fx/arc5/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc5",
+   "target": "fx/arc5/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc5/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc5/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc6",
+   "target": "fx/arc6/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc6",
+   "target": "fx/arc6/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc6",
+   "target": "fx/arc6/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc6/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc6/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc7",
+   "target": "fx/arc7/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc7",
+   "target": "fx/arc7/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc7",
+   "target": "fx/arc7/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc7/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc7/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc8",
+   "target": "fx/arc8/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc8",
+   "target": "fx/arc8/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc8",
+   "target": "fx/arc8/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc8/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc8/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc9",
+   "target": "fx/arc9/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc9",
+   "target": "fx/arc9/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc9",
+   "target": "fx/arc9/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc9/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc9/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc10",
+   "target": "fx/arc10/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc10",
+   "target": "fx/arc10/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc10",
+   "target": "fx/arc10/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc10/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc10/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.arc11",
+   "target": "fx/arc11/intensity",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.arc11",
+   "target": "fx/arc11/glowIntensity",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "visual.arc11",
+   "target": "fx/arc11/light",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 8,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc11/jaggedness",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.jag",
+   "target": "fx/arc11/flicker",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/coreLoad/material/emissive",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "lights/coreGlow/intensity",
+   "amount": 150.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/coreCoil/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/cables/material/emissive",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "fx/crackle/intensity",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "fx/crackle/crackle",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "fx/crackle/glowIntensity",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "lights/coreGlow/intensity",
+   "amount": 220.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/sparks/burst",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 30
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/fill/intensity",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc0/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc1/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc2/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc3/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc4/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc5/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc6/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc7/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc8/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc9/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc10/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "fx/arc11/color",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.anyHeld",
+   "target": "post/bloom/intensity",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 110.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       10.7978,
+       7.6,
+       20.3078
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.875,
+      "value": [
+       13.4063,
+       7.7414,
+       18.6888
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.75,
+      "value": [
+       15.4324,
+       7.8,
+       17.0541
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.625,
+      "value": [
+       16.6774,
+       7.7414,
+       15.8387
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.5,
+      "value": [
+       17.0923,
+       7.6,
+       15.39
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 34.375,
+      "value": [
+       16.6774,
+       7.4586,
+       15.8387
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.25,
+      "value": [
+       15.4324,
+       7.4,
+       17.0541
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.125,
+      "value": [
+       13.4063,
+       7.4586,
+       18.6888
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0,
+      "value": [
+       10.7978,
+       7.6,
+       20.3078
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       7.997,
+       7.7414,
+       21.565
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.75,
+      "value": [
+       5.5088,
+       7.8,
+       22.3305
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.625,
+      "value": [
+       3.805,
+       7.7414,
+       22.6831
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       3.201,
+       7.6,
+       22.7762
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 89.375,
+      "value": [
+       3.805,
+       7.4586,
+       22.6831
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.25,
+      "value": [
+       5.5088,
+       7.4,
+       22.3305
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 103.125,
+      "value": [
+       7.997,
+       7.4586,
+       21.565
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       10.7978,
+       7.6,
+       20.3078
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 110.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.0616,
+       3.2,
+       2.1596
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.875,
+      "value": [
+       -3.7378,
+       3.2,
+       2.6813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.75,
+      "value": [
+       -3.4108,
+       3.2,
+       3.0865
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.625,
+      "value": [
+       -3.1677,
+       3.2,
+       3.3355
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.5,
+      "value": [
+       -3.078,
+       3.2,
+       3.4185
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 34.375,
+      "value": [
+       -3.1677,
+       3.2,
+       3.3355
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.25,
+      "value": [
+       -3.4108,
+       3.2,
+       3.0865
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.125,
+      "value": [
+       -3.7378,
+       3.2,
+       2.6813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0,
+      "value": [
+       -4.0616,
+       3.2,
+       2.1596
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       -4.313,
+       3.2,
+       1.5994
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.75,
+      "value": [
+       -4.4661,
+       3.2,
+       1.1018
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.625,
+      "value": [
+       -4.5366,
+       3.2,
+       0.761
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       -4.5552,
+       3.2,
+       0.6402
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 89.375,
+      "value": [
+       -4.5366,
+       3.2,
+       0.761
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.25,
+      "value": [
+       -4.4661,
+       3.2,
+       1.1018
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 103.125,
+      "value": [
+       -4.313,
+       3.2,
+       1.5994
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       -4.0616,
+       3.2,
+       2.1596
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-tesla-choir.mp4"
+ },
+ "sonicScene": {
+  "category": "energy",
+  "thesis": "Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn in lightning, so harmony has a shape.",
+  "composition": {
+   "background": "a vast dark turbine hall: ribbed walls, sodium windows high up, ozone haze",
+   "midground": "twelve copper coil towers on a circle (the circle of fifths) round the core",
+   "foreground": "cables snaking across wet concrete toward the camera",
+   "focal": "the core's top-load and the arcs leaving it, on the right third",
+   "secondary": [
+    "the tower crowns",
+    "sparks",
+    "the floor's sheen under each flash"
+   ],
+   "atmosphere": "haze, so arcs and flashes light the air",
+   "post": "bloom, a chromatic tick on discharges, grain, hard contrast",
+   "camera": "low and wide; a 40-degree dolly round the ring over 110 s"
+  },
+  "palette": {
+   "dominant": "#0a0e14",
+   "secondary": "#6a3b22",
+   "accent": "#ff9a3c",
+   "highlight": "#d6c8ff",
+   "background_value": "near black",
+   "saturation": "the arcs are near-white; colour lives only in the copper and the sodium windows"
+  },
+  "motion": {
+   "very_slow": [
+    "the dolly",
+    "the haze"
+   ],
+   "medium": [
+    "the core's hum (bass)",
+    "the coils' glow"
+   ],
+   "fast": [
+    "arcs per note (writhing while held)"
+   ],
+   "extremely_fast": [
+    "the kick's discharge",
+    "the snare's crackle",
+    "sparks (hat)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "melodic / chords",
+    "response.note",
+    "each held note arcs from the core to its tower; a triad draws a triangle of lightning, a cluster a jagged fan"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "arc brightness and its light"
+   ],
+   [
+    "sustained",
+    "notes.active",
+    "a held note is a steady writhing arc; a staccato note one crack"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the core charges: its top-load glows and the hall hums brighter"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a discharge: bolts from the core to the ring, the hall flashes"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "crackle crawls over the core"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "sparks spit from the core's crown"
+   ],
+   [
+    "tension",
+    "notes.tension",
+    "dissonant chords make the arcs jagged and flickering"
+   ],
+   [
+    "timbre",
+    "sonic.roughness",
+    "arc jaggedness; arc colour from violet to blue-white"
+   ]
+  ],
+  "tier": "medium: haze march (24 steps live), twelve ribbon arcs, one SDF hall",
+  "id": "tesla-choir",
+  "title": "Tesla Choir",
+  "regions": [
+   {
+    "id": "core",
+    "box": [
+     0.563,
+     0.177,
+     0.721,
+     0.457
+    ]
+   },
+   {
+    "id": "towers",
+    "box": [
+     0.325,
+     0.396,
+     1.0,
+     0.593
+    ]
+   },
+   {
+    "id": "background",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.22
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "arc0",
+   "name": "arc0",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 11,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      6.123233995736766e-16,
+      4.6,
+      10.0
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc1",
+   "name": "arc1",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 18,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -4.999999999999998,
+      4.6,
+      8.660254037844387
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc2",
+   "name": "arc2",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 25,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -8.660254037844387,
+      4.6,
+      4.999999999999999
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc3",
+   "name": "arc3",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 32,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -10.0,
+      4.6,
+      1.2246467991473533e-15
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc4",
+   "name": "arc4",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 39,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -8.660254037844386,
+      4.6,
+      -5.000000000000001
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc5",
+   "name": "arc5",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 46,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -5.000000000000004,
+      4.6,
+      -8.660254037844384
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc6",
+   "name": "arc6",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 53,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      -1.8369701987210296e-15,
+      4.6,
+      -10.0
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc7",
+   "name": "arc7",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 60,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      5.000000000000001,
+      4.6,
+      -8.660254037844386
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc8",
+   "name": "arc8",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 67,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      8.660254037844384,
+      4.6,
+      -5.000000000000004
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc9",
+   "name": "arc9",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 74,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      10.0,
+      4.6,
+      -2.4492935982947065e-15
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc10",
+   "name": "arc10",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 81,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      8.660254037844386,
+      4.6,
+      5.0
+     ]
+    }
+   }
+  },
+  {
+   "id": "arc11",
+   "name": "arc11",
+   "type": "arc",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strands": 2,
+    "rate": 9.0,
+    "jaggedness": 0.14,
+    "sag": -0.12,
+    "branchProbability": 0.07,
+    "depth": 6,
+    "reach": 10.0,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.028,
+    "glowIntensity": 0.0,
+    "glowWidth": 0.32,
+    "flicker": 0.45,
+    "light": 0.0,
+    "lightRange": 20.0,
+    "seed": 88,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.9,
+      0.0
+     ]
+    },
+    "target": {
+     "kind": "world",
+     "position": [
+      4.999999999999997,
+      4.6,
+      8.660254037844389
+     ]
+    }
+   }
+  },
+  {
+   "id": "discharge",
+   "name": "discharge",
+   "type": "discharge",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "bolts": 3,
+    "radius": 4.2,
+    "downward": 0.9,
+    "boltDuration": 0.16,
+    "jaggedness": 0.3,
+    "branchProbability": 0.3,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 30.0,
+    "flashIntensity": 900.0,
+    "coreWidth": 0.035,
+    "glowIntensity": 1.2,
+    "glowWidth": 0.4,
+    "flashRange": 26.0,
+    "sparkCount": 16,
+    "sparkSpeed": 10.0,
+    "sparkLife": 0.6,
+    "sparkIntensity": 12.0,
+    "seed": 5,
+    "source": {
+     "kind": "world",
+     "position": [
+      0.0,
+      6.7,
+      0.0
+     ]
+    }
+   },
+   "trigger": {
+    "source": "signal",
+    "name": "response.kick",
+    "threshold": 0.25
+   }
+  },
+  {
+   "id": "crackle",
+   "name": "crackle",
+   "type": "electricField",
+   "owner": {
+    "kind": "entity",
+    "name": "coreLoad"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "crackle": 0.0,
+    "crackleScale": 6.0,
+    "crackleSpeed": 3.0,
+    "coverage": 0.5,
+    "arcCount": 3,
+    "arcRate": 9.0,
+    "hopDistance": 0.6,
+    "color": [
+     0.67244,
+     0.57758,
+     1.0
+    ],
+    "intensity": 0.0,
+    "coreWidth": 0.02,
+    "glowWidth": 0.25,
+    "glowIntensity": 0.0,
+    "seed": 3
+   }
+  }
+ ]
+}

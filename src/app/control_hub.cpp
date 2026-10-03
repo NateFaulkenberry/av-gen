@@ -171,6 +171,10 @@ void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) 
     // ADR-1025: live Sonic input takes the notes (and the sustain pedal) into its note model. Bindings still see
     // every message, so a project can also map a key or a CC as it always could.
     bool matched = engine.liveSonic() && engine.liveSonicMidi(message);
+    if (engine.liveSonic() && message.kind == K::ProgramChange) {
+        programChange_ = static_cast<int>(message.data1); // ADR-1063: the scene switcher
+        matched = true;
+    }
     for (auto& binding : map_.midi) {
         if (auto match = control::matchMidi(binding, message)) {
             applyTarget(engine, binding.target, *match);

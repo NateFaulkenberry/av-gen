@@ -1,0 +1,1801 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "cel-dream.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.0,
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.18,
+  "post/bloom/threshold": 1.4,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.18,
+  "post/output/grain": 0.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4,
+  "post/outline/amount": 1.0,
+  "post/outline/color": [
+   0.04667,
+   0.01229,
+   0.07819
+  ],
+  "post/outline/intensity": 1.0,
+  "post/outline/width": 2.2,
+  "post/outline/depthThreshold": 0.06,
+  "post/outline/normalThreshold": 0.4,
+  "post/outline/objectEdges": 1.0
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sing0_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.019230769230769273,
+      "gain": 3.4615384615384617
+     },
+     {
+      "name": "sing1_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.0576923076923077,
+      "gain": 3.4615384615384617
+     },
+     {
+      "name": "sing2_loc",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -1.853846153846154,
+      "gain": 3.4615384615384617
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene2",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sing0_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing0_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "sing0_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing0_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "sing1_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing1_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "sing1_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing1_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "sing2_up",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing2_loc",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     },
+     {
+      "name": "sing2_dn",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "visual.sing2_loc",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -0.11111111111111109,
+      "gain": 2.2222222222222223
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "scene3",
+   "settings": {
+    "mappings": [
+     {
+      "name": "sing0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing0_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "singHit0",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing0_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing0_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sing1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing1_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "singHit1",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing1_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing1_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "sing2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing2_dn",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "singHit2",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "visual.sing2_up",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.sing2_dn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.kick",
+   "target": "nodes/blob1/position",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240,
+    "delayMs": 0,
+    "springHz": 2.4,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "nodes/blob2/position",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240,
+    "delayMs": 70,
+    "springHz": 2.4,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "nodes/blob3/position",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240,
+    "delayMs": 140,
+    "springHz": 2.4,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "nodes/blob4/position",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240,
+    "delayMs": 210,
+    "springHz": 2.4,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "nodes/blob5/position",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240,
+    "delayMs": 280,
+    "springHz": 2.4,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob1/scale",
+   "amount": -0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob1/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob1/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob2/scale",
+   "amount": -0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob2/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob2/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob3/scale",
+   "amount": -0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob3/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob3/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob4/scale",
+   "amount": -0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob4/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob4/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob5/scale",
+   "amount": -0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob5/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/blob5/scale",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "camera/position",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/petals/transform/scale",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260,
+    "springHz": 3.0,
+    "springDamping": 0.4
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/confetti/burst",
+   "amount": 140.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/sparkle/burst",
+   "amount": 18.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "particles/sparkle/spawnRate",
+   "amount": 60.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/cloud0/transform/position",
+   "amount": -2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/cloud1/transform/position",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/cloud2/transform/position",
+   "amount": -2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/cloud3/transform/position",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "nodes/blob1/rotation",
+   "amount": -22.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "nodes/blob2/rotation",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "nodes/blob3/rotation",
+   "amount": 26.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "env/sky/zenithColor",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "env/sky/zenithColor",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "env/sky/zenithColor",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "lights/sun/intensity",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/petals/distribution/radius",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/heart/transform/scale",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/blob1/position",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/blob2/position",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/blob3/position",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/blob4/position",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/blob5/position",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "nodes/blob4/position",
+   "amount": 3.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 250,
+    "decayMs": 900,
+    "springHz": 1.6,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "nodes/blob5/position",
+   "amount": 3.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5,
+    "attackMs": 250,
+    "decayMs": 900,
+    "springHz": 1.6,
+    "springDamping": 0.45
+   }
+  },
+  {
+   "source": "visual.singHit0",
+   "target": "nodes/blob1Mouth/scale",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.singHit0",
+   "target": "nodes/blob1/position",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "visual.singHit1",
+   "target": "nodes/blob2Mouth/scale",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.singHit1",
+   "target": "nodes/blob2/position",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "visual.singHit2",
+   "target": "nodes/blob3Mouth/scale",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "visual.singHit2",
+   "target": "nodes/blob3/position",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/tulipStems/distribution/count",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/tulips/distribution/count",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow0/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 0,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow1/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 60,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow2/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 120,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow3/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 180,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow4/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 240,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/rainbow5/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "delayMs": 300,
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/whale/scale",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "particles/spout/burst",
+   "amount": 160.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.05
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "nodes/whaleMouth/scale",
+   "amount": 0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "lights/sun/intensity",
+   "amount": -2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "env/sky/zenithColor",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.75,
+    "offset": 1.0,
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "env/sky/horizonColor",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.6,
+    "offset": 1.0,
+    "attackMs": 80,
+    "decayMs": 80
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "nodes/whale/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "interp": "smooth",
+      "value": [
+       -3.0,
+       25.0,
+       -50.0
+      ]
+     },
+     {
+      "time": 7.5,
+      "interp": "smooth",
+      "value": [
+       1.5,
+       26.905,
+       -49.196
+      ]
+     },
+     {
+      "time": 15.0,
+      "interp": "smooth",
+      "value": [
+       4.794,
+       26.905,
+       -47.0
+      ]
+     },
+     {
+      "time": 22.5,
+      "interp": "smooth",
+      "value": [
+       6.0,
+       25.0,
+       -44.0
+      ]
+     },
+     {
+      "time": 30.0,
+      "interp": "smooth",
+      "value": [
+       4.794,
+       23.095,
+       -41.0
+      ]
+     },
+     {
+      "time": 37.5,
+      "interp": "smooth",
+      "value": [
+       1.5,
+       23.095,
+       -38.804
+      ]
+     },
+     {
+      "time": 45.0,
+      "interp": "smooth",
+      "value": [
+       -3.0,
+       25.0,
+       -38.0
+      ]
+     },
+     {
+      "time": 52.5,
+      "interp": "smooth",
+      "value": [
+       -7.5,
+       26.905,
+       -38.804
+      ]
+     },
+     {
+      "time": 60.0,
+      "interp": "smooth",
+      "value": [
+       -10.794,
+       26.905,
+       -41.0
+      ]
+     },
+     {
+      "time": 67.5,
+      "interp": "smooth",
+      "value": [
+       -12.0,
+       25.0,
+       -44.0
+      ]
+     },
+     {
+      "time": 75.0,
+      "interp": "smooth",
+      "value": [
+       -10.794,
+       23.095,
+       -47.0
+      ]
+     },
+     {
+      "time": 82.5,
+      "interp": "smooth",
+      "value": [
+       -7.5,
+       23.095,
+       -49.196
+      ]
+     },
+     {
+      "time": 90.0,
+      "interp": "smooth",
+      "value": [
+       -3.0,
+       25.0,
+       -50.0
+      ]
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       12.5319,
+       4.6,
+       20.198
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       14.7791,
+       4.6,
+       19.5329
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       16.6331,
+       4.6,
+       18.8181
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.875,
+      "value": [
+       17.8404,
+       4.6,
+       18.2653
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       18.2577,
+       4.6,
+       18.0572
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.125,
+      "value": [
+       17.8404,
+       4.6,
+       18.2653
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       16.6331,
+       4.6,
+       18.8181
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.375,
+      "value": [
+       14.7791,
+       4.6,
+       19.5329
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       12.5319,
+       4.6,
+       20.198
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.625,
+      "value": [
+       10.2354,
+       4.6,
+       20.6657
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       8.2629,
+       4.6,
+       20.905
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       6.9374,
+       4.6,
+       20.9837
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       6.4712,
+       4.6,
+       20.9959
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 73.125,
+      "value": [
+       6.9374,
+       4.6,
+       20.9837
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       8.2629,
+       4.6,
+       20.905
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 84.375,
+      "value": [
+       10.2354,
+       4.6,
+       20.6657
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       12.5319,
+       4.6,
+       20.198
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       6.9703,
+       4.2,
+       -6.2419
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.625,
+      "value": [
+       6.9457,
+       4.2,
+       -6.3252
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       6.9192,
+       4.2,
+       -6.3938
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.875,
+      "value": [
+       6.8987,
+       4.2,
+       -6.4385
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       6.891,
+       4.2,
+       -6.454
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.125,
+      "value": [
+       6.8987,
+       4.2,
+       -6.4385
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       6.9192,
+       4.2,
+       -6.3938
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.375,
+      "value": [
+       6.9457,
+       4.2,
+       -6.3252
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       6.9703,
+       4.2,
+       -6.2419
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.625,
+      "value": [
+       6.9876,
+       4.2,
+       -6.1569
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       6.9965,
+       4.2,
+       -6.0838
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.875,
+      "value": [
+       6.9994,
+       4.2,
+       -6.0347
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       6.9998,
+       4.2,
+       -6.0175
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 73.125,
+      "value": [
+       6.9994,
+       4.2,
+       -6.0347
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       6.9965,
+       4.2,
+       -6.0838
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 84.375,
+      "value": [
+       6.9876,
+       4.2,
+       -6.1569
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       6.9703,
+       4.2,
+       -6.2419
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-cel-dream.mp4"
+ },
+ "sonicScene": {
+  "category": "cel-shaded",
+  "thesis": "Candy Archipelago: a toy island floating in a candy sky, inked and cel-shaded, where three round creatures sing the notes, hop on the kick and the giant flower blooms when the sound is held.",
+  "composition": {
+   "background": "a peach-to-pink sky with flat pastel clouds; small islands drifting behind",
+   "midground": "the island: a mint lawn on a lilac rock, lollipop and cone trees, the giant flower, the ring",
+   "foreground": "three round creatures in a row on the lawn's front edge, looking at the camera",
+   "focal": "the creatures, with the giant flower above them",
+   "secondary": [
+    "the giant flower",
+    "the waterfall",
+    "the far islands"
+   ],
+   "atmosphere": "(none: flat colour)",
+   "post": "plum outlines, a soft bloom on the rims",
+   "camera": "a slow arc round the diorama from slightly above"
+  },
+  "palette": {
+   "dominant": "#ffc9b0",
+   "secondary": "#8ff0c0",
+   "accent": "#ff8a7a",
+   "highlight": "#ffe27a",
+   "background_value": "light",
+   "saturation": "pastel pushed to candy; plum ink"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's arc",
+    "the clouds' drift"
+   ],
+   "medium": [
+    "the flower's bloom",
+    "the island's bob"
+   ],
+   "fast": [
+    "the creatures singing"
+   ],
+   "extremely_fast": [
+    "the creatures' hop on the kick"
+   ]
+  },
+  "vocabulary": [
+   [
+    "kick",
+    "response.kick",
+    "the creatures hop, a ripple left to right, landing on a spring"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the creatures squash and stretch; the camera bobs"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the giant flower's petals flick; a confetti puff"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "sparkles round the flower"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the clouds sway; the creatures turn their heads"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the time of day: the sky and the sun's strength"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the giant flower blooms open"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "everyone bobs on the beat"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: two more creatures pop up out of the lawn"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "the creature at the note's register sings: its mouth opens, it lifts by the velocity"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: as many lawn flowers bloom as there are notes"
+   ],
+   [
+    "held",
+    "notes.held",
+    "a rainbow rises behind the island"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "day to night"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the islands float; the waterfall falls"
+   ]
+  ],
+  "tier": "light: about 45 low-poly procedural nodes with cel lighting, the outline pass, one particle system",
+  "id": "cel-dream",
+  "title": "Cel-Shaded Dream World",
+  "regions": [
+   {
+    "id": "creatures",
+    "box": [
+     0.3,
+     0.45,
+     0.7,
+     0.8
+    ]
+   },
+   {
+    "id": "flower",
+    "box": [
+     0.25,
+     0.1,
+     0.5,
+     0.45
+    ]
+   }
+  ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
+ }
+}

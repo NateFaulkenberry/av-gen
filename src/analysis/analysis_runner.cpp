@@ -40,7 +40,45 @@ void AnalysisRunner::stop() {
 }
 
 bool AnalysisRunner::acquire() {
-    return frames_.acquire();
+    if (!frames_.acquire()) {
+        return false;
+    }
+    consumed_.store(frames_.front().liveSerial, std::memory_order_release);
+    return true;
+}
+
+void AnalysisRunner::carryEvents(AnalysisFrame& frame) {
+    frame.liveSerial = ++serial_;
+    const std::uint64_t consumed = consumed_.load(std::memory_order_acquire);
+    // One kind: this frame's own event replaces the pending one; otherwise a pending event not yet seen by the
+    // render thread rides on this frame too.
+    const auto carry = [&](bool& flag, float* strength, std::uint64_t& stamp, bool& pFlag, float* pStrength,
+                           std::uint64_t& pStamp) {
+        if (flag) {
+            stamp = frame.liveSerial;
+            pFlag = true;
+            pStamp = stamp;
+            if (strength != nullptr) {
+                *pStrength = *strength;
+            }
+            return;
+        }
+        if (pFlag && pStamp > consumed) {
+            flag = true;
+            stamp = pStamp;
+            if (strength != nullptr) {
+                *strength = *pStrength;
+            }
+        } else {
+            pFlag = false;
+        }
+    };
+    auto& p = pending_;
+    carry(frame.onset, &frame.onsetStrength, frame.onsetStamp, p.onset, &p.onsetStrength, p.onsetStamp);
+    carry(frame.beat, nullptr, frame.beatStamp, p.beat, nullptr, p.beatStamp);
+    carry(frame.lowOnset, &frame.lowOnsetStrength, frame.lowStamp, p.low, &p.lowStrength, p.lowStamp);
+    carry(frame.midOnset, &frame.midOnsetStrength, frame.midStamp, p.mid, &p.midStrength, p.midStamp);
+    carry(frame.highOnset, &frame.highOnsetStrength, frame.highStamp, p.high, &p.highStrength, p.highStamp);
 }
 
 std::vector<AnalysisFrame> AnalysisRunner::history(std::size_t count) const {
@@ -74,6 +112,7 @@ void AnalysisRunner::threadMain(std::stop_token token) {
             // Seek or restart: the analyzer restamps and the beat tracker starts from unknown.
             analyzer_.reset(result.startFrame);
             beatTracker_.reset();
+            causal_.reset();
         }
         analyzer_.push(std::span<const float>(chunk.data(), result.count));
 
@@ -85,9 +124,22 @@ void AnalysisRunner::threadMain(std::stop_token token) {
             frame.beat = beat.beat;
             frame.beatPhase = beat.phase;
             frame.beatCount = beat.beatCount;
+            // ADR-1060: live kick, snare and hat (the band-onset fields a file gets from ADR-898's offline pass).
+            causal_.process(frame, static_cast<float>(config_.sampleRate) / static_cast<float>(config_.windowSize),
+                            static_cast<double>(config_.hopSize) / static_cast<double>(config_.sampleRate));
+            {
+                const CausalOnsets& c = frame.causal;
+                frame.lowOnset = c.hit[static_cast<std::size_t>(HitClass::Kick)];
+                frame.lowOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Kick)];
+                frame.midOnset = c.hit[static_cast<std::size_t>(HitClass::Snare)];
+                frame.midOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Snare)];
+                frame.highOnset = c.hit[static_cast<std::size_t>(HitClass::Hat)];
+                frame.highOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Hat)];
+            }
             if (tap_ != nullptr) {
                 tap_->onFrame(frame);
             }
+            carryEvents(frame);
             {
                 const std::lock_guard lock(historyMutex_);
                 if (history_.size() < kHistorySize) {

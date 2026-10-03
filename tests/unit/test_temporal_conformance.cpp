@@ -91,6 +91,8 @@ TEST_CASE("every temporal kind declares a bound that the ring can hold", "[tempo
     s.echo.enabled = true;
     s.echo.frames = 12;
     s.mosh.enabled = true; // ADR-1049
+    s.feedback.enabled = true; // ADR-1066
+    s.slit.enabled = true;
     const auto bounds = conf::declaredBounds(s);
     REQUIRE(bounds.size() == kTemporalEffectKinds.size());
     for (const auto& b : bounds) {

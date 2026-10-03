@@ -4433,6 +4433,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // whose camera walks through rooms). The SDF march starts at the near plane, so a near plane larger
     // than the camera's clearance cuts the nearest wall open.
     cameraNear_ = &params.add(floatDesc(prefix_ + "camera/near", cameraNearSetting_, 0.0f, 10.0f, 0.0f, 0.5f));
+    // ADR-1075: a roll about the line of sight, in degrees (positive rolls the camera clockwise, so the horizon
+    // tilts anticlockwise in the picture). The world
+    // and its lights stay put; only the camera's up turns.
+    cameraRoll_ = &params.add(floatDesc(prefix_ + "camera/roll", 0.0f, -720.0f, 720.0f, -180.0f, 180.0f));
     cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
                                                      .defaultValue = cameraModeSetting_,
                                                      .hardMin = 0,
@@ -5821,6 +5825,7 @@ void Composition::detach() {
     materialParams_.clear();
     cameraFov_ = nullptr;
     cameraNear_ = nullptr;
+    cameraRoll_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
     cameraTarget_ = nullptr;
@@ -8809,6 +8814,16 @@ void Composition::applyParameters() {
         applyCameraBreath(breath, scene_.camera.position, scene_.camera.target, fov);
     }
     scene_.camera.fovYRadians = glm::radians(fov);
+    // ADR-1075: camera/roll turns the up vector about the line of sight; 0 is the world's up exactly.
+    {
+        const float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
+        if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {
+            up = glm::angleAxis(glm::radians(roll), glm::normalize(forward)) * up;
+        }
+        scene_.camera.up = up;
+    }
     {
         // ADR-1058: the automatic near plane is 0.5% of the world's radius. That suits an object to orbit;
         // a journey's camera walks through 3 m rooms inside an 80 m world, and a 0.4 m near plane there

@@ -29,6 +29,45 @@ void NoteTrack::finish() {
         notes[i].id = static_cast<std::uint32_t>(i);
         longest = std::max(longest, notes[i].duration);
     }
+    for (std::size_t i = 0; i < notes.size(); ++i) {
+        assignVoice(*this, i);
+    }
+}
+
+void assignVoice(NoteTrack& track, std::size_t index) {
+    auto& n = track.notes;
+    if (index >= n.size()) {
+        return;
+    }
+    const double start = n[index].start;
+    std::array<bool, kVoiceSlots> busy{};
+    std::array<double, kVoiceSlots> since{};
+    since.fill(1e300);
+    // Every earlier note that still sounds at this start; none began more than `longest` before it (a held live note
+    // is longer than `longest` until the next refresh, so live scans the whole track: it is bounded at 4096).
+    for (std::size_t j = index; j > 0; --j) {
+        const NoteEvent& e = n[j - 1];
+        if (e.voice < kVoiceSlots && e.end() > start && e.start <= start) {
+            busy[e.voice] = true;
+            since[e.voice] = std::min(since[e.voice], e.start);
+        }
+    }
+    int slot = -1;
+    for (int v = 0; v < kVoiceSlots; ++v) {
+        if (!busy[static_cast<std::size_t>(v)]) {
+            slot = v;
+            break;
+        }
+    }
+    if (slot < 0) {
+        slot = 0;
+        for (int v = 1; v < kVoiceSlots; ++v) {
+            if (since[static_cast<std::size_t>(v)] < since[static_cast<std::size_t>(slot)]) {
+                slot = v;
+            }
+        }
+    }
+    n[index].voice = static_cast<std::uint8_t>(slot);
 }
 
 namespace {
@@ -514,6 +553,104 @@ std::string pitchName(float midi) {
         return "-";
     }
     return std::string(kNames[static_cast<std::size_t>(n % 12)]) + std::to_string(n / 12 - 1);
+}
+
+// ---- ADR-1062: per-note facts ---------------------------------------------------------------------------------
+
+NoteFacts noteFactsAt(const NoteTrack& track, double seconds, const ContextSettings& settings) {
+    NoteFacts f;
+    const auto& n = track.notes;
+    const auto end = std::upper_bound(n.begin(), n.end(), seconds,
+                                      [](double t, const NoteEvent& e) { return t < e.start; });
+    if (end == n.begin()) {
+        return f;
+    }
+    // The latest note-on, and the step to it from the previous onset at a different time.
+    const NoteEvent& last = *(end - 1);
+    f.lastPitch = last.pitch;
+    f.lastVelocity = last.velocity;
+    f.lastChannel = last.channel;
+    for (auto it = end - 1; it != n.begin();) {
+        --it;
+        if (last.start - it->start > settings.chordSeconds) {
+            f.interval = last.pitch - it->pitch;
+            break;
+        }
+    }
+    // Sounding notes: begun at or before now, ending after it. None began more than `longest` ago.
+    double sum = 0.0, square = 0.0;
+    int count = 0;
+    for (auto it = end; it != n.begin();) {
+        --it;
+        const double age = seconds - it->start;
+        if (age <= settings.window) {
+            sum += it->velocity;
+            square += static_cast<double>(it->velocity) * it->velocity;
+            ++count;
+        } else if (age > track.longest) {
+            break;
+        }
+        if (it->end() <= seconds) {
+            continue;
+        }
+        f.lowest = f.lowest < 0.0f ? it->pitch : std::min(f.lowest, it->pitch);
+        f.highest = std::max(f.highest, it->pitch);
+        f.held = std::max(f.held, age);
+        const auto cls = static_cast<std::size_t>(it->key % 12);
+        f.pitchClass[cls] = std::max(f.pitchClass[cls], it->velocity);
+        if (it->voice < kVoiceSlots) {
+            NoteFacts::Voice& v = f.voices[it->voice];
+            // The newest note in the slot owns it (a stolen slot shows the thief).
+            if (!v.held || age < v.age) {
+                v.held = true;
+                v.velocity = it->velocity;
+                v.pitch = it->pitch;
+                v.age = age;
+            }
+        }
+    }
+    if (count > 1) {
+        const double mean = sum / count;
+        f.velocitySpread = static_cast<float>(std::sqrt(std::max(0.0, square / count - mean * mean)));
+    }
+    return f;
+}
+
+NoteFactEvents noteFactEventsBetween(const NoteTrack& track, double from, double to, int splitKey) {
+    NoteFactEvents e;
+    if (!(to > from)) {
+        return e;
+    }
+    const auto& n = track.notes;
+    const auto end = std::upper_bound(n.begin(), n.end(), to, [](double t, const NoteEvent& x) { return t < x.start; });
+    for (auto it = end; it != n.begin();) {
+        --it;
+        if (it->start > from) {
+            if (it->key < splitKey) {
+                e.low = true;
+                e.lowVelocity = std::max(e.lowVelocity, it->velocity);
+            } else {
+                e.high = true;
+                e.highVelocity = std::max(e.highVelocity, it->velocity);
+            }
+            if (it->voice < kVoiceSlots) {
+                e.voiceOn[it->voice] = true;
+                e.voiceVelocity[it->voice] = std::max(e.voiceVelocity[it->voice], it->velocity);
+            }
+            const auto cls = static_cast<std::size_t>(it->key % 12);
+            e.classOn[cls] = true;
+            e.classVelocity[cls] = std::max(e.classVelocity[cls], it->velocity);
+        }
+        const double off = it->end();
+        if (off > from && off <= to) {
+            e.release = true;
+            e.releaseSeconds = std::max(e.releaseSeconds, static_cast<float>(it->duration));
+        }
+        if (to - it->start > track.longest + (to - from)) {
+            break;
+        }
+    }
+    return e;
 }
 
 } // namespace avgen::sonic

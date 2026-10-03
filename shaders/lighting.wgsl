@@ -145,7 +145,56 @@ struct ShadeContext {
     // to be a saving. `localLightBudget` is 0xffffffff on the Full tier.
     tier: u32,
     localLightBudget: u32,
+    // ADR-1071: the material's cel lighting, ObjectUniforms::toon0 and toon2.w. A ShadeContext is
+    // zero-initialised, so every construction site that does not fill this -- water, the styled and
+    // PBR paths -- has toon.x == 0 and takes the paths it always took.
+    toon: vec4<f32>,       // x = lit bands (0 = off), y = edge softness, z = terminator, w = highlight strength
+    toonHighlight: f32,    // highlight size (0 = a point, 1 = the whole lit side)
 };
+
+// ---- ADR-1071: cel lighting ----------------------------------------------------------------------
+//
+// One light's N.L, pushed to the shadow side by its shadow (visibility 0 is N.L = -1), measured from
+// the terminator and cut into `bands` lit tones, each edge `softness` wide. x = the lit share (0 the
+// shadow tone, 1 the brightest band), y = 1 on the lit side of the terminator (the highlight's mask).
+fn toonBand(nDotL: f32, visibility: f32, ctx: ShadeContext) -> vec2<f32> {
+    let bands = max(ctx.toon.x, 1.0);
+    let s = max(ctx.toon.y, 1e-3);
+    let terminator = ctx.toon.z;
+    // The shadow is cut too, at half visibility: a soft or noisy visibility (a PCF penumbra, the
+    // contact march's jitter, an SDF's soft shadow) would otherwise move N.L across a band edge and
+    // print its noise as speckle in a flat tone.
+    let w = 0.15 + s;
+    let shade = smoothstep(0.5 - w, 0.5 + w, clamp(visibility, 0.0, 1.0));
+    let x = mix(-1.0, nDotL, shade);
+    let t = (x - terminator) / max(1.0 - terminator, 1e-3);
+    let lit = smoothstep(-s, s, t);
+    var q = 0.0;
+    let count = u32(bands + 0.5);
+    for (var k = 0u; k < count; k = k + 1u) {
+        let e = f32(k) / bands;
+        q = q + smoothstep(e - s, e + s, t);
+    }
+    return vec2<f32>(q / bands, lit);
+}
+
+// One light's contribution BEFORE the band: the flat lit tone (albedo / pi times the light's
+// radiance, which is what the PBR path gives a surface facing the light) and the hard highlight.
+// `evaluateLightToon` multiplies both by the band once it knows the shadow.
+fn shadeToonUnbanded(ctx: ShadeContext, l: vec3<f32>, radiance: vec3<f32>) -> LightSample {
+    var out: LightSample;
+    out.diffuse = ctx.diffuseColor * radiance / PI;
+    out.specular = vec3<f32>(0.0);
+    if (ctx.toon.w > 0.0) {
+        let h = lightSafeNormalize(l + ctx.view, ctx.normal);
+        let size = clamp(ctx.toonHighlight, 0.0, 1.0);
+        let edge = 1.0 - size * size;
+        let s = max(ctx.toon.y, 1e-3) * 0.25;
+        let hard = smoothstep(edge - s, edge + s, max(dot(ctx.normal, h), 0.0));
+        out.specular = radiance * (ctx.toon.w * hard / PI);
+    }
+    return out;
+}
 
 fn distributionGgxL(nDotH: f32, alpha: f32) -> f32 {
     let a2 = alpha * alpha;
@@ -350,6 +399,17 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     // `geoNormal` would otherwise silently bias along the zero vector -- an offset of nothing and a
     // slope scale pinned at its maximum, which reads as a scene-wide shadow bias bug with no
     // obvious cause. Falling back to the shading normal restores the old behaviour instead.
+    let visibility = lightVisibility(index, light, ctx, toLight);
+    sample.diffuse = sample.diffuse * visibility;
+    sample.specular = sample.specular * visibility;
+    return sample;
+}
+
+// The shadow of light `index` at this fragment: the map term (from the half-resolution mask where it
+// is valid) combined by minimum with the contact march. Split out of `evaluateLight` unchanged by
+// ADR-1071, which needs the same number for the cel band.
+fn lightVisibility(index: u32, light: GpuLight, ctx: ShadeContext, toLight: vec3<f32>) -> f32 {
+    let kind = light.positionType.w;
     let shadowNormal = select(ctx.normal, ctx.geoNormal, dot(ctx.geoNormal, ctx.geoNormal) > 0.5);
 
     var visibility = -1.0;
@@ -375,8 +435,77 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
         let contact = contactShadow(ctx.worldPos, shadowNormal, toLight, ctx.screenUv, ctx.viewDepth, ctx.jitter);
         visibility = min(visibility, mix(1.0, contact, clamp(light.up.w, 0.0, 1.0)));
     }
-    sample.diffuse = sample.diffuse * visibility;
-    sample.specular = sample.specular * visibility;
+    return visibility;
+}
+
+// ADR-1071: one light under cel lighting. Every kind is lit from one direction -- an area light from
+// its centre, at the brightness a surface facing it would receive -- because a band is a cut of one
+// N.L; the shadow is `lightVisibility`, exactly the PBR path's, folded into the band so a cast shadow
+// lands as the shadow tone with the same hard edge as the terminator.
+fn evaluateLightToon(index: u32, ctx: ShadeContext) -> LightSample {
+    let light = sceneLights[index];
+    var sample: LightSample;
+    sample.diffuse = vec3<f32>(0.0);
+    sample.specular = vec3<f32>(0.0);
+    let kind = light.positionType.w;
+    var toLight = -light.directionRange.xyz;
+    var radiance = light.colorIntensity.rgb;
+    if (kind > LIGHT_POINT - 0.5) {
+        let delta = light.positionType.xyz - ctx.worldPos;
+        let dist2 = max(dot(delta, delta), 1e-4);
+        let dist = sqrt(dist2);
+        toLight = delta / dist;
+        var window = 1.0;
+        if (light.directionRange.w > 0.0) {
+            let d = dist / light.directionRange.w;
+            let w = clamp(1.0 - d * d * d * d, 0.0, 1.0);
+            window = w * w;
+        }
+        if (kind < LIGHT_SPOT + 0.5) {
+            var attenuation = window / dist2;
+            if (kind > LIGHT_POINT + 0.5) {
+                let cosAngle = dot(-toLight, light.directionRange.xyz);
+                let spot = clamp((cosAngle - light.cone.x) * light.cone.y, 0.0, 1.0);
+                attenuation = attenuation * spot * spot;
+            }
+            radiance = radiance * attenuation;
+        } else if (kind < LIGHT_DISK + 0.5) {
+            // A rect or disk: radiance x the form factor of the emitter seen face on, times pi to
+            // undo the 1/pi the unbanded tone divides by (the LTC path's diffuse has no 1/pi).
+            let isDisk = kind > LIGHT_RECT + 0.5;
+            let area = select(light.sizeSoft.x * light.sizeSoft.y, PI * light.sizeSoft.z * light.sizeSoft.z, isDisk);
+            let facing = abs(dot(cross(light.tangent.xyz, light.up.xyz), toLight));
+            radiance = radiance * (window * PI * area * facing / (PI * dist2 + area));
+        } else {
+            // A tube or sphere: its centre as a point, its area turning radiance into intensity, as
+            // shadeRepresentative does.
+            let r = max(light.sizeSoft.z, 1e-3);
+            var area = PI * r * r;
+            if (kind > LIGHT_TUBE - 0.5 && kind < LIGHT_TUBE + 0.5) {
+                area = 2.0 * r * max(light.sizeSoft.x, 1e-3);
+            }
+            radiance = radiance * (window * area / dist2);
+        }
+    }
+    sample = shadeToonUnbanded(ctx, toLight, radiance);
+    if (light.extra.x > 0.5 || ctx.tier >= 2u) {
+        sample.specular = vec3<f32>(0.0);
+    }
+    if (light.extra.y > 0.5) {
+        sample.diffuse = vec3<f32>(0.0);
+    }
+    let nDotL = dot(ctx.normal, toLight);
+    var visibility = 1.0;
+    let lit = max(max(sample.diffuse.r + sample.diffuse.g + sample.diffuse.b,
+                      sample.specular.r + sample.specular.g + sample.specular.b), 0.0);
+    // The same budget rules as evaluateLight: no shadow work where nothing is lit, none on the flat
+    // tier, and none on the dark side of the terminator, where the band is already the shadow tone.
+    if (lit > 0.0 && ctx.tier < 2u && nDotL > ctx.toon.z - max(ctx.toon.y, 1e-3) * 2.0) {
+        visibility = lightVisibility(index, light, ctx, toLight);
+    }
+    let band = toonBand(nDotL, visibility, ctx);
+    sample.diffuse = sample.diffuse * band.x;
+    sample.specular = sample.specular * band.y;
     return sample;
 }
 
@@ -440,6 +569,15 @@ fn clusterIndexFor(screenUv: vec2<f32>, viewDepth: f32) -> u32 {
     return (iz * dims.y + iy) * dims.x + ix;
 }
 
+// ADR-1071: the toon branch is chosen per draw (the gate is the object's uniform), so the whole wave
+// takes the same side.
+fn evaluateLightAny(index: u32, ctx: ShadeContext) -> LightSample {
+    if (ctx.toon.x > 0.5) {
+        return evaluateLightToon(index, ctx);
+    }
+    return evaluateLight(index, ctx);
+}
+
 // Direct lighting: every directional light, then the local lights of this fragment's froxel (or
 // all of them on the uniform fallback tier, where the packed buffer holds at most eight).
 fn directLighting(ctx: ShadeContext) -> LightSample {
@@ -451,7 +589,7 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
     if (frame.clusterParams.w > 0.5) {
         // Directional lights reach every fragment, so they never enter the grid.
         for (var i = 0u; i < directional; i = i + 1u) {
-            let s = evaluateLight(i, ctx);
+            let s = evaluateLightAny(i, ctx);
             total.diffuse = total.diffuse + s.diffuse;
             total.specular = total.specular + s.specular;
         }
@@ -467,7 +605,7 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
             if (index >= totalLights) {
                 continue;
             }
-            let s = evaluateLight(index, ctx);
+            let s = evaluateLightAny(index, ctx);
             total.diffuse = total.diffuse + s.diffuse;
             total.specular = total.specular + s.specular;
         }
@@ -479,7 +617,13 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
             if (i >= uniformCount) { break; }
             let light = frame.lights[i];
             let lr = uniformLightRadiance(light, ctx.worldPos);
-            let s = shadeUniform(light, ctx, lr.xyz, lr.w);
+            var s = shadeUniform(light, ctx, lr.xyz, lr.w);
+            if (ctx.toon.x > 0.5) { // ADR-1071, unshadowed as this tier always is
+                s = shadeToonUnbanded(ctx, lr.xyz, light.colorIntensity.rgb * lr.w);
+                let band = toonBand(dot(ctx.normal, lr.xyz), 1.0, ctx);
+                s.diffuse = s.diffuse * band.x;
+                s.specular = s.specular * band.y;
+            }
             total.diffuse = total.diffuse + s.diffuse;
             total.specular = total.specular + s.specular;
         }

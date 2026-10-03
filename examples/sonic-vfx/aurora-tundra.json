@@ -1,0 +1,879 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "aurora-tundra.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.6,
+   "attack": 1.3,
+   "release": 1.7
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.32,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.38,
+  "post/output/grain": 0.014,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 18.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/temperature": -0.06,
+  "post/grade/contrast": 1.04,
+  "post/lens/chromaticAberration": 0.002,
+  "post/tonemap/operator": 3
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "mood",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.tension",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.polyphony",
+        "weight": 0.4
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.sustain",
+   "target": "fx/aurora/intensity",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "fx/aurora/curtainHeight",
+   "amount": 600.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/aurora/baseHeight",
+   "amount": -140.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/aurora/curtainHeight",
+   "amount": 500.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "visual.mood",
+   "target": "palette/position",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1600,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "fx/aurora/waveAmplitude",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "fx/aurora/turbulence",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "fx/aurora/edgeBrightness",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "fx/aurora/intensity",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "fx/aurora/edgeBrightness",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/atIce/op/40/constant/constant",
+   "amount": 0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/atIce/op/25/constant/constant",
+   "amount": 0.530575,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/atIce/op/25/constant/constant",
+   "amount": 2.017375,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/atIce/op/25/constant/constant",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/dust/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "particles/dust/spawnRate",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "visual.mood",
+   "target": "post/bloom/intensity",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 150.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       1.6,
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       1.2,
+       1.6,
+       5.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 150.0,
+      "value": [
+       0.0,
+       1.6,
+       6.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 150.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -60.0,
+       80.0,
+       -220.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       70.0,
+       84.0,
+       -215.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 150.0,
+      "value": [
+       -60.0,
+       80.0,
+       -220.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-aurora-tundra.mp4"
+ },
+ "sonicScene": {
+  "category": "atmospheric",
+  "thesis": "Over a frozen lake the aurora is the pad: chords hang curtains of light, the melody ripples them, the hats are diamond dust glittering in the air, and the snare cracks the ice with light.",
+  "composition": {
+   "background": "the aurora filling the sky over a black spruce line; stars",
+   "midground": "the far shore's spruce silhouettes on the lower quarter",
+   "foreground": "black lake ice crazed with white fractures, leading to the shore",
+   "focal": "the aurora's brightest fold",
+   "secondary": [
+    "the fractures lighting on the snare",
+    "diamond dust",
+    "the treeline"
+   ],
+   "atmosphere": "cold clear air; diamond dust near the camera",
+   "post": "bloom on the curtains, fine grain, a cold grade",
+   "camera": "low on the ice, looking up; a slow pan along the shore"
+  },
+  "palette": {
+   "dominant": "#071226",
+   "secondary": "#cfe6f5",
+   "accent": "#b07cff",
+   "highlight": "#5cff9a",
+   "background_value": "dark (a night sky)",
+   "saturation": "the aurora is the only saturated colour; the ice takes its green"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's pan",
+    "the curtains' drift",
+    "the palette (chords)"
+   ],
+   "medium": [
+    "the curtains' folds and height (bass)",
+    "the brightness (sustain)"
+   ],
+   "fast": [
+    "ripples along the curtains (notes)"
+   ],
+   "extremely_fast": [
+    "cracks of light in the ice (snare)",
+    "diamond dust (hat)",
+    "a surge (kick)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "sustained",
+    "response.sustain",
+    "the curtains brighten and lengthen"
+   ],
+   [
+    "chords / tension",
+    "notes.tension",
+    "the curtain colour moves through the palette: green (consonant), teal, violet, rose (dissonant)"
+   ],
+   [
+    "melodic",
+    "response.note",
+    "a ripple runs through the curtains and their edges flare"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the curtains reach lower and taller"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a surge of brightness through the curtains"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the ice cracks with light"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "diamond dust glitters in the air"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how big a note's ripple is"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a faint green arc drifting over the trees, the stars, the still ice"
+   ]
+  ],
+  "tier": "light: the aurora is shells in the sky pass; no march",
+  "id": "aurora-tundra",
+  "title": "Aurora Tundra",
+  "regions": [
+   {
+    "id": "sky",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     0.62
+    ]
+   },
+   {
+    "id": "ice",
+    "box": [
+     0.4,
+     0.78,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "id": "shore",
+    "box": [
+     0.0,
+     0.62,
+     1.0,
+     0.76
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "aurora",
+   "name": "aurora",
+   "type": "aurora",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 1.5,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "appearance": {
+     "edgeBrightness": 3.6,
+     "emission": 1.0,
+     "filaments": 2.2,
+     "horizonGlow": 0.2,
+     "intensity": 2.0,
+     "lowColor": [
+      0.04667,
+      1.0,
+      0.27468
+     ],
+     "midColor": [
+      0.04519,
+      0.7454,
+      0.57758
+     ],
+     "topColor": [
+      0.20508,
+      0.14703,
+      1.0
+     ],
+     "opacity": 0.85,
+     "sparkle": 0.2
+    },
+    "audio": {
+     "bass": 0.0,
+     "beat": 0.0,
+     "glints": 0.0,
+     "high": 0.0,
+     "lowMid": 0.0,
+     "mid": 0.0,
+     "sensitivity": 0.0,
+     "spectrumShape": 0.0
+    },
+    "rainbow": {
+     "brightness": 1.0,
+     "enabled": false,
+     "hueOffset": 0.0,
+     "saturation": 0.85,
+     "scale": 1.1,
+     "speed": 0.0
+    },
+    "shape": {
+     "anchor": "camera",
+     "anchorPosition": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "baseHeight": 260.0,
+     "complexity": 58.0,
+     "curtainCount": 2.0,
+     "curtainHeight": 1500.0,
+     "driftSpeed": 0.08,
+     "flowSpeed": 0.04,
+     "layerSpacing": 0.32,
+     "radius": 5200.0,
+     "turbulence": 0.4,
+     "verticalSpeed": 0.05,
+     "waveAmplitude": 0.32,
+     "waveScale": 2.2
+    }
+   },
+   "ground": {
+    "color": [
+     0.04667,
+     1.0,
+     0.27468
+    ],
+    "falloff": 2.0,
+    "intensity": 0.12,
+    "mode": "subtle",
+    "radius": 400.0
+   },
+   "flow": {
+    "field": "",
+    "influence": 0.0
+   }
+  },
+  {
+   "id": "stars",
+   "name": "stars",
+   "type": "stars",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "brightness": 1.0,
+    "density": 0.35,
+    "magnitudeSlope": 6.0,
+    "colorSpread": 0.5,
+    "twinkle": 0.3,
+    "twinkleRate": 1.5,
+    "horizonFade": 0.5,
+    "band": 0.25,
+    "bandTilt": 30.0,
+    "daylight": 0.0
+   }
+  }
+ ],
+ "palette": {
+  "states": [
+   {
+    "name": "green",
+    "colors": {
+     "low": [
+      0.04667,
+      1.0,
+      0.27468
+     ],
+     "mid": [
+      0.04519,
+      0.7454,
+      0.57758
+     ],
+     "top": [
+      0.20508,
+      0.14703,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "teal",
+    "colors": {
+     "low": [
+      0.04519,
+      0.88792,
+      0.57758
+     ],
+     "mid": [
+      0.04231,
+      0.43415,
+      1.0
+     ],
+     "top": [
+      0.32314,
+      0.14703,
+      1.0
+     ]
+    }
+   },
+   {
+    "name": "violet",
+    "colors": {
+     "low": [
+      0.19462,
+      0.26225,
+      1.0
+     ],
+     "mid": [
+      0.43415,
+      0.20156,
+      1.0
+     ],
+     "top": [
+      1.0,
+      0.14703,
+      0.64448
+     ]
+    }
+   },
+   {
+    "name": "rose",
+    "colors": {
+     "low": [
+      1.0,
+      0.14703,
+      0.32314
+     ],
+     "mid": [
+      0.57758,
+      0.14703,
+      1.0
+     ],
+     "top": [
+      0.10224,
+      0.04519,
+      1.0
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "low",
+    "target": "fx/aurora/lowColor"
+   },
+   {
+    "role": "mid",
+    "target": "fx/aurora/midColor"
+   },
+   {
+    "role": "top",
+    "target": "fx/aurora/topColor"
+   },
+   {
+    "role": "low",
+    "target": "material/atIce/op/38/constant/constant"
+   }
+  ],
+  "position": 0.15,
+  "saturation": 1.0,
+  "value": 1.0
+ }
+}

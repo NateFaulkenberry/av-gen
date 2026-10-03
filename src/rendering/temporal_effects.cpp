@@ -10,6 +10,8 @@
 #include <array>
 #include <string>
 
+#include <glm/glm.hpp>
+
 namespace avgen::rendering {
 namespace {
 
@@ -46,6 +48,12 @@ struct TemporalEffects::Impl {
     wgpu::RenderPipeline echo;
     wgpu::RenderPipeline mosh; // ADR-1049
     wgpu::Buffer moshUniforms; // its own buffer: one queue write per buffer per submit is what lands
+    wgpu::RenderPipeline feedback; // ADR-1066
+    wgpu::RenderPipeline slit;     // ADR-1066
+    wgpu::Buffer feedbackUniforms;
+    wgpu::Buffer slitUniforms;
+    wgpu::TextureFormat feedbackFormat = wgpu::TextureFormat::Undefined;
+    wgpu::TextureFormat slitFormat = wgpu::TextureFormat::Undefined;
     wgpu::RenderPipeline debugHistory;
     wgpu::TextureFormat echoFormat = wgpu::TextureFormat::Undefined;
     wgpu::TextureFormat moshFormat = wgpu::TextureFormat::Undefined;
@@ -136,6 +144,10 @@ Result<void> TemporalEffects::init() {
         im.uniforms = device.CreateBuffer(&desc);
         desc.label = "temporal-mosh-uniforms";
         im.moshUniforms = device.CreateBuffer(&desc);
+        desc.label = "temporal-feedback-uniforms";
+        im.feedbackUniforms = device.CreateBuffer(&desc);
+        desc.label = "temporal-slit-uniforms";
+        im.slitUniforms = device.CreateBuffer(&desc);
     }
     {
         wgpu::SamplerDescriptor desc{};
@@ -204,6 +216,10 @@ Result<void> TemporalEffects::reload() {
     // next frame rebuild against the new module rather than keep the old code silently.
     im.echo = nullptr;
     im.mosh = nullptr;
+    im.feedback = nullptr;
+    im.slit = nullptr;
+    im.feedbackFormat = wgpu::TextureFormat::Undefined;
+    im.slitFormat = wgpu::TextureFormat::Undefined;
     im.debugHistory = nullptr;
     im.echoFormat = wgpu::TextureFormat::Undefined;
     im.moshFormat = wgpu::TextureFormat::Undefined;
@@ -296,7 +312,7 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
             pass.colorAttachmentCount = 1;
             pass.colorAttachments = &colour;
             if (im.timeline != nullptr) {
-                pass.timestampWrites = im.timeline->mark("temporal", gpu::FrameTimeline::PassKind::Render);
+                pass.timestampWrites = im.timeline->mark("temporal/echo", gpu::FrameTimeline::PassKind::Render);
             }
             wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
             rp.SetPipeline(im.echo);
@@ -306,6 +322,82 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
             result = out.view;
             ++stats_.passes;
             im.passThisFrame = true;
+        }
+    }
+
+    // ---- ADR-1066 feedback and slit-scan: FIR over the clean ring, before the mosh (which corrupts what they show)
+    // and before the capture. Nothing is encoded at amount 0: the ring stays warm for the event that turns them up.
+    const auto ringPass = [&](const char* entry, const char* label, const char* mark, wgpu::RenderPipeline& pipeline,
+                              wgpu::TextureFormat& format, wgpu::Buffer& buffer, const Uniforms& u) -> bool {
+        if (pipeline == nullptr || format != in.hdrFormat) {
+            auto made = im.makePipeline(entry, in.hdrFormat, label);
+            if (!made) {
+                return false;
+            }
+            pipeline = *made;
+            format = in.hdrFormat;
+        }
+        auto out = pool.acquire(in.width, in.height, in.hdrFormat);
+        im.context.queue().WriteBuffer(buffer, 0, &u, sizeof(u));
+        wgpu::BindGroup group = im.makeGroup(result, history_->arrayView(TemporalChannel::Colour), &buffer);
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = out.view;
+        colour.loadOp = wgpu::LoadOp::Clear;
+        colour.storeOp = wgpu::StoreOp::Store;
+        colour.clearValue = {0.0, 0.0, 0.0, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = label;
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        if (im.timeline != nullptr) {
+            pass.timestampWrites = im.timeline->mark(mark, gpu::FrameTimeline::PassKind::Render);
+        }
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetPipeline(pipeline);
+        rp.SetBindGroup(0, group);
+        rp.Draw(3);
+        rp.End();
+        result = out.view;
+        ++stats_.passes;
+        im.passThisFrame = true;
+        return true;
+    };
+    const auto ringUniforms = [&](std::uint32_t taps) {
+        Uniforms u{};
+        u.sizes = {static_cast<float>(history_->width()), static_cast<float>(history_->height()),
+                   1.0f / static_cast<float>(history_->width()), 1.0f / static_cast<float>(history_->height())};
+        u.outputSize = {static_cast<float>(in.width), static_cast<float>(in.height),
+                        1.0f / static_cast<float>(in.width), 1.0f / static_cast<float>(in.height)};
+        u.ring = {static_cast<float>(history_->frames(TemporalChannel::Colour)),
+                  static_cast<float>(history_->writeLayer(TemporalChannel::Colour)),
+                  static_cast<float>(state.framesValid), static_cast<float>(taps)};
+        return u;
+    };
+    const scene::FeedbackSettings& fb = settings.feedback;
+    if (fb.enabled && fb.amount > 0.0f) {
+        const std::uint32_t taps =
+            std::min<std::uint32_t>(static_cast<std::uint32_t>(std::max(fb.frames, 1)), state.framesValid);
+        if (taps > 0) {
+            Uniforms u = ringUniforms(taps);
+            u.params = {fb.amount, std::clamp(fb.decay, 0.0f, 0.99f), std::max(fb.zoom, 1e-3f), glm::radians(fb.rotate)};
+            u.extra = {fb.driftX, fb.driftY, fb.hue,
+                       static_cast<float>(in.width) / static_cast<float>(std::max(in.height, 1u))};
+            if (!ringPass("fs_feedback", "temporal-feedback", "temporal/feedback", im.feedback, im.feedbackFormat,
+                          im.feedbackUniforms, u)) {
+                return result;
+            }
+        }
+    }
+    const scene::SlitSettings& sl = settings.slit;
+    if (sl.enabled && sl.amount > 0.0f) {
+        const std::uint32_t taps =
+            std::min<std::uint32_t>(static_cast<std::uint32_t>(std::max(sl.frames, 1)), state.framesValid);
+        if (taps > 0) {
+            Uniforms u = ringUniforms(taps);
+            u.params = {std::clamp(sl.amount, 0.0f, 1.0f), std::round(sl.mode), sl.reverse, 0.0f};
+            if (!ringPass("fs_slit", "temporal-slit", "temporal/slit", im.slit, im.slitFormat, im.slitUniforms, u)) {
+                return result;
+            }
         }
     }
 
@@ -356,6 +448,9 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
         pass.label = "temporal-mosh";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &colour;
+        if (im.timeline != nullptr) {
+            pass.timestampWrites = im.timeline->mark("temporal/mosh", gpu::FrameTimeline::PassKind::Render);
+        }
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(im.mosh);
         rp.SetBindGroup(0, group);
@@ -427,7 +522,7 @@ void TemporalEffects::setTimeline(gpu::FrameTimeline* timeline) {
 void TemporalEffects::collectTimings() {
     Impl& im = *impl_;
     if (im.timeline != nullptr) {
-        const double ms = im.timeline->msFor("temporal");
+        const double ms = im.timeline->msForPrefix("temporal/"); // ADR-1066: every pass marks its own label
         if (ms >= 0.0) {
             im.lastMs = ms;
         }

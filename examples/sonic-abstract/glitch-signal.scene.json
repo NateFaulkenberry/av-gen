@@ -1,0 +1,1002 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "glitch-signal",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   13.0,
+   0.0
+  ],
+  "target": [
+   0.0,
+   15.0,
+   -400.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.00061,
+   0.00091,
+   0.00273
+  ],
+  "fogColor": [
+   0.00061,
+   0.00091,
+   0.00273
+  ],
+  "volumeDensity": 0.0042,
+  "volumeMaxDistance": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00061,
+    0.00091,
+    0.00273
+   ],
+   "horizonColor": [
+    0.00182,
+    0.00518,
+    0.02732
+   ],
+   "groundColor": [
+    0.00061,
+    0.00091,
+    0.00273
+   ],
+   "haze": 0.2,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "wallL",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.2,
+      5.2,
+      5.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      9,
+      160
+     ],
+     "gridSpacing": [
+      6.0,
+      6.0,
+      6.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      -26.6,
+      24.4,
+      -462.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.00061,
+      0.00091,
+      0.00273
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "gsPixel"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.0,
+      "frequency": 0.52,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 0.05,
+      "speed": 0.0,
+      "seed": 17,
+      "axisMask": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "wallR",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.2,
+      5.2,
+      5.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      9,
+      160
+     ],
+     "gridSpacing": [
+      6.0,
+      6.0,
+      6.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      26.6,
+      24.4,
+      -462.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.00061,
+      0.00091,
+      0.00273
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "gsPixel"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.0,
+      "frequency": 0.52,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 0.05,
+      "speed": 0.0,
+      "seed": 17,
+      "axisMask": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.2,
+      0.6,
+      5.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      8,
+      1,
+      160
+     ],
+     "gridSpacing": [
+      6.0,
+      6.0,
+      6.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -0.3,
+      -462.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.00061,
+      0.00091,
+      0.00273
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "gsPixel"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.0,
+      "frequency": 0.52,
+      "speed": 0.0,
+      "phase": 0.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.0,
+      "scale": 0.05,
+      "speed": 0.0,
+      "seed": 23,
+      "axisMask": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "ribbons",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      0.35,
+      960.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      2,
+      4,
+      1
+     ],
+     "gridSpacing": [
+      45.0,
+      11.0,
+      1.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      18.0,
+      -462.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.34191,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 3.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "gsRibbon"
+    }
+   }
+  },
+  {
+   "name": "fragments",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.4,
+      7.0,
+      12.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -14.0,
+      22.0,
+      -790.0
+     ],
+     "end": [
+      -14.0,
+      22.0,
+      -22.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.02416,
+      0.67244
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "gsPixel"
+    },
+    "variation": {
+     "seed": 7,
+     "randomPosition": [
+      26.0,
+      12.0,
+      30.0
+     ],
+     "randomRotation": [
+      0.0,
+      0.5,
+      0.15
+     ]
+    }
+   }
+  },
+  {
+   "name": "horizon",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      260.0,
+      3.0,
+      1.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      16.0,
+      -1150.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 40.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "horizonCore",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      36.0,
+      36.0,
+      1.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      16.0,
+      -1160.0
+     ],
+     "rotation": [
+      0,
+      0,
+      45.0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.68669,
+      0.96469,
+      1.0
+     ],
+     "emissiveIntensity": 22.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "rain",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 12000,
+    "seed": 29,
+    "shape": "box",
+    "position": [
+     0.0,
+     52.0,
+     -300.0
+    ],
+    "extent": [
+     26.0,
+     1.0,
+     300.0
+    ],
+    "direction": [
+     0.0,
+     -0.35,
+     1.0
+    ],
+    "spawnRate": 220.0,
+    "lifetimeMin": 1.5,
+    "lifetimeMax": 2.6,
+    "spread": 0.0,
+    "speedMin": 31.5,
+    "speedMax": 37.5,
+    "gravity": [
+     0,
+     -9.0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.45,
+    "sizeEnd": 0.3,
+    "colorStart": [
+     0.34191,
+     0.92158,
+     1.0,
+     1.0
+    ],
+    "colorEnd": [
+     1.0,
+     0.02416,
+     0.67244,
+     0.0
+    ],
+    "emissive": 6.0,
+    "blend": "additive",
+    "turbulence": 0.0,
+    "velocityStretch": 0.6,
+    "stretchMax": 1.2
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.35
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0,
+   "temperature": 5600.0,
+   "softness": 1.0,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "gsPixel",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "localPosition"
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 0.0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      -1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 1,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 4,
+     "srcA": 3,
+     "value": 0.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.3,
+      0.0,
+      1.3,
+      0.0
+     ],
+     "constant3": [
+      0.005208333333333333,
+      0.0,
+      0.005208333333333333,
+      0.0
+     ],
+     "constant4": [
+      -0.25,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.21,
+      0.37,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 4,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 11
+    },
+    {
+     "kind": "threshold",
+     "dst": 4,
+     "srcA": 3,
+     "value": 0.58
+    },
+    {
+     "kind": "threshold",
+     "dst": 5,
+     "srcA": 3,
+     "value": 0.7
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "ramp",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.00061,
+      0.00091,
+      0.00273,
+      1.0
+     ],
+     "constant2": [
+      0.00301,
+      0.01045,
+      0.09202,
+      1.0
+     ],
+     "constant3": [
+      0.88898,
+      2.39611,
+      2.6,
+      1.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 3,
+     "srcA": 3,
+     "value": 0.0,
+     "constant": [
+      0.78,
+      0.78,
+      0.78,
+      0.78
+     ],
+     "constant2": [
+      0.22,
+      0.22,
+      0.22,
+      0.22
+     ],
+     "constant3": [
+      1.1111111111111112,
+      1.1111111111111112,
+      1.1111111111111112,
+      1.1111111111111112
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 3
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "gsRibbon",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "time"
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      -60.0,
+      -60.0,
+      -60.0,
+      -60.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "noise",
+     "dst": 0,
+     "srcA": 0,
+     "value": 0.09,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 3
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.52,
+      0.6,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "cameraDistance"
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.1,
+      0.1,
+      0.1,
+      0.1
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      62.0,
+      12.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 2
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 0,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}

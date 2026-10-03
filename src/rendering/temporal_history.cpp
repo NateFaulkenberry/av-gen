@@ -429,7 +429,7 @@ void TemporalHistory::encodeCapture(wgpu::CommandEncoder& encoder, const wgpu::T
     pass.colorAttachmentCount = 1;
     pass.colorAttachments = &colour;
     if (im.timeline != nullptr) {
-        pass.timestampWrites = im.timeline->mark("temporal", gpu::FrameTimeline::PassKind::Render);
+        pass.timestampWrites = im.timeline->mark("temporal/capture", gpu::FrameTimeline::PassKind::Render);
     }
     wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
     rp.SetPipeline(im.captureColour);

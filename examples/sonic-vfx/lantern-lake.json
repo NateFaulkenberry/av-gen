@@ -1,0 +1,720 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "lantern-lake.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.45,
+   "sustain": 0.6,
+   "attack": 1.3,
+   "release": 1.7
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.35,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.016,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.08,
+  "post/halation/warmth": 0.8,
+  "post/grade/contrast": 1.05,
+  "post/lens/chromaticAberration": 0.002,
+  "post/tonemap/operator": 3
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "lakeX",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.7499999999999999,
+      "gain": 2.5
+     },
+     {
+      "name": "cluster",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "notes.noteOn",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.lakeX",
+   "target": "particles/lanterns/position",
+   "amount": 36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "offset": -0.5,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/lanterns/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "visual.cluster",
+   "target": "particles/lanterns/burst",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.lastVelocity",
+   "target": "particles/lanterns/emissive",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "particles/lanterns/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.lakeX",
+   "target": "particles/twins/position",
+   "amount": 36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "offset": -0.5,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/twins/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "visual.cluster",
+   "target": "particles/twins/burst",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.lastVelocity",
+   "target": "particles/twins/emissive",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "particles/twins/emissive",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "lights/glow/intensity",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "lights/glow/intensity",
+   "amount": 120.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/swell/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/llMirror/op/11/remap/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/llMirror/op/11/remap/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/25/remap/constant",
+   "amount": -0.77,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.0
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/25/remap/constant",
+   "amount": -0.77,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.0
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "material/llMirror/op/27/constant/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 320
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "fx/swell/strength",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "fx/swell/scale",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/fireflies/burst",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "particles/fireflies/spawnRate",
+   "amount": 30.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "post/bloom/intensity",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.2,
+       1.1,
+       7.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.2,
+       1.1500000000000001,
+       4.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       1.2,
+       1.1,
+       7.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0,
+       8.0,
+       -80.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       5.0,
+       8.2,
+       -80.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       4.0,
+       8.0,
+       -80.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-lantern-lake.mp4"
+ },
+ "sonicScene": {
+  "category": "atmospheric",
+  "thesis": "Each note releases a paper lantern from the surface of a still lake at dusk; the melody becomes a drifting constellation, and the bass a slow swell beneath it.",
+  "composition": {
+   "background": "a dusk sky over a far shore of low dark hills",
+   "midground": "the lanterns rising and drifting, doubled in the mirror of the lake",
+   "foreground": "the end of a wooden jetty, its posts in the water, lower left",
+   "focal": "the newest lantern, low over the water at the pitch's place",
+   "secondary": [
+    "the drifting constellation of older lanterns",
+    "fireflies at the jetty on the hats",
+    "the reflection's swell"
+   ],
+   "atmosphere": "a faint evening haze over the water",
+   "post": "bloom round the lanterns, halation, a warm-on-indigo grade, fine grain",
+   "camera": "low over the water; a slow push along the jetty"
+  },
+  "palette": {
+   "dominant": "#141a3a",
+   "secondary": "#20283f",
+   "accent": "#0a0a0c",
+   "highlight": "#ffb050",
+   "background_value": "dark (dusk)",
+   "saturation": "the lanterns are the only warm, saturated colour"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's push",
+    "the lanterns' rise",
+    "the sky"
+   ],
+   "medium": [
+    "the swell of the reflection (bass)",
+    "the lanterns' drift"
+   ],
+   "fast": [
+    "a lantern's release (note)"
+   ],
+   "extremely_fast": [
+    "the kick's ripple",
+    "fireflies (hat)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "note",
+    "response.note",
+    "a lantern is released at the pitch's place across the lake (low notes left, high notes right)"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "how bright the new lanterns burn"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "a cluster of lanterns at once"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the lanterns glow brighter and the dusk lingers"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "a slow swell beneath: the reflection heaves"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a ripple runs through the reflection"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "fireflies blink at the jetty"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a still lake: the old lanterns drift up into the dark, doubled below"
+   ]
+  ],
+  "tier": "light: two particle twins, a few procedural copies, one DF shimmer column; no march",
+  "id": "lantern-lake",
+  "title": "Lantern Lake",
+  "regions": [
+   {
+    "id": "lanterns",
+    "box": [
+     0.18,
+     0.243,
+     0.734,
+     0.623
+    ]
+   },
+   {
+    "id": "reflection",
+    "box": [
+     0.171,
+     0.622,
+     0.74,
+     1.0
+    ]
+   },
+   {
+    "id": "jetty",
+    "box": [
+     0.0,
+     0.62,
+     0.35,
+     1.0
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "swell",
+   "name": "swell",
+   "type": "heatShimmer",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strength": 0.08,
+    "radius": 900.0,
+    "height": 60.0,
+    "scale": 0.9,
+    "riseSpeed": 0.4,
+    "chroma": 0.0,
+    "churn": 0.4,
+    "edgeSoftness": 0.2,
+    "heightFalloff": 0.2,
+    "thicknessRef": 60.0,
+    "fadeDistance": 0.0,
+    "offsetX": 1.2,
+    "offsetY": -60.0,
+    "offsetZ": -293.0
+   }
+  }
+ ]
+}

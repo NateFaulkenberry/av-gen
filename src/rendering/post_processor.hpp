@@ -63,6 +63,9 @@ struct PostFrameInputs {
     // paths without changing the image: `emission` weights bloom, `identifier` masks sharpening.
     wgpu::TextureView emission;
     wgpu::TextureView identifier;
+    // ADR-1072: the normal + roughness target (rg = octahedral normal), for the outline's crease
+    // test. Null drops that test; the depth and object edges still draw.
+    wgpu::TextureView normal;
     // ADR-040: the RG16F per-pixel screen motion. Null skips motion blur entirely - there is no
     // longer a camera-only fallback, because it disagreed with everything that moves on its own.
     wgpu::TextureView velocity;
@@ -72,6 +75,8 @@ struct PostFrameInputs {
     glm::mat4 invViewProj{1.0f};
     glm::vec3 cameraPos{0.0f};
     std::uint64_t frameIndex = 0;
+    double renderTime = 0.0;    // ADR-1065: timeline seconds, what the glitch's hashed epochs are a function of
+    float tapScale = 1.0f;      // ADR-1065: QualitySettings::postEffectTapScale
     const scene::PostSettings* settings = nullptr;
     // ADR-038: the scene's depth layers grade contrast and saturation by distance (atmospheric
     // perspective). Null, or a scene with no layers, leaves the grade uniform across the frame.
@@ -249,6 +254,9 @@ private:
     wgpu::RenderPipeline upsample_;
     wgpu::RenderPipeline wide_;
     wgpu::RenderPipeline lens_;
+    wgpu::RenderPipeline glitch_;  // ADR-1065
+    wgpu::RenderPipeline display_; // ADR-1065
+    wgpu::RenderPipeline outline_; // ADR-1072
     wgpu::RenderPipeline composite_;
     wgpu::RenderPipeline fxaa_;
     wgpu::RenderPipeline sharpen_;

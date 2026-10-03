@@ -1056,3 +1056,335 @@ fn fs_look(in: FsIn) -> @location(0) vec4<f32> {
 
     return vec4<f32>(color, 1.0);
 }
+
+// ---- ADR-1065: post effects as instruments, the glitch vocabulary --------------------------------------------
+//
+// fs_glitch (HDR, beside the lens, before bloom): a shockwave ring, row tears and block displacement chosen by hashes
+// of floor(time x rate) + seed, a directional or spectral RGB split, a radial blur, and a stateless "pixel sort"
+// (inside a brightness mask, the brightest sample along a direction smeared down the span). Every piece is a pure
+// function of this frame and the clock, so seek equals play at once; the pass is never encoded while all of its
+// amounts are 0. Uniforms (CPU side, post_processor.cpp):
+//   params0 shock (amount in frame heights, radius, width in half-diagonals, chroma)
+//   params1 shock centre xy, glitch amount, block px
+//   params2 epoch, tear share, tear shift (uv x), swap chance
+//   params3 drift px, split px, split angle (rad), spectral
+//   params4 sort amount, threshold, length px, angle (rad)
+//   tintA   sort invert, radial amount, radial centre xy
+//   tintB   sort taps, radial taps, spectral taps, 0
+
+fn glitchPcg(v: u32) -> u32 {
+    let s = v * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+fn glitchHash(a: u32, b: u32, c: u32) -> f32 {
+    return f32(glitchPcg(a ^ glitchPcg(b ^ glitchPcg(c))) >> 8u) / 16777216.0;
+}
+
+fn glitchLuma(c: vec3<f32>) -> f32 {
+    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+}
+
+fn glitchTap(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(source, linearSampler, clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb;
+}
+
+// The split: red ahead, blue behind, by `px` pixels along `angle`; spectral blends toward a rainbow fringe of
+// `taps` samples whose per-channel weights sum to one, so white stays white.
+fn glitchSplit(uv: vec2<f32>, px: f32) -> vec3<f32> {
+    if (px <= 0.0) {
+        return glitchTap(uv);
+    }
+    let a = post.params3.z;
+    let off = vec2<f32>(cos(a), sin(a)) * px * post.texelSize;
+    let three = vec3<f32>(glitchTap(uv + off).r, glitchTap(uv).g, glitchTap(uv - off).b);
+    let spectral = clamp(post.params3.w, 0.0, 1.0);
+    if (spectral <= 0.0) {
+        return three;
+    }
+    let taps = max(i32(post.tintB.z + 0.5), 2);
+    var acc = vec3<f32>(0.0);
+    var weights = vec3<f32>(0.0);
+    for (var i = 0; i < taps; i = i + 1) {
+        let t = f32(i) / f32(taps - 1);
+        let w = vec3<f32>(t, 1.0 - abs(2.0 * t - 1.0), 1.0 - t);
+        acc = acc + glitchTap(uv + off * (2.0 * t - 1.0)) * w;
+        weights = weights + w;
+    }
+    return mix(three, acc / max(weights, vec3<f32>(1e-4)), spectral);
+}
+
+@fragment
+fn fs_glitch(in: FsIn) -> @location(0) vec4<f32> {
+    var uv = in.uv;
+    let size = post.outputSize;
+    let px = in.uv * size;
+    let aspect = size.x / max(size.y, 1.0);
+    var fringe = 0.0;
+    // ---- the shockwave ring ----
+    if (post.params0.x > 0.0) {
+        let d = (uv - post.params1.xy) * vec2<f32>(aspect, 1.0);
+        let halfDiagonal = 0.5 * sqrt(aspect * aspect + 1.0);
+        let r = length(d) / halfDiagonal;
+        let x = (r - post.params0.y) / max(post.params0.z, 1e-4);
+        if (abs(x) < 1.0) {
+            let profile = (1.0 - x * x) * x; // outward ahead of the crest, inward behind it
+            let dir = d / max(length(d), 1e-5);
+            let push = post.params0.x * profile;
+            uv = uv - dir * push / vec2<f32>(aspect, 1.0);
+            fringe = post.params0.w * abs(push) * size.y;
+        }
+    }
+    let epoch = bitcast<u32>(i32(floor(post.params2.x)));
+    // ---- tears: row bands thrown sideways ----
+    if (post.params2.y > 0.0) {
+        let band = max(post.params1.w * 0.25, 2.0);
+        let row = u32(max(floor(px.y / band), 0.0));
+        if (glitchHash(row, 911u, epoch) < post.params2.y) {
+            uv.x = uv.x + (glitchHash(row, 3u, epoch) - 0.5) * 2.0 * post.params2.z;
+        }
+    }
+    // ---- blocks: displaced, and some with their channels swapped ----
+    var swapped = false;
+    if (post.params1.z > 0.0) {
+        let block = max(post.params1.w, 1.0);
+        let cell = vec2<u32>(max(floor(px / block), vec2<f32>(0.0)));
+        if (glitchHash(cell.x, cell.y, epoch) < post.params1.z) {
+            let angle = glitchHash(cell.x + 17u, cell.y, epoch) * 6.2831853;
+            let dist = post.params3.x * (0.25 + 0.75 * glitchHash(cell.x, cell.y + 29u, epoch));
+            uv = uv - vec2<f32>(cos(angle), sin(angle)) * dist * post.texelSize;
+            swapped = glitchHash(cell.y, cell.x, epoch + 7u) < post.params2.w;
+        }
+    }
+    uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0));
+    let splitPx = post.params3.y + fringe;
+    var colour = glitchSplit(uv, splitPx);
+    // ---- radial blur toward a centre ----
+    if (post.tintA.y > 0.0) {
+        let c = post.tintA.zw;
+        let taps = max(i32(post.tintB.y + 0.5), 1);
+        var acc = colour;
+        for (var i = 1; i <= taps; i = i + 1) {
+            let t = f32(i) / f32(taps);
+            acc = acc + glitchSplit(c + (uv - c) * (1.0 - post.tintA.y * t), splitPx);
+        }
+        colour = acc / f32(taps + 1);
+    }
+    // ---- the stateless sort: inside the mask, the brightest (or darkest) sample up the span ----
+    if (post.params4.x > 0.0) {
+        let threshold = post.params4.y;
+        let invert = post.tintA.x > 0.5;
+        let l = glitchLuma(colour);
+        let inside = select(l > threshold, l < threshold, invert);
+        if (inside) {
+            let taps = max(i32(post.tintB.x + 0.5), 1);
+            let a = post.params4.w;
+            let stepUv = vec2<f32>(cos(a), sin(a)) * (post.params4.z / f32(taps)) * post.texelSize;
+            var best = colour;
+            var bestL = l;
+            for (var i = 1; i <= taps; i = i + 1) {
+                let s = glitchTap(uv - stepUv * f32(i));
+                let ls = glitchLuma(s);
+                if (select(ls <= threshold, ls >= threshold, invert)) {
+                    break; // the span ends where the mask does
+                }
+                if (select(ls > bestL, ls < bestL, invert)) {
+                    best = s;
+                    bestL = ls;
+                }
+            }
+            colour = mix(colour, best, clamp(post.params4.x, 0.0, 1.0));
+        }
+    }
+    if (swapped) {
+        colour = colour.brg;
+    }
+    return vec4<f32>(max(colour, vec3<f32>(0.0)), 1.0);
+}
+
+// fs_display (after the composite and the look, before FXAA): mosaic, posterise with an ordered dither, scanlines.
+//   params0 scanline depth, lines over the frame, mosaic cell px, levels
+//   params1 dither, 0, 0, 0
+// Posterising is done on a display-like proxy, c / (1 + c), so the bands fall where the eye sees steps; the mosaic and
+// the dither are indexed by output pixel (or mosaic cell), never by uv, and the scanlines by lines of the frame.
+
+fn displayBayer(p: vec2<u32>) -> f32 {
+    var m = array<f32, 16>(0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+    return (m[(p.y & 3u) * 4u + (p.x & 3u)] + 0.5) / 16.0;
+}
+
+@fragment
+fn fs_display(in: FsIn) -> @location(0) vec4<f32> {
+    let size = post.outputSize;
+    var uv = in.uv;
+    let cellPx = post.params0.z;
+    var cell = vec2<u32>(max(floor(in.uv * size), vec2<f32>(0.0)));
+    if (cellPx >= 1.0) {
+        let c = floor(in.uv * size / cellPx);
+        uv = (c + 0.5) * cellPx / size;
+        cell = vec2<u32>(max(c, vec2<f32>(0.0)));
+    }
+    var colour = textureSampleLevel(source, linearSampler, uv, 0.0).rgb;
+    let levels = post.params0.w;
+    if (levels >= 2.0) {
+        var t = max(colour, vec3<f32>(0.0));
+        t = t / (vec3<f32>(1.0) + t);
+        let d = (displayBayer(cell) - 0.5) * clamp(post.params1.x, 0.0, 1.0);
+        t = floor(t * (levels - 1.0) + 0.5 + d) / (levels - 1.0);
+        t = clamp(t, vec3<f32>(0.0), vec3<f32>(0.999));
+        colour = t / (vec3<f32>(1.0) - t);
+    }
+    let depth = clamp(post.params0.x, 0.0, 1.0);
+    if (depth > 0.0) {
+        let s = 0.5 + 0.5 * cos(6.2831853 * in.uv.y * post.params0.y);
+        colour = colour * mix(1.0, s, depth) / (1.0 - 0.5 * depth); // darker between lines, the mean held
+    }
+    // The letterbox: black bars to `params1.y` (width / height), top and bottom for a wider aspect than the
+    // frame's, left and right for a narrower one; `params1.z` slides them in (0 none, 1 the full aspect).
+    let aspect = post.params1.y;
+    if (aspect > 0.0) {
+        let frameAspect = size.x / max(size.y, 1.0);
+        let amount = clamp(post.params1.z, 0.0, 1.0);
+        if (aspect > frameAspect) {
+            let bar = 0.5 * (1.0 - frameAspect / aspect) * amount;
+            if (in.uv.y < bar || in.uv.y > 1.0 - bar) {
+                colour = vec3<f32>(0.0);
+            }
+        } else {
+            let bar = 0.5 * (1.0 - aspect / frameAspect) * amount;
+            if (in.uv.x < bar || in.uv.x > 1.0 - bar) {
+                colour = vec3<f32>(0.0);
+            }
+        }
+    }
+    return vec4<f32>(colour, 1.0);
+}
+
+// ---- ADR-1072: the outline ------------------------------------------------------------------------
+//
+// params0 = (amount, width in this frame's pixels, depth threshold, normal threshold)
+// params1 = (line colour x intensity, silhouette only 1/0)
+// params2 = (fade start, fade end in metres, object edges 1/0, normal target bound 1/0)
+// params3 = (camera forward, 0)
+// `second` is the normal + roughness target (rg = octahedral normal) and `identifierTex` the object ids.
+//
+// Each pixel looks at four pairs of neighbours, opposite each other at half the width: an edge is drawn
+// on both sides of a discontinuity, so the line is `width` wide in all. Background is depth 1.
+
+fn outlineOctDecode(e: vec2<f32>) -> vec3<f32> {
+    var n = vec3<f32>(e.x, e.y, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0) {
+        let signs = vec2<f32>(select(-1.0, 1.0, n.x >= 0.0), select(-1.0, 1.0, n.y >= 0.0));
+        let xy = (vec2<f32>(1.0) - abs(vec2<f32>(n.y, n.x))) * signs;
+        n = vec3<f32>(xy, n.z);
+    }
+    return normalize(n);
+}
+
+struct OutlineTap {
+    inverseDepth: f32, // 1 / view depth; 0 for the background
+    distance: f32,     // metres from the camera; 1e6 for the background
+    normal: vec3<f32>,
+    id: u32,           // the object id (low 16 bits of the identifier word); 0xFFFFFFFF for none
+    background: bool,
+};
+
+fn outlineTap(texel: vec2<i32>, size: vec2<i32>) -> OutlineTap {
+    let c = clamp(texel, vec2<i32>(0), size - vec2<i32>(1));
+    var tap: OutlineTap;
+    let d = textureLoad(depthTex, c, 0);
+    tap.background = d >= 1.0;
+    tap.inverseDepth = 0.0;
+    tap.distance = 1e6;
+    if (!tap.background) {
+        let uv = (vec2<f32>(c) + vec2<f32>(0.5)) / vec2<f32>(size);
+        let world = worldFromDepth(uv, d);
+        let toPoint = world - post.cameraPos.xyz;
+        tap.distance = length(toPoint);
+        tap.inverseDepth = 1.0 / max(dot(toPoint, post.params3.xyz), 1e-4);
+    }
+    tap.normal = vec3<f32>(0.0, 0.0, 1.0);
+    if (post.params2.w > 0.5) {
+        let nsize = vec2<i32>(textureDimensions(second));
+        let nc = clamp(c * nsize / max(size, vec2<i32>(1)), vec2<i32>(0), nsize - vec2<i32>(1));
+        tap.normal = outlineOctDecode(textureLoad(second, nc, 0).rg);
+    }
+    tap.id = 0xFFFFFFFFu;
+    if (post.params2.z > 0.5) {
+        let isize = vec2<i32>(textureDimensions(identifierTex));
+        let ic = clamp(c * isize / max(size, vec2<i32>(1)), vec2<i32>(0), isize - vec2<i32>(1));
+        let word = textureLoad(identifierTex, ic, 0).r;
+        tap.id = select(word & 0xFFFFu, 0xFFFFFFFFu, word == 0u);
+    }
+    return tap;
+}
+
+// How much of an edge there is between the centre and one neighbour (0..1), and the opposite pair's
+// depth term, which needs both.
+fn outlineEdgePair(c: OutlineTap, a: OutlineTap, b: OutlineTap) -> f32 {
+    let depthThreshold = post.params0.z;
+    let normalThreshold = post.params0.w;
+    var edge = 0.0;
+    // The background against a surface, either way round: always an edge.
+    if (c.background != a.background || c.background != b.background) {
+        edge = 1.0;
+    }
+    if (!c.background) {
+        // The second difference of 1 / depth across the pixel, relative to the pixel's own: zero on
+        // any plane however steeply it is seen. A background neighbour is handled above.
+        if (!a.background && !b.background) {
+            let lap = abs(a.inverseDepth + b.inverseDepth - 2.0 * c.inverseDepth) / max(c.inverseDepth, 1e-6);
+            edge = max(edge, smoothstep(depthThreshold, depthThreshold * 1.5, lap));
+        }
+        if (post.params2.z > 0.5 && ((!a.background && a.id != c.id) || (!b.background && b.id != c.id))) {
+            edge = 1.0;
+        }
+        if (post.params1.w < 0.5 && post.params2.w > 0.5) {
+            var crease = 0.0;
+            if (!a.background) {
+                crease = max(crease, 1.0 - dot(a.normal, c.normal));
+            }
+            if (!b.background) {
+                crease = max(crease, 1.0 - dot(b.normal, c.normal));
+            }
+            edge = max(edge, smoothstep(normalThreshold, normalThreshold * 1.25, crease));
+        }
+    }
+    return edge;
+}
+
+@fragment
+fn fs_outline(in: FsIn) -> @location(0) vec4<f32> {
+    let size = vec2<i32>(textureDimensions(depthTex));
+    let src = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let texel = vec2<i32>(in.uv * vec2<f32>(size));
+    let width = post.params0.y;
+    if (width <= 0.0) {
+        return src;
+    }
+    // Below a pixel the taps are one pixel apart and the line's strength is its coverage.
+    let radius = max(width * 0.5, 1.0);
+    let coverage = clamp(width, 0.0, 1.0);
+    let c = outlineTap(texel, size);
+    var edge = 0.0;
+    var nearest = c.distance;
+    let r = i32(round(radius));
+    let rd = i32(round(radius * 0.70710678));
+    var dirs = array<vec2<i32>, 4>(vec2<i32>(r, 0), vec2<i32>(0, r), vec2<i32>(rd, rd), vec2<i32>(rd, -rd));
+    for (var k = 0; k < 4; k = k + 1) {
+        let a = outlineTap(texel + dirs[k], size);
+        let b = outlineTap(texel - dirs[k], size);
+        let e = outlineEdgePair(c, a, b);
+        if (e > 0.0) {
+            nearest = min(nearest, min(a.distance, b.distance));
+        }
+        edge = max(edge, e);
+    }
+    var fade = 1.0;
+    if (post.params2.y > post.params2.x) {
+        fade = 1.0 - smoothstep(post.params2.x, post.params2.y, nearest);
+    }
+    let alpha = clamp(edge * fade * coverage * post.params0.x, 0.0, 1.0);
+    return vec4<f32>(mix(src.rgb, post.params1.xyz, alpha), src.a);
+}

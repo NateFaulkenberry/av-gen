@@ -128,11 +128,13 @@ void LiveNotes::noteOn(double seconds, std::uint8_t channel, std::uint8_t key, f
     if (notes.empty() || notes.back().start < seconds ||
         (notes.back().start == seconds && notes.back().key <= key)) {
         notes.push_back(n);
+        assignVoice(track_, notes.size() - 1); // ADR-1062: the slot it owns until it ends
     } else {
         const auto at = std::upper_bound(notes.begin(), notes.end(), n, [](const NoteEvent& a, const NoteEvent& b) {
             return a.start != b.start ? a.start < b.start : a.key < b.key;
         });
-        notes.insert(at, n);
+        const auto index = static_cast<std::size_t>(notes.insert(at, n) - notes.begin());
+        assignVoice(track_, index);
     }
     open_.push_back(Open{n.id, channel, key, false});
     if (notes.size() > kMaxNotes) {

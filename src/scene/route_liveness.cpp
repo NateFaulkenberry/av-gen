@@ -859,7 +859,9 @@ std::optional<Finding> SceneLivenessFacts::effectNeverFires(const world::EffectI
                 e.owner.kind == world::EffectTarget::Entity ? std::string_view(e.owner.name) : std::string_view();
             std::array<double, 1> last{};
             const double end = duration > 0.0 ? duration : 1e9;
+            // A Signal trigger's events come from the host (derived or recorded), which the audit does not run.
             if (e.timing.trigger.source != world::TriggerSource::Proximity &&
+                e.timing.trigger.source != world::TriggerSource::Signal &&
                 c.triggers->lastTriggers(e.timing.trigger, owner, end, last) == 0) {
                 const char* why = c.triggers->silence(e.timing.trigger, owner);
                 never(why != nullptr ? std::string(why)

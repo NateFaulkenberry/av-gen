@@ -1,0 +1,1089 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "salt-flat-mirage.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.45,
+   "sustain": 0.6,
+   "attack": 1.3,
+   "release": 1.6
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.07,
+  "post/bloom/threshold": 1.2,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.3,
+  "post/output/vignette": 0.3,
+  "post/output/grain": 0.018,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 18.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.06,
+  "post/halation/warmth": 0.7,
+  "post/grade/contrast": 1.05,
+  "post/lens/chromaticAberration": 0.003,
+  "post/tonemap/operator": 3
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "dissonance",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.tension",
+        "weight": 1.0
+       }
+      ],
+      "gain": 2.0
+     },
+     {
+      "name": "consonance",
+      "combine": "min",
+      "inputs": [
+       {
+        "signal": "notes.polyphony",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.tension",
+        "weight": 1.0,
+        "invert": true
+       }
+      ]
+     },
+     {
+      "name": "glow",
+      "combine": "max",
+      "inputs": [
+       {
+        "signal": "response.sustain",
+        "weight": 1.0
+       },
+       {
+        "signal": "notes.held",
+        "weight": 0.5
+       }
+      ]
+     },
+     {
+      "name": "skyX",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "notes.lastPitch",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.7499999999999999,
+      "gain": 2.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.dissonance",
+   "target": "palette/position",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "visual.consonance",
+   "target": "palette/position",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "palette/value",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "env/sky/sunIntensity",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "env/sky/sunGlow",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/meteors/position",
+   "amount": 2000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/meteors/position",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/meteors/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "notes.lastVelocity",
+   "target": "particles/meteors/emissive",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/ignition/position",
+   "amount": 2000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "visual.skyX",
+   "target": "particles/ignition/position",
+   "amount": 260.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/ignition/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "notes.lastVelocity",
+   "target": "particles/ignition/emissive",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "fx/shimmer/strength",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "scene/volumeDensity",
+   "amount": 0.00018,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/glints/burst",
+   "amount": 160.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 30
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/salt/burst",
+   "amount": 50.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "particles/salt/spawnRate",
+   "amount": 240.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/sfMonolith/op/9/constant/constant",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/sfMonolith/op/9/constant/constant",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/sfMonolith/op/9/constant/constant",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/foot/intensity",
+   "amount": 900.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "visual.glow",
+   "target": "post/bloom/intensity",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.5,
+       1.55,
+       5.96
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       2.5849,
+       1.57,
+       5.9834
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       2.62,
+       1.55,
+       6.04
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       2.5849,
+       1.53,
+       6.0966
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       2.5,
+       1.55,
+       6.12
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       2.4151,
+       1.57,
+       6.0966
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.38,
+       1.55,
+       6.04
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       2.4151,
+       1.53,
+       5.9834
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       2.5,
+       1.55,
+       5.96
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       2.5282,
+       15.6168,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       2.5491,
+       15.6108,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       2.5413,
+       15.5832,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       2.5092,
+       15.5892,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       2.4718,
+       15.6168,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       2.4509,
+       15.6108,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.4587,
+       15.5832,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       2.4908,
+       15.5892,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       2.5282,
+       15.6168,
+       -60.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-salt-flat-mirage.mp4"
+ },
+ "sonicScene": {
+  "category": "atmospheric",
+  "thesis": "On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as meteors, the bass makes the horizon shimmer, and a black monolith answers the drums.",
+  "composition": {
+   "background": "a dusk sky (two thirds of the frame) over a thin violet range",
+   "midground": "the horizon dissolving into haze and heat shimmer",
+   "foreground": "salt crust polygons and puddles to the horizon; the monolith's shadow, a dark wedge from the frame's foot; the sun's glow broken across the puddles",
+   "focal": "the monolith on the left third, a silhouette with the setting sun just behind its right edge",
+   "secondary": [
+    "meteors",
+    "the ring of light the kick sends across the salt",
+    "the path of light on the puddles"
+   ],
+   "atmosphere": "horizon haze; blowing salt grains",
+   "post": "halation round the sun, fine grain, a cool dusk grade with a warm horizon",
+   "camera": "ultra-wide (18 mm), low, nearly still: a 90 s drift of a few centimetres"
+  },
+  "palette": {
+   "dominant": "#5a5070",
+   "secondary": "#c48a8a",
+   "accent": "#0a0a0c",
+   "highlight": "#ffd8a0",
+   "background_value": "mid (a dusk sky)",
+   "saturation": "the horizon band is the only saturated region; the salt takes the sky's colour"
+  },
+  "motion": {
+   "very_slow": [
+    "the sky's colour (the palette)",
+    "the camera"
+   ],
+   "medium": [
+    "the shimmer",
+    "the haze",
+    "blowing salt"
+   ],
+   "fast": [
+    "meteors"
+   ],
+   "extremely_fast": [
+    "the monolith's outline (snare)",
+    "the ring of light (kick)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "sustained / chords",
+    "notes.tension",
+    "the chord paints the sky: a consonant chord warms the dusk to gold, dissonance darkens it through violet to indigo; a bright sound brightens it, held sound lifts the sun"
+   ],
+   [
+    "melodic",
+    "response.note",
+    "a meteor falls at the pitch's place across the sky (low notes low and left, high notes high and right), all from one radiant"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "the meteor's brightness"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "heat shimmer along the horizon; the haze thickens"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a ring of light runs out across the salt from the monolith's base"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the monolith's outline flares white"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "salt crystals glint across the near crust; grains blow low across the flat"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a still rose dusk: the sky settles, nothing moves but the drift"
+   ]
+  ],
+  "tier": "light: one shadowed sun, a thin uniform haze (no march detail), one DF shimmer column",
+  "id": "salt-flat-mirage",
+  "title": "Salt Flat Mirage",
+  "regions": [
+   {
+    "id": "monolith",
+    "box": [
+     0.3,
+     0.476,
+     0.381,
+     0.704
+    ]
+   },
+   {
+    "id": "sky",
+    "box": [
+     0.12,
+     0.04,
+     0.95,
+     0.5
+    ]
+   },
+   {
+    "id": "ground",
+    "box": [
+     0.0,
+     0.7,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "id": "horizon",
+    "box": [
+     0.0,
+     0.6,
+     1.0,
+     0.7
+    ]
+   }
+  ]
+ },
+ "effects": [
+  {
+   "id": "stars",
+   "name": "stars",
+   "type": "stars",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "brightness": 0.5,
+    "density": 0.04,
+    "magnitudeSlope": 7.0,
+    "colorSpread": 0.4,
+    "twinkle": 0.25,
+    "twinkleRate": 2.0,
+    "horizonFade": 0.5,
+    "band": 0.0,
+    "daylight": 0.8
+   }
+  },
+  {
+   "id": "shimmer",
+   "name": "shimmer",
+   "type": "heatShimmer",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "always",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.0,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "strength": 0.3,
+    "radius": 400.0,
+    "height": 30.0,
+    "scale": 4.0,
+    "riseSpeed": 1.5,
+    "chroma": 0.0,
+    "churn": 0.7,
+    "edgeSoftness": 0.5,
+    "heightFalloff": 1.4,
+    "thicknessRef": 300.0,
+    "fadeDistance": 0.0,
+    "offsetX": 2.5,
+    "offsetY": 0.0,
+    "offsetZ": -374.0
+   }
+  },
+  {
+   "id": "ring",
+   "name": "ring",
+   "type": "groundPulse",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.5,
+    "lifetime": 0.0,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "source": {
+     "kind": "world",
+     "position": [
+      -11.0,
+      0.0,
+      -30.0
+     ]
+    },
+    "propagation": {
+     "kind": "radial",
+     "speed": 60.0,
+     "range": 220.0,
+     "frontWidth": 3.5,
+     "trailLength": 18.0,
+     "falloff": 1.6,
+     "ringCount": 1.0,
+     "verticalExtent": 1.0
+    },
+    "appearance": {
+     "color": [
+      1.0,
+      0.76052,
+      0.57758
+     ],
+     "intensity": 0.6,
+     "edgeColor": [
+      1.0,
+      0.90466,
+      0.80695
+     ],
+     "edgeIntensity": 1.6,
+     "width": 1.0,
+     "rainbow": false
+    },
+    "response": {
+     "ground": 1.0,
+     "foliage": 0.0,
+     "surface": 1.0,
+     "emissive": 0.0
+    },
+    "sparkle": {
+     "enabled": false
+    }
+   },
+   "trigger": {
+    "source": "signal",
+    "name": "response.kick",
+    "threshold": 0.25
+   }
+  }
+ ],
+ "palette": {
+  "states": [
+   {
+    "name": "gold",
+    "colors": {
+     "zenith": [
+      0.02519,
+      0.06848,
+      0.2384
+     ],
+     "horizon": [
+      1.0,
+      0.41789,
+      0.13287
+     ],
+     "sun": [
+      1.0,
+      0.62396,
+      0.25415
+     ],
+     "fog": [
+      0.7454,
+      0.35153,
+      0.19462
+     ],
+     "light": [
+      1.0,
+      0.62396,
+      0.30499
+     ]
+    }
+   },
+   {
+    "name": "rose",
+    "colors": {
+     "zenith": [
+      0.01033,
+      0.01764,
+      0.12214
+     ],
+     "horizon": [
+      0.92158,
+      0.30054,
+      0.21586
+     ],
+     "sun": [
+      1.0,
+      0.35153,
+      0.16203
+     ],
+     "fog": [
+      0.57758,
+      0.23074,
+      0.25415
+     ],
+     "light": [
+      1.0,
+      0.43415,
+      0.25415
+     ]
+    }
+   },
+   {
+    "name": "violet",
+    "colors": {
+     "zenith": [
+      0.00605,
+      0.00478,
+      0.04519
+     ],
+     "horizon": [
+      0.45641,
+      0.11444,
+      0.33245
+     ],
+     "sun": [
+      1.0,
+      0.23074,
+      0.12214
+     ],
+     "fog": [
+      0.26225,
+      0.11193,
+      0.2705
+     ],
+     "light": [
+      1.0,
+      0.32314,
+      0.2384
+     ]
+    }
+   },
+   {
+    "name": "indigo",
+    "colors": {
+     "zenith": [
+      0.00152,
+      0.00243,
+      0.01161
+     ],
+     "horizon": [
+      0.03434,
+      0.03434,
+      0.15593
+     ],
+     "sun": [
+      0.39157,
+      0.2462,
+      1.0
+     ],
+     "fog": [
+      0.02956,
+      0.02956,
+      0.11193
+     ],
+     "light": [
+      0.45641,
+      0.32314,
+      1.0
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "zenith",
+    "target": "env/sky/zenithColor"
+   },
+   {
+    "role": "horizon",
+    "target": "env/sky/horizonColor"
+   },
+   {
+    "role": "sun",
+    "target": "env/sky/sunColor"
+   },
+   {
+    "role": "light",
+    "target": "lights/sun/color"
+   },
+   {
+    "role": "fog",
+    "target": "scene/fogColor"
+   }
+  ],
+  "position": 1.0,
+  "saturation": 1.15,
+  "value": 1.0
+ }
+}

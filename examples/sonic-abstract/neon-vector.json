@@ -1,0 +1,1703 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "neon-vector.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.6,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0,
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 0.7,
+  "post/bloom/emissionWeight": 1.0,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.3,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "procedural/lines_near/deform/2/amount",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/fins_near/deform/2/amount",
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/lines_near/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/fins_near/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/lines_mid/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/fins_mid/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/lines_far/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/fins_far/deform/1/amount",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.lowMid",
+   "target": "procedural/lines_mid/deform/2/amount",
+   "amount": 2.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.lowMid",
+   "target": "procedural/fins_mid/deform/2/amount",
+   "amount": 2.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/lines_mid/deform/3/amount",
+   "amount": 2.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/fins_mid/deform/3/amount",
+   "amount": 2.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/lines_far/deform/2/amount",
+   "amount": 2.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/fins_far/deform/2/amount",
+   "amount": 2.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/lines_far/deform/3/amount",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/fins_far/deform/3/amount",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/lines_near/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/fins_near/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/lines_near/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/fins_near/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/lines_mid/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/fins_mid/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/lines_mid/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/fins_mid/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/lines_far/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/fins_far/deform/4/amount",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 15,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/lines_far/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/fins_far/deform/4/amount",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "field/plainNoise/position",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260,
+    "integrate": true
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "field/peakNoise/position",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260,
+    "integrate": true
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "camera/lens/focalLength",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/buildBar/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650,
+    "delayMs": 0
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/buildSquare/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650,
+    "delayMs": 90
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/buildDisc/transform/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 650,
+    "delayMs": 180
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/lines_near/material/emissive",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/lines_mid/material/emissive",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "procedural/lines_far/material/emissive",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/monolithL/wire/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/monolithL/wire/width",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/monolithL/source/scale",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/monolithL/source/position",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/monolithL/distribution/count",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/monolithR/wire/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "audio.highMid",
+   "target": "procedural/monolithR/wire/width",
+   "amount": 1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/monolithR/source/scale",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/monolithR/source/position",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/monolithR/distribution/count",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   }
+  },
+  {
+   "source": "response.onset",
+   "target": "procedural/blockEdge/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle0/transform/scale",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle0/transform/rotation",
+   "amount": -12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle1/transform/scale",
+   "amount": 0.062,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle1/transform/rotation",
+   "amount": 18.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle2/transform/scale",
+   "amount": 0.07400000000000001,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle2/transform/rotation",
+   "amount": -24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle3/transform/scale",
+   "amount": 0.08600000000000001,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle3/transform/rotation",
+   "amount": 30.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle4/transform/scale",
+   "amount": 0.098,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle4/transform/rotation",
+   "amount": -36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle5/transform/scale",
+   "amount": 0.11,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle5/transform/rotation",
+   "amount": 42.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle6/transform/scale",
+   "amount": 0.12200000000000001,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "procedural/circle6/transform/rotation",
+   "amount": -48.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "post/grade/hueShift",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "offset": -0.55,
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/beatSweep/op/3/constant/constant",
+   "amount": -186.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "response.level",
+   "target": "material/beatSweep/op/7/constant/constant",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/lines_near/distribution/count",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.55
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/fins_near/distribution/count",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.55
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/lines_mid/distribution/count",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.55
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/fins_mid/distribution/count",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.55
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/lines_near/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/fins_near/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/lines_mid/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/fins_mid/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/lines_far/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/fins_far/deform/3/amount",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "field/notePeak/position",
+   "amount": 90.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "offset": -0.5,
+    "springHz": 3.0,
+    "springDamping": 0.8
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/lines_near/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/fins_near/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/lines_near/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/fins_near/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/lines_mid/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/fins_mid/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/lines_mid/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/fins_mid/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/lines_far/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/fins_far/deform/5/amount",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/lines_far/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "procedural/fins_far/deform/5/amount",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle0/source/majorSegments",
+   "amount": -256.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.0,
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle0/source/majorSegments",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle2/source/majorSegments",
+   "amount": -256.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.0,
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle2/source/majorSegments",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle4/source/majorSegments",
+   "amount": -256.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.0,
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle4/source/majorSegments",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle6/source/majorSegments",
+   "amount": -256.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.0,
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "procedural/circle6/source/majorSegments",
+   "amount": 8.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "field/plainNoise/frequency",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 60
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       5.0,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       1.1314,
+       5.35,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.6,
+       5.0,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.1314,
+       4.65,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       0.0,
+       5.0,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -1.1314,
+       5.35,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       -1.6,
+       5.0,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -1.1314,
+       4.65,
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -0.0,
+       5.0,
+       14.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.6939,
+       -33.2371,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       2.9486,
+       -33.4178,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       2.476,
+       -34.2469,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.553,
+       -34.0662,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       -1.6939,
+       -33.2371,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -2.9486,
+       -33.4178,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       -2.476,
+       -34.2469,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": [
+       -0.553,
+       -34.0662,
+       -217.21
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       1.6939,
+       -33.2371,
+       -217.21
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/roll",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 48.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": -0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": -2.828,
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": -4.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": -2.828,
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": -0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": 2.828,
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": 4.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 42.0,
+      "value": 2.828,
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": 0.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/plainNoise/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 600.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 600.0,
+      "value": [
+       0.0,
+       0.0,
+       4800.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "field/peakNoise/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 600.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 600.0,
+      "value": [
+       0.0,
+       0.0,
+       5400.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-neon-vector.mp4"
+ },
+ "sonicScene": {
+  "category": "vector",
+  "thesis": "Pulsar Plain: a poster you can fly through. Hidden-line ridgelines ripple to the horizon under a colossal outline circle; the drums build flat blocks of one bold colour.",
+  "composition": {
+   "background": "pure black sky, one hairline horizon, a colossal outline circle of concentric rings",
+   "midground": "a flat accent-colour triangle standing in the plain, half hidden by the ridges",
+   "foreground": "the ridgelines, close and bright, rippling under the camera",
+   "focal": "the spiky central peaks leading to the circle on the horizon",
+   "secondary": [
+    "the colour block",
+    "the circle's rings"
+   ],
+   "atmosphere": "(none: lines and planes only)",
+   "post": "bloom on the lines; a split on the snare",
+   "camera": "low and level, flying forward (the plain's shapes advance toward it)"
+  },
+  "palette": {
+   "dominant": "#000000",
+   "secondary": "#f4f4f0",
+   "accent": "#ff2e88",
+   "highlight": "#ffe500",
+   "background_value": "black",
+   "saturation": "white lines; one accent colour per section"
+  },
+  "motion": {
+   "very_slow": [
+    "the circle's rings turning"
+   ],
+   "medium": [
+    "the flight",
+    "the plain's swell"
+   ],
+   "fast": [
+    "peaks rising under notes"
+   ],
+   "extremely_fast": [
+    "blocks snapping into place",
+    "line flashes"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "the near rows swell under the camera; the monoliths stretch taller"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "construction: three flat colour shapes snap into the sky in sequence; the lines flash"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "fine jitter on every line"
+   ],
+   [
+    "bands",
+    "audio.lowMid",
+    "the spectrum lies across the landscape in depth: low mids and mids swell the middle rows, high mids the far rows"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the horizon circle's rings breathe and turn"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the section's accent colour (the whole image's hue turns; white stays white)"
+   ],
+   [
+    "beat",
+    "beat.phase",
+    "the beat sweep: a band of light runs down the plain to the camera once per beat"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "STRUCTURE: denser rows, taller peaks, longer rows of monoliths"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "a mountain rises across the plain at the pitch's place, as tall as the velocity"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: the horizon circle becomes a polygon of as many sides as notes"
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the plain's wavelength: smooth swells to jagged peaks"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the plain glides toward the camera under a still circle"
+   ]
+  ],
+  "tier": "light: six tube nodes (about 70 rows), a few rings and slabs, unlit",
+  "id": "neon-vector",
+  "title": "Neon Vector World",
+  "regions": [
+   {
+    "id": "peaks",
+    "box": [
+     0.38,
+     0.35,
+     0.62,
+     0.75
+    ]
+   },
+   {
+    "id": "circle",
+    "box": [
+     0.25,
+     0.05,
+     0.75,
+     0.45
+    ]
+   },
+   {
+    "id": "block",
+    "box": [
+     0.1,
+     0.15,
+     0.4,
+     0.6
+    ]
+   }
+  ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
+ }
+}

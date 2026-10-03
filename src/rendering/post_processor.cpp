@@ -249,7 +249,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 18> slots{{
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 21> slots{{
         {"fs_exposure", &exposure_},
         {"fs_meter_prefilter", &meterPrefilter_},
         {"fs_meter_reduce", &meterReduce_},
@@ -272,6 +272,9 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_look_blur", &lookBlur_},
         {"fs_look", &look_},
         {"fs_box_down", &boxDown_}, // ADR-917, appended
+        {"fs_glitch", &glitch_},    // ADR-1065, appended
+        {"fs_display", &display_},  // ADR-1065, appended
+        {"fs_outline", &outline_},  // ADR-1072, appended
     }};
     // The velocity-tile passes write RG16F, not the HDR format (ADR-040). ADR-917 appends the two
     // halves of the tile maximum it takes separably past 40 px.
@@ -578,6 +581,39 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         current = target.view;
     }
 
+    // ---- 1a. ADR-1072: the outline. After the exposure (its colour is in exposed units, like every
+    // threshold below) and before everything that resamples the image without the depth buffer, so a
+    // line hazes, defocuses, smears and blooms with the surface it is drawn round. Never encoded while
+    // the amount is 0. -------------------------------------------------------------------------------
+    if (s.outline.active() && in.depth) {
+        const scene::PostOutlineSettings& o = s.outline;
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(o.amount, 0.0f, 1.0f), std::max(o.width * pixelScale, 0.0f),
+                              std::max(o.depthThreshold, 1e-4f), std::max(o.normalThreshold, 1e-4f));
+        u.params1 = glm::vec4(glm::max(o.color, glm::vec3(0.0f)) * std::max(o.intensity, 0.0f),
+                              o.silhouette >= 0.5f ? 1.0f : 0.0f);
+        u.params2 = glm::vec4(std::max(o.fadeStart, 0.0f), std::max(o.fadeEnd, 0.0f),
+                              o.objectEdges >= 0.5f && in.identifier ? 1.0f : 0.0f, in.normal ? 1.0f : 0.0f);
+        // The camera's forward axis, for view depth (1 / view depth is linear across a plane on screen,
+        // which is what makes the depth test silent on a floor).
+        {
+            const glm::vec4 far = in.invViewProj * glm::vec4(0.0f, 0.0f, 0.5f, 1.0f);
+            const glm::vec3 ahead = glm::vec3(far) / far.w - in.cameraPos;
+            const float len = glm::length(ahead);
+            u.params3 = glm::vec4(len > 1e-6f ? ahead / len : glm::vec3(0.0f, 0.0f, -1.0f), 0.0f);
+        }
+        PassTextures textures;
+        textures.source = current;
+        textures.second = in.normal;
+        textures.depth = in.depth;
+        textures.identifier = in.identifier;
+        stage_ = "post/outline";
+        runPass(encoder, outline_, target.view, textures, u);
+        captureStage("outline", target);
+        current = target.view;
+    }
+
     // ---- 1b. cinematic integration, atmospheric (Image/Look §68.1) -------------------------------
     // Here, and not later, for the reason depth of field is here: it reads depth, and everything
     // from the lens stage onward resamples the image without resampling the depth buffer. Ahead of
@@ -694,6 +730,35 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         stage_ = "post/lens";
         runPass(encoder, lens_, target.view, current, nullptr, nullptr, u);
         captureStage("lens", target);
+        current = target.view;
+    }
+
+    // ---- 4b. ADR-1065: shock, tears, blocks, split, radial blur, sort -- one pass, never encoded while every
+    // amount is 0. Beside the lens and before bloom, so the glow follows the damage. ----------------------------
+    if (s.glitch.glitchPassActive()) {
+        const scene::PostGlitchSettings& g = s.glitch;
+        const float h = static_cast<float>(in.height);
+        const float w = static_cast<float>(in.width);
+        const auto taps = [&](float full) { return std::max(1.0f, std::round(full * std::clamp(in.tapScale, 0.1f, 1.0f))); };
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(g.shockAmount * pixelScale / std::max(h, 1.0f), g.shockRadius, g.shockWidth,
+                              std::clamp(g.shockChroma, 0.0f, 1.0f));
+        u.params1 = glm::vec4(g.shockCenterX, g.shockCenterY, std::clamp(g.glitchAmount, 0.0f, 1.0f),
+                              std::max(g.glitchBlock * pixelScale, 1.0f));
+        const double epoch = std::floor(in.renderTime * static_cast<double>(std::max(g.glitchRate, 0.0f))) +
+                             static_cast<double>(g.glitchSeed);
+        u.params2 = glm::vec4(static_cast<float>(epoch), std::clamp(g.glitchTear, 0.0f, 1.0f),
+                              g.glitchTearShift * pixelScale / std::max(w, 1.0f), std::clamp(g.glitchSwap, 0.0f, 1.0f));
+        u.params3 = glm::vec4(g.glitchDrift * pixelScale, g.splitAmount * pixelScale, glm::radians(g.splitAngle),
+                              std::clamp(g.splitSpectral, 0.0f, 1.0f));
+        u.params4 = glm::vec4(std::clamp(g.sortAmount, 0.0f, 1.0f), g.sortThreshold, g.sortLength * pixelScale,
+                              glm::radians(g.sortAngle));
+        u.tintA = glm::vec4(g.sortInvert, std::clamp(g.radialAmount, 0.0f, 1.0f), g.radialCenterX, g.radialCenterY);
+        u.tintB = glm::vec4(taps(32.0f), taps(12.0f), taps(8.0f), 0.0f);
+        stage_ = "post/glitch";
+        runPass(encoder, glitch_, target.view, current, nullptr, nullptr, u);
+        captureStage("glitch", target);
         current = target.view;
     }
 
@@ -1028,6 +1093,26 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         runPass(encoder, look_, target.view, textures, u);
         captureStage("look", target);
         pool.release(blurV);
+        current = target.view;
+        output_ = target.texture;
+    }
+
+    // ---- 6c. ADR-1065: the display -- mosaic, posterise and dither, scanlines. After the grade and the look (it is
+    // about the picture as shown), before FXAA. Never encoded while every amount is 0. ---------------------------
+    if (s.glitch.displayPassActive()) {
+        const scene::PostGlitchSettings& g = s.glitch;
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(g.displayScanlines, 0.0f, 1.0f), std::max(g.displayLines, 1.0f),
+                              g.displayPixelate >= 1.0f ? std::max(g.displayPixelate * pixelScale, 1.0f) : 0.0f,
+                              g.displayPosterize >= 2.0f ? std::round(g.displayPosterize) : 0.0f);
+        u.params1 = glm::vec4(std::clamp(g.displayDither, 0.0f, 1.0f), std::max(g.displayLetterbox, 0.0f),
+                              std::clamp(g.displayLetterboxAmount, 0.0f, 1.0f), 0.0f);
+        PassTextures textures;
+        textures.source = current;
+        stage_ = "post/display";
+        runPass(encoder, display_, target.view, textures, u);
+        captureStage("display", target);
         current = target.view;
         output_ = target.texture;
     }

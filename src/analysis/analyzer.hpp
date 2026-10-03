@@ -5,6 +5,8 @@
 // and shaped by the modulation chain; the three ADR-897 features that are defined by a time
 // constant (the long-term band levels, the onset rate and the energy composite) carry their own.
 
+#include "analysis/causal_onsets.hpp"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -133,6 +135,22 @@ struct AnalysisFrame {
     float midOnsetStrength = 0.0f;
     bool highOnset = false;
     float highOnsetStrength = 0.0f;
+
+    // ---- ADR-1060: causal onsets (live: AnalysisRunner; file: AnalysisTrack's pass, the same detector) ---------
+    CausalOnsets causal;
+    // Live only: the frame index each event above was first raised on. The runner carries an event forward until
+    // the render thread has acquired a frame that holds it, so one between two render frames is not lost; the
+    // consumer fires an event only when its stamp is newer than the last it fired (`LiveEventLatch`). 0 = none.
+    std::uint64_t onsetStamp = 0, beatStamp = 0, lowStamp = 0, midStamp = 0, highStamp = 0;
+    std::uint64_t liveSerial = 0; // live only: this frame's position in the runner's output, from 1
+};
+
+// ADR-1060: the render thread's half of the live event carry (see `AnalysisFrame::onsetStamp`). An event whose stamp
+// is not newer than the last one fired for its kind was already seen on an earlier frame, and is cleared.
+struct LiveEventLatch {
+    std::uint64_t onset = 0, beat = 0, low = 0, mid = 0, high = 0;
+    std::uint64_t serial = 0; // the newest frame seen: a smaller one means a new runner, and the latch restarts
+    void apply(AnalysisFrame& frame);
 };
 
 class Analyzer {

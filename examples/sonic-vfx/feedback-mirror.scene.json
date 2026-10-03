@@ -1,0 +1,753 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "feedback-mirror",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   8.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 30.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.007,
+   0.00212,
+   0.01938
+  ],
+  "fogColor": [
+   0,
+   0,
+   0
+  ],
+  "volumeDensity": 0.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00335,
+    0.00121,
+    0.00913
+   ],
+   "horizonColor": [
+    0.007,
+    0.00212,
+    0.01938
+   ],
+   "groundColor": [
+    0.00335,
+    0.00121,
+    0.00913
+   ],
+   "haze": 0.9,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "glyph",
+   "kind": "sdf",
+   "visible": true,
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "translate",
+      "translation": [
+       1.14,
+       0.12,
+       0.0
+      ],
+      "children": [
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "rotate",
+          "rotation": [
+           90.0,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "torus",
+            "radius": 0.82,
+            "rounding": 0.016,
+            "material": 0
+           }
+          ]
+         },
+         {
+          "kind": "rotate",
+          "rotation": [
+           0.0,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "translate",
+              "translation": [
+               -0.3302154864630064,
+               0.19064999999999993,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 0.0,
+                 -210.0
+                ],
+                "children": [
+                 {
+                  "kind": "capsule",
+                  "radius": 0.011,
+                  "height": 1.3208619458520257,
+                  "material": 1
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               -1.1102230246251565e-16,
+               -0.3813000000000002,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 0.0,
+                 -90.00000000000001
+                ],
+                "children": [
+                 {
+                  "kind": "capsule",
+                  "radius": 0.011,
+                  "height": 1.3208619458520254,
+                  "material": 1
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.3302154864630063,
+               0.19064999999999982,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "rotate",
+                "rotation": [
+                 0.0,
+                 0.0,
+                 29.999999999999986
+                ],
+                "children": [
+                 {
+                  "kind": "capsule",
+                  "radius": 0.011,
+                  "height": 1.3208619458520259,
+                  "material": 1
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               4.6695782451488574e-17,
+               0.7626,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "sphere",
+                "radius": 0.042,
+                "material": 1
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               -0.6604309729260128,
+               -0.3813000000000001,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "sphere",
+                "radius": 0.042,
+                "material": 1
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.6604309729260126,
+               -0.3813000000000003,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "sphere",
+                "radius": 0.042,
+                "material": 1
+               }
+              ]
+             }
+            ]
+           }
+          ],
+          "name": "tri"
+         },
+         {
+          "kind": "rotate",
+          "rotation": [
+           0.0,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.42,
+                 0.0,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.4108219923081984,
+                 0.08732291014345891,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.38368909220989234,
+                 0.1708293900918361,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.3397871376374779,
+                 0.2468698059628387,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.2810348546707204,
+                 0.31212082670050556,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.21000000000000005,
+                 0.3637306695894642,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.12978713763747793,
+                 0.39944373684396445,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.04390195457241445,
+                 0.41769919605467476,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.04390195457241449,
+                 0.41769919605467476,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.12978713763747787,
+                 0.3994437368439645,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.2099999999999999,
+                 0.36373066958946426,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.2810348546707204,
+                 0.31212082670050556,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.33978713763747787,
+                 0.24686980596283875,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.3836890922098923,
+                 0.17082939009183618,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.4108219923081984,
+                 0.08732291014345891,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.42,
+                 5.143516556418883e-17,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.4108219923081983,
+                 -0.08732291014345898,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.38368909220989234,
+                 -0.1708293900918361,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.3397871376374779,
+                 -0.24686980596283867,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.2810348546707204,
+                 -0.3121208267005056,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.2100000000000002,
+                 -0.3637306695894641,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.12978713763747798,
+                 -0.39944373684396445,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.04390195457241441,
+                 -0.4176991960546748,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               },
+               {
+                "kind": "translate",
+                "translation": [
+                 0.043901954572414255,
+                 -0.4176991960546748,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.12978713763747785,
+                 -0.3994437368439645,
+                 0.0
+                ],
+                "children": [
+                 {
+                  "kind": "sphere",
+                  "radius": 0.02,
+                  "material": 0
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ],
+          "name": "inner"
+         },
+         {
+          "kind": "sphere",
+          "radius": 0.07,
+          "name": "core",
+          "material": 2
+         }
+        ]
+       }
+      ],
+      "name": "glyph"
+     }
+    },
+    "renderMode": "raymarch",
+    "compile": true,
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.5,
+     "metallic": 0.0
+    },
+    "boundsMin": [
+     -0.5,
+     -1.0,
+     -0.3
+    ],
+    "boundsMax": [
+     2.8,
+     1.25,
+     0.3
+    ],
+    "castShadows": false,
+    "depthPrepass": false,
+    "maxSteps": 96,
+    "epsilon": 0.0006,
+    "stepScale": 0.9,
+    "normalEpsilon": 0.002,
+    "maxDistance": 30.0,
+    "surfaces": [
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       3.0,
+       1.56299,
+       0.30673
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       2.4,
+       2.09128,
+       1.4975
+      ]
+     },
+     {
+      "color": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "emission": [
+       4.0,
+       4.0,
+       4.0
+      ]
+     }
+    ]
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "glyph",
+    "position": [
+     1.14,
+     0.12,
+     0.0
+    ],
+    "radius": 0.82,
+    "weight": 1.0
+   }
+  ]
+ }
+}

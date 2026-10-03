@@ -1,0 +1,1426 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "chromatic-topography",
+ "camera": {
+  "mode": 1,
+  "position": [
+   77.744,
+   64.0,
+   0.0
+  ],
+  "target": [
+   -170.903,
+   19.2,
+   -420.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   1.0,
+   0.76815,
+   0.56471
+  ],
+  "fogColor": [
+   0.92158,
+   0.69387,
+   0.56471
+  ],
+  "volumeDensity": 0.00085,
+  "volumeMaxDistance": 0.0,
+  "fogSky": 1.0,
+  "fogSkyDistance": 900.0,
+  "skyIntensity": 1.0,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.01764,
+    0.0648,
+    0.39157
+   ],
+   "horizonColor": [
+    1.0,
+    0.76815,
+    0.56471
+   ],
+   "groundColor": [
+    1.0,
+    0.76815,
+    0.56471
+   ],
+   "haze": 0.42,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "swell",
+   "kind": "field",
+   "field": {
+    "kind": "wave",
+    "waveGeometry": "cylindrical",
+    "waveShape": "sine",
+    "amplitude": 1.0,
+    "wavelength": 700.0,
+    "waveSpeed": 90.0,
+    "waveWidth": 0.0,
+    "axis": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "land",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-land.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctLand"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "river",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-river.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.04092,
+      0.88792,
+      0.71569
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctRiver"
+    }
+   }
+  },
+  {
+   "name": "cones",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-cones.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.00402,
+      0.11444,
+      0.17144
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "balls",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-balls.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.01681,
+      0.06125,
+      0.47932
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal0.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal1.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal2.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal3.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal4.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal5",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal5.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal6",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal6.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal7",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal7.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal8",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal8.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal9",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal9.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal10",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal10.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "crystal11",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/ct-crystal11.glb"
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "end": [
+      0.0,
+      0.0,
+      -4800.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.3467,
+      0.92158,
+      1.0
+     ],
+     "emissiveIntensity": 0.55,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "ctFlat"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "swell",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "pollen",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 5000,
+    "seed": 13,
+    "shape": "box",
+    "position": [
+     0.0,
+     30.0,
+     -260.0
+    ],
+    "extent": [
+     220.0,
+     26.0,
+     240.0
+    ],
+    "direction": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "spawnRate": 40.0,
+    "lifetimeMin": 2.0,
+    "lifetimeMax": 4.0,
+    "spread": 0.05,
+    "speedMin": 20.0,
+    "speedMax": 20.0,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.0,
+    "sizeStart": 0.35,
+    "sizeEnd": 0.0,
+    "colorStart": [
+     1.0,
+     0.96469,
+     0.7454,
+     1.0
+    ],
+    "colorEnd": [
+     0.04092,
+     0.88792,
+     0.71569,
+     0.0
+    ],
+    "emissive": 6.0,
+    "blend": "additive",
+    "turbulence": 0.6,
+    "turbulenceScale": 0.05
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.35
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0,
+   "temperature": 5600.0,
+   "softness": 1.0,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "ctLand",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "normal"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 3,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      520.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      -0.07,
+      -0.17,
+      -0.3,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "threshold",
+     "dst": 5,
+     "srcA": 5,
+     "value": 0.0
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      -0.45,
+      -0.62,
+      -0.8,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "threshold",
+     "dst": 6,
+     "srcA": 6,
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.16666666666666666,
+      0.16666666666666666,
+      0.16666666666666666,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "ramp",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.01229,
+      0.02315,
+      0.16827,
+      1.0
+     ],
+     "constant2": [
+      0.43415,
+      0.02956,
+      0.26225,
+      1.0
+     ],
+     "constant3": [
+      0.96469,
+      0.65141,
+      0.14413,
+      1.0
+     ]
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 1,
+     "constant": [
+      -0.6353394827491877,
+      0.7162008714627206,
+      0.28879067397690344,
+      0.62
+     ],
+     "value": 0.45
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "palette",
+     "dst": 6,
+     "srcA": 3,
+     "value": 0.0,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ],
+     "constant2": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ],
+     "constant3": [
+      0.045454545454545456,
+      0.045454545454545456,
+      0.045454545454545456,
+      0.045454545454545456
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.93,
+      0.995,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.58,
+      0.5,
+      0.66,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "mixBy",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7,
+     "srcC": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 3,
+     "constant": [
+      1.6,
+      -0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.03273,
+      0.71034,
+      0.57255,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 5,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "ctFlat",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "materialEmission"
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "normal"
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      -0.6353394827491877,
+      0.7162008714627206,
+      0.28879067397690344,
+      0.45
+     ],
+     "value": 0.7
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 2
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 0,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "ctRiver",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      2.0,
+      2.0,
+      2.0,
+      2.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "time"
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "palette",
+     "dst": 0,
+     "srcA": 0,
+     "value": 0.0,
+     "constant": [
+      0.62,
+      0.62,
+      0.62,
+      0.62
+     ],
+     "constant2": [
+      0.38,
+      0.38,
+      0.38,
+      0.38
+     ],
+     "constant3": [
+      0.02631578947368421,
+      0.02631578947368421,
+      0.02631578947368421,
+      0.02631578947368421
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      0.0982,
+      2.13102,
+      1.71766,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 0,
+     "srcA": 0,
+     "srcB": 1
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 0,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}

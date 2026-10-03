@@ -1,5 +1,7 @@
 #include "signals/source.hpp"
 
+#include "signals/publish_source.hpp"
+
 #include "signals/beat_grid.hpp"
 
 #include "sonic/interpret_source.hpp"
@@ -1340,6 +1342,10 @@ std::unique_ptr<Source> SourceRack::create(const std::string& kind, const std::s
     if (kind == "beatgrid") {
         // ADR-1045: the author's bars and beats, and the events written on them.
         return std::make_unique<BeatGridSource>(name);
+    }
+    if (kind == "publish") {
+        // ADR-1064: chosen parameters' final values as signals (effects modulating effects).
+        return std::make_unique<PublishSource>(name);
     }
     if (kind == "interpret") {
         // ADR-1020: the Sonic Garden's Visual Interpreter; its mappings publish visual.<mapping>.

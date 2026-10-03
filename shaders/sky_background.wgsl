@@ -30,6 +30,12 @@ fn skySmoothstepF(e0: f32, e1: f32, x: f32) -> f32 {
 }
 
 fn skyRadianceFrame(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
+    return skyRadianceFrameScaled(dir, minRadius, 1.0);
+}
+
+// ADR-1070: the same sky with the sun's intensity applied, as the cube applies it, for the live
+// background of a procedural-sky IBL (the ADR-345 caller above has never applied it).
+fn skyRadianceFrameScaled(dir: vec3<f32>, minRadius: f32, sunScale: f32) -> vec3<f32> {
     let d = normalize(dir);
     let hazeWidth = max(frame.skyZenithColor.w, 1e-3);
     let haze = exp(-saturate(d.y) / hazeWidth);
@@ -44,7 +50,7 @@ fn skyRadianceFrame(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
     let energy = (sunRadius / radius) * (sunRadius / radius);
     let disc = (1.0 - skySmoothstepF(radius * 0.85, radius * 1.15, theta)) * energy;
     let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
-    let sun = frame.skySunRadiance.rgb * (disc + glow) * band;
+    let sun = frame.skySunRadiance.rgb * sunScale * (disc + glow) * band;
     return base + sun;
 }
 
@@ -86,8 +92,16 @@ fn skyBackgroundAt(dir: vec3<f32>, equirectLod: f32, minRadius: f32) -> vec3<f32
         } else if (frame.skyExtra.x >= 0.5) {
             // The analytic sky has no map behind it; the prefiltered cube is its only form, and
             // its own `intensity` (params.w) is what has always scaled it.
-            let mip = frame.skyParams.w * frame.envParams.y;
-            color = textureSampleLevel(prefilteredMap, iblSampler, d, mip).rgb * frame.params.w;
+            if (frame.skyLive.x >= 0.5) {
+                // ADR-1070, live: this frame's sky, not the cube its lighting is rebuilt into at a
+                // capped rate. The cube's own factors: the sun's intensity, the sky's intensity, and
+                // params.w on top as below; the disc floored as the source cube floors it.
+                color = skyRadianceFrameScaled(d, max(minRadius, frame.skyLive.w), frame.skyLive.y)
+                        * frame.skyLive.z * frame.params.w;
+            } else {
+                let mip = frame.skyParams.w * frame.envParams.y;
+                color = textureSampleLevel(prefilteredMap, iblSampler, d, mip).rgb * frame.params.w;
+            }
         } else {
             // ADR-049: read the HDRI itself. A 128 px prefiltered cube face is under 3 texels per
             // degree; a star is one texel of an 8K map and does not survive being resampled to

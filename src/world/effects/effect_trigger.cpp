@@ -74,6 +74,7 @@ const char* triggerSourceName(TriggerSource s) {
     case TriggerSource::TimelineMarker: return "marker";
     case TriggerSource::Repeat: return "repeat";
     case TriggerSource::Proximity: return "proximity";
+    case TriggerSource::Signal: return "signal";
     }
     return "beat";
 }
@@ -82,7 +83,8 @@ std::optional<TriggerSource> triggerSourceFromName(std::string_view name) {
     // One spelling each (ADR-441): a file that says "beats" or "timelineMarker" is refused by name
     // rather than quietly read as something.
     for (const TriggerSource s : {TriggerSource::Beat, TriggerSource::Onset, TriggerSource::MusicEvent,
-                                  TriggerSource::TimelineMarker, TriggerSource::Repeat, TriggerSource::Proximity}) {
+                                  TriggerSource::TimelineMarker, TriggerSource::Repeat, TriggerSource::Proximity,
+                                  TriggerSource::Signal}) {
         if (name == triggerSourceName(s)) {
             return s;
         }
@@ -118,6 +120,12 @@ Result<void> Trigger::validate() const {
     case TriggerSource::Proximity:
         if (entity.empty()) { return fail("a proximity trigger needs the entity it measures to"); }
         if (!(radius > 0.0f) || !std::isfinite(radius)) { return fail("a proximity trigger's radius must be positive"); }
+        break;
+    case TriggerSource::Signal:
+        if (name.empty()) { return fail("a signal trigger needs the name of the bus event it fires on"); }
+        if (!(threshold >= 0.0f) || !std::isfinite(threshold)) {
+            return fail("a signal trigger's threshold must be a non-negative number");
+        }
         break;
     }
     return {};
@@ -302,8 +310,98 @@ std::size_t TriggerClock::lastTriggers(const Trigger& trig, std::string_view own
         return n;
     }
     case TriggerSource::Proximity: return proximity(trig, owner, t, out);
+    case TriggerSource::Signal: {
+        const SignalEvents& list = signalEvents(trig.name);
+        std::span<const TriggerOnset> events = list.events;
+        std::size_t i = upperIndex<TriggerOnset>(events, t, [](const TriggerOnset& o) { return o.t; });
+        while (i > 0 && n < out.size()) {
+            --i;
+            if (events[i].strength >= trig.threshold) {
+                n = put(out, n, events[i].t);
+            }
+        }
+        return n;
+    }
     }
     return 0;
+}
+
+// ---- ADR-1061: signal events ------------------------------------------------------------------------
+
+const TriggerClock::SignalEvents& TriggerClock::signalEvents(const std::string& name) const {
+    // Asking is wanting: the host derives or records what has been asked for (`pendingSignals`, `recordSignals`).
+    return signals_.try_emplace(name).first->second;
+}
+
+std::vector<std::string> TriggerClock::pendingSignals() const {
+    std::vector<std::string> out;
+    for (const auto& [name, list] : signals_) {
+        if (!list.resolved) {
+            out.push_back(name);
+        }
+    }
+    return out;
+}
+
+void TriggerClock::setDerivedSignal(const std::string& name, std::vector<TriggerOnset> ascending) {
+    SignalEvents& list = signals_[name];
+    list.events = std::move(ascending);
+    list.derived = true;
+    list.resolved = true;
+}
+
+void TriggerClock::setRecordedSignal(const std::string& name) {
+    SignalEvents& list = signals_[name];
+    if (list.derived) {
+        list.events.clear();
+    }
+    list.derived = false;
+    list.resolved = true;
+}
+
+void TriggerClock::resetSignals() {
+    for (auto& [name, list] : signals_) {
+        list = SignalEvents{};
+    }
+    lastRecorded_ = std::numeric_limits<double>::quiet_NaN();
+}
+
+void TriggerClock::recordSignals(const signals::SignalBus& bus, double t) {
+    if (!std::isfinite(t)) {
+        return;
+    }
+    const bool back = !std::isnan(lastRecorded_) && t < lastRecorded_;
+    const bool repeat = !std::isnan(lastRecorded_) && t == lastRecorded_;
+    for (auto& [name, list] : signals_) {
+        if (!list.resolved || list.derived) {
+            continue;
+        }
+        if (back) {
+            // Back in time: what was recorded after `t` has not happened yet.
+            while (!list.events.empty() && list.events.back().t > t) {
+                list.events.pop_back();
+            }
+        }
+        if (repeat) {
+            continue; // the same frame asked again
+        }
+        if (list.id == signals::kInvalidSignal) {
+            if (const auto id = bus.find(name)) {
+                list.id = *id;
+            } else {
+                continue;
+            }
+        }
+        if (list.id < bus.size() && bus.event(list.id)) {
+            list.events.push_back(TriggerOnset{t, bus.value(list.id)});
+            // Bounded: a long live set keeps the newest events, which are the only ones a front can still use.
+            if (list.events.size() > kMaxRecordedEvents) {
+                list.events.erase(list.events.begin(),
+                                  list.events.begin() + static_cast<std::ptrdiff_t>(list.events.size() / 2));
+            }
+        }
+    }
+    lastRecorded_ = t;
 }
 
 // The owner's ring, walked newest to oldest over the samples at or before `t`; the other entity is
@@ -392,6 +490,23 @@ const char* TriggerClock::silence(const Trigger& trig, std::string_view owner) c
             return "The owner or the other entity has no recorded motion (is the entity in this scene?).";
         }
         return nullptr;
+    case TriggerSource::Signal: {
+        const SignalEvents& list = signalEvents(trig.name);
+        for (const TriggerOnset& o : list.events) {
+            if (o.strength >= trig.threshold) {
+                return nullptr;
+            }
+        }
+        if (!list.resolved) {
+            return "The signal's events are being prepared.";
+        }
+        if (list.derived) {
+            return list.events.empty() ? "The signal never fires in this piece."
+                                       : "No event of the signal in this piece reaches this trigger's threshold.";
+        }
+        return "Recorded from the bus as it plays: no event of the signal has reached this trigger's threshold "
+               "yet (live input, or a signal that is not a function of the piece).";
+    }
     }
     return nullptr;
 }
@@ -541,18 +656,21 @@ Result<Trigger> triggerFromJson(const json& j) {
     }
     Trigger t;
     if (!j.contains("source") || !j.at("source").is_string()) {
-        return fail("a trigger needs a 'source' (beat, onset, musicEvent, marker, repeat, proximity)");
+        return fail("a trigger needs a 'source' (beat, onset, musicEvent, marker, repeat, proximity, signal)");
     }
     const std::string source = j.at("source").get<std::string>();
     const auto kind = triggerSourceFromName(source);
     if (!kind) {
-        return fail("unknown trigger source '{}' (one of beat, onset, musicEvent, marker, repeat, proximity)",
+        return fail("unknown trigger source '{}' (one of beat, onset, musicEvent, marker, repeat, proximity, signal)",
                     source);
     }
     t.source = *kind;
     bool bad = false;
     t.everyN = static_cast<int>(readNumber(j, "everyN", t.everyN, bad));
     t.offset = static_cast<int>(readNumber(j, "offset", t.offset, bad));
+    if (t.source == TriggerSource::Signal) {
+        t.threshold = 0.0f; // a bus event's strength is 0..1: any event fires unless the file asks for more
+    }
     t.threshold = static_cast<float>(readNumber(j, "threshold", static_cast<double>(t.threshold), bad));
     t.period = readNumber(j, "period", t.period, bad);
     t.phase = readNumber(j, "phase", t.phase, bad);

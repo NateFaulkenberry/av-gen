@@ -63,6 +63,12 @@ public:
 
     // Learn: the most recent messages seen (for the UI's "map last input to ...").
     [[nodiscard]] const std::optional<control::MidiMessage>& lastMidi() const { return lastMidi_; }
+    // ADR-1063: the newest program change received while live Sonic input runs (the scene switcher's), taken once.
+    [[nodiscard]] std::optional<int> takeProgramChange() {
+        auto p = programChange_;
+        programChange_.reset();
+        return p;
+    }
     [[nodiscard]] const std::optional<control::OscMessage>& lastOsc() const { return lastOsc_; }
     // Creates a binding from the last MIDI / OSC message to `signal` (control channel) or a
     // parameter path. Returns false when nothing has been received yet.
@@ -119,6 +125,7 @@ private:
     std::vector<control::MidiMessage> midiScratch_;
     std::vector<control::OscMessage> injectedOsc_;
     std::optional<control::MidiMessage> lastMidi_;
+    std::optional<int> programChange_;
     std::optional<control::OscMessage> lastOsc_;
     std::unordered_map<std::string, std::vector<float>> feedbackCache_; // path -> last seen base components
     std::unordered_set<std::string> oscWritten_; // paths written through OSC this frame (no echo)

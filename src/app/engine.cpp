@@ -3162,6 +3162,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         layers_.clear();
     }
     layers_.attach(params_);
+    syncResponseControls(); // ADR-1062: a scene load clears the parameters; the response's must exist for the file's values
 
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
@@ -4960,6 +4961,8 @@ FrameTime Engine::tick(FrameClock& clock) {
 
 void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const {
     clock.latest = frame;
+    // ADR-1060: an event the runner carried onto several frames fires once.
+    liveLatch_.apply(clock.latest);
     // ADR-896/898: live playback of a loaded file takes the whole-track analysis's beat and band
     // onsets at the same position, so the editor hears what a render of the same second hears. Live
     // INPUT has no track and keeps the causal tracker's answers.
@@ -5159,6 +5162,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     // ADR-1025: while live input runs, the live session publishes these instead (after this, on the engine's own
     // bus); a replay bus then carries nothing sonic, like any other live-only signal.
     if (!liveSonic_.running()) {
+        clock.sonic.setControls(responseControls_); // ADR-1062: the performer's controls, the same on a replay
         if (sonic_ && track_ != nullptr && !track_->empty()) {
             clock.sonic.advance(*sonic_, *track_, time.renderTime);
         }
@@ -5168,6 +5172,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
 }
 
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
+    syncResponseControls(); // ADR-1062: before the clock steps the response model
     const auto& midiClock = controlHub_.midiClock();
     midiClockActive_ = tempoSource_ == TempoSource::MidiClock && midiClock.running() && midiClock.hasTempo();
     // The same resolution the transport readout uses, so the picture and the display cannot be
@@ -5187,6 +5192,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     in.playing = isPlaying();
     const bool pulse = advanceClock(clock_, bus_, time, newAnalysisFrame, in);
     if (liveSonic_.running()) {
+        liveSonic_.setControls(responseControls_);
         liveSonic_.frame(*activeSonicSetup(), liveTimbre_.get(), bus_, liveFrameSeconds_, liveFrameNs_);
     }
 
@@ -5790,6 +5796,32 @@ std::span<const world::ShotSpan> Engine::effectShots() const {
 
 bool Engine::effectShotsFromAuthoredCut() const { return shotSpans_.empty() && !effectShots().empty(); }
 
+void Engine::serviceSignalTriggers() {
+    // ADR-1061. A file's events are a function of the piece and are derived once; live input's (and any signal
+    // that is not a function of the piece) are recorded from the bus as they fire. Changing what is analysed, or
+    // turning live input on or off, starts both again.
+    const bool live = liveSonic_.running() || input_ != nullptr;
+    std::uint64_t key = sonic_ ? sonic_->key() : 0;
+    key ^= reinterpret_cast<std::uintptr_t>(track_.get()) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    key ^= (track_ ? track_->frames().size() : 0) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    key ^= (live ? 1u : 2u) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+    if (key != signalTriggerKey_) {
+        triggerClock_.resetSignals();
+        signalDeriver_.clear();
+        signalTriggerKey_ = key;
+    }
+    for (const std::string& name : triggerClock_.pendingSignals()) {
+        if (!live) {
+            if (auto events = signalDeriver_.derive(name, track_.get(), sonic_.get())) {
+                triggerClock_.setDerivedSignal(name, std::move(*events));
+                continue;
+            }
+        }
+        triggerClock_.setRecordedSignal(name);
+    }
+    triggerClock_.recordSignals(bus_, timelineClock_.seconds);
+}
+
 world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene) const {
     const scene::Scene& live = controller_->scene();
     world::EffectContext ctx;
@@ -6186,6 +6218,7 @@ void Engine::update(const FrameTime& time) {
     // counts every triggered field's clock from it. Binding it again later in the frame is the same
     // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
     triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    serviceSignalTriggers(); // ADR-1061: derive or record the bus events Signal triggers fire on
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
     }
@@ -6499,7 +6532,31 @@ Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem
     log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
               sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
     refreshSonicTimbre();
+    syncResponseControls(); // ADR-1062: the response parameters exist before the project's parameters are applied
     return {};
+}
+
+void Engine::syncResponseControls() {
+    // ADR-1062: `sonic/response/*`, registered while the project has a `sonic` block or live input runs. Their
+    // defaults are the block's `response` values; the Live panel's Response sliders edit them.
+    if (!sonic_ && !liveSonic_.running()) {
+        responseControls_ = sonic::ResponseControls{};
+        return;
+    }
+    const sonic::ResponseControls& d = activeSonicSetup()->response.controls;
+    const auto param = [&](const char* path, float fallback, float lo, float hi, float softLo, float softHi) {
+        auto* p = params_.findAs<float>(path);
+        if (p == nullptr) {
+            p = &params_.add(params::ParamDesc<float>{.path = path, .defaultValue = fallback, .hardMin = lo,
+                                                      .hardMax = hi, .softMin = softLo, .softMax = softHi});
+        }
+        return p->value();
+    };
+    responseControls_.sensitivity = param("sonic/response/sensitivity", d.sensitivity, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.transient = param("sonic/response/transient", d.transient, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.sustain = param("sonic/response/sustain", d.sustain, 0.0f, 1.0f, 0.0f, 1.0f);
+    responseControls_.attack = param("sonic/response/attack", d.attack, 0.25f, 4.0f, 0.25f, 4.0f);
+    responseControls_.release = param("sonic/response/release", d.release, 0.25f, 4.0f, 0.25f, 4.0f);
 }
 
 void Engine::refreshSonicTimbre() {

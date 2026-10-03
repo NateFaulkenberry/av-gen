@@ -18,6 +18,7 @@
 
 #include "core/error.hpp"
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <span>
@@ -34,6 +35,7 @@ struct NoteEvent {
     std::uint8_t key = 0;     // 0..127
     std::uint8_t channel = 0; // 0..15
     std::uint32_t id = 0;     // unique per track, in start order
+    std::uint8_t voice = 0xFF; // ADR-1062: the voice slot it owns for its life (0..kVoiceSlots-1), 0xFF unassigned
 
     [[nodiscard]] double end() const { return start + duration; }
 };
@@ -97,6 +99,48 @@ struct NoteEvents {
 // The notes begun and ended in (from, to]. `from` >= `to` is an empty interval.
 [[nodiscard]] NoteEvents eventsBetween(const NoteTrack& track, double from, double to,
                                        const ContextSettings& settings = {});
+
+// ---- ADR-1062: per-note facts -----------------------------------------------------------------------------------
+
+// Voice slots: a note takes the lowest slot free at its start and owns it until it ends; with every slot busy it takes
+// the one whose note began first. Assigned at note-on from what is known then (a held live note's end lies past "now"),
+// so a file and the same notes played live get the same slots.
+inline constexpr int kVoiceSlots = 8;
+// Assigns `track.notes[index]` a slot from the notes before it (which must already have theirs).
+void assignVoice(NoteTrack& track, std::size_t index);
+
+struct NoteFacts {
+    float lastPitch = -1.0f;    // the latest note-on's pitch (MIDI), -1 never
+    float lastVelocity = 0.0f;
+    int lastChannel = -1;
+    float interval = 0.0f;      // the last melodic step, signed semitones (latest onset's pitch - the one before)
+    float lowest = -1.0f;       // the sounding notes' lowest and highest pitch, -1 none
+    float highest = -1.0f;
+    float velocitySpread = 0.0f; // the standard deviation of the velocities begun in the context window
+    double held = 0.0;          // how long the longest-sounding note has been held, seconds
+    struct Voice {
+        bool held = false;
+        float velocity = 0.0f;
+        float pitch = 0.0f;     // MIDI
+        double age = 0.0;       // seconds since its note began
+    };
+    std::array<Voice, kVoiceSlots> voices{};
+    std::array<float, 12> pitchClass{}; // per pitch class (C = 0), the loudest sounding velocity
+};
+[[nodiscard]] NoteFacts noteFactsAt(const NoteTrack& track, double seconds, const ContextSettings& settings = {});
+
+struct NoteFactEvents {
+    bool release = false;       // a note ended in the interval...
+    float releaseSeconds = 0.0f; // ...and the longest of those that did, its duration
+    bool low = false, high = false; // a note began below / at or above the split key
+    float lowVelocity = 0.0f, highVelocity = 0.0f;
+    std::array<bool, kVoiceSlots> voiceOn{};
+    std::array<float, kVoiceSlots> voiceVelocity{};
+    std::array<bool, 12> classOn{};
+    std::array<float, 12> classVelocity{};
+};
+// What began and ended in (from, to]. `splitKey` divides `low` from `high`.
+[[nodiscard]] NoteFactEvents noteFactEventsBetween(const NoteTrack& track, double from, double to, int splitKey = 60);
 
 // "C3", "F#4" (MIDI 60 = C4). For the diagnostic view.
 [[nodiscard]] std::string pitchName(float midi);

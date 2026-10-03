@@ -184,3 +184,19 @@ build/release/src/avgen --example "Sonic Live" --input "BlackHole" --midi "*"
 `build/release/tools/avgen_sonic_probe <latency|sweep|drive|demo>` stands in for a keyboard and synth. It creates
 a virtual MIDI source ("AV Gen Probe") and plays a small synth into BlackHole 2ch. Start AV Gen as above with
 BlackHole as the input, then run the probe.
+
+
+## Response and scenes (VFX expansion, 2026-10-02)
+
+- **Response** (the Live panel, under the audio input):
+  - **Sensitivity** sets how readily the world answers: it lowers the floor and lifts small values, without pushing
+    loud ones past full.
+  - **Transients** sets kicks, snares, hats and notes. At 0, no hit fires.
+  - **Sustain** sets the bass, the level and held sound.
+  - **Attack** and **Release** are multipliers. Release is the feel.
+  - The four meters show the kick, snare, hat and note as the detector hears them.
+  - **Reset** returns the five sliders to the scene's own values.
+  - The old "Sensitivity" is now **Input gain** (the interface level).
+- **Scenes:** step through Sonic Live and the Sonic VFX scenes with the Scene row's arrows or list, PageUp/PageDown,
+  or a program change from the keyboard (program n = scene n). Live input, the projection and your Response
+  adjustments carry across.

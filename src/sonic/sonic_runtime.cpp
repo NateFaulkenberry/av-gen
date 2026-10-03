@@ -73,6 +73,12 @@ Result<SonicSetup> SonicSetup::fromJson(const nlohmann::json& j, const std::file
         k.shortNote = c->value("shortNote", k.shortNote);
         k.longNote = c->value("longNote", k.longNote);
     }
+    if (const auto r = j.find("response"); r != j.end()) {
+        if (auto ok = s.response.applyJson(*r); !ok) {
+            return std::unexpected(ok.error());
+        }
+        s.splitKey = std::clamp(r->value("splitKey", s.splitKey), 0, 127);
+    }
     if (const auto n = j.find("notes"); n != j.end()) {
         if (!n->is_string()) {
             return fail("'sonic.notes' must be a path to a MIDI file");
@@ -157,14 +163,54 @@ void SonicRuntime::declare(signals::SignalBus& bus) {
     bus.setLabel(ids_.active, "notes sounding (a count)");
     bus.setLabel(ids_.notePitch, "pitch centre of the notes (0 = C1, 1 = C8)");
     bus.setLabel(ids_.direction, "melodic direction (-1 falling, +1 rising)");
+
+    // ADR-1062, appended so every id above is the one it was: the per-note facts, then the response model.
+    ids_.lastPitch = bus.declare("notes.lastPitch");
+    bus.setLabel(ids_.lastPitch, "pitch of the latest note-on (0 = C1, 1 = C8)");
+    ids_.lastVelocity = bus.declare("notes.lastVelocity");
+    ids_.interval = bus.declare("notes.interval", -1.0f, 1.0f);
+    bus.setLabel(ids_.interval, "the last melodic step, signed (an octave = 1)");
+    ids_.lowest = bus.declare("notes.lowest");
+    bus.setLabel(ids_.lowest, "lowest sounding note (0 = C1, 1 = C8; 0 when none)");
+    ids_.highest = bus.declare("notes.highest");
+    ids_.velocitySpread = bus.declare("notes.velocitySpread");
+    ids_.held = bus.declare("notes.held");
+    bus.setLabel(ids_.held, "how long the longest-sounding note has been held (log, 0.05-4 s)");
+    ids_.channel = bus.declare("notes.channel");
+    ids_.release = bus.declare("notes.release", 0.0f, 1.0f, true);
+    bus.setLabel(ids_.release, "note off (strength = how long the note was, log 0.05-4 s)");
+    ids_.low = bus.declare("notes.low", 0.0f, 1.0f, true);
+    bus.setLabel(ids_.low, "note on below the split key (strength = velocity)");
+    ids_.high = bus.declare("notes.high", 0.0f, 1.0f, true);
+    bus.setLabel(ids_.high, "note on at or above the split key (strength = velocity)");
+    for (int v = 0; v < kVoiceSlots; ++v) {
+        const std::string p = "notes.voice." + std::to_string(v) + ".";
+        auto& ids = ids_.voices[static_cast<std::size_t>(v)];
+        ids.held = bus.declare(p + "held");
+        ids.velocity = bus.declare(p + "velocity");
+        ids.pitch = bus.declare(p + "pitch");
+        ids.age = bus.declare(p + "age");
+        ids.on = bus.declare(p + "on", 0.0f, 1.0f, true);
+    }
+    for (int k = 0; k < 12; ++k) {
+        ids_.pitchClass[static_cast<std::size_t>(k)] = bus.declare("notes.class." + std::to_string(k));
+        ids_.classOn[static_cast<std::size_t>(k)] = bus.declare("notes.classOn." + std::to_string(k), 0.0f, 1.0f, true);
+    }
+    bus.setLabel(ids_.pitchClass[0], "pitch class C (the loudest sounding velocity)");
+    response_.declare(bus);
 }
 
 void SonicRuntime::reset() {
     const SonicSignals ids = ids_;
     const float timeScale = timeScale_;
+    const ResponseSignals responseIds = response_.ids();
+    const ResponseControls controls = controls_;
     *this = SonicRuntime{};
     ids_ = ids;
     timeScale_ = timeScale;
+    controls_ = controls;
+    response_ = ResponseModel{};
+    restoreResponseIds(responseIds);
 }
 
 void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double dt) {
@@ -241,6 +287,8 @@ void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double
     }
     primed_ = true;
 
+    response_.step(f, dt, controls_, setup.response); // ADR-1062
+
     // The fast tier: a transient event on the rising edge, with a refractory time and hysteresis.
     sinceTransient_ += dt;
     if (transient >= spec.transientThreshold && transientArmed_ && sinceTransient_ >= spec.transientRefractory) {
@@ -263,10 +311,14 @@ void SonicRuntime::advance(const SonicSetup& setup, const analysis::AnalysisTrac
         const SonicSignals ids = ids_;
         const double lastPublish = lastPublish_;
         const float timeScale = timeScale_;
+        const ResponseSignals responseIds = response_.ids();
+        const ResponseControls controls = controls_;
         *this = SonicRuntime{};
         ids_ = ids;
         lastPublish_ = lastPublish;
         timeScale_ = timeScale;
+        controls_ = controls;
+        restoreResponseIds(responseIds);
     }
     const double hop = static_cast<double>(track.config().hopSize) / static_cast<double>(track.config().sampleRate);
     while (cursor_ < frames.size() && frames[cursor_].timeSeconds <= seconds) {
@@ -294,6 +346,19 @@ void SonicRuntime::publish(const SonicSetup* setup, signals::SignalBus& bus, dou
                   ids_.repetition, ids_.phrase}) {
                 bus.set(id, 0.0f);
             }
+            for (const signals::SignalId id : {ids_.lastPitch, ids_.lastVelocity, ids_.interval, ids_.lowest,
+                                               ids_.highest, ids_.velocitySpread, ids_.held, ids_.channel}) {
+                bus.set(id, 0.0f);
+            }
+            for (const auto& v : ids_.voices) {
+                for (const signals::SignalId id : {v.held, v.velocity, v.pitch, v.age}) {
+                    bus.set(id, 0.0f);
+                }
+            }
+            for (const signals::SignalId id : ids_.pitchClass) {
+                bus.set(id, 0.0f);
+            }
+            response_.publishZeros(bus);
             zeroed_ = true;
         }
         return;
@@ -362,7 +427,78 @@ void SonicRuntime::publish(const SonicSetup& setupRef, const NoteTrack& notes, s
     bus.setEvent(ids_.noteOn, e.noteOn, e.onVelocity);
     bus.setEvent(ids_.noteOff, e.noteOff, 1.0f);
     bus.setEvent(ids_.phraseStart, e.phraseStart, e.onVelocity);
+
+    // ADR-1062: the per-note facts and the response model.
+    float midiMelodic = 0.0f;
+    float midiPitch = -1.0f;
+    publishNoteFacts(*setup, notes, bus, seconds, from, seconds > from && seconds - from <= 0.25, midiMelodic,
+                     midiPitch);
+    response_.publish(bus, notes, seconds, e.noteOn, e.onVelocity, midiMelodic, midiPitch, controls_, setup->response);
     lastPublish_ = seconds;
+}
+
+void SonicRuntime::restoreResponseIds(const ResponseSignals& ids) {
+    response_.restoreIds(ids);
+}
+
+void SonicRuntime::publishNoteFacts(const SonicSetup& setup, const NoteTrack& notes, signals::SignalBus& bus,
+                                    double seconds, double from, bool interval, float& midiMelodic,
+                                    float& midiPitch) {
+    if (ids_.lastPitch == signals::kInvalidSignal) {
+        return;
+    }
+    const ContextScale& k = setup.scale;
+    const auto pitch01 = [&](float midi) {
+        return midi >= 0.0f ? norm01((midi - k.lowPitch) / (k.highPitch - k.lowPitch)) : 0.0f;
+    };
+    const auto log01 = [&](double seconds01) {
+        return seconds01 > 0.0 ? norm01(static_cast<float>(std::log(seconds01 / k.shortNote) /
+                                                           std::log(k.longNote / k.shortNote)))
+                               : 0.0f;
+    };
+    const NoteFacts f = noteFactsAt(notes, seconds, setup.context);
+    bus.set(ids_.lastPitch, pitch01(f.lastPitch));
+    bus.set(ids_.lastVelocity, f.lastVelocity);
+    bus.set(ids_.interval, std::clamp(f.interval / 12.0f, -1.0f, 1.0f));
+    bus.set(ids_.lowest, pitch01(f.lowest));
+    bus.set(ids_.highest, pitch01(f.highest));
+    bus.set(ids_.velocitySpread, norm01(f.velocitySpread / 0.5f));
+    bus.set(ids_.held, log01(f.held));
+    bus.set(ids_.channel, f.lastChannel >= 0 ? static_cast<float>(f.lastChannel) / 15.0f : 0.0f);
+    for (std::size_t v = 0; v < ids_.voices.size(); ++v) {
+        const NoteFacts::Voice& voice = f.voices[v];
+        bus.set(ids_.voices[v].held, voice.held ? 1.0f : 0.0f);
+        bus.set(ids_.voices[v].velocity, voice.held ? voice.velocity : 0.0f);
+        bus.set(ids_.voices[v].pitch, voice.held ? pitch01(voice.pitch) : 0.0f);
+        bus.set(ids_.voices[v].age, voice.held ? log01(voice.age) : 0.0f);
+    }
+    for (std::size_t c = 0; c < 12; ++c) {
+        bus.set(ids_.pitchClass[c], f.pitchClass[c]);
+    }
+    NoteFactEvents e;
+    if (interval) {
+        e = noteFactEventsBetween(notes, from, seconds, setup.splitKey);
+    }
+    bus.setEvent(ids_.release, e.release, std::max(0.05f, log01(e.releaseSeconds)));
+    bus.setEvent(ids_.low, e.low, e.lowVelocity);
+    bus.setEvent(ids_.high, e.high, e.highVelocity);
+    for (std::size_t v = 0; v < ids_.voices.size(); ++v) {
+        bus.setEvent(ids_.voices[v].on, e.voiceOn[v], e.voiceVelocity[v]);
+    }
+    for (std::size_t c = 0; c < 12; ++c) {
+        bus.setEvent(ids_.classOn[c], e.classOn[c], e.classVelocity[c]);
+    }
+    // The MIDI half of response.melodic and response.pitch: single notes in a moving line, and the latest note
+    // while it is recent.
+    const MusicalContext& c = context_;
+    midiMelodic = (1.0f - norm01(c.chord)) * norm01(c.rhythm / k.rhythm) * norm01(3.0f * c.motion / k.motion);
+    if (f.lastPitch >= 0.0f && !notes.notes.empty()) {
+        const auto it = std::upper_bound(notes.notes.begin(), notes.notes.end(), seconds,
+                                         [](double t, const NoteEvent& n) { return t < n.start; });
+        if (it != notes.notes.begin() && seconds - (it - 1)->start <= 2.0) {
+            midiPitch = pitch01(f.lastPitch);
+        }
+    }
 }
 
 } // namespace avgen::sonic

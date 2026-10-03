@@ -17,6 +17,7 @@
 #include "signals/signal_bus.hpp"
 #include "sonic/character.hpp"
 #include "sonic/notes.hpp"
+#include "sonic/response.hpp"
 #include "sonic/timbre.hpp"
 
 #include <nlohmann/json.hpp>
@@ -48,6 +49,8 @@ struct SonicSetup {
     TimbreConfig timbreConfig;
     ContextSettings context;
     ContextScale scale;
+    ResponseSettings response;            // ADR-1062: `sonic.response` (the controls' defaults and the detail)
+    int splitKey = 60;                    // ADR-1062: notes.low / notes.high divide here (`sonic.response.splitKey`)
     NoteTrack notes;
     std::filesystem::path notesPath;      // as resolved; empty = no notes
     std::vector<TimbreFeatures> timbre;   // parallel to the analysis track's frames; empty until analysed
@@ -89,6 +92,19 @@ struct SonicSignals {
                       regularity = signals::kInvalidSignal, chord = signals::kInvalidSignal,
                       tension = signals::kInvalidSignal, repetition = signals::kInvalidSignal,
                       phrase = signals::kInvalidSignal;
+    // ADR-1062: per-note facts
+    signals::SignalId lastPitch = signals::kInvalidSignal, lastVelocity = signals::kInvalidSignal,
+                      interval = signals::kInvalidSignal, lowest = signals::kInvalidSignal,
+                      highest = signals::kInvalidSignal, velocitySpread = signals::kInvalidSignal,
+                      held = signals::kInvalidSignal, channel = signals::kInvalidSignal,
+                      release = signals::kInvalidSignal, low = signals::kInvalidSignal, high = signals::kInvalidSignal;
+    struct Voice {
+        signals::SignalId held = signals::kInvalidSignal, velocity = signals::kInvalidSignal,
+                          pitch = signals::kInvalidSignal, age = signals::kInvalidSignal, on = signals::kInvalidSignal;
+    };
+    std::array<Voice, kVoiceSlots> voices{};
+    std::array<signals::SignalId, 12> pitchClass{};
+    std::array<signals::SignalId, 12> classOn{};
 };
 
 class SonicRuntime {
@@ -111,6 +127,10 @@ public:
     // Multiplies every medium- and slow-tier time constant (ADR-1025: the live panel's "smoothing"). 1 is the
     // character as specified, and is what the file path always uses.
     void setTimeScale(float scale) { timeScale_ = scale; }
+    // ADR-1062: the performer's response controls (the `sonic/response/*` parameters), read when stepped.
+    void setControls(const ResponseControls& c) { controls_ = c; }
+    [[nodiscard]] const ResponseControls& controls() const { return controls_; }
+    [[nodiscard]] const ResponseModel& response() const { return response_; }
     [[nodiscard]] float timeScale() const { return timeScale_; }
 
     void reset();
@@ -157,6 +177,11 @@ private:
     bool zeroed_ = false;
     MusicalContext context_;
     float timeScale_ = 1.0f;
+    ResponseModel response_;     // ADR-1062
+    ResponseControls controls_;
+    void restoreResponseIds(const ResponseSignals& ids);
+    void publishNoteFacts(const SonicSetup& setup, const NoteTrack& notes, signals::SignalBus& bus, double seconds,
+                          double from, bool interval, float& midiMelodic, float& midiPitch);
 };
 
 } // namespace avgen::sonic

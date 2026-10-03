@@ -19,7 +19,12 @@
 //   * Repeat -- the schedule `phase + k period`;
 //   * Proximity -- the owner's and the other entity's positions in the HistoryBank (HIST), which is
 //     recorded on the simulation grid by a play AND by a seek's replay, and carried in the ADR-700
-//     checkpoints -- so the crossing a scrub finds is the one a play found.
+//     checkpoints -- so the crossing a scrub finds is the one a play found;
+//   * Signal (ADR-1061) -- an event signal of the bus by name. The host DERIVES its event list from the
+//     piece wherever the signal is a function of it (`notes.*` from the note track, `sonic.*`/`response.*`
+//     from a walk of the timbre track, `audio.onset*`/`audio.beat` from the analysis frames), so a seek
+//     finds the fronts a play reaches; otherwise -- live input, or any other signal -- it RECORDS the bus's
+//     events as they fire, and a backward jump forgets the ones after it.
 //
 // Consumers compute `age = t - t0` and keep NO state. That is what makes a shockwave scrubbed to
 // second N the same shockwave a play reaches at N (ADR-091): there is no "the wave started when I
@@ -38,12 +43,15 @@
 // rings) calls `effectEventTimes`.
 
 #include "analysis/meter.hpp"
+#include "signals/signal_bus.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_timing.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
+#include <limits>
+#include <map>
 #include <span>
 #include <string>
 #include <string_view>
@@ -117,6 +125,25 @@ public:
     [[nodiscard]] std::span<const TriggerMoment> musicEvents() const { return moments_; }
     [[nodiscard]] std::span<const TriggerMarker> markers() const { return markers_; }
 
+    // ---- ADR-1061: Signal triggers ----
+    // The names asked for that the host has not yet derived or chosen to record. Asking `lastTriggers` or
+    // `silence` about a Signal trigger is what puts its name here.
+    [[nodiscard]] std::vector<std::string> pendingSignals() const;
+    // The host's answer for one name: its whole event list as a function of the piece (ascending), or "record it".
+    void setDerivedSignal(const std::string& name, std::vector<TriggerOnset> ascending);
+    void setRecordedSignal(const std::string& name);
+    // Forgets every derivation and recording (a new piece, live input turned on or off); names stay wanted.
+    void resetSignals();
+    // Appends this frame's events of every recorded name (call once per frame, after the bus is published).
+    void recordSignals(const signals::SignalBus& bus, double t);
+    struct SignalEvents {
+        std::vector<TriggerOnset> events;
+        bool derived = false;
+        bool resolved = false; // the host has derived it or chosen to record it
+        signals::SignalId id = signals::kInvalidSignal;
+    };
+    static constexpr std::size_t kMaxRecordedEvents = 4096;
+
 private:
     std::size_t proximity(const Trigger& trigger, std::string_view owner, double t, std::span<double> out) const;
 
@@ -132,6 +159,10 @@ private:
     std::size_t boundFrames_ = 0;
     std::size_t boundBeats_ = 0;
     analysis::Meter boundMeter_{0, 0, 0, 0}; // never a real meter, so the first bind derives
+
+    [[nodiscard]] const SignalEvents& signalEvents(const std::string& name) const;
+    mutable std::map<std::string, SignalEvents, std::less<>> signals_; // mutable: asking registers the name
+    double lastRecorded_ = std::numeric_limits<double>::quiet_NaN();
 
     double seconds_ = 0.0;
     double edgeStart_ = 0.0;

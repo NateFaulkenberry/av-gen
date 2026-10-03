@@ -245,6 +245,8 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.waveEdgeTint = &params.add(f("post/wave/edgeTint", s.waveEdgeTint, 0.0f, 1.0f, 0.0f, 1.0f));
     p.waveTrail = &params.add(f("post/wave/trail", s.waveTrail, 0.0f, 1.0f, 0.0f, 1.0f));
     p.waveTrailColor = &params.add(v3("post/wave/trailColor", s.waveTrailColor, 0.0f, 100.0f, true));
+    p.glitch = registerPostGlitchParameters(params, s.glitch); // ADR-1065
+    p.outline = registerPostOutlineParameters(params, s.outline); // ADR-1072
     return p;
 }
 
@@ -327,6 +329,21 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
     };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;
+        {
+            std::string outlineError;
+            if (applyPostOutlineJsonKey(p.outline, key, value, outlineError)) { // ADR-1072
+                if (!outlineError.empty()) {
+                    return fail("{}", outlineError);
+                }
+                continue;
+            }
+        }
+        if (applyPostGlitchJsonKey(p.glitch, key, value)) { // ADR-1065
+            if (!value.is_number()) {
+                return fail("post.{} must be a number", key);
+            }
+            continue;
+        }
         for (const auto& [name, param] : floats) {
             if (key == name && param != nullptr) {
                 if (!value.is_number()) {
@@ -492,6 +509,8 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
         s.waveTrail = p.waveTrail->value();
         s.waveTrailColor = p.waveTrailColor->value();
     }
+    applyPostGlitchParameters(p.glitch, s.glitch); // ADR-1065
+    applyPostOutlineParameters(p.outline, s.outline); // ADR-1072
 }
 
 float tiltShiftCoverage(const PostSettings& s, glm::vec2 uv, float aspect) {

@@ -401,4 +401,29 @@ void Analyzer::computeFrame() {
     ready_.push_back(std::move(frame));
 }
 
+void LiveEventLatch::apply(AnalysisFrame& frame) {
+    if (frame.liveSerial == 0) {
+        return; // not a live runner's frame
+    }
+    if (frame.liveSerial < serial) {
+        *this = LiveEventLatch{};
+    }
+    serial = frame.liveSerial;
+    const auto latch = [](bool& flag, std::uint64_t stamp, std::uint64_t& last) {
+        if (!flag || stamp == 0) {
+            return; // not a carried live event (a file frame, or none)
+        }
+        if (stamp <= last) {
+            flag = false; // already fired on an earlier render frame
+        } else {
+            last = stamp;
+        }
+    };
+    latch(frame.onset, frame.onsetStamp, onset);
+    latch(frame.beat, frame.beatStamp, beat);
+    latch(frame.lowOnset, frame.lowStamp, low);
+    latch(frame.midOnset, frame.midStamp, mid);
+    latch(frame.highOnset, frame.highStamp, high);
+}
+
 } // namespace avgen::analysis

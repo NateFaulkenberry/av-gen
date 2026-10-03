@@ -1,0 +1,788 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "color-geometry.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.0,
+   "release": 1.0,
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/emissionWeight": 0.8,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.35,
+  "post/output/grain": 0.012,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 85.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/tonemap/operator": 4
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "sdf/corridor/node/accordion/size",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": 0.28,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "sdf/corridor/node/travel/translation",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": 0.28,
+    "offset": 1.0,
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "scene/volumeDensity",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/radial/amount",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "camera/lens/focalLength",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 240
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "lights/end/intensity",
+   "amount": 30000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/endLight/material/emissive",
+   "amount": 50.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 180,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "sdf/corridor/node/twist/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "sdf/corridor/look/edge/intensity",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "sdf/corridor/look/edge/intensity",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "sdf/corridor/node/twist/amount",
+   "amount": 0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "sdf/corridor/node/travel/translation",
+   "amount": -1.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "lights/end/intensity",
+   "amount": 22000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "procedural/endLight/material/emissive",
+   "amount": 30.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "post/bloom/intensity",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "material/cgSpace/op/6/hueShift/value",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "springHz": 1.5,
+    "springDamping": 0.8
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "sdf/corridor/node/polygon/count",
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.3
+   }
+  },
+  {
+   "source": "notes.polyphony",
+   "target": "sdf/corridor/node/polygon/count",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 8.0,
+    "offset": -3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 5.0
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "lights/end/intensity",
+   "amount": 26000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "procedural/endLight/material/emissive",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "notes.held",
+   "target": "scene/volumeDensity",
+   "amount": 0.01,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.modwheel",
+   "target": "sdf/corridor/node/slab/size",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 60
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "sdf/corridor/node/travel/translation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 2.6,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 2.6,
+      "value": [
+       0.0,
+       -9.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.8,
+       -0.5,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       1.295,
+       -0.05,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       1.5,
+       -0.5,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       1.295,
+       -0.95,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.8,
+       -0.5,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.0,
+      "value": [
+       0.305,
+       -0.05,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       0.1,
+       -0.5,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.0,
+      "value": [
+       0.305,
+       -0.95,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.8,
+       -0.5,
+       4.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.3707,
+       1.9781,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0,
+      "value": [
+       0.4657,
+       1.5564,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.1507,
+       -0.3781,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       -1.1313,
+       0.0436,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       -2.6293,
+       1.9781,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.0,
+      "value": [
+       -3.4657,
+       1.5564,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -3.1507,
+       -0.3781,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.0,
+      "value": [
+       -1.8687,
+       0.0436,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       -0.3707,
+       1.9781,
+       -60.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-color-geometry.mp4"
+ },
+ "sonicScene": {
+  "category": "colour field",
+  "thesis": "Chromatic Corridor: monumental portals of pure colour flow toward you forever through coloured haze, each a step further round the colour wheel, toward a blinding light. The music breathes the corridor's spacing, winds its twist and recolours the space itself.",
+  "composition": {
+   "background": "the light at the end, white-gold, blooming through the last frames",
+   "midground": "the procession of portals receding and twisting, vermilion to violet to cobalt to teal",
+   "foreground": "the nearest portal's edge sweeping past the frame",
+   "focal": "the vanishing point, slightly off-centre",
+   "secondary": [
+    "the floating slabs",
+    "the haze between the frames"
+   ],
+   "atmosphere": "a thin luminous haze; the light at the end",
+   "post": "bloom; a radial zoom on the kick",
+   "camera": "a long lens (85 mm) down the corridor's axis from just inside it: the frames stacked into a spiral of the whole colour wheel round the light; the corridor flows toward it"
+  },
+  "palette": {
+   "dominant": "#ff2d8a",
+   "secondary": "#8a2be2",
+   "accent": "#00c2b8",
+   "highlight": "#fff3d4",
+   "background_value": "mid (colour)",
+   "saturation": "full saturation, flat; colour by depth"
+  },
+  "motion": {
+   "very_slow": [
+    "the colour's drift",
+    "the twist's wind"
+   ],
+   "medium": [
+    "the flow toward the viewer",
+    "the accordion breath"
+   ],
+   "fast": [
+    "colour jumps on the snare"
+   ],
+   "extremely_fast": [
+    "the kick's zoom punch"
+   ]
+  },
+  "vocabulary": [
+   [
+    "bass",
+    "response.bass",
+    "STRUCTURE: the corridor's spacing breathes like an accordion round the viewer"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a zoom punch toward the light; the light flares"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "the whole colour sequence jumps a step round the wheel and stays there"
+   ],
+   [
+    "mids",
+    "audio.mid",
+    "the corridor winds its twist"
+   ],
+   [
+    "highs",
+    "audio.treble",
+    "a fine light traces every edge"
+   ],
+   [
+    "brightness",
+    "sonic.brightness.slow",
+    "the colour range cools as the sound brightens"
+   ],
+   [
+    "flux",
+    "response.flux",
+    "the corridor wrings tighter"
+   ],
+   [
+    "beat",
+    "beat.pulse",
+    "the corridor surges forward on each beat"
+   ],
+   [
+    "intensity",
+    "response.intensity",
+    "the light at the end grows; the bloom opens"
+   ],
+   [
+    "note",
+    "notes.lastPitch",
+    "each note recolours the space (the pitch sets the hue)"
+   ],
+   [
+    "chord",
+    "notes.polyphony",
+    "STRUCTURE: the portals' polygon order: a triangle, square, hexagon..."
+   ],
+   [
+    "mod wheel",
+    "control.modwheel",
+    "the frames thicken"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "the corridor flows slowly toward the light"
+   ]
+  ],
+  "tier": "medium: one compiled SDF corridor (72 steps to 130 m), analytic haze, an emissive light, bloom",
+  "id": "color-geometry",
+  "title": "Infinite Color Geometry",
+  "regions": [
+   {
+    "id": "vanishing",
+    "box": [
+     0.4,
+     0.35,
+     0.6,
+     0.6
+    ]
+   },
+   {
+    "id": "near",
+    "box": [
+     0.0,
+     0.0,
+     1.0,
+     1.0
+    ]
+   }
+  ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "modwheel",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
+ }
+}

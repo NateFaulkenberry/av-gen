@@ -96,6 +96,7 @@ const MAT_OP_ANISOTROPY: u32 = 27u;
 const MAT_OP_ROUGHNESS_FILTER: u32 = 28u;
 const MAT_OP_MICRO_DETAIL: u32 = 29u;
 const MAT_OP_SWIZZLE: u32 = 30u;
+const MAT_OP_VORONOI_EDGE: u32 = 31u; // ADR-1069
 
 fn matPick(v: vec4<f32>, index: f32) -> f32 {
     return v[clamp(i32(index), 0, 3)];
@@ -654,6 +655,11 @@ fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields:
         // constant broadcasts x, which is the case that matters: it takes a value that arrived in
         // some other channel and puts it where every mask op looks for it.
         return vec4<f32>(matPick(a, k.x), matPick(a, k.y), matPick(a, k.z), matPick(a, k.w));
+    }
+    if (kind == MAT_OP_VORONOI_EDGE) {
+        // ADR-1069: F2 - F1 is 0 on the boundary between two cells -- polygons, not blobs.
+        let w = worleyF1F2(a.xyz * f + k.xyz, matOpSeed(pi, oi));
+        return vec4<f32>(w.y - w.x, w.x, w.z, w.y);
     }
     return vec4<f32>(0.0);
 }

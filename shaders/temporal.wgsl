@@ -228,3 +228,129 @@ fn fs_debug_history(in: FsIn) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(c, 1.0);
 }
+
+// ---- ADR-1066 feedback, unrolled over the clean ring -------------------------------------------------------------
+//
+// MilkDrop's loop F = C + d g(F_prev(T uv)) is an IIR filter, which ADR-410 forbids. Unrolled K taps over the CLEAN
+// ring it is an FIR with the same first K terms:
+//   out = C + amount (1 - decay) sum_k decay^(k-1) hue^k(R_k(T^k uv))
+// where T zooms by `zoom`, turns by `rotate` and drifts by `drift` per frame about the centre (in aspect-correct
+// space), so frame k back is read where it would have been carried to by now, and hue^k turns its colour k x `hue`
+// turns in OKLab, which holds lightness where an HSV turn would flash. Samples from outside the frame are black.
+//   params: amount, decay, zoom, rotate (rad/frame)    extra: driftX, driftY (frame/frame), hue (turns/frame), aspect
+
+fn fbToOklab(c: vec3<f32>) -> vec3<f32> {
+    let l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+    let m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+    let s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+    let l3 = pow(max(l, 0.0), 1.0 / 3.0);
+    let m3 = pow(max(m, 0.0), 1.0 / 3.0);
+    let s3 = pow(max(s, 0.0), 1.0 / 3.0);
+    return vec3<f32>(0.2104542553 * l3 + 0.7936177850 * m3 - 0.0040720468 * s3,
+                     1.9779984951 * l3 - 2.4285922050 * m3 + 0.4505937099 * s3,
+                     0.0259040371 * l3 + 0.7827717662 * m3 - 0.8086757660 * s3);
+}
+
+fn fbFromOklab(c: vec3<f32>) -> vec3<f32> {
+    let l3 = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z;
+    let m3 = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z;
+    let s3 = c.x - 0.0894841775 * c.y - 1.2914855480 * c.z;
+    let l = l3 * l3 * l3;
+    let m = m3 * m3 * m3;
+    let s = s3 * s3 * s3;
+    return max(vec3<f32>(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                         -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                         -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s), vec3<f32>(0.0));
+}
+
+fn fbHue(c: vec3<f32>, turns: f32) -> vec3<f32> {
+    if (abs(turns) < 1e-6) {
+        return c;
+    }
+    let lab = fbToOklab(c);
+    let a = turns * 6.2831853;
+    let ab = vec2<f32>(lab.y * cos(a) - lab.z * sin(a), lab.y * sin(a) + lab.z * cos(a));
+    return fbFromOklab(vec3<f32>(lab.x, ab));
+}
+
+@fragment
+fn fs_feedback(in: FsIn) -> @location(0) vec4<f32> {
+    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let taps = i32(temporal.ring.w + 0.5);
+    if (taps <= 0) {
+        return current;
+    }
+    let depth = i32(temporal.ring.x + 0.5);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let amount = temporal.params.x;
+    let decay = clamp(temporal.params.y, 0.0, 0.99);
+    let zoom = max(temporal.params.z, 1e-3);
+    let turn = temporal.params.w;
+    let drift = temporal.extra.xy;
+    let aspect = max(temporal.extra.w, 1e-3);
+    let q = (in.uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0);
+    var tail = vec3<f32>(0.0);
+    var weight = 1.0 - decay;
+    for (var k = 1; k <= taps; k = k + 1) {
+        let fk = f32(k);
+        // Where the content that is at `uv` now was k frames ago: the k-fold transform, inverted.
+        let back = q - drift * fk * vec2<f32>(aspect, 1.0);
+        let a = -turn * fk;
+        let r = vec2<f32>(back.x * cos(a) - back.y * sin(a), back.x * sin(a) + back.y * cos(a)) / pow(zoom, fk);
+        let uv = r / vec2<f32>(aspect, 1.0) + vec2<f32>(0.5);
+        if (all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0))) {
+            let layer = ((writeLayer - k) % depth + depth) % depth;
+            let s = textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
+            tail = tail + fbHue(s, temporal.extra.z * fk) * weight;
+        }
+        weight = weight * decay;
+    }
+    return vec4<f32>(current.rgb + tail * amount, current.a);
+}
+
+// ---- ADR-1066 slit-scan time displacement ------------------------------------------------------------------------
+//
+// Each pixel shows the frame d(uv) x taps ago, blended between the two nearest (0 is the current frame): rows,
+// columns, radial or luminance, newest at the top / left / centre / brightest unless reversed.
+//   params: amount, mode (0..3), reverse, 0
+
+@fragment
+fn fs_slit(in: FsIn) -> @location(0) vec4<f32> {
+    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let taps = i32(temporal.ring.w + 0.5);
+    if (taps <= 0) {
+        return current;
+    }
+    let depth = i32(temporal.ring.x + 0.5);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let mode = i32(temporal.params.y + 0.5);
+    var d = in.uv.y;
+    if (mode == 1) {
+        d = in.uv.x;
+    } else if (mode == 2) {
+        d = clamp(length(in.uv - vec2<f32>(0.5)) * 1.41421356, 0.0, 1.0);
+    } else if (mode == 3) {
+        let l = dot(current.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+        d = 1.0 - l / (1.0 + l);
+    }
+    if (temporal.params.z > 0.5) {
+        d = 1.0 - d;
+    }
+    let age = d * f32(taps);
+    let k0 = min(i32(floor(age)), taps);
+    let k1 = min(k0 + 1, taps);
+    let f = clamp(age - f32(k0), 0.0, 1.0);
+    let a = slitTap(in.uv, k0, writeLayer, depth, current.rgb);
+    let b = slitTap(in.uv, k1, writeLayer, depth, current.rgb);
+    let displaced = mix(a, b, f);
+    return vec4<f32>(mix(current.rgb, displaced, clamp(temporal.params.x, 0.0, 1.0)), current.a);
+}
+
+// Frame k back (0 = the current frame).
+fn slitTap(uv: vec2<f32>, k: i32, writeLayer: i32, depth: i32, current: vec3<f32>) -> vec3<f32> {
+    if (k <= 0) {
+        return current;
+    }
+    let layer = ((writeLayer - k) % depth + depth) % depth;
+    return textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
+}

@@ -132,6 +132,9 @@ struct QualitySettings {
     // a tier to scale resolution and sample counts; it does not allow it to remove an artistic
     // control, and how far an echo reaches is one.
     float temporalHistoryScale = 0.5f;
+    // ADR-1065: the tap counts of the multi-tap post effects (the sort's march, the radial blur, the spectral
+    // split): a sample count, which a tier may scale. 0.5 at Preview; the amounts and lengths are never touched.
+    float postEffectTapScale = 1.0f;
     // ADR-087: the fraction of the scene's resolution the directional lights' combined shadow term
     // (cascade lookup + contact march) is computed at, before a bilateral upsample in the lit
     // pass. 1.0 means "no mask pass": the lit pass computes the term per pixel, exactly as it did
@@ -373,6 +376,7 @@ struct QualitySettings {
             q.flatTierFromRung = 1; // ADR-155
             q.volumeResolutionScale = 0.25f;
             q.temporalHistoryScale = 0.25f;
+            q.postEffectTapScale = 0.5f; // ADR-1065
             q.volumeStepScale = 0.5f;
             q.cosmicOctaveScale = 0.75f; // 4 nebula octaves -> 3
             q.cosmicSampleScale = 0.34f; // 3x3 planet cells -> 1x1, and the dust off

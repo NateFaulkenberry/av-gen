@@ -17,7 +17,10 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace avgen::gpu {
 class Context;
@@ -42,6 +45,24 @@ struct EnvironmentSettings {
 // how "not per frame" stops being a hope and becomes a number a run can be judged against.
 [[nodiscard]] std::uint64_t environmentBuildCount() noexcept;
 
+// ADR-1070: one procedural-sky IBL build in flight (EnvironmentProcessor::beginSky / advanceSky).
+struct SkyBuildJob {
+    struct Pass {
+        const wgpu::RenderPipeline* pipeline = nullptr;
+        wgpu::TextureView target;
+        wgpu::BindGroup group;
+        std::array<std::uint8_t, 112> uniforms{}; // an EnvUniforms
+        double cost = 0.0;
+    };
+    std::vector<Pass> passes;
+    std::size_t next = 0;
+    IblResources result;
+    scene::SkyRuntime sky{};
+    EnvironmentSettings settings{};
+    double totalCost = 0.0;
+    [[nodiscard]] bool active() const { return !passes.empty() && next < passes.size(); }
+};
+
 class EnvironmentProcessor {
 public:
     EnvironmentProcessor(gpu::Context& context, gpu::ShaderLibrary& shaders);
@@ -55,6 +76,19 @@ public:
     // `process` does; call it when the sky's hash changes, not per frame.
     [[nodiscard]] Result<IblResources> processSky(const scene::SkyRuntime& sky,
                                                   const EnvironmentSettings& settings = {});
+
+    // ADR-1070: the same chain as `processSky`, run a slice a frame without blocking. `beginSky`
+    // allocates the new cubes and records every pass (nothing is submitted); `advanceSky` encodes
+    // passes until their cost reaches `budget` (texels written x samples taken; at least one pass)
+    // and submits them WITHOUT waiting, and returns true once the last pass is submitted. The IBL in
+    // `job.result` is then complete as far as anything submitted after it can tell: WebGPU runs a
+    // queue's submissions in order, so the frame that binds it reads finished cubes. The cubes the
+    // renderer is drawing meanwhile are untouched (the job writes new ones), so the lighting on
+    // screen is the previous sky until the swap.
+    using SkyJob = SkyBuildJob;
+    [[nodiscard]] Result<void> beginSky(SkyJob& job, const scene::SkyRuntime& sky,
+                                        const EnvironmentSettings& settings = {});
+    [[nodiscard]] bool advanceSky(SkyJob& job, double budget);
 
     // The BRDF LUT is environment-independent; computed once on first use.
     [[nodiscard]] const gpu::GpuTexture& brdfLut() const { return brdf_; }
@@ -76,6 +110,7 @@ private:
         glm::vec4 skySunDir;    // xyz = unit direction towards the sun
     };
     static_assert(sizeof(EnvUniforms) == 32 + 80);
+    static_assert(sizeof(EnvUniforms) == sizeof(SkyJob::Pass::uniforms));
 
     struct CubeTexture {
         wgpu::Texture texture;
@@ -94,6 +129,18 @@ private:
     // Shared tail of `process` and `processSky`: irradiance + prefiltered specular from a
     // finished source cube.
     Result<IblResources> filterCube(const CubeTexture& sourceCube, const EnvironmentSettings& settings);
+    // ADR-1070: the sky chain as a list of passes, shared by `processSky` (run blocking, as before)
+    // and `beginSky` (run a slice a frame).
+    Result<void> recordSky(SkyJob& job, const scene::SkyRuntime& sky, const EnvironmentSettings& settings);
+    void recordFilter(SkyJob& job, const CubeTexture& sourceCube, const CubeTexture& irradiance,
+                      const CubeTexture& prefiltered, const EnvironmentSettings& settings);
+    void addPass(SkyJob& job, const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
+                 const wgpu::BindGroup& group, const EnvUniforms& uniforms, double cost);
+    // Every remaining pass, submitting and waiting whenever the uniform ring fills and once at the
+    // end: exactly the submission pattern the chain always had.
+    void runBlocking(SkyJob& job);
+    // Encodes one recorded pass into `encoder` at uniform slot `slot`.
+    void encodePass(wgpu::CommandEncoder& encoder, const SkyJob::Pass& pass, std::uint32_t slot);
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;

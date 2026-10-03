@@ -83,6 +83,8 @@ class ShaderLibrary;
 namespace avgen::rendering {
 
 class EnvironmentProcessor;
+struct SkyBuildJob;
+struct EnvironmentSettings;
 
 // Optional per-frame inputs for user shader layers.
 struct ShaderFrameInputs {
@@ -354,6 +356,12 @@ struct FrameUniforms {
     // z = the distance at which the fog is fully the sky's colour (metres, > 0), w = 0. Appended
     // last, for the reason every block above was.
     glm::vec4 fogSky{0.0f};
+    // ADR-1070: the live background draws the procedural sky from this frame's values rather than
+    // from its lighting cube, which a live sky rebuilds at a capped rate. x = 1 when it does,
+    // y = the sun's intensity, z = the sky's intensity (the cube's own factor; params.w is applied
+    // on top, as the cube path applies it), w = the sun disc's floor radius (one and a half
+    // texel of the source cube). All zero offline: the background reads the cube, as it always has. Appended last.
+    glm::vec4 skyLive{0.0f};
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -367,7 +375,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::
                                        32 + // ADR-715: two vec4s of terrain height placement
                                        16 + // ADR-717: one vec4 of fog pooling
                                        48 + // Wave 2: three vec4s of star field
-                                       16); // ADR-918: one vec4 of fog-from-sky, appended last
+                                       16 + // ADR-918: one vec4 of fog-from-sky
+                                       16); // ADR-1070: one vec4 of the live sky, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -438,8 +447,15 @@ struct ObjectUniforms {
     // while this is the node's own value and is always on. (1, 0) is the identity, so a draw that
     // keeps the default is the draw it was before this existed.
     glm::vec4 emission{1.0f, 0.0f, 0.0f, 0.0f};
+    // ADR-1071: the material's cel lighting, the last three padding vec4s (the struct now fills its
+    // 512-byte slot; the next lane anyone needs grows kObjectStride). toon0.x is the gate: 0 (every
+    // material that does not ask for it) and the lit shader never enters the toon branch. Packed by
+    // rendering/toon_pack.hpp; read by `shadeSurface` in pbr_shade.wgsl and `evaluateLight`.
+    glm::vec4 toon0{0.0f}; // x = lit bands (0 = off), y = edge softness, z = terminator, w = highlight strength
+    glm::vec4 toon1{0.0f}; // rgb = shadow tone (shadowColor x ambient), w = rim width
+    glm::vec4 toon2{0.0f}; // rgb = rim colour x intensity, w = highlight size
 };
-static_assert(sizeof(ObjectUniforms) == 464);
+static_assert(sizeof(ObjectUniforms) == 512);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -455,6 +471,8 @@ static_assert(offsetof(ObjectUniforms, energyB) == 400);
 static_assert(offsetof(ObjectUniforms, fxA) == 416);
 static_assert(offsetof(ObjectUniforms, fxB) == 432);
 static_assert(offsetof(ObjectUniforms, emission) == 448);
+static_assert(offsetof(ObjectUniforms, toon0) == 464);
+static_assert(offsetof(ObjectUniforms, toon2) == 496);
 
 struct TonemapUniforms {
     float exposure;
@@ -779,6 +797,26 @@ public:
     // clock has no business deciding what a deterministic render contains. Only the live editor
     // sets it, in `Application::runLive`.
     void setInteractiveEnvironmentBudget(double budgetMs) { interactiveEnvBudgetMs_ = budgetMs; }
+    // ADR-1070, live only. A sky whose colours a performance routes (a chord painting the dusk)
+    // moves on every frame, and each move past ADR-1022's tolerance used to cost the whole blocking
+    // IBL chain inside a frame -- 7-17 ms, several times a second, each one a dropped frame. With
+    // this on, the BACKGROUND draws the sky from the frame's own values (exact, every frame), and
+    // the LIGHTING cube is rebuilt at most `maxRateHz` times a second, its passes spread across
+    // frames (`passBudget` texel-samples a frame) and swapped in when the last is submitted. The
+    // lighting lags the sky by at most about 1 / maxRateHz plus the frames the build is spread over.
+    //
+    // Off by default and off in every offline render: the schedule reads a wall clock. Offline the
+    // cube is rebuilt whenever the hash moves and the background reads it, as before.
+    struct LiveSkyLighting {
+        bool enabled = false;
+        double maxRateHz = 2.0;   // lighting rebuilds a second, at most
+        double passBudget = 4.0e6; // texel-samples of the chain a frame (the whole chain is about 19e6)
+    };
+    void setLiveSkyLighting(const LiveSkyLighting& live) { liveSky_ = live; }
+    [[nodiscard]] const LiveSkyLighting& liveSkyLighting() const { return liveSky_; }
+    // ADR-1070: lighting builds completed through the live schedule, and whether one is in flight.
+    [[nodiscard]] std::uint64_t liveSkyBuilds() const { return liveSkyBuilds_; }
+    [[nodiscard]] bool liveSkyBuildInFlight() const;
     // True while the sky on screen is behind the sky the parameters ask for. The canvas says so;
     // a picture that is deliberately a few frames stale must never be silently stale.
     [[nodiscard]] bool environmentAwaitingRebuild() const { return skyDeferral_.deferring; }
@@ -983,6 +1021,14 @@ private:
     // said when the raise starts or changes -- not on every rebuild of a sky that is animating.
     std::uint32_t loggedSkyFloorCube_ = 0;
     std::uint32_t loggedSkyFloorPrefiltered_ = 0;
+    // ADR-1070: the live schedule, the build in flight and the hash it is building.
+    LiveSkyLighting liveSky_{};
+    std::unique_ptr<SkyBuildJob> skyJob_;
+    std::uint64_t skyJobHash_ = 0;
+    std::chrono::steady_clock::time_point lastSkyJobStart_{};
+    std::uint64_t liveSkyBuilds_ = 0;
+    // Returns true when the live schedule owns this frame's sky (the blocking path is skipped).
+    bool serviceLiveSky(const scene::SkyRuntime& sky, std::uint64_t hash, const EnvironmentSettings& settings);
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;

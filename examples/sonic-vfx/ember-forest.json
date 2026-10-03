@@ -1,0 +1,953 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "ember-forest.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.55,
+   "sustain": 0.55,
+   "attack": 1.1,
+   "release": 1.4
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.32,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.03,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 32.0,
+  "scene/volumeSteps": 16,
+  "scene/volumeJitter": 0.6,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08,
+  "post/grade/temperature": 0.04,
+  "post/lens/chromaticAberration": 0.002,
+  "post/tonemap/operator": 3
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "notes.lastPitch",
+   "target": "particles/ember/position",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "offset": -0.3,
+    "springHz": 1.3,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "particles/ember/attractorPosition",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "offset": -0.3,
+    "springHz": 1.3,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "notes.lastPitch",
+   "target": "lights/emberLight/position",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "offset": -0.3,
+    "springHz": 1.3,
+    "springDamping": 0.55
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "particles/ember/emissive",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "notes.lastVelocity",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.noteEnv",
+   "target": "lights/emberLight/intensity",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "notes.noteOn",
+   "target": "particles/ember/burst",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.01
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/efAsh/op/10/constant/constant",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/efAsh/op/10/constant/constant",
+   "amount": 0.72065,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1400
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "scene/volumeNoise",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "scene/volumeDensity",
+   "amount": 0.0012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "particles/sparks/spawnRate",
+   "amount": 120.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 50,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/efBark/op/9/constant/constant",
+   "amount": 9.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 450
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "material/efBark/op/9/constant/constant",
+   "amount": 1.2971700000000002,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 450
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/thrown/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "particles/sparks/burst",
+   "amount": 40.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "lights/fire/intensity",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/fireline/material/emissive",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "env/sky/intensity",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2400
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/lens/chromaticAberration",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "particles/ember/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 24.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2.4,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       2.9856,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       3.2,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       2.9856,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       2.4,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       0.8,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.2144,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.0,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.2144,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0,
+      "value": [
+       0.8,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/ember/attractorPosition",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 24.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2.4,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       2.9856,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       3.2,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       2.9856,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       2.4,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       0.8,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.2144,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.0,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.2144,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0,
+      "value": [
+       0.8,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "lights/emberLight/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 24.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.0,
+      "value": [
+       2.4,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       2.9856,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.0,
+      "value": [
+       3.2,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       2.9856,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       2.4,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": [
+       0.8,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       0.2144,
+       1.4,
+       -4.3072
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       0.0,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.2144,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0,
+      "value": [
+       0.8,
+       1.4,
+       -5.6928
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       1.6,
+       1.4,
+       -5.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.0,
+       1.7,
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       4.0,
+       1.75,
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -4.0,
+       1.7,
+       6.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -2.0,
+       2.6,
+       -20.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       4.5,
+       2.6,
+       -20.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -2.0,
+       2.6,
+       -20.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-ember-forest.mp4"
+ },
+ "sonicScene": {
+  "category": "organic",
+  "thesis": "The morning after the fire: the bass is the wind breathing on the embers, the snare a flare-up in the black trunks, the melody one ember dancing through the smoke.",
+  "composition": {
+   "background": "the fire's glow low behind the last plane of trunks",
+   "midground": "two more planes of trunks, separated by lit smoke and shafts",
+   "foreground": "near trunks; ash ground with seams of live coal",
+   "focal": "the dancing ember and its trail, between the near trunks",
+   "secondary": [
+    "the coal seams breathing with the wind",
+    "flare-ups in the trunks",
+    "sparks"
+   ],
+   "atmosphere": "low smoke lit from behind, with shafts between the trunks",
+   "post": "bloom on the fire, a warm-on-black grade, grain",
+   "camera": "a slow sideways track, so the trunk planes slide in parallax"
+  },
+  "palette": {
+   "dominant": "#070505",
+   "secondary": "#3a3230",
+   "accent": "#d8d0c8",
+   "highlight": "#ff6a00",
+   "background_value": "near black over a warm band",
+   "saturation": "only the fire is saturated"
+  },
+  "motion": {
+   "very_slow": [
+    "the camera's track",
+    "the smoke's drift",
+    "the horizon glow (sustain)"
+   ],
+   "medium": [
+    "the coal seams' breathing (bass)"
+   ],
+   "fast": [
+    "the dancing ember (melody)"
+   ],
+   "extremely_fast": [
+    "flare-ups (snare)",
+    "sparks (hat)",
+    "the crack and throw of embers (kick)"
+   ]
+  },
+  "vocabulary": [
+   [
+    "melodic",
+    "notes.lastPitch",
+    "the dancing ember's height: the melody's contour drawn in fire"
+   ],
+   [
+    "note",
+    "response.note",
+    "the ember flares and its trail brightens"
+   ],
+   [
+    "bass",
+    "response.bass",
+    "the wind breathes on the embers: the coal seams glow and the smoke stirs"
+   ],
+   [
+    "snare",
+    "response.snare",
+    "a flare-up: fire runs up the charred trunks"
+   ],
+   [
+    "kick",
+    "response.kick",
+    "a trunk cracks and throws embers"
+   ],
+   [
+    "hat",
+    "response.hat",
+    "sparks"
+   ],
+   [
+    "sustained",
+    "response.sustain",
+    "the fire's glow behind the trees builds"
+   ],
+   [
+    "velocity",
+    "notes.lastVelocity",
+    "the ember's brightness"
+   ],
+   [
+    "silence",
+    "(no input)",
+    "a still, smoking forest; the coals glow faintly; the last sparks rise"
+   ]
+  ],
+  "tier": "medium: a smoke march (32 steps live) with the trunks' shadows; three instanced trunk planes",
+  "id": "ember-forest",
+  "title": "Ember Forest",
+  "regions": [
+   {
+    "id": "ember",
+    "box": [
+     0.68,
+     0.254,
+     0.943,
+     0.721
+    ]
+   },
+   {
+    "id": "ground",
+    "box": [
+     0.0,
+     0.7,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "id": "glow",
+    "box": [
+     0.0,
+     0.3,
+     1.0,
+     0.62
+    ]
+   }
+  ]
+ }
+}
