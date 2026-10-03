@@ -3571,6 +3571,759 @@
    }
   },
   {
+   "name": "radA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.22,
+     "segments": 14,
+     "rings": 9
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.11193,
+       0.80695,
+       1.0
+      ],
+      "intensity": 3.2,
+      "opacity": 1.0,
+      "width": 1.4,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    0.42,
+    2.6,
+    0.45
+   ]
+  },
+  {
+   "name": "radAInner",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.12100000000000001,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.11193,
+       0.80695,
+       1.0
+      ],
+      "intensity": 2.0,
+      "opacity": 1.0,
+      "width": 1.0,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    22.0,
+    0.0
+   ],
+   "parent": "radA"
+  },
+  {
+   "name": "radASpines0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.00396,
+     "height": 0.198,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.29700000000000004,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radA"
+  },
+  {
+   "name": "radASpines1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.00396,
+     "height": 0.198,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.29700000000000004,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.11193,
+      0.80695,
+      1.0
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    90.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radA"
+  },
+  {
+   "name": "radACore",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.044000000000000004,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.7454
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radA"
+  },
+  {
+   "name": "radB",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.32,
+     "segments": 14,
+     "rings": 9
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.56471,
+       1.0,
+       0.11193
+      ],
+      "intensity": 3.2,
+      "opacity": 1.0,
+      "width": 1.4,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    -1.75,
+    1.55,
+    -0.9
+   ]
+  },
+  {
+   "name": "radBInner",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.17600000000000002,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.56471,
+       1.0,
+       0.11193
+      ],
+      "intensity": 2.0,
+      "opacity": 1.0,
+      "width": 1.0,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    22.0,
+    0.0
+   ],
+   "parent": "radB"
+  },
+  {
+   "name": "radBSpines0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.0057599999999999995,
+     "height": 0.28800000000000003,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.43200000000000005,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radB"
+  },
+  {
+   "name": "radBSpines1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.0057599999999999995,
+     "height": 0.28800000000000003,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.43200000000000005,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.56471,
+      1.0,
+      0.11193
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    90.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radB"
+  },
+  {
+   "name": "radBCore",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.064,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.7454
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radB"
+  },
+  {
+   "name": "radC",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.38,
+     "segments": 14,
+     "rings": 9
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.64448,
+       0.19807,
+       1.0
+      ],
+      "intensity": 3.2,
+      "opacity": 1.0,
+      "width": 1.4,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    1.55,
+    1.9,
+    -1.9
+   ]
+  },
+  {
+   "name": "radCInner",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.20900000000000002,
+     "segments": 8,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "wire": {
+      "mode": "feature",
+      "crease": 6.0,
+      "color": [
+       0.64448,
+       0.19807,
+       1.0
+      ],
+      "intensity": 2.0,
+      "opacity": 1.0,
+      "width": 1.0,
+      "fill": 0,
+      "occlude": 1
+     }
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    22.0,
+    0.0
+   ],
+   "parent": "radC"
+  },
+  {
+   "name": "radCSpines0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.00684,
+     "height": 0.342,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.513,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radC"
+  },
+  {
+   "name": "radCSpines1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.00684,
+     "height": 0.342,
+     "radialSegments": 5,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 10,
+     "radius": 0.513,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      0.64448,
+      0.19807,
+      1.0
+     ],
+     "emissiveIntensity": 2.4,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    },
+    "sourceTransform": {
+     "rotation": [
+      90.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    90.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radC"
+  },
+  {
+   "name": "radCCore",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.07600000000000001,
+     "segments": 12,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00182,
+      0.00518,
+      0.00478
+     ],
+     "emissiveColor": [
+      1.0,
+      0.92158,
+      0.7454
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 0.45,
+     "metallic": 0.0,
+     "program": "ogJelly"
+    }
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "parent": "radC"
+  },
+  {
    "name": "puff",
    "kind": "particles",
    "particles": {

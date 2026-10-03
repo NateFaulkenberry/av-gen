@@ -130,6 +130,36 @@ BUDS = [(-2.1, 0.0, -2.6), (-1.2, 0.0, -3.1), (-0.2, 0.0, -2.9), (0.55, 0.0, -2.
 BUD_COLS = [CORAL, ORCHID, PEACH, CYAN, LIME, ORCHID]
 
 
+# radiolarians (Haeckel's glass organisms): (name, centre, radius, colour) floating round the lantern
+RADIOLARIANS = [("radA", (0.42, 2.6, 0.45), 0.22, CYAN), ("radB", (-1.75, 1.55, -0.9), 0.32, LIME),
+                ("radC", (1.55, 1.9, -1.9), 0.38, ORCHID)]
+
+
+def radiolarian(s, name, centre, r, col):
+    """A lattice shell (a low sphere drawn as its latitude and longitude lines: wire lines, ADR-1073, lines only),
+    two rings of spines, a glowing core. The whole organism turns slowly (a node rotation track)."""
+    wire = {"mode": "feature", "crease": 6.0, "color": hexrgb(col), "intensity": 3.2, "opacity": 1.0, "width": 1.4,
+            "fill": 0, "occlude": 1}
+    s.proc(name, {"kind": "sphere", "radius": r, "segments": 14, "rings": 9},
+           material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 1.0,
+                     "metallic": 0.0, "unlit": True, "wire": wire},
+           position=centre)
+    s.proc(name + "Inner", {"kind": "sphere", "radius": r * 0.55, "segments": 8, "rings": 6},
+           material={"baseColor": [0, 0, 0], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 1.0,
+                     "metallic": 0.0, "unlit": True, "wire": dict(wire, intensity=2.0, width=1.0)},
+           position=(0, 0, 0), rotation=(0, 22.0, 0), parent=name)
+    for k, rot in enumerate(((0, 0, 0), (90, 0, 0))):
+        s.proc(name + "Spines%d" % k, {"kind": "cylinder", "radius": r * 0.018, "height": r * 0.9,
+                                       "radialSegments": 5, "caps": True},
+               distribution={"kind": "radial", "count": 10, "radius": r * 1.35, "plane": "xz", "orientation": "outward"},
+               material=jelly(col, 2.4), position=(0, 0, 0), rotation=rot, parent=name,
+               extra={"sourceTransform": {"rotation": [90.0, 0.0, 0.0]}})
+    s.proc(name + "Core", {"kind": "sphere", "radius": r * 0.2, "segments": 12, "rings": 8},
+           material=jelly("#fff6e0", 7.0), position=(0, 0, 0), parent=name)
+    s.track("nodes/%s/rotation" % name, [{"time": 0.0, "value": [10.0, 0.0, 0.0], "interp": "linear"},
+                                         {"time": 40.0, "value": [10.0, 360.0, 0.0], "interp": "linear"}], loop=40.0)
+
+
 def instrument(s):
     """The modulation map (ABSTRACT-PLAN.md section 5)."""
     P = "procedural/%s/"
@@ -190,6 +220,12 @@ def instrument(s):
                 R(v + "held", P % ("budHeart%d" % k) + "material/emissive", 6.0, attackMs=60, decayMs=600))
     s.route(R("polyphony", P % "bell" + "distribution/count", 24.0, attackMs=0, decayMs=900),
             R("release", "particles/petalFall/burst", 60.0, attackMs=0, decayMs=0))
+    # ---- RADIOLARIANS: the hats flash their lattices, the bass breathes them, the kick pulses their cores
+    for name, *_ in RADIOLARIANS:
+        s.route(R("hat", P % name + "wire/intensity", 4.0, attackMs=0, decayMs=140),
+                R("audio.treble", P % name + "wire/width", 1.2, attackMs=20, decayMs=200),
+                R("bass", "nodes/%s/scale" % name, 0.12, attackMs=40, decayMs=420),
+                R("kick", P % (name + "Core") + "material/emissive", 10.0, attackMs=0, decayMs=260))
     # ---- MOD WHEEL: the season (the whole garden's hue turns)
     s.route(R(s.modwheel(), "post/grade/hueShift", 0.5, attackMs=80, decayMs=80))
 
@@ -315,6 +351,9 @@ def build():
                extra={"sourceTransform": {"rotation": [-35.0, 0.0, 0.0], "scale": [0.45, 0.15, 1.0]}})
         s.proc("budHeart%d" % k, {"kind": "sphere", "radius": 0.06, "segments": 10, "rings": 6},
                material=jelly(PEACH, 1.0), transform=at(x - 0.04, h + 0.05, z))
+
+    for name, c, r, col in RADIOLARIANS:
+        radiolarian(s, name, c, r, col)
 
     # ---- the lantern's spore puff (the kick), the mushrooms' spores (the snare), falling petals (note releases)
     s.particles("puff", capacity=2000, seed=31, shape="sphere", position=[BELL[0], BELL[1] - 0.1, BELL[2]],

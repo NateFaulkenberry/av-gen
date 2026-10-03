@@ -1072,6 +1072,138 @@
    }
   },
   {
+   "source": "response.hat",
+   "target": "procedural/radA/wire/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/radA/wire/width",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/radA/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/radACore/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/radB/wire/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/radB/wire/width",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/radB/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/radBCore/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/radC/wire/intensity",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 140
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/radC/wire/width",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 20,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "nodes/radC/scale",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/radCCore/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
    "source": "control.modwheel",
    "target": "post/grade/hueShift",
    "amount": 0.5,
@@ -1088,6 +1220,90 @@
   "enabled": true,
   "cues": [],
   "tracks": [
+   {
+    "target": "nodes/radA/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       10.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       10.0,
+       360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "nodes/radB/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       10.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       10.0,
+       360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "nodes/radC/rotation",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       10.0,
+       0.0,
+       0.0
+      ],
+      "interp": "linear"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       10.0,
+       360.0,
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
    {
     "target": "camera/position",
     "component": -1,

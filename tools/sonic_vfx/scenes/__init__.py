@@ -30,12 +30,13 @@ SCENES = [
 # examples/sonic-abstract/, the index category "Sonic Abstract", built by tools/sonic_vfx/abstract.py `build`. Numbered
 # as the owner's brief numbers its directions.
 ABSTRACT = [
-    "sacred_geometry",          # 1 Sacred Geometry Garden: The Armillary
+    # 1 sacred_flight            Sacred Geometry Flight (05-brief-direction-correction.md): being built
     "neon_vector",              # 2 Neon Vector World: Pulsar Plain
     "cel_dream",                # 3 Cel-Shaded Dream World: Candy Archipelago
     "color_geometry",           # 4 Infinite Color Geometry: Chromatic Corridor
     "organic_garden",           # 5 Organic Digital Garden: Lantern Reef
-    "particle_world",           # 6 Particle / VFX World: Galaxy Engine
-    "impossible_architecture",  # 7 Impossible Architecture: Relativity Court
-    "cinematic_void",           # 8 Abstract Cinematic Void: The Gate
+    # 6 digital_alpine           Digital Alpine (07-brief-digital-alpine.md): being built
+    # 7 chromatic_topography     Chromatic Topography (05-brief-direction-correction.md): being built
+    # 8 glitch_signal            Glitch Signal (06-brief-glitch-signal.md): being built
+    # 9 bit_ocean                8-Bit Ocean (08-brief-8bit-ocean.md): being built
 ]
