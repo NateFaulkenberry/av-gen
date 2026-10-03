@@ -5217,56 +5217,6 @@ int Application::runLive() {
         }
         renderer_->collectFrameTimings();
         compositor_->collectTimings();
-        // TEMPORARY (live-render-perf investigation, 2026-10-02): one row per live frame of the
-        // renderer's GPU passes (the last landed timeline, so it lags the CPU columns by the ring's
-        // depth) and its submission counters. Off unless AVGEN_LIVE_FRAME_CSV names a file.
-        {
-            static std::FILE* liveCsv = [] {
-                const char* path = std::getenv("AVGEN_LIVE_FRAME_CSV");
-                std::FILE* f = path != nullptr ? std::fopen(path, "w") : nullptr;
-                if (f != nullptr) {
-                    std::fputs("frame,gpuMs,draws,tris,shadowDraws,dispatches,pipelineBinds,bindGroupBinds,"
-                               "vbBinds,renderPasses,computePasses,entities,lights,shadowCasters,"
-                               "visibleInstances,culledInstances,sceneW,sceneH,"
-                               "cpuUploads,cpuLights,cpuObjects,cpuFields,cpuSim,cpuParticles,cpuProcedural,"
-                               "cpuSdf,cpuShadowEnc,cpuBgEnc,cpuDepthEnc,cpuSceneEnc,cpuVolEnc,cpuPostEnc,"
-                               "cpuTonemapEnc,cpuTotal,diagMs,prevModelsMs,frameGroupsMs,sdfMs,applyParamsMs,sdfCompiles,"
-                               "kallocs,procRebuildMs,passes\n",
-                               f);
-                }
-                return f;
-            }();
-            if (liveCsv != nullptr && viewportPolicy.drawWorld) {
-                const rendering::RenderStats& rs = renderer_->stats();
-                const rendering::CpuFrameBreakdown& c = rs.cpu;
-                std::string passes;
-                for (const auto& e : rendering::sumByLabel(renderer_->timeline().passes())) {
-                    passes += fmt::format("{}={:.4f};", e.label, e.ms);
-                }
-                std::fprintf(liveCsv,
-                             "%d,%.4f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%llu,%llu,%u,%u,"
-                             "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,"
-                             "%.4f,%.4f,%.4f,%.4f,%.4f,%llu,%.3f,%.4f,%s\n",
-                             framesRendered, renderer_->timeline().frameMs(), rs.drawCalls, rs.triangles,
-                             rs.shadowDraws, rs.computeDispatches, rs.state.pipelineBinds,
-                             rs.state.bindGroupBinds, rs.state.vertexBufferBinds, rs.state.renderPasses,
-                             rs.state.computePasses, rs.entities, rs.lights, rs.shadowCasters,
-                             static_cast<unsigned long long>(rs.visibleInstances),
-                             static_cast<unsigned long long>(rs.culledInstances), rs.width, rs.height,
-                             c.uploadsMs, c.lightsMs, c.objectsMs, c.fieldsMs, c.simulationMs, c.particlesMs,
-                             c.proceduralMs, c.sdfMs, c.shadowEncodeMs, c.backgroundEncodeMs, c.depthEncodeMs,
-                             c.sceneEncodeMs, c.volumeEncodeMs, c.postEncodeMs, c.tonemapEncodeMs, c.totalMs,
-                             probe2::frame().diagFrameMs, probe2::frame().prevModelsMs,
-                             probe2::frame().frameBindGroupsMs, probe2::frame().sdfPackMs,
-                             probe2::frame().applyParamsMs,
-                             static_cast<unsigned long long>(probe2::frame().sdfCompiles),
-                             static_cast<double>(core::allocCounters().allocations - allocsAtFrameStart) / 1000.0,
-                             probe2::frame().procRebuildMs, passes.c_str());
-                if (framesRendered % 60 == 0) {
-                    std::fflush(liveCsv);
-                }
-            }
-        }
         if (panel_ != nullptr) {
             // Placement is the world editor's now (ADR-092): it plans and commits inside the UI
             // pass against the CPU ground probe, so a click no longer costs a GPU round trip and a
@@ -5493,19 +5443,6 @@ int Application::runLive() {
                       static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, window_->pixelWidth(),
                       window_->pixelHeight(), window_->pixelScale());
             const EngineStats& es = engine_->stats();
-            { // TEMPORARY: live-render-perf
-                std::size_t enabledRoutes = 0;
-                for (const auto& r : engine_->modulator().routes()) {
-                    enabledRoutes += r.enabled && r.targetParam != nullptr ? 1 : 0;
-                }
-                log::info("live-perf: {} parameters, {} routes ({} bound), {} entities, {} sdfs, {} procedurals, "
-                          "{} lights, {} particle systems, {} meshes, {} textures",
-                          engine_->params().size(), engine_->modulator().routes().size(), enabledRoutes,
-                          engine_->scene().entities.size(), engine_->scene().sdfs.size(),
-                          engine_->scene().procedurals.size(), engine_->scene().lights.size(),
-                          engine_->scene().particles.size(), engine_->scene().meshes.size(),
-                          engine_->scene().textures.size());
-            }
             log::info("engine.update allocations: control={} signals={} modulation={} controller={} other={}",
                       es.allocsControl, es.allocsSignals, es.allocsModulation, es.allocsController, es.allocsOther);
         }
@@ -6764,12 +6701,7 @@ void Application::stopProjection() {
 void Application::openProjectionWindow() {
     projectionDisplays_ = connectedProjectionDisplays();
     projectionLastScan_ = std::chrono::steady_clock::now();
-    AppSettings::Projection probeProjection = settings_.projection; // TEMPORARY: live-projection investigation
-    if (const char* w = std::getenv("AVGEN_X_PROJ_W"), *h = std::getenv("AVGEN_X_PROJ_H"); w != nullptr && h != nullptr) {
-        probeProjection.windowWidth = static_cast<std::uint32_t>(std::atoi(w));  // points
-        probeProjection.windowHeight = static_cast<std::uint32_t>(std::atoi(h));
-    }
-    const OutputDesc desc = makeProjectionOutput(probeProjection, projectionDisplays_);
+    const OutputDesc desc = makeProjectionOutput(settings_.projection, projectionDisplays_);
     const ProjectionDisplayChoice choice = chooseProjectionDisplay(projectionDisplays_, settings_.projection.display);
     outputs_.remove(kProjectionOutputName);
     auto added = outputs_.add(desc);
@@ -6891,18 +6823,7 @@ void Application::serviceLiveQuality() {
         liveQualityBase_ = renderer_->qualitySettings();
         haveLiveQualityBase_ = true;
     }
-    auto pinned = livePinnedQuality();
-    // TEMPORARY (live-quality measurement, not for main): AVGEN_X_LQ_SWEEP=<n> pins the ladder and walks
-    // it 0,1,2,3,4,3,2,1,0,... every n frames, so each rung's cost and each transition's hitch can be read
-    // off one run's per-frame CSV.
-    {
-        static const int probeSweep = std::getenv("AVGEN_X_LQ_SWEEP") != nullptr ? std::atoi(std::getenv("AVGEN_X_LQ_SWEEP")) : 0;
-        static std::uint64_t probeFrame = 0;
-        if (probeSweep > 0) {
-            static constexpr int kWalk[] = {0, 1, 2, 3, 4, 3, 2, 1};
-            pinned = static_cast<LiveQualityLevel>(kWalk[(probeFrame++ / static_cast<std::uint64_t>(probeSweep)) % 8]);
-        }
-    }
+    const auto pinned = livePinnedQuality();
     const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
     const AppliedLiveQuality now{true, rung, want.strategy, want.scaleFloor};
     const bool moved = !appliedLiveQuality_.valid || appliedLiveQuality_.rung != now.rung ||

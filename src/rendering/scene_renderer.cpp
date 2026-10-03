@@ -2796,7 +2796,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     if (!finiteMatrix(view) || !finiteMatrix(proj)) {
         return fail("scene render: camera produced a non-finite view or projection matrix");
     }
-    const auto probeDiagStart = std::chrono::steady_clock::now(); // TEMPORARY: live-render-perf
     diagnosticFrame_ = RendererDiagnosticFrame{};
     diagnosticFrame_.frameIndex = time.frameIndex;
     diagnosticFrame_.cameraPosition = scene.camera.position;
@@ -2912,8 +2911,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
 
     // ---- frame uniforms ----
-    probe2::frame().diagFrameMs += std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - probeDiagStart).count(); // TEMPORARY: live-render-perf
     FrameUniforms frame{};
     frame.viewProj = proj * view;
     frame.invViewProj = glm::inverse(frame.viewProj);
@@ -3205,10 +3202,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     shadows_->upload(&frame, sizeof(frame));
     // The AO output and the shadow atlas are bound through the frame group, and both change layer
     // count / target as the frame is set up.
-    {
-        const probe2::Add probeGroups(probe2::frame().frameBindGroupsMs); // TEMPORARY: live-render-perf
-        rebuildFrameBindGroups();
-    }
+    rebuildFrameBindGroups();
     stage(cpu.lightsMs);
 
     const auto waterSlotFor = [&scene](const std::string& program) -> std::uint32_t {
@@ -3248,12 +3242,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Model history belongs to the scene entity, not to whether this frame happened to submit a
     // camera or shadow draw. Advancing it for every entity prevents a moving object from carrying
     // a stale transform through several culled frames and producing a false re-entry velocity.
-    {
-        const probe2::Add probePrev(probe2::frame().prevModelsMs); // TEMPORARY: live-render-perf
-        prevModelsNext_.clear();
-        for (const scene::Entity& entity : scene.entities) {
-            prevModelsNext_.insert_or_assign(entity.name, entity.transform.matrix());
-        }
+    prevModelsNext_.clear();
+    for (const scene::Entity& entity : scene.entities) {
+        prevModelsNext_.insert_or_assign(entity.name, entity.transform.matrix());
     }
     // ADR-086. Everything a skinned entity does differently at a draw site: the skinned pipeline, a
     // second dynamic offset naming its slice of the joint buffer, and the influence stream in
@@ -3849,10 +3840,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // §16 / ADR-034: the shadow march's step budget, which the tier table has always set and
     // nothing has ever read. Per frame, for the same reason the cull ladder's hysteresis is.
     sdfs_->setSdfShadowSteps(qualitySettings_.sdfShadowSteps);
-    {
-        const probe2::Add probeSdf(probe2::frame().sdfPackMs); // TEMPORARY: live-render-perf
-        sdfs_->update(scene, time, frame.viewProj, fields_.get());
-    }
+    sdfs_->update(scene, time, frame.viewProj, fields_.get());
     stats_.sdf = sdfs_->stats();
     stage(cpu.sdfMs);
 

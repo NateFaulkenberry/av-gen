@@ -6060,9 +6060,7 @@ void Engine::update(const FrameTime& time) {
     }
     sources_.update(bus_, sourceContext_);
     params_.resetFinals();
-    if (std::getenv("AVGEN_X_NOMOD") == nullptr) { // TEMPORARY: live-render-perf
-        timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
-    }
+    timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     // Spatial reactivity, between automation and the routes (ADR-097). After timeline_.apply so a
     // field that follows a baked actor reads the position that actor has *at this instant* --
     // which is what makes such a field a pure function of time, and so scrub-safe and
@@ -6073,10 +6071,7 @@ void Engine::update(const FrameTime& time) {
     // before the routes that read them -- one step of latency, the same in a play and a scrub.
     publishEntitySignals();
     publishStagingSignals(time); // ADR-930: last step's staging beats, as bus events
-    static const bool probeNoMod = std::getenv("AVGEN_X_NOMOD") != nullptr; // TEMPORARY: live-render-perf
-    if (!probeNoMod) {
-        modulator_.applyRoutes(bus_, params_, time.deltaTime);
-    }
+    modulator_.applyRoutes(bus_, params_, time.deltaTime);
     // ADR-1043: the palette, after the timeline and the routes that may move its three parameters, and
     // before anything reads the colours it writes.
     if (!palette_.empty()) {
