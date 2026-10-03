@@ -138,6 +138,10 @@ pipeline (depth, shadow, lit), where the edge list costs nothing to any draw tha
 
 ## Log
 
+- 2026-10-02 hand-back: FULL suites at 779c31a5, under the lock, one after the other: `avgen_tests` exit 0
+  (4025 cases: 4005 passed, 19 skipped, 1 failed as expected); `avgen_render_tests` exit 0 (575 cases: 574 passed,
+  1 skipped). An earlier run caught ADRs 1071-1075 missing from `docs/decisions/README.md` (fixed in 779c31a5).
+
 - 2026-10-02 (resumed): ADR-1075 landed; `[adr1075]`, `[tinyscale]`, `[camera]`, `[adr1065]` pass. Not done: engine
   needs 3 (translucent procedurals), 4 (per-instance deformer phase), 6 (audit for live projects), wire/toon on glTF
   entities (ObjectUniforms is full; needs its own uniform).
