@@ -76,7 +76,10 @@ NOTES = {
         ],
         "expand": ["a candy village of creature houses", "an underwater cel reef", "a sky-train between islands",
                    "a creature choir, one creature per voice"],
-        "verdict": "",
+        "verdict": ("Charming rather than holy-shit. It's a complete, coherent toy world: inked, cel-banded and "
+                    'pastel, with a sky-whale, a ringed planet, an island chain and creatures who hop and sing. It '
+                    "reads as a game's key art and is the friendliest of the eight. Its ceiling is the genre: it "
+                    'looks like a lovely indie game, not like something only Sonic Garden could make.'),
     },
     "color-geometry": {
         "working_title": "Chromatic Corridor",
@@ -95,7 +98,10 @@ NOTES = {
         ],
         "expand": ["nested colour rooms (Turrell's Ganzfeld)", "a colour-field staircase", "a sky of floating "
                    "slabs", "a portal sequence over still water"],
-        "verdict": "",
+        "verdict": ('Close. Monumental colour frames in a luminous haze, twisted into a spiral and flowing at you: '
+                    "Albers' squares in depth. As a still it's a flat pink wall with a spiral hole. It lives in "
+                    'motion: the accordion on the bass, the colour jumps on the snare, the polygon order on chords. '
+                    'Needs a second element (light, or a figure) for scale.'),
     },
     "organic-garden": {
         "working_title": "Lantern Reef",
@@ -115,7 +121,10 @@ NOTES = {
         ],
         "expand": ["a jellyfish cathedral", "a coral forest that branches per phrase", "a radiolarian sky",
                    "a seed bank that grows one plant per note"],
-        "verdict": "",
+        "verdict": ('Not yet. A glowing coral lily-lantern with luminous stamens in macro focus, translucent jelly-'
+                    "trees as soft backlight, spore bokeh. It's pretty and alive (it breathes, blooms, sways and "
+                    "grows), but it's the closest of the eight to familiar 'bioluminescent alien flora', and the "
+                    "jelly doesn't read as jelly yet (no real translucency in the engine)."),
     },
     "particle-world": {
         "working_title": "Galaxy Engine",
