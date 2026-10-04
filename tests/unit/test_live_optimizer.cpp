@@ -240,3 +240,23 @@ TEST_CASE("the profile tool's child command line carries the request", "[unit][l
     CHECK(std::find(argv.begin(), argv.end(), "--deep") != argv.end());
     CHECK(std::find(argv.begin(), argv.end(), "--no-text") != argv.end());
 }
+
+TEST_CASE("at the bottom of the ladder the unsustainable verdict is judged once per dwell, not every frame",
+          "[unit][live-optimizer]") {
+    // The Live panel flickered: at the bottom, a median sitting on the budget flipped the verdict every frame.
+    app::InteractiveResolution c;
+    const auto s = quick();
+    c.configure(s);
+    feed(c, 600, 60.0);
+    REQUIRE(c.rung() == app::kLiveQualityLevels - 1);
+    int flips = 0;
+    bool last = c.unsustainable();
+    for (int i = 0; i < 80; ++i) {
+        c.note(s.budgetMs + ((i % 2) == 0 ? 0.4 : -0.4), s.budgetMs + 1.0);
+        if (c.unsustainable() != last) {
+            ++flips;
+            last = c.unsustainable();
+        }
+    }
+    CHECK(flips <= 80 / s.dwellFrames + 1);
+}

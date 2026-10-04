@@ -685,6 +685,25 @@ private:
     double liveGpuSpanShown_ = -1.0;
     double liveIntervalShown_ = -1.0;
     double liveCpuMsShown_ = -1.0;
+    // A Live panel warning latched with hysteresis: on after `hold` of `raise`, off after `hold` of `clear`.
+    struct StickyWarning {
+        bool on = false;
+        std::chrono::steady_clock::time_point since{};
+        bool update(bool raise, bool clear, std::chrono::steady_clock::time_point now,
+                    std::chrono::steady_clock::duration hold = std::chrono::seconds(1)) {
+            const bool toward = on ? clear : raise;
+            if (!toward) {
+                since = now;
+            } else if (now - since >= hold) {
+                on = !on;
+                since = now;
+            }
+            return on;
+        }
+    };
+    StickyWarning cpuWarning_;
+    StickyWarning unsustainableWarning_;
+    StickyWarning atBottomWarning_;
     std::uint64_t liveTransitions_ = 0;
     std::uint64_t liveTransitionsProfiled_ = 0;
 

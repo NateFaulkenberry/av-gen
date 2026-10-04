@@ -236,6 +236,8 @@ public:
         double budgetMs = 14.67;   // the GPU budget the target implies
         double gpuMs = -1.0;       // smoothed; -1 = no timing yet
         double cpuMs = -1.0;       // the main thread's work, smoothed
+        bool cpuOverFrame = false; // latched (hysteresis): the CPU alone is longer than a frame at the target
+        bool atBottomOver = false; // latched: automatic, at the bottom, and the GPU still over the budget
         float renderScale = 1.0f;
         std::uint32_t internalWidth = 0, internalHeight = 0;
         std::uint32_t outputWidth = 0, outputHeight = 0;

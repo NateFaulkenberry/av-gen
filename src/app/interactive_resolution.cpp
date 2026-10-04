@@ -458,7 +458,11 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
                 moveTo(last, gpu); // the minimum was raised under us
                 return {rung_, true};
             }
-            return d; // the bottom of the ladder: nothing left to give
+            // The bottom of the ladder: nothing left to give. Judged once per dwell like every other decision --
+            // re-judged every frame, a median on the budget line flipped the verdict frame to frame and the Live
+            // panel's "LIVE TARGET UNSUSTAINABLE" flickered with it.
+            sinceDecision_ = 0;
+            return d;
         }
         unsustainable_ = false;
         if (onProbation) {

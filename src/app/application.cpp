@@ -5555,8 +5555,12 @@ int Application::runLive() {
 
         const auto frameEnd = std::chrono::steady_clock::now();
         // CPU work excludes the swapchain wait inside acquire and the present call.
-        stats.cpuFrameMs = std::chrono::duration<double, std::milli>((workBeforeAcquire - frameStart) +
-                                                                     (workEnd - workAfterAcquire)).count();
+        // ...and the frame cap's own sleep (ADR-1107), which sits between `frameStart` and the work: counted, it
+        // made the CPU read as one whole frame at the target and lit "the CPU alone is longer than a frame".
+        stats.cpuFrameMs = std::max(0.0, std::chrono::duration<double, std::milli>((workBeforeAcquire - frameStart) +
+                                                                                   (workEnd - workAfterAcquire))
+                                                 .count() -
+                                             paceWaitMs);
         stats.frameIntervalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
         prof.count(kPhAllocK,
                    static_cast<double>(core::allocCounters().allocations - allocsAtFrameStart) / 1000.0);
@@ -7213,6 +7217,19 @@ void Application::serviceLiveQuality() {
     view.budgetMs = want.budgetMs;
     view.gpuMs = liveGpuMsShown_;
     view.cpuMs = liveCpuMsShown_;
+    // The panel's three warnings are latched with hysteresis (`StickyWarning`): raised after a second of the
+    // condition, cleared after a second clearly without it. A reading sitting on a line must not show and hide the
+    // line every frame -- each flip moved everything below it, which read as the whole panel flickering.
+    {
+        const auto now = std::chrono::steady_clock::now();
+        const double frame = view.targetFrameMs;
+        const double gpu = liveGpuMsShown_;
+        view.cpuOverFrame = cpuWarning_.update(liveCpuMsShown_ > frame,
+                                               liveCpuMsShown_ >= 0.0 && liveCpuMsShown_ < frame * 0.9, now);
+        view.unsustainable = unsustainableWarning_.update(view.unsustainable, !view.unsustainable, now);
+        view.atBottomOver = atBottomWarning_.update(view.atBottom && gpu > view.budgetMs,
+                                                    !view.atBottom || gpu < view.budgetMs * 0.9, now);
+    }
     view.renderScale = renderer_->qualitySettings().renderScale;
     view.internalWidth = renderer_->stats().width;
     view.internalHeight = renderer_->stats().height;

@@ -367,11 +367,11 @@ void ControlPanel::drawLive(app::Engine& engine) {
             }
         }
         // The CPU is diagnosed, never acted on (§8): no level of quality makes the main thread faster.
-        if (q.cpuMs > q.targetFrameMs) {
+        if (q.cpuOverFrame) {
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),
                                "The CPU alone (%.1f ms) is longer than a %.0f fps frame: lowering quality cannot reach it.",
                                q.cpuMs, q.targetFps);
-        } else if (q.atBottom && gpuOver) {
+        } else if (q.atBottomOver) {
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "At the lowest quality and still over the budget.");
         }
         ImGui::Separator();
