@@ -1,5 +1,23 @@
 # Live optimizer: progress (resumable cold)
 
+## Phase 5 (branch `live/optimizer-p5`, from main ba0003de; plan `03-phase5-plan.md`; ADRs 1108-1113)
+Report: `~/Desktop/av-gen-review/32-live-optimizer-phase5/REPORT.md`, data beside it.
+
+| stage | state |
+|---|---|
+| A contribution (ADR-1108) | DONE: entity radiusPx/coverage/box/contribution; `contribution` section (caster floors 8-48 px, LOD candidates, emitters, hero boxes, suggested heroes) |
+| B heroes (ADR-1109) | DONE: leaks fixed (spawn scale, rig rate, entity bands); `heroEffect` per candidate; `--hero-policy protect|strict` |
+| C A/B (ADR-1110) | DONE: `--compare <levers|project>`, `avgen_quality ab` (avgen.abdiff/1), self-difference floor, `--ab-frames`, `--ab-dir` |
+| D search (ADR-1111) | DONE: `--optimize`, `--optimize-risk`, `--optimize-margin`, `--optimize-candidates`; measured on the three scenes |
+| E Critic + agents (ADR-1112/1113) | DONE: `--ab-critic` (Critic preview mode, optional); tools `performance.optimize_scene`, `apply_low_risk_optimizations`, `benchmark_before_after`; `examples/ai/live-optimize.ai.json` run end to end |
+| Definition-of-Success run | DONE on Glowmere Valley 2 (data/dos); found and fixed the live status under the frame cap |
+
+Commands: `tools/gpu-lock.sh ./build/release/src/avgen --live-profile --project <p> --quality ultra --optimize
+[--optimize-risk high] --ab-dir <d> --json <f>`; `... --compare scale85,volumequarter|project [--ab-critic --critic
+<path>]`; Critic CLI `~/Documents/GitHub/creative-critic/.venv/bin/critic` (`critic start --daemon` if down).
+Tests: CPU `[live-optimize]` (tests/unit/test_live_optimize.cpp), `[live-profile]`, rig test in test_skeleton.cpp;
+GPU `[live-optimizer]` (spawn-scale hero test).
+
 **Branch:** `live/optimizer` in `/Users/natefaulkenberry/Documents/GitHub/av-gen-opt` (based on `live/quality`).
 ADRs 1090-1109 are this stream's. Brief `00-brief.md`, inventory `01-research.md`, plan `02-plan.md`.
 Report target: `~/Desktop/av-gen-review/31-live-optimizer/REPORT.md`.
