@@ -1,0 +1,714 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "meadow-2000",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -60.0,
+   2.0,
+   0.0
+  ],
+  "target": [
+   -20.0,
+   0.8,
+   12.0
+  ],
+  "fov": 60.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.3,
+  "background": [
+   0.05,
+   0.06,
+   0.09
+  ]
+ },
+ "nodes": [
+  {
+   "name": "meadow",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "terrain": {
+    "chunkSize": 48.0,
+    "resolution": 40,
+    "lodLevels": 4,
+    "lodDistance": 86.0,
+    "viewDistance": 700.0,
+    "skirtDepth": 1.2
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.05,
+     0.03
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   },
+   "world": {
+    "name": "meadow",
+    "seed": 20261005,
+    "size": [
+     2000,
+     2000
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 3.0
+     },
+     {
+      "frequency": 0.02,
+      "amplitude": 0.6
+     }
+    ]
+   },
+   "scatter": [
+    {
+     "name": "grass-0",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-1",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 118,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-2",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 135,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-3",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 152,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-4",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 169,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-5",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 186,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-6",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 203,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-7",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 220,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-8",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 237,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-9",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 254,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-10",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 271,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-11",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 288,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-12",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 305,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-13",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 322,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-14",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 339,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-15",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 356,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-16",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 373,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-17",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 390,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-18",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 407,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-19",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 424,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-20",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 441,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-21",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 458,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "grass-22",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 0.22756521739130434,
+      "meadow": 0.22756521739130434,
+      "forest": 0.22756521739130434,
+      "scree": 0.22756521739130434,
+      "rim": 0.22756521739130434
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 475,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "reeds",
+     "asset": "../../../assets/quaternius/glTF/Grass_Wispy_Tall.gltf",
+     "densities": {
+      "marsh": 0.0829,
+      "meadow": 0.0829,
+      "forest": 0.0829,
+      "scree": 0.0829,
+      "rim": 0.0829
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 1.55,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 150.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "mushrooms",
+     "asset": "../../../assets/quaternius/glTF/Mushroom_Common.gltf",
+     "densities": {
+      "marsh": 0.00317,
+      "meadow": 0.00317,
+      "forest": 0.00317,
+      "scree": 0.00317,
+      "rim": 0.00317
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.5,
+     "maxScale": 1.5,
+     "height": 1.6,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 220.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "spires",
+     "asset": "../../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+     "densities": {
+      "marsh": 0.000376,
+      "meadow": 0.000376,
+      "forest": 0.000376,
+      "scree": 0.000376,
+      "rim": 0.000376
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.4,
+     "maxScale": 1.6,
+     "height": 10.0,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 700.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    }
+   ]
+  }
+ ]
+}

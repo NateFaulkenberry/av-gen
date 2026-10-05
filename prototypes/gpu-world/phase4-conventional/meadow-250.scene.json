@@ -1,0 +1,186 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "meadow-250",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -37.5,
+   2.0,
+   0.0
+  ],
+  "target": [
+   2.5,
+   0.8,
+   12.0
+  ],
+  "fov": 60.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.3,
+  "background": [
+   0.05,
+   0.06,
+   0.09
+  ]
+ },
+ "nodes": [
+  {
+   "name": "meadow",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "terrain": {
+    "chunkSize": 48.0,
+    "resolution": 40,
+    "lodLevels": 4,
+    "lodDistance": 86.0,
+    "viewDistance": 700.0,
+    "skirtDepth": 1.2
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.05,
+     0.03
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   },
+   "world": {
+    "name": "meadow",
+    "seed": 20261005,
+    "size": [
+     250,
+     250
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 3.0
+     },
+     {
+      "frequency": 0.02,
+      "amplitude": 0.6
+     }
+    ]
+   },
+   "scatter": [
+    {
+     "name": "grass",
+     "asset": "../../../assets/quaternius/glTF/Grass_Common_Short.gltf",
+     "densities": {
+      "marsh": 5.234,
+      "meadow": 5.234,
+      "forest": 5.234,
+      "scree": 5.234,
+      "rim": 5.234
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 0.42,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 40.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "reeds",
+     "asset": "../../../assets/quaternius/glTF/Grass_Wispy_Tall.gltf",
+     "densities": {
+      "marsh": 0.0829,
+      "meadow": 0.0829,
+      "forest": 0.0829,
+      "scree": 0.0829,
+      "rim": 0.0829
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.6,
+     "maxScale": 1.4,
+     "height": 1.55,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 150.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "mushrooms",
+     "asset": "../../../assets/quaternius/glTF/Mushroom_Common.gltf",
+     "densities": {
+      "marsh": 0.00317,
+      "meadow": 0.00317,
+      "forest": 0.00317,
+      "scree": 0.00317,
+      "rim": 0.00317
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.5,
+     "maxScale": 1.5,
+     "height": 1.6,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 220.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    },
+    {
+     "name": "spires",
+     "asset": "../../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+     "densities": {
+      "marsh": 0.000376,
+      "meadow": 0.000376,
+      "forest": 0.000376,
+      "scree": 0.000376,
+      "rim": 0.000376
+     },
+     "maxSlope": 1.0,
+     "avoidWater": false,
+     "minScale": 0.4,
+     "maxScale": 1.6,
+     "height": 10.0,
+     "seed": 101,
+     "randomYaw": 1.0,
+     "clusterScale": 40.0,
+     "clustering": 0.5,
+     "maxInstances": 1000000,
+     "viewDistance": 700.0,
+     "minScreenRadius": 0.0,
+     "castsShadow": false
+    }
+   ]
+  }
+ ]
+}
