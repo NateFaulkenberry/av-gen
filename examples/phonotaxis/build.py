@@ -67,12 +67,8 @@ def programs():
         op("remap", 0, srcA=0, value=1, constant=[0.15, 3.6, 0.0, 1.0]),
         op("power", 0, srcA=0, value=1.4),
         *species_colour_ops(0, 1, (2, 3)),
-        # white-hot where the lanes are densest: (x + y + z)^3 of white, so the hierarchy is in value, not hue
-        op("swizzle", 2, srcA=0, constant=[0, 0, 0, 0]),
-        op("swizzle", 3, srcA=0, constant=[1, 1, 1, 1]),
-        op("add", 2, srcA=2, srcB=3),
-        op("swizzle", 3, srcA=0, constant=[2, 2, 2, 2]),
-        op("add", 2, srcA=2, srcB=3),
+        # white-hot where the lanes are densest: saturate((x + y + z) / 2)^3, so the hierarchy is in value, not hue
+        op("gradient", 2, srcA=0, value=0.5, constant=[1, 1, 1, 0]),
         op("power", 2, srcA=2, value=3.0),
         op("constant", 3, constant=[0.35, 0.33, 0.30, 0]),
         op("multiply", 2, srcA=2, srcB=3),
@@ -83,21 +79,13 @@ def programs():
         op("multiply", 1, srcA=1, srcB=4),
         op("constant", 6, constant=[0.004, 0.004, 0.006, 1]),
     ]
-    # The Choir: each filament takes the colour of whoever walked there (normalised species mix), its
-    # brightness from the instance's emission multiplier (echo + kick effectors), brighter at the tip.
     choir = [
-        op("field", 0, field="trail"),
-        *species_colour_ops(0, 1, (2, 3)),
-        # normalise by x + y + z
-        op("swizzle", 2, srcA=0, constant=[0, 0, 0, 0]),
-        op("swizzle", 3, srcA=0, constant=[1, 1, 1, 1]),
-        op("add", 2, srcA=2, srcB=3),
-        op("swizzle", 3, srcA=0, constant=[2, 2, 2, 2]),
-        op("add", 2, srcA=2, srcB=3),
-        op("constant", 3, constant=[0.05, 0.05, 0.05, 0.05]),
-        op("add", 2, srcA=2, srcB=3),
-        op("power", 2, srcA=2, value=-1.0),
-        op("multiply", 1, srcA=1, srcB=2),
+        # each reed hears its own band (the echo field's element band is the record's random lane w), so it wears
+        # that band's colour: lows ember, mids teal, highs violet -- colour is frequency, with no field sampled per
+        # fragment (sampling the organism's trail here cost ~2 ms at Medium)
+        op("input", 0, input="instanceRandom"),
+        op("swizzle", 0, srcA=0, constant=[3, 3, 3, 3]),
+        op("ramp", 1, srcA=0, constant=EMBER + [1.0], constant2=TEAL + [1.0], constant3=VIOLET + [1.0]),
         # tip gradient: local y of the unit source (0 at the root, 1 at the tip)
         op("input", 4, input="localPosition"),
         op("swizzle", 4, srcA=4, constant=[1, 1, 1, 1]),
@@ -174,9 +162,9 @@ def organism():
         "name": "organism", "enabled": True, "mode": "agents", "wrap": "wrap",
         "resolution": [1024, 1, 1024], "boundsMin": [-BASIN, -1, -BASIN], "boundsMax": [BASIN, 1, BASIN],
         "velocityField": "drift", "advect": 0.15, "diffusion": 0.12, "dissipation": 3.5,
-        "simRate": 60.0, "maxSubSteps": 4, "seed": 2026, "agentCount": 450000, "species": 3,
-        "sensorAngle": 0.5, "sensorDistance": 5.0, "turnAngle": 0.5, "stepSize": 1.0,
-        "depositAmount": 0.015, "repel": 0.7, "depositField": "hunger", "checkpointInterval": 5.0,
+        "simRate": 30.0, "maxSubSteps": 4, "seed": 2026, "agentCount": 380000, "species": 3,
+        "sensorAngle": 0.5, "sensorDistance": 5.0, "turnAngle": 0.5, "stepSize": 2.0,
+        "depositAmount": 0.042, "repel": 0.7, "depositField": "hunger", "checkpointInterval": 5.0,
     }
 
 
@@ -197,7 +185,7 @@ def choir():
         "sourceTransform": {"position": [0, 0.5, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
         "variation": {"seed": 11},
         "distribution": {"kind": "generator", "generator": {
-            "cellSize": 0.38, "viewDistance": 70.0, "presence": 1.0, "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.5,
+            "cellSize": 0.52, "viewDistance": 62.0, "presence": 1.0, "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.5,
             "tilt": 0.1, "bounded": True, "regionMin": [-FOREST_R, -FOREST_R], "regionMax": [FOREST_R, FOREST_R],
             "regionRadius": FOREST_R, "groundHeight": 0.0, "groundAmplitude": 0.0, "groundFrequency": 0.01,
             "groundSeed": 7}},
@@ -212,7 +200,7 @@ def choir():
             # LOW is mass: the forest heaves as a kick front passes under it
             {"field": "kickRing", "op": "positionOffset", "blend": "add", "strength": 0.45, "axis": [0, 1, 0]},
         ],
-        "lod": {"cull": True, "maxDistance": 80.0, "count": 1},
+        "lod": {"cull": True, "maxDistance": 66.0, "count": 1},
         "material": {"baseColor": [0.01, 0.01, 0.012], "emissiveColor": [1, 1, 1], "emissiveIntensity": 0.6,
                      "roughness": 0.4, "metallic": 0.0, "program": "choir"}}}
 
@@ -223,32 +211,47 @@ def choir():
 STRAND_GAIN = {"helixLow": 3.1, "helixMid": 3.5, "helixHigh": 3.5}
 
 
-def helix(name, strand, colour, fieldname, segment):
-    """One strand of the Cochlea. segment "root": the flared foot (radius 7 -> 2.2 over 0..5 m);
-    "bell": the throat opening into the canopy (2.2 -> 19 over 5..HELIX_H m)."""
-    weave = segment == "weave"  # the same band, wound the other way: the threads cross into a lattice
-    if weave:
-        segment = "bell"
-    if segment == "root":
-        dist = {"count": 240, "radius": 7.0, "radiusGrowth": -4.8, "turns": 1.2, "spiralHeight": 5.0,
-                "center": [0, 0.3, 0]}
-    else:
-        dist = {"count": 1500, "radius": 2.2, "radiusGrowth": 16.8, "turns": 4.6, "spiralHeight": HELIX_H - 5.0,
-                "center": [0, 5.3, 0]}
-    dist.update({"kind": "spiral", "spiralAngle": strand * 2.0943951 + (0.0 if segment == "root" else 1.2 * 6.2831853),
-                 "plane": "xz", "orientation": "outward"})
-    if weave:
-        dist["turns"] = -dist["turns"]
-        dist["spiralAngle"] += 1.0471976
+def spiral_points(n, radius, growth, turns, height, y0, angle0):
+    """Placements along a spiral: each a thread segment whose local +x lies along the spiral and whose length
+    (scale x) is the arc to the next one, so consecutive segments meet."""
+    out = []
+    pts = []
+    for k in range(n + 1):
+        u = k / n
+        a = angle0 + u * turns * 2.0 * math.pi
+        r = radius + growth * u
+        pts.append((r * math.cos(a), y0 + height * u, r * math.sin(a)))
+    for k in range(n):
+        (x0, y_0, z0), (x1, y1, z1) = pts[k], pts[k + 1]
+        dx, dy, dz = x1 - x0, y1 - y_0, z1 - z0
+        length = math.sqrt(dx * dx + dy * dy + dz * dz)
+        yaw = math.atan2(-dz, dx)            # about +y: local +x -> (cos yaw, 0, -sin yaw)
+        pitch = math.atan2(dy, math.hypot(dx, dz))  # then about local +z, to follow the rise
+        cy, sy, cp, sp = math.cos(yaw / 2), math.sin(yaw / 2), math.cos(pitch / 2), math.sin(pitch / 2)
+        # q = q_yaw(y) * q_pitch(z)
+        qx, qy, qz, qw = -sy * sp, sy * cp, cy * sp, cy * cp
+        mx, my, mz = (x0 + x1) / 2, (y_0 + y1) / 2, (z0 + z1) / 2
+        out.append([round(v, 5) for v in (mx, my, mz, qx, qy, qz, qw, length * 1.12, 1.0, 1.0)])
+    return out
+
+
+def helix(name, strand, colour, fieldname):
+    """One band of the Cochlea as one object: a flared root (radius 7 -> 2.2 over 0..5 m), the throat opening into
+    the canopy (2.2 -> 19 over 5..HELIX_H m), and the same throat wound the other way, so the threads cross into a
+    lattice. One object per band: a procedural object costs ~0.4 ms of fixed GPU work whatever its size, and nine
+    strand objects cost 3.4 ms at 730x410."""
+    a = strand * 2.0943951
+    pts = (spiral_points(120, 7.0, -4.8, 1.2, 5.0, 0.3, a)
+           + spiral_points(620, 2.2, 16.8, 4.6, HELIX_H - 5.0, 5.3, a + 1.2 * 2 * math.pi)
+           + spiral_points(620, 2.2, 16.8, -4.6, HELIX_H - 5.0, 5.3, a + 1.2 * 2 * math.pi + 1.0471976))
     return {"name": name, "kind": "procedural", "procedural": {
-        # a thread segment along the spiral (an "outward" placement's local +x is the spiral's tangent): end to end
-        # they draw the tower as threads of light circling upward; loud moments lengthen and light their segments
+        # a thread segment: end to end they draw the tower as threads of light circling upward; its band's energy
+        # at its moment thickens and lights it
         "source": {"kind": "box", "size": [1.0, 0.05, 0.05], "subdivisions": 1},
         "variation": {"seed": 40 + strand},
-        "distribution": dist,
+        "distribution": {"kind": "points", "points": pts},
         "effectors": [
-            # its band's energy at its moment thickens and lengthens it
-            {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.6, 0.5, 0.5]},
+            {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.15, 0.6, 0.6]},
             {"field": fieldname, "op": "emission", "blend": "add", "strength": STRAND_GAIN[fieldname]},
         ],
         "lod": {"cull": True, "count": 1},
@@ -320,7 +323,7 @@ def scene():
             "fogColor": [0.016, 0.012, 0.034], "horizonDensity": 0.5,
             # a thin medium the heart scatters into: the throat glows, the basin's edge dissolves into air
             "volumeDensity": 0.008, "volumeScattering": 1.0, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.35,
-            "volumeLocalLights": 0.45, "volumeSteps": 24, "volumeJitter": 0.5, "volumeMaxDistance": 600.0,
+            "volumeLocalLights": 0.45, "volumeSteps": 16, "volumeJitter": 0.5, "volumeMaxDistance": 600.0,
             "volumeNoise": 0.35, "volumeNoiseScale": 0.03, "volumeNoiseSpeed": 0.05,
             "sky": {"enabled": True, "background": True, "zenithColor": [0.0006, 0.0007, 0.002],
                     "horizonColor": [0.014, 0.009, 0.026], "groundColor": [0.001, 0.001, 0.002], "haze": 0.0,
@@ -339,9 +342,8 @@ def scene():
         "grids": [organism()],
         "materialPrograms": programs(),
         "nodes": [*fields(), bed(), choir(),
-                  *[helix(f"{n}{seg.capitalize()}", i, c, n, seg)
-                    for i, (n, c) in enumerate([("helixLow", EMBER), ("helixMid", TEAL), ("helixHigh", VIOLET)])
-                    for seg in ("root", "bell", "weave")],
+                  *[helix(n, i, c, n)
+                    for i, (n, c) in enumerate([("helixLow", EMBER), ("helixMid", TEAL), ("helixHigh", VIOLET)])],
                   plain(), horizon(), spores()],
     }
 
@@ -383,7 +385,7 @@ LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
 #   (name, label, cc, default, [(path, min, max, op)])
 KNOBS = [
     ("energy", "ENERGY", 1, 0.0, []),  # targets below: the arc itself
-    ("hunger", "HUNGER", 21, 0.5, [("grid/organism/depositAmount", -0.012, 0.03, "add")]),
+    ("hunger", "HUNGER", 21, 0.5, [("grid/organism/depositAmount", -0.034, 0.084, "add")]),
     ("restless", "RESTLESS", 22, 0.5, [("grid/organism/turnAngle", -0.3, 0.6, "add"),
                                         ("grid/organism/sensorAngle", -0.2, 0.4, "add")]),
     ("current", "CURRENT", 23, 0.5, [("field/inflow/strength", -1.0, 1.6, "add")]),
@@ -411,7 +413,8 @@ PADS = {"strike": 36, "scatter": 37, "Dormant": 40, "Germination": 41, "Chorus":
 # ------------------------------------------------------------------------------------------ states
 # Each state is a preset: the large-scale configuration of the world. Continuous expression (the energy
 # arc, the bands, the knobs) rides on top as routes. Colour rule kept in every state: colour is frequency.
-GILDED = {"lo": [1.0, 0.28, 0.04], "mid": [1.0, 0.66, 0.2], "hi": [0.88, 0.9, 1.0]}  # one hue family: molten
+# The reborn world keeps the rule (colour is frequency) in one molten hue family: ember, gold, white.
+REBIRTH = {"lo": [1.0, 0.28, 0.04], "mid": [1.0, 0.66, 0.2], "hi": [0.88, 0.9, 1.0]}
 NIGHT = {"lo": EMBER, "mid": TEAL, "hi": VIOLET}
 
 COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade", "turn", "gaze", "reach",
@@ -419,25 +422,29 @@ COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade
         "bloom", "heart", "orbit"]
 STATES = {
     #            grow lift  chG  thG  bedG  dep    fade turn gaze rch  infl wand spor  kick hor  dist hgt  fov tgtY  exp   echo bloom heart orbit
-    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.004, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
-    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.012, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
-    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
-    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.020, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
-    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.030, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
-    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.6, 0.35, 0.45, 100, 0.02),
-    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
+    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.0112, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
+    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.0336, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
+    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
+    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.0560, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
+    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
+    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.0000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.6, 0.35, 0.45, 100, 0.02),
+    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
 }
 # Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
 # instead of sitting dead centre in every state.
 PIVOT_X = {"Germination": 22.0, "Rebirth": -26.0, "Surge": 18.0, "Dormant": -6.0}
 PIVOT_Z = {"Germination": 10.0, "Rebirth": 14.0, "Surge": -12.0, "Dormant": 4.0}
-PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": GILDED}  # only the world-defining states recolour
+PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": REBIRTH}  # only the world-defining states recolour
 
 
 def colour_paths(prog_ops, prog_name, colour):
     """The bed and choir programs' three species constants: the op paths (1-indexed) holding them."""
     out = {}
     for i, o in enumerate(prog_ops, start=1):
+        if o["kind"] == "ramp":
+            out[f"material/{prog_name}/op/{i}/ramp/constant"] = colour["lo"] + [1.0]
+            out[f"material/{prog_name}/op/{i}/ramp/constant2"] = colour["mid"] + [1.0]
+            out[f"material/{prog_name}/op/{i}/ramp/constant3"] = colour["hi"] + [1.0]
         if o["kind"] == "constant" and o["constant"][:3] in (EMBER, TEAL, VIOLET):
             key = {tuple(EMBER): "lo", tuple(TEAL): "mid", tuple(VIOLET): "hi"}[tuple(o["constant"][:3])]
             out[f"material/{prog_name}/op/{i}/constant/constant"] = colour[key] + [0.0]
@@ -481,8 +488,7 @@ def presets():
                 for path, c in colour_paths(progs[prog], prog, pal).items():
                     values[path] = c
             for strand, key in (("helixLow", "lo"), ("helixMid", "mid"), ("helixHigh", "hi")):
-                for seg in ("Root", "Bell", "Weave"):
-                    values[f"procedural/{strand}{seg}/material/emissiveColor"] = pal[key]
+                values[f"procedural/{strand}/material/emissiveColor"] = pal[key]
         out.append({"name": name.lower(), "values": values})
     return out
 
@@ -583,7 +589,7 @@ def project(name, audio, live=False):
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
         "assets": {"scene": {"kind": "composition", "path": "phonotaxis.scene.json"}},
-        "live": {"qualityStrategy": "resolution_first", "targetFps": 60},
+        "live": {"qualityStrategy": "effects_first", "targetFps": 60},
         "parameters": dict(POST),
         "sources": [LISTEN],
         "routes": routes(),

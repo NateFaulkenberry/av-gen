@@ -11,7 +11,7 @@
   }
  },
  "live": {
-  "qualityStrategy": "resolution_first",
+  "qualityStrategy": "effects_first",
   "targetFps": 60
  },
  "parameters": {
@@ -240,8 +240,8 @@
    "targets": [
     {
      "path": "grid/organism/depositAmount",
-     "min": -0.012,
-     "max": 0.03,
+     "min": -0.034,
+     "max": 0.084,
      "op": "add"
     }
    ]
@@ -375,7 +375,7 @@
      0.22
     ],
     "grid/organism/depositAmount": [
-     0.004
+     0.0112
     ],
     "grid/organism/dissipation": [
      1.6
@@ -451,65 +451,35 @@
      1.0,
      0.0
     ],
-    "material/choir/op/3/constant/constant": [
+    "material/choir/op/3/ramp/constant": [
      1.0,
      0.36,
      0.1,
-     0.0
+     1.0
     ],
-    "material/choir/op/6/constant/constant": [
+    "material/choir/op/3/ramp/constant2": [
      0.1,
      0.85,
      0.78,
-     0.0
-    ],
-    "material/choir/op/10/constant/constant": [
-     0.62,
-     0.32,
-     1.0,
-     0.0
-    ],
-    "procedural/helixLowRoot/material/emissiveColor": [
-     1.0,
-     0.36,
-     0.1
-    ],
-    "procedural/helixLowBell/material/emissiveColor": [
-     1.0,
-     0.36,
-     0.1
-    ],
-    "procedural/helixLowWeave/material/emissiveColor": [
-     1.0,
-     0.36,
-     0.1
-    ],
-    "procedural/helixMidRoot/material/emissiveColor": [
-     0.1,
-     0.85,
-     0.78
-    ],
-    "procedural/helixMidBell/material/emissiveColor": [
-     0.1,
-     0.85,
-     0.78
-    ],
-    "procedural/helixMidWeave/material/emissiveColor": [
-     0.1,
-     0.85,
-     0.78
-    ],
-    "procedural/helixHighRoot/material/emissiveColor": [
-     0.62,
-     0.32,
      1.0
     ],
-    "procedural/helixHighBell/material/emissiveColor": [
+    "material/choir/op/3/ramp/constant3": [
      0.62,
      0.32,
+     1.0,
      1.0
     ],
-    "procedural/helixHighWeave/material/emissiveColor": [
+    "procedural/helixLow/material/emissiveColor": [
+     1.0,
+     0.36,
+     0.1
+    ],
+    "procedural/helixMid/material/emissiveColor": [
+     0.1,
+     0.85,
+     0.78
+    ],
+    "procedural/helixHigh/material/emissiveColor": [
      0.62,
      0.32,
      1.0
@@ -535,7 +505,7 @@
      0.6
     ],
     "grid/organism/depositAmount": [
-     0.012
+     0.0336
     ],
     "grid/organism/dissipation": [
      2.5
@@ -614,7 +584,7 @@
      1.0
     ],
     "grid/organism/depositAmount": [
-     0.015
+     0.042
     ],
     "grid/organism/dissipation": [
      3.5
@@ -693,7 +663,7 @@
      1.0
     ],
     "grid/organism/depositAmount": [
-     0.02
+     0.056
     ],
     "grid/organism/dissipation": [
      3.5
@@ -772,7 +742,7 @@
      1.2
     ],
     "grid/organism/depositAmount": [
-     0.03
+     0.084
     ],
     "grid/organism/dissipation": [
      3.0
@@ -930,7 +900,7 @@
      1.0
     ],
     "grid/organism/depositAmount": [
-     0.015
+     0.042
     ],
     "grid/organism/dissipation": [
      3.5
@@ -1006,65 +976,35 @@
      1.0,
      0.0
     ],
-    "material/choir/op/3/constant/constant": [
+    "material/choir/op/3/ramp/constant": [
      1.0,
      0.28,
      0.04,
-     0.0
+     1.0
     ],
-    "material/choir/op/6/constant/constant": [
+    "material/choir/op/3/ramp/constant2": [
      1.0,
      0.66,
      0.2,
-     0.0
-    ],
-    "material/choir/op/10/constant/constant": [
-     0.88,
-     0.9,
-     1.0,
-     0.0
-    ],
-    "procedural/helixLowRoot/material/emissiveColor": [
-     1.0,
-     0.28,
-     0.04
-    ],
-    "procedural/helixLowBell/material/emissiveColor": [
-     1.0,
-     0.28,
-     0.04
-    ],
-    "procedural/helixLowWeave/material/emissiveColor": [
-     1.0,
-     0.28,
-     0.04
-    ],
-    "procedural/helixMidRoot/material/emissiveColor": [
-     1.0,
-     0.66,
-     0.2
-    ],
-    "procedural/helixMidBell/material/emissiveColor": [
-     1.0,
-     0.66,
-     0.2
-    ],
-    "procedural/helixMidWeave/material/emissiveColor": [
-     1.0,
-     0.66,
-     0.2
-    ],
-    "procedural/helixHighRoot/material/emissiveColor": [
-     0.88,
-     0.9,
      1.0
     ],
-    "procedural/helixHighBell/material/emissiveColor": [
+    "material/choir/op/3/ramp/constant3": [
      0.88,
      0.9,
+     1.0,
      1.0
     ],
-    "procedural/helixHighWeave/material/emissiveColor": [
+    "procedural/helixLow/material/emissiveColor": [
+     1.0,
+     0.28,
+     0.04
+    ],
+    "procedural/helixMid/material/emissiveColor": [
+     1.0,
+     0.66,
+     0.2
+    ],
+    "procedural/helixHigh/material/emissiveColor": [
      0.88,
      0.9,
      1.0
