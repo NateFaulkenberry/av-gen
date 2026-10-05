@@ -542,6 +542,58 @@ Tests: `tests/rendering/test_gpu_regression_scenes_gpu.cpp`, `[gpu][gpu-regressi
 and `[.perf][gpu-regression]` for the benchmark.
 
 
+## Regression benchmarks
+
+Two instruments, both run under the lock at a 1-minute load under 5 (M2 Max, 1920×1080):
+
+1. `avgen --live-profile --project examples/gpu-regression/<scene>.json --quality ultra --start 20`:
+   the product's own profiler, 300 measured frames, headless.
+2. `avgen_render_tests "[.perf][gpu-regression]"`: the Realtime tier through the engine, 120 frames.
+   It also times seeks, and it CHECKs the expected ranges below, so a step change fails it.
+
+**Live profile, Ultra (2026-10-05, load 4.4-5.0):**
+
+| Scene | Population | GPU median / P95 | Scene pass | Shadows | Generator pass | Effectors | Cull | Simulation | CPU work median | GPU-system bytes held |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Echo Field | 696,000 generator cells (bounded disc, camera window) | 45.2 / 49.8 ms | 31.1 ms | 10.6 ms | 0.26 ms | 0.98 ms | 0.26 ms | — | 0.74 ms | 96.0 MB records, 0.4 MB audio ring |
+| Endless Meadow | 280,820 cells over 4 layers (unbounded) | 16.9 / 21.4 ms | 12.3 ms | 2.9 ms | 0.13 ms | 0.13 ms | 0.20 ms | — | 0.70 ms | 27.0 MB records, 0.4 MB ring |
+| Mycelium | 1,000,000 agents (512², 3 species) + 110,000-cell carpet | 42.1 / 48.4 ms | 31.7 ms | 5.8 ms | <1 tick | 0.46 ms | 0.07 ms | **3.01 ms** (1 step/frame) | 0.81 ms | 24.0 MB carpet, 32.8 MB state, 5 checkpoints 101 MB |
+
+What the numbers say:
+
+- **The CPU is flat.** 0.70-0.81 ms of CPU work per frame in every scene, from 110k to 1M elements. No
+  frame reads the GPU back.
+- **Generating is nearly free.** The generator kernel costs 0.26 ms for 696k cells, which matches the
+  spike's prototype (0.20 ms per 1M).
+- **Drawing is the cost**, and so are the shadows of what is drawn. None of these scenes is
+  60-fps-ready at Ultra as authored, and that is by design: they are regression fixtures at the scale
+  the spike built them. The handoff's budget rules come from this table.
+- **1M agents cost 3.0 ms a step.** That is 4.5× the spike prototype's 0.66 ms per 2M. The production
+  kernel samples a compound audio field and curl noise per agent per step; the prototype had neither.
+
+**Expected ranges** (`[.perf][gpu-regression]`, Realtime tier; each widened about 1.5-2× from measured):
+
+| Scene | CPU work | GPU frame | GPU-system bytes held at 60 s | Population | Seek 20→60 s | Seek 60→58 s |
+|---|---|---|---|---|---|---|
+| Echo Field | ≤ 8 ms | 15-90 ms | ≤ 140 MB | ≥ 600k cells | ≤ 1 s (stateless) | ≤ 1 s |
+| Endless Meadow | ≤ 8 ms | 4-40 ms | ≤ 60 MB | ≥ 200k cells | ≤ 1 s | ≤ 1 s |
+| Mycelium | ≤ 10 ms | 10-80 ms | ≤ 600 MB | ≥ 1M agents | ≤ 15 s (replays from its newest checkpoint) | ≤ 2 s (restores the 55 s checkpoint) |
+
+**Benchmark run, Realtime tier** (`[.perf][gpu-regression]`, 2026-10-05, exit 0: every range held). The
+first run was at load ~5. This rerun gave up waiting for a quiet machine and ran at load ~10, and agrees
+with the first within a few percent:
+
+| Scene | CPU work | GPU frame | Generator / effectors / cull / sim GPU | Bytes held at 22 s | Seek 20→60 s | Seek 60→58 s |
+|---|---|---|---|---|---|---|
+| Echo Field | 1.08 ms | 43.4 ms | 0.20 / 0.98 / 0.26 / — ms | 91.9 MB | 50 ms | 48 ms |
+| Endless Meadow | 0.70 ms | 15.9 ms | 0.13 / 0.13 / 0.20 / — ms | 26.1 MB | 27 ms | 20 ms |
+| Mycelium | 0.73 ms | 34.4 ms | 0.07 / 0.46 / 0.07 / 2.88 ms | 131.6 MB (231 MB of checkpoints by 60 s) | **6.5 s** (2,370 steps replayed past the played checkpoints) | **550 ms** (restored 55 s, replayed 180 steps) |
+
+Synchronisation in every scene: **no blocking readback in the frame loop.** A seek on Mycelium waits
+for the GPU once per replay chunk, on purpose (Risks, item 1). A *forward* seek past the newest
+checkpoint replays at 2.9 ms a step for 1M agents. A backward one restores and replays at most the
+spacing.
+
 ## Phase 4 handoff (for the art agent)
 
 You own the flagship LIVE scene: brief Phase 4, its research, art direction, MIDI vocabulary, camera,
