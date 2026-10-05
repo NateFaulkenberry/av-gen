@@ -1,0 +1,98 @@
+AV GEN LIVE SCENE PROFILE (headless)
+--------------------------------------------------------
+Scene:        /Users/natefaulkenberry/Documents/GitHub/av-gen-gpuworld/prototypes/gpu-world/phase4-conventional/meadow-500.json
+Machine:      Mac14,6, Apple M2 Max
+OS:           macOS 26.7.1
+Renderer:     WebGPU / Dawn / Metal (Apple M2 Max)
+Build:        Release 03c146061f5b
+Output:       1920 x 1080 offscreen
+Internal:     1920 x 1080 (scale 1.00)
+Quality:      ultra -> Ultra, strategy balanced
+Target:       60 FPS   Budget: 16.67 ms
+Audio/MIDI:   none / off
+Measured:     5.0 s from 6.0 s (300 frames)
+These numbers are specific to this machine.
+--------------------------------------------------------
+COLD COSTS (not in the frame statistics)
+  load 2047 ms   pre-warm 0 ms (0 built)   first frame 163.4 ms
+  warm-up 60 frames / 1.0 s, steady state reached
+--------------------------------------------------------
+FRAME (headless: budget checked against max(GPU span, CPU work) per frame (each measured; their max is the pipelined model). frameMs is the serial wall clock, a pessimistic bound)
+  Mean  16.67  Median  16.50  P90  17.75  P95  18.60  P99  18.87  Worst  19.02 ms
+  GPU  median  14.48  P95  16.78  P99  17.04 ms
+  CPU work median   0.91  P95   1.07 ms   waits median 15.56 ms
+  under budget: 94.0%   over: 18 of 300
+  critical path: GPU -- headless: GPU 14.48 ms against CPU work 0.91 ms; a pipelined live frame is held to the larger (headless has no present, so sync is not measured)
+  worst frames: 19.0ms@4.14s 19.0ms@0.43s 18.9ms@3.70s 18.9ms@4.24s 18.9ms@0.90s
+--------------------------------------------------------
+STATUS: AT RISK
+--------------------------------------------------------
+GPU (medians, measured)
+  geometry/opaque         13.17 ms  [scene=12.06 cull=0.72 depth=0.39]
+  shadows                  0.52 ms  [shadowmask=0.52 shadow=0.00]
+  lighting                 0.72 ms  [ao=0.72 clusters=0.00]
+  post: bloom              0.13 ms  [post/bloom=0.13]
+  post: other              0.13 ms  [post/composite=0.07 post/fxaa=0.07]
+  composite/tonemap        0.07 ms  [tonemap=0.07]
+  other                    0.00 ms  [background=0.00]
+CPU (medians)
+  audio analysis                                         0.00 ms coarse
+  MIDI / OSC / control                                   0.00 ms measured
+  signal bus                                             0.00 ms measured
+  modulation and timeline                                0.00 ms coarse
+  scene update (animation, entities, procedural, physics)   0.03 ms coarse
+  engine other                                           0.00 ms measured
+  resource uploads                                       0.00 ms measured
+  render submission: objects and culling                 0.05 ms coarse
+  render submission: procedural                          0.03 ms measured
+  render submission: lights                              0.15 ms measured
+  render submission: SDF                                 0.00 ms measured
+  render submission: particles (encode)                  0.00 ms measured
+  render submission: fields and materials                0.01 ms measured
+  render submission: pass encoding                       0.21 ms measured
+  synchronization (queue wait)                          15.57 ms measured
+  physics / simulation (separately)                       --    not separately measurable
+--------------------------------------------------------
+RESOURCES (medians over the window)
+  geometry: 89 draws, 434369 triangles (204895502 logical), 79 entities, instances 4991 visible / 1254207 culled
+  memory (Dawn's estimate): textures 314.7 MB (render targets 279.2, depth 142.5), buffers 217.8 MB
+      134.2 MB  shadow-atlas dimensions=2048x2048 px, 8 layer format=TextureFormat::Depth24Plus internal_usage=TextureUsage::(CopySrc|CopyDst|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(TextureBinding|RenderAttachment)
+       22.4 MB  Rocks_Diffuse dimensions=2048x2048 px format=TextureFormat::RGBA8UnormSrgb internal_usage=TextureUsage::(CopyDst|TextureBinding) sample_count=1 usage=TextureUsage::(CopyDst|TextureBinding)
+       16.6 MB  transient dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)
+       16.6 MB  transient dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)
+       16.6 MB  hdr-target dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)
+  pipelines: 82 render, 19 compute, 34 shader modules; SDF variants 0; material programs 1 (12 ops)
+  shadows: 27 casters, 3 views (3 cascades, 0 spot, 0 point), 2048^2, 37 draws
+  particles: 0 systems, capacity 0, 0 spawns/frame, 0 sim steps/frame
+  post: 15 passes at 1920x1080, bloom 7 levels; volume 0x0 x 0 steps; AO 960x540
+--------------------------------------------------------
+OPTIMIZATION CANDIDATES (savings ESTIMATED unless marked MEASURED)
+ 1. Procedural material programs -- cost 13.17 ms
+    change:    1 program(s), 12 ops each on average: fewer ops, or a plain material on what is small on screen
+    estimated: 0.41-4.08 ms  (~3 ms + ~0.09 ms per op for a program covering the whole 1080p frame (the Sonic Abstract art pass, M2 Max); their screen coverage is not measured, so the range is 10% to 100% of the frame)
+    risk:      high   (lever: noprograms)
+ 2. Render resolution -- cost 14.48 ms
+    change:    render at 85% and upscale (renderScale 0.85)
+    estimated: 1.84-2.45 ms  (each category's per-pixel share times the pixels saved (28%))
+    risk:      medium   (lever: scale85)
+ 3. Geometry level of detail -- cost 13.17 ms
+    change:    coarser LOD sooner (lodBias 2)
+    estimated: 0.40-2.63 ms  (the vertex share of the scene pass; the fitted fixed part is 40-50% on vertex-heavy scenes)
+    risk:      low   (lever: lodbias2)
+ 4. Draw distance -- cost 13.17 ms
+    change:    procedural and entity draw distance at 75%
+    estimated: 0.26-1.98 ms  (what is drawn beyond three quarters of the distance; scene-dependent)
+    risk:      medium   (lever: drawdist75)
+ 5. Shadow map resolution -- cost 0.52 ms
+    change:    a 1024 shadow atlas (from 2048)
+    estimated: 0.03-0.16 ms  (fewer texels to write and filter; vertex work is unchanged)
+    risk:      medium   (lever: shadowatlas1k)
+--------------------------------------------------------
+LIMITS
+  - Results are specific to this machine (see conditions); another GPU, display or OS is another measurement.
+  - GPU pass times are intervals between pass-end timestamps on one timeline (gpu/frame_timeline.hpp); consecutive frames can overlap on the GPU, so a span can over-read (ADR-1085 caps it by the frame interval).
+  - Metal writes no timestamp for an empty render pass; that pass's cost folds into the next pass's interval.
+  - The ImGui UI and the output/projection copies are not GPU-timed; in live mode their cost is inside the frame interval and the waits.
+  - Headless has no present, no Fifo and no UI: it cannot show deadline misses. Use --mode live for a touring prediction.
+  * entities: the 100 largest on screen of 137 are listed
+  * headless measured 300 frames of piece time at a fixed 60 fps step, from 5.98 s

@@ -1,0 +1,18 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "meadow-2000-terrain-only.scene.json"
+  }
+ },
+ "parameters": {},
+ "sources": [],
+ "routes": [],
+ "presets": []
+}

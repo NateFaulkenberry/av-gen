@@ -1,0 +1,966 @@
+{
+  "candidates": [
+    {
+      "costMs": 7.012352,
+      "estimateBasis": "~3 ms + ~0.09 ms per op for a program covering the whole 1080p frame (the Sonic Abstract art pass, M2 Max); their screen coverage is not measured, so the range is 10% to 100% of the frame",
+      "estimatedSavingMs": {
+        "high": 4.08,
+        "low": 0.40800000000000003
+      },
+      "id": "material-programs",
+      "lever": "noprograms",
+      "risk": "high",
+      "suggestion": "1 program(s), 12 ops each on average: fewer ops, or a plain material on what is small on screen",
+      "title": "Procedural material programs",
+      "verified": false
+    },
+    {
+      "costMs": 8.323072,
+      "estimateBasis": "each category's per-pixel share times the pixels saved (28%)",
+      "estimatedSavingMs": {
+        "high": 1.3894287360000004,
+        "low": 1.0420715520000003
+      },
+      "id": "render-scale",
+      "lever": "scale85",
+      "risk": "medium",
+      "suggestion": "render at 85% and upscale (renderScale 0.85)",
+      "title": "Render resolution",
+      "verified": false
+    },
+    {
+      "costMs": 0.6553599999999999,
+      "estimateBasis": "fewer texels to write and filter; vertex work is unchanged",
+      "estimatedSavingMs": {
+        "high": 0.19660799999999998,
+        "low": 0.032768
+      },
+      "id": "shadow-atlas",
+      "lever": "shadowatlas1k",
+      "risk": "medium",
+      "suggestion": "a 1024 shadow atlas (from 2048)",
+      "title": "Shadow map resolution",
+      "verified": false
+    }
+  ],
+  "cold": {
+    "compilesDuringMeasure": 0,
+    "firstFrameMs": 43.888833,
+    "loadMs": 1153.662667,
+    "prewarmMs": 0.0,
+    "prewarmVariants": 0,
+    "steadyReached": true,
+    "warmupFrames": 100,
+    "warmupSeconds": 1.013462208
+  },
+  "conditions": {
+    "audio": "none",
+    "backend": "WebGPU / Dawn / Metal",
+    "budgetMs": 16.666666666666668,
+    "buildType": "Release",
+    "camera": "",
+    "cpu": "Apple M2 Max",
+    "deep": false,
+    "displayRefreshHz": null,
+    "gitDirty": false,
+    "gitRevision": "03c146061f5b",
+    "gpu": "Apple M2 Max",
+    "hardwareSpecific": true,
+    "internal": {
+      "height": 1080,
+      "width": 1920
+    },
+    "machine": "Mac14,6",
+    "measureSeconds": 5.0,
+    "midi": "off",
+    "mode": "headless",
+    "os": "macOS 26.7.1",
+    "output": {
+      "height": 1080,
+      "width": 1920
+    },
+    "quality": {
+      "level": "Ultra",
+      "profile": "",
+      "renderScale": 1.0,
+      "requested": "ultra",
+      "strategy": "balanced"
+    },
+    "qualityBudgetMs": 14.666666666666668,
+    "scene": "/Users/natefaulkenberry/Documents/GitHub/av-gen-gpuworld/prototypes/gpu-world/phase4-conventional/meadow-250-terrain-only.json",
+    "seed": null,
+    "sessionId": "2026-10-05T07:20:48-28176",
+    "startSeconds": 6.65,
+    "startedAt": "2026-10-05T07:20:48",
+    "targetFps": 60.0,
+    "warmupCapSeconds": 3.0,
+    "window": "offscreen"
+  },
+  "cpu": [
+    {
+      "basis": "coarse",
+      "covers": "the main thread catching the offline analysis up to the playhead; the live analysis thread is not timed",
+      "medianMs": 0.0,
+      "name": "audio analysis"
+    },
+    {
+      "basis": "measured",
+      "covers": "the control hub's drain of MIDI, OSC and the bindings (engine.update: control)",
+      "medianMs": 0.000292,
+      "name": "MIDI / OSC / control"
+    },
+    {
+      "basis": "measured",
+      "covers": "engine.update: signals",
+      "medianMs": 0.000333,
+      "name": "signal bus"
+    },
+    {
+      "basis": "coarse",
+      "covers": "modulators, routes and timeline automation together (engine.update: modulation)",
+      "medianMs": 0.002167,
+      "name": "modulation and timeline"
+    },
+    {
+      "basis": "coarse",
+      "covers": "the scene controller's update: animation, entity behaviour, procedural regeneration and any flatten are one phase; they are not separately measurable",
+      "medianMs": 0.017042,
+      "name": "scene update (animation, entities, procedural, physics)"
+    },
+    {
+      "basis": "measured",
+      "covers": "engine.update: the remainder",
+      "medianMs": 0.000667,
+      "name": "engine other"
+    },
+    {
+      "basis": "measured",
+      "covers": "mesh and texture uploads and environment builds",
+      "medianMs": 0.000167,
+      "name": "resource uploads"
+    },
+    {
+      "basis": "coarse",
+      "covers": "entity traversal, object uniforms and shadow-caster selection (culling is inside it)",
+      "medianMs": 0.020209,
+      "name": "render submission: objects and culling"
+    },
+    {
+      "basis": "measured",
+      "covers": "procedural instance rebuilds, uploads and the cull encode",
+      "medianMs": 0.000916,
+      "name": "render submission: procedural"
+    },
+    {
+      "basis": "measured",
+      "covers": "frame uniforms, light packing, cascade fitting, the froxel encode",
+      "medianMs": 0.094167,
+      "name": "render submission: lights"
+    },
+    {
+      "basis": "measured",
+      "covers": "SDF node packing and mesh uploads",
+      "medianMs": 0.000292,
+      "name": "render submission: SDF"
+    },
+    {
+      "basis": "measured",
+      "covers": "the particle update encode; the simulation itself runs on the GPU",
+      "medianMs": 0.001375,
+      "name": "render submission: particles (encode)"
+    },
+    {
+      "basis": "measured",
+      "covers": "fields, material programs, spline tables",
+      "medianMs": 0.008625,
+      "name": "render submission: fields and materials"
+    },
+    {
+      "basis": "measured",
+      "covers": "recording every pass's commands",
+      "medianMs": 0.13595800000000002,
+      "name": "render submission: pass encoding"
+    },
+    {
+      "basis": "measured",
+      "covers": "headless blocks on the queue each frame: GPU time seen from the CPU, not CPU work",
+      "medianMs": 8.882792,
+      "name": "synchronization (queue wait)"
+    },
+    {
+      "basis": "not separately measurable",
+      "covers": "inside the scene update above; no phase times it alone",
+      "medianMs": null,
+      "name": "physics / simulation (separately)"
+    }
+  ],
+  "criticalPath": {
+    "cpuWorkMs": 0.5649580000000007,
+    "explanation": "headless: GPU 8.32 ms against CPU work 0.56 ms; a pipelined live frame is held to the larger (headless has no present, so sync is not measured)",
+    "frameMs": 8.323072,
+    "gpuMs": 8.323072,
+    "verdict": "GPU",
+    "waitMs": 8.873375
+  },
+  "definitions": {
+    "budgetMs": "1000 / targetFps",
+    "candidates.estimated*": "ESTIMATED savings from the per-pass scaling model",
+    "candidates.measured*": "MEASURED savings from an interleaved, counterbalanced A/B in this process",
+    "coarse": "timed on this run, but the number covers more than its name",
+    "cpuWorkMs": "main-thread work per frame, waits excluded",
+    "criticalPath": "GPU, CPU or sync/present: which one the frame waits on, from the measured medians",
+    "deadlineMisses": "live only: frames that took more display refreshes than the target allows",
+    "estimated": "computed from a model (the basis says which); never a measurement",
+    "frameMs": "live: the interval between presented frames; headless: the wall clock of one serial frame",
+    "gpuMs": "the GPU timeline's span per frame (first to last pass end)",
+    "measured": "timed on this run"
+  },
+  "entities": [
+    {
+      "castsShadow": true,
+      "distance": 18.51655387878418,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk13",
+      "projectedArea": 1.0,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 34.89337158203125,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk14",
+      "projectedArea": 1.0,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 34.382144927978516,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water14",
+      "projectedArea": 1.0,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 46.95073699951172,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk19",
+      "projectedArea": 0.7083097823910017,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 55.82634735107422,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk7",
+      "projectedArea": 0.5116476357720832,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 55.881507873535156,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk20",
+      "projectedArea": 0.5072681579117793,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 55.45479965209961,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water20",
+      "projectedArea": 0.5066780862256287,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 62.979007720947266,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water8",
+      "projectedArea": 0.3908535369890035,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 63.152061462402344,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk8",
+      "projectedArea": 0.38919223218216203,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 64.45276641845703,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk12",
+      "projectedArea": 0.3822510046963236,
+      "visible": false
+    },
+    {
+      "castsShadow": false,
+      "distance": 64.2713851928711,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water12",
+      "projectedArea": 0.37940382439010395,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 77.2931137084961,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk18",
+      "projectedArea": 0.2636189217185931,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 81.40080261230469,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk15",
+      "projectedArea": 0.23747099603613375,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 83.08973693847656,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk6",
+      "projectedArea": 0.23574802781122628,
+      "visible": false
+    },
+    {
+      "castsShadow": false,
+      "distance": 82.97858428955078,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water6",
+      "projectedArea": 0.23243459389168852,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 91.8075180053711,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk21",
+      "projectedArea": 0.19111676386706505,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 93.61278533935547,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk25",
+      "projectedArea": 0.17720104917010204,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 102.18770599365234,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk1",
+      "projectedArea": 0.17120542079945664,
+      "visible": false
+    },
+    {
+      "castsShadow": false,
+      "distance": 96.97654724121094,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water9",
+      "projectedArea": 0.16505560917997888,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 98.17681121826172,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk26",
+      "projectedArea": 0.16366190034108696,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 97.34107971191406,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk9",
+      "projectedArea": 0.16213747888299823,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 97.87825012207031,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water26",
+      "projectedArea": 0.16205910206393365,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 106.35143280029297,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk2",
+      "projectedArea": 0.13913997926046576,
+      "visible": false
+    },
+    {
+      "castsShadow": false,
+      "distance": 106.29096984863281,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water2",
+      "projectedArea": 0.13894362583015998,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 119.54788970947266,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk0",
+      "projectedArea": 0.13129437056182597,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 111.58287048339844,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk24",
+      "projectedArea": 0.12629755231860712,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 121.91194152832031,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk27",
+      "projectedArea": 0.10968443907919503,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 129.1833953857422,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk16",
+      "projectedArea": 0.0933502836061044,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 135.54136657714844,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk22",
+      "projectedArea": 0.0925853765583807,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 129.4015350341797,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water3",
+      "projectedArea": 0.09250980486012735,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 129.5311279296875,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk3",
+      "projectedArea": 0.09191944870176519,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 139.54408264160156,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk10",
+      "projectedArea": 0.07980403150891242,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 141.10032653808594,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk31",
+      "projectedArea": 0.07702837225944012,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 144.32872009277344,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk32",
+      "projectedArea": 0.07412124405303078,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 144.10403442382813,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.water32",
+      "projectedArea": 0.07378552930206507,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 157.45953369140625,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk28",
+      "projectedArea": 0.06688795346876976,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 153.4066619873047,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk30",
+      "projectedArea": 0.06653647707129383,
+      "visible": false
+    },
+    {
+      "castsShadow": true,
+      "distance": 161.2566375732422,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk33",
+      "projectedArea": 0.05997013112314602,
+      "visible": true
+    },
+    {
+      "castsShadow": true,
+      "distance": 163.5787811279297,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk4",
+      "projectedArea": 0.05902488507721411,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 176.60792541503906,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk17",
+      "projectedArea": 0.05670873831736076,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 184.3077392578125,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk11",
+      "projectedArea": 0.052132295945215686,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 181.66355895996094,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk23",
+      "projectedArea": 0.04972568778633811,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 189.41392517089844,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk34",
+      "projectedArea": 0.04387794211153996,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 203.40110778808594,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk5",
+      "projectedArea": 0.042574153896419914,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 198.5858154296875,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk29",
+      "projectedArea": 0.039697459789611984,
+      "visible": true
+    },
+    {
+      "castsShadow": false,
+      "distance": 224.6626434326172,
+      "hero": false,
+      "importance": "normal",
+      "name": "meadow.chunk35",
+      "projectedArea": 0.03057873410605223,
+      "visible": true
+    }
+  ],
+  "frame": {
+    "basis": "headless: budget checked against max(GPU span, CPU work) per frame (each measured; their max is the pipelined model). frameMs is the serial wall clock, a pessimistic bound",
+    "budget": {
+      "budgetMs": 16.666666666666668,
+      "deadlineMisses": null,
+      "frames": 300,
+      "overBudget": 0,
+      "percentUnder": 100.0
+    },
+    "cpuWorkMs": {
+      "count": 300,
+      "low1Percent": 0.8473053333333335,
+      "max": 0.8846670000000003,
+      "mean": 0.5842657,
+      "min": 0.5082079999999998,
+      "p50": 0.5649580000000007,
+      "p90": 0.6714169999999999,
+      "p95": 0.7237080000000002,
+      "p99": 0.8146249999999995,
+      "stddev": 0.0628568328289243
+    },
+    "frameMs": {
+      "count": 300,
+      "low1Percent": 11.463778,
+      "max": 11.741042,
+      "mean": 9.666667493333325,
+      "min": 8.985334,
+      "p50": 9.450416,
+      "p90": 10.403667,
+      "p95": 10.938542,
+      "p99": 11.21225,
+      "stddev": 0.5340875622145025
+    },
+    "gpuBudget": {
+      "budgetMs": 16.666666666666668,
+      "deadlineMisses": null,
+      "frames": 300,
+      "overBudget": 0,
+      "percentUnder": 100.0
+    },
+    "gpuMs": {
+      "count": 300,
+      "low1Percent": 10.179925333333333,
+      "max": 10.223616,
+      "mean": 8.531258026666665,
+      "min": 7.995392,
+      "p50": 8.323072,
+      "p90": 9.306111999999999,
+      "p95": 9.895935999999999,
+      "p99": 10.15808,
+      "stddev": 0.4986716402160702
+    },
+    "waitMs": {
+      "count": 300,
+      "low1Percent": 10.791708666666667,
+      "max": 10.983042,
+      "mean": 9.082401793333329,
+      "min": 8.45475,
+      "p50": 8.873375,
+      "p90": 9.794041,
+      "p95": 10.337333,
+      "p99": 10.590875,
+      "stddev": 0.5162800084029633
+    }
+  },
+  "gpu": [
+    {
+      "basis": "measured",
+      "category": "geometry/opaque",
+      "labels": [
+        {
+          "label": "scene",
+          "medianMs": 6.946816
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 7.012352
+    },
+    {
+      "basis": "measured",
+      "category": "shadows",
+      "labels": [
+        {
+          "label": "shadowmask",
+          "medianMs": 0.458752
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.196608
+        }
+      ],
+      "medianMs": 0.6553599999999999
+    },
+    {
+      "basis": "measured",
+      "category": "lighting",
+      "labels": [
+        {
+          "label": "ao",
+          "medianMs": 0.589824
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        }
+      ],
+      "medianMs": 0.589824
+    },
+    {
+      "basis": "measured",
+      "category": "post: bloom",
+      "labels": [
+        {
+          "label": "post/bloom",
+          "medianMs": 0.131072
+        }
+      ],
+      "medianMs": 0.131072
+    },
+    {
+      "basis": "measured",
+      "category": "post: other",
+      "labels": [
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        },
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 0.131072
+    },
+    {
+      "basis": "measured",
+      "category": "composite/tonemap",
+      "labels": [
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 0.065536
+    },
+    {
+      "basis": "measured",
+      "category": "other",
+      "labels": [
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "medianMs": 0.0
+    }
+  ],
+  "headroom": true,
+  "limits": [
+    "Results are specific to this machine (see conditions); another GPU, display or OS is another measurement.",
+    "GPU pass times are intervals between pass-end timestamps on one timeline (gpu/frame_timeline.hpp); consecutive frames can overlap on the GPU, so a span can over-read (ADR-1085 caps it by the frame interval).",
+    "Metal writes no timestamp for an empty render pass; that pass's cost folds into the next pass's interval.",
+    "The ImGui UI and the output/projection copies are not GPU-timed; in live mode their cost is inside the frame interval and the waits.",
+    "Headless has no present, no Fifo and no UI: it cannot show deadline misses. Use --mode live for a touring prediction."
+  ],
+  "notes": [
+    "headless measured 300 frames of piece time at a fixed 60 fps step, from 6.65 s"
+  ],
+  "resources": {
+    "computeDispatches": 1.0,
+    "geometry": {
+      "culledInstances": 0.0,
+      "draws": 33.0,
+      "entities": 39.0,
+      "entityLod": {
+        "demoted": 0.0,
+        "drawables": 0.0
+      },
+      "logicalTriangles": 0.0,
+      "proceduralLod": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "triangles": 48801.0,
+      "visibleInstances": 0.0
+    },
+    "gpuPasses": 27.0,
+    "lights": {
+      "clustered": 0.0,
+      "directional": 1.0,
+      "shaded": 1.0
+    },
+    "memory": {
+      "basis": "Dawn's own estimate (ComputeEstimatedMemoryUsageInfo), read once after measuring",
+      "bufferBytes": 33884032,
+      "buffers": 384,
+      "depthStencilBytes": 142512164,
+      "largestTextures": [
+        {
+          "bytes": 134217728,
+          "detail": "dimensions=2048x2048 px, 8 layer format=TextureFormat::Depth24Plus internal_usage=TextureUsage::(CopySrc|CopyDst|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(TextureBinding|RenderAttachment)",
+          "label": "shadow-atlas"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "transient"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "transient"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "hdr-target"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "aux-normal-roughness"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "aux-emission"
+        }
+      ],
+      "renderTargetBytes": 279179356,
+      "textureBytes": 283517184,
+      "textures": 56,
+      "totalBytes": 317401216
+    },
+    "particles": {
+      "aliveNote": "alive counts live on the GPU and are not read back; capacity is the pools' sum",
+      "capacity": 0.0,
+      "dispatches": 0.0,
+      "emittedPerFrame": 0.0,
+      "simulationStepsPerFrame": 0.0,
+      "systems": 0.0
+    },
+    "pipelines": {
+      "compute": 19,
+      "materialProgramOps": 12,
+      "materialPrograms": 1,
+      "render": 82,
+      "sdfVariants": 0,
+      "shaderModules": 34
+    },
+    "post": {
+      "ao": {
+        "height": 540,
+        "width": 960
+      },
+      "bloomLevels": 7.0,
+      "height": 1080,
+      "passes": 15.0,
+      "volume": {
+        "height": 0,
+        "steps": 0.0,
+        "width": 0
+      },
+      "width": 1920
+    },
+    "sdf": {
+      "avgSteps": 0.0,
+      "raymarchObjects": 0.0
+    },
+    "shadows": {
+      "cascades": 3.0,
+      "casters": 25.0,
+      "lightsCasting": 1.0,
+      "passSkippedNothingLit": false,
+      "pointMaps": 0.0,
+      "resolution": 2048.0,
+      "shadowDraws": 34.0,
+      "spotMaps": 0.0,
+      "views": 3.0
+    },
+    "transientTextures": 15.0
+  },
+  "schema": "avgen.liveprofile/1",
+  "status": "TARGET ACHIEVED",
+  "verification": "",
+  "worstFrames": [
+    {
+      "atSeconds": 0.400358041,
+      "cpuWorkMs": 0.7580000000000009,
+      "frameMs": 11.741042,
+      "gpuMs": 9.961471999999999,
+      "index": 40,
+      "waitMs": 10.983042
+    },
+    {
+      "atSeconds": 2.232617458,
+      "cpuWorkMs": 0.6444579999999984,
+      "frameMs": 11.387875,
+      "gpuMs": 10.223616,
+      "index": 230,
+      "waitMs": 10.743417
+    },
+    {
+      "atSeconds": 1.1356325,
+      "cpuWorkMs": 0.6715419999999988,
+      "frameMs": 11.262417,
+      "gpuMs": 10.15808,
+      "index": 116,
+      "waitMs": 10.590875
+    },
+    {
+      "atSeconds": 1.367252291,
+      "cpuWorkMs": 0.5635829999999995,
+      "frameMs": 11.21225,
+      "gpuMs": 10.15808,
+      "index": 140,
+      "waitMs": 10.648667
+    },
+    {
+      "atSeconds": 0.235145375,
+      "cpuWorkMs": 0.6667080000000016,
+      "frameMs": 11.117292,
+      "gpuMs": 10.027008,
+      "index": 23,
+      "waitMs": 10.450584
+    }
+  ]
+}

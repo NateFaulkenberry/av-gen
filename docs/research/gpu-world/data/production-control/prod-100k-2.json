@@ -1,0 +1,559 @@
+{
+  "candidates": [
+    {
+      "costMs": 14.221312,
+      "estimateBasis": "each category's per-pixel share times the pixels saved (28%)",
+      "estimatedSavingMs": {
+        "high": 2.4224071680000003,
+        "low": 1.8168053760000002
+      },
+      "id": "render-scale",
+      "lever": "scale85",
+      "risk": "medium",
+      "suggestion": "render at 85% and upscale (renderScale 0.85)",
+      "title": "Render resolution",
+      "verified": false
+    },
+    {
+      "costMs": 12.451839999999999,
+      "estimateBasis": "what is drawn beyond three quarters of the distance; scene-dependent",
+      "estimatedSavingMs": {
+        "high": 1.8677759999999997,
+        "low": 0.24903679999999997
+      },
+      "id": "draw-distance",
+      "lever": "drawdist75",
+      "risk": "medium",
+      "suggestion": "procedural and entity draw distance at 75%",
+      "title": "Draw distance",
+      "verified": false
+    },
+    {
+      "costMs": 0.8519680000000001,
+      "estimateBasis": "fewer texels to write and filter; vertex work is unchanged",
+      "estimatedSavingMs": {
+        "high": 0.2555904,
+        "low": 0.04259840000000001
+      },
+      "id": "shadow-atlas",
+      "lever": "shadowatlas1k",
+      "risk": "medium",
+      "suggestion": "a 1024 shadow atlas (from 2048)",
+      "title": "Shadow map resolution",
+      "verified": false
+    }
+  ],
+  "cold": {
+    "compilesDuringMeasure": 0,
+    "firstFrameMs": 79.498917,
+    "loadMs": 1056.401416,
+    "prewarmMs": 4.2e-05,
+    "prewarmVariants": 0,
+    "steadyReached": true,
+    "warmupFrames": 80,
+    "warmupSeconds": 1.316151708
+  },
+  "conditions": {
+    "audio": "none",
+    "backend": "WebGPU / Dawn / Metal",
+    "budgetMs": 16.666666666666668,
+    "buildType": "Release",
+    "camera": "",
+    "cpu": "Apple M2 Max",
+    "deep": false,
+    "displayRefreshHz": null,
+    "gitDirty": false,
+    "gitRevision": "03c146061f5b",
+    "gpu": "Apple M2 Max",
+    "hardwareSpecific": true,
+    "internal": {
+      "height": 1080,
+      "width": 1920
+    },
+    "machine": "Mac14,6",
+    "measureSeconds": 5.0,
+    "midi": "off",
+    "mode": "headless",
+    "os": "macOS 26.7.1",
+    "output": {
+      "height": 1080,
+      "width": 1920
+    },
+    "quality": {
+      "level": "Ultra",
+      "profile": "",
+      "renderScale": 1.0,
+      "requested": "ultra",
+      "strategy": "balanced"
+    },
+    "qualityBudgetMs": 14.666666666666668,
+    "scene": "prototypes/gpu-world/production-control/swarm-100k.json",
+    "seed": null,
+    "sessionId": "2026-10-04T22:48:59-10742",
+    "startSeconds": 6.316666666666666,
+    "startedAt": "2026-10-04T22:48:59",
+    "targetFps": 60.0,
+    "warmupCapSeconds": 3.0,
+    "window": "offscreen"
+  },
+  "cpu": [
+    {
+      "basis": "coarse",
+      "covers": "the main thread catching the offline analysis up to the playhead; the live analysis thread is not timed",
+      "medianMs": 0.0,
+      "name": "audio analysis"
+    },
+    {
+      "basis": "measured",
+      "covers": "the control hub's drain of MIDI, OSC and the bindings (engine.update: control)",
+      "medianMs": 0.005041,
+      "name": "MIDI / OSC / control"
+    },
+    {
+      "basis": "measured",
+      "covers": "engine.update: signals",
+      "medianMs": 0.004,
+      "name": "signal bus"
+    },
+    {
+      "basis": "coarse",
+      "covers": "modulators, routes and timeline automation together (engine.update: modulation)",
+      "medianMs": 0.017834,
+      "name": "modulation and timeline"
+    },
+    {
+      "basis": "coarse",
+      "covers": "the scene controller's update: animation, entity behaviour, procedural regeneration and any flatten are one phase; they are not separately measurable",
+      "medianMs": 0.084291,
+      "name": "scene update (animation, entities, procedural, physics)"
+    },
+    {
+      "basis": "measured",
+      "covers": "engine.update: the remainder",
+      "medianMs": 0.005041,
+      "name": "engine other"
+    },
+    {
+      "basis": "measured",
+      "covers": "mesh and texture uploads and environment builds",
+      "medianMs": 0.002125,
+      "name": "resource uploads"
+    },
+    {
+      "basis": "coarse",
+      "covers": "entity traversal, object uniforms and shadow-caster selection (culling is inside it)",
+      "medianMs": 0.006708,
+      "name": "render submission: objects and culling"
+    },
+    {
+      "basis": "measured",
+      "covers": "procedural instance rebuilds, uploads and the cull encode",
+      "medianMs": 0.053958,
+      "name": "render submission: procedural"
+    },
+    {
+      "basis": "measured",
+      "covers": "frame uniforms, light packing, cascade fitting, the froxel encode",
+      "medianMs": 0.183959,
+      "name": "render submission: lights"
+    },
+    {
+      "basis": "measured",
+      "covers": "SDF node packing and mesh uploads",
+      "medianMs": 0.002167,
+      "name": "render submission: SDF"
+    },
+    {
+      "basis": "measured",
+      "covers": "the particle update encode; the simulation itself runs on the GPU",
+      "medianMs": 0.003833,
+      "name": "render submission: particles (encode)"
+    },
+    {
+      "basis": "measured",
+      "covers": "fields, material programs, spline tables",
+      "medianMs": 0.011833,
+      "name": "render submission: fields and materials"
+    },
+    {
+      "basis": "measured",
+      "covers": "recording every pass's commands",
+      "medianMs": 0.5121669999999999,
+      "name": "render submission: pass encoding"
+    },
+    {
+      "basis": "measured",
+      "covers": "headless blocks on the queue each frame: GPU time seen from the CPU, not CPU work",
+      "medianMs": 15.416791,
+      "name": "synchronization (queue wait)"
+    },
+    {
+      "basis": "not separately measurable",
+      "covers": "inside the scene update above; no phase times it alone",
+      "medianMs": null,
+      "name": "physics / simulation (separately)"
+    }
+  ],
+  "criticalPath": {
+    "cpuWorkMs": 2.753750000000002,
+    "explanation": "headless: GPU 14.22 ms against CPU work 2.75 ms; a pipelined live frame is held to the larger (headless has no present, so sync is not measured)",
+    "frameMs": 14.221312,
+    "gpuMs": 14.221312,
+    "verdict": "GPU",
+    "waitMs": 15.392709
+  },
+  "definitions": {
+    "budgetMs": "1000 / targetFps",
+    "candidates.estimated*": "ESTIMATED savings from the per-pass scaling model",
+    "candidates.measured*": "MEASURED savings from an interleaved, counterbalanced A/B in this process",
+    "coarse": "timed on this run, but the number covers more than its name",
+    "cpuWorkMs": "main-thread work per frame, waits excluded",
+    "criticalPath": "GPU, CPU or sync/present: which one the frame waits on, from the measured medians",
+    "deadlineMisses": "live only: frames that took more display refreshes than the target allows",
+    "estimated": "computed from a model (the basis says which); never a measurement",
+    "frameMs": "live: the interval between presented frames; headless: the wall clock of one serial frame",
+    "gpuMs": "the GPU timeline's span per frame (first to last pass end)",
+    "measured": "timed on this run"
+  },
+  "entities": [],
+  "frame": {
+    "basis": "headless: budget checked against max(GPU span, CPU work) per frame (each measured; their max is the pipelined model). frameMs is the serial wall clock, a pessimistic bound",
+    "budget": {
+      "budgetMs": 16.666666666666668,
+      "deadlineMisses": null,
+      "frames": 300,
+      "overBudget": 44,
+      "percentUnder": 85.33333333333333
+    },
+    "cpuWorkMs": {
+      "count": 300,
+      "low1Percent": 4.205888333333333,
+      "max": 4.303708,
+      "mean": 2.4267527466666667,
+      "min": 0.5810829999999996,
+      "p50": 2.753750000000002,
+      "p90": 3.5575410000000005,
+      "p95": 3.734375,
+      "p99": 4.026417000000002,
+      "stddev": 1.0450294068279276
+    },
+    "frameMs": {
+      "count": 300,
+      "low1Percent": 24.400972,
+      "max": 24.550625,
+      "mean": 18.529922756666664,
+      "min": 14.368709,
+      "p50": 17.8105,
+      "p90": 21.901166,
+      "p95": 22.47925,
+      "p99": 24.134666,
+      "stddev": 2.3372581914494797
+    },
+    "gpuBudget": {
+      "budgetMs": 16.666666666666668,
+      "deadlineMisses": null,
+      "frames": 300,
+      "overBudget": 44,
+      "percentUnder": 85.33333333333333
+    },
+    "gpuMs": {
+      "count": 300,
+      "low1Percent": 19.15835733333333,
+      "max": 19.267584,
+      "mean": 14.797154986666671,
+      "min": 13.107199999999999,
+      "p50": 14.221312,
+      "p90": 17.03936,
+      "p95": 17.498112,
+      "p99": 18.939904,
+      "stddev": 1.5098445079588778
+    },
+    "waitMs": {
+      "count": 300,
+      "low1Percent": 20.722208666666663,
+      "max": 21.081042,
+      "mean": 16.103170010000003,
+      "min": 13.687792,
+      "p50": 15.392709,
+      "p90": 18.521792,
+      "p95": 18.976041,
+      "p99": 20.307208,
+      "stddev": 1.6254245199235706
+    }
+  },
+  "gpu": [
+    {
+      "basis": "measured",
+      "category": "geometry/opaque",
+      "labels": [
+        {
+          "label": "scene",
+          "medianMs": 11.993088
+        },
+        {
+          "label": "effectors",
+          "medianMs": 0.262144
+        },
+        {
+          "label": "depth",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "cull",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 12.451839999999999
+    },
+    {
+      "basis": "measured",
+      "category": "shadows",
+      "labels": [
+        {
+          "label": "shadowmask",
+          "medianMs": 0.589824
+        },
+        {
+          "label": "shadow",
+          "medianMs": 0.262144
+        }
+      ],
+      "medianMs": 0.8519680000000001
+    },
+    {
+      "basis": "measured",
+      "category": "lighting",
+      "labels": [
+        {
+          "label": "ao",
+          "medianMs": 0.9830399999999999
+        },
+        {
+          "label": "clusters",
+          "medianMs": 0.0
+        }
+      ],
+      "medianMs": 0.9830399999999999
+    },
+    {
+      "basis": "measured",
+      "category": "post: bloom",
+      "labels": [
+        {
+          "label": "post/bloom",
+          "medianMs": 0.196608
+        }
+      ],
+      "medianMs": 0.196608
+    },
+    {
+      "basis": "measured",
+      "category": "post: other",
+      "labels": [
+        {
+          "label": "post/fxaa",
+          "medianMs": 0.131072
+        },
+        {
+          "label": "post/composite",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 0.196608
+    },
+    {
+      "basis": "measured",
+      "category": "composite/tonemap",
+      "labels": [
+        {
+          "label": "tonemap",
+          "medianMs": 0.065536
+        }
+      ],
+      "medianMs": 0.065536
+    },
+    {
+      "basis": "measured",
+      "category": "other",
+      "labels": [
+        {
+          "label": "background",
+          "medianMs": 0.0
+        }
+      ],
+      "medianMs": 0.0
+    }
+  ],
+  "headroom": false,
+  "limits": [
+    "Results are specific to this machine (see conditions); another GPU, display or OS is another measurement.",
+    "GPU pass times are intervals between pass-end timestamps on one timeline (gpu/frame_timeline.hpp); consecutive frames can overlap on the GPU, so a span can over-read (ADR-1085 caps it by the frame interval).",
+    "Metal writes no timestamp for an empty render pass; that pass's cost folds into the next pass's interval.",
+    "The ImGui UI and the output/projection copies are not GPU-timed; in live mode their cost is inside the frame interval and the waits.",
+    "Headless has no present, no Fifo and no UI: it cannot show deadline misses. Use --mode live for a touring prediction."
+  ],
+  "notes": [
+    "headless measured 300 frames of piece time at a fixed 60 fps step, from 6.32 s"
+  ],
+  "resources": {
+    "computeDispatches": 3.0,
+    "geometry": {
+      "culledInstances": 37117.0,
+      "draws": 2.0,
+      "entities": 0.0,
+      "entityLod": {
+        "demoted": 0.0,
+        "drawables": 0.0
+      },
+      "logicalTriangles": 194672.0,
+      "proceduralLod": [
+        60219.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "triangles": 120439.0,
+      "visibleInstances": 60219.0
+    },
+    "gpuPasses": 29.0,
+    "lights": {
+      "clustered": 0.0,
+      "directional": 1.0,
+      "shaded": 1.0
+    },
+    "memory": {
+      "basis": "Dawn's own estimate (ComputeEstimatedMemoryUsageInfo), read once after measuring",
+      "bufferBytes": 44254476,
+      "buffers": 87,
+      "depthStencilBytes": 142512164,
+      "largestTextures": [
+        {
+          "bytes": 134217728,
+          "detail": "dimensions=2048x2048 px, 8 layer format=TextureFormat::Depth24Plus internal_usage=TextureUsage::(CopySrc|CopyDst|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(TextureBinding|RenderAttachment)",
+          "label": "shadow-atlas"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "transient"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "transient"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "hdr-target"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "aux-normal-roughness"
+        },
+        {
+          "bytes": 16588800,
+          "detail": "dimensions=1920x1080 px format=TextureFormat::RGBA16Float internal_usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment) sample_count=1 usage=TextureUsage::(CopySrc|TextureBinding|RenderAttachment)",
+          "label": "aux-emission"
+        }
+      ],
+      "renderTargetBytes": 279179356,
+      "textureBytes": 283390176,
+      "textures": 55,
+      "totalBytes": 327644652
+    },
+    "particles": {
+      "aliveNote": "alive counts live on the GPU and are not read back; capacity is the pools' sum",
+      "capacity": 0.0,
+      "dispatches": 0.0,
+      "emittedPerFrame": 0.0,
+      "simulationStepsPerFrame": 0.0,
+      "systems": 0.0
+    },
+    "pipelines": {
+      "compute": 19,
+      "materialProgramOps": 0,
+      "materialPrograms": 0,
+      "render": 82,
+      "sdfVariants": 0,
+      "shaderModules": 34
+    },
+    "post": {
+      "ao": {
+        "height": 540,
+        "width": 960
+      },
+      "bloomLevels": 7.0,
+      "height": 1080,
+      "passes": 15.0,
+      "volume": {
+        "height": 0,
+        "steps": 0.0,
+        "width": 0
+      },
+      "width": 1920
+    },
+    "sdf": {
+      "avgSteps": 0.0,
+      "raymarchObjects": 0.0
+    },
+    "shadows": {
+      "cascades": 3.0,
+      "casters": 0.0,
+      "lightsCasting": 1.0,
+      "passSkippedNothingLit": false,
+      "pointMaps": 0.0,
+      "resolution": 2048.0,
+      "shadowDraws": 0.0,
+      "spotMaps": 0.0,
+      "views": 3.0
+    },
+    "transientTextures": 15.0
+  },
+  "schema": "avgen.liveprofile/1",
+  "status": "AT RISK",
+  "verification": "",
+  "worstFrames": [
+    {
+      "atSeconds": 0.40169099999999996,
+      "cpuWorkMs": 3.469583,
+      "frameMs": 24.550625,
+      "gpuMs": 19.267584,
+      "index": 18,
+      "waitMs": 21.081042
+    },
+    {
+      "atSeconds": 2.792922417,
+      "cpuWorkMs": 3.976707000000001,
+      "frameMs": 24.342541,
+      "gpuMs": 18.939904,
+      "index": 147,
+      "waitMs": 20.365834
+    },
+    {
+      "atSeconds": 0.426010042,
+      "cpuWorkMs": 3.59,
+      "frameMs": 24.30975,
+      "gpuMs": 19.267584,
+      "index": 19,
+      "waitMs": 20.71975
+    },
+    {
+      "atSeconds": 2.768557792,
+      "cpuWorkMs": 3.827458,
+      "frameMs": 24.134666,
+      "gpuMs": 18.546688,
+      "index": 146,
+      "waitMs": 20.307208
+    },
+    {
+      "atSeconds": 2.839485625,
+      "cpuWorkMs": 3.7323340000000016,
+      "frameMs": 23.823917,
+      "gpuMs": 18.284544,
+      "index": 149,
+      "waitMs": 20.091583
+    }
+  ]
+}
