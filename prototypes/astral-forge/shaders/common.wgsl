@@ -24,7 +24,7 @@ struct Frame {
     flags: vec4f,    // debug view, density weight, density norm, grating spacing (um)
     entity: vec4f,   // centre xyz, scale
     misc: vec4f,     // fall (abyss sink), escape rate, strobe, appendage density weight
-    ext: vec4f,      // sharpness spread (1 = only the anatomy's centre sharpens, 0 = everywhere), bloom, -, -
+    ext: vec4f,      // sharpness spread (1 = only the anatomy's centre sharpens, 0 = everywhere), mask filaments on/off, meta-field radius, meta-face strength
 };
 
 @group(0) @binding(0) var<uniform> F: Frame;

@@ -108,7 +108,7 @@ fn maskFilaments(q: vec3f) -> f32 {
         let fk = f32(k);
         let a = fk * TAU / 13.0 + 0.3 * sin(fk * 2.3);
         let rim = vec3f(2.05 * cos(a), 0.15 + 2.75 * sin(a), -0.45);
-        let dir = normalize(vec3f(cos(a), sin(a), -0.35 + 0.25 * sin(fk)));
+        let dir = normalize(vec3f(cos(a), sin(a), -0.9 + 0.7 * sin(fk * 2.7)));
         var lp = q - rim;
         let along = dot(lp, dir);
         let u = clamp(along, 0.0, 6.0);
@@ -214,8 +214,9 @@ fn faceMouth(q: vec3f, fp: FaceP) -> f32 {
     let lower = sdCone(mq, vec3f(tx + 0.08, -hy - 0.06, 0.05), vec3f(tx + 0.08, -hy - 0.06 + lenL, 0.12), 0.05, 0.004);
     d = min(d, min(upper, lower));
     if (fp.inner > 0.5) {
-        let iq = (mq - vec3f(0.0, 0.0, -0.35 - 1.2 * fp.tunnel)) / 0.2;
-        d = min(d, miniFace(iq) * 0.2);
+        let isc = 0.2 + 0.12 * clamp(fp.open - 0.2, 0.0, 1.0);
+        let iq = (mq - vec3f(0.0, 0.0, -0.35 - 1.2 * fp.tunnel)) / isc;
+        d = min(d, miniFace(iq) * isc);
     }
     return d;
 }
@@ -413,6 +414,7 @@ fn faceParamsFor(arch: i32) -> FaceP {
     var fp = defaultFace();
     fp.eyeDepth = F.fold0.y;
     fp.tunnel = F.fold0.z;
+    fp.open += F.fold1.y; // the mouth as a portal (TEST 05)
     if (arch == 0) { fp.asym = 0.85; }
     if (arch == 1) { fp.asym = 0.0; fp.open = 0.1; }
     if (arch == 2) { fp.asym = 0.5; fp.eyeL = 1.55; fp.eyeR = 0.55; fp.open = 1.6; fp.tunnel = max(fp.tunnel, 0.6); }
@@ -465,7 +467,7 @@ fn archetypeD(q: vec3f, arch: i32, part: i32) -> f32 {
         if (arch == 1) { app = seraphWings(q); }
         if (arch == 2) { app = abyssTendrils(q); }
         if (arch == 4) { app = machineRings(q); }
-        if (arch == 0) { app = maskFilaments(q); } // the mask alone: its appendages are the filaments it frays into
+        if (arch == 0) { app = select(facePlate(q, fp), maskFilaments(q), F.ext.y > 0.5); } // filaments it frays into (ext.y), or a thicker plate
     }
     if (part == 1) { return faceEyes(q, fp); }
     if (part == 2) { return faceMouth(q, fp); }

@@ -128,7 +128,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     let hz = u01(h);
     // world size: plates when bound, dust when free; drifters are the finest
     var rw = F.look.w * (0.55 + 0.9 * hz) * (0.8 + 0.4 * b);
-    if (role == 5) { rw *= 0.45; }
+    if (role == 5) { rw *= 0.45 + 0.5 * F.ext.w; }
     let rpx0 = rw / max(dist * F.camFwd.w, 1e-6);
     // a flake nearer the lens than its focus would be a big bokeh disc: cap the footprint and fade it instead,
     // so close-ups stay readable as surface rather than a snowstorm
@@ -151,7 +151,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     let F0 = vec3f(0.5, 0.51, 0.54) * film;
     let Fr = F0 + (vec3f(0.95) - F0) * pow(1.0 - cosV, 5.0);
     // the flake's reflected radiance: dark unless its normal finds a band (a glint)
-    let base = envF(r, 0.012) * Fr * select(0.35 + 0.5 * b, 0.15, role == 5);
+    let base = envF(r, 0.012) * Fr * select(0.35 + 0.5 * b, 0.15 + 0.6 * F.ext.w, role == 5);
     // heat shows as sparks: only a third of the matter carries it visibly, so a collapse is a spray, not a fireball
     var glint = heatColor(heat) * select(0.0, 1.4, hz < 0.045);
     // a few hot cores: the field's nervous system

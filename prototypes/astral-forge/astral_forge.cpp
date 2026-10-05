@@ -455,7 +455,7 @@ int main(int argc, char** argv) {
         f.flags = glm::vec4(static_cast<float>(o.debug), s.mass, 1.0f / perCell, s.gratingUm);
         f.entity = glm::vec4(s.centre, s.scale);
         f.misc = glm::vec4(s.fall, s.escape, s.strobe, s.appendWeight);
-        f.ext = glm::vec4(s.sharpSpread, s.bloom, 0.0f, 0.0f);
+        f.ext = glm::vec4(s.sharpSpread, s.filaments, s.metaRadius, s.metaFace);
     };
 
     auto dispatch1D = [&](wgpu::ComputePassEncoder& cp, std::uint32_t n) {

@@ -46,7 +46,7 @@ fn cs_init(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     if (i >= u32(F.grid1.w)) { return; }
     let role = roleOf(i);
     let h = u01(hashu(i * 0x85ebca6bu + 0xc2b2ae35u));
-    let R = select(9.0, 22.0, role == 5);
+    let R = select(9.0, F.ext.z, role == 5);
     let p = F.entity.xyz + ballPoint(i, 17u) * R * vec3f(1.2, 0.9, 1.0);
     P[i] = vec4f(p, thetaFor(role, h));
     V[i] = vec4f(curl(p * 0.2) * 0.3, 0.0);
@@ -151,8 +151,22 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     // of a noise field gives the free matter its own ambiguous shapes (sheets, clots, voids between) --
     // the brief's "loose clustering" and "suggestive structure" before any anatomy exists.
     acc += (1.0 - b) * chaos * cflow;
-    if (role != 5) {
-        let np = p * 0.32 + vec3f(0.0, t * 0.04, t * 0.02);
+    // META SCALE: the unbound dust can itself condense, faintly, into a mask eight times the entity's size --
+    // the entity is then one feature inside a far larger face (ext.w = strength; TEST 05's reveal)
+    if (role == 5 && F.ext.w > 0.0) {
+        let M = 8.0 * F.entity.w;
+        // the entity sits in the giant's LEFT EYE: it was the pupil of a far larger face
+        let qm = (p - F.entity.xyz) / M + eyeCentreL();
+        let fpm = defaultFace();
+        let e = 0.02;
+        let d0 = facePlate(qm, fpm);
+        let gm = vec3f(facePlate(qm + vec3f(e, 0, 0), fpm) - d0, facePlate(qm + vec3f(0, e, 0), fpm) - d0, facePlate(qm + vec3f(0, 0, e), fpm) - d0);
+        let g = gm / max(length(gm), 1e-6);
+        let tgt = p - g * d0 * M;
+        acc += F.ext.w * (2.5 * (tgt - p) - 1.6 * v);
+    }
+    if (role != 5 || F.ext.w > 0.0) {
+        let np = p * select(0.32, 0.07, role == 5) + vec3f(0.0, t * 0.04, t * 0.02);
         let e = 0.15;
         let n0 = vnoise3(np, 53u) - 0.5;
         let ng = vec3f(vnoise3(np + vec3f(e, 0, 0), 53u), vnoise3(np + vec3f(0, e, 0), 53u), vnoise3(np + vec3f(0, 0, e), 53u)) - 0.5 - n0;
@@ -166,7 +180,7 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     }
     // weak containment: the meta field stays around the entity
     let rel = p - F.entity.xyz;
-    let rmax = select(11.0, 24.0, role == 5) * F.entity.w;
+    let rmax = select(11.0, F.ext.z * 1.1, role == 5) * F.entity.w;
     acc -= rel * 0.6 * smoothstep(rmax * 0.8, rmax * 1.3, length(rel));
 
     let drag = 0.35 + 1.4 * b;

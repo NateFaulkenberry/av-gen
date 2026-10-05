@@ -31,6 +31,9 @@ struct State {
     float gratingUm = 1.6f;
     float sharpSpread = 0.6f;  // 1: only the anatomy's centre becomes precise; 0: everywhere (material studies)
     float bloom = 0.035f;
+    float metaRadius = 22.0f;
+    float metaFace = 0.0f;
+    float filaments = 1.0f;    // the mask's appendage matter: filaments (1) or a thicker plate (0)     // the dust condenses into a giant ghost mask (0..1)  // how far the unbound dust field extends
     float appendWeight = 1.0f; // density weight of appendage matter (below ~0.4: strands of dust, not tubes)
     glm::vec3 eye{0.0f, 0.0f, 25.0f}, target{0.0f};
     float fovDeg = 30.0f;
@@ -69,7 +72,7 @@ inline void defaults(State& s) {
 inline State test01(float t) {
     State s;
     s.archA = s.archB = kMask;
-    s.appendWeight = 0.3f;
+    s.appendWeight = 0.15f;
     const Curve C{{{0.0f, 0.0f}, {1.5f, 0.02f}, {3.0f, 0.17f}, {5.0f, 0.33f}, {7.0f, 0.52f}, {8.6f, 0.72f}, {9.9f, 0.92f},
                    {10.7f, 1.0f}, {11.5f, 1.0f}, {11.6f, 0.2f}, {14.0f, 0.06f}}};
     s.C = C(t);
@@ -174,36 +177,43 @@ inline State test04(float t) {
 inline State test05(float t) {
     State s;
     s.archA = s.archB = kMask;
-    s.appendWeight = 0.3f;
+    s.appendWeight = 0.15f;
+    s.metaRadius = 90.0f;
+    s.metaFace = 1.0f;
+    s.filaments = 0.0f;
+    s.sharpSpread = 0.0f;
     s.C = 1.0f;
     defaults(s);
     s.temper = 0.35f;
     s.flow = 0.9f;
     s.shimmer = 0.35f;
     s.rigPhase = t * 0.3f;
-    const glm::vec3 eyeRing{-0.86f + 0.25f, 0.52f + 0.1f, 0.62f + 0.33f};
-    const glm::vec3 inner{0.0f, -1.32f, 0.66f - 0.35f};
-    // log-distance: 0.18 -> 70 (t 0..7), hold, then 70 -> 0.12 at the inner face (t 9..16)
+    // the mouth opens into a portal while the camera is far away, so the dive can pass through it
+    s.fold1.y = 1.1f * sstep(6.0f, 10.0f, t);
+    const glm::vec3 eyeRing{-0.76f + 0.22f, 0.72f + 0.08f, 0.6f + 0.3f};
+    const glm::vec3 inner{0.0f, -1.45f, 0.62f - 0.35f};
     float logd;
     glm::vec3 focus;
     if (t < 7.0f) {
         const float u = sstep(0.0f, 7.0f, t);
-        logd = std::log(0.18f) + (std::log(70.0f) - std::log(0.18f)) * u;
-        focus = glm::mix(eyeRing, glm::vec3(0.0f), sstep(0.5f, 5.0f, t));
-    } else if (t < 9.0f) {
-        logd = std::log(70.0f);
-        focus = glm::vec3(0.0f);
+        logd = std::log(0.22f) + (std::log(95.0f) - std::log(0.22f)) * u;
+        focus = glm::mix(eyeRing, glm::vec3(0.76f * 8.0f, -0.72f * 8.0f, 0.0f) * 0.85f, sstep(1.5f, 7.0f, t));
+    } else if (t < 8.5f) {
+        logd = std::log(95.0f);
+        focus = glm::vec3(0.76f * 8.0f, -0.72f * 8.0f, 0.0f) * 0.85f;
     } else {
-        const float u = sstep(9.0f, 16.0f, t);
-        logd = std::log(70.0f) + (std::log(0.12f) - std::log(70.0f)) * u;
-        focus = glm::mix(glm::vec3(0.0f), inner, sstep(10.0f, 14.5f, t));
+        const float u = sstep(8.5f, 16.0f, t);
+        logd = std::log(95.0f) + (std::log(0.55f) - std::log(95.0f)) * u;
+        focus = glm::mix(glm::vec3(0.76f * 8.0f, -0.72f * 8.0f, 0.0f) * 0.85f, inner, sstep(8.5f, 13.5f, t));
     }
     const float d = std::exp(logd);
-    const float az = -20.0f + 30.0f * std::sin(t * 0.25f);
-    s.eye = orbit(d, az, 6.0f, focus);
+    // head-on for the dive (the slit must be in front of the lens), drifting while far
+    const float az = t < 8.5f ? -20.0f + 30.0f * std::sin(t * 0.25f) : glm::mix(-20.0f + 30.0f * std::sin(8.5f * 0.25f), 0.0f, sstep(8.5f, 12.0f, t));
+    const float el = t < 8.5f ? 6.0f : glm::mix(6.0f, 0.0f, sstep(8.5f, 12.0f, t));
+    s.eye = orbit(d, az, el, focus);
     s.target = focus;
     s.fovDeg = 30.0f;
-    s.label = t < 3.0f ? "MICRO" : (t < 9.0f ? "REVEAL" : (t < 13.0f ? "INTERNAL" : "MICRO"));
+    s.label = t < 3.0f ? "MICRO" : (t < 8.5f ? "REVEAL" : (t < 13.0f ? "INTERNAL" : "MICRO"));
     return s;
 }
 
