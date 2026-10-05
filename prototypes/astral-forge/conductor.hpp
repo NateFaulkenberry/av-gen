@@ -123,18 +123,20 @@ inline State test03(float t) {
     s.C = 0.96f - 0.12f * pulse(t, 7.0f, 0.5f);
     defaults(s);
     const float restore = 1.0f - sstep(10.0f, 12.5f, t);
-    s.fold0.x = 1.4f * sstep(2.0f, 4.0f, t) * restore;            // twist
+    s.fold0.x = 0.75f * sstep(2.0f, 4.5f, t) * restore;           // twist (wide wings tear above ~0.8: their tips outrun the matter)
     s.fold0.y = 1.0f * sstep(3.5f, 6.0f, t) * restore;            // the left eye recedes through depth
     s.fold0.z = 1.0f * sstep(5.0f, 7.5f, t) * restore;            // the mouth becomes a tunnel
-    s.fold0.w = 0.8f * sstep(7.0f, 9.0f, t) * restore;            // sphere inversion: folds inward
+    s.fold0.w = 0.42f * sstep(7.0f, 9.0f, t) * restore;           // sphere inversion: folds inward
     s.fold1.x = 1.2f * sstep(6.0f, 8.5f, t) * restore;            // bend
     s.morph = sstep(8.0f, 9.8f, t) * (1.0f - sstep(10.5f, 12.5f, t)); // unfolds as something else
     s.temper = 0.25f + 0.45f * s.morph + 0.2f * s.fold0.w;
     s.flow = 1.0f;
     s.shimmer = 0.4f;
     s.rigPhase = t * 0.4f;
-    s.eye = orbit(19.0f - 2.0f * sstep(0.0f, 14.0f, t), -25.0f + 50.0f * sstep(0.0f, 14.0f, t), 6.0f, {0.0f, 0.0f, 0.0f});
-    s.target = {0.0f, -0.2f, 0.0f};
+    s.eye = orbit(14.0f - 2.5f * sstep(0.0f, 14.0f, t), -25.0f + 50.0f * sstep(0.0f, 14.0f, t), 6.0f, {0.0f, 0.3f, 0.0f});
+    s.target = {0.0f, 0.4f, 0.0f};
+    s.fovDeg = 30.0f;
+    s.exposure = 1.1f;
     s.label = "IMPOSSIBLE";
     return s;
 }
@@ -143,7 +145,7 @@ inline State test03(float t) {
 inline State test04(float t) {
     State s;
     s.archA = s.archB = kChoir;
-    const Curve C{{{0.0f, 0.15f}, {3.0f, 0.9f}, {12.4f, 1.0f}, {12.5f, 0.15f}, {15.0f, 0.05f}}};
+    const Curve C{{{0.0f, 0.55f}, {1.5f, 0.92f}, {12.4f, 1.0f}, {12.5f, 0.15f}, {15.0f, 0.05f}}};
     s.C = C(t);
     defaults(s);
     s.fold1.z = sstep(4.5f, 8.0f, t);   // sync
@@ -155,9 +157,13 @@ inline State test04(float t) {
     s.strobe = 0.6f * pulse(t, 12.45f, 0.08f);
     s.rigPhase = t * 0.4f;
     s.warmth = 0.6f;
-    const float d = 13.0f + 12.0f * sstep(0.0f, 7.0f, t) - 6.0f * sstep(8.5f, 12.0f, t);
-    s.eye = orbit(d, 35.0f - 35.0f * sstep(2.0f, 10.0f, t), 18.0f - 14.0f * sstep(3.0f, 11.0f, t), {0.0f, 0.0f, 0.0f});
-    s.target = {0.0f, -0.1f, 0.0f};
+    s.sharpSpread = 0.0f; // every small face must be precise, not only the centre
+    // close on a few faces (each its own), pulling back to reveal what they compose, then onto the one face
+    const float d = 7.0f + 9.0f * sstep(1.5f, 8.0f, t) - 2.5f * sstep(9.0f, 12.0f, t);
+    const glm::vec3 near{0.9f, 0.6f, 0.0f};
+    const glm::vec3 focus = glm::mix(near, glm::vec3(0.0f, 0.1f, 0.0f), sstep(1.5f, 7.0f, t));
+    s.eye = orbit(d, 28.0f - 28.0f * sstep(1.0f, 9.0f, t), 10.0f - 8.0f * sstep(2.0f, 9.0f, t), focus);
+    s.target = focus;
     s.label = t < 7.0f ? "REVEAL" : (t < 12.4f ? "DESCENT" : "COLLISION");
     return s;
 }

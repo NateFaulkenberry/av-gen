@@ -129,7 +129,11 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     // world size: plates when bound, dust when free; drifters are the finest
     var rw = F.look.w * (0.55 + 0.9 * hz) * (0.8 + 0.4 * b);
     if (role == 5) { rw *= 0.45; }
-    let rpx = rw / max(dist * F.camFwd.w, 1e-6);
+    let rpx0 = rw / max(dist * F.camFwd.w, 1e-6);
+    // a flake nearer the lens than its focus would be a big bokeh disc: cap the footprint and fade it instead,
+    // so close-ups stay readable as surface rather than a snowstorm
+    let rpx = min(rpx0, 2.5);
+    let nearFade = min(1.0, (2.5 / max(rpx0, 1e-3)) * (2.5 / max(rpx0, 1e-3)));
 
     // orientation
     let jit = vec3f(u01(h >> 3u), u01(h >> 7u), u01(h >> 11u)) - 0.5;
@@ -149,7 +153,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     // the flake's reflected radiance: dark unless its normal finds a band (a glint)
     let base = envF(r, 0.012) * Fr * select(0.35 + 0.5 * b, 0.15, role == 5);
     // heat shows as sparks: only a third of the matter carries it visibly, so a collapse is a spray, not a fireball
-    var glint = heatColor(heat) * select(0.0, 1.1, hz < 0.14);
+    var glint = heatColor(heat) * select(0.0, 1.4, hz < 0.045);
     // a few hot cores: the field's nervous system
     if (hz > 0.992) { glint += vec3f(0.85, 0.92, 1.0) * (0.4 + 2.0 * F.audio0.w + 1.5 * F.audio1.w) * (0.3 + 0.7 * b); }
 
@@ -165,7 +169,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     }
     // as the form sharpens, bound matter FUSES into the surface: its flakes thin out to a residual sparkle
     let fuse = 1.0 - 0.97 * F.ent0.z * smoothstep(0.6, 1.0, b);
-    let w = fuse / f32(n);
+    let w = fuse * nearFade / f32(n);
     for (var k = 0; k < n; k++) {
         let c = mix(s0.xy, s1.xy, (f32(k) + 0.5) / f32(n));
         splatPoint(c, select(rpx, min(rpx, 1.1), n > 1), w, base, glint);

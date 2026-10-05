@@ -182,7 +182,7 @@ struct Options {
     char approach = 'E';
     std::uint32_t n = 2u << 20;
     int gridRes = 192;
-    float gridSize = 20.0f;
+    float gridSize = -1.0f; // default per test (the choir needs a tighter box for its small faces)
     std::uint32_t width = 1920, height = 1080;
     double at = -1.0, from = 0.0, to = -1.0, fps = 30.0;
     std::string png, clip, song;
@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
     const int approach = std::clamp(o.approach - 'A', 0, 4);
+    if (o.gridSize <= 0.0f) o.gridSize = o.test == 4 ? 12.5f : 20.0f;
     if (o.song.empty()) o.song = std::string(std::getenv("HOME")) + "/Desktop/Nate/Fireballs.mp3";
 
     // ---- audio ----

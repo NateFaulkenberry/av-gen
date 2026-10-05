@@ -231,11 +231,11 @@ fn seraphWings(q: vec3f) -> f32 {
     let side = sign(q.x + 1e-6);
     var p = q;
     p.x = abs(p.x);
-    let root = vec3f(1.5, 0.3, -1.5);
+    let root = vec3f(1.3, 0.6, -1.5);
     for (var k = 0; k < 3; k++) {
         let fk = f32(k);
         let open = 0.12 * F.ent1.w + 0.05 * sin(t * 0.8 + fk);
-        let ang = -0.35 - 0.52 * fk - open; // fan outward from vertical
+        let ang = 0.25 + 0.42 * fk + open; // rotating the sample point by +a turns the blade by -a: outward, fanning from vertical
         var lp = p - root;
         let xy = rot2(ang) * lp.xy;
         lp = vec3f(xy.x, xy.y, lp.z);
@@ -377,45 +377,34 @@ fn hornsRings(q: vec3f) -> f32 {
 // ---- choir: hundreds of small faces on a shell (cube-sphere cells), syncing, then merging ---------
 
 fn choirShell(q: vec3f) -> f32 {
+    // THE CHOIR: the great mask's skin is made of hundreds of small faces. Each lives in a cell of a 3-D
+    // lattice; only cells whose centre lies within the host mask's shell hold one. Before sync each face is
+    // turned and displaced on its own; synced, they all stare forward; merged, the host face takes over.
     let t = F.cam.w;
     let sync = F.fold1.z;
-    let R = 4.2;
-    let r = length(q);
-    let dir = q / max(r, 1e-4);
-    // cube-sphere cell: pick the dominant axis, then a 9x9 grid on that face
-    let a = abs(dir);
-    var face = 0u; var uv = vec2f(0.0); var axis = vec3f(0.0);
-    if (a.x >= a.y && a.x >= a.z) { face = select(1u, 0u, dir.x > 0.0); uv = dir.yz / a.x; axis = vec3f(sign(dir.x), 0.0, 0.0); }
-    else if (a.y >= a.z) { face = select(3u, 2u, dir.y > 0.0); uv = dir.xz / a.y; axis = vec3f(0.0, sign(dir.y), 0.0); }
-    else { face = select(5u, 4u, dir.z > 0.0); uv = dir.xy / a.z; axis = vec3f(0.0, 0.0, sign(dir.z)); }
-    let N = 9.0;
-    let cell = clamp(floor((uv * 0.5 + 0.5) * N), vec2f(0.0), vec2f(N - 1.0));
-    let cuv = (cell + 0.5) / N * 2.0 - 1.0;
-    var cdir = vec3f(0.0);
-    if (face <= 1u) { cdir = normalize(vec3f(axis.x, cuv.x, cuv.y)); }
-    else if (face <= 3u) { cdir = normalize(vec3f(cuv.x, axis.y, cuv.y)); }
-    else { cdir = normalize(vec3f(cuv.x, cuv.y, axis.z)); }
-    let id = hashu(face * 1000u + u32(cell.x) * 31u + u32(cell.y));
-    // a frame on the shell: the face looks outward; its "up" wobbles independently until sync
-    let up0 = select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(cdir.y) > 0.9);
-    var xb = normalize(cross(up0, cdir));
-    var yb = cross(cdir, xb);
-    let indep = (1.0 - sync) * (u01(id) - 0.5) * 2.4 * sin(t * (0.5 + u01(id >> 3u)) + f32(id & 255u));
-    let ca = cos(indep); let sa = sin(indep);
-    let xr = xb * ca + yb * sa;
-    let yr = -xb * sa + yb * ca;
-    // when synchronised, every face turns to look the same way (+z): the shell becomes a crowd that stares
-    let look = normalize(mix(cdir, normalize(cdir + vec3f(0.0, 0.0, 1.6)), sync));
-    let lx = normalize(cross(yr, look));
-    let ly = cross(look, lx);
-    let c = cdir * R;
-    let lp = q - c;
-    let local = vec3f(dot(lp, lx), dot(lp, ly), dot(lp, look));
-    let s = 0.33;
-    var d = miniFace(local / s) * s;
-    // a thin web between them so the shell reads as one organism
-    d = smin(d, abs(r - R + 0.35) - 0.03, 0.12);
-    return d;
+    // a lattice bent like scales: an axis-aligned grid of faces reads as tiles or windows (architecture), so the
+    // cell coordinates are warped by a slow field before rounding; rows curve and crowd like skin
+    let cs = 0.54;
+    let wq = q + 0.32 * vec3f(sin(q.y * 1.3 + 0.7 * q.z), sin(q.x * 1.1 - 0.5 * q.z + 1.7), 0.4 * sin(q.x * 0.9 + q.y * 0.8));
+    let cell = round(wq / cs);
+    let c = cell * cs - (wq - q);
+    let fp = defaultFace();
+    let host = facePlate(c, fp);
+    if (abs(host) > 0.42) { return max(abs(host) - 0.42, 0.05); } // outside the shell: a bound to the shell
+    let id = hashu((u32(cell.x + 64.0) * 73856093u) ^ (u32(cell.y + 64.0) * 19349663u) ^ (u32(cell.z + 64.0) * 83492791u));
+    let r0 = vec3f(u01(id), u01(id >> 8u), u01(id >> 16u)) - 0.5;
+    let wob = (1.0 - sync);
+    let off = r0 * (0.08 + 0.18 * wob);
+    var lp = q - c - off;
+    // independent turning (yaw, pitch, roll), each with its own rhythm, decaying to zero with sync
+    let a1 = wob * (r0.x * 2.4 + 0.5 * sin(t * (0.7 + r0.y) + r0.z * 9.0));
+    let a2 = wob * (r0.y * 1.6 + 0.4 * sin(t * (0.9 + r0.z) + r0.x * 7.0));
+    let a3 = wob * (r0.z * 2.0);
+    let xz = rot2(a1) * lp.xz; lp = vec3f(xz.x, lp.y, xz.y);
+    let yz = rot2(a2) * lp.yz; lp = vec3f(lp.x, yz.x, yz.y);
+    let xy = rot2(a3) * lp.xy; lp = vec3f(xy.x, xy.y, lp.z);
+    let s = 0.2;
+    return miniFace(lp / s) * s;
 }
 
 // ---- archetype assembly ---------------------------------------------------------------------------
