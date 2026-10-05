@@ -109,13 +109,21 @@ TEST_CASE("GridField validation rejects impossible grids", "[grid]") {
     CHECK_FALSE(g.validate().has_value());
     g.maxSubSteps = 4;
 
-    // A 128^3 vector grid does not fit the shared table; a 128^3 scalar grid exactly does.
+    // A 128^3 vector grid does not fit the shared table; a 128^3 scalar grid does, twice (ADR-1120
+    // doubled the table to 16 MB so one 1024 x 1 x 1024 agents trail fits it exactly).
     g.mode = spatial::GridMode::Vector;
     g.resolution = glm::ivec3(128);
     CHECK_FALSE(g.validate().has_value());
     g.mode = spatial::GridMode::Scalar;
     CHECK(g.validate().has_value());
+    CHECK(g.floatCount() * 2 == spatial::kMaxGridTableFloats);
+    g.mode = spatial::GridMode::Agents;
+    g.resolution = glm::ivec3(1024, 1, 1024);
+    g.agentCount = 1000;
+    CHECK(g.validate().has_value());
     CHECK(g.floatCount() == spatial::kMaxGridTableFloats);
+    g.resolution = glm::ivec3(1024, 2, 1024); // an agents grid is a plane
+    CHECK_FALSE(g.validate().has_value());
 }
 
 TEST_CASE("GridField sampling is trilinear and honours the wrap rule", "[grid]") {

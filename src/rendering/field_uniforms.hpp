@@ -45,10 +45,12 @@ namespace avgen::rendering {
 struct FieldAudioGpu {
     glm::uvec4 ring{0u};   // x = ring offset in the table (floats), y = rows, z = bins, w = 1 when audio is bound
     glm::vec4 timing{0.0f, -1.0f, 0.0f, 0.0f}; // x = rows per second, y = newest row (-1 none), z = audible rows
-    glm::vec4 onsetAge[spatial::kOnsetSources * 2];      // source s: [2s], [2s + 1]; < 0 = none
-    glm::vec4 onsetStrength[spatial::kOnsetSources * 2];
+    // Literal extents: the layout guard (tests/unit/test_renderer_layout_guards.cpp) scrapes them.
+    glm::vec4 onsetAge[8];      // source s: [2s], [2s + 1]; < 0 = none
+    glm::vec4 onsetStrength[8];
 };
 static_assert(sizeof(FieldAudioGpu) == 288);
+static_assert(spatial::kOnsetSources * 2 == 8, "FieldAudio holds two vec4s of onsets per source");
 static_assert(spatial::kOnsetHistory == 8, "FieldAudio packs eight onsets per source in two vec4s");
 
 // Mirrors `FieldBlock` in shaders/fields.wgsl (6192 bytes).
