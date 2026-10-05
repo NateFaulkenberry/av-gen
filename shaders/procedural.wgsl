@@ -383,6 +383,7 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     var recordIndex = instanceIndex;
     if (proc.fieldInfo.w > 0.5) { recordIndex = visibleIndices[instanceIndex]; }
     let inst = instances[recordIndex];
+    fieldElement = inst.random.w; // ADR-1116: Field deformers sample per element, as the effector pass does
     var out: ProcVertexOut;
     out.uv = in.uv;
     out.instColor = inst.color;
@@ -558,6 +559,7 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     info.emissionField = 1.0;
     let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
     if (emissiveSlot >= 0) {
+        fieldElement = in.instRandom.w; // ADR-1116
         info.emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
     }
     info.variation = in.variation;

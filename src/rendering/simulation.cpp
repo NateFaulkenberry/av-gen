@@ -329,7 +329,7 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
     }
     const std::uint64_t floats = spatial::gridTableFloats(grids);
     stats_.tableFloats = floats;
-    if (floats * sizeof(float) > FieldUniforms::kGridBufferSize) {
+    if (floats > spatial::kMaxGridTableFloats) {
         if (!im.warnedLimit) {
             log::warn("simulated grids need {} floats; the shared table holds {}", floats,
                       spatial::kMaxGridTableFloats);

@@ -95,15 +95,16 @@ struct SampleContext {
     bool world;
 };
 
-Sample sampleAt(const SampleContext& ctx, const glm::vec3& p) {
+// `element` is the point's own random (ADR-1116: random.w, what shaders/points.wgsl hands fields).
+Sample sampleAt(const SampleContext& ctx, const glm::vec3& p, float element) {
     const glm::vec3 sp = ctx.world ? glm::vec3(ctx.objectToWorld * glm::vec4(p, 1.0f)) : p;
     Sample out;
-    out.s = sampleScalar(ctx.field, sp, ctx.time, &ctx.fields);
-    out.v = sampleVector(ctx.field, sp, ctx.time, &ctx.fields);
+    out.s = sampleScalar(ctx.field, sp, ctx.time, &ctx.fields, element);
+    out.v = sampleVector(ctx.field, sp, ctx.time, &ctx.fields, element);
     if (ctx.world) {
         out.v = ctx.worldToObject * out.v;
     }
-    out.c = sampleColor(ctx.field, sp, ctx.time, &ctx.fields);
+    out.c = sampleColor(ctx.field, sp, ctx.time, &ctx.fields, element);
     return out;
 }
 
@@ -115,7 +116,7 @@ void applyOne(const Effector& e, const SampleContext& ctx, std::size_t count, Ac
     const bool vectorField = ctx.field.type() == FieldType::Vector;
     for (std::size_t i = 0; i < count; ++i) {
         const glm::vec3 p = access.position(i);
-        const Sample smp = sampleAt(ctx, p);
+        const Sample smp = sampleAt(ctx, p, access.element(i));
         switch (e.op) {
         case EffectorOp::PositionOffset: {
             const glm::vec3 raw = vectorField ? smp.v * k : e.axis * (smp.s * k);
@@ -179,6 +180,7 @@ void applyOne(const Effector& e, const SampleContext& ctx, std::size_t count, Ac
 
 struct CloudAccess {
     PointCloud& cloud;
+    float element(std::size_t i) const { return cloud.random(i, 3); }
     std::span<glm::vec3> pos;
     std::span<glm::vec4> rot;
     std::span<glm::vec3> sc;
@@ -229,6 +231,7 @@ struct CloudAccess {
 
 struct RecordAccess {
     std::span<InstanceRecord> records;
+    float element(std::size_t i) const { return records[i].random.w; }
 
     glm::vec3 position(std::size_t i) const { return glm::vec3(records[i].position); }
     void setPosition(std::size_t i, const glm::vec3& v) { records[i].position = glm::vec4(v, records[i].position.w); }

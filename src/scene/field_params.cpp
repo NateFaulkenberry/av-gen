@@ -142,6 +142,17 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
     r.f("falloff/exponent", rest.falloff.exponent, 0.01f, 32.0f, 0.1f, 8.0f);
     r.f("falloff/noiseAmount", rest.falloff.noiseAmount, 0.0f, 10.0f, 0.0f, 1.0f);
     r.f("falloff/noiseScale", rest.falloff.noiseScale, 0.001f, 100.0f, 0.01f, 5.0f);
+    // ADR-1116: an audio field's numbers, registered only for the audio kinds (the band mode and the
+    // onset source stay in the file, as a trigger's source does).
+    if (rest.isAudio()) {
+        r.f("bandLow", "band from (0 = 32 Hz, 1 = 16 kHz)", rest.bandLow, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("bandHigh", "band to (0 = 32 Hz, 1 = 16 kHz)", rest.bandHigh, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.i("bandRepeat", "angle sweeps per turn", rest.bandRepeat, 1, 64, 12);
+        r.f("audioDelay", "hears the song this many seconds late", rest.audioDelay, 0.0f, 16.0f, 0.0f, 8.0f);
+        r.f("audioSpeed", "the present travels outward at (m/s)", rest.audioSpeed, 0.0f, 1000.0f, 0.0f, 60.0f);
+        r.f("onsetDecay", "an onset fades at (1/s)", rest.onsetDecay, 0.0f, 100.0f, 0.0f, 20.0f);
+        r.f("onsetWidth", "the onset front's half width (m)", rest.onsetWidth, 0.0f, 1000.0f, 0.0f, 20.0f);
+    }
     // ADR-906: a triggered field's timing, adjustable where the field is. What it fires on -- the
     // source, and the name of the musical event or marker -- stays in the file, as an effect's does;
     // the numbers that say which of those events are here, and only the ones its source reads.
@@ -202,6 +213,13 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
     copyValue(p, "falloff/exponent", live.falloff.exponent);
     copyValue(p, "falloff/noiseAmount", live.falloff.noiseAmount);
     copyValue(p, "falloff/noiseScale", live.falloff.noiseScale);
+    copyValue(p, "bandLow", live.bandLow); // ADR-1116 (registered only for the audio kinds)
+    copyValue(p, "bandHigh", live.bandHigh);
+    copyValue(p, "bandRepeat", live.bandRepeat);
+    copyValue(p, "audioDelay", live.audioDelay);
+    copyValue(p, "audioSpeed", live.audioSpeed);
+    copyValue(p, "onsetDecay", live.onsetDecay);
+    copyValue(p, "onsetWidth", live.onsetWidth);
     // ADR-906: the trigger's numbers (registered only for the source that reads them).
     if (live.trigger) {
         copyValue(p, "trigger/everyN", live.trigger->everyN);

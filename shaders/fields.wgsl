@@ -54,13 +54,30 @@ struct FieldGpu {
     gridRes: vec4<f32>,              // resolution.xyz, w = 0 unbound, 1 bound (clamp), 3 bound (wrap)
 };
 
+// ADR-1116: the audio history the Spectrum and Onset kinds read (rendering::FieldUniforms packs it
+// from spatial::AudioHistory each frame). The spectrogram rows live in a ring in `gridTable`, after
+// the grids: row r is at ring.x + (r mod ring.y) * ring.z. Only rows in (newest - ring.y, newest]
+// are held; anything older or newer reads 0.
+struct FieldAudio {
+    ring: vec4<u32>,                    // x = ring offset in gridTable (floats), y = rows, z = bins, w = 1 when audio is bound
+    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none)
+    onsetAge: array<vec4<f32>, 8>,      // source s (low, mid, high, beat): [2s] and [2s + 1] hold its newest 8 onsets' ages (s), < 0 none
+    onsetStrength: array<vec4<f32>, 8>,
+};
+
 struct FieldBlock {
     count: u32,
     pad0: u32,
     pad1: u32,
     pad2: u32,
+    audio: FieldAudio,
     fields: array<FieldGpu, 16>,
 };
+
+// ADR-1116: the sampling element's own random in [0, 1), read by an Element-band Spectrum field.
+// A caller that samples per record sets it first (cs_effectors: the record's random.w); everyone
+// else reads the middle band.
+var<private> fieldElement: f32 = 0.5;
 
 const FIELD_CONSTANT: u32 = 0u;
 const FIELD_LINEAR_GRADIENT: u32 = 1u;
@@ -87,6 +104,8 @@ const FIELD_NOISE_COLOR: u32 = 21u;
 const FIELD_POSITION_COLOR: u32 = 22u;
 const FIELD_COMPOUND: u32 = 23u;
 const FIELD_GRID: u32 = 24u;
+const FIELD_SPECTRUM: u32 = 25u;
+const FIELD_ONSET: u32 = 26u;
 
 const FIELD_TYPE_SCALAR: u32 = 0u;
 const FIELD_TYPE_VECTOR: u32 = 1u;
@@ -364,6 +383,128 @@ fn waveValue(fi: u32, q: vec3<f32>) -> f32 {
     return fieldBlock.fields[fi].wave0.x * envelope * v;
 }
 
+// ---- audio (ADR-1116); mirrors spatial/audio_history.cpp and field.cpp `audioShape` ----------------
+
+fn audioRingValue(row: i32, bin: i32) -> f32 {
+    let a = fieldBlock.audio;
+    let newest = i32(a.timing.y);
+    let rows = i32(a.ring.y);
+    if (a.ring.w == 0u || newest < 0 || row > newest || row <= newest - rows || row < 0) {
+        return 0.0;
+    }
+    let slot = u32(row % rows);
+    return gridTable[a.ring.x + slot * a.ring.z + u32(bin)];
+}
+
+fn audioRowLerp(x: f32, bin: i32) -> f32 {
+    let newest = i32(fieldBlock.audio.timing.y);
+    let r0f = floor(x);
+    let f = x - r0f;
+    let r0 = i32(r0f);
+    let r1 = min(r0 + 1, newest);
+    let a = audioRingValue(r0, bin);
+    let b = audioRingValue(r1, bin);
+    return a + (b - a) * f;
+}
+
+fn audioDelayedRow(delay: f32) -> f32 {
+    return fieldBlock.audio.timing.y - max(delay, 0.0) * fieldBlock.audio.timing.x;
+}
+
+fn audioSpectrumAt(delay: f32, binPos: f32) -> f32 {
+    if (fieldBlock.audio.ring.w == 0u || fieldBlock.audio.timing.y < 0.0) {
+        return 0.0;
+    }
+    let x = audioDelayedRow(delay);
+    let top = f32(i32(fieldBlock.audio.ring.z) - 1);
+    let b = clamp(binPos, 0.0, 1.0) * top;
+    let b0f = floor(b);
+    let fb = b - b0f;
+    let b0 = i32(b0f);
+    let b1 = min(b0 + 1, i32(top));
+    let v0 = audioRowLerp(x, b0);
+    let v1 = audioRowLerp(x, b1);
+    return v0 + (v1 - v0) * fb;
+}
+
+fn audioSpectrumRange(delay: f32, lo: f32, hi: f32) -> f32 {
+    if (fieldBlock.audio.ring.w == 0u || fieldBlock.audio.timing.y < 0.0) {
+        return 0.0;
+    }
+    let x = audioDelayedRow(delay);
+    let top = f32(i32(fieldBlock.audio.ring.z) - 1);
+    let b0 = i32(floor(clamp(lo, 0.0, 1.0) * top + 0.5));
+    let b1 = max(b0, i32(floor(clamp(hi, 0.0, 1.0) * top + 0.5)));
+    var sum = 0.0;
+    for (var bin = b0; bin <= b1; bin = bin + 1) {
+        sum = sum + audioRowLerp(x, bin);
+    }
+    return sum / f32(b1 - b0 + 1);
+}
+
+// Fraction of a turn about the field's axis around `point`; 0 on the axis (atan2(0, 0) is NaN on Metal).
+fn audioAngleTurns(fi: u32, q: vec3<f32>) -> f32 {
+    let n = fieldAxis(fi);
+    let r = q - fieldBlock.fields[fi].pointLength.xyz;
+    let rp = r - n * dot(r, n);
+    var refAxis = vec3<f32>(1.0, 0.0, 0.0);
+    if (abs(n.y) < 0.99) {
+        refAxis = vec3<f32>(0.0, 1.0, 0.0);
+    }
+    let e1 = fieldNormalize(cross(n, refAxis));
+    let e2 = cross(n, e1);
+    let x = dot(rp, e1);
+    let y = dot(rp, e2);
+    if (x * x + y * y < 1e-12) {
+        return 0.0;
+    }
+    return atan2(y, x) / FIELD_TWO_PI + 0.5;
+}
+
+fn audioShape(fi: u32, q: vec3<f32>) -> f32 {
+    if (fieldBlock.audio.ring.w == 0u) {
+        return 0.0;
+    }
+    let params0 = fieldBlock.fields[fi].gridBounds0; // bandLow, bandHigh, audioDelay, audioSpeed
+    let params1 = fieldBlock.fields[fi].gridBounds1; // audioBand, bandRepeat, onsetDecay, onsetWidth
+    let d = waveDistance(fi, q);
+    var travel = 0.0;
+    if (params0.w > 0.0) {
+        travel = d / params0.w;
+    }
+    if (fieldBlock.fields[fi].kind == FIELD_ONSET) {
+        let source = u32(fieldBlock.fields[fi].gridRes.x + 0.5);
+        var sum = 0.0;
+        for (var k = 0u; k < 8u; k = k + 1u) {
+            let lane = source * 2u + k / 4u;
+            let age = fieldBlock.audio.onsetAge[lane][k % 4u];
+            if (age < 0.0) {
+                continue;
+            }
+            var front = 1.0;
+            if (params1.w > 0.0) {
+                let x = (d - age * params0.w) / params1.w;
+                front = exp(-(x * x));
+            }
+            sum = sum + fieldBlock.audio.onsetStrength[lane][k % 4u] * exp(-max(params1.z, 0.0) * age) * front;
+        }
+        return sum;
+    }
+    let delay = max(params0.z, 0.0) + travel;
+    let lo = saturate(params0.x);
+    let hi = saturate(params0.y);
+    let band = u32(params1.x + 0.5);
+    if (band == 0u) {
+        return audioSpectrumRange(delay, lo, hi);
+    }
+    if (band == 1u) {
+        return audioSpectrumAt(delay, lo + saturate(fieldElement) * (hi - lo));
+    }
+    let u = fract(audioAngleTurns(fi, q) * max(params1.y, 1.0));
+    let tri = 1.0 - abs(2.0 * u - 1.0);
+    return audioSpectrumAt(delay, lo + tri * (hi - lo));
+}
+
 // Scalar shape of a scalar kind (before invert and weight).
 fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     let kind = fieldBlock.fields[fi].kind;
@@ -400,6 +541,9 @@ fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     }
     if (kind == FIELD_GRID) {
         return gridScalarAt(fi, q);
+    }
+    if (kind == FIELD_SPECTRUM || kind == FIELD_ONSET) {
+        return audioShape(fi, q);
     }
     return 0.0; // anything unknown
 }

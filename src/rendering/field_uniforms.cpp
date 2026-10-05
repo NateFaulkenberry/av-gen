@@ -4,6 +4,7 @@
 #include "gpu/context.hpp"
 
 #include <algorithm>
+#include <array>
 
 namespace avgen::rendering {
 
@@ -54,7 +55,83 @@ void FieldUniforms::update(const spatial::FieldSet& fields, double time) {
         }
     }
     block_.count = static_cast<std::uint32_t>(count);
+    updateAudio(fields, time);
     context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));
+}
+
+void FieldUniforms::updateAudio(const spatial::FieldSet& fields, double time) {
+    using spatial::kAudioBins;
+    using spatial::kAudioRingRows;
+    audioStats_ = FieldAudioStats{};
+    audioStats_.ringBytes = spatial::kAudioRingFloats * sizeof(float);
+    FieldAudioGpu& a = block_.audio;
+    for (glm::vec4& v : a.onsetAge) {
+        v = glm::vec4(-1.0f);
+    }
+    if (!fields.audio) {
+        return;
+    }
+    const spatial::AudioHistory& audio = *fields.audio;
+    const double clock = audio.now(time);
+    const std::int64_t newest = audio.newestRow(clock);
+    a.ring = glm::uvec4(kAudioRingOffset, static_cast<std::uint32_t>(kAudioRingRows),
+                        static_cast<std::uint32_t>(kAudioBins), 1u);
+    a.timing = glm::vec4(static_cast<float>(audio.rowRate()), static_cast<float>(newest), 0.0f, 0.0f);
+    for (int s = 0; s < spatial::kOnsetSources; ++s) {
+        std::array<float, spatial::kOnsetHistory> ages{};
+        std::array<float, spatial::kOnsetHistory> strengths{};
+        ages.fill(-1.0f);
+        audio.lastOnsets(static_cast<spatial::OnsetSource>(s), clock, ages, strengths);
+        for (int k = 0; k < spatial::kOnsetHistory; ++k) {
+            a.onsetAge[s * 2 + k / 4][k % 4] = ages[static_cast<std::size_t>(k)];
+            a.onsetStrength[s * 2 + k / 4][k % 4] = strengths[static_cast<std::size_t>(k)];
+        }
+    }
+    audioStats_.bound = true;
+    audioStats_.newestRow = newest;
+    if (newest < 0) {
+        return;
+    }
+    // The rows the window needs, minus the rows the ring already holds. Both are kAudioRingRows long,
+    // so the difference is one interval.
+    const std::int64_t needLo = newest - kAudioRingRows + 1;
+    std::int64_t lo = needLo;
+    std::int64_t hi = newest;
+    const bool sameSource = ringAudio_ == &audio && ringRevision_ == audio.revision() &&
+                            ringNewest_ != std::numeric_limits<std::int64_t>::min();
+    if (sameSource) {
+        const std::int64_t heldLo = ringNewest_ - kAudioRingRows + 1;
+        const std::int64_t heldHi = ringNewest_;
+        if (newest == heldHi) {
+            return;
+        }
+        if (newest > heldHi && heldHi >= needLo) {
+            lo = heldHi + 1; // playing forwards: only the new rows
+        } else if (newest < heldHi && newest >= heldLo) {
+            hi = heldLo - 1; // stepped back inside the window: only the older rows
+        }
+    }
+    ringAudio_ = &audio;
+    ringRevision_ = audio.revision();
+    ringNewest_ = newest;
+    // Written as runs of contiguous slots (at most two: the ring wraps once).
+    std::int64_t row = lo;
+    while (row <= hi) {
+        const auto slot = static_cast<std::uint32_t>(((row % kAudioRingRows) + kAudioRingRows) % kAudioRingRows);
+        const std::int64_t run = std::min<std::int64_t>(hi - row + 1, kAudioRingRows - slot);
+        ringStaging_.assign(static_cast<std::size_t>(run) * kAudioBins, 0.0f);
+        for (std::int64_t k = 0; k < run; ++k) {
+            for (int b = 0; b < kAudioBins; ++b) {
+                ringStaging_[static_cast<std::size_t>(k) * kAudioBins + static_cast<std::size_t>(b)] =
+                    audio.value(row + k, b);
+            }
+        }
+        const std::uint64_t offset =
+            (static_cast<std::uint64_t>(kAudioRingOffset) + static_cast<std::uint64_t>(slot) * kAudioBins) * sizeof(float);
+        context_.queue().WriteBuffer(gridBuffer_, offset, ringStaging_.data(), ringStaging_.size() * sizeof(float));
+        audioStats_.rowsUploaded += static_cast<std::uint32_t>(run);
+        row += run;
+    }
 }
 
 int FieldUniforms::slotOf(std::string_view name) const {

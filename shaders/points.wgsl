@@ -89,6 +89,7 @@ fn cs_effectors(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= pointsParams.info.x) { return; }
     var r = baseRecords[i];
+    fieldElement = r.random.w; // ADR-1116: an Element-band Spectrum field hears this record's own band
     let count = min(pointsParams.info.y, 8u);
     for (var k = 0u; k < 8u; k = k + 1u) {
         if (k >= count) { break; }

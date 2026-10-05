@@ -6113,6 +6113,7 @@ void Engine::update(const FrameTime& time) {
     } else {
         audioSignals_.publishSilence(bus_);
     }
+    updateAudioHistory(newFrame);
 
     const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
     const std::uint32_t allocsAtStart = allocsNow();
@@ -6221,6 +6222,7 @@ void Engine::update(const FrameTime& time) {
     serviceSignalTriggers(); // ADR-1061: derive or record the bus events Signal triggers fire on
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
+        comp->setAudioHistory(audioHistory_); // ADR-1116
     }
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
@@ -6621,6 +6623,30 @@ Result<void> Engine::setLiveSonic(bool enabled) {
 
 bool Engine::liveSonicMidi(const control::MidiMessage& message) {
     return liveSonic_.midi(message, liveFrameSeconds_);
+}
+
+void Engine::updateAudioHistory(bool newFrame) {
+    if (track_ && !track_->empty()) {
+        // The whole track: a pure function of the transport second, so a seek is exact (ADR-1116).
+        if (!audioHistory_ || audioHistoryRevision_ != audioRevision_ || liveAudioFeed_) {
+            audioHistory_ = std::make_shared<const spatial::AudioHistory>(analysis::buildAudioHistory(*track_));
+            audioHistoryRevision_ = audioRevision_;
+            liveAudioFeed_.reset();
+        }
+        return;
+    }
+    if (mode_ == EngineMode::Live && runner_) {
+        if (!liveAudioFeed_) {
+            liveAudioFeed_ = std::make_unique<analysis::LiveAudioHistoryFeed>(analyzerConfig_);
+        }
+        if (newFrame) {
+            liveAudioFeed_->push(clock_.latest);
+        }
+        audioHistory_ = liveAudioFeed_->history();
+        return;
+    }
+    audioHistory_.reset();
+    liveAudioFeed_.reset();
 }
 
 } // namespace avgen::app

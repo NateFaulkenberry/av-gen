@@ -43,6 +43,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace avgen::spatial {
@@ -306,9 +307,61 @@ T combineValues(FieldCombine combine, float mixAmount, const std::vector<T>& val
     return T(0.0f);
 }
 
-float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth);
-glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth);
-glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth);
+float scalarAt(const FieldSpec& f, const glm::vec3& p, double t, const FieldSet* set, int depth, float element);
+glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double t, const FieldSet* set, int depth, float element);
+glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, double t, const FieldSet* set, int depth, float element);
+
+// ---- audio kinds (ADR-1116) --------------------------------------------------------------------
+
+// The angle about the field's axis around `point`, as a fraction of a turn in [0, 1). A point on the
+// axis reads 0 (atan2(0, 0) is NaN on Metal; the GPU guards the same way).
+float angleTurns(const FieldSpec& f, const glm::vec3& q) {
+    const glm::vec3 n = fieldAxis(f);
+    const glm::vec3 r = q - f.point;
+    const glm::vec3 rp = r - n * glm::dot(r, n);
+    const glm::vec3 ref = std::abs(n.y) < 0.99f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+    const glm::vec3 e1 = unitOrZero(glm::cross(n, ref));
+    const glm::vec3 e2 = glm::cross(n, e1);
+    const float x = glm::dot(rp, e1);
+    const float y = glm::dot(rp, e2);
+    if (x * x + y * y < 1e-12f) {
+        return 0.0f;
+    }
+    return std::atan2(y, x) / kTwoPi + 0.5f;
+}
+
+// Shape of a Spectrum or Onset field at local q (before invert and weight).
+float audioShape(const FieldSpec& f, const glm::vec3& q, double time, const FieldSet* set, float element) {
+    if (set == nullptr || !set->audio) {
+        return 0.0f;
+    }
+    const AudioHistory& audio = *set->audio;
+    const double clock = audio.now(time);
+    const float d = waveDistance(f, q);
+    const float travel = f.audioSpeed > 0.0f ? d / f.audioSpeed : 0.0f;
+    if (f.kind == FieldKind::Onset) {
+        std::array<float, kOnsetHistory> ages{};
+        std::array<float, kOnsetHistory> strengths{};
+        ages.fill(-1.0f);
+        audio.lastOnsets(f.onsetSource, clock, ages, strengths);
+        return onsetResponse(ages, strengths, d, f.audioSpeed, f.onsetWidth, f.onsetDecay);
+    }
+    const float delay = std::max(f.audioDelay, 0.0f) + travel;
+    const float lo = saturate(f.bandLow);
+    const float hi = saturate(f.bandHigh);
+    switch (f.audioBand) {
+    case AudioBand::Range:
+        return spectrumRange(audio, clock, delay, lo, hi);
+    case AudioBand::Element:
+        return spectrumAt(audio, clock, delay, lo + saturate(element) * (hi - lo));
+    case AudioBand::Angle: {
+        const float u = fract(angleTurns(f, q) * static_cast<float>(std::max(f.bandRepeat, 1)));
+        const float tri = 1.0f - std::abs(2.0f * u - 1.0f);
+        return spectrumAt(audio, clock, delay, lo + tri * (hi - lo));
+    }
+    }
+    return 0.0f;
+}
 
 // Enabled, resolvable children (first kMaxCompoundChildren names).
 std::vector<const FieldSpec*> compoundChildren(const FieldSpec& f, const FieldSet* set) {
@@ -335,7 +388,8 @@ const GridField* boundGrid(const FieldSpec& f, const FieldSet* set) {
     return (g != nullptr && g->enabled) ? g : nullptr;
 }
 
-float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
+float scalarAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet* set, int depth, float element) {
+    const auto t = static_cast<float>(td);
     // ADR-906: a triggered field before its first event samples as a disabled one. `t` stays the
     // transport clock for everything this calls (children keep their own clocks); only this field's
     // own shape reads its clock.
@@ -346,7 +400,7 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g != nullptr && g->mode == GridMode::Vector) {
-            return glm::length(vectorAt(f, p, t, set, depth)); // vector as scalar
+            return glm::length(vectorAt(f, p, td, set, depth, element)); // vector as scalar
         }
         const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
         float v = g != nullptr ? g->sampleScalar(q) : 0.0f;
@@ -355,11 +409,19 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
         }
         return v * fieldWeight(f, q);
     }
+    if (f.isAudio()) { // ADR-1116: scalar kinds on the transport clock (a trigger only gates them)
+        const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
+        float v = audioShape(f, q, td, set, element);
+        if (f.invert) {
+            v = 1.0f - v;
+        }
+        return v * fieldWeight(f, q);
+    }
     switch (f.type()) {
     case FieldType::Vector:
-        return glm::length(vectorAt(f, p, t, set, depth));
+        return glm::length(vectorAt(f, p, td, set, depth, element));
     case FieldType::Color: {
-        const glm::vec4 c = colorAt(f, p, t, set, depth);
+        const glm::vec4 c = colorAt(f, p, td, set, depth, element);
         return luminance(glm::vec3(c)) * c.a;
     }
     case FieldType::Scalar:
@@ -371,7 +433,7 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
     if (f.kind == FieldKind::Compound) {
         std::vector<float> values;
         for (const FieldSpec* child : compoundChildren(f, set)) {
-            values.push_back(scalarAt(*child, p, t, set, depth + 1));
+            values.push_back(scalarAt(*child, p, td, set, depth + 1, element));
         }
         v = combineValues(f.combine, f.mix, values);
     } else {
@@ -383,7 +445,8 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
     return v * w;
 }
 
-glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
+glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet* set, int depth, float element) {
+    const auto t = static_cast<float>(td);
     if (!f.enabled || f.silent() || depth > kMaxDepth) { // ADR-906, as scalarAt
         return glm::vec3(0.0f);
     }
@@ -393,7 +456,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g == nullptr || g->mode != GridMode::Vector) {
-            return scalarAt(f, p, t, set, depth) * (frame.rotation * fieldAxis(f)); // scalar as vector
+            return scalarAt(f, p, td, set, depth, element) * (frame.rotation * fieldAxis(f)); // scalar as vector
         }
         glm::vec3 dir = g->sampleVector(q);
         if (f.invert) {
@@ -404,7 +467,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     if (f.kind == FieldKind::Compound) {
         std::vector<glm::vec3> values;
         for (const FieldSpec* child : compoundChildren(f, set)) {
-            values.push_back(vectorAt(*child, p, t, set, depth + 1));
+            values.push_back(vectorAt(*child, p, td, set, depth + 1, element));
         }
         glm::vec3 v = combineValues(f.combine, f.mix, values);
         if (f.invert) {
@@ -414,10 +477,10 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     }
     switch (f.type()) {
     case FieldType::Scalar:
-        return scalarAt(f, p, t, set, depth) * (frame.rotation * fieldAxis(f));
+        return scalarAt(f, p, td, set, depth, element) * (frame.rotation * fieldAxis(f));
     case FieldType::Color: {
         // Colour as vector = (colour as scalar) along the axis, like the GPU (fields.wgsl basicVector).
-        const glm::vec4 c = colorAt(f, p, t, set, depth);
+        const glm::vec4 c = colorAt(f, p, td, set, depth, element);
         const float lum = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
         return (lum * c.a) * (frame.rotation * fieldAxis(f));
     }
@@ -432,7 +495,8 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     return frame.rotation * (dir * w);
 }
 
-glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
+glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet* set, int depth, float element) {
+    const auto t = static_cast<float>(td);
     if (!f.enabled || f.silent() || depth > kMaxDepth) { // ADR-906, as scalarAt
         return glm::vec4(0.0f);
     }
@@ -442,16 +506,16 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSe
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g != nullptr && g->mode == GridMode::Vector) {
-            return glm::vec4(vectorAt(f, p, t, set, depth) * 0.5f + 0.5f, w);
+            return glm::vec4(vectorAt(f, p, td, set, depth, element) * 0.5f + 0.5f, w);
         }
-        const float s = scalarAt(f, p, t, set, depth);
+        const float s = scalarAt(f, p, td, set, depth, element);
         return glm::vec4(glm::mix(glm::vec3(f.colorA), glm::vec3(f.colorB), saturate(s)), w);
     }
     if (f.kind == FieldKind::Compound) {
         std::vector<glm::vec3> rgb;
         float alpha = 0.0f;
         for (const FieldSpec* child : compoundChildren(f, set)) {
-            const glm::vec4 c = colorAt(*child, p, t, set, depth + 1);
+            const glm::vec4 c = colorAt(*child, p, td, set, depth + 1, element);
             rgb.push_back(glm::vec3(c));
             alpha = std::max(alpha, c.a);
         }
@@ -463,11 +527,11 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSe
     }
     switch (f.type()) {
     case FieldType::Scalar: {
-        const float s = scalarAt(f, p, t, set, depth);
+        const float s = scalarAt(f, p, td, set, depth, element);
         return glm::vec4(glm::mix(glm::vec3(f.colorA), glm::vec3(f.colorB), saturate(s)), w);
     }
     case FieldType::Vector: {
-        const glm::vec3 v = vectorAt(f, p, t, set, depth);
+        const glm::vec3 v = vectorAt(f, p, td, set, depth, element);
         return glm::vec4(v * 0.5f + 0.5f, w);
     }
     case FieldType::Color:
@@ -536,6 +600,10 @@ const char* fieldKindName(FieldKind kind) {
         return "compound";
     case FieldKind::Grid:
         return "grid";
+    case FieldKind::Spectrum:
+        return "spectrum";
+    case FieldKind::Onset:
+        return "onset";
     }
     return "radial";
 }
@@ -548,7 +616,7 @@ constexpr FieldKind kAllFieldKinds[] = {
     FieldKind::RadialVector,  FieldKind::Attractor,      FieldKind::Repulsor,      FieldKind::Vortex,
     FieldKind::CurlNoise,     FieldKind::Spiral,         FieldKind::WaveVector,    FieldKind::ConstantColor,
     FieldKind::Gradient,      FieldKind::RadialGradient, FieldKind::NoiseColor,    FieldKind::PositionColor,
-    FieldKind::Compound,      FieldKind::Grid,
+    FieldKind::Compound,      FieldKind::Grid,           FieldKind::Spectrum,      FieldKind::Onset,
 };
 }
 
@@ -707,6 +775,27 @@ const char* fieldCombineName(FieldCombine combine) {
     return "add";
 }
 
+const char* audioBandName(AudioBand band) {
+    switch (band) {
+    case AudioBand::Range:
+        return "range";
+    case AudioBand::Element:
+        return "element";
+    case AudioBand::Angle:
+        return "angle";
+    }
+    return "range";
+}
+
+std::optional<AudioBand> audioBandFromName(std::string_view name) {
+    for (const auto b : {AudioBand::Range, AudioBand::Element, AudioBand::Angle}) {
+        if (name == audioBandName(b)) {
+            return b;
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<FieldCombine> fieldCombineFromName(std::string_view name) {
     for (const auto c : {FieldCombine::Add, FieldCombine::Multiply, FieldCombine::Max, FieldCombine::Min, FieldCombine::Mix,
                          FieldCombine::Average}) {
@@ -847,6 +936,17 @@ Result<void> FieldSpec::validate() const {
     if (kind == FieldKind::Grid && reference.empty()) {
         return fail("field '{}': grid needs a 'reference' (the grid's name)", name);
     }
+    if (isAudio()) {
+        if (!(bandLow >= 0.0f && bandLow <= 1.0f && bandHigh >= 0.0f && bandHigh <= 1.0f)) {
+            return fail("field '{}': bandLow and bandHigh must be in [0, 1]", name);
+        }
+        if (bandRepeat < 1) {
+            return fail("field '{}': bandRepeat must be >= 1", name);
+        }
+        if (audioDelay < 0.0f || audioSpeed < 0.0f || onsetDecay < 0.0f || onsetWidth < 0.0f) {
+            return fail("field '{}': audioDelay, audioSpeed, onsetDecay and onsetWidth must be >= 0", name);
+        }
+    }
     return {};
 }
 
@@ -895,6 +995,18 @@ std::uint64_t FieldSpec::structuralHash() const {
     h.u8(static_cast<std::uint8_t>(combine));
     h.f32(mix);
     h.str(reference);
+    // ADR-1116: hashed only for the audio kinds, so every other field keeps the hash it always had.
+    if (isAudio()) {
+        h.u8(static_cast<std::uint8_t>(audioBand));
+        h.f32(bandLow);
+        h.f32(bandHigh);
+        h.u32(static_cast<std::uint32_t>(bandRepeat));
+        h.f32(audioDelay);
+        h.f32(audioSpeed);
+        h.u8(static_cast<std::uint8_t>(onsetSource));
+        h.f32(onsetDecay);
+        h.f32(onsetWidth);
+    }
     // ADR-906: hashed only when present, so a field without one keeps the hash it always had.
     if (trigger) {
         h.u8(static_cast<std::uint8_t>(trigger->source));
@@ -956,6 +1068,18 @@ json FieldSpec::toJson() const {
     j["combine"] = fieldCombineName(combine);
     j["mix"] = mix;
     j["reference"] = reference;
+    // ADR-1116: written only for the audio kinds.
+    if (isAudio()) {
+        j["audioBand"] = audioBandName(audioBand);
+        j["bandLow"] = bandLow;
+        j["bandHigh"] = bandHigh;
+        j["bandRepeat"] = bandRepeat;
+        j["audioDelay"] = audioDelay;
+        j["audioSpeed"] = audioSpeed;
+        j["onsetSource"] = onsetSourceName(onsetSource);
+        j["onsetDecay"] = onsetDecay;
+        j["onsetWidth"] = onsetWidth;
+    }
     // ADR-906: written only when set, so every field file before it round-trips unchanged.
     if (trigger) {
         j["trigger"] = world::triggerToJson(*trigger);
@@ -1002,6 +1126,15 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
         AVGEN_SPATIAL_READ_ENUM(f.combine, "combine", &fieldCombineFromName, "field combine");
         AVGEN_SPATIAL_READ(f.mix, "mix", detail::readFloat);
         AVGEN_SPATIAL_READ(f.reference, "reference", detail::readString);
+        AVGEN_SPATIAL_READ_ENUM(f.audioBand, "audioBand", &audioBandFromName, "audio band");
+        AVGEN_SPATIAL_READ(f.bandLow, "bandLow", detail::readFloat);
+        AVGEN_SPATIAL_READ(f.bandHigh, "bandHigh", detail::readFloat);
+        AVGEN_SPATIAL_READ(f.bandRepeat, "bandRepeat", detail::readInt);
+        AVGEN_SPATIAL_READ(f.audioDelay, "audioDelay", detail::readFloat);
+        AVGEN_SPATIAL_READ(f.audioSpeed, "audioSpeed", detail::readFloat);
+        AVGEN_SPATIAL_READ_ENUM(f.onsetSource, "onsetSource", &onsetSourceFromName, "onset source");
+        AVGEN_SPATIAL_READ(f.onsetDecay, "onsetDecay", detail::readFloat);
+        AVGEN_SPATIAL_READ(f.onsetWidth, "onsetWidth", detail::readFloat);
     }
     if (root.contains("falloff")) {
         const json& j = root.at("falloff");
@@ -1084,16 +1217,16 @@ int FieldSet::indexOf(std::string_view name) const {
     return -1;
 }
 
-float sampleScalar(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set) {
-    return scalarAt(field, p, static_cast<float>(time), set, 0);
+float sampleScalar(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set, float element) {
+    return scalarAt(field, p, time, set, 0, element);
 }
 
-glm::vec3 sampleVector(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set) {
-    return vectorAt(field, p, static_cast<float>(time), set, 0);
+glm::vec3 sampleVector(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set, float element) {
+    return vectorAt(field, p, time, set, 0, element);
 }
 
-glm::vec4 sampleColor(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set) {
-    return colorAt(field, p, static_cast<float>(time), set, 0);
+glm::vec4 sampleColor(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set, float element) {
+    return colorAt(field, p, time, set, 0, element);
 }
 
 float sampleWeight(const FieldSpec& field, const glm::vec3& p, double /*time*/) {
@@ -1148,6 +1281,12 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
                                                                                  : FieldType::Scalar);
             }
         }
+    }
+    if (field.isAudio()) { // ADR-1116: the grid lanes carry the audio parameters (see FieldGpu)
+        g.gridBounds0 = glm::vec4(field.bandLow, field.bandHigh, field.audioDelay, field.audioSpeed);
+        g.gridBounds1 = glm::vec4(static_cast<float>(static_cast<int>(field.audioBand)),
+                                  static_cast<float>(std::max(field.bandRepeat, 1)), field.onsetDecay, field.onsetWidth);
+        g.gridRes = glm::vec4(static_cast<float>(static_cast<int>(field.onsetSource)), 0.0f, 0.0f, 0.0f);
     }
     g.children = glm::ivec4(-1);
     for (int c = 0; c < kMaxCompoundChildren; ++c) {

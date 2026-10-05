@@ -22,6 +22,7 @@
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
 #include "analysis/analysis_track.hpp"
+#include "analysis/audio_history_builder.hpp"
 #include "analysis/analyzer.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/arrangement.hpp"
@@ -1020,6 +1021,10 @@ public:
     // tens of megabytes of spectra.
     [[nodiscard]] std::shared_ptr<const analysis::AnalysisTrack> trackShared() const { return track_; }
     [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return clock_.latest; }
+    // ADR-1116: the audio history Spectrum and Onset fields read (null when there is no audio). The
+    // whole analysed track when there is one -- offline, and live playback of a file -- else the live
+    // input's rolling history.
+    [[nodiscard]] std::shared_ptr<const spatial::AudioHistory> audioHistory() const { return audioHistory_; }
     [[nodiscard]] bool hasFrame() const { return clock_.hasFrame; }
     // ADR-870: the signal pipeline's carried state. For tests that compare a scrub with a play.
     [[nodiscard]] const SignalClock& signalClock() const { return clock_; }
@@ -1321,6 +1326,11 @@ private:
 
     std::vector<audio::AudioClip> audioClips_;
     std::uint64_t audioRevision_ = 1;
+    // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.
+    void updateAudioHistory(bool newFrame);
+    std::shared_ptr<const spatial::AudioHistory> audioHistory_;
+    std::uint64_t audioHistoryRevision_ = 0;
+    std::unique_ptr<analysis::LiveAudioHistoryFeed> liveAudioFeed_;
     audio::ClipSources clipSources_;
     audio::MixReport audioMix_;
     // Embedded Tempo, captured when the arrangement's sources were loaded. Not derived from

@@ -467,6 +467,7 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     p.velocity += force * dt;
     // field forces (in order; a Kill force ends the particle here)
     let fieldCount = min(params.fieldInfo.x, 4u);
+    fieldElement = fract(p.seed); // ADR-1116: an Element-band Spectrum field hears this particle's own band
     for (var k = 0u; k < 4u; k = k + 1u) {
         if (k >= fieldCount) { break; }
         let a = params.fieldForces[k * 2u];

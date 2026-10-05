@@ -8585,6 +8585,8 @@ void Composition::applyParameters() {
     // included -- has its finals. The clock is the engine's, bound to this frame's transport second.
     resolveFieldTriggers(scene_.fields, triggerClock_,
                          triggerClock_ != nullptr ? triggerClock_->seconds() : currentTime_);
+    // ADR-1116: and the audio history the audio fields read.
+    scene_.fields.audio = audioHistory_;
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //

@@ -25,6 +25,7 @@
 // each event and travels out at `waveSpeed`.
 
 #include "core/error.hpp"
+#include "spatial/audio_history.hpp"
 #include "spatial/grid_field.hpp"
 #include "world/effects/effect_timing.hpp" // world::Trigger (ADR-906)
 
@@ -33,6 +34,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <array>
+#include <memory>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -75,6 +77,12 @@ enum class FieldKind : std::uint8_t {
     Compound,        // combine(children) with `combine`
     // simulated (ADR-032)
     Grid,            // value = the named GridField's trilinear sample at q (`reference` = grid name)
+    // audio (ADR-1116): read the FieldSet's AudioHistory. Each element can hear the song at its own
+    // moment and in its own band: d = waveDistance(q) (waveGeometry about `point` along `axis`),
+    // delay = audioDelay + (audioSpeed > 0 ? d / audioSpeed : 0) seconds.
+    Spectrum,        // value = spectrogram at the delay, in the band `audioBand` picks (bandLow..bandHigh)
+    Onset,           // value = sum over the newest onsets of `onsetSource`: strength * exp(-onsetDecay * age)
+                     //         * exp(-((d - age * audioSpeed) / onsetWidth)^2) (onsetWidth 0 = a flash everywhere)
 };
 [[nodiscard]] const char* fieldKindName(FieldKind kind);
 [[nodiscard]] std::optional<FieldKind> fieldKindFromName(std::string_view name);
@@ -117,6 +125,16 @@ enum class WaveGeometry : std::uint8_t { Planar, Radial, Spherical, Cylindrical 
 enum class WaveShape : std::uint8_t { Sine, Pulse, Triangle };
 [[nodiscard]] const char* waveShapeName(WaveShape shape);
 [[nodiscard]] std::optional<WaveShape> waveShapeFromName(std::string_view name);
+
+// ADR-1116: how a Spectrum field chooses its band.
+//   Range   : the mean of the bins between bandLow and bandHigh (positions in [0, 1] of the log axis)
+//   Element : one bin per element, bandLow + element * (bandHigh - bandLow), the element being the
+//             sampling record's own random (InstanceRecord::random.w; 0.5 for a caller with none)
+//   Angle   : the angle about `axis` around `point` sweeps bandLow..bandHigh and back, `bandRepeat`
+//             times round the circle (fans of frequency)
+enum class AudioBand : std::uint8_t { Range, Element, Angle };
+[[nodiscard]] const char* audioBandName(AudioBand band);
+[[nodiscard]] std::optional<AudioBand> audioBandFromName(std::string_view name);
 
 enum class FieldCombine : std::uint8_t { Add, Multiply, Max, Min, Mix, Average };
 [[nodiscard]] const char* fieldCombineName(FieldCombine combine);
@@ -164,6 +182,16 @@ struct FieldSpec {
     float mix = 0.5f;
     // Grid: the name of the simulated grid it samples.
     std::string reference;
+    // Audio kinds (ADR-1116). Serialised, hashed and registered as parameters only for those kinds.
+    AudioBand audioBand = AudioBand::Range;
+    float bandLow = 0.0f;                  // [0, 1] of the log-frequency axis (kAudioMinHz..kAudioMaxHz)
+    float bandHigh = 0.25f;
+    int bandRepeat = 2;                    // Angle: sweeps round the circle
+    float audioDelay = 0.0f;               // seconds behind the present, everywhere
+    float audioSpeed = 0.0f;               // m/s the present travels outward from `point` (0 = no travel)
+    OnsetSource onsetSource = OnsetSource::Low;
+    float onsetDecay = 4.0f;               // 1/s
+    float onsetWidth = 0.0f;               // m, the front's half width (0 = a flash everywhere at once)
     // ADR-906: what starts this field's clock. Absent -- every field before this -- is the transport
     // clock. Authored as the same `trigger` block an effect instance carries (effect_trigger.hpp).
     std::optional<world::Trigger> trigger;
@@ -173,6 +201,7 @@ struct FieldSpec {
     double triggerAge = -1.0;
 
     [[nodiscard]] FieldType type() const { return fieldTypeOf(kind); }
+    [[nodiscard]] bool isAudio() const { return kind == FieldKind::Spectrum || kind == FieldKind::Onset; }
     [[nodiscard]] glm::mat4 localToWorld() const;
     [[nodiscard]] glm::mat4 worldToLocal() const;
     // ADR-906: the clock this field runs on at transport-clock `time`: `time` itself, or the trigger's
@@ -190,6 +219,9 @@ struct FieldSpec {
 struct FieldSet {
     std::vector<FieldSpec> fields;
     std::vector<GridField> grids; // ADR-032; simulated, sampled through a Grid field
+    // ADR-1116, runtime only (never serialised or hashed): what Spectrum and Onset fields read, set
+    // every frame by the engine (Composition::setAudioHistory). Null: audio fields sample 0.
+    std::shared_ptr<const AudioHistory> audio;
     [[nodiscard]] const FieldSpec* find(std::string_view name) const;
     [[nodiscard]] int indexOf(std::string_view name) const; // -1 when missing
     [[nodiscard]] const GridField* findGrid(std::string_view name) const;
@@ -197,10 +229,15 @@ struct FieldSet {
 };
 
 // CPU sampling (pure). `set` resolves compound children; may be empty for simple kinds. Time in
-// seconds. Depth limits compound recursion (cycles yield 0).
-[[nodiscard]] float sampleScalar(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set = nullptr);
-[[nodiscard]] glm::vec3 sampleVector(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set = nullptr);
-[[nodiscard]] glm::vec4 sampleColor(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set = nullptr);
+// seconds. Depth limits compound recursion (cycles yield 0). `element` is the sampling element's own
+// random in [0, 1) (ADR-1116: InstanceRecord::random.w for a record; 0.5 when the caller has none),
+// read only by an Element-band Spectrum field.
+[[nodiscard]] float sampleScalar(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set = nullptr,
+                                 float element = 0.5f);
+[[nodiscard]] glm::vec3 sampleVector(const FieldSpec& field, const glm::vec3& p, double time,
+                                     const FieldSet* set = nullptr, float element = 0.5f);
+[[nodiscard]] glm::vec4 sampleColor(const FieldSpec& field, const glm::vec3& p, double time, const FieldSet* set = nullptr,
+                                    float element = 0.5f);
 // The falloff weight at p (strength * falloff), useful for effectors and debugging.
 [[nodiscard]] float sampleWeight(const FieldSpec& field, const glm::vec3& p, double time);
 
@@ -233,6 +270,8 @@ struct alignas(16) FieldGpu {
     glm::ivec4 children;               // compound child slots (-1 = none)
     // Grid kind (ADR-032). Zero for every other kind, and gridRes.w = 0 means "no grid bound",
     // which samples as 0 (so a scene without grids never reads the table).
+    // Audio kinds (ADR-1116) reuse the three lanes: gridBounds0 = (bandLow, bandHigh, audioDelay,
+    // audioSpeed), gridBounds1 = (audioBand, bandRepeat, onsetDecay, onsetWidth), gridRes.x = onsetSource.
     glm::vec4 gridBounds0;             // grid boundsMin.xyz, offset into the grid table (floats)
     glm::vec4 gridBounds1;             // grid boundsMax.xyz, components per cell
     glm::vec4 gridRes;                 // resolution.xyz, w = 1 bound + 2 when wrapping (0 = unbound)
