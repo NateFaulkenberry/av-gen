@@ -59,6 +59,12 @@ if(AVGEN_GPUWORLD_PROTOTYPE)
     add_subdirectory(prototypes/gpu-world)
 endif()
 
+# THE ASTRAL FORGE scene experiment (docs/prototypes/astral-forge/): a disposable prototype, never built by default.
+option(AVGEN_ASTRAL_FORGE_PROTOTYPE "Build the Astral Forge scene-experiment prototype" OFF)
+if(AVGEN_ASTRAL_FORGE_PROTOTYPE)
+    add_subdirectory(prototypes/astral-forge)
+endif()
+
 if(AVGEN_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
