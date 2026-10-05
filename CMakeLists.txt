@@ -53,6 +53,12 @@ set(AVGEN_SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 add_subdirectory(src)
 add_subdirectory(tools)
 
+# GPU World research spike: a disposable prototype, never built by default.
+option(AVGEN_GPUWORLD_PROTOTYPE "Build the GPU World research prototype" OFF)
+if(AVGEN_GPUWORLD_PROTOTYPE)
+    add_subdirectory(prototypes/gpu-world)
+endif()
+
 if(AVGEN_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
