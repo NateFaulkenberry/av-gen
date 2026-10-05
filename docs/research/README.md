@@ -34,6 +34,16 @@ tooling.md ───────────────────────
                                                ADR-009 (testing), ADR-010 (language/core libs)
 ```
 
+## GPU procedural systems (2026-10)
+
+- `gpu-world-architecture-spike.md`: the research spike (GREEN, narrowly scoped).
+- `gpu-world-productionization.md`: the productionization. It covers the CPU/GPU bridge research
+  (ownership, synchronisation, determinism, measured limits), the architecture, and what was built
+  (ADR-1116 to ADR-1121). It also has the permanent regression scenes, their benchmarks, and the
+  Phase 4 handoff.
+- Answers one gap below: Dawn's Metal backend compiles every shader with `math_mode(relaxed)` and fast
+  transcendentals on macOS 15+ (source-verified, `ShaderModuleMTL.mm`), unless `strictMath` is chained.
+
 ## Known gaps (carried forward as follow-ups)
 
 - Dawn Metal backend support for `multi_draw_indirect` with a GPU count buffer is unverified.
