@@ -322,10 +322,7 @@ TEST_CASE("The effector pass gives every record its own band at its own delay", 
     spatial::Effector scale;
     scale.field = "element";
     scale.op = spatial::EffectorOp::Scale;
-    // Mix at weight 1 is the target scale on both sides. Add is NOT: the GPU pass adds the target to
-    // the existing scale (blendVec3) where the CPU reference returns the target -- a disagreement
-    // older than this test, recorded in docs/research/gpu-world-productionization.md and left to
-    // the owner because five shipped scenes were tuned on the GPU's reading.
+    // Mix at weight 1 is the target scale (every blend agrees with the CPU since ADR-1121).
     scale.blend = spatial::EffectorBlend::Mix;
     scale.weight = 1.0f;
     scale.strength = 2.0f;

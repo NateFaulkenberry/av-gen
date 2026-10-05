@@ -92,11 +92,8 @@ Phase 5 proposed "new inputs to `cs_effectors`". This record decides their shape
 - The effector pass now gives every record its own band at its own delay (the same test, through the
   real `ProceduralRenderer`).
 - Memory: 384 KB fixed in the field table, plus the CPU history (6 MB for a 4-minute track).
-- **Found, not fixed:** the GPU effector pass and the CPU reference disagree on `Scale` with the
-  default `Add` blend. The GPU adds the target scale to the existing one; the CPU returns the target.
-  Existing tests used only `Replace` and `Mix` for `Scale`. Five shipped scenes author `scale` with
-  `Add` and were tuned on the GPU's reading, so either fix changes something shipped. Recorded for the
-  owner.
+- Found here: the GPU effector pass and the CPU reference disagreed on `Scale` with the default `Add`
+  blend, and on 16 other (op, blend) pairs. **Fixed by ADR-1121** on the owner's ruling.
 
 ## Revisit triggers
 
