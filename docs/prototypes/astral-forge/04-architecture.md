@@ -114,6 +114,11 @@ it to **8.8 ms**, a 1.9× saving, with no visible difference at 30 or 60 fps:
 | 4K30 | 33 ms | 2M fits (23.5 ms) |
 | Offline | none | 4M+, 256³ grid, supersampling |
 
+**Caveat from the six tests** (`05-tests-and-assessment.md`, §Performance): the 1.8 ms surface figure holds
+while the entity is mid-frame. When the surface fills the frame with sharpening on (the close-ups of TEST 02,
+03 and 06), the surface pass rises to 10-15 ms, and the frame to 24-30 ms. The planned fix is a cached latent
+distance volume.
+
 Memory at the default: 291 MB (particle state 128 MB, splat grid 54 MB, density texture 54 MB, flake
 accumulation 55 MB).
 
