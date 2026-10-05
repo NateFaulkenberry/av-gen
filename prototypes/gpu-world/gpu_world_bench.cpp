@@ -511,7 +511,8 @@ void synthAudio(float t, Params& p) {
 } // namespace
 
 int main(int argc, char** argv) {
-    std::string arm = "gpu", scenario = "field", meshName = "mushroom", png, label;
+    std::string arm = "gpu", scenario = "field", meshName = "mushroom", png, label, clipDir;
+    std::uint32_t clipEvery = 2; // with --clip: every 2nd 60 Hz frame = a 30 fps sequence
     std::uint32_t n = 10000, warm = 60, frames = 300, width = 1920, height = 1080;
     int threads = 8;
     bool audio = false;
@@ -528,6 +529,8 @@ int main(int argc, char** argv) {
         else if (a == "--threads") threads = std::stoi(next());
         else if (a == "--audio") audio = true;
         else if (a == "--png") png = next();
+        else if (a == "--clip") clipDir = next();
+        else if (a == "--clip-every") clipEvery = static_cast<std::uint32_t>(std::stoul(next()));
         else if (a == "--start") startTime = std::stof(next());
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &width, &height); }
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
@@ -871,6 +874,13 @@ int main(int argc, char** argv) {
         const double submitMs = msSince(s0);
         timeline.collect();
         const double cpuMs = msSince(cpu0);
+        if (!clipDir.empty() && measuring && (f - warm) % clipEvery == 0) {
+            // Clip mode stalls on a readback every frame; its timings are not evidence.
+            auto img = gpu::readTexture8(ctx, color, width, height, false);
+            char name[64];
+            std::snprintf(name, sizeof(name), "/f%05u.png", (f - warm) / clipEvery);
+            if (img) (void)assets::writePng(clipDir + name, width, height, img->rgba);
+        }
 
         if (measuring) {
             sCpu.add(cpuMs); sUpdate.add(updateMs); sUpload.add(uploadMs); sEncode.add(encodeMs);

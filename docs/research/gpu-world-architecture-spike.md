@@ -4,7 +4,7 @@ Branch `research/gpu-world`, from main `ba0003de`, started 2026-10-04. The brief
 `docs/research/gpu-world-brief.md` (the owner's, verbatim). Machine: Apple M2 Max (38-core GPU, 64 GB),
 macOS 26, Dawn/WebGPU on Metal. All GPU runs went through `tools/gpu-lock.sh`.
 
-**Status:** Phase 0 complete. Gate 0: PASS (narrow; see below).
+**Status:** Phase 1 complete. Gate 0: PASS (narrow). Gate 1: CONDITIONAL PASS.
 
 ## Hypothesis (from the brief)
 
@@ -135,6 +135,152 @@ them:
 
 ---
 
+## Phase 1: Controlled GPU Population Benchmark
+
+### Experiment design
+
+Prototype: `prototypes/gpu-world/gpu_world_bench.cpp` (~900 lines, one file), built only with
+`-DAVGEN_GPUWORLD_PROTOTYPE=ON` (target `avgen_gpu_world_bench`). It links `avgen_gpu` read-only for the
+Dawn context, `gpu::FrameTimeline` (the production GPU timestamp instrument), texture readback and the
+production mushroom generator. No production file changed apart from the three-line CMake option.
+
+One population of a simple asset. Every element animates every frame: a bob, a two-axis sway, a slow
+yaw, a scale pulse and an emission pulse, each with a per-instance phase. The animation is a pure
+function of (rest record, time), like `evaluateFloaters`. Four arms share the draw shader, the mesh,
+the animation maths (C++ and WGSL written operation for operation), the cull rule, the camera and the
+1920x1080 target. Only where the per-frame instance data comes from differs.
+
+| Arm | Per frame on the CPU | Per frame on the GPU |
+|---|---|---|
+| `cpu` (Control A) | per instance: conservative pre-cull on the rest position, animate, exact frustum and distance cull, pack a 48 B record; one `WriteBuffer` of the survivors | one `DrawIndexed` |
+| `cpumt` (Control A, strongest) | the same split across a persistent 8-thread pool | same |
+| `cpugrid` (Control A, world) | a uniform XZ grid built once; visit only cells whose box reaches the frustum and the max distance (ADR-056's idea) | same |
+| `gpu` (Experimental B) | write one 304 B uniform block and the 20 B indirect args | one compute dispatch: animate, cull and append survivors (workgroup-aggregated atomics) into a compact buffer, then one `DrawIndexedIndirect` |
+
+Scenarios:
+
+- **field** (the population is the shot): a 200 m square of N elements seen from above at an angle,
+  so ~82% are on screen at every N. Asset: an 8-triangle "firefly" octahedron. It is cheap to draw, so
+  the population cost is visible rather than buried under raster cost.
+- **world** (a big world, a nearby camera): the population is spread at constant density over a square
+  of side √N metres. The camera stands at eye height and culls at 120 m, so ~10k are visible whatever
+  N is. Asset: the production procedural mushroom (`organism::buildMushroom` at the schema's
+  midpoint, 6,010 triangles, flattened to one mesh with per-part colour and an emissive mask). This is
+  the realistic case: heavy asset, most of the world off screen.
+
+Protocol: Release build. 60 warm-up frames, then 300 measured frames, with two frames in flight (the
+CPU waits on the frame before last, as a live loop does). Each (N, arm) ran twice, with the arm order
+reversed on the second repeat. Every run went through `tools/gpu-lock.sh`, and every run waited for
+the 1-minute load average to fall under 4. **The first full matrix was discarded:** another agent was
+compiling (load 18-58, seven clang processes at 90%+). It is kept in `data/contended/` for transparency.
+Cells show the p50 of the two runs' per-run p50s, with the range of the two in brackets.
+
+Instrument limits: GPU times come from `gpu::FrameTimeline`, whose resolution here is about 0.066 ms.
+A "0.000" GPU compute value means "under one tick", not zero. "CPU frame" is the CPU work for the
+frame: update, upload, encode and submit, excluding the wait for the GPU. "Frame interval" is the
+wall-clock time between frame starts, so it is the end-to-end cost.
+
+### Results: field (firefly, 8 triangles), everything animated and ~82% visible
+
+Data: `docs/research/gpu-world/data/p1-firefly-field.{jsonl,table.md}`.
+
+| N | visible | CPU frame ms: cpu / cpumt(8) / gpu | upload B/frame: CPU arms / gpu | GPU frame ms: cpu / gpu (compute part) | frame interval ms: cpu / cpumt / gpu |
+|---|---|---|---|---|---|
+| 1,000 | 857 | 0.080 / 0.093 / 0.051 | 41 KB / 324 B | 0.07 / 0.13 (<0.07) | 0.43 / 0.45 / 0.54 |
+| 10,000 | 8,259 | 0.53 / 0.18 / 0.053 | 396 KB / 324 B | 0.26 / 0.26 (<0.07) | 0.63 / 0.64 / 0.68 |
+| 100,000 | 82,498 | 4.94 / 0.98 / 0.059 | 3.96 MB / 324 B | 0.79 / 0.46 (<0.07) | 4.94 / 1.08 / 0.81 |
+| 1,000,000 | 819,299 | 50.4 / 11.4 / 0.33 | 39.3 MB / 324 B | 4.85 / 2.29 (0.20) | 50.4 / 11.4 / **2.71** |
+| 4,000,000 | 3,275,701 | 202 / 43.3 / 0.64 | 157 MB / 324 B | 16.3 / 8.78 (0.72) | 202 / 43.3 / **9.24** |
+
+(`cpugrid` tracks `cpu` within 5% here; when everything is on screen a grid has nothing to skip. The
+full table is in the data folder.)
+
+![field, 100k, CPU arm](gpu-world/p1-field-100k-cpu.jpg) ![field, 100k, GPU arm](gpu-world/p1-field-100k-gpu.jpg)
+
+### Results: world (mushroom, 6,010 triangles), ~10k visible whatever N is
+
+Data: `docs/research/gpu-world/data/p1-mushroom-world.{jsonl,table.md}`.
+
+| N | visible | CPU frame ms: cpu / cpumt / cpugrid / gpu | GPU frame ms (all arms) | frame interval ms: best CPU arm / gpu |
+|---|---|---|---|---|
+| 1,000 | 235 | 0.086 / 0.18 / 0.13 / 0.071 | 0.59-0.79 | 0.93 / 1.00 |
+| 10,000 | 2,278 | 0.71 / 0.51 / 0.87 / 0.21 | 2.29-2.36 | 2.70 / 2.69 |
+| 100,000 | 10,283 | 2.57 / 1.96 / 2.30 / 0.31 | 7.67-7.86 | 8.12 / 8.34 |
+| 1,000,000 | 10,246 | 3.95 / 2.54 / 2.39 / 0.45 | 7.80-7.90 | 8.22 / 8.37 |
+
+![world, 10k mushrooms, GPU arm](gpu-world/p1-world-10k-mushroom-gpu.jpg)
+
+### Correctness and equivalence
+
+- **The visible counts are identical** in every arm at every N (for example 819,299 at 1M field and
+  10,246 at 1M world), so all arms draw the same set.
+- **Image comparison**, at the same frame (t = 10.5 s) and the same camera, using 8-bit sRGB output:
+  - field 100k, CPU vs GPU: 12 of 2,073,600 pixels differ by more than 2/255 (max 66, mean 0.0001);
+  - world 10k mushrooms: 187 pixels (max 182, mean 0.007).
+  These are silhouette pixels. GPU `sin`/`exp` and libm differ in the last bits, and that moves an
+  edge by under a pixel. The images are equivalent, but not bit-identical.
+- **GPU run-to-run**: two fresh runs gave byte-identical images, even though the append order of the
+  workgroup atomics is not guaranteed. The depth test hides the order for opaque geometry. Translucent
+  or additive geometry drawn in that order would not be stable (see the Bad-Idea list).
+
+### Profiling observations
+
+- **The CPU arms scale linearly with N.** That is about 50 ns per element on one core (animate, cull
+  and pack), plus about 3.1 ms of `WriteBuffer` per million visible elements (39 MB). Eight threads
+  give 4.4-4.7x on the update, but the upload does not parallelise: at 1M it is 3.5 ms of the 11.4.
+- **The GPU arm's CPU cost is flat:** 0.05-0.06 ms up to 100k. At 1M-4M it is 0.3-0.6 ms, all of it
+  encode and submit. That is Dawn's per-submit overhead, not population work.
+- **The GPU compute pass is cheap:** 0.20 ms at 1M and 0.72 ms at 4M (animate, cull, append), against
+  a draw of 2.1 and 8.1 ms. These agree with the production effector pass (1.1-1.4 ms per 1M records
+  for an analytic field), which moves twice the bytes per record.
+- **Surprise:** the CPU arms' *GPU* frame is longer than the GPU arm's (4.85 vs 2.29 ms at 1M, 16.3
+  vs 8.8 at 4M), even though they draw the same instances. The likely cause is the 39-157 MB per-frame
+  staging copy landing in the same timeline. It was not isolated further; it does not change the
+  conclusion.
+- **Memory:** the CPU arms hold a rest array plus a full staging array: 76 MB at 1M, 305 MB at 4M.
+  The GPU arm holds the rest array on the GPU (32 B/element) plus the output buffer (48 B/element),
+  30.5 MB of CPU-side rest copy at 1M (which could be dropped after upload), and uploads 324 B a
+  frame against 39 MB. No arm grew its footprint over 300 frames.
+- **The world scenario is GPU-bound in every arm** (7.8 ms of mushroom raster for ~10k visible). The
+  GPU arm cuts CPU work 5.3x at 1M (2.39 → 0.45 ms against the best CPU control), and the frame is
+  *0.15 ms slower* (8.37 vs 8.22). That is the Phase 0 finding reproduced in miniature: when the GPU
+  is the bottleneck, freeing the CPU buys nothing.
+
+### Gate 1 decision: **CONDITIONAL PASS**
+
+Against the brief's targets:
+
+| Target | Result |
+|---|---|
+| ≥2x less CPU work at meaningful sizes | **Met.** 16x at 100k against the 8-thread control (0.98 → 0.06 ms), 35x at 1M (11.4 → 0.33), 68x at 4M; 5.3x in the GPU-bound world at 1M |
+| dramatically better scaling | **Met.** The CPU is flat in N, against linear for every CPU arm |
+| substantially less CPU/GPU traffic | **Met.** 324 B/frame against 4 MB (100k), 39 MB (1M) and 157 MB (4M) |
+| materially larger feasible population | **Met for cheap elements.** At a 60 fps budget (16.7 ms frame) the 8-thread CPU arm tops out around 1.4M animated elements, using every performance core. The GPU arm draws 4M in 9.2 ms end to end and is raster-bound, not population-bound |
+| end-to-end frame | **Better only when the population is CPU-bound:** 4.2x at 1M (11.4 → 2.7 ms), 4.7x at 4M, 1.3x at 100k. **No change** (−2%) in the GPU-bound mushroom world and at ≤10k |
+
+It is a pass because the CPU, scaling and transfer advantages are large, not marginal. It is
+*conditional* for two reasons, both measured:
+
+1. **The win is workload-specific.** It pays only for populations of hundreds of thousands or more
+   of cheap, individually animated elements. A world of heavy assets is raster-bound, and so are all
+   three shipped scenes (Phase 0). There the GPU arm changes nothing end to end.
+2. **Control A is not what AV Gen does at scale.** Large populations in production already use
+   GPU-resident records, the GPU effector pass and GPU cull (Phase 0 §4). Production's CPU cost per
+   frame is already microseconds, so the GPU arm's CPU advantage over *production* is close to zero.
+   The only production path shaped like Control A is floaters, and no example scene uses it. What
+   Phase 1 shows is that "per-frame CPU animation of large populations" is a bad idea, which is
+   already the engine's design. It does not show that the engine needs a new architecture.
+
+Why continue to Phase 2 anyway: the condition the brief sets is "continue only if the workload is
+representative of an important AV Gen use case". Large populations of individually *audio-reactive*
+elements are that use case if anything is. They are also the one thing the existing effector path may
+not express, because effectors and fields respond to audio per object or per field (≤16 fields), not
+per element. Phase 2 therefore has a sharper question than the brief's generic one: **does per-element
+audio response need anything production's GPU effector path does not already give, and is the CPU
+alternative actually unaffordable?** Phase 2 adds production's own path as a control.
+
+---
+
 ## Reasons This Might Be A Bad Idea (live)
 
 - **The shipped scenes are GPU-bound.** CPU scene work is 1-1.5 ms of a 3-5 ms CPU frame against
@@ -153,3 +299,17 @@ them:
   harder on the GPU.
 - **Nobody uses the CPU-animated population path today** (no example uses floaters), which suggests
   the demand for the workload this spike can win on is unproven.
+- **(Phase 1) The end-to-end win needs CPU-bound content.** In a raster-bound world of 6k-triangle
+  mushrooms the GPU arm cut CPU work 5x and made the frame 2% *slower*. Every shipped scene is
+  raster-bound.
+- **(Phase 1) The GPU arm's advantage over *production* is near zero for stateless animation.**
+  Production's records are already GPU-resident and its effectors already animate them on the GPU, at
+  microseconds of CPU.
+- **(Phase 1) Append order with atomics is nondeterministic.** It was invisible for opaque geometry in
+  this test, where two runs were byte-identical. It is a real hazard for translucent or additive
+  populations, and for anything that reads back "instance k". Production avoids atomics on purpose
+  (ADR-015, ADR-029). Matching that costs a prefix-scan compaction (3 more dispatches; production
+  already has the code).
+- **(Phase 1) CPU and GPU maths diverge in the last bits** (12-187 silhouette pixels per frame here).
+  An offline/CPU fallback for a GPU population cannot be bit-identical, so the golden-image tests would
+  need tolerances.
