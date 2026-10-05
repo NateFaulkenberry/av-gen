@@ -688,3 +688,49 @@ See the measured table below. The rules of thumb from it:
 9. **A seek on a big agents grid stalls the CPU on purpose** while it replays (it waits per chunk; see
    Risks). In a performance, prefer cues that do not jump the transport.
 10. **`examples/gpu-regression/` scenes are regression fixtures. Do not art-direct them.** Copy them.
+
+## Risks found while building, and what is left
+
+**Fixed here:**
+
+- **GPU effectors disagreed with the CPU reference** in 17 of 36 (op, blend) pairs, Scale + Add
+  among them. ADR-1121 fixes it, on the owner's ruling. Four shipped scenes change.
+- **Grid replay was exact only for still inputs** (ADR-1114 §4). Per-step inputs (ADR-1119) fix it.
+
+**Open, and known:**
+
+1. **A long unsynced GPU backlog produced a silently empty frame.**
+   - What happened: a fresh `avgen --render` of Mycelium at 32 s queued about 6 s of catch-up work
+     in eight chunks. The PNG came back all zeros, with "GPU errors: 0" and the device not lost. At
+     28 s (about 5.2 s of work) it rendered. The test harness, whose readbacks happen to wait,
+     rendered 40 s correctly.
+   - Mitigation: `Simulation` waits for each catch-up chunk.
+   - **The root cause in Dawn or Metal was not found.** Any other path that queues seconds of GPU
+     work without a sync could meet it. `RenderJob` reporting success over an empty frame is a
+     defect worth its own investigation.
+2. **One-level frame residue between continuous play and a fresh seek.** In Mycelium, 36 of
+   230,400 channels differ by one level, while the simulation state underneath is byte-identical, and
+   a restored scrub matches a fresh seek byte for byte. This is renderer frame history, unexplained,
+   and inside the project's same-frame rule (ADR-1114's tolerance).
+3. **The composition's default routes spin the world**, and the spin integrates over frames (pitfall
+   1 in the handoff). This is not new, but it now matters more: it makes every field, generator and
+   grid under the root a function of frame history, not of t. A scene that wants exact seeks must route
+   those four itself. Zero-amount routes, the regression projects' answer, log "dead route" warnings
+   at load.
+4. **Opt-in blocking readback.** The LOD debug overlay (`readProceduralLodLevels`) reads back
+   synchronously when enabled. It is a debug view, not a product path, but it is in the frame loop
+   when on.
+5. **Still frame-sampled inside simulations:** a node transform the engine animates, a triggered
+   field's age (ADR-906), and a Grid field read by another grid.
+6. **Live input** is visually equivalent, not equal. The live spectrogram holds a row between render
+   frames instead of the lost hops, because the analysis triple buffer delivers only the newest frame.
+7. **No camera-relative rendering.** Generated positions are f32 object space, 7.8 mm quantum at
+   100 km.
+8. **The CPU path tracer** cannot see generators or simulated grids. It says so; the bake is the
+   escape hatch.
+9. **Unverified on screen:** the World inspector's Generator section (element, derived fields, bake
+   button) and the Performance panel lines. ImGui is not visible to this agent. The logic under them
+   is tested; the widgets are not.
+10. **Not built:** a velocity AOV for generated elements' own motion, `MaterialVariation.hueShift` for
+    generators, a generator registry (no second kernel yet), a lossless live spectrogram (a FrameTap
+    feeding an SPSC queue), and per-element picking that includes effector offsets.
