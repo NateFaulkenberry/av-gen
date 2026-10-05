@@ -26,6 +26,15 @@ fn sdEllipsoid(p: vec3f, r: vec3f) -> f32 {
     let k1 = length(p / (r * r));
     return k0 * (k0 - 1.0) / max(k1, 1e-6);
 }
+// A thin blade (an ellipsoid with one tiny radius). Far away its distance bound is nearly a PLANE, so matter
+// attracted from afar collapses onto that plane and draws a straight line across the frame (measured in TEST 01
+// and 02). Beyond 1.2x its longest radius the guide is radial instead.
+fn sdBlade(p: vec3f, r: vec3f) -> f32 {
+    let R = max(r.x, max(r.y, r.z));
+    let L = length(p);
+    if (L > 1.2 * R) { return L - 0.85 * R; }
+    return sdEllipsoid(p, r);
+}
 // A superellipsoid-ish "faceted" version: the 6-norm turns the plate into chamfered planes.
 fn len6(v: vec3f) -> f32 { let w = v * v * v; return pow(dot(w, w), 1.0 / 6.0); }
 fn sdFacet(p: vec3f, r: vec3f) -> f32 { return (len6(p / r) - 1.0) * min(r.x, min(r.y, r.z)); }
@@ -157,6 +166,9 @@ fn facePlate(q: vec3f, fp: FaceP) -> f32 {
 // eye is an octahedron. The left eye can travel backward through depth (fold0.y).
 fn faceEyes(q: vec3f, fp: FaceP) -> f32 {
     let t = F.cam.w;
+    // far field: radial toward the nearer eye (same reason as the mouth)
+    let farE = min(length(q - eyeCentreL() + vec3f(0.0, 0.0, fp.eyeDepth * 2.2)), length(q - eyeCentreR()));
+    if (farE > 1.3) { return farE - 0.45; }
     let eL = eyeCentreL() + vec3f(0.0, 0.0, -0.2 - fp.eyeDepth * 2.2);
     let eR = eyeCentreR() + vec3f(0.0, 0.0, -0.2);
     let rL = 0.4 * fp.eyeL;
@@ -199,6 +211,10 @@ fn miniFace(q: vec3f) -> f32 {
 fn faceMouth(q: vec3f, fp: FaceP) -> f32 {
     let m = mouthCentre();
     var mq = q - m;
+    // far field: a radial guide. The slit is a very flat ellipsoid, and the ellipsoid bound's far gradient points
+    // almost entirely along y, so distant matter fell onto the plane y = mouth first (a line across the frame)
+    let far = length(mq * vec3f(1.0, 1.6, 1.0));
+    if (far > 1.7) { return far - 1.0; }
     mq.z *= 1.0 / (1.0 + 3.0 * fp.tunnel);
     let hy = 0.09 + 0.2 * fp.open;
     var d = abs(sdEllipsoid(mq, vec3f(0.97, hy + 0.03, 0.85))) - 0.02;
@@ -245,7 +261,7 @@ fn seraphWings(q: vec3f) -> f32 {
         let len = 4.6 - 0.6 * fk;
         // a blade: long thin ellipsoid, slightly curved
         lp.z += 0.04 * lp.y * lp.y;
-        let b = sdEllipsoid(lp - vec3f(0.0, len, 0.0), vec3f(0.42 - 0.06 * fk, len, 0.045));
+        let b = sdBlade(lp - vec3f(0.0, len, 0.0), vec3f(0.42 - 0.06 * fk, len, 0.045));
         d = min(d, b);
     }
     return d;
@@ -322,7 +338,7 @@ fn machineRings(q: vec3f) -> f32 {
     let ang = safeAtan2(bp.y, bp.x) + 0.05 * t;
     let cell = round(ang / (TAU / n)) * (TAU / n);
     let r2 = rot2(-cell + 0.05 * t) * bp.xy;
-    let bl = sdEllipsoid(vec3f(r2.x - 4.3, r2.y, bp.z), vec3f(2.2, 0.16, 0.04));
+    let bl = sdBlade(vec3f(r2.x - 4.3, r2.y, bp.z), vec3f(2.2, 0.16, 0.04));
     d = min(d, bl);
     return d;
 }
@@ -373,7 +389,7 @@ fn hornsRings(q: vec3f) -> f32 {
     // bend the fin backward along its height
     let b = rot2(0.25 * lp.y) * lp.xz;
     lp = vec3f(b.x, lp.y, b.y);
-    return sdEllipsoid(lp, vec3f(0.55, 2.6 - 0.4 * abs(sin(cell * 1.7)), 0.035));
+    return sdBlade(lp, vec3f(0.55, 2.6 - 0.4 * abs(sin(cell * 1.7)), 0.035));
 }
 // ---- choir: hundreds of small faces on a shell (cube-sphere cells), syncing, then merging ---------
 

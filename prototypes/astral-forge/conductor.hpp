@@ -345,9 +345,11 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const bool build = phraseCoherence(sc, p, tc) < 0.9f;
         const float az = -30.0f + 60.0f * static_cast<float>(std::fmod(p.index * 0.618, 1.0)) + 12.0f * v;
         float d, el;
-        if (first) { d = 13.0f + 30.0f * sstep(0.0f, 0.6f, v); el = 10.0f; lab = "REVEAL"; }
-        else if (build) { d = 30.0f - 13.0f * v; el = 6.0f; lab = "OBSERVER"; }
+        if (build) { d = 30.0f - 13.0f * v; el = 6.0f; lab = "OBSERVER"; }
         else { d = 15.0f - 4.0f * v; el = 22.0f - 18.0f * v; lab = "DESCENT"; }
+        // a new section: REVEAL, a 4.5 s pull-out-and-return laid over the phrase's own path
+        const float since = static_cast<float>(tc - p.start);
+        if (first && since < 4.5f) { d += 24.0f * std::sin(glm::pi<float>() * since / 4.5f); el += 6.0f; lab = "REVEAL"; }
         if (p.kickOpens && (tc - p.start) < 1.4) { d -= 5.0f * (1.0f - static_cast<float>(tc - p.start) / 1.4f); lab = "COLLISION"; }
         eye = orbit(d, az, el, {0.0f, 0.2f, 0.0f});
         tgt = {0.0f, -0.1f, 0.0f};

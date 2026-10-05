@@ -190,7 +190,7 @@ struct Options {
     std::uint32_t benchFrames = 240, benchWarm = 60;
     float preroll = 6.0f;
     int debug = 0;
-    double songStart = 0.0; // TEST 06: where the excerpt starts in the song
+    double songStart = -1.0; // TEST 06: where the excerpt starts in the song (default per track)
 };
 
 astral::State conduct(const Options& o, float t, const astral::SongAnalysis& song, const astral::Score& score) {
@@ -244,7 +244,10 @@ int main(int argc, char** argv) {
     }
     const int approach = std::clamp(o.approach - 'A', 0, 4);
     if (o.gridSize <= 0.0f) o.gridSize = o.test == 4 ? 12.5f : 20.0f;
-    if (o.song.empty()) o.song = std::string(std::getenv("HOME")) + "/Desktop/Nate/Fireballs.mp3";
+    // The owner's test song (2026-10-05): Trench. Fireballs is the only secondary check (--song).
+    if (o.song.empty()) o.song = std::string(ASTRAL_SHADER_DIR) + "/../../../assets/audio/trench.wav"; // repo asset (gitignored)
+    // TEST 06 default excerpt: the verse's last phrases, the break (86.25 s) and the chorus (94.61 s, a kick-opened collapse)
+    if (o.songStart < 0.0) o.songStart = o.song.find("rench") != std::string::npos ? 66.54 : 41.3;
 
     // ---- audio ----
     const auto cacheDir = std::filesystem::path(argv[0]).parent_path() / "cache";
