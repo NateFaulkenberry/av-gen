@@ -36,7 +36,7 @@ PAD = {"strike": 36, "scatter": 37, "Dormant": 40, "Germination": 41, "Chorus": 
 
 SCORES = {
     "default": [
-        (0.0, "cc", "sensitivity", 0.6),
+        (0.0, "cc", "sensitivity", 0.3),
         (4.0, "pad", "Germination", 1.0),
         (10.0, "pad", "Chorus", 1.0),
         (14.0, "sweep", "reach", (0.25, 6.0)),

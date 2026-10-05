@@ -375,6 +375,7 @@ POST = {
     "temporal/echo/enabled": True, "temporal/echo/frames": 8.0,
     "temporal/echo/decay": 0.6,
     "camera/mode": 0, "camera/orbitPivotWeight": 1.0,
+    "sources/driftA/rate": 0.019, "sources/driftB/rate": 0.0123,
 }
 # Owned by the states (presets), so never set here: a project's parameters apply after the initial state's
 # preset and would pin them. camera/distance, height, fov, orbitPivot, orbitSpeed, exposure compensation,
@@ -402,7 +403,8 @@ KNOBS = [
     ("orbit", "ORBIT", 26, 0.5, [("camera/orbitSpeed", -0.18, 0.18, "add")]),
     ("glow", "GLOW", 27, 0.5, [("post/bloom/intensity", -0.3, 0.45, "add"),
                                ("post/halation/intensity", -0.15, 0.3, "add")]),
-    ("sensitivity", "SENSITIVITY", 28, 0.5, []),  # the depth of the music's push on the energy (a route depth)
+    ("sensitivity", "SENSITIVITY", 28, 0.25, []),  # the depth of the music's push on the energy (a route
+                                                    # depth, 0..4; 0.25 = 1.0): dark or quiet material wants more
 ]
 # The energy arc (macro.energy, 0..1) adds this much on top of whatever the state set.
 ENERGY_TARGETS = [
@@ -439,8 +441,8 @@ STATES = {
 }
 # Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
 # instead of sitting dead centre in every state.
-PIVOT_X = {"Germination": 22.0, "Rebirth": -26.0, "Surge": 18.0, "Dormant": -6.0}
-PIVOT_Z = {"Germination": 10.0, "Rebirth": 14.0, "Surge": -12.0, "Dormant": 4.0}
+PIVOT_X = {"Germination": 22.0, "Rebirth": -26.0, "Surge": 18.0, "Dormant": -6.0, "Chorus": 14.0}
+PIVOT_Z = {"Germination": 10.0, "Rebirth": 14.0, "Surge": -12.0, "Dormant": 4.0, "Chorus": -9.0}
 PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": REBIRTH}  # only the world-defining states recolour
 
 
@@ -522,16 +524,16 @@ def states():
          "triggers": [pad("Germination"), trig_energy(0.15, frm="Dormant")]},
         {"name": "Chorus", "preset": "chorus", "transition": {"seconds": 6, "easing": "smooth"},
          "triggers": [pad("Chorus"), trig_energy(0.45, frm="Germination"),
-                      trig_energy(0.62, frm="Surge", falling=True)]},
+                      trig_energy(0.58, frm="Surge", falling=True)]},
         {"name": "Surge", "preset": "surge", "transition": {"seconds": 4, "easing": "easeInOut"},
-         "triggers": [pad("Surge"), trig_energy(0.72, frm="Chorus"), trig_energy(0.72, frm="Rebirth"),
+         "triggers": [pad("Surge"), trig_energy(0.66, frm="Chorus"), trig_energy(0.66, frm="Rebirth"),
                       trig_energy(0.7, frm="Eruption", falling=True)]},
         {"name": "Eruption", "preset": "eruption", "transition": {"seconds": 1.5, "easing": "easeIn"},
          "triggers": [pad("Eruption"), trig_energy(0.86, frm="Surge")]},
         {"name": "Collapse", "preset": "collapse", "transition": {"seconds": 3, "easing": "easeOut"},
          # well below each source state's own entry, so a state never collapses on the wobble that entered it
          "triggers": [pad("Collapse")] + [trig_energy(t, frm=f, falling=True)
-                                          for f, t in (("Chorus", 0.3), ("Surge", 0.5), ("Eruption", 0.55),
+                                          for f, t in (("Chorus", 0.38), ("Surge", 0.5), ("Eruption", 0.55),
                                                        ("Rebirth", 0.3))]},
         {"name": "Rebirth", "preset": "rebirth", "transition": {"seconds": 10, "easing": "smooth"},
          "triggers": [pad("Rebirth"), trig_energy(0.5, frm="Collapse")]},
@@ -563,8 +565,11 @@ def routes():
     r = list(ZERO_DEFAULTS)
     # The arc: what the music does to the world's energy, slowly, scaled by the SENSITIVITY knob.
     r.append({"source": "visual.drive", "target": "macros/energy", "op": "add", "amount": 1.0,
-              "depthSource": "macro.sensitivity", "depthMin": 0.0, "depthMax": 2.0,
+              "depthSource": "macro.sensitivity", "depthMin": 0.0, "depthMax": 4.0,
               "chain": {"attackMs": 2500, "decayMs": 4000}})
+    # Slow travel, independent of the music: the vantage breathes over tens of seconds (height, then distance).
+    r.append({"source": "lfo.driftA.bipolar", "target": "camera/height", "op": "add", "amount": 4.5})
+    r.append({"source": "lfo.driftB.bipolar", "target": "camera/distance", "op": "add", "amount": 11.0})
     # LOW is mass and fronts (the kick fields, the heaving floor, the low strand): it lives in fields.
     # A heavy kick, when the energy is high, nudges the camera; never in the quiet states.
     r.append({"source": "audio.onsetLow", "target": "camera/shake/amplitude", "op": "add", "amount": 0.05,
@@ -591,14 +596,16 @@ def routes():
     return r
 
 
-def project(name, audio, live=False):
+def project(name, audio, live=False, sensitivity=None):
     p = {
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
         "assets": {"scene": {"kind": "composition", "path": "phonotaxis.scene.json"}},
         "live": {"qualityStrategy": "effects_first", "targetFps": 60},
         "parameters": dict(POST),
-        "sources": [LISTEN],
+        # two slow, incommensurate drifts: the camera never holds still and never repeats a move (slow dolly and crane)
+        "sources": [LISTEN, {"kind": "lfo", "name": "driftA", "settings": {"shape": "sine"}},
+                    {"kind": "lfo", "name": "driftB", "settings": {"shape": "sine"}}],
         "routes": routes(),
         "worldMacros": macros(),
         "presets": presets(),
@@ -608,6 +615,10 @@ def project(name, audio, live=False):
     }
     if audio:
         p["assets"]["audio"] = {"path": audio}
+    if sensitivity is not None:
+        # the energy arc reads absolute loudness and air; dark or quiet material is trimmed up here, as a
+        # performer would with the SENSITIVITY knob
+        p["parameters"]["macros/sensitivity"] = sensitivity
     if live:
         p["sonic"] = {"live": True}
     return p
@@ -619,7 +630,8 @@ def main():
         # development and the review renders: the song the spike's Echo Field was made on
         "phonotaxis.json": project("PHONOTAXIS", "~/Desktop/All You Got.wav"),
         # a second, shorter track with a long quiet intro and a breakdown (graceful with other music)
-        "phonotaxis-night-shift.json": project("PHONOTAXIS / Night Shift", "../../assets/audio/night-shift.wav"),
+        "phonotaxis-night-shift.json": project("PHONOTAXIS / Night Shift", "../../assets/audio/night-shift.wav",
+                                               sensitivity=0.8),
         # the instrument: live input (pick the device in the Live panel) and MIDI
         "phonotaxis-live.json": project("PHONOTAXIS LIVE", None, live=True),
     }

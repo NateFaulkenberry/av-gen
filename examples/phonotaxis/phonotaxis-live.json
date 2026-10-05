@@ -32,7 +32,9 @@
   "temporal/echo/frames": 8.0,
   "temporal/echo/decay": 0.6,
   "camera/mode": 0,
-  "camera/orbitPivotWeight": 1.0
+  "camera/orbitPivotWeight": 1.0,
+  "sources/driftA/rate": 0.019,
+  "sources/driftB/rate": 0.0123
  },
  "sources": [
   {
@@ -62,6 +64,20 @@
       "curve": 1.0
      }
     ]
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftA",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftB",
+   "settings": {
+    "shape": "sine"
    }
   }
  ],
@@ -97,11 +113,23 @@
    "amount": 1.0,
    "depthSource": "macro.sensitivity",
    "depthMin": 0.0,
-   "depthMax": 2.0,
+   "depthMax": 4.0,
    "chain": {
     "attackMs": 2500,
     "decayMs": 4000
    }
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/height",
+   "op": "add",
+   "amount": 4.5
+  },
+  {
+   "source": "lfo.driftB.bipolar",
+   "target": "camera/distance",
+   "op": "add",
+   "amount": 11.0
   },
   {
    "source": "audio.onsetLow",
@@ -351,7 +379,7 @@
   {
    "name": "sensitivity",
    "label": "SENSITIVITY",
-   "default": 0.5,
+   "default": 0.25,
    "targets": []
   }
  ],
@@ -623,9 +651,9 @@
      44
     ],
     "camera/orbitPivot": [
-     0.0,
+     14.0,
      13,
-     0.0
+     -9.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -1115,7 +1143,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.62,
+      "threshold": 0.58,
       "from": "Surge",
       "falling": true
      }
@@ -1137,13 +1165,13 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.72,
+      "threshold": 0.66,
       "from": "Chorus"
      },
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.72,
+      "threshold": 0.66,
       "from": "Rebirth"
      },
      {
@@ -1192,7 +1220,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.3,
+      "threshold": 0.38,
       "from": "Chorus",
       "falling": true
      },
