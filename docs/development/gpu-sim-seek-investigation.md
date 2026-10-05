@@ -96,6 +96,7 @@ found along the way:
   clamp at 0, so a render that starts at 2 s simulates the 2 s *before* the song began. That is why
   warm-up 240 is worse than warm-up 0 for the tree at 2 s. It would be a contained fix, a clamp in
   `core/pre_roll.cpp`, but it is not made here, because particles are the owner's call.
+  **Since fixed: ADR-1115 clamps the roll at t = 0.**
 
 ### Not measured
 

@@ -83,9 +83,45 @@ TEST_CASE("a pre-roll is off unless asked for, and capped when it is", "[core][p
     CHECK(planPreRoll(roll, arriving).frames.size() == 8);
 
     // The bound is the point: an unbounded re-simulation is the thing ADR-360 refused to add.
+    // Arriving at 10 s, so the cap and not the head of the song (ADR-1115) is what binds.
     roll.frames = 100000;
     roll.cap = 240;
-    CHECK(planPreRoll(roll, arriving).frames.size() == 240);
+    CHECK(planPreRoll(roll, frame(10.0, kDt, 600)).frames.size() == 240);
+}
+
+TEST_CASE("a pre-roll never reaches before the song starts", "[core][preroll][determinism]") {
+    // ADR-1115. The roll stands in for a render that played from t = 0, and that render began with
+    // empty pools. A roll into negative seconds simulates a pre-song field no render ever held:
+    // a 240-frame warm-up at 2 s made the Tree of Life worse than no warm-up at all. The roll is
+    // min(requested, T) long.
+    PreRoll roll;
+    roll.frames = 240; // 4 s at 60 fps
+
+    // 2 s in: only 2 s of song lie behind it, so 120 frames, the oldest exactly at t = 0.
+    const PreRollPlan atTwo = planPreRoll(roll, frame(2.0, kDt, 120));
+    REQUIRE(atTwo.frames.size() == 120);
+    CHECK(atTwo.frames.front().renderTime >= -1e-12);
+    CHECK(std::abs(atTwo.frames.front().renderTime) < 1e-9);
+    CHECK(std::abs(atTwo.frames.back().renderTime + kDt - 2.0) < 1e-12);
+    for (const FrameTime& f : atTwo.frames) {
+        INFO("roll frame at " << f.renderTime);
+        CHECK(f.renderTime >= -1e-12);
+    }
+    // The shorter roll still chains into the arriving frame.
+    FrameTime arrival = frame(2.0, kDt, atTwo.arrivalFrameIndex);
+    CHECK(classifyStep(true, atTwo.frames.back(), arrival) == TimelineStep::Continuous);
+
+    // At the very head of the song there is nothing to warm: an empty plan, not a roll into -4 s.
+    CHECK(planPreRoll(roll, frame(0.0, 0.0, 0)).frames.empty());
+
+    // Less than one step in: still nothing.
+    CHECK(planPreRoll(roll, frame(kDt * 0.5, kDt, 0)).frames.empty());
+
+    // Past 4 s the request fits and is honoured unchanged.
+    CHECK(planPreRoll(roll, frame(10.0, kDt, 600)).frames.size() == 240);
+
+    // The step rule is unchanged by the clamp: at 24 fps, 1 s in, 24 frames.
+    CHECK(planPreRoll(roll, frame(1.0, 1.0 / 24.0, 24)).frames.size() == 24);
 }
 
 TEST_CASE("a pre-roll lands on the seconds a full render would have had", "[core][preroll][determinism]") {

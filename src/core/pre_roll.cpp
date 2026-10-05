@@ -42,8 +42,8 @@ TimelineStep classifyStep(bool havePrevious, const FrameTime& previous, const Fr
 PreRollPlan planPreRoll(const PreRoll& roll, const FrameTime& time) {
     PreRollPlan plan;
     plan.arrivalFrameIndex = time.frameIndex;
-    const std::uint32_t n = std::min(roll.frames, roll.cap);
-    if (n == 0) {
+    const std::uint32_t requested = std::min(roll.frames, roll.cap);
+    if (requested == 0) {
         return plan;
     }
     // The step. The arriving frame's own delta when it has a usable one -- an offline render's
@@ -53,6 +53,17 @@ PreRollPlan planPreRoll(const PreRoll& roll, const FrameTime& time) {
     double step = roll.stepSeconds;
     if (!(step > 0.0)) {
         step = time.deltaTime > 0.0 && time.deltaTime <= 0.1 ? time.deltaTime : 1.0 / 60.0;
+    }
+    // Never before the song (ADR-1115). The roll stands in for a render that PLAYED to this frame,
+    // and that render started at t = 0 with empty pools. Seconds before 0 are seconds no render
+    // ever had: a roll into them invents a pre-song field the full render never held, which is
+    // what made a 240-frame warm-up worse than none for the Tree of Life at 2 s. So the roll is
+    // min(requested, T) long. The epsilon keeps T = k * step from losing its oldest frame to
+    // division slop.
+    const double room = time.renderTime > 0.0 ? std::floor(time.renderTime / step + 1e-6) : 0.0;
+    const std::uint32_t n = room < static_cast<double>(requested) ? static_cast<std::uint32_t>(room) : requested;
+    if (n == 0) {
+        return plan;
     }
     const std::uint64_t base = std::max<std::uint64_t>(time.frameIndex, n);
     plan.arrivalFrameIndex = base;

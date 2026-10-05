@@ -4,6 +4,8 @@
 - Builds on ADR-032 (simulated grids), ADR-581 (the 240-step catch-up, recorded and not fixed),
   ADR-360 (scrub may differ from play for particles only), ADR-397 (pre-roll).
 - Investigation: `docs/development/gpu-sim-seek-investigation.md`.
+- Follow-up: the particle warm-up's missing clamp at t = 0 that this investigation found
+  (fix option P0) is fixed in ADR-1115.
 
 ## Problem
 

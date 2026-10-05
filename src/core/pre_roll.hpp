@@ -82,7 +82,8 @@ struct PreRollPlan {
 };
 
 // The schedule for a pre-roll ending immediately before `time`. An empty plan when `roll.frames`
-// is 0, which is the default and costs nothing.
+// is 0, which is the default and costs nothing. The roll never reaches before t = 0 (ADR-1115): it
+// is clamped to the whole steps that fit between 0 and `time`, so at t = 0 it is empty.
 [[nodiscard]] PreRollPlan planPreRoll(const PreRoll& roll, const FrameTime& time);
 
 } // namespace avgen
