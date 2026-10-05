@@ -1,0 +1,81 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "swarm.scene.json"
+  }
+ },
+ "parameters": {
+  "root/rotationSpeed": 0.0,
+  "scene/brightness": 0.8,
+  "scene/keyLight": 0.7,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.4,
+  "post/bloom/threshold": 1.1,
+  "procedural/swarm/distribution/gridCountX": 46,
+  "procedural/swarm/distribution/gridCountY": 46,
+  "procedural/swarm/distribution/gridCountZ": 46,
+  "procedural/swarm/distribution/gridSpacing": [
+   5.6,
+   5.6,
+   5.6
+  ],
+  "procedural/swarm/source/pointSize": 0.3
+ },
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "bass",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "mids",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "highs",
+   "settings": {
+    "shape": "saw"
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "lfo.mids",
+   "target": "procedural/swarm/effector/1/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.bass",
+   "target": "procedural/swarm/effector/2/strength",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.highs",
+   "target": "procedural/swarm/effector/3/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  }
+ ],
+ "presets": []
+}

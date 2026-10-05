@@ -1,0 +1,151 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "stress",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0,
+   40,
+   150
+  ],
+  "target": [
+   0,
+   10,
+   0
+  ],
+  "fov": 60.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "volumeDensity": 0.00666044,
+  "volumeMaxDistance": 0.0,
+  "background": [
+   0.004,
+   0.005,
+   0.01
+  ]
+ },
+ "nodes": [
+  {
+   "name": "swirl",
+   "kind": "field",
+   "field": {
+    "kind": "vortex",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "strength": 1.0,
+    "falloff": {
+     "kind": "smooth",
+     "inner": 5.0,
+     "outer": 140.0
+    }
+   }
+  },
+  {
+   "name": "swarm",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "point",
+     "pointSize": 0.35
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      32,
+      32,
+      32
+     ],
+     "gridSpacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "center": [
+      0,
+      20,
+      0
+     ]
+    },
+    "variation": {
+     "seed": 17,
+     "randomPosition": [
+      1.2,
+      1.2,
+      1.2
+     ]
+    },
+    "effectors": [
+     {
+      "field": "swirl",
+      "op": "positionOffset",
+      "strength": 0.8
+     },
+     {
+      "field": "pulse",
+      "op": "scale",
+      "strength": 0.5
+     },
+     {
+      "field": "glow",
+      "op": "emission",
+      "strength": 1.0
+     }
+    ],
+    "lod": {
+     "cull": true
+    },
+    "material": {
+     "baseColor": [
+      0.5,
+      0.7,
+      0.95
+     ],
+     "emissiveColor": [
+      0.6,
+      0.85,
+      1.0
+     ],
+     "emissiveIntensity": 1.2,
+     "roughness": 1.0,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "hueGradient": 0.3,
+     "emissiveRandom": 0.5
+    }
+   }
+  },
+  {
+   "name": "pulse",
+   "kind": "field",
+   "field": {
+    "kind": "radial",
+    "radius": 140.0,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "glow",
+   "kind": "field",
+   "field": {
+    "kind": "noise",
+    "frequency": 0.05,
+    "speed": 0.3,
+    "seed": 3,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  }
+ ]
+}

@@ -4,7 +4,9 @@ Branch `research/gpu-world`, from main `ba0003de`, started 2026-10-04. The brief
 `docs/research/gpu-world-brief.md` (the owner's, verbatim). Machine: Apple M2 Max (38-core GPU, 64 GB),
 macOS 26, Dawn/WebGPU on Metal. All GPU runs went through `tools/gpu-lock.sh`.
 
-**Status:** Phase 1 complete. Gate 0: PASS (narrow). Gate 1: CONDITIONAL PASS.
+**Status:** Phase 2 complete; this spike stops here by scope (Phase 3 is handed to an art agent; see
+"Phase 3 handoff"). Gate 0: PASS (narrow). Gate 1: CONDITIONAL PASS. Gate 2: CONDITIONAL PASS.
+Interim recommendation: **YELLOW** (see "Recommendation at the end of Phase 2").
 
 ## Hypothesis (from the brief)
 
@@ -281,6 +283,280 @@ alternative actually unaffordable?** Phase 2 adds production's own path as a con
 
 ---
 
+## Phase 2: GPU-Resident Audio-Reactive Population
+
+### Experiment design
+
+The same prototype with `--audio`. The CPU supplies one block of signals per frame: bass, mids, highs,
+beat phase, the times of the last four kicks, and a 32-bin spectrum (all inside the 304 B uniform).
+Each element derives its own response from those signals and its own seeded attributes:
+
+| Signal | Per-element behaviour |
+|---|---|
+| beat phase | animation phase: half the population locks to the beat, half to half-time (chosen by the element's own random) |
+| bass | scale, weighted by the element's own random (so the swell is uneven, not uniform) |
+| kick | an impulse that *travels outward from the centre*: each element responds to each of the last four kicks when the front reaches it, with exponential decay (scale and lift) |
+| mids | sway amplitude |
+| highs + spectrum | emission. Each element listens to **its own spectral band** (one of 32, from its seed), on top of an overall highs gain |
+
+The signals are synthesised from the clock (120 bpm, a kick on every beat, a sweeping spectrum peak),
+so every arm and every run sees identical input. That keeps the comparison deterministic. It also
+means no real audio analysis is in the loop. Production's analysis cost does not depend on N, so it
+does not change the comparison.
+
+Three controls:
+
+1. **The CPU arms** (`cpu`, `cpumt`, `cpugrid`), running the same per-element audio maths in C++.
+2. **Production's own GPU path** (new in this phase). `prototypes/gpu-world/production-control/` is a
+   project derived from `examples/stress`. It holds a point swarm of 10k / 100k / 1M with three
+   effectors (vortex position offset, radial scale and noise emission), each driven by a
+   modulation route from a signal source (`lfo.mids`, `lfo.bass`, `lfo.highs`). An LFO is used rather
+   than an audio file, because a route costs the same per frame whatever its source. It was measured
+   with the production profiler: `avgen --live-profile --quality ultra --start 5`, headless, 300
+   frames, two runs per size, under the GPU lock.
+3. **Entities**, the conventional AV Gen way to give one element its own reaction (ADR-088 reactions
+   compile to `ModRoute`s). These are priced from existing instrumentation rather than built: see
+   "Entities" below.
+
+### Results: per-element audio response, prototype
+
+Data: `docs/research/gpu-world/data/p2-firefly-field-audio.{jsonl,table.md}`. Same protocol as Phase 1
+(field scenario, firefly mesh, 300 frames, two repeats, load gated, under the lock).
+
+| N | visible | CPU frame ms: cpu / cpumt(8) / gpu | audio's added CPU update cost (vs Phase 1): cpu / cpumt | GPU compute ms with audio (without) | frame interval ms: cpumt / gpu |
+|---|---|---|---|---|---|
+| 10,000 | 8,272 | 0.69 / 0.21 / 0.060 | +33% / +25% | <0.07 (<0.07) | 0.64 / 0.72 |
+| 100,000 | 82,545 | 6.19 / 1.20 / 0.081 | +24% / +28% | <0.07 (<0.07) | 1.21 / 0.94 |
+| 1,000,000 | 819,423 | 61.3 / 13.5 / 0.072 | +23% / +28% | 0.197 (0.197) | 13.5 / **2.71** |
+| 4,000,000 | 3,275,978 | 248 / 51.3 / 0.35 | +24% / +26% | 0.721 (0.721) | 51.3 / **9.27** |
+
+- **The audio response is free on the GPU and costs about a quarter more on the CPU.** The compute
+  pass is bandwidth-bound: an element reads 32 B and writes 48 B, and four `exp`s and a band lookup
+  vanish inside that. On the CPU every added operation is paid N times. The richer the per-element
+  behaviour, the wider the gap; this phase's behaviours are modest.
+- **At 60 fps** (16.7 ms), the best CPU control can afford about 1.2M audio-reactive elements, and
+  only with eight cores fully used for nothing else. The GPU arm draws 4M in 9.3 ms end to end. Its
+  limit is raster, not population.
+- **Equivalence:** at 100k with audio, CPU vs GPU images differ in 38 silhouette pixels (max 77/255).
+  At 4M the visible counts differ by **one element** (3,275,978 vs 3,275,977): an element exactly on a
+  frustum plane is classified differently by the GPU's and libm's last-bit maths.
+
+### Results: production's existing GPU path (control 2)
+
+Data: `docs/research/gpu-world/data/production-control/`. CPU numbers here are noisier than the
+prototype's because the other agent's test suites were running between these runs. The rows that
+matter are the population-attributable ones.
+
+| N | instances visible | effector pass GPU ms | cull pass GPU ms | scene update CPU ms | procedural submission CPU ms |
+|---|---|---|---|---|---|
+| 10k | 6,606 | 0.07 | 0.07 | 0.04-0.07 | 0.02-0.05 |
+| 100k | 60,219 | 0.20-0.26 | 0.07 | 0.08-0.09 | 0.05 |
+| 1M | 611,964 | 1.11 | 0.33 | 0.03-0.13 | 0.02-0.08 |
+
+**Production's audio-modulated GPU population already has the property Phase 1 and this phase
+measured for the GPU arm:** CPU flat in N (tens of microseconds), GPU effector pass about 1.1 ms per
+1M with three effectors. Against production, the prototype's GPU arm is not faster in any way that
+matters (0.2 vs 1.1 + 0.33 ms per 1M of GPU compute, with the prototype doing less per element and
+skipping the scan compaction).
+
+(A side observation, not pursued: production's 1M scene pass costs 42 ms at Ultra against the
+prototype's 2.1 ms draw of 1M octahedra. The two are not comparable. Production's pass has full PBR
+with clustered lights, multiple render targets, three deformer-chain evaluations per vertex, and
+quads enlarged by the scale effector. It still shows that **in production, the cost of a big
+population is its drawing, not its management.**)
+
+### What production cannot express, and the prototype can
+
+Read from `shaders/points.wgsl`, `spatial/effector.hpp` and `spatial/field.hpp`:
+
+| Behaviour | Production today | Prototype |
+|---|---|---|
+| bass → scale, mids → movement, highs → emission, uniform or varying in space | **yes**: a `Scale`/`PositionOffset`/`Emission` effector over any field, with a route on its strength | yes |
+| a continuous travelling wave | **yes**: `Wave`/`WaveVector` fields, ground waves (ADR-207/702) | yes |
+| an impulse that starts at each **kick** and travels outward, overlapping with earlier kicks | **no**: a route on a wave's strength flashes the whole wave; the front's timing is the clock's, not the kick's | yes (last 4 kicks) |
+| each element listening to **its own spectral band** | **no**: effectors sample fields at the element's *position*; `InstanceRecord::random` is declared in `points.wgsl` but never read | yes |
+| per-element phase locks (beat vs half-time) from the element's seed | **no** (the same reason) | yes |
+| per-element state across frames (previous-frame velocity, accumulated energy) | **no** for procedural records (the effector pass recomputes from base records every frame); yes for particles | no (not built; the prototype is stateless too) |
+
+Every "no" in that table is an **input** that production's effector pass lacks. It needs the
+element's seed, the spectrum, and a short kick history. None of them requires a new execution model:
+`cs_effectors` already runs one thread per record over GPU-resident records, after the CPU has written
+a uniform block.
+
+### Entities (control 3), priced not built
+
+The conventional way to give 100k elements their own reaction is 100k entities. That was not built:
+it would be the straw man the brief warns against, and the existing evidence already prices it.
+
+- An entity is a composition node with its own draw (not instanced) and its own `ModRoute`s,
+  evaluated per route per frame by `Modulator::applyRoutes`. Glowmere's 96 entities cost 1.55 ms of
+  scene update (Phase 0), about 16 µs each including character AI.
+- `avgen_seek_probe` (`k` arm, 200 bodies, run during this phase) measured the cheap behaviour kinds
+  at 0.03-0.04 µs per body-step and `wander` at 15 µs. The maths of a simple behaviour is not the cost.
+  The per-entity overhead is (node, routes, draw).
+- **Estimate (not measured):** at even 2 µs per entity per frame, 100k entities are 200 ms of CPU
+  per frame plus 100k draws per pass. Entities are an architecture for tens to hundreds of
+  characters, not for populations. That matches their design (ADR-088) and is not news.
+
+### Visual evidence
+
+Stills (repo) and clips (Desktop, too large for the repo):
+
+- ![1M fireflies, a kick front](gpu-world/p2-fireflies-f060.jpg) 1M fireflies. The concentric rings
+  are the last four kicks' fronts travelling outward, each element answering when the front reaches it.
+- ![100k mushrooms, four frames](gpu-world/p2-mushrooms-sheet.jpg) 100k production mushrooms (world
+  scenario), frames 0, 45, 60 and 90 of the clip. Scale swells with bass and kick, and emission comes
+  from each mushroom's own band. **Not art-directed:** the ranges were chosen to be visible, and the
+  overlap at kick peaks is ugly. Making it beautiful is Phase 3's job.
+- Clips: `~/Desktop/av-gen-review/33-gpu-world-spike/phase2/p2-audio-{fireflies,mushrooms}-1080p.mp4`
+  (6 s, 30 fps), 640-wide versions beside them, and the PNG frames in `clip-*/`.
+
+### Gate 2 decision: **CONDITIONAL PASS**
+
+The brief's question has two parts. On the evidence:
+
+1. **Meaningful performance advantage?** Against CPU-driven evaluation: **yes, large.** That is
+   35-190x less CPU at 1M-4M, 5x faster end to end at 1M, and the audio maths free on the GPU but
+   +25% on the CPU. Against production's existing GPU effector path: **no.** Production is already
+   O(1) on the CPU and pays about 1.1 ms per 1M on the GPU. The prototype is an alternate
+   implementation of what production already does for the expressible subset.
+2. **Dramatically greater population or detail than practical CPU evaluation?** **Yes:** 4M
+   per-element audio-reactive elements at 9.3 ms against a CPU ceiling near 1.2M on eight saturated
+   cores. Entities are out of the question beyond hundreds.
+
+It passes because one thing is real and relevant: **per-element divergent audio response** (own band,
+own phase lock, kick-timed fronts) over hundreds of thousands to millions of elements. AV Gen cannot
+express it today on any path. The GPU does it at no measurable added cost. The CPU cannot do it at
+that scale, and audio reactivity is the product's defining feature.
+
+It is *conditional* because the advantage lives **inside the existing GPU population path**, not in a
+new architecture. The smallest production change that captures it is new inputs to `cs_effectors`
+(the record's seed, a spectrum block and a kick-history block). The "GPU World" framing adds nothing
+the evidence asked for. The remaining open question, whether these behaviours are *aesthetically*
+valuable rather than just possible, is what Phase 3 tests.
+
+Per the coordinator's scope change, this spike stops here. Phase 3 goes to a separate art agent.
+
+### Recommendation at the end of Phase 2 (interim): **YELLOW, targeted adoption**
+
+Do not create "GPU Worlds". Do consider extending the existing GPU population path
+(`ProceduralRenderer`'s effector pass, ADR-025) with per-element audio inputs:
+
+- the record's seed exposed to effectors (`InstanceRecord::random` is already there and unread);
+- a spectrum block (32 bins) beside the `FieldBlock`;
+- a kick/onset history (the last N onset times on the timeline clock, so it is a pure function of
+  time and seeks exactly);
+- two or three effector ops that use them.
+
+That should be gated on Phase 3 showing it is worth looking at. Phases 4-5 were not run. Nothing here
+argues for a compact procedural world representation, and Phase 0 found the flatten is not a
+per-frame cost.
+
+The hypothesis's final verdict is withheld until Phase 3 reports (see "Final decision" below, written
+when the art agent's result is in).
+
+---
+
+## Phase 3 handoff (for the art agent)
+
+**What you have.** `prototypes/gpu-world/gpu_world_bench.cpp` is a single-file, hard-coded GPU
+population renderer. One compute dispatch animates, culls and compacts N instances of one mesh, and one
+indirect draw renders them. It is **not** the production renderer: no PBR, no lights beyond one
+directional term, no post, no bloom, Reinhard-ish tonemap, a flat background. Treat it as a sketchbook
+for *behaviour*, not *look*. Anything you learn about behaviour transfers to production effectors. Look
+will not transfer.
+
+**Build and run.**
+
+```
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DAVGEN_GPUWORLD_PROTOTYPE=ON
+cmake --build build/release -j 10 --target avgen_gpu_world_bench
+tools/gpu-lock.sh ./build/release/prototypes/gpu-world/avgen_gpu_world_bench --arm gpu --n 1000000 \
+    --mesh firefly --audio --png out.png
+tools/gpu-lock.sh ./build/release/prototypes/gpu-world/avgen_gpu_world_bench --arm gpu --n 100000 \
+    --scenario world --audio --warm 10 --frames 360 --clip <dir>      # 6 s of 30 fps PNGs
+ffmpeg -framerate 30 -i <dir>/f%05d.png -c:v libx264 -pix_fmt yuv420p out.mp4
+```
+
+The option is OFF by default, and a plain configure does not build the prototype. Every run must go
+through `tools/gpu-lock.sh`. It prints one JSON line of timings to stdout.
+
+**Knobs (command line).**
+
+| Flag | Meaning |
+|---|---|
+| `--arm gpu` | always use `gpu` for art (`cpu`, `cpumt`, `cpugrid` exist for benchmarking only) |
+| `--n` | population size |
+| `--scenario field\|world` | `field`: a 200 m square seen from above, ~82% visible. `world`: constant density over √N m, eye-height camera at the origin, 120 m cull |
+| `--mesh mushroom\|firefly` | the production mushroom generator at its schema midpoint (6,010 tris), or an 8-tri octahedron |
+| `--audio` | per-element audio behaviour on (see the Phase 2 table) |
+| `--start <s>` | timeline second of the first frame (default 10); the synthetic signals are a pure function of it |
+| `--frames`, `--warm` | measured and warm-up frames |
+| `--png <file>` | the last frame; `--clip <dir>` every `--clip-every` (default 2) frames from the first measured frame |
+| `--size WxH` | target (default 1920x1080) |
+
+**Knobs (in the source, which is where art direction will happen).** All the behaviour lives in
+`animate()` in the WGSL string `kComputeWgsl`. The C++ `animate()` must be kept identical only if you
+benchmark CPU arms; for art, edit the WGSL alone and don't run `cpu*`. The constants:
+
+- sway 0.12 rad, scaled by `1 + 2·mids`;
+- bob 5% of size at 2.1 rad/s;
+- scale pulse ±8%;
+- bass scale `0.35·bass·rand.z`;
+- kick impulse scale `0.4` per kick and lift `0.6·size`;
+- kick front speed `wave.z` (25 m/s world, 60 field), decay `wave.w` = 5/s, centre `wave.xy` = origin;
+- emission `(0.3 + 0.7·highs)·pulse + 2·bandEnergy`;
+- tint lerp orange→cyan by `rand.w`, which also picks the band.
+
+The synthetic signals are in `synthAudio()`: 120 bpm, kick each beat, a spectrum peak sweeping at
+0.5 rad/s. Swapping in real audio means filling `Params.audio/kicks/spectrum` from an analysis of a
+file. Production's `signals/` has that, but wiring it in is not done.
+
+**Measured costs (M2 Max, 1080p, from Phases 1-2), to budget with.** GPU compute (animate, cull and
+compact): under 0.07 ms up to 100k, 0.20 ms at 1M, 0.72 ms at 4M, with or without audio. The draw
+dominates:
+
+| Asset | Visible | Draw |
+|---|---|---|
+| firefly | 82k | 0.46-0.59 ms |
+| firefly | 820k | 2.1-2.3 ms |
+| firefly | 3.3M | 8.1 ms |
+| mushroom (6k tris) | 2.3k | 2.3 ms |
+| mushroom (6k tris) | 10k | 7.8 ms |
+
+CPU is about 0.05-0.35 ms whatever N. Mushroom worlds are raster-bound at about 10k visible, so add
+distance or LOD before adding more. Production costs are different: the same population through
+`ProceduralRenderer` with full shading cost 42 ms at 1M points at Ultra.
+
+**Pitfalls.**
+
+- **Append order is nondeterministic.** That is invisible for opaque geometry, but translucent or
+  additive blending in this prototype would shimmer frame to frame. Production uses a prefix-scan
+  compaction for exactly this reason.
+- **The world scenario's camera sits at the kick centre,** so kick fronts expand from under the
+  viewer, and the scale impulse overlaps neighbours at peaks (see the Phase 2 sheet). Lower the kick
+  scale or move `wave.xy`.
+- **Emission has no bloom here,** so glow reads weaker than it would in production. Don't tune
+  emission levels in this prototype for production use.
+- **The prototype is stateless.** Behaviours that need memory (trails, flocking, accumulated energy)
+  need a ping-pong state buffer, and a seek then needs a checkpoint or a replay (ADR-700's problem on
+  the GPU). Note it if you build one; it is a central architecture question.
+- **The mushroom is one mesh at one parameter set.** Variety needs several meshes (one draw each) or
+  per-instance vertex deformation.
+- **The clip mode stalls on a readback every frame,** so its timings are meaningless. Benchmark
+  without `--clip`.
+- **Another agent shares the GPU** (`../av-gen-opt`). Use the lock, and check `uptime` before trusting
+  any CPU number.
+
+**What Gate 3 needs from you** (the brief's wording): at least one visual system that is compelling
+*and* impractical, prohibitively expensive or architecturally unnatural with conventional AV Gen
+entities **or with the existing effector path**. The second clause is this spike's addition: Phase 2
+showed effectors already cover uniform and position-varying audio response. Per-element divergence
+(own band, own phase, kick fronts, and anything stateful) is where the unexplored ground is. "A faster
+way to render some particles" does not pass.
+
+---
+
 ## Reasons This Might Be A Bad Idea (live)
 
 - **The shipped scenes are GPU-bound.** CPU scene work is 1-1.5 ms of a 3-5 ms CPU frame against
@@ -313,3 +589,17 @@ alternative actually unaffordable?** Phase 2 adds production's own path as a con
 - **(Phase 1) CPU and GPU maths diverge in the last bits** (12-187 silhouette pixels per frame here).
   An offline/CPU fallback for a GPU population cannot be bit-identical, so the golden-image tests would
   need tolerances.
+- **(Phase 2) Production already has the GPU population path the hypothesis describes.** Its
+  audio-modulated effector pass is O(1) on the CPU and about 1.1 ms per 1M on the GPU. The prototype's
+  performance advantage is over a CPU control that production does not use at scale.
+- **(Phase 2) The capability gap is a handful of shader inputs, not an architecture.** Per-element
+  seed, spectrum and kick history passed to `cs_effectors` would close every "no" found in Phase 2.
+- **(Phase 2) Last-bit divergence reaches culling.** At 4M the GPU and CPU disagreed about one
+  element on a frustum plane. Any feature that mirrors GPU decisions on the CPU (picking, bounds,
+  offline fallback) will occasionally disagree.
+- **(Phase 2) In production the cost of a big population is drawing it.** 42 ms for 1M shaded points
+  at Ultra, against about 1.4 ms for effectors plus cull. Moving more *management* to the GPU attacks
+  the small term.
+- **(Phase 2) Stateful GPU behaviour (flocking, trails, energy) was not tested.** It is where a real
+  architectural need could appear (GPU state checkpointing for seek, ADR-700), and also where the cost
+  and the determinism risk are largest.
