@@ -1,0 +1,37 @@
+{
+  "_comment": [
+    "A scripted run of the live optimizer's agent workflow (ADR-1113). Only the choosing is scripted: every tool",
+    "below is the real tool, running avgen --live-profile on a scratch copy in a child process.",
+    "",
+    "  tools/gpu-lock.sh ./build/release/src/avgen --headless --frames 2 \\",
+    "      --project examples/sonic-garden/sonic-live.json \\",
+    "      --ai-script examples/ai/live-optimize.ai.json --save-project /tmp/after.json",
+    "",
+    "Diagnose, apply the measured low-risk set as live ceilings (never the scene), benchmark before/after,",
+    "read the ceilings back."
+  ],
+  "turns": [
+    {
+      "text": "Profiling the scene at the top level first, to find the largest bottleneck.",
+      "toolCalls": [
+        { "name": "performance.profile_scene", "arguments": { "quality": "ultra", "start": 0 } }
+      ]
+    },
+    {
+      "text": "Applying only the low-risk, hero-safe levers whose saving is measured outside the noise.",
+      "toolCalls": [
+        { "name": "performance.apply_low_risk_optimizations", "arguments": { "quality": "ultra" } }
+      ]
+    },
+    {
+      "text": "Benchmarking the project with its ceilings against without them, time and picture.",
+      "toolCalls": [
+        { "name": "performance.benchmark_before_after", "arguments": { "levers": "project", "quality": "ultra" } },
+        { "name": "performance.get_live_quality" }
+      ]
+    },
+    {
+      "text": "Done: the low-risk levers are project ceilings, measured before and after."
+    }
+  ]
+}

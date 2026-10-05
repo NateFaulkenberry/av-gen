@@ -6,6 +6,8 @@ Runs the profiler on one scene, prints its human report, and prints the JSON rec
 
     tools/live_scene_profile.py examples/world/glowmere-valley-2.json --target-fps 60
     tools/live_scene_profile.py examples/liminal/all-you-got.json --start 60 --mode live --verify-candidates 3
+    tools/live_scene_profile.py examples/world/glowmere-valley-2.json --quality ultra --optimize     # ADR-1111
+    tools/live_scene_profile.py examples/world/glowmere-valley-2.json --compare scale85,volumequarter  # ADR-1110
 
 Every GPU run goes through tools/gpu-lock.sh (one job per lock hold), so two agents never measure at once.
 Estimated savings and measured savings stay separate fields in the record; read docs/live-optimizer/ for what
@@ -41,6 +43,15 @@ def main() -> int:
     p.add_argument("--capture", help="a PNG of the last measured frame")
     p.add_argument("--json", help="where to write the record (default: a temporary file)")
     p.add_argument("--verify-candidates", type=int, default=0)
+    # Phase 5 (ADR-1108..1112), headless only.
+    p.add_argument("--compare", help="ORIGINAL vs OPTIMIZED: comma-separated levers, or 'project'")
+    p.add_argument("--optimize", action="store_true", help="search lever combinations for the target")
+    p.add_argument("--hero-policy", choices=["protect", "strict"])
+    p.add_argument("--optimize-risk", choices=["low", "medium", "high"])
+    p.add_argument("--ab-frames", type=int)
+    p.add_argument("--ab-dir", help="keep the ORIGINAL/OPTIMIZED frames here")
+    p.add_argument("--ab-critic", action="store_true", help="also ask the Creative Critic (optional)")
+    p.add_argument("--critic", help="the Critic's CLI (default $AVGEN_CRITIC)")
     p.add_argument("--binary", default=os.path.join(REPO, "build", "release", "src", "avgen"))
     p.add_argument("--no-lock", action="store_true", help="do not take tools/gpu-lock.sh (the caller holds it)")
     a = p.parse_args()
@@ -64,6 +75,22 @@ def main() -> int:
         cmd += ["--capture", a.capture]
     if a.verify_candidates > 0:
         cmd += ["--verify-candidates", str(a.verify_candidates)]
+    if a.compare:
+        cmd += ["--compare", a.compare]
+    if a.optimize:
+        cmd.append("--optimize")
+    if a.hero_policy:
+        cmd += ["--hero-policy", a.hero_policy]
+    if a.optimize_risk:
+        cmd += ["--optimize-risk", a.optimize_risk]
+    if a.ab_frames:
+        cmd += ["--ab-frames", str(a.ab_frames)]
+    if a.ab_dir:
+        cmd += ["--ab-dir", a.ab_dir]
+    if a.ab_critic:
+        cmd.append("--ab-critic")
+    if a.critic:
+        cmd += ["--critic", a.critic]
     if not a.no_lock:
         cmd = [os.path.join(REPO, "tools", "gpu-lock.sh")] + cmd
     # stdout is the report; stderr is the engine's log, kept out of the way.

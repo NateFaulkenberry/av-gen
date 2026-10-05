@@ -367,6 +367,31 @@ int Application::runLivePhase5(LiveProfileRecord& record, const LiveAbDriver& d)
             admitted += s.admitted ? 1 : 0;
             opt.candidates.push_back(std::move(s));
         }
+        // The search's own extras (ADR-1111): the next render-scale step (high risk: half the pixels) and the
+        // volume's other axis, which the rules do not offer while a cheaper form of the same lever is open.
+        const auto addExtra = [&](const char* lever, const char* title, const char* risk, bool when) {
+            if (!when || std::any_of(opt.candidates.begin(), opt.candidates.end(),
+                                     [&](const SearchCandidate& s) { return s.lever == lever; })) {
+                return;
+            }
+            SearchCandidate s;
+            s.lever = lever;
+            s.title = title;
+            s.risk = risk;
+            s.heroEffect = heroEffectOfLever(lever);
+            s.admitted = leverAdmitted(lever, risk, opt.heroPolicy, opt.maxRisk, &s.refusal);
+            if (s.admitted && admitted >= o.optimizeCandidates) {
+                s.admitted = false;
+                s.refusal = fmt::format("over --optimize-candidates {}", o.optimizeCandidates);
+            }
+            admitted += s.admitted ? 1 : 0;
+            opt.candidates.push_back(std::move(s));
+        };
+        const bool hasVolume = std::any_of(record.gpu.begin(), record.gpu.end(), [](const GpuCategory& g) {
+            return g.name == "volumetrics" && g.medianMs > 0.1;
+        });
+        addExtra("scale71", "Render resolution (half the pixels)", "high", d.base.renderScale > 0.72f);
+        addExtra("volumesteps", "Volumetric march steps", "medium", hasVolume && d.base.volumeStepScale > 0.5f);
         if (opt.alreadyUnder) {
             opt.notes.push_back("the baseline is already under the target; singles are still measured so the low-risk "
                                 "set is known");

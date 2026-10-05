@@ -101,11 +101,15 @@ ContributionReport analyseContribution(const std::vector<LiveProfileEntity>& ent
         r.emittersBeyondCull += em.beyondCull ? 1 : 0;
     }
     if (r.heroEntities == 0) {
+        // An object, not a backdrop: something that fills a quarter of the frame or more (terrain, water, a sky
+        // dome, anything the camera is inside) is the setting a hero stands in, not a hero.
         for (const auto* e : shown) {
             if (r.suggestedHeroes.size() >= 3 || e->projectedArea < 0.01) {
                 break;
             }
-            r.suggestedHeroes.push_back(e->name);
+            if (e->projectedArea < 0.25) {
+                r.suggestedHeroes.push_back(e->name);
+            }
         }
     }
     r.limits = {

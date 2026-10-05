@@ -141,11 +141,12 @@ TEST_CASE("contribution: the caster table is the renderer's floor, and a hero ca
 
 TEST_CASE("contribution: with no hero declared, the largest visible contributors are suggested, not marked",
           "[unit][live-optimize]") {
-    std::vector<app::LiveProfileEntity> es{ent("tree", 0.12, 200.0, true), ent("rock", 0.02, 50.0, true),
-                                           ent("speck", 0.001, 4.0, true)};
+    std::vector<app::LiveProfileEntity> es{ent("terrain", 1.0, 0.0, true), ent("tree", 0.12, 200.0, true),
+                                           ent("rock", 0.02, 50.0, true), ent("speck", 0.001, 4.0, true)};
     const app::ContributionReport r = app::analyseContribution(es, {});
     CHECK(r.heroEntities == 0);
-    CHECK(r.suggestedHeroes == std::vector<std::string>{"tree", "rock"}); // the speck is under 1% of the frame
+    // The terrain fills the frame (a backdrop, not a hero); the speck is under 1% of it.
+    CHECK(r.suggestedHeroes == std::vector<std::string>{"tree", "rock"});
     CHECK(r.heroRegions.empty());
     const nlohmann::json j = app::contributionJson(r);
     CHECK(j["suggestedHeroesNote"].is_string());
