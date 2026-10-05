@@ -136,6 +136,8 @@ fn qmul(a: vec4f, b: vec4f) -> vec4f {
 }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 fn qaxis(axis: vec3f, ang: f32) -> vec4f { return vec4f(axis * sin(0.5 * ang), cos(0.5 * ang)); }
+// atan2(0, 0) is undefined in WGSL and NaN on Metal: a zero bend made every vertex NaN (invisible).
+fn bendAngle(b: vec2f) -> f32 { return select(atan2(b.y, b.x), 0.0, dot(b, b) < 1e-12); }
 
 fn hashu(x0: u32) -> u32 {
     var x = x0;
@@ -181,7 +183,7 @@ fn skyColorM(dir: vec3f, moon: f32) -> vec3f {
     c = mix(c, F.groundTint.rgb * 0.5, clamp(-y * 6.0, 0.0, 1.0));
     // a broad horizon glow toward the "sun" (a low moon) and a halo around it
     let sd = max(dot(dir, F.sun.xyz), 0.0);
-    c += F.sunColor.rgb * (pow(sd, 6.0) * 0.06 * F.skyHorizon.w + moon * (pow(sd, 400.0) * 1.5 + pow(sd, 3000.0) * 30.0));
+    c += F.sunColor.rgb * (pow(sd, 6.0) * 0.06 * F.skyHorizon.w + moon * (pow(sd, 900.0) * 0.35 + pow(sd, 5000.0) * 9.0));
     // stars
     if (y > 0.0 && F.skyZenith.w > 0.0 && moon > 0.5) {
         let q = dir / max(abs(dir.x), max(abs(dir.y), abs(dir.z)));
@@ -243,7 +245,8 @@ struct VOut { @builtin(position) clip: vec4f, @location(0) n: vec3f, @location(1
     let amb = mix(F.groundTint.rgb, F.skyZenith.rgb * 4.0 + F.skyHorizon.rgb, n.y * 0.5 + 0.5) * F.sunColor.w;
     let dif = max(dot(n, F.sun.xyz), 0.0) * F.sunColor.rgb * F.sun.w;
     let rim = pow(1.0 - max(dot(n, V), 0.0), 3.0) * F.fog.rgb * F.groundTint.w;
-    var c = albedo * (amb + dif) + rim + i.col.a * i.tint.rgb * i.tint.a;
+    let spec = pow(max(dot(reflect(-V, n), F.sun.xyz), 0.0), 48.0) * F.sunColor.rgb * F.sun.w * 1.5;
+    var c = albedo * (amb + dif) + rim + spec + i.col.a * i.tint.rgb * i.tint.a;
     return vec4f(applyFog(c, i.wpos), 1.0);
 }
 )";
@@ -514,17 +517,32 @@ MeshCpu makeBlade(glm::vec3 col) { // a curved tapered blade, 4 segments, double
 }
 
 MeshCpu makeCrystal(int sides, float r, float shoulder, glm::vec3 col, float emis) { // a long faceted spire
+    // The body is split into rings so the light can gather toward the top (mask ~ h^3), and
+    // alternate facets carry less of it, so a flare reads as faceted glass rather than a lit slab.
     MeshCpu m;
-    const glm::vec3 lo(0, 0, 0), hi(0, 1, 0);
+    const int segs = 5;
+    auto ringPt = [&](int k, float a) {
+        const float y = shoulder * static_cast<float>(k) / segs;
+        const float rr = r * (1.0f - 0.2f * static_cast<float>(k) / segs);
+        return glm::vec3(rr * std::cos(a), y, rr * std::sin(a));
+    };
+    auto mask = [&](int k, int s) {
+        const float h = static_cast<float>(k) / segs;
+        return emis * (0.45f * h * h * h) * ((s & 1) ? 0.55f : 1.0f);
+    };
+    const glm::vec3 hi(0, 1, 0), lo(0, 0, 0);
     for (int s = 0; s < sides; ++s) {
         const float a0 = 6.2831853f * s / sides, a1 = 6.2831853f * (s + 1) / sides;
-        const glm::vec3 b0(r * std::cos(a0), 0.0f, r * std::sin(a0)), b1(r * std::cos(a1), 0.0f, r * std::sin(a1));
-        const glm::vec3 t0(r * 0.8f * std::cos(a0), shoulder, r * 0.8f * std::sin(a0)), t1(r * 0.8f * std::cos(a1), shoulder, r * 0.8f * std::sin(a1));
-        const glm::vec4 cb(col, emis * 0.15f), ct(col, emis * 0.6f), ch(col, emis);
-        addTri(m, b0, t1, b1, cb, ct, cb);
-        addTri(m, b0, t0, t1, cb, ct, ct);
+        for (int k = 0; k < segs; ++k) {
+            const glm::vec3 b0 = ringPt(k, a0), b1 = ringPt(k, a1), t0 = ringPt(k + 1, a0), t1 = ringPt(k + 1, a1);
+            const glm::vec4 cb(col, mask(k, s)), ct(col, mask(k + 1, s));
+            addTri(m, b0, t1, b1, cb, ct, cb);
+            addTri(m, b0, t0, t1, cb, ct, ct);
+        }
+        const glm::vec3 t0 = ringPt(segs, a0), t1 = ringPt(segs, a1);
+        const glm::vec4 ct(col, mask(segs, s)), ch(col, emis * ((s & 1) ? 0.7f : 1.0f));
         addTri(m, t0, hi, t1, ct, ch, ct);
-        addTri(m, b0, b1, lo, cb, cb, cb);
+        addTri(m, ringPt(0, a0), ringPt(0, a1), lo, glm::vec4(col, 0.0f), glm::vec4(col, 0.0f), glm::vec4(col, 0.0f));
     }
     return m;
 }
@@ -542,11 +560,14 @@ MeshCpu makeOrb(glm::vec3 col) { // icosahedron centred at y = 0.5
     return m;
 }
 
-MeshCpu makeMushroom() { // the production mushroom generator at its schema midpoint, normalised to unit height
+// The production mushroom generator (organism::buildMushroom), normalised to unit height. Parameters
+// not named in `pick` sit at the schema midpoint.
+MeshCpu makeMushroom(const std::vector<std::pair<std::string, float>>& pick = {}) {
     const auto& specs = organism::mushroomSchema().parameters.specs();
     search::Parameters values;
     for (const auto& s : specs) {
-        const float v = 0.5f * (s.min + s.max);
+        float v = 0.5f * (s.min + s.max);
+        for (const auto& [name, value] : pick) if (name == s.name) v = value;
         values.push_back(s.integral ? std::round(v) : v);
     }
     auto subject = organism::buildMushroom(values);
@@ -560,7 +581,7 @@ MeshCpu makeMushroom() { // the production mushroom generator at its schema midp
     for (const auto& part : subject->parts) {
         const auto first = static_cast<std::uint32_t>(m.v.size());
         const float glow = std::min(part.emissiveIntensity, 1.0f);
-        const glm::vec3 col = glm::mix(part.baseColor, glm::vec3(1.0f), 0.2f);
+        const glm::vec3 col = glm::mix(part.baseColor, glm::vec3(0.5f, 0.3f, 0.25f), 0.5f);
         for (const auto& v : part.mesh.vertices) {
             const glm::vec3 p = (v.position - centre) / height;
             m.v.push_back({{p.x, p.y, p.z}, {v.normal.x, v.normal.y, v.normal.z}, {col.x, col.y, col.z, glow}});
@@ -715,7 +736,7 @@ fn cs_field(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation
         let dist = length(pos - F.camPos.xyz);
         let pxW = dist * F.camFwd.w;              // metres per pixel at this distance
         let widen = max(1.0, F.sys[1].z * pxW / (s * 0.012));
-        o.shape = vec4f(hy, length(bv), atan2(bv.y, bv.x), widen);
+        o.shape = vec4f(hy, length(bv), bendAngle(bv), widen);
         o.color.a = o.color.a / widen;
         // cull: frustum on a bounding sphere, and distance
         let c = pos + vec3f(0.0, 0.5 * s * hy, 0.0);
@@ -913,7 +934,7 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<System> sys;
     if (systemName == "field") { auto s = std::make_unique<FieldSystem>(); if (n) s->n = n; sys = std::move(s); }
-    else if (systemName == "world") { auto s = std::make_unique<WorldSystem>(); sys = std::move(s); }
+    else if (systemName == "world") { auto s = std::make_unique<WorldSystem>(); if (n) s->speed = static_cast<float>(n); sys = std::move(s); }
     else if (systemName == "organism") { auto s = std::make_unique<OrganismSystem>(); if (n) s->n = n; sys = std::move(s); }
     else { std::fprintf(stderr, "--system field|world|organism\n"); return 2; }
 
@@ -932,7 +953,7 @@ int main(int argc, char** argv) {
     const std::uint32_t cap = sys->capacity();
     const std::uint64_t outBytes = static_cast<std::uint64_t>(cap) * std::max<std::size_t>(bucketList.size(), 1) * sizeof(Inst);
     wgpu::Buffer outBuf = makeBuffer(ctx, outBytes, wgpu::BufferUsage::Storage, "insts");
-    wgpu::Buffer argsBuf = makeBuffer(ctx, 80, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc, "args");
+    wgpu::Buffer argsBuf = makeBuffer(ctx, 160, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc, "args");
     wgpu::Buffer dummyAux = makeBuffer(ctx, 256, wgpu::BufferUsage::Storage, "aux0");
 
     // ---- shaders ----
@@ -1088,7 +1109,7 @@ int main(int argc, char** argv) {
     if (ctx.errorCount() != 0) { std::fprintf(stderr, "setup errors: %s\n", ctx.lastError().c_str()); return 4; }
 
     const Look look = sys->look();
-    std::vector<std::uint32_t> argsInit(20, 0);
+    std::vector<std::uint32_t> argsInit(40, 0);
     for (std::size_t b = 0; b < bucketList.size(); ++b) argsInit[b * 5] = meshes[bucketList[b].mesh].indexCount;
 
     // ---- the seek / determinism test (organism only) ----
@@ -1108,7 +1129,7 @@ int main(int argc, char** argv) {
     if (clip) std::filesystem::create_directories(clipDir);
     std::uint64_t footprint0 = 0;
     FrameU fu{};
-    std::uint32_t lastVisible[4] = {0, 0, 0, 0};
+    std::uint32_t lastVisible[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
     for (std::uint32_t f = 0; f < total; ++f) {
         const bool measuring = f >= warm;
@@ -1231,15 +1252,15 @@ int main(int argc, char** argv) {
     }
     ctx.waitForQueue();
     {
-        wgpu::Buffer rb = makeBuffer(ctx, 80, wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst, "rb");
+        wgpu::Buffer rb = makeBuffer(ctx, 160, wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst, "rb");
         wgpu::CommandEncoder enc = dev.CreateCommandEncoder();
-        enc.CopyBufferToBuffer(argsBuf, 0, rb, 0, 80);
+        enc.CopyBufferToBuffer(argsBuf, 0, rb, 0, 160);
         wgpu::CommandBuffer cb = enc.Finish();
         queue.Submit(1, &cb);
-        auto fut = rb.MapAsync(wgpu::MapMode::Read, 0, 80, wgpu::CallbackMode::WaitAnyOnly, [](wgpu::MapAsyncStatus, wgpu::StringView) {});
+        auto fut = rb.MapAsync(wgpu::MapMode::Read, 0, 160, wgpu::CallbackMode::WaitAnyOnly, [](wgpu::MapAsyncStatus, wgpu::StringView) {});
         (void)ctx.waitFor(fut);
-        const auto* a = static_cast<const std::uint32_t*>(rb.GetConstMappedRange(0, 80));
-        for (int b = 0; b < 4; ++b) lastVisible[b] = a[b * 5 + 1];
+        const auto* a = static_cast<const std::uint32_t*>(rb.GetConstMappedRange(0, 160));
+        for (int b = 0; b < 8; ++b) lastVisible[b] = a[b * 5 + 1];
     }
     if (!png.empty()) {
         auto img = gpu::readTexture8(ctx, ldr, width, height, false);
@@ -1254,9 +1275,9 @@ int main(int argc, char** argv) {
     };
     std::printf("{\"system\":\"%s\",\"n\":%u,\"shot\":%d,\"start\":%.2f,\"frames\":%u,\"clip\":%d,", systemName.c_str(), n, shot, start, frames, clip ? 1 : 0);
     j("interval_ms", sInterval); j("cpu_ms", sCpu); j("gpu_frame_ms", sGpuFrame); j("gpu_compute_ms", sCompute); j("gpu_scene_ms", sScene); j("gpu_post_ms", sPost);
-    std::printf("\"visible\":[%u,%u,%u,%u],\"triangles\":%llu,\"inst_buffer_mb\":%.1f,\"gpu_state_mb\":%.1f,\"spec_mb\":%.1f,\"footprint_mb\":%.1f,"
+    std::printf("\"visible\":[%u,%u,%u,%u,%u,%u,%u,%u],\"triangles\":%llu,\"inst_buffer_mb\":%.1f,\"gpu_state_mb\":%.1f,\"spec_mb\":%.1f,\"footprint_mb\":%.1f,"
                 "\"footprint_growth_mb\":%.1f,\"upload_bytes_per_frame\":%zu%s}\n",
-                lastVisible[0], lastVisible[1], lastVisible[2], lastVisible[3], static_cast<unsigned long long>(tris), outBytes / 1048576.0,
+                lastVisible[0], lastVisible[1], lastVisible[2], lastVisible[3], lastVisible[4], lastVisible[5], lastVisible[6], lastVisible[7], static_cast<unsigned long long>(tris), outBytes / 1048576.0,
                 sys->gpuStateBytes() / 1048576.0, song.spec.size() * 4 / 1048576.0, footprintBytes() / 1048576.0,
                 (static_cast<double>(footprintBytes()) - footprint0) / 1048576.0, sizeof(FrameU) + 80 + 32, sys->extraJson().c_str());
     return 0;
