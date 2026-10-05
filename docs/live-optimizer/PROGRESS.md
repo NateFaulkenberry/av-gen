@@ -17,6 +17,9 @@ Commands: `tools/gpu-lock.sh ./build/release/src/avgen --live-profile --project 
 <path>]`; Critic CLI `~/Documents/GitHub/creative-critic/.venv/bin/critic` (`critic start --daemon` if down).
 Tests: CPU `[live-optimize]` (tests/unit/test_live_optimize.cpp), `[live-profile]`, rig test in test_skeleton.cpp;
 GPU `[live-optimizer]` (spawn-scale hero test).
+Full suites at fc058423 (under the lock, one after the other): `avgen_tests` exit 0 -- 4110 cases, 4090 passed, 19
+skipped, 1 failed as expected (the known shouldfail); `avgen_render_tests` exit 0 -- 587 cases, 586 passed, 1 skipped.
+The report file was refused by the harness; its text is in the agent's final message.
 
 **Branch:** `live/optimizer` in `/Users/natefaulkenberry/Documents/GitHub/av-gen-opt` (based on `live/quality`).
 ADRs 1090-1109 are this stream's. Brief `00-brief.md`, inventory `01-research.md`, plan `02-plan.md`.
