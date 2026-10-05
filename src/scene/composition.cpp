@@ -4500,6 +4500,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     const float reachCam = 10.0f * std::max(radius_, 1.0f);
     cameraPosition_ = &params.add(vec3Desc(prefix_ + "camera/position", cameraPositionSetting_, -1e4f, 1e4f, -reachCam, reachCam));
     cameraTarget_ = &params.add(vec3Desc(prefix_ + "camera/target", cameraTargetSetting_, -1e4f, 1e4f, -reachCam, reachCam));
+    // ADR-1123: the orbit's pivot, so a state, a route or a knob can choose what the orbit circles and looks at.
+    cameraOrbitPivot_ = &params.add(
+        vec3Desc(prefix_ + "camera/orbitPivot", cameraOrbitPivotSetting_, -1e4f, 1e4f, -reachCam, reachCam));
+    cameraOrbitPivotWeight_ = &params.add(
+        floatDesc(prefix_ + "camera/orbitPivotWeight", cameraOrbitPivotWeightSetting_, 0.0f, 1.0f, 0.0f, 1.0f));
     cameraSplineT_ = &params.add(floatDesc(prefix_ + "camera/splineT", 0.0f, -10.0f, 10.0f, 0.0f, 1.0f));
     cameraLookAhead_ = &params.add(floatDesc(prefix_ + "camera/lookAhead", 2.0f, -100.0f, 100.0f, 0.0f, 10.0f));
     cameraSplineOffset_ = &params.add(vec3Desc(prefix_ + "camera/splineOffset", glm::vec3(0.0f), -1e3f, 1e3f, -5.0f, 5.0f));
@@ -5878,6 +5883,8 @@ void Composition::detach() {
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
+    cameraOrbitPivot_ = nullptr;
+    cameraOrbitPivotWeight_ = nullptr;
     cameraSplineT_ = nullptr;
     cameraLookAhead_ = nullptr;
     cameraSplineOffset_ = nullptr;
@@ -7979,10 +7986,17 @@ CameraPose Composition::evaluateMainCamera() const {
                        pose.position.y, pose.position.z, pose.target.x, pose.target.y, pose.target.z);
         }
     } else {
+        // ADR-1123: the orbit circles and looks at its pivot, mix(bounds centre, orbitPivot, weight).
+        const float w = std::clamp(
+            cameraOrbitPivotWeight_ != nullptr ? cameraOrbitPivotWeight_->value() : cameraOrbitPivotWeightSetting_, 0.0f,
+            1.0f);
+        const glm::vec3 pivot = glm::mix(
+            center_, cameraOrbitPivot_ != nullptr ? cameraOrbitPivot_->value() : cameraOrbitPivotSetting_, w);
         pose.position =
-            center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
+            pivot + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
         pose.position.y = height;
-        pose.target = center_;
+        pose.target = pivot;
+        ensureDistinctAim(pose);
     }
     return pose;
 }
@@ -9882,6 +9896,14 @@ nlohmann::json Composition::toJson() const {
     }
     camera["orbitSpeed"] =
         cameraOrbitSpeed_ != nullptr ? cameraOrbitSpeed_->base() : cameraOrbitSpeedSetting_;
+    { // ADR-1123: written only when the orbit has a pivot, so every scene without one keeps its file byte for byte
+        const float w = cameraOrbitPivotWeight_ != nullptr ? cameraOrbitPivotWeight_->base() : cameraOrbitPivotWeightSetting_;
+        if (w > 0.0f) {
+            const glm::vec3 pv = cameraOrbitPivot_ != nullptr ? cameraOrbitPivot_->base() : cameraOrbitPivotSetting_;
+            camera["orbitPivot"] = {pv.x, pv.y, pv.z};
+            camera["orbitPivotWeight"] = w;
+        }
+    }
     camera["fov"] = cameraFov_ != nullptr ? cameraFov_->base() : cameraFovSetting_;
     if (const float nearPlane = cameraNear_ != nullptr ? cameraNear_->base() : cameraNearSetting_; nearPlane > 0.0f) {
         camera["near"] = nearPlane; // ADR-1058
@@ -10813,6 +10835,18 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(orbit.error());
         }
         comp->cameraOrbitSpeedSetting_ = *orbit;
+        if (c.contains("orbitPivotWeight")) { // ADR-1123
+            auto w = readFloat(c, "orbitPivotWeight", 0.0f);
+            if (!w) {
+                return std::unexpected(w.error());
+            }
+            comp->cameraOrbitPivotWeightSetting_ = std::clamp(*w, 0.0f, 1.0f);
+        }
+        if (c.contains("orbitPivot") && c["orbitPivot"].is_array() && c["orbitPivot"].size() == 3 &&
+            c["orbitPivot"][0].is_number()) {
+            comp->cameraOrbitPivotSetting_ = glm::vec3(c["orbitPivot"][0].get<float>(), c["orbitPivot"][1].get<float>(),
+                                                       c["orbitPivot"][2].get<float>());
+        }
         if (c.contains("mode") && c["mode"].is_number_integer()) {
             comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 3);
         }

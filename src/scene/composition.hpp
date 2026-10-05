@@ -2408,6 +2408,12 @@ private:
     params::Parameter<float>* cameraDistance_ = nullptr;
     params::Parameter<float>* cameraHeight_ = nullptr;
     params::Parameter<float>* cameraOrbitSpeed_ = nullptr;
+    // ADR-1123: what the orbit (camera mode 0) circles and looks at -- mix(bounds centre, pivot, weight). Weight 0,
+    // the default, is the bounds centre every orbit has always used.
+    params::Parameter<glm::vec3>* cameraOrbitPivot_ = nullptr;
+    params::Parameter<float>* cameraOrbitPivotWeight_ = nullptr;
+    glm::vec3 cameraOrbitPivotSetting_{0.0f};
+    float cameraOrbitPivotWeightSetting_ = 0.0f;
     params::Parameter<float>* cameraFov_ = nullptr;
     params::Parameter<float>* cameraNear_ = nullptr; // ADR-1058
     params::Parameter<float>* cameraRoll_ = nullptr; // ADR-1075

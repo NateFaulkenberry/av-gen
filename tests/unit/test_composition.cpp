@@ -3690,3 +3690,56 @@ TEST_CASE("A simulated grid's behaviour is parameters and only its layout re-see
     finer.resolution = {128, 1, 128};
     CHECK(finer.layoutHash() != layout);
 }
+
+// ADR-1123: an orbit circles and looks at its pivot when given one; weight 0 is the bounds centre, unchanged.
+TEST_CASE("An orbit camera circles its pivot, and weight 0 is the old orbit", "[scene][composition][camera][orbit-pivot]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "orbit",
+      "camera": {"mode": 0, "distance": 20.0, "height": 3.0, "orbitSpeed": 0.0},
+      "nodes": [ {"name": "orb", "kind": "orb", "position": [4, 1, -2]} ]
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const glm::vec3 legacyTarget = (*comp)->scene().camera.target;
+    const glm::vec3 legacyPosition = (*comp)->scene().camera.position;
+    // Registered at weight 0: nothing moves.
+    auto* pivot = dynamic_cast<params::Parameter<glm::vec3>*>(params.find("camera/orbitPivot"));
+    auto* weight = dynamic_cast<params::Parameter<float>*>(params.find("camera/orbitPivotWeight"));
+    REQUIRE(pivot != nullptr);
+    REQUIRE(weight != nullptr);
+    CHECK(weight->value() == 0.0f);
+    CHECK_FALSE((*comp)->toJson()["camera"].contains("orbitPivot")); // a file without one keeps its bytes
+
+    pivot->setBase(glm::vec3(0.0f, 12.0f, 0.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{0.1, 0.1, 1});
+    checkVec((*comp)->scene().camera.target, legacyTarget); // still weight 0
+    checkVec((*comp)->scene().camera.position, legacyPosition);
+
+    weight->setBase(1.0f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{0.2, 0.1, 2});
+    const scene::Camera& cam = (*comp)->scene().camera;
+    checkVec(cam.target, glm::vec3(0.0f, 12.0f, 0.0f));
+    CHECK_THAT(glm::length(glm::vec2(cam.position.x, cam.position.z)), WithinAbs(20.0, 1e-3));
+    CHECK_THAT(cam.position.y, WithinAbs(3.0, 1e-5));
+
+    // Half way: the pivot is half way between the bounds centre and the authored point.
+    weight->setBase(0.5f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{0.3, 0.1, 3});
+    checkVec((*comp)->scene().camera.target, glm::mix(legacyTarget, glm::vec3(0.0f, 12.0f, 0.0f), 0.5f));
+
+    // A save writes it, and a load reads it back.
+    const nlohmann::json j = (*comp)->toJson();
+    REQUIRE(j["camera"].contains("orbitPivot"));
+    CHECK(j["camera"]["orbitPivotWeight"] == 0.5f);
+    auto again = scene::Composition::fromJson(j, fx.registry);
+    REQUIRE(again.has_value());
+    CHECK((*again)->toJson()["camera"] == j["camera"]);
+}
