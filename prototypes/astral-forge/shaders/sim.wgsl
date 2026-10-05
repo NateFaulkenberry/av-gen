@@ -11,6 +11,7 @@
 @group(1) @binding(3) var<storage, read_write> grid: array<atomic<u32>>; // 2 channels: density, heat
 @group(1) @binding(4) var densTex: texture_3d<f32>;   // last frame's density (repulsion)
 @group(1) @binding(5) var densSamp: sampler;
+@group(1) @binding(6) var<storage, read_write> TG: array<vec4f>;  // the latent target (surface point), refreshed every K steps
 
 const DENS_SCALE: f32 = 1024.0;
 
@@ -50,6 +51,7 @@ fn cs_init(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     P[i] = vec4f(p, thetaFor(role, h));
     V[i] = vec4f(curl(p * 0.2) * 0.3, 0.0);
     A[i] = vec4f(0.0, 0.0, 1.0, 0.0);
+    TG[i] = vec4f(p, 0.0);
 }
 
 fn bindOf(theta: f32, c: f32) -> f32 { return smoothstep(theta - 0.08, theta + 0.08, c); }
@@ -94,20 +96,31 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     var acc = vec3f(0.0);
     var nrm = A[i].xyz;
     let chaos = F.ent3.z;
+    // one curl per step, shared by chaos, surface flow and the collapse
+    let cflow = curl(p * 0.25 + vec3f(t * 0.05, t * 0.04, t * 0.03));
 
     if (role != 5 && approach != 1) {
-        // the latent pulls bound matter onto the anatomy (a relaxed Witkin-Heckbert constraint)
-        // a per-particle offset on the sampling point: on a medial ridge (between two eyes, say) the pulls
-        // cancel and matter collects on the bisector plane; the offset makes each particle commit to a side
-        let jo = jitter3(hi * 7u + 3u) * 0.16 * F.entity.w;
-        let dg = latentDG(p + jo, role);
-        let target_ = p - dg.g * dg.d;
-        let K = 18.0 + 70.0 * C * C;
-        acc += b * (K * (target_ - p) - 2.0 * sqrt(K) * 0.55 * v);
+        // The latent pulls bound matter onto the anatomy (a relaxed Witkin-Heckbert constraint). The projection
+        // costs four latent evaluations, so each particle refreshes it every K = 3 steps (staggered), and on any
+        // step where it is released; in between it springs toward the stored surface point.
+        let K = 3u;
+        var tg = TG[i];
+        let refresh = ((i + u32(F.sim.y)) % K == 0u) || release > 0.0 || tg.w < 0.5;
+        if (refresh) {
+            // a per-particle offset on the sampling point: on a medial ridge (between two eyes, say) the pulls
+            // cancel and matter collects on the bisector plane; the offset makes each particle commit to a side
+            let jo = jitter3(hi * 7u + 3u) * 0.16 * F.entity.w;
+            let dg = latentDG(p + jo, role);
+            nrm = dg.g;
+            tg = vec4f(p - dg.g * dg.d, 1.0);
+            TG[i] = tg;
+        }
+        let Ks = 18.0 + 70.0 * C * C;
+        acc += b * (Ks * (tg.xyz - p) - 2.0 * sqrt(Ks) * 0.55 * v);
         // bound matter migrates over the surface: curl projected into the tangent plane
-        var c = curl(p * 0.45 + vec3f(0.0, t * 0.08, 0.0));
-        c -= dg.g * dot(c, dg.g);
-        acc += b * F.ent2.z * c;
+        var c = cflow;
+        c -= nrm * dot(c, nrm);
+        acc += b * F.ent2.z * c * 1.6;
         // repulsion down the density gradient keeps matter from piling into a few voxels
         let uvw = gridUvw(p);
         let s = 1.0 / F.grid1.x;
@@ -115,17 +128,16 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
         let gy = textureSampleLevel(densTex, densSamp, uvw + vec3f(0, s, 0), 0.0).r - textureSampleLevel(densTex, densSamp, uvw - vec3f(0, s, 0), 0.0).r;
         let gz = textureSampleLevel(densTex, densSamp, uvw + vec3f(0, 0, s), 0.0).r - textureSampleLevel(densTex, densSamp, uvw - vec3f(0, 0, s), 0.0).r;
         let gd = vec3f(gx, gy, gz);
-        acc -= b * gd * 9.0 * (1.0 - 0.5 * dot(gd, dg.g) * dot(gd, dg.g));
+        acc -= b * gd * 9.0 * (1.0 - 0.5 * dot(gd, nrm) * dot(gd, nrm));
         // the collapse: released matter is THROWN along the surface normal, with a twist, and heated
         if (release > 0.0) {
             let jitter = vec3f(u01(hi), u01(hi >> 5u), u01(hi >> 11u)) - 0.5;
             let sgn = select(1.0, -1.0, u01(hi >> 17u) < 0.2);
-            v += release * F.ent3.x * (dg.g * sgn * (0.6 + 0.8 * u01(hi >> 3u)) + curl(p * 0.3) * 0.25 + jitter * 0.6);
+            v += release * F.ent3.x * (nrm * sgn * (0.6 + 0.8 * u01(hi >> 3u)) + cflow * 0.2 + jitter * 0.6);
             heat += release * F.ent3.y * (0.5 + u01(hi >> 7u));
         }
-        nrm = dg.g;
         // a few bound flakes escape and are re-absorbed: the form is always being generated
-        if (u01(hashu(hi + u32(t * 3.0))) < F.misc.y * dt) { v += (dg.g + jitter3(hi)) * 3.0; b *= 0.2; }
+        if (u01(hashu(hi + u32(t * 3.0))) < F.misc.y * dt) { v += (nrm + jitter3(hi)) * 3.0; b *= 0.2; }
     } else if (approach == 1 && role != 5) {
         // Approach B: no latent anatomy; matter is drawn to a few wandering point attractors
         let k = f32(hi % 5u);
@@ -138,7 +150,7 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     // chaos: what remains when the god lets go. Curl keeps it moving; a weak pull onto the drifting zero set
     // of a noise field gives the free matter its own ambiguous shapes (sheets, clots, voids between) --
     // the brief's "loose clustering" and "suggestive structure" before any anatomy exists.
-    acc += (1.0 - b) * chaos * curl(p * 0.16 + vec3f(t * 0.05, 0.0, t * 0.03));
+    acc += (1.0 - b) * chaos * cflow;
     if (role != 5) {
         let np = p * 0.32 + vec3f(0.0, t * 0.04, t * 0.02);
         let e = 0.15;

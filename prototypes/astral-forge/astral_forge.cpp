@@ -281,6 +281,7 @@ int main(int argc, char** argv) {
     wgpu::Buffer Pb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "P");
     wgpu::Buffer Vb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "V");
     wgpu::Buffer Ab = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "A");
+    wgpu::Buffer TGb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "TG");
     const std::uint64_t gridBytes = static_cast<std::uint64_t>(R) * R * R * 2 * 4;
     wgpu::Buffer gridBuf = makeBuffer(ctx, gridBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, "grid");
     const std::uint64_t accumBytes = static_cast<std::uint64_t>(W) * H * 7 * 4;
@@ -336,12 +337,12 @@ int main(int argc, char** argv) {
     std::array<wgpu::BindGroup, kSlots> frameGroups;
     for (int k = 0; k < kSlots; ++k) frameGroups[k] = makeGroup(ctx, frameLayout, {buf(frameBufs[k], sizeof(FrameU))});
 
-    auto simLayout = makeLayout(ctx, {B::Storage, B::Storage, B::Storage, B::Storage, B::Tex3D, B::Sampler}, CS);
+    auto simLayout = makeLayout(ctx, {B::Storage, B::Storage, B::Storage, B::Storage, B::Tex3D, B::Sampler, B::Storage}, CS);
     auto simPL = makePL(ctx, {frameLayout, simLayout});
     auto initPipe = makeCompute(ctx, simMod, "cs_init", simPL);
     auto stepPipe = makeCompute(ctx, simMod, "cs_step", simPL);
     auto splatPipe = makeCompute(ctx, simMod, "cs_splat", simPL);
-    auto simGroup = makeGroup(ctx, simLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(gridBuf, gridBytes), tex(densView), smp(sampler)});
+    auto simGroup = makeGroup(ctx, simLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(gridBuf, gridBytes), tex(densView), smp(sampler), buf(TGb, stateBytes)});
 
     auto resLayout = makeLayout(ctx, {B::ReadOnly, B::StoreTex3D_RGBA16F}, CS);
     auto resPipe = makeCompute(ctx, resMod, "cs_resolve", makePL(ctx, {frameLayout, resLayout}));
@@ -637,7 +638,7 @@ int main(int argc, char** argv) {
             const auto c0 = Clock::now();
             runFrame(t, true);
             const double cpu = msSince(c0);
-            if (f % 3 == 2) ctx.waitForQueue(); // keep the queue bounded like a presenting app would
+            ctx.waitForQueue(); // one frame in flight: pass timestamps are then this frame's alone
             if (f >= o.benchWarm) {
                 sCpu.add(cpu);
                 if (timeline.completedFrames() != lastCompleted) {
@@ -657,7 +658,7 @@ int main(int argc, char** argv) {
         auto j = [](const char* name, const Stat& s) { std::printf("\"%s\":{\"p50\":%.3f,\"p90\":%.3f},", name, s.pct(0.5), s.pct(0.9)); };
         std::printf("{\"test\":%d,\"approach\":\"%c\",\"n\":%u,\"grid\":%d,\"size\":\"%ux%u\",\"t\":%.2f,", o.test, o.approach, N, R, W, H, t0);
         j("cpu_ms", sCpu); j("gpu_frame_ms", sGpu); j("sim_ms", sSim); j("density_ms", sDen); j("surface_ms", sSurf); j("flakes_ms", sFlk); j("post_ms", sPost);
-        std::printf("\"state_mb\":%.1f,\"grid_mb\":%.1f,\"accum_mb\":%.1f,\"dens_tex_mb\":%.1f,\"samples\":%zu}\n", 3 * stateBytes / 1048576.0,
+        std::printf("\"state_mb\":%.1f,\"grid_mb\":%.1f,\"accum_mb\":%.1f,\"dens_tex_mb\":%.1f,\"samples\":%zu}\n", 4 * stateBytes / 1048576.0,
                     gridBytes / 1048576.0, accumBytes / 1048576.0, R * R * R * 8 / 1048576.0, sGpu.v.size());
         return 0;
     }
