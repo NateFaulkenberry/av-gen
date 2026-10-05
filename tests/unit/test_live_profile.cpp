@@ -224,3 +224,32 @@ TEST_CASE("live profile: headless budgets the pipelined frame, not the serial wa
     CHECK(r.critical.verdict == "GPU");
     CHECK(r.budget.refreshMs == 0.0);
 }
+
+// Found by the Phase 5 Definition-of-Success run: under ADR-1107's cap the interval sits AT the budget (16.68 ms at a
+// 16.67 ms budget), and a strict comparison called a steady, miss-free 60 "OVER BUDGET" with 48% "under budget".
+TEST_CASE("live profile: a capped loop at the budget with no deadline misses is on target", "[live-profile]") {
+    std::vector<LiveProfileFrame> frames;
+    for (int i = 0; i < 600; ++i) {
+        LiveProfileFrame f;
+        f.atSeconds = i / 60.0;
+        f.frameMs = i % 3 == 0 ? 16.60 : 16.70; // timer jitter around the vsync period
+        f.gpuMs = 12.9;
+        f.cpuWorkMs = 5.0;
+        frames.push_back(f);
+    }
+    // the median (16.70) is above the budget, within the jitter
+    LiveProfileRecord r;
+    r.conditions.mode = "live";
+    r.conditions.budgetMs = 1000.0 / 60.0;
+    r.conditions.displayRefreshHz = 60.0;
+    buildLiveProfile(r, frames, true);
+    CHECK(r.frameMs.p50 > r.conditions.budgetMs);
+    CHECK(r.budget.deadlineMisses == 0);
+    CHECK(r.status == "TARGET ACHIEVED");
+    // A real miss rate still says so.
+    for (int i = 0; i < 60; ++i) {
+        frames[static_cast<std::size_t>(i * 10)].frameMs = 33.4;
+    }
+    buildLiveProfile(r, frames, true);
+    CHECK(r.status == "AT RISK");
+}

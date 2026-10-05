@@ -370,9 +370,11 @@ void chooseCombination(OptimizationReport& o) {
     } else if (bestSaving >= 0) {
         const AbComparison& c = o.measuredCombos[static_cast<std::size_t>(bestSaving)];
         o.decision = fmt::format("NO admitted combination reaches the target: the largest measured saving is {} "
-                                 "({:.2f} -> {:.2f} ms, target {:.2f}). The live controller's levels are what remain "
-                                 "(or a riskier search: --optimize-risk high, --hero-policy is not relaxed for you)",
-                                 joined(c.levers), c.timing.baselineMs, c.timing.optimizedMs, o.targetMs);
+                                 "({:.2f} -> {:.2f} ms, target {:.2f}). The live controller's levels are what remain{}",
+                                 joined(c.levers), c.timing.baselineMs, c.timing.optimizedMs, o.targetMs,
+                                 o.maxRisk == "high" ? std::string()
+                                                     : std::string(" (or a riskier search: --optimize-risk high; the "
+                                                                   "hero policy is never relaxed for you)"));
     } else {
         o.decision = "nothing was measured that saves time outside the noise; no change is recommended";
     }
@@ -656,7 +658,7 @@ std::vector<std::string> criticSequenceCommand(const std::string& critic, const 
     if (!url.empty()) {
         argv.insert(argv.end(), {"--url", url});
     }
-    argv.insert(argv.end(), {"submit", "--mode", "fast", "--sequence", dir, "--fps", fmt::format("{}", fps), "--label",
+    argv.insert(argv.end(), {"submit", "--mode", "preview", "--sequence", dir, "--fps", fmt::format("{}", fps), "--label",
                              label, "--wait", "--json", "--no-autostart", "--session", "avgen-live-optimizer"});
     if (!compareTo.empty()) {
         argv.insert(argv.end(), {"--compare-to", compareTo});

@@ -721,11 +721,17 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
     record.gpu = groupGpuCategories(record.passMedians);
     // Status. "AT RISK": the median fits but more than 5% of frames do not.
     const double p50 = live ? record.frameMs.p50 : std::max(gpuMedian, record.cpuWorkMs.p50);
+    // Live with the display's refresh known (ADR-1107's cap holds the interval AT the budget): a frame interval within
+    // the timer's jitter of the budget is on time, and "on time" is decided in vsync terms -- the deadline misses -- not
+    // by a strict comparison that a 16.68 ms interval at a 16.67 ms budget fails half the time.
+    const bool vsyncTerms = live && record.budget.refreshMs > 0.0;
+    const double tolerance = vsyncTerms ? 0.02 * budget : 0.0;
     if (record.budget.frames == 0) {
         record.status = "NO DATA";
-    } else if (p50 > budget) {
+    } else if (p50 > budget + tolerance) {
         record.status = "OVER BUDGET";
-    } else if (record.budget.percentUnder < 95.0 || (live && record.budget.percentMissed > 1.0)) {
+    } else if ((vsyncTerms ? record.budget.percentMissed > 1.0 : record.budget.percentUnder < 95.0) ||
+               (live && record.budget.percentMissed > 1.0)) {
         record.status = "AT RISK";
     } else {
         record.status = "TARGET ACHIEVED";
