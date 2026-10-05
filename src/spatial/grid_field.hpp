@@ -130,6 +130,11 @@ struct GridField {
 
     [[nodiscard]] bool agents() const { return mode == GridMode::Agents; }
     [[nodiscard]] Result<void> validate() const;
+    // ADR-1122: what the state's shape and seed depend on -- mode, wrap, resolution, bounds, the sim rate, the
+    // seed, the agents' count and species, and the names of the fields it reads. A change here re-seeds the grid
+    // (rendering::Simulation compares it); every other setting is behaviour, a coefficient the next step reads,
+    // and changing it changes only what the grid does from then on (scene/grid_params.hpp).
+    [[nodiscard]] std::uint64_t layoutHash() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // settings only, never the cell values
     [[nodiscard]] nlohmann::json toJson() const;        // settings only
     static Result<GridField> fromJson(const nlohmann::json& j);

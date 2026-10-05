@@ -370,6 +370,32 @@ Result<void> GridField::validate() const {
     return {};
 }
 
+std::uint64_t GridField::layoutHash() const {
+    detail::Fnv h;
+    h.str(name);
+    h.boolean(enabled);
+    h.u8(static_cast<std::uint8_t>(mode));
+    h.u8(static_cast<std::uint8_t>(wrap));
+    h.i32(resolution.x);
+    h.i32(resolution.y);
+    h.i32(resolution.z);
+    h.v3(boundsMin);
+    h.v3(boundsMax);
+    h.str(injectField);
+    h.str(velocityField);
+    h.i32(diffuseIterations);
+    h.f32(simRate);
+    h.i32(maxSubSteps);
+    h.u32(seed);
+    h.f32(seedAmount);
+    if (mode == GridMode::Agents) {
+        h.i32(agentCount);
+        h.i32(species);
+        h.str(depositField);
+    }
+    return h.value();
+}
+
 std::uint64_t GridField::structuralHash() const {
     detail::Fnv h;
     h.str(name);

@@ -1070,6 +1070,13 @@ Result<void> Composition::addGrid(spatial::GridField grid) {
         }
     }
     grids_.push_back(std::move(grid));
+    if (params_ != nullptr) { // ADR-1122: a grid added after attach gets its behaviour knobs too
+        gridParams_.push_back(registerGridParameters(*params_, grids_.back(),
+                                                     "grid/" + sanitise(prefix_) + grids_.back().name + "/"));
+        for (const params::IParameter* q : gridParams_.back().all) {
+            registeredPaths_.push_back(q->path()); // so `unregisterParameters` frees them with the rest
+        }
+    }
     dirty_ = true;
     return {};
 }
@@ -4866,6 +4873,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     for (auto& node : nodes_) {
         registerNodeParameters(*node);
     }
+    // ADR-1122: each simulated grid's behaviour (its layout stays in the file).
+    gridParams_.clear();
+    for (const spatial::GridField& g : grids_) {
+        gridParams_.push_back(registerGridParameters(params, g, "grid/" + sanitise(prefix_) + g.name + "/"));
+    }
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -5862,6 +5874,7 @@ void Composition::detach() {
             node->child->detach();
         }
     }
+    gridParams_.clear(); // ADR-1122 (the parameters themselves go with `registeredPaths_`)
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
@@ -8632,6 +8645,12 @@ void Composition::applyParameters() {
     // ADR-1116: and the audio history the audio fields read.
     scene_.fields.audio = audioHistory_;
     scene_.fields.inputKey = simulationInputKey_; // ADR-1119
+    // ADR-1122: the grids' behaviour finals. This composition's own grids lead `scene_.fields.grids` (the
+    // rebuild pushes them before any nested scene's), so index i is grids_[i]. A nested scene's grids take
+    // their behaviour from that scene's own parameters at its rebuild.
+    for (std::size_t i = 0; i < gridParams_.size() && i < grids_.size() && i < scene_.fields.grids.size(); ++i) {
+        applyGridParameters(gridParams_[i], grids_[i], scene_.fields.grids[i]);
+    }
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //

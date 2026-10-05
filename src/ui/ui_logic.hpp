@@ -65,7 +65,7 @@ inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/",  "
                                                          "camera/", "root/",   "music/",    "shader/",
                                                          "temporal/", "staging/"};
 inline constexpr std::string_view kIntermediatePrefixes[] = {
-    "procedural/", "field/", "spline/", "sdf/", "material/", "particles/", "entity/"};
+    "procedural/", "field/", "grid/", "spline/", "sdf/", "material/", "particles/", "entity/"};
 } // namespace detail
 
 // True when `path` (a parameter path) belongs to the layer.

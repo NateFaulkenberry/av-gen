@@ -297,3 +297,72 @@ TEST_CASE("Two runs of an agents grid are bit-identical and a small budget doubl
     CHECK(a.sim.stats().checkpoints == 10); // 2, 4, ... 20 s
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1122: a grid's behaviour is a parameter a performer moves while it runs. A change to it must continue
+// the population -- every agent one frame further on from where it was -- and change what it does next; only a
+// change to the layout (here the seed) may re-seed it.
+TEST_CASE("A behaviour change continues an agents grid and only a layout change re-seeds it",
+          "[gpu][simulation][agents][grid-params]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const scene::Scene s = agentsScene();
+    const double t = 2.0;
+    const double next = t + 1.0 / 30.0; // two 60 Hz steps
+
+    const auto playTo = [&](Sim& sim) {
+        for (int f = 0; f <= static_cast<int>(t * 30.0); ++f) {
+            sim.frame(s, f / 30.0);
+        }
+    };
+    // Agents are (x, z, heading, species) in cells; how many moved further than `cells` (wrap-aware).
+    const auto movedFurther = [&](const std::vector<glm::vec4>& a, const std::vector<glm::vec4>& b, float cells) {
+        const glm::vec2 res(static_cast<float>(s.fields.grids[0].resolution.x),
+                            static_cast<float>(s.fields.grids[0].resolution.z));
+        std::size_t n = 0;
+        for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i) {
+            glm::vec2 d = glm::abs(glm::vec2(a[i].x - b[i].x, a[i].y - b[i].y));
+            d = glm::min(d, res - d);
+            n += glm::length(d) > cells ? 1u : 0u;
+        }
+        return n;
+    };
+
+    Sim reference(*ctx, shaders);
+    playTo(reference);
+    const std::vector<glm::vec4> before = reference.agents(s);
+    reference.frame(s, next);
+    const std::vector<glm::vec4> unchanged = reference.agents(s);
+
+    // The performer turns the organism's turn and gaze up for the next frame.
+    Sim moved(*ctx, shaders);
+    playTo(moved);
+    scene::Scene behaviour = s;
+    behaviour.fields.grids[0].turnAngle = 1.3f;
+    behaviour.fields.grids[0].sensorAngle = 1.1f;
+    behaviour.fields.grids[0].sensorDistance = 2.0f;
+    REQUIRE(behaviour.fields.grids[0].layoutHash() == s.fields.grids[0].layoutHash());
+    moved.frame(behaviour, next);
+    const std::vector<glm::vec4> after = moved.agents(behaviour);
+    // Continued: two steps of at most `stepSize` cells each, so (nearly) every agent is within ~2 cells of
+    // where it was. A re-seed would scatter them across the plane.
+    const std::size_t far = movedFurther(after, before, 2.5f);
+    INFO(far << " of " << after.size() << " agents moved further than 2.5 cells after the behaviour change");
+    CHECK(far < after.size() / 100);
+    CHECK(moved.sim.stats().catchUpSteps == 0);
+    // ...and it changed what they do: headings differ from the unchanged run's for many agents.
+    std::size_t turned = 0;
+    for (std::size_t i = 0; i < after.size(); ++i) {
+        turned += std::abs(after[i].z - unchanged[i].z) > 1e-4f ? 1u : 0u;
+    }
+    INFO(turned << " agents turned differently");
+    CHECK(turned > after.size() / 10);
+
+    // A layout change -- a new seed -- is a new population.
+    scene::Scene layout = s;
+    layout.fields.grids[0].seed += 1;
+    REQUIRE(layout.fields.grids[0].layoutHash() != s.fields.grids[0].layoutHash());
+    moved.frame(layout, next + 1.0 / 30.0);
+    const std::vector<glm::vec4> reseeded = moved.agents(layout);
+    CHECK(movedFurther(reseeded, after, 2.5f) > reseeded.size() / 2);
+    CHECK(ctx->errorCount() == 0);
+}

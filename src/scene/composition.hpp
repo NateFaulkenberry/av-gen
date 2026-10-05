@@ -21,6 +21,7 @@
 #include "graph/graph.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
+#include "scene/grid_params.hpp"
 #include "scene/ground_query.hpp"
 #include "entity/clip_motion_provider.hpp"
 #include "entity/match_motion_provider.hpp"
@@ -2291,6 +2292,7 @@ private:
     std::vector<std::string> graphWarnings_;
     params::Modulator* graphModulator_ = nullptr;
     std::vector<spatial::GridField> grids_;
+    std::vector<GridParameters> gridParams_; // ADR-1122: one per grid in `grids_`, while attached
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms

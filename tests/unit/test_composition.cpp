@@ -3612,3 +3612,81 @@ TEST_CASE("the Tree of Life's chains reach the scene with LOD0 untouched", "[sce
     comp.update(FrameTime{});
     CHECK(comp.scene().meshLods.size() == chains);
 }
+
+// ADR-1122: a grid's behaviour is parameters, applied every frame; only its layout is the file's.
+TEST_CASE("A simulated grid's behaviour is parameters and only its layout re-seeds it",
+          "[scene][composition][grid][grid-params]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "organism",
+      "grids": [
+        { "name": "organism", "mode": "agents", "wrap": "wrap", "resolution": [64, 1, 64],
+          "boundsMin": [-8, -1, -8], "boundsMax": [8, 1, 8], "agentCount": 1000, "species": 3,
+          "sensorAngle": 0.5, "sensorDistance": 5.0, "turnAngle": 0.4, "stepSize": 1.0,
+          "depositAmount": 0.02, "repel": 0.7, "diffusion": 0.2, "dissipation": 2.0 },
+        { "name": "smoke", "mode": "scalar", "resolution": 8, "boundsMin": [-4, 0, -4], "boundsMax": [4, 8, 4],
+          "dissipation": 0.2 }
+      ]
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+
+    // Registered with the authored values, so attaching changes nothing.
+    auto* turn = dynamic_cast<params::Parameter<float>*>(params.find("grid/organism/turnAngle"));
+    REQUIRE(turn != nullptr);
+    CHECK(turn->value() == 0.4f);
+    REQUIRE(params.find("grid/organism/dissipation") != nullptr);
+    REQUIRE(params.find("grid/organism/depositAmount") != nullptr);
+    REQUIRE(params.find("grid/smoke/dissipation") != nullptr);
+    // The agents' leaves exist only for an agents grid, Gray-Scott's only for reaction-diffusion.
+    CHECK(params.find("grid/smoke/turnAngle") == nullptr);
+    CHECK(params.find("grid/smoke/feed") == nullptr);
+    CHECK(params.find("grid/organism/feed") == nullptr);
+    // The layout is not a parameter.
+    CHECK(params.find("grid/organism/agentCount") == nullptr);
+    CHECK(params.find("grid/organism/seed") == nullptr);
+
+    (*comp)->update(FrameTime{});
+    const std::uint64_t layoutBefore = (*comp)->scene().fields.grids[0].layoutHash();
+    const std::uint64_t settingsBefore = (*comp)->scene().fields.grids[0].structuralHash();
+
+    // A move reaches the scene's grid on the next frame, and only the behaviour moves.
+    turn->setBase(1.1f);
+    auto* fade = dynamic_cast<params::Parameter<float>*>(params.find("grid/organism/dissipation"));
+    REQUIRE(fade != nullptr);
+    fade->setBase(5.0f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{0.1, 0.1, 1});
+    const spatial::GridField& live = (*comp)->scene().fields.grids[0];
+    CHECK(live.turnAngle == 1.1f);
+    CHECK(live.dissipation == 5.0f);
+    CHECK(live.agentCount == 1000);
+    CHECK(live.layoutHash() == layoutBefore);       // the simulation keeps its state
+    CHECK(live.structuralHash() != settingsBefore); // ...and drops checkpoints taken under the old behaviour
+    // The authored grid is untouched: the file still says what it said.
+    CHECK((*comp)->grids()[0].turnAngle == 0.4f);
+
+    // The split itself: behaviour never moves the layout hash; the seed, the count or the plane do.
+    spatial::GridField g = (*comp)->grids()[0];
+    const std::uint64_t layout = g.layoutHash();
+    g.sensorAngle = 1.4f;
+    g.sensorDistance = 12.0f;
+    g.stepSize = 2.0f;
+    g.depositAmount = 0.5f;
+    g.repel = -0.2f;
+    g.advect = 3.0f;
+    g.diffusion = 0.9f;
+    CHECK(g.layoutHash() == layout);
+    spatial::GridField seeded = (*comp)->grids()[0];
+    seeded.seed += 1;
+    CHECK(seeded.layoutHash() != layout);
+    spatial::GridField bigger = (*comp)->grids()[0];
+    bigger.agentCount = 2000;
+    CHECK(bigger.layoutHash() != layout);
+    spatial::GridField finer = (*comp)->grids()[0];
+    finer.resolution = {128, 1, 128};
+    CHECK(finer.layoutHash() != layout);
+}

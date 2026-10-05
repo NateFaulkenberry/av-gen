@@ -32,7 +32,7 @@ std::uint64_t layoutHashOf(const std::vector<spatial::GridField>& grids) {
     };
     mix(grids.size());
     for (const spatial::GridField& g : grids) {
-        mix(g.structuralHash());
+        mix(g.layoutHash()); // ADR-1122: behaviour changes continue the state; only the layout re-seeds it
     }
     return h;
 }
