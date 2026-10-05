@@ -138,8 +138,8 @@ Unity GPU-driven pipeline (Haar and Aaltonen, SIGGRAPH 2015), Unity's BatchRende
 FrameGraph (O'Donnell, GDC 2017), Houdini DOP caching, Blender simulation zones, GGPO, EA SEED's
 PB-MPM, TouchDesigner's docs and arXiv 2408.05148. The second is measurement on this machine
 (`tests/rendering/test_gpu_bridge_probe_gpu.cpp`, `[.perf][gpu-bridge]`, under the lock). The probe ran
-while other agents were compiling (load 11-25), so its timings are orders of magnitude, not a
-benchmark.
+twice: once while other agents were compiling (load 11-25), and once at load 5.9. The ranges below
+span both, and they agree.
 
 ### What the established systems do, and what AV Gen takes from them
 
@@ -162,10 +162,10 @@ benchmark.
 | `maxStorageBufferBindingSize`, `maxBufferSize` | 4 GiB each (the WebGPU default is 128 / 256 MiB) | A population or checkpoint store is bounded by memory, not binding size, *on this machine*; on other adapters it may not be |
 | `maxStorageBuffersPerShaderStage` | 10 (default 8) | Adding storage bindings to every field consumer (PBR fragment included) spends a scarce limit. ADR-1116 adds none |
 | `maxComputeWorkgroupsPerDimension` | 65,535 | 2-D dispatch for windows over 4.2M cells |
-| Upload, `queue.WriteBuffer` | 1 MB: 0.03 ms. 64 MB: 6.7 ms to return, 8.1 ms to complete (~7.7 GB/s) | Per-frame uploads must stay at KB scale. The audio ring writes ~400 B a frame; a full refill (384 KB) is about 0.05 ms |
-| GPU→GPU copy (`CopyBufferToBuffer`) | 8 MB: 0.11 ms. 46 MB: 0.32 ms. 128 MB: 0.80 ms (~150 GB/s) | A checkpoint save or restore is cheap enough to do inside a frame |
-| Blocking readback (copy + map + wait) | 16 B: 0.27 ms. 1 MB: 0.28 ms. 46 MB: 5.6 ms | **A readback is never in the frame loop.** Even a 16-byte one costs a quarter-millisecond stall plus a GPU drain |
-| Empty submit + wait | 0.027 ms | The floor of any synchronisation |
+| Upload, `queue.WriteBuffer` | 1 MB: 0.03 ms. 64 MB: 5.9-6.7 ms to return, 7.6-8.1 ms to complete (~8 GB/s) | Per-frame uploads must stay at KB scale. The audio ring writes ~400 B a frame; a full refill (384 KB) is about 0.05 ms |
+| GPU→GPU copy (`CopyBufferToBuffer`) | 8 MB: 0.08-0.11 ms. 46 MB: 0.32-0.38 ms. 128 MB: 0.80-0.87 ms (~120-150 GB/s) | A checkpoint save or restore is cheap enough to do inside a frame |
+| Blocking readback (copy + map + wait) | 16 B: 0.16-0.27 ms. 1 MB: 0.26-0.28 ms. 46 MB: 5.6 ms | **A readback is never in the frame loop.** Even a 16-byte one costs a quarter-millisecond stall plus a GPU drain |
+| Empty submit + wait | 0.024-0.027 ms | The floor of any synchronisation |
 | Timestamp quantum | ~0.066 ms (the spike's measurement; Dawn quantizes by default) | Sub-tick passes are reported as "<1 tick", never as zero |
 
 ### The answers
