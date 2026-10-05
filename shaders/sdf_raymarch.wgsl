@@ -200,6 +200,41 @@ fn vs_sdf(@builtin(vertex_index) vertexIndex: u32) -> SdfVertexOut {
     return out;
 }
 
+// ADR-1160: the shadow views' quad. `sdf.rect` is the CAMERA's projection of the bounds (computed on the CPU), and
+// in a shadow pass it covers an unrelated region of the light's map, so the caster's shadow came out wherever the
+// two happened to overlap. Here the rect is this view's own: the eight bound corners through `frame.viewProj`,
+// which is the light's in a shadow pass. A corner at or behind the eye plane covers the whole view.
+@vertex
+fn vs_sdf_shadow(@builtin(vertex_index) vertexIndex: u32) -> SdfVertexOut {
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0),
+        vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 1.0));
+    var mn = vec2<f32>(1.0e30);
+    var mx = vec2<f32>(-1.0e30);
+    var whole = false;
+    for (var k = 0u; k < 8u; k = k + 1u) {
+        let corner = vec3<f32>(select(sdf.boundsMin.x, sdf.boundsMax.x, (k & 1u) != 0u),
+                               select(sdf.boundsMin.y, sdf.boundsMax.y, (k & 2u) != 0u),
+                               select(sdf.boundsMin.z, sdf.boundsMax.z, (k & 4u) != 0u));
+        let clip = frame.viewProj * (object.model * vec4<f32>(corner, 1.0));
+        if (clip.w <= 1.0e-5) {
+            whole = true;
+        }
+        let ndc = clip.xy / max(clip.w, 1.0e-5);
+        mn = min(mn, ndc);
+        mx = max(mx, ndc);
+    }
+    var rect = vec4<f32>(clamp(mn, vec2<f32>(-1.0), vec2<f32>(1.0)), clamp(mx, vec2<f32>(-1.0), vec2<f32>(1.0)));
+    if (whole) {
+        rect = vec4<f32>(-1.0, -1.0, 1.0, 1.0);
+    }
+    let ndc = mix(rect.xy, rect.zw, corners[vertexIndex]);
+    var out: SdfVertexOut;
+    out.clip = vec4<f32>(ndc, 0.0, 1.0);
+    out.ndc = ndc;
+    return out;
+}
+
 struct SdfFragmentOut {
     @location(0) color: vec4<f32>,
     @location(1) normalRoughness: vec4<f32>,
@@ -454,7 +489,7 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
 // bounded by the object's box, because a caster silhouette needs far less precision.
 @fragment
 fn fs_sdf_depth(in: SdfVertexOut) -> SdfDepthOut {
-    return sdfDepthOnly(in, sdf.info.z, sdf.march.x);
+    return sdfDepthOnly(in, sdf.info.z, sdf.march.x, false);
 }
 
 @fragment
@@ -462,23 +497,46 @@ fn fs_sdf_shadow(in: SdfVertexOut) -> SdfDepthOut {
     // `info.w` is the tier's `sdfShadowSteps`, capped by the object's own march so a cheap object
     // does not get an expensive shadow. It used to be a bare `info.z / 4`, and the tier field was
     // read by nothing at all -- four numbers in the tier table that no path evaluated.
-    return sdfDepthOnly(in, clamp(min(sdf.info.w, sdf.info.z), 8u, 1024u), sdf.march.x * 3.0);
+    return sdfDepthOnly(in, clamp(min(sdf.info.w, sdf.info.z), 8u, 1024u), sdf.march.x * 3.0, true);
 }
 
-fn sdfDepthOnly(in: SdfVertexOut, maxSteps: u32, epsilon: f32) -> SdfDepthOut {
+// `fromNearPlane` (ADR-1160): the shadow views keep the CAMERA's `frame.cameraPos` on purpose (the deformers and
+// the wind read a to-camera vector from it; shadow_renderer.cpp), so a shadow march must not start there. It starts
+// on the view's own near plane and travels to its far plane: parallel rays for a directional cascade, rays from the
+// light for a spot or a cube face. The depth prepass keeps the camera eye, so it marches exactly as the lit pass does.
+fn sdfDepthOnly(in: SdfVertexOut, maxSteps: u32, epsilon: f32, fromNearPlane: bool) -> SdfDepthOut {
     let nearH = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
     let farH = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
     let nearW = nearH.xyz / nearH.w;
     let farW = farH.xyz / farH.w;
-    let eye = frame.cameraPos.xyz;
-    let rdW = normalize(farW - eye);
-    let tNearPlane = length(nearW - eye);
+    let eye = select(frame.cameraPos.xyz, nearW, fromNearPlane);
+    let rdW = normalize(farW - select(eye, nearW, fromNearPlane));
+    let tNearPlane = select(length(nearW - eye), 0.0, fromNearPlane);
 
     let roL = (sdf.worldToLocal * vec4<f32>(eye, 1.0)).xyz;
     let rdScaled = (sdf.worldToLocal * vec4<f32>(rdW, 0.0)).xyz;
     let unitScale = max(length(rdScaled), 1e-8);
     let rdL = rdScaled / unitScale;
     let slab = sdfSlab(roL, rdL, sdf.boundsMin.xyz, sdf.boundsMax.xyz);
+    if (fromNearPlane) {
+        // ADR-1160: a shadow ray's distance is measured from where it enters the bounds, not from the light's near
+        // plane. The hit test is relative (`d < epsilon * t`), and a cascade's near plane can be hundreds of metres
+        // up the light: from there the tolerance fattened every caster. The camera's `maxDistance` does not apply.
+        let entry = max(slab.x, 0.0);
+        if (slab.x > slab.y || slab.y <= 0.0) {
+            discard;
+        }
+        let ro = roL + rdL * entry;
+        let ms = sdfMarch(ro, rdL, 0.0, slab.y - entry, maxSteps, epsilon);
+        if (!ms.hit) {
+            discard;
+        }
+        let shadowPos = (object.model * vec4<f32>(ro + rdL * ms.t, 1.0)).xyz;
+        let shadowClip = frame.viewProj * vec4<f32>(shadowPos, 1.0);
+        var shadowOut: SdfDepthOut;
+        shadowOut.depth = clamp(shadowClip.z / shadowClip.w, 0.0, 1.0);
+        return shadowOut;
+    }
     let tStart = max(slab.x, tNearPlane * unitScale);
     let tEnd = sdfMarchEnd(slab.y);
     if (slab.x > slab.y || tEnd <= 0.0) {

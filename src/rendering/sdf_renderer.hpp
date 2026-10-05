@@ -44,6 +44,7 @@ class FieldUniforms;
 struct SdfStats {
     std::uint32_t objects = 0;          // visible SDF objects drawn this frame (both modes)
     std::uint32_t raymarchObjects = 0;  // drawn by the raymarch pass
+    std::uint32_t shadowOnlyObjects = 0; // ADR-1160: off the camera's screen, marched into the shadow maps only
     std::uint32_t meshObjects = 0;      // drawn as meshes
     std::uint32_t packedNodes = 0;      // packed records uploaded this frame (raymarch objects)
     std::uint32_t meshTriangles = 0;    // triangles of the drawn meshed objects

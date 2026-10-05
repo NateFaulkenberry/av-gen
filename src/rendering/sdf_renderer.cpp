@@ -117,6 +117,10 @@ struct SdfRenderer::Impl {
         std::size_t objectIndex; // into scene.sdfs
         std::uint32_t offset;    // dynamic offset into both uniform buffers
         const Pipelines* compiled = nullptr; // null: the interpreter's pipelines
+        // ADR-1160: false for an object whose bounds are off the camera's screen. It is still marched into the
+        // shadow maps (a caster out of frame still throws its shadow into frame), but the lit pass and the
+        // depth prepass skip it.
+        bool onCamera = true;
     };
     struct MeshItem {
         std::size_t objectIndex;
@@ -394,6 +398,7 @@ Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgp
     }
     depthFragment.entryPoint = "fs_sdf_shadow";
     depthDesc.label = "sdf-raymarch-shadow";
+    depthDesc.vertex.entryPoint = "vs_sdf_shadow"; // ADR-1160: the view's own rect, not the camera's
     auto shadowPipeline = finish(depthDesc, "sdf-raymarch-shadow");
     if (!shadowPipeline) {
         return std::unexpected(shadowPipeline.error());
@@ -442,6 +447,7 @@ void SdfRenderer::Impl::buildPipelinesAsync(const wgpu::ShaderModule& module, co
     wgpu::RenderPipelineDescriptor shadowDesc = depthDesc;
     shadowDesc.label = "sdf-raymarch-shadow";
     shadowDesc.fragment = &shadowFragment;
+    shadowDesc.vertex.entryPoint = "vs_sdf_shadow"; // ADR-1160
     slot->pending = 3;
     const auto& device = context.device();
     const auto make = [&](const wgpu::RenderPipelineDescriptor& d, wgpu::RenderPipeline Pipelines::* member) {
@@ -697,6 +703,11 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         return;
     }
     ++im.frame;
+    // ADR-1160: whether any light draws a shadow map this frame. Only then is an off-screen caster worth marching.
+    bool anyCaster = false;
+    for (const scene::PunctualLight& light : scene.lights) {
+        anyCaster = anyCaster || (light.enabled && light.castsShadow && light.shadowStrength > 0.0f);
+    }
     im.pieceSeconds = time.renderTime;
     collectTimings();
     // ADR-1102: the pre-warm. Every object that asks for compilation is compiled as soon as the scene has it --
@@ -730,10 +741,14 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         const ObjectUniforms obj = objectUniformsFor(object, i);
         const std::uint32_t offset = slot * kObjectStride;
 
+        bool drawnOnCamera = true; // ADR-1160: false for a shadow-only raymarch item
         if (object.renderMode == scene::SdfRenderMode::Raymarch) {
             glm::vec4 rect{};
-            if (!projectedRect(viewProj * obj.model, object.boundsMin, object.boundsMax, rect)) {
-                continue; // off screen
+            // ADR-1160: off the camera's screen is not out of the world -- the object can still cast into it. Its
+            // camera passes are skipped (`onCamera`); the shadow pass projects its own rect per view.
+            const bool onCamera = projectedRect(viewProj * obj.model, object.boundsMin, object.boundsMax, rect);
+            if (!onCamera && (!object.castShadows || !anyCaster)) {
+                continue; // off screen, and nothing to cast into
             }
             // ADR-1003: a compiled object uploads its per-node parameter table; the interpreter its program.
             const Impl::Pipelines* compiled = im.compiledPipelines(object, &scene.fields);
@@ -819,8 +834,13 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
-            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, compiled});
-            ++stats_.raymarchObjects;
+            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, compiled, onCamera});
+            drawnOnCamera = onCamera;
+            if (onCamera) {
+                ++stats_.raymarchObjects;
+            } else {
+                ++stats_.shadowOnlyObjects;
+            }
             stats_.packedNodes += static_cast<std::uint32_t>(count);
         } else {
             if (!object.mesh.valid() || object.mesh.indices.empty()) {
@@ -856,7 +876,9 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             ++stats_.meshObjects;
             stats_.meshTriangles += state.indexCount / 3;
         }
-        ++stats_.objects;
+        if (drawnOnCamera) {
+            ++stats_.objects;
+        }
         ++slot;
     }
     if (slot > 0) {
@@ -944,8 +966,8 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
     pass.SetBindGroup(0, frameBindGroup);
     pass.SetBindGroup(3, iblBindGroup);
     for (const auto& item : im.raymarchItems) {
-        if (item.objectIndex >= scene.sdfs.size()) {
-            continue;
+        if (item.objectIndex >= scene.sdfs.size() || !item.onCamera) {
+            continue; // ADR-1160: a shadow-only item has no pixels on the camera's screen
         }
         pass.SetPipeline(item.compiled != nullptr ? item.compiled->lit : im.raymarchPipeline);
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
@@ -980,6 +1002,9 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
         const scene::SdfObject& object = scene.sdfs[item.objectIndex];
         if (reducedSteps ? !object.castShadows : !object.depthPrepass) {
             continue; // ADR-1002: opted out of this depth-only march
+        }
+        if (!reducedSteps && !item.onCamera) {
+            continue; // ADR-1160: the prepass is the camera's; a shadow-only item is marched for the lights alone
         }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
         pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());

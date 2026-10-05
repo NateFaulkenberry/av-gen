@@ -261,6 +261,8 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
 - `depthPrepass`, `castShadows` (ADR-1002, default true): whether the object is marched again into
   the depth prepass and into the shadow maps. Off saves a full march each; the lit pass still writes
   depth, but prepass readers (GTAO, the screen-space shadow mask, contact shadows) no longer see it.
+  The shadow march is the light's (ADR-1160): each shadow view projects its own quad, rays start on the
+  view's near plane, and a caster off the camera's screen still casts (a shadow-only item).
 - `maxSteps`, `epsilon` (hit threshold, scaled by distance so it is screen-space constant),
   `stepScale` (relaxation; displaced or twisted trees need < 1) and `normalEpsilon` are raymarch
   only. `resolution` is mesh only.
