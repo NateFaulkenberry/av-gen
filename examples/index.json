@@ -482,7 +482,7 @@
     },
     {
       "category": "Flagship",
-      "description": "The flagship LIVE scene: a 380k-agent organism draws veins of light that spiral into a woven tower of threads, each band of the music heard at its own height and moment; a generated forest grows where the organism walked. Plays All You Got (Desktop). Seven states follow the music's energy; see docs/research/gpu-world-productionization.md, Phase 4.",
+      "description": "The flagship LIVE scene: a continuous flight through an endless world that hears. A 420k-agent organism draws the floor and the roof in light (colour is frequency), a forest grows where it walked, sea whips and colossal horns pass by, and kick fronts race out from the traveller. Seven stages of the journey follow the music's energy. Plays Feline Footwear (assets/audio/feline-footwear.wav, not in the repo); see docs/research/gpu-world-productionization.md, Phase 4.",
       "name": "PHONOTAXIS",
       "project": "phonotaxis/phonotaxis.json"
     },
