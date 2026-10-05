@@ -340,6 +340,14 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                    generators);
         }
     }
+    // ADR-1119/1120: a simulated grid (agents included) is GPU state stepped on the timeline; the tracer
+    // samples no fields, so whatever a grid drives (effectors, emission, volumes) is traced undriven.
+    if (!scene.fields.grids.empty()) {
+        snap.capabilities.note("simulated grid", Support::Unsupported,
+                               "GPU state stepped on the timeline (ADR-032/1119/1120); the tracer samples no "
+                               "fields, so what the grid drives is traced at rest",
+                               static_cast<int>(scene.fields.grids.size()));
+    }
     // ---- procedural scatter ----------------------------------------------------------------
     //
     // The realtime renderer resolves these with `scene::makeSourceMesh` on the CPU and then

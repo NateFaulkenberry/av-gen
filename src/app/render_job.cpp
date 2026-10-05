@@ -205,6 +205,7 @@ Result<void> RenderJob::start() {
     // ADR-521: ADR-360's warm-up, on the renderer that actually produces the output. Clamped by
     // the renderer itself (kMaxWarmUpFrames); asking for more cannot buy anything.
     renderer_->setParticleWarmUpFrames(settings_.particleWarmUpFrames);
+    renderer_->simulation().setCheckpointBudget(settings_.simCheckpointMb * 1024ull * 1024ull); // ADR-1119
     {
         rendering::QualityTier tier = rendering::QualityTier::Offline;
         if (!rendering::qualityTierFromName(settings_.tier, tier)) {

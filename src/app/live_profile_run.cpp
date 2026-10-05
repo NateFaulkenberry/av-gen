@@ -207,8 +207,21 @@ void Application::fillLiveProfileResources(LiveProfileRecord& record, const std:
     r.computeDispatches = m([](const RS& s) { return s.computeDispatches; });
     r.gpuPasses = m([](const RS& s) { return s.gpuPasses; });
     r.transientTextures = m([](const RS& s) { return s.transientTextures; });
+    r.generatorObjects = m([](const RS& s) { return s.procedural.generatorObjects; });
+    r.generatorCells = m([](const RS& s) { return static_cast<double>(s.procedural.generatorCells); });
+    r.audioRowsPerFrame = m([](const RS& s) { return s.fieldAudio.rowsUploaded; });
+    r.simGrids = m([](const RS& s) { return s.simulation.grids; });
+    r.simAgents = m([](const RS& s) { return static_cast<double>(s.simulation.agents); });
+    r.simStepsPerFrame = m([](const RS& s) { return s.simulation.steps; });
     if (!stats.empty()) {
         const RS& last = stats.back();
+        r.generatorBytes = last.procedural.generatorBytes;
+        r.generatorMs = last.procedural.generatorMs;
+        r.audioBound = last.fieldAudio.bound;
+        r.audioRingBytes = last.fieldAudio.ringBytes;
+        r.simStateBytes = last.simulation.stateBytes;
+        r.simCheckpointBytes = last.simulation.checkpointBytes;
+        r.simCheckpoints = last.simulation.checkpoints;
         r.postWidth = last.post.width;
         r.postHeight = last.post.height;
         r.volumeWidth = last.volume.marchWidth;

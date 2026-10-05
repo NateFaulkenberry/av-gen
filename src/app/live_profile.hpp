@@ -272,6 +272,16 @@ struct LiveProfileResources {
     double volumeSteps = 0;
     double sdfRaymarchObjects = 0, sdfAvgSteps = 0;
     double computeDispatches = 0, gpuPasses = 0, transientTextures = 0;
+    // ADR-1116..1120: the GPU procedural systems' own bytes and work, which Dawn's totals above contain but do
+    // not name. Medians over the measured window, except the held bytes (the last frame's).
+    double generatorObjects = 0, generatorCells = 0, generatorMs = -1;
+    std::uint64_t generatorBytes = 0;
+    bool audioBound = false;
+    double audioRowsPerFrame = 0;
+    std::uint64_t audioRingBytes = 0;
+    double simGrids = 0, simAgents = 0, simStepsPerFrame = 0;
+    std::uint64_t simStateBytes = 0, simCheckpointBytes = 0;
+    std::uint32_t simCheckpoints = 0;
 };
 
 // 1h.

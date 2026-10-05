@@ -3872,6 +3872,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- fields (ADR-025): the per-frame field block shared by particles and procedurals ----
     fields_->update(scene.fields, time.renderTime);
+    stats_.fieldAudio = fields_->audioStats();
     // ---- material programs (ADR-030): packed after the fields so Field ops resolve to slots ----
     materialPrograms_->update(scene.materialPrograms, fields_.get());
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----

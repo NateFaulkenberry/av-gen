@@ -187,6 +187,7 @@ struct RenderStats {
     ClusterOccupancy clusters;
     bool haveClusters = false;
     SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
+    FieldAudioStats fieldAudio; // ADR-1116; the audio ring audio fields read
     SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
     PostStats post;
     TemporalStats temporal;     // ADR-410; ring occupancy, settling state, and what it costs

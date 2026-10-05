@@ -182,6 +182,8 @@ struct AppOptions {
     // and the field blooms in over one lifetime. Set it to at least the longest particle lifetime
     // in the scene, in frames, and the head of the range holds what a full render would have held.
     std::uint32_t particleWarmUpFrames = 0;
+    // --sim-checkpoint-mb: ADR-1119's budget for simulation checkpoints, megabytes (default 512; 0 = none).
+    std::uint64_t simCheckpointMb = 512;
     std::optional<std::string> aovs; // ADR-242: --aov, auxiliary passes beside the beauty frames
     // ADR-277: --post-stages, every intermediate the post chain rendered, as scene-linear EXRs.
     std::filesystem::path postStages;

@@ -99,6 +99,8 @@ struct RenderSettings {
     // continuous emitter without it is not a shot at t, it is a shot of the first 1/60th of a
     // second of a field that should have been running for minutes.
     std::uint32_t particleWarmUpFrames = 0;
+    // ADR-1119: the simulation checkpoint budget for THIS render (MB), on the renderer that produces it.
+    std::uint64_t simCheckpointMb = 512;
     // ADR-186: which distance-based detail reductions this render is under. "tier" (the default)
     // takes the tier's answer -- offline lifts them all, every other tier keeps live playback's;
     // "live" keeps them whatever the tier, which is what a quick proof render wants; "unlimited"

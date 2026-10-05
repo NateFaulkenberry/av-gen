@@ -929,6 +929,17 @@ json liveProfileJson(const LiveProfileRecord& r) {
         {"computeDispatches", s.computeDispatches},
         {"gpuPasses", s.gpuPasses},
         {"transientTextures", s.transientTextures},
+        // ADR-1116..1120
+        {"gpuSystems",
+         {{"generators", {{"objects", s.generatorObjects}, {"cells", s.generatorCells}, {"bytes", s.generatorBytes}}},
+          {"audio", {{"bound", s.audioBound}, {"ringBytes", s.audioRingBytes}, {"rowsPerFrame", s.audioRowsPerFrame}}},
+          {"simulation",
+           {{"grids", s.simGrids},
+            {"agents", s.simAgents},
+            {"stepsPerFrame", s.simStepsPerFrame},
+            {"stateBytes", s.simStateBytes},
+            {"checkpoints", s.simCheckpoints},
+            {"checkpointBytes", s.simCheckpointBytes}}}}},
     };
     json cands = json::array();
     for (const auto& k : r.candidates) {
@@ -1095,6 +1106,13 @@ std::string liveProfileText(const LiveProfileRecord& r) {
          s.particleCapacity, s.particlesEmitted, s.particleSimSteps);
     line("  post: {:.0f} passes at {}x{}, bloom {:.0f} levels; volume {}x{} x {:.0f} steps; AO {}x{}", s.postPasses,
          s.postWidth, s.postHeight, s.bloomLevels, s.volumeWidth, s.volumeHeight, s.volumeSteps, s.aoWidth, s.aoHeight);
+    if (s.generatorObjects > 0 || s.audioBound || s.simGrids > 0) { // ADR-1116..1120
+        line("  gpu systems: generators {:.0f} ({:.0f} cells, {:.1f} MB); audio ring {:.1f} MB ({:.1f} rows/frame); "
+             "simulation {:.0f} grids, {:.0f} agents, {:.0f} steps/frame, state {:.1f} MB, {} checkpoints {:.1f} MB",
+             s.generatorObjects, s.generatorCells, s.generatorBytes / 1.0e6, s.audioBound ? s.audioRingBytes / 1.0e6 : 0.0,
+             s.audioRowsPerFrame, s.simGrids, s.simAgents, s.simStepsPerFrame, s.simStateBytes / 1.0e6, s.simCheckpoints,
+             s.simCheckpointBytes / 1.0e6);
+    }
     line("{}", rule);
     line("OPTIMIZATION CANDIDATES (savings ESTIMATED unless marked MEASURED)");
     int n = 0;

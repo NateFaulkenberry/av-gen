@@ -274,6 +274,8 @@ std::string usageText() {
            "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
            "                      given, it also applies to a headless playback run (ADR-1024)\n"
            "  --supersample <f>   offline render only: render the scene at this multiple of the output\n"
+           "  --sim-checkpoint-mb <n>  memory simulated grids may hold in GPU checkpoints for an exact\n"
+           "                      seek (ADR-1119; default 512, 0 = none: every seek replays from 0)\n"
            "  --particle-warmup <n>  step the particle pools n frames before the first frame of a\n"
            "                      render range or after a seek, so the range does not open on an\n"
            "                      empty field (ADR-360). 0 (the default) is the bloom-in. Use at\n"
@@ -870,6 +872,15 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             else if (arg == "--ui-ab-blocks") options.uiAbBlocks = std::max(1, n);
             else options.uiAbSettle = n;
             ++i;
+        } else if (arg == "--sim-checkpoint-mb") {
+            auto v = need(i, "--sim-checkpoint-mb");
+            if (!v) return std::unexpected(v.error());
+            const long n = std::strtol(v->c_str(), nullptr, 10);
+            if (n < 0 || n > 65536) {
+                return fail("--sim-checkpoint-mb must be 0 to 65536, got '{}'", *v);
+            }
+            options.simCheckpointMb = static_cast<std::uint64_t>(n);
+            ++i;
         } else if (arg == "--particle-warmup") {
             auto v = need(i, "--particle-warmup");
             if (!v) return std::unexpected(v.error());
@@ -1382,6 +1393,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     // per scrub click and is the measured cause of the app's scrub lag, and this would be a second
     // re-simulation stacked on it.
     renderer_->setParticleWarmUpFrames(options_.particleWarmUpFrames);
+    renderer_->simulation().setCheckpointBudget(options_.simCheckpointMb * 1024ull * 1024ull); // ADR-1119
     // The 2D composition (ADR-083): installed as the renderer's overlay, so it draws over the
     // tone-mapped frame in every path the renderer already has -- window, offline render,
     // screenshot, projection output -- rather than in one of them.
@@ -5886,6 +5898,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     s.qualityArms = options_.qualityArms;
     // ADR-521: and the warm-up, for the same reason. See RenderSettings::particleWarmUpFrames.
     s.particleWarmUpFrames = options_.particleWarmUpFrames;
+    s.simCheckpointMb = options_.simCheckpointMb; // ADR-1119, for the same reason
     // `--tier` used to reach the interactive renderer and stop there, so `--render out --tier
     // realtime` -- the fast proof everyone wants before committing an hour to a sequence -- still
     // rendered at the offline tier. Exactly ADR-147's defect one flag over.

@@ -434,6 +434,7 @@ struct ProceduralRenderer::Impl {
     int pendingStatsSlot = -1;
     double lastEffectorMs = -1.0;   // the latest completed effector-pass measurement
     double lastCullMs = -1.0;       // the latest completed cull-pass measurement
+    double lastGeneratorMs = -1.0;  // ADR-1117: the latest completed generator-pass measurement
     bool passThisFrame = false;      // an effector pass was encoded in the current update()
     bool cullPassThisFrame = false;  // a cull pass was encoded in the current update()
     // ADR-056: the disturbance set is frame-global -- a body pushing through the valley pushes
@@ -1554,10 +1555,15 @@ void ProceduralRenderer::collectTimings() {
         if (cull >= 0.0) {
             im.lastCullMs = cull;
         }
+        const double generators = im.timeline->msFor("generators"); // ADR-1117
+        if (generators >= 0.0) {
+            im.lastGeneratorMs = generators;
+        }
     }
     im.pumpStats();
     stats_.effectorPassMs = im.passThisFrame ? im.lastEffectorMs : -1.0;
     stats_.cullMs = im.cullPassThisFrame ? im.lastCullMs : -1.0;
+    stats_.generatorMs = im.generatorItems.empty() ? -1.0 : im.lastGeneratorMs;
 }
 
 void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
