@@ -74,6 +74,8 @@ struct FrameStats {
     std::string adapter;
     std::string backend;
     rendering::ProceduralStats procedural;
+    rendering::SimulationStats simulation; // ADR-1119/1120: grids, agents, checkpoints
+    rendering::FieldAudioStats fieldAudio; // ADR-1116: the audio ring
     rendering::SdfStats sdf;
     rendering::ParticleStats particles;
 };

@@ -2716,6 +2716,27 @@ void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStat
 void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats) {
     helpHeader("performance/diagnosis");
 
+    // ADR-1116..1120: the GPU procedural systems, which hold memory Dawn counts but does not name.
+    if (stats.procedural.generatorObjects > 0) {
+        const auto& pr = stats.procedural;
+        ImGui::Text("generators: %u objects  %llu window cells  %.1f MB records  pass %.3f ms", pr.generatorObjects,
+                    static_cast<unsigned long long>(pr.generatorCells),
+                    static_cast<double>(pr.generatorBytes) / (1024.0 * 1024.0), pr.generatorMs);
+    }
+    if (stats.fieldAudio.bound) {
+        ImGui::Text("audio fields: newest row %lld  %u rows uploaded  ring %.2f MB",
+                    static_cast<long long>(stats.fieldAudio.newestRow), stats.fieldAudio.rowsUploaded,
+                    static_cast<double>(stats.fieldAudio.ringBytes) / (1024.0 * 1024.0));
+    }
+    if (stats.simulation.grids > 0) {
+        const auto& sim = stats.simulation;
+        ImGui::Text("simulation: %u grids  %llu agents  %u steps  state %.1f MB  %u checkpoints %.1f MB%s",
+                    sim.grids, static_cast<unsigned long long>(sim.agents), sim.steps,
+                    static_cast<double>(sim.stateBytes) / (1024.0 * 1024.0), sim.checkpoints,
+                    static_cast<double>(sim.checkpointBytes) / (1024.0 * 1024.0),
+                    sim.restores > 0 ? "  (seek restored a checkpoint)" : "");
+    }
+
     ImGui::Text("%.1f fps (%.1f ms)  cpu work %.2f ms  gpu %s", stats.fps, stats.frameIntervalMs, stats.cpuFrameMs,
                 stats.gpuFrameMs >= 0.0 ? (std::to_string(stats.gpuFrameMs).substr(0, 5) + " ms").c_str() : "n/a");
     ImGui::Text("%ux%u  %u draws  %u tris  analysis %.0f us/hop (%llu frames)  modulation %.0f us", stats.width,

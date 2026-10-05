@@ -5166,6 +5166,8 @@ int Application::runLive() {
         stats.drawCalls = renderer_->stats().drawCalls;
         stats.triangles = renderer_->stats().triangles;
         stats.procedural = renderer_->stats().procedural;
+        stats.simulation = renderer_->stats().simulation; // ADR-1119/1120
+        stats.fieldAudio = renderer_->stats().fieldAudio; // ADR-1116
         stats.sdf = renderer_->stats().sdf;
         stats.particles = renderer_->stats().particles;
         stats.gpuFrameMs = renderer_->timeline().frameMs();
