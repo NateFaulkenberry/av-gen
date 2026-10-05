@@ -64,8 +64,8 @@ def programs():
     bed = [
         op("field", 0, field="trail"),
         # thin the veins: trail / T, clamped, then a convex curve, so only a lane's core is bright
-        op("remap", 0, srcA=0, value=1, constant=[0.15, 4.5, 0.0, 1.0]),
-        op("power", 0, srcA=0, value=1.6),
+        op("remap", 0, srcA=0, value=1, constant=[0.15, 3.6, 0.0, 1.0]),
+        op("power", 0, srcA=0, value=1.4),
         *species_colour_ops(0, 1, (2, 3)),
         # white-hot where the lanes are densest: (x + y + z)^3 of white, so the hierarchy is in value, not hue
         op("swizzle", 2, srcA=0, constant=[0, 0, 0, 0]),
@@ -217,24 +217,39 @@ def choir():
                      "roughness": 0.4, "metallic": 0.0, "program": "choir"}}}
 
 
+# Each strand's gain into the tower's contrast curve (throat program: lit above a multiplier of 2.6). Mastered
+# music carries more normalised energy in the lows than in the air, so the higher strands get more gain and all
+# three bands light about as often.
+STRAND_GAIN = {"helixLow": 3.1, "helixMid": 3.5, "helixHigh": 3.5}
+
+
 def helix(name, strand, colour, fieldname, segment):
     """One strand of the Cochlea. segment "root": the flared foot (radius 7 -> 2.2 over 0..5 m);
     "bell": the throat opening into the canopy (2.2 -> 19 over 5..HELIX_H m)."""
+    weave = segment == "weave"  # the same band, wound the other way: the threads cross into a lattice
+    if weave:
+        segment = "bell"
     if segment == "root":
-        dist = {"count": 90, "radius": 7.0, "radiusGrowth": -4.8, "turns": 1.2, "spiralHeight": 5.0,
+        dist = {"count": 240, "radius": 7.0, "radiusGrowth": -4.8, "turns": 1.2, "spiralHeight": 5.0,
                 "center": [0, 0.3, 0]}
     else:
-        dist = {"count": 520, "radius": 2.2, "radiusGrowth": 16.8, "turns": 4.6, "spiralHeight": HELIX_H - 5.0,
+        dist = {"count": 1500, "radius": 2.2, "radiusGrowth": 16.8, "turns": 4.6, "spiralHeight": HELIX_H - 5.0,
                 "center": [0, 5.3, 0]}
     dist.update({"kind": "spiral", "spiralAngle": strand * 2.0943951 + (0.0 if segment == "root" else 1.2 * 6.2831853),
                  "plane": "xz", "orientation": "outward"})
+    if weave:
+        dist["turns"] = -dist["turns"]
+        dist["spiralAngle"] += 1.0471976
     return {"name": name, "kind": "procedural", "procedural": {
-        "source": {"kind": "box", "size": [0.09, 1.5, 0.05], "subdivisions": 1},
+        # a thread segment along the spiral (an "outward" placement's local +x is the spiral's tangent): end to end
+        # they draw the tower as threads of light circling upward; loud moments lengthen and light their segments
+        "source": {"kind": "box", "size": [1.0, 0.05, 0.05], "subdivisions": 1},
         "variation": {"seed": 40 + strand},
         "distribution": dist,
         "effectors": [
-            {"field": fieldname, "op": "scale", "blend": "add", "strength": 1.4, "scaleAxis": [0.6, 1.0, 0.6]},
-            {"field": fieldname, "op": "emission", "blend": "add", "strength": 3.0},
+            # its band's energy at its moment thickens and lengthens it
+            {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.6, 0.5, 0.5]},
+            {"field": fieldname, "op": "emission", "blend": "add", "strength": STRAND_GAIN[fieldname]},
         ],
         "lod": {"cull": True, "count": 1},
         "material": {"baseColor": [0.015, 0.015, 0.018], "emissiveColor": colour, "emissiveIntensity": 0.025,
@@ -302,17 +317,17 @@ def scene():
         "camera": {"mode": 1, "position": [30, 4, 34], "target": [0, 12, 0], "fov": 42, "orbitSpeed": 0.0},
         "environment": {
             "background": [0.0015, 0.0016, 0.004], "intensity": 0.05,
-            "fogColor": [0.016, 0.012, 0.034], "horizonDensity": 1.0,
+            "fogColor": [0.016, 0.012, 0.034], "horizonDensity": 0.5,
             # a thin medium the heart scatters into: the throat glows, the basin's edge dissolves into air
-            "volumeDensity": 0.011, "volumeScattering": 1.0, "volumeAbsorption": 0.4, "volumeAnisotropy": 0.35,
-            "volumeLocalLights": 0.45, "volumeSteps": 24, "volumeJitter": 0.5, "volumeMaxDistance": 220.0,
+            "volumeDensity": 0.008, "volumeScattering": 1.0, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.35,
+            "volumeLocalLights": 0.45, "volumeSteps": 24, "volumeJitter": 0.5, "volumeMaxDistance": 600.0,
             "volumeNoise": 0.35, "volumeNoiseScale": 0.03, "volumeNoiseSpeed": 0.05,
             "sky": {"enabled": True, "background": True, "zenithColor": [0.0006, 0.0007, 0.002],
                     "horizonColor": [0.014, 0.009, 0.026], "groundColor": [0.001, 0.001, 0.002], "haze": 0.0,
                     "sunIntensity": 0.0, "intensity": 1.0, "useKeyLight": False}},
         "lights": [
-            {"name": "heart", "id": "heart", "type": "point", "position": [0, 4.0, 0], "color": [1.0, 0.5, 0.24],
-             "intensity": 900, "range": 70, "radius": 1.0, "castsShadow": False, "volumetric": 0.3},
+            {"name": "heart", "id": "heart", "type": "point", "position": [0, 4.0, 0], "color": [1.0, 0.36, 0.13],
+             "intensity": 900, "range": 42, "radius": 1.0, "castsShadow": False, "volumetric": 0.3},
             {"name": "moon", "id": "moon", "type": "directional", "direction": [-0.3, -0.8, -0.5],
              "color": [0.55, 0.65, 1.0], "intensity": 0.35, "castsShadow": False, "volumetric": 0.0},
         ],
@@ -326,8 +341,8 @@ def scene():
         "nodes": [*fields(), bed(), choir(),
                   *[helix(f"{n}{seg.capitalize()}", i, c, n, seg)
                     for i, (n, c) in enumerate([("helixLow", EMBER), ("helixMid", TEAL), ("helixHigh", VIOLET)])
-                    for seg in ("root", "bell")],
-                  spine(), plain(), horizon(), spores()],
+                    for seg in ("root", "bell", "weave")],
+                  plain(), horizon(), spores()],
     }
 
 
@@ -414,8 +429,8 @@ STATES = {
 }
 # Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
 # instead of sitting dead centre in every state.
-PIVOT_X = {"Germination": 14.0, "Rebirth": -16.0, "Surge": 10.0}
-PIVOT_Z = {"Germination": 6.0, "Rebirth": 10.0, "Surge": -8.0}
+PIVOT_X = {"Germination": 22.0, "Rebirth": -26.0, "Surge": 18.0, "Dormant": -6.0}
+PIVOT_Z = {"Germination": 10.0, "Rebirth": 14.0, "Surge": -12.0, "Dormant": 4.0}
 PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": GILDED}  # only the world-defining states recolour
 
 
@@ -466,7 +481,7 @@ def presets():
                 for path, c in colour_paths(progs[prog], prog, pal).items():
                     values[path] = c
             for strand, key in (("helixLow", "lo"), ("helixMid", "mid"), ("helixHigh", "hi")):
-                for seg in ("Root", "Bell"):
+                for seg in ("Root", "Bell", "Weave"):
                     values[f"procedural/{strand}{seg}/material/emissiveColor"] = pal[key]
         out.append({"name": name.lower(), "values": values})
     return out

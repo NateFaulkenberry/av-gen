@@ -30,15 +30,15 @@
    0.012,
    0.034
   ],
-  "horizonDensity": 1.0,
-  "volumeDensity": 0.011,
+  "horizonDensity": 0.5,
+  "volumeDensity": 0.008,
   "volumeScattering": 1.0,
-  "volumeAbsorption": 0.4,
+  "volumeAbsorption": 0.8,
   "volumeAnisotropy": 0.35,
   "volumeLocalLights": 0.45,
   "volumeSteps": 24,
   "volumeJitter": 0.5,
-  "volumeMaxDistance": 220.0,
+  "volumeMaxDistance": 600.0,
   "volumeNoise": 0.35,
   "volumeNoiseScale": 0.03,
   "volumeNoiseSpeed": 0.05,
@@ -78,11 +78,11 @@
    ],
    "color": [
     1.0,
-    0.5,
-    0.24
+    0.36,
+    0.13
    ],
    "intensity": 900,
-   "range": 70,
+   "range": 42,
    "radius": 1.0,
    "castsShadow": false,
    "volumetric": 0.3
@@ -267,7 +267,7 @@
      "value": 1,
      "constant": [
       0.15,
-      4.5,
+      3.6,
       0.0,
       1.0
      ]
@@ -276,7 +276,7 @@
      "kind": "power",
      "dst": 0,
      "srcA": 0,
-     "value": 1.6
+     "value": 1.4
     },
     {
      "kind": "swizzle",
@@ -1262,8 +1262,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1272,7 +1272,7 @@
      "seed": 40
     },
     "distribution": {
-     "count": 90,
+     "count": 240,
      "radius": 7.0,
      "radiusGrowth": -4.8,
      "turns": 1.2,
@@ -1292,18 +1292,18 @@
       "field": "helixLow",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixLow",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.1
      }
     ],
     "lod": {
@@ -1335,8 +1335,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1345,7 +1345,7 @@
      "seed": 40
     },
     "distribution": {
-     "count": 520,
+     "count": 1500,
      "radius": 2.2,
      "radiusGrowth": 16.8,
      "turns": 4.6,
@@ -1365,18 +1365,91 @@
       "field": "helixLow",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixLow",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.1
+     }
+    ],
+    "lod": {
+     "cull": true,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.015,
+      0.015,
+      0.018
+     ],
+     "emissiveColor": [
+      1.0,
+      0.36,
+      0.1
+     ],
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
+     "program": "throat"
+    }
+   }
+  },
+  {
+   "name": "helixLowWeave",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.05,
+      0.05
+     ],
+     "subdivisions": 1
+    },
+    "variation": {
+     "seed": 40
+    },
+    "distribution": {
+     "count": 1500,
+     "radius": 2.2,
+     "radiusGrowth": 16.8,
+     "turns": -4.6,
+     "spiralHeight": 31.0,
+     "center": [
+      0,
+      5.3,
+      0
+     ],
+     "kind": "spiral",
+     "spiralAngle": 8.587019960000001,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "effectors": [
+     {
+      "field": "helixLow",
+      "op": "scale",
+      "blend": "add",
+      "strength": 4.0,
+      "scaleAxis": [
+       0.6,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "field": "helixLow",
+      "op": "emission",
+      "blend": "add",
+      "strength": 3.1
      }
     ],
     "lod": {
@@ -1408,8 +1481,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1418,7 +1491,7 @@
      "seed": 41
     },
     "distribution": {
-     "count": 90,
+     "count": 240,
      "radius": 7.0,
      "radiusGrowth": -4.8,
      "turns": 1.2,
@@ -1438,18 +1511,18 @@
       "field": "helixMid",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixMid",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.5
      }
     ],
     "lod": {
@@ -1481,8 +1554,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1491,7 +1564,7 @@
      "seed": 41
     },
     "distribution": {
-     "count": 520,
+     "count": 1500,
      "radius": 2.2,
      "radiusGrowth": 16.8,
      "turns": 4.6,
@@ -1511,18 +1584,91 @@
       "field": "helixMid",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixMid",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.5
+     }
+    ],
+    "lod": {
+     "cull": true,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.015,
+      0.015,
+      0.018
+     ],
+     "emissiveColor": [
+      0.1,
+      0.85,
+      0.78
+     ],
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
+     "program": "throat"
+    }
+   }
+  },
+  {
+   "name": "helixMidWeave",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.05,
+      0.05
+     ],
+     "subdivisions": 1
+    },
+    "variation": {
+     "seed": 41
+    },
+    "distribution": {
+     "count": 1500,
+     "radius": 2.2,
+     "radiusGrowth": 16.8,
+     "turns": -4.6,
+     "spiralHeight": 31.0,
+     "center": [
+      0,
+      5.3,
+      0
+     ],
+     "kind": "spiral",
+     "spiralAngle": 10.68141506,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "effectors": [
+     {
+      "field": "helixMid",
+      "op": "scale",
+      "blend": "add",
+      "strength": 4.0,
+      "scaleAxis": [
+       0.6,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "field": "helixMid",
+      "op": "emission",
+      "blend": "add",
+      "strength": 3.5
      }
     ],
     "lod": {
@@ -1554,8 +1700,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1564,7 +1710,7 @@
      "seed": 42
     },
     "distribution": {
-     "count": 90,
+     "count": 240,
      "radius": 7.0,
      "radiusGrowth": -4.8,
      "turns": 1.2,
@@ -1584,18 +1730,18 @@
       "field": "helixHigh",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixHigh",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.5
      }
     ],
     "lod": {
@@ -1627,8 +1773,8 @@
     "source": {
      "kind": "box",
      "size": [
-      0.09,
-      1.5,
+      1.0,
+      0.05,
       0.05
      ],
      "subdivisions": 1
@@ -1637,7 +1783,7 @@
      "seed": 42
     },
     "distribution": {
-     "count": 520,
+     "count": 1500,
      "radius": 2.2,
      "radiusGrowth": 16.8,
      "turns": 4.6,
@@ -1657,18 +1803,18 @@
       "field": "helixHigh",
       "op": "scale",
       "blend": "add",
-      "strength": 1.4,
+      "strength": 4.0,
       "scaleAxis": [
        0.6,
-       1.0,
-       0.6
+       0.5,
+       0.5
       ]
      },
      {
       "field": "helixHigh",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 3.5
      }
     ],
     "lod": {
@@ -1694,50 +1840,75 @@
    }
   },
   {
-   "name": "spine",
+   "name": "helixHighWeave",
    "kind": "procedural",
    "procedural": {
     "source": {
-     "kind": "cylinder",
-     "radius": 0.22,
-     "height": 40.0,
-     "radialSegments": 24,
-     "caps": true
+     "kind": "box",
+     "size": [
+      1.0,
+      0.05,
+      0.05
+     ],
+     "subdivisions": 1
     },
-    "sourceTransform": {
-     "position": [
-      0,
-      20.0,
-      0
-     ],
-     "rotation": [
-      0,
-      0,
-      0
-     ],
-     "scale": [
-      1,
-      1,
-      1
-     ]
+    "variation": {
+     "seed": 42
     },
     "distribution": {
-     "kind": "single"
+     "count": 1500,
+     "radius": 2.2,
+     "radiusGrowth": 16.8,
+     "turns": -4.6,
+     "spiralHeight": 31.0,
+     "center": [
+      0,
+      5.3,
+      0
+     ],
+     "kind": "spiral",
+     "spiralAngle": 12.77581016,
+     "plane": "xz",
+     "orientation": "outward"
+    },
+    "effectors": [
+     {
+      "field": "helixHigh",
+      "op": "scale",
+      "blend": "add",
+      "strength": 4.0,
+      "scaleAxis": [
+       0.6,
+       0.5,
+       0.5
+      ]
+     },
+     {
+      "field": "helixHigh",
+      "op": "emission",
+      "blend": "add",
+      "strength": 3.5
+     }
+    ],
+    "lod": {
+     "cull": true,
+     "count": 1
     },
     "material": {
      "baseColor": [
-      0.01,
-      0.01,
-      0.012
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
-      1.0,
-      0.85,
-      0.7
+      0.62,
+      0.32,
+      1.0
      ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.15,
-     "metallic": 0.9
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
+     "program": "throat"
     }
    }
   },

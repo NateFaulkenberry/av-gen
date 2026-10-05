@@ -414,9 +414,9 @@
      56
     ],
     "camera/orbitPivot": [
-     0.0,
+     -6.0,
      15,
-     0.0
+     4.0
     ],
     "camera/exposure/compensation": [
      -0.7
@@ -479,6 +479,11 @@
      0.36,
      0.1
     ],
+    "procedural/helixLowWeave/material/emissiveColor": [
+     1.0,
+     0.36,
+     0.1
+    ],
     "procedural/helixMidRoot/material/emissiveColor": [
      0.1,
      0.85,
@@ -489,12 +494,22 @@
      0.85,
      0.78
     ],
+    "procedural/helixMidWeave/material/emissiveColor": [
+     0.1,
+     0.85,
+     0.78
+    ],
     "procedural/helixHighRoot/material/emissiveColor": [
      0.62,
      0.32,
      1.0
     ],
     "procedural/helixHighBell/material/emissiveColor": [
+     0.62,
+     0.32,
+     1.0
+    ],
+    "procedural/helixHighWeave/material/emissiveColor": [
      0.62,
      0.32,
      1.0
@@ -559,9 +574,9 @@
      48
     ],
     "camera/orbitPivot": [
-     14.0,
+     22.0,
      8,
-     6.0
+     10.0
     ],
     "camera/exposure/compensation": [
      -0.35
@@ -717,9 +732,9 @@
      40
     ],
     "camera/orbitPivot": [
-     10.0,
+     18.0,
      4,
-     -8.0
+     -12.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -954,9 +969,9 @@
      32
     ],
     "camera/orbitPivot": [
-     -16.0,
+     -26.0,
      11,
-     10.0
+     14.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -1019,6 +1034,11 @@
      0.28,
      0.04
     ],
+    "procedural/helixLowWeave/material/emissiveColor": [
+     1.0,
+     0.28,
+     0.04
+    ],
     "procedural/helixMidRoot/material/emissiveColor": [
      1.0,
      0.66,
@@ -1029,12 +1049,22 @@
      0.66,
      0.2
     ],
+    "procedural/helixMidWeave/material/emissiveColor": [
+     1.0,
+     0.66,
+     0.2
+    ],
     "procedural/helixHighRoot/material/emissiveColor": [
      0.88,
      0.9,
      1.0
     ],
     "procedural/helixHighBell/material/emissiveColor": [
+     0.88,
+     0.9,
+     1.0
+    ],
+    "procedural/helixHighWeave/material/emissiveColor": [
      0.88,
      0.9,
      1.0
