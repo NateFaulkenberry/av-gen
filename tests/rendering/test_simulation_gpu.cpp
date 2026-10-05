@@ -47,7 +47,7 @@ class SimHarness {
 public:
     explicit SimHarness(gpu::Context& ctx, gpu::ShaderLibrary& shaders)
         : ctx_(ctx), fields_(ctx), simulation_(ctx, shaders) {
-        auto ok = simulation_.init(fields_.buffer(), fields_.gridBuffer());
+        auto ok = simulation_.init(fields_.gridBuffer());
         if (!ok) {
             FAIL(ok.error().message);
         }
@@ -61,7 +61,7 @@ public:
         time.deltaTime = 1.0 / 60.0;
         time.frameIndex = frameIndex;
         wgpu::CommandEncoder encoder = ctx_.device().CreateCommandEncoder();
-        simulation_.update(encoder, scene, time);
+        simulation_.update(encoder, scene, time, &fields_);
         wgpu::CommandBuffer commands = encoder.Finish();
         ctx_.queue().Submit(1, &commands);
         ctx_.waitForQueue();

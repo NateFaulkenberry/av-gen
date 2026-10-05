@@ -368,13 +368,13 @@ TEST_CASE("What a seek costs a simulated grid", "[.perf][seek][simulation]") {
         for (const double t : {4.0, 10.0, 60.0, 300.0}) {
             rendering::FieldUniforms fields(*ctx);
             rendering::Simulation sim(*ctx, shaders);
-            REQUIRE(sim.init(fields.buffer(), fields.gridBuffer()).has_value());
+            REQUIRE(sim.init(fields.gridBuffer()).has_value());
             fields.update(s.fields, t);
             // One untimed frame at t = 0 so pipeline creation and the initial upload are not billed.
             {
                 FrameTime z{};
                 wgpu::CommandEncoder e = ctx->device().CreateCommandEncoder();
-                sim.update(e, s, z);
+                sim.update(e, s, z, &fields);
                 wgpu::CommandBuffer c = e.Finish();
                 ctx->queue().Submit(1, &c);
                 ctx->waitForQueue();
@@ -385,7 +385,7 @@ TEST_CASE("What a seek costs a simulated grid", "[.perf][seek][simulation]") {
             time.deltaTime = 0.0;
             const auto start = std::chrono::steady_clock::now();
             wgpu::CommandEncoder e = ctx->device().CreateCommandEncoder();
-            sim.update(e, s, time);
+            sim.update(e, s, time, &fields);
             wgpu::CommandBuffer c = e.Finish();
             ctx->queue().Submit(1, &c);
             ctx->waitForQueue();

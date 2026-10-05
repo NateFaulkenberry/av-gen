@@ -60,7 +60,7 @@ struct FieldGpu {
 // are held; anything older or newer reads 0.
 struct FieldAudio {
     ring: vec4<u32>,                    // x = ring offset in gridTable (floats), y = rows, z = bins, w = 1 when audio is bound
-    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none)
+    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none), z = audible rows (kAudioMaxDelayRows)
     onsetAge: array<vec4<f32>, 8>,      // source s (low, mid, high, beat): [2s] and [2s + 1] hold its newest 8 onsets' ages (s), < 0 none
     onsetStrength: array<vec4<f32>, 8>,
 };
@@ -389,7 +389,7 @@ fn audioRingValue(row: i32, bin: i32) -> f32 {
     let a = fieldBlock.audio;
     let newest = i32(a.timing.y);
     let rows = i32(a.ring.y);
-    if (a.ring.w == 0u || newest < 0 || row > newest || row <= newest - rows || row < 0) {
+    if (a.ring.w == 0u || newest < 0 || row > newest || row <= newest - i32(a.timing.z) || row < 0) {
         return 0.0;
     }
     let slot = u32(row % rows);

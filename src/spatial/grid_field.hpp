@@ -40,7 +40,14 @@ struct FieldSet;
 
 // What a cell holds. Scalar: 1 float. Vector: 4 floats (xyz + pad, so the GPU reads are aligned).
 // ReactionDiffusion: 2 floats (A, B); sampled as a scalar it reports B, the pattern channel.
-enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion };
+// Agents (ADR-1120): 4 floats, the trail of species 0..2 and their sum. A population of `agentCount`
+// agents lives on the grid's XZ plane (resolution.y must be 1): each step every agent senses the
+// trail ahead (its own species attracts, the others repel by `repel`), turns towards the stronger
+// side, moves and deposits into its species' channel with a u32 fixed-point atomic add (order-free,
+// so bit-exact); then the trail blurs by `diffusion` and fades by `dissipation`. GPU only: the CPU
+// `step()` does nothing for it (a chaotic population cannot be mirrored to the last bit), and it is
+// sampled as a vector (the three trails), so a scalar read is the trails' length.
+enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents };
 [[nodiscard]] const char* gridModeName(GridMode mode);
 [[nodiscard]] std::optional<GridMode> gridModeFromName(std::string_view name);
 
@@ -49,8 +56,12 @@ enum class GridWrap : std::uint8_t { Clamp, Wrap };
 [[nodiscard]] std::optional<GridWrap> gridWrapFromName(std::string_view name);
 
 constexpr int kMaxGridResolution = 128;
-// Total floats every grid of a scene may occupy together (8 MB; one 128^3 scalar grid).
-constexpr std::size_t kMaxGridTableFloats = 2u * 1024u * 1024u;
+// ADR-1120: an Agents grid is a plane, and may be finer on x and z.
+constexpr int kMaxAgentGridResolution = 1024;
+constexpr int kMaxAgents = 4 * 1024 * 1024;
+// Total floats every grid of a scene may occupy together (16 MB: one 1024 x 1 x 1024 agents trail,
+// or two 128^3 scalar grids; ADR-1120 doubled it from 8 MB).
+constexpr std::size_t kMaxGridTableFloats = 4u * 1024u * 1024u;
 
 struct GridField {
     std::string name = "grid";
@@ -78,6 +89,18 @@ struct GridField {
     int maxSubSteps = 4;   // most sub-steps one frame may take (a stall does not explode)
     std::uint32_t seed = 11;
     float seedAmount = 0.0f; // amplitude of the initial fbm3 noise in the grid
+    // Agents (ADR-1120). Distances are in cells of the XZ plane.
+    int agentCount = 0;
+    int species = 3;              // 1..3, one trail channel each
+    float sensorAngle = 0.45f;    // radians either side of the heading
+    float sensorDistance = 9.0f;  // cells
+    float turnAngle = 0.35f;      // radians per step
+    float stepSize = 1.0f;        // cells per step
+    float depositAmount = 1.0f;   // trail added per agent per step (x the deposit field, when set)
+    float repel = 0.6f;           // how much the other species' trails count against a direction
+    std::string depositField;     // a scalar field the deposit is multiplied by (audio, typically); empty = 1
+    // Checkpoints for an exact seek (ADR-1119): one every this many seconds of steps; 0 = none.
+    float checkpointInterval = 5.0f;
 
     // Cell values, `components()` floats per cell; empty until reset() (the GPU keeps its own
     // copy in the shared table and never fills this).
@@ -105,6 +128,7 @@ struct GridField {
     // `set` resolves injectField / velocityField (null = no inputs).
     void step(float dt, double time, const FieldSet* set = nullptr);
 
+    [[nodiscard]] bool agents() const { return mode == GridMode::Agents; }
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // settings only, never the cell values
     [[nodiscard]] nlohmann::json toJson() const;        // settings only

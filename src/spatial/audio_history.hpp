@@ -37,6 +37,10 @@ inline constexpr float kAudioMaxHz = 16000.0f;
 // far back; anything older reads 0. 393,216 B in the field table.
 inline constexpr int kAudioRingRows = 1536;
 inline constexpr std::size_t kAudioRingFloats = static_cast<std::size_t>(kAudioRingRows) * kAudioBins;
+// The furthest a spectrum field can hear into the past: 12.0 s at 93.75 rows/s. Shorter than the ring on
+// purpose (ADR-1119): a simulation replaying a backlog steps up to 4 s behind the ring's newest row, and
+// every step must still find all its rows, or a replayed step would hear less than the played one did.
+inline constexpr int kAudioMaxDelayRows = 1125;
 inline constexpr int kOnsetHistory = 8; // newest onsets per source handed to the GPU
 
 // Appended only: the integer is packed into FieldGpu and mirrored in shaders/fields.wgsl.

@@ -8631,6 +8631,7 @@ void Composition::applyParameters() {
                          triggerClock_ != nullptr ? triggerClock_->seconds() : currentTime_);
     // ADR-1116: and the audio history the audio fields read.
     scene_.fields.audio = audioHistory_;
+    scene_.fields.inputKey = simulationInputKey_; // ADR-1119
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //

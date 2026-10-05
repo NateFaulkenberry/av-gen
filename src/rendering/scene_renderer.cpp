@@ -546,7 +546,7 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
-    if (auto r = simulation_->init(fields_->buffer(), fields_->gridBuffer()); !r) {
+    if (auto r = simulation_->init(fields_->gridBuffer()); !r) {
         return r;
     }
     if (auto r = postProcessor_->init(); !r) {
@@ -3878,7 +3878,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     splines_->update(scene.splines);
     stage(cpu.fieldsMs);
     // ---- simulated grid fields (ADR-032): fixed sub-steps into the shared grid table ----
-    simulation_->update(encoder, scene, time);
+    simulation_->update(encoder, scene, time, fields_.get());
     stats_.simulation = simulation_->stats();
     stage(cpu.simulationMs);
 

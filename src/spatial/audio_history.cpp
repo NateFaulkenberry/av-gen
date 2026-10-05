@@ -156,10 +156,10 @@ std::size_t AudioHistory::bytes() const {
 
 namespace {
 
-// The ring's view of one row: 0 outside [newest - kAudioRingRows + 1, newest] (the GPU holds only
-// that window), else the held value.
+// The audible view of one row: 0 outside [newest - kAudioMaxDelayRows + 1, newest] (the GPU ring holds
+// more, and the furthest delay is shorter on purpose: ADR-1119), else the held value.
 float ringValue(const AudioHistory& audio, std::int64_t newest, std::int64_t row, int bin) {
-    if (row > newest || row <= newest - kAudioRingRows) {
+    if (row > newest || row <= newest - kAudioMaxDelayRows) {
         return 0.0f;
     }
     return audio.value(row, bin);

@@ -877,6 +877,8 @@ public:
     // ADR-1116: the audio history Spectrum and Onset fields read, handed to the scene's FieldSet on
     // every flatten. The engine's; null leaves every audio field silent.
     void setAudioHistory(std::shared_ptr<const spatial::AudioHistory> audio) { audioHistory_ = std::move(audio); }
+    // ADR-1119: the simulation input key the engine computed this frame (FieldSet::inputKey).
+    void setSimulationInputKey(std::uint64_t key) { simulationInputKey_ = key; }
     // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
     // the node and its ancestors composed in. Equal to `nodeWorldTransform` when none applies.
     [[nodiscard]] Transform nodeDrawnWorldTransform(const CompositionNode& node) const;
@@ -2251,6 +2253,7 @@ private:
     const world::TransformFrame* effectOffsets_ = nullptr; // Wave 2 (XFORM): the engine's; see `setEffectOffsets`
     const world::TriggerClock* triggerClock_ = nullptr;    // ADR-906: the engine's; see `setTriggerClock`
     std::shared_ptr<const spatial::AudioHistory> audioHistory_; // ADR-1116: the engine's; see `setAudioHistory`
+    std::uint64_t simulationInputKey_ = 0;                     // ADR-1119: see `setSimulationInputKey`
     // A node's own transform with its XFORM offset composed in (identity when it has none).
     [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;

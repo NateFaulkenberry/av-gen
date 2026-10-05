@@ -12,6 +12,7 @@
 #include "core/phase_profiler.hpp"
 #include "core/interaction_latency.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
+#include <bit>
 #include <optional>
 
 #include <cstdlib>
@@ -6223,6 +6224,19 @@ void Engine::update(const FrameTime& time) {
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
         comp->setAudioHistory(audioHistory_); // ADR-1116
+        // ADR-1119: every parameter base and the audio revision -- what a simulation checkpoint must
+        // match. The bases, not the finals: modulation moves finals every frame and replays exactly; an
+        // edit moves a base and must drop the checkpoints (ADR-700's rule, for the GPU).
+        std::uint64_t key = 0xcbf29ce484222325ull;
+        const auto mixKey = [&key](std::uint64_t v) { key = (key ^ v) * 0x100000001b3ull; };
+        mixKey(audioRevision_);
+        mixKey(params_.ordered().size());
+        for (const params::IParameter* p : params_.ordered()) {
+            for (std::size_t c = 0; c < p->componentCount(); ++c) {
+                mixKey(std::bit_cast<std::uint32_t>(p->baseComponent(c)));
+            }
+        }
+        comp->setSimulationInputKey(key);
     }
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects

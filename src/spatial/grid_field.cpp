@@ -41,12 +41,14 @@ const char* gridModeName(GridMode mode) {
         return "vector";
     case GridMode::ReactionDiffusion:
         return "reactionDiffusion";
+    case GridMode::Agents:
+        return "agents";
     }
     return "scalar";
 }
 
 std::optional<GridMode> gridModeFromName(std::string_view name) {
-    for (const GridMode m : {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion}) {
+    for (const GridMode m : {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents}) {
         if (name == gridModeName(m)) {
             return m;
         }
@@ -76,6 +78,8 @@ int GridField::components() const {
         return 4;
     case GridMode::ReactionDiffusion:
         return 2;
+    case GridMode::Agents:
+        return 4;
     }
     return 1;
 }
@@ -193,7 +197,7 @@ float GridField::sampleScalar(const glm::vec3& p) const {
         return 0.0f;
     }
     const glm::vec3 coord = gridCoord(*this, p);
-    if (mode == GridMode::Vector) {
+    if (mode == GridMode::Vector || mode == GridMode::Agents) {
         return glm::length(sampleVector(p));
     }
     return trilinear(*this, coord, mode == GridMode::ReactionDiffusion ? 1 : 0);
@@ -204,15 +208,15 @@ glm::vec3 GridField::sampleVector(const glm::vec3& p) const {
         return glm::vec3(0.0f);
     }
     const glm::vec3 coord = gridCoord(*this, p);
-    if (mode != GridMode::Vector) {
+    if (mode != GridMode::Vector && mode != GridMode::Agents) {
         return glm::vec3(sampleScalar(p));
     }
     return glm::vec3(trilinear(*this, coord, 0), trilinear(*this, coord, 1), trilinear(*this, coord, 2));
 }
 
 void GridField::step(float dt, double time, const FieldSet* set) {
-    if (!allocated() || dt <= 0.0f) {
-        return;
+    if (!allocated() || dt <= 0.0f || mode == GridMode::Agents) {
+        return; // ADR-1120: agents run on the GPU only
     }
     const int comps = components();
     const FieldSpec* inject = (set != nullptr && !injectField.empty()) ? set->find(injectField) : nullptr;
@@ -323,8 +327,26 @@ Result<void> GridField::validate() const {
     if (resolution.x < 1 || resolution.y < 1 || resolution.z < 1) {
         return fail("grid '{}': resolution must be >= 1 on every axis", name);
     }
-    if (resolution.x > kMaxGridResolution || resolution.y > kMaxGridResolution || resolution.z > kMaxGridResolution) {
+    if (mode == GridMode::Agents) {
+        if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': an agents grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
+        if (agentCount < 0 || agentCount > kMaxAgents) {
+            return fail("grid '{}': agentCount must be in [0, {}]", name, kMaxAgents);
+        }
+        if (species < 1 || species > 3) {
+            return fail("grid '{}': species must be 1, 2 or 3", name);
+        }
+        if (sensorDistance < 0.0f || stepSize < 0.0f || depositAmount < 0.0f || diffusion > 1.0f) {
+            return fail("grid '{}': sensorDistance, stepSize and depositAmount must be >= 0, diffusion <= 1", name);
+        }
+    } else if (resolution.x > kMaxGridResolution || resolution.y > kMaxGridResolution ||
+               resolution.z > kMaxGridResolution) {
         return fail("grid '{}': resolution must be <= {} on every axis", name, kMaxGridResolution);
+    }
+    if (checkpointInterval < 0.0f) {
+        return fail("grid '{}': checkpointInterval must be >= 0", name);
     }
     if (!(boundsMax.x > boundsMin.x && boundsMax.y > boundsMin.y && boundsMax.z > boundsMin.z)) {
         return fail("grid '{}': boundsMax must be greater than boundsMin on every axis", name);
@@ -374,6 +396,17 @@ std::uint64_t GridField::structuralHash() const {
     h.i32(maxSubSteps);
     h.u32(seed);
     h.f32(seedAmount);
+    if (mode == GridMode::Agents) { // ADR-1120: hashed only for agents, so every other grid keeps its hash
+        h.i32(agentCount);
+        h.i32(species);
+        h.f32(sensorAngle);
+        h.f32(sensorDistance);
+        h.f32(turnAngle);
+        h.f32(stepSize);
+        h.f32(depositAmount);
+        h.f32(repel);
+        h.str(depositField);
+    }
     return h.value();
 }
 
@@ -401,6 +434,20 @@ json GridField::toJson() const {
     j["maxSubSteps"] = maxSubSteps;
     j["seed"] = seed;
     j["seedAmount"] = seedAmount;
+    if (checkpointInterval != 5.0f) {
+        j["checkpointInterval"] = checkpointInterval;
+    }
+    if (mode == GridMode::Agents) {
+        j["agentCount"] = agentCount;
+        j["species"] = species;
+        j["sensorAngle"] = sensorAngle;
+        j["sensorDistance"] = sensorDistance;
+        j["turnAngle"] = turnAngle;
+        j["stepSize"] = stepSize;
+        j["depositAmount"] = depositAmount;
+        j["repel"] = repel;
+        j["depositField"] = depositField;
+    }
     return j;
 }
 
@@ -442,6 +489,16 @@ Result<GridField> GridField::fromJson(const json& root) {
     AVGEN_SPATIAL_READ(g.maxSubSteps, "maxSubSteps", detail::readInt);
     AVGEN_SPATIAL_READ(g.seed, "seed", detail::readU32);
     AVGEN_SPATIAL_READ(g.seedAmount, "seedAmount", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.checkpointInterval, "checkpointInterval", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.agentCount, "agentCount", detail::readInt);
+    AVGEN_SPATIAL_READ(g.species, "species", detail::readInt);
+    AVGEN_SPATIAL_READ(g.sensorAngle, "sensorAngle", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.sensorDistance, "sensorDistance", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.turnAngle, "turnAngle", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.stepSize, "stepSize", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.depositAmount, "depositAmount", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.repel, "repel", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.depositField, "depositField", detail::readString);
     if (auto ok = g.validate(); !ok) {
         return std::unexpected(ok.error());
     }

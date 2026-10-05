@@ -222,6 +222,10 @@ struct FieldSet {
     // ADR-1116, runtime only (never serialised or hashed): what Spectrum and Onset fields read, set
     // every frame by the engine (Composition::setAudioHistory). Null: audio fields sample 0.
     std::shared_ptr<const AudioHistory> audio;
+    // ADR-1119, runtime only: what a simulation checkpoint must match to be restored -- a hash of every
+    // parameter base and the audio revision, set every frame by the engine. A person's edit changes it and
+    // drops the checkpoints; modulation (which moves finals, not bases) does not.
+    std::uint64_t inputKey = 0;
     [[nodiscard]] const FieldSpec* find(std::string_view name) const;
     [[nodiscard]] int indexOf(std::string_view name) const; // -1 when missing
     [[nodiscard]] const GridField* findGrid(std::string_view name) const;

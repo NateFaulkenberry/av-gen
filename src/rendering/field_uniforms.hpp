@@ -44,7 +44,7 @@ namespace avgen::rendering {
 // Mirrors `FieldAudio` in shaders/fields.wgsl (ADR-1116, 288 bytes).
 struct FieldAudioGpu {
     glm::uvec4 ring{0u};   // x = ring offset in the table (floats), y = rows, z = bins, w = 1 when audio is bound
-    glm::vec4 timing{0.0f, -1.0f, 0.0f, 0.0f}; // x = rows per second, y = newest row (-1 none)
+    glm::vec4 timing{0.0f, -1.0f, 0.0f, 0.0f}; // x = rows per second, y = newest row (-1 none), z = audible rows
     glm::vec4 onsetAge[spatial::kOnsetSources * 2];      // source s: [2s], [2s + 1]; < 0 = none
     glm::vec4 onsetStrength[spatial::kOnsetSources * 2];
 };
@@ -77,6 +77,13 @@ public:
     // Packs and uploads `fields` at `time` (seconds). Call once per frame before the renderers
     // that sample fields run.
     void update(const spatial::FieldSet& fields, double time);
+    // The block `update` would upload for `fields` at `time`, without uploading it (ADR-1119: a
+    // simulation packs one per sub-step, at the step's own second).
+    [[nodiscard]] static FieldBlock pack(const spatial::FieldSet& fields, double time);
+    // Makes the audio ring hold the rows up to `newest` (writing only the ones it lacks); returns how
+    // many rows were written. `update` calls it for the frame; a simulation replaying a backlog calls it
+    // per chunk and then again with the frame's row, so the frame's other passes read the frame's ring.
+    std::uint32_t holdAudioRows(const spatial::AudioHistory& audio, std::int64_t newest);
     // Slot of an enabled, uploaded field by name; -1 when unknown, disabled or beyond the limit.
     [[nodiscard]] int slotOf(std::string_view name) const;
     [[nodiscard]] std::uint32_t count() const { return block_.count; }
@@ -100,7 +107,6 @@ private:
     bool warnedLimit_ = false;
     // ADR-1116: which rows the ring holds -- (ringNewest_ - kAudioRingRows, ringNewest_] of the history
     // `ringAudio_` at `ringRevision_`. A different history or revision refills it.
-    void updateAudio(const spatial::FieldSet& fields, double time);
     const spatial::AudioHistory* ringAudio_ = nullptr;
     std::uint64_t ringRevision_ = 0;
     std::int64_t ringNewest_ = std::numeric_limits<std::int64_t>::min();

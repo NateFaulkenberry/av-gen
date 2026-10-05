@@ -23,23 +23,16 @@ FieldUniforms::FieldUniforms(gpu::Context& context) : context_(context) {
     gridBuffer_ = context_.device().CreateBuffer(&gridDesc);
 }
 
-void FieldUniforms::update(const spatial::FieldSet& fields, double time) {
-    block_ = FieldBlock{};
-    slots_.clear();
+FieldBlock FieldUniforms::pack(const spatial::FieldSet& fields, double time) {
+    FieldBlock block{};
     const std::size_t count = std::min<std::size_t>(fields.fields.size(), spatial::kMaxGpuFields);
-    if (fields.fields.size() > count && !warnedLimit_) {
-        log::warn("scene has {} fields; only the first {} are available on the GPU", fields.fields.size(),
-                  spatial::kMaxGpuFields);
-        warnedLimit_ = true;
-    }
     for (std::size_t i = 0; i < count; ++i) {
         const spatial::FieldSpec& field = fields.fields[i];
-        spatial::FieldGpu& g = block_.fields[i];
+        spatial::FieldGpu& g = block.fields[i];
         // ADR-906: a triggered field before its first event is silent, and silence is exactly
         // what a disabled field already packs to.
         if (field.enabled && !field.silent()) {
             g = spatial::packField(field, time, &fields);
-            slots_.emplace(field.name, static_cast<int>(i));
         } else {
             // A disabled field samples as 0 everywhere: a zero-strength scalar constant.
             g = spatial::FieldGpu{};
@@ -54,43 +47,64 @@ void FieldUniforms::update(const spatial::FieldSet& fields, double time) {
             g.children = glm::ivec4(-1);
         }
     }
-    block_.count = static_cast<std::uint32_t>(count);
-    updateAudio(fields, time);
-    context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));
-}
-
-void FieldUniforms::updateAudio(const spatial::FieldSet& fields, double time) {
-    using spatial::kAudioBins;
-    using spatial::kAudioRingRows;
-    audioStats_ = FieldAudioStats{};
-    audioStats_.ringBytes = spatial::kAudioRingFloats * sizeof(float);
-    FieldAudioGpu& a = block_.audio;
+    block.count = static_cast<std::uint32_t>(count);
+    // ADR-1116: the audio record -- the ring's place in the table, the newest row at this second, and the
+    // newest onsets of each source at this second.
+    FieldAudioGpu& a = block.audio;
     for (glm::vec4& v : a.onsetAge) {
         v = glm::vec4(-1.0f);
     }
-    if (!fields.audio) {
-        return;
-    }
-    const spatial::AudioHistory& audio = *fields.audio;
-    const double clock = audio.now(time);
-    const std::int64_t newest = audio.newestRow(clock);
-    a.ring = glm::uvec4(kAudioRingOffset, static_cast<std::uint32_t>(kAudioRingRows),
-                        static_cast<std::uint32_t>(kAudioBins), 1u);
-    a.timing = glm::vec4(static_cast<float>(audio.rowRate()), static_cast<float>(newest), 0.0f, 0.0f);
-    for (int s = 0; s < spatial::kOnsetSources; ++s) {
-        std::array<float, spatial::kOnsetHistory> ages{};
-        std::array<float, spatial::kOnsetHistory> strengths{};
-        ages.fill(-1.0f);
-        audio.lastOnsets(static_cast<spatial::OnsetSource>(s), clock, ages, strengths);
-        for (int k = 0; k < spatial::kOnsetHistory; ++k) {
-            a.onsetAge[s * 2 + k / 4][k % 4] = ages[static_cast<std::size_t>(k)];
-            a.onsetStrength[s * 2 + k / 4][k % 4] = strengths[static_cast<std::size_t>(k)];
+    if (fields.audio) {
+        const spatial::AudioHistory& audio = *fields.audio;
+        const double clock = audio.now(time);
+        a.ring = glm::uvec4(kAudioRingOffset, static_cast<std::uint32_t>(spatial::kAudioRingRows),
+                            static_cast<std::uint32_t>(spatial::kAudioBins), 1u);
+        a.timing = glm::vec4(static_cast<float>(audio.rowRate()), static_cast<float>(audio.newestRow(clock)),
+                             static_cast<float>(spatial::kAudioMaxDelayRows), 0.0f);
+        for (int s = 0; s < spatial::kOnsetSources; ++s) {
+            std::array<float, spatial::kOnsetHistory> ages{};
+            std::array<float, spatial::kOnsetHistory> strengths{};
+            ages.fill(-1.0f);
+            audio.lastOnsets(static_cast<spatial::OnsetSource>(s), clock, ages, strengths);
+            for (int k = 0; k < spatial::kOnsetHistory; ++k) {
+                a.onsetAge[s * 2 + k / 4][k % 4] = ages[static_cast<std::size_t>(k)];
+                a.onsetStrength[s * 2 + k / 4][k % 4] = strengths[static_cast<std::size_t>(k)];
+            }
         }
     }
-    audioStats_.bound = true;
-    audioStats_.newestRow = newest;
+    return block;
+}
+
+void FieldUniforms::update(const spatial::FieldSet& fields, double time) {
+    slots_.clear();
+    const std::size_t count = std::min<std::size_t>(fields.fields.size(), spatial::kMaxGpuFields);
+    if (fields.fields.size() > count && !warnedLimit_) {
+        log::warn("scene has {} fields; only the first {} are available on the GPU", fields.fields.size(),
+                  spatial::kMaxGpuFields);
+        warnedLimit_ = true;
+    }
+    for (std::size_t i = 0; i < count; ++i) {
+        const spatial::FieldSpec& field = fields.fields[i];
+        if (field.enabled && !field.silent()) {
+            slots_.emplace(field.name, static_cast<int>(i));
+        }
+    }
+    block_ = pack(fields, time);
+    audioStats_ = FieldAudioStats{};
+    audioStats_.ringBytes = spatial::kAudioRingFloats * sizeof(float);
+    if (fields.audio) {
+        audioStats_.bound = true;
+        audioStats_.newestRow = static_cast<std::int64_t>(block_.audio.timing.y);
+        audioStats_.rowsUploaded = holdAudioRows(*fields.audio, audioStats_.newestRow);
+    }
+    context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));
+}
+
+std::uint32_t FieldUniforms::holdAudioRows(const spatial::AudioHistory& audio, std::int64_t newest) {
+    using spatial::kAudioBins;
+    using spatial::kAudioRingRows;
     if (newest < 0) {
-        return;
+        return 0;
     }
     // The rows the window needs, minus the rows the ring already holds. Both are kAudioRingRows long,
     // so the difference is one interval.
@@ -103,7 +117,7 @@ void FieldUniforms::updateAudio(const spatial::FieldSet& fields, double time) {
         const std::int64_t heldLo = ringNewest_ - kAudioRingRows + 1;
         const std::int64_t heldHi = ringNewest_;
         if (newest == heldHi) {
-            return;
+            return 0;
         }
         if (newest > heldHi && heldHi >= needLo) {
             lo = heldHi + 1; // playing forwards: only the new rows
@@ -114,6 +128,7 @@ void FieldUniforms::updateAudio(const spatial::FieldSet& fields, double time) {
     ringAudio_ = &audio;
     ringRevision_ = audio.revision();
     ringNewest_ = newest;
+    std::uint32_t written = 0;
     // Written as runs of contiguous slots (at most two: the ring wraps once).
     std::int64_t row = lo;
     while (row <= hi) {
@@ -129,9 +144,10 @@ void FieldUniforms::updateAudio(const spatial::FieldSet& fields, double time) {
         const std::uint64_t offset =
             (static_cast<std::uint64_t>(kAudioRingOffset) + static_cast<std::uint64_t>(slot) * kAudioBins) * sizeof(float);
         context_.queue().WriteBuffer(gridBuffer_, offset, ringStaging_.data(), ringStaging_.size() * sizeof(float));
-        audioStats_.rowsUploaded += static_cast<std::uint32_t>(run);
+        written += static_cast<std::uint32_t>(run);
         row += run;
     }
+    return written;
 }
 
 int FieldUniforms::slotOf(std::string_view name) const {

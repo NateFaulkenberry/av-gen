@@ -399,7 +399,7 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet
     const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g != nullptr && g->mode == GridMode::Vector) {
+        if (g != nullptr && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
             return glm::length(vectorAt(f, p, td, set, depth, element)); // vector as scalar
         }
         const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
@@ -455,7 +455,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double td, const Fiel
     const glm::vec3 q = glm::vec3(frame.worldToLocal * glm::vec4(p, 1.0f));
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g == nullptr || g->mode != GridMode::Vector) {
+        if (g == nullptr || (g->mode != GridMode::Vector && g->mode != GridMode::Agents)) {
             return scalarAt(f, p, td, set, depth, element) * (frame.rotation * fieldAxis(f)); // scalar as vector
         }
         glm::vec3 dir = g->sampleVector(q);
@@ -505,7 +505,7 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, double td, const Field
     const float w = fieldWeight(f, q);
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g != nullptr && g->mode == GridMode::Vector) {
+        if (g != nullptr && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
             return glm::vec4(vectorAt(f, p, td, set, depth, element) * 0.5f + 0.5f, w);
         }
         const float s = scalarAt(f, p, td, set, depth, element);
@@ -1277,7 +1277,7 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
                                       static_cast<float>(grid.resolution.z),
                                       grid.wrap == GridWrap::Wrap ? 3.0f : 1.0f);
                 // The bound grid's mode decides how the record reads across types.
-                g.type = static_cast<std::uint32_t>(grid.mode == GridMode::Vector ? FieldType::Vector
+                g.type = static_cast<std::uint32_t>((grid.mode == GridMode::Vector || grid.mode == GridMode::Agents) ? FieldType::Vector
                                                                                  : FieldType::Scalar);
             }
         }
