@@ -14,9 +14,18 @@ scoped), `docs/development/gpu-sim-seek-investigation.md`, ADR-1114 and ADR-1115
 | Phase | State | Where |
 |---|---|---|
 | 0. Reality check | done | §Phase 0 |
-| 1. CPU/GPU bridge research | in progress | §Phase 1 |
-| 2. Architecture decision | not started | §Phase 2 |
-| 3. Production hardening | not started | §Phase 3 |
+| 1. CPU/GPU bridge research | done (primary sources plus measurements on this machine) | §Phase 1 |
+| 2. Architecture decision | done: three additive extensions, no container | §Phase 2 |
+| 3. Production hardening | done: ADR-1116 to ADR-1121, three regression scenes, benchmarks | §Phase 3, §Regression benchmarks |
+| 4. Flagship LIVE scene | handed to the art agent | §Phase 4 handoff |
+
+Resume points, if anything has to be picked up cold:
+
+- Every GPU run goes through `tools/gpu-lock.sh`.
+- Tests: `avgen_tests "[audio-fields],[generator]"`; `avgen_render_tests "[audio-fields],[generator],[effectors],[simulation],[gpu-regression]"`.
+- The benchmark is `avgen_render_tests "[.perf][gpu-regression]"` and the bridge probe is
+  `"[gpu-bridge]"`. Run both alone, at a load under 5.
+- The regression projects are `examples/gpu-regression/*.json`.
 
 ---
 
