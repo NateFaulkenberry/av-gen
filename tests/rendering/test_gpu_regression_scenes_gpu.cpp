@@ -25,6 +25,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/simulation.hpp"
 #include "scene/generator.hpp"
+#include "scene/procedural.hpp"
 #include "support/groove.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -186,6 +187,20 @@ TEST_CASE("Endless Meadow's windows do not grow with distance", "[gpu][gpu-regre
         REQUIRE(grass.has_value());
         CHECK(grass->visible > 1000);
     }
+    // A generator's description is a parameter: what a route or a MIDI CC moves. Presence to 0 through the
+    // engine's parameter set empties the grass on the next frame, with no rebuild and the window unchanged.
+    auto* presence = rig.engine.params().findAs<float>("procedural/grass/distribution/generator/presence");
+    REQUIRE(presence != nullptr);
+    const std::uint64_t rebuildsBefore = scene::proceduralRebuildCount();
+    presence->setBase(0.0f);
+    rig.draw();
+    rig.draw(); // the cull counts are read back for the frame just drawn
+    auto emptied = rig.renderer.procedurals().readCullCounts("grass");
+    REQUIRE(emptied.has_value());
+    CHECK(emptied->visible == 0);
+    CHECK(rig.renderer.stats().procedural.generatorCells == cells);
+    INFO("procedural rebuilds while presence moved: " << scene::proceduralRebuildCount() - rebuildsBefore);
+    CHECK(scene::proceduralRebuildCount() - rebuildsBefore <= 1);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -338,3 +353,21 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
 }
 
 
+
+// Prints the parameter paths the regression scenes expose (the Phase 4 handoff quotes them). Hidden.
+TEST_CASE("The regression scenes' parameter paths", "[.list-params]") {
+    for (const char* name : {"echo-field.scene.json", "endless-meadow.scene.json", "mycelium.scene.json"}) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(scenePath(name)).has_value());
+        std::string paths;
+        for (const params::IParameter* p : engine.params().ordered()) {
+            const std::string& path = p->path();
+            if (path.find("generator/") != std::string::npos || path.find("audio") != std::string::npos ||
+                path.find("band") != std::string::npos || path.find("onset") != std::string::npos ||
+                path.find("effector/") != std::string::npos) {
+                paths += path + "\n";
+            }
+        }
+        WARN(name << ":\n" << paths);
+    }
+}

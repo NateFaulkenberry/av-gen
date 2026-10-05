@@ -410,3 +410,125 @@ Checkpoint -> Seek
 
 The current implementation satisfied none of these before this work (Phase 0); each is implemented in
 Phase 3 below.
+
+## Phase 3: Production Hardening (what was built)
+
+Order as proposed: audio inputs, then the generator, then stateful systems. Each item below is reachable
+from the scene file, the editor, the CLI, live mode and an offline render. Each is exercised end to end
+through `app::Engine` + `SceneRenderer`, not only unit-tested. None reads the GPU back in the frame
+loop, and each reports its bytes to `--live-profile` (`resources.gpuSystems`) and the Performance
+panel.
+
+### Step 1: per-element audio inputs (ADR-1116)
+
+- **Two field kinds:**
+  - `spectrum`: each element hears its own band at its own delay-by-distance, as a range, an
+    element-random band or angle fans.
+  - `onset`: the newest 8 onsets of low / mid / high / beat, as travelling fronts.
+
+  Fields are the one input path, so effectors, Field deformers, emissive fields, particle field forces,
+  grid injection and agent deposits all hear audio with no new code.
+- **Element.** `InstanceRecord::random.w` is the record's own random, set in `cs_effectors`, the
+  vertex stage and the particle pass (`var<private> fieldElement`).
+- **Data.**
+  - The 64-bin spectrogram is a 1,536-row ring (384 KB) appended to the field table at binding 15,
+    so there is no new binding.
+  - Onset ages and strengths ride in the `FieldBlock`, which grows from 5,904 to 6,192 B.
+  - The audible delay is bounded at 12 s (ADR-1119).
+- **Sources.**
+  - The whole analysed track: offline, editor, and live playback of a file. It is folded once to log
+    bins and stretched per bin over the track's 20th to 98th percentile. Its clock is the transport,
+    so play and seek are exact.
+  - Live input: a rolling history from the newest analysis frame, with running percentiles; its
+    clock is the input's. Visually equivalent, not equal.
+- **Reach:** scene JSON (`audioBand`, `bandLow/High/Repeat`, `audioDelay`, `audioSpeed`,
+  `onsetSource/Decay/Width`); the World inspector (these register as parameters for audio kinds
+  only, so routes and MIDI reach them); live (the live feed); offline (`RenderJob` through the engine).
+- **Tests:**
+  - CPU/GPU parity ≤ 2e-4 through forward, back, jump and new-track ring updates.
+  - The effector pass gives records diverging scales (spread > 0.5).
+  - The history, the builder, the live feed, JSON and parameters are covered in `avgen_tests`.
+
+**Found and fixed on the way (ADR-1121, the owner's ruling).** The GPU effector pass disagreed with the
+CPU reference ADR-025 names in **17 of 36 (op, blend) pairs**, Scale + Add (the default) among them.
+The GPU now transcribes the reference, and a parity test over all 36 pairs fails before and passes
+after. Four shipped scenes change visually (ADR-1121's table).
+
+### Step 2: the generator distribution, its mirror, picking and bake (ADR-1117, ADR-1118)
+
+- **`distribution.kind: "generator"`.**
+  - A per-frame kernel (`shaders/generator.wgsl`) writes a camera-centred window of hashed cells into
+    the object's record buffer.
+  - From there the **existing** effectors and prefix-scan cull and LOD draw it. Empty cells are
+    zero-scale records the cull rejects.
+  - One kernel ("cells"), no registry.
+  - Layers share a ground through `groundSeed`.
+  - Only cell size, view distance and region are structural; presence, size, tilt, ground and
+    clusters are per-frame parameters, so a route or a MIDI CC moves a world with no rebuild.
+- **The CPU mirror** (`scene/generator.hpp`) is the rule. It answers queries for a cell, a region, a
+  ray, the nearest element and the present count of a window. It holds no records.
+- **Picking.** The depth position goes into generator space, and the nearest element is resolved
+  there. The World inspector shows the element's cell, position, size and random lanes, plus every
+  effector field the GPU applies to it, computed by the CPU reference with the element's own random.
+  Nothing is read back.
+- **Bake to points.** The new serialised `points` distribution (at most 65,536 placements) is the
+  bake target. The inspector button and `Composition::bakeGeneratorToPoints` write it.
+- **CPU consumers.** The path tracer notes "generator distribution: Unsupported". Navigation, ecology
+  lights and the vegetation simulation skip generators.
+- **Reach:** scene JSON; the World inspector (description parameters, the element, the bake); the
+  viewport pick; live levers (the window shrinks with `drawDistanceScale`); offline; CLI.
+- **Tests:**
+  - Mirror parity is identity-exact: 0 mismatches over 8,844 present cells, bounded and unbounded,
+    at two cameras. Positions agree within 16 ulps.
+  - Visible ≤ present.
+  - The same (t, camera) draws byte-identical frames after different histories.
+  - 100 km costs what 0 m costs.
+  - Effectors work on generated records.
+  - Unit tests cover the bake, round-trips and refusals.
+
+### Step 3: stateful GPU systems (ADR-1119, ADR-1120)
+
+- **Per-step inputs.** Every simulation sub-step reads a field block packed at its own second, bound by
+  dynamic offset. Long replays reposition the audio ring per chunk. **Moving and audio-driven inputs
+  now replay exactly**, which was ADR-1114 §4's open defect.
+- **GPU checkpoints.** GPU-to-GPU copies every `checkpointInterval` (default 5 s) of steps, under a
+  budget (`--sim-checkpoint-mb`, default 512). Overflow doubles a grid's spacing. A checkpoint is
+  keyed on the grid, the layout and `FieldSet::inputKey` (every parameter base plus the audio
+  revision). A seek restores the best checkpoint at or before the target and replays at most the
+  spacing. Live-input audio never restores.
+- **Agents grid** (`mode: "agents"`). Up to 4M agents on a plane of up to 1024². They sense, turn,
+  steer by a field, move and deposit with u32 fixed-point atomics, scaled by a deposit field (audio).
+  The trail blurs and fades. The grid is sampled through ordinary `grid` fields.
+- **Particles keep ADR-360 and never deposit:** the rejected step 3b (ADR-1120).
+- **Catch-up chunks are synced.** A replay waits for each catch-up chunk before queueing the next.
+  Measured: an unsynced 6 s backlog produced a silently empty frame in `avgen --render` (see Risks).
+  The wait happens on a seek or a fresh render only, never in playback.
+- **Reach:** scene JSON (`grids[].mode/agentCount/species/sensor*/turnAngle/stepSize/depositAmount/
+  repel/depositField/checkpointInterval`); the CLI (`--sim-checkpoint-mb`); the Performance panel
+  (agents, state, checkpoints); `--live-profile`; offline; live.
+- **Tests:**
+  - An agents grid driven by onset, element-band spectrum and moving curl noise: played, fresh seek
+    and restored seek give byte-identical cells and agents. The controls hold: one frame later
+    differs in more than 10% of cells and more than half the agents.
+  - A wave-fed grid replays exactly.
+  - Two runs are bit-identical.
+  - The budget holds.
+  - Through the engine (Mycelium scene, 1M agents), the seek lands on the played grid byte for byte,
+    and on the played frame within the project's same-frame rule (below).
+
+### Regression scenes (permanent)
+
+`examples/gpu-regression/`, each a scene plus a project that zeroes the composition's four default
+audio routes. Left in, they spin the whole world, which would make every field a function of frame
+history. Each scene says its purpose in its `_note`.
+
+- **echo-field**: a generator disc (220 m, 0.22 m cells, about 1M cells) of reeds whose height and
+  glow follow an angle-band `spectrum` field at 9 m/s, plus `onset` kick fronts.
+- **endless-meadow**: four unbounded generator layers (ground tiles, grass, reeds, spires) on one
+  ground. The reeds hear their own bands; the spires flare on the kicks.
+- **mycelium**: an agents grid (1M agents, 512², three species) depositing by band and kick and
+  steered by moving curl noise, shown by a 110k-cell generator carpet through grid fields.
+
+Tests: `tests/rendering/test_gpu_regression_scenes_gpu.cpp`, `[gpu][gpu-regression]` in the default run,
+and `[.perf][gpu-regression]` for the benchmark.
+
