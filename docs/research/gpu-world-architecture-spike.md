@@ -4,9 +4,10 @@ Branch `research/gpu-world`, from main `ba0003de`, started 2026-10-04. The brief
 `docs/research/gpu-world-brief.md` (the owner's, verbatim). Machine: Apple M2 Max (38-core GPU, 64 GB),
 macOS 26, Dawn/WebGPU on Metal. All GPU runs went through `tools/gpu-lock.sh`.
 
-**Status:** Phase 2 complete; this spike stops here by scope (Phase 3 is handed to an art agent; see
-"Phase 3 handoff"). Gate 0: PASS (narrow). Gate 1: CONDITIONAL PASS. Gate 2: CONDITIONAL PASS.
-Interim recommendation: **YELLOW** (see "Recommendation at the end of Phase 2").
+**Status:** Phase 3 complete (art agent, 2026-10-04/05). Gate 0: PASS (narrow). Gate 1: CONDITIONAL
+PASS. Gate 2: CONDITIONAL PASS. **Gate 3: PASS.** Phases 0-2 were run by the code agent and Phase 3 by a
+separate art agent (see "Phase 3 handoff"). **Phase 4 is next on the gate**; it was not run.
+Recommendation: **YELLOW**, with a wider capability scope after Phase 3 (see "Final decision").
 
 ## Hypothesis (from the brief)
 
@@ -557,6 +558,320 @@ way to render some particles" does not pass.
 
 ---
 
+## Phase 3: New-Art Experiment
+
+Run by the art agent, 2026-10-04/05, from the handoff above. The question changes here. It is no longer
+"is it faster" but "does this architecture enable a category of visual system that would be
+impractical, prohibitively expensive, cumbersome or architecturally unnatural with conventional AV Gen
+entities, and is the result aesthetically useful?" Following the handoff, "or with the existing effector
+path" is added to the bar, and "faster particles" does not pass.
+
+### What was built
+
+`prototypes/gpu-world/gpu_world_art.cpp` (plus `art_audio.{hpp,cpp}`, `art_world.inl` and
+`art_organism.inl`; target `avgen_gpu_world_art`, behind the same OFF-by-default option). It is a new,
+deliberately small renderer, because the Phase 1-2 bench had no look at all. It has 4x MSAA HDR,
+exponential height fog integrated along the ray, a sky with stars and a low moon, a 6-level bloom and
+ACES. It is still a sketchbook: no shadows, no PBR, no clustered lights. It is not the production
+renderer, and per-pixel costs in production will be higher (see the Bad-Idea list).
+
+**The audio is real.** The track is *All You Got* (`~/Desktop/All You Got.wav`, the Liminal scene's
+music, 253.8 s). It is analysed once with production's own `analysis::AnalysisTrack`: the same
+analyzer, the offline beat tracker and the ADR-898 band onsets a render uses. That takes 2.4 s for the
+whole song and is cached. The analysis is reduced to three things:
+
+- a 64-bin log-frequency spectrogram (32 Hz-16 kHz) of the **whole song**, 23,789 rows at 93.75/s,
+  5.8 MB on the GPU, each bin normalised over the track and scaled by a 0.6 s loudness envelope so
+  the quiet intro stays quiet;
+- band envelopes;
+- the kick, snare and hat onset lists (`lowOnset`, `midOnset`, `highOnset`).
+
+Every frame is therefore a pure function of t. The kick detector found 152 kicks: one every 1.1 s
+(half-time) from 38 to 165 s, and only about 20 in the final chorus. Clips were taken from 36-64 s,
+which runs through the "first major release" at 37.43 s. The synthetic signals of Phase 2 are gone.
+
+Build and run (all GPU runs under `tools/gpu-lock.sh`):
+
+```
+cmake --build build/release -j 10 --target avgen_gpu_world_art
+tools/gpu-lock.sh ./build/release/prototypes/gpu-world/avgen_gpu_world_art --system field|world|organism \
+    [--shot N] [--start S] [--n N] [--png out.png | --clip dir --fps 30 --warm 0 --frames F]
+tools/gpu-lock.sh ./build/release/prototypes/gpu-world/avgen_gpu_world_art --system organism --seektest "60:<dir>"
+```
+
+Costs below are M2 Max, 1920x1080, 4x MSAA, p50 of 300 frames after 30 warm-up frames, under the lock.
+Data is in `docs/research/gpu-world/data/p3-*.jsonl`. Clips with the song muxed in are in
+`~/Desktop/av-gen-review/33-gpu-world-spike/phase3/`.
+
+### A. Echo Field: a million reeds, each hearing the song at its own moment
+
+![Echo Field from above: the last 12 s of the song as rings](gpu-world/p3-a-echo-field-top.jpg)
+![Echo Field, orbit](gpu-world/p3-a-echo-field-orbit.jpg)
+
+**What it is.** One million reeds stand on a 110 m disc around a ring of crystal spires. Each reed's
+position is a pure function of its index (a sunflower spiral with jitter), so **there is no instance
+buffer of any kind**. Each reed:
+
+- **reads the spectrogram at its own delay.** The delay is its distance from the source divided by
+  9 m/s, so the field holds the last ~12 s of the song as rings: the present at the centre, the past
+  at the rim;
+- reads its own band. The angle around the source maps to frequency, mirrored twice, with ±3.5 bins
+  of jitter, so the bands form fans that interleave;
+- is struck by each of the last eight kicks when that kick's front arrives (a flash, and a lean
+  outward);
+- sways with the mids.
+
+Its height and bud brightness come from its band's energy *at its moment*.
+
+**What it looks like.** From above it is a record of the music: tree rings or a vinyl groove. Each
+kick is a bright band and each quiet bar a dark one, with lows in ember, mids in gold, highs in ice and
+the air in violet. From the ground, at the start of the release clip, the far field is still the quiet
+intro. The release arrives at the centre at 37.4 s and rolls outward to the rim over the next 12 s
+while the camera rises. It reads the song legibly: you can *see* the half-time kick spacing and the
+moment the drums enter. This is the strongest of the three, both as an image and as a usable
+music-video shot.
+
+| N | visible | compute ms | scene ms | GPU frame ms | triangles drawn |
+|---|---|---|---|---|---|
+| 250,000 | 128k | <0.07 | 4.0 | 4.1 | 2.5M |
+| 1,000,000 | 514k | 0.13 | 13.8 | 13.9 | 10.0M |
+| 4,000,000 | 2.05M | 0.52 | 107.9 | 108.4 | 39.9M |
+
+CPU is about 1 ms a frame whatever N is (encode and submit). Per frame it uploads 880 B, plus the
+5.8 MB spectrogram once. Persistent GPU state is **zero**. As in Phases 1-2, drawing is the whole cost.
+1M is affordable here, but in production (full shading) it would not be; 250k would.
+
+**Production alternative, concretely.** A 1M population is fine in production (GPU records, GPU cull,
+indirect draw; procedural clouds are capped at 1M, ecology layers at 60k). The per-element response
+is the problem:
+
+- Effectors sample ≤16 fields at the element's *position*. Audio reaches them only as a scalar route
+  on a field or effector strength. A `Wave` field with a route on its strength flashes the whole wave
+  with the *current* level; it cannot show the past.
+- No spectrum reaches effectors at all. The only spectrum on the GPU is a one-row texture for
+  fullscreen shader layers. A shader layer could paint a 2D picture of rings, but not a lit 3D field
+  with parallax, bend and fog.
+- With entities, a million is out of the question (Phase 2).
+
+So A is **impractical with anything production has today**. It is **not a new architecture**, though.
+The smallest production change is the Phase 2 recommendation plus history: the record's seed, a
+spectrogram history buffer (the whole track offline; a ~12 s ring of 288 KB live) and a
+"sample at delay(distance)" op in `cs_effectors`. It is stateless, so it seeks exactly. It is not
+"faster particles": the new thing is each element reading **audio history**, not raw throughput.
+
+### B. Endless Meadow: an unbounded world that exists only around the camera
+
+![Endless Meadow, the ride](gpu-world/p3-b-meadow-ride.jpg)
+![Endless Meadow, spires](gpu-world/p3-b-meadow-spires.jpg)
+
+**What it is.** A night landscape with no instance records at all. Each frame one dispatch visits
+**430,349 cells**, in five windows pushed ahead of the camera along the view direction. It hashes each
+cell's integer coordinates into presence, position, size, band and colour, places the result on a
+procedural fbm terrain, culls it and appends it to its layer's draw. The layers are:
+
+- grass (0.11 m cells, 30 m);
+- glow reeds in patches (0.9 m, 140 m);
+- crystal spires in clusters (7 m, 560 m);
+- the **production mushroom generator** (`organism::buildMushroom` with a domed parameter set) in
+  the hollows;
+- motes.
+
+The camera flies a path that is a pure function of t, at 16 m/s: 3.9 km over the song, and the flight
+could go on forever. Each kick sends a ring outward from **where the camera was** when the kick
+landed, so distant spires flare in sequence as each ping reaches them. Reeds and grass hear the song
+delayed by their distance from the traveller (A's idea, made mobile). Snares flash a random 18% of
+grass tips, and motes twinkle on their own high bands with the hats.
+
+**What it looks like.** It is a moody alien moor under a rose moon. The spires are dark glass with
+light gathered at their tips, and the grass shows bands of colour by frequency. Its value is clearest
+in motion: the land never repeats, and spires a few hundred metres away light up in order as the kick
+rings expand. As a still it is weaker than A or C. That is a prototype-renderer problem (no shadows or
+GI) more than a concept problem.
+
+| Shot | instances drawn (grass, reeds near/far, spires, mushrooms, motes) | compute ms | scene ms | GPU frame ms |
+|---|---|---|---|---|
+| ride (eye level) | 75,116 / 1,745 / 16,278 / 436 / 93 / 424 | 0.26 | 2.56 | 2.82 |
+| high | 0 / 468 / 16,031 / 418 / 111 / 330 | 0.20 | 2.69 | 2.95 |
+
+**Memory is the window, not the distance.** Stored world state is 0 B, and the instance buffer is a
+fixed 73 MB, over-provisioned at 200k per layer. That is the same at 0 m, at 47 km and at 940 km. The
+940 km still (`p3-b-meadow-940km.jpg`) looks like the near ones. At that range f32 world coordinates
+quantise to about 6 cm. That was not tested in motion, and a truly unbounded version would need
+camera-relative coordinates.
+
+**Production alternative, concretely.**
+
+- **Terrain:** bounded chunks built at flatten.
+- **Scatter:** generated on the CPU at flatten inside fixed bounds, uploaded once, hard-capped at
+  60,000 instances per ecology layer.
+- **Covering this one flight with authored scatter:**
+  - the grass alone, a 60 m corridor × 3.9 km at ~58 blades/m², is about 13.6M records;
+  - that is 1.3 GB at 96 B each, or about 227 ecology layers;
+  - it adds flatten time, and the camera still could not leave the corridor.
+- **A live, free-flying camera** cannot be served at all.
+- **SDF domain repetition** (what Liminal uses) is unbounded, but it repeats identical tiles and is
+  raymarched per pixel; a dense, varied, rasterised population is not what it does.
+
+So B is **prohibitively expensive at this density and architecturally unnatural** for a flatten-time
+scatter model. In production terms the smallest change is a *generator* for `ProceduralRenderer`: a
+compute kernel that writes this frame's records from a compact description around the camera,
+instead of records uploaded at flatten. Records would then flow into the existing cull and LOD
+unchanged. This is also the first direct evidence for the "compact procedural description" half of
+the hypothesis, which is Phase 4's question. B is a one-layer-deep answer to it, not a test of it.
+
+### C. Mycelium: a stateful GPU organism on the timeline (and what seeking it costs)
+
+![Mycelium, the low glide](gpu-world/p3-c-mycelium-glide.jpg)
+![Mycelium from above](gpu-world/p3-c-mycelium-crane.jpg)
+
+**What it is.** Two million physarum agents in three species crawl over a 1024² trail field covering
+160 m. Each step an agent senses the field ahead (its own species attracts, the others repel), turns
+the full angle toward the stronger side (Jones's rule), moves and deposits; then the field blurs and
+decays. Its behaviour depends on everything the brief lists:
+
+| Input | How |
+|---|---|
+| audio | each agent deposits by **its own band's** energy (species 0 = lows, 1 = mids, 2 = highs); a kick makes the ember species surge and widen its gaze; a snare makes the teal species jitter; the hats make the violet one flare |
+| neighbours | through the field (stigmergy): every agent reads what all the others wrote |
+| procedural field | a slow flow-noise heading bias migrates the network |
+| previous-frame state | the agents and the field *are* the previous step |
+| camera | agents steer away from the point the camera is looking at on the ground, so a clearing opens ahead of the viewer and heals behind |
+
+**What it looks like.** It looks like bioluminescent rivers. The three species form interleaved lanes
+(they repel, so they marble rather than form one mesh), with spores riding them. It is dim through
+the intro, and the ember species visibly surges when the drums arrive. It fits the Glowmere art
+direction directly. From above it is a living marbled map, and from the ground a landscape of light
+roads.
+
+**Determinism, designed in.** Deposits are u32 fixed-point `atomicAdd`s. Integer adds commute, so the
+order of the scatter cannot matter. (WGSL has no float atomics; here that constraint helps.) Sensing
+reads only the previous step's field, the blur has a fixed order, and randomness is
+`hash(agent, step)`. The simulation runs in fixed 60 Hz steps, and each step gets its own 256 B
+uniform block (a dynamic offset) holding the audio **and the camera at that step's time**. So
+state(k) is a pure function of k, independent of frame rate and of how steps are batched into
+submits.
+
+**The seek test** (`--seektest 60`, 2M agents, 3,600 steps, run in two separate processes; data in
+`data/p3-c-mycelium-seektest.jsonl`):
+
+| Question | Result |
+|---|---|
+| run to run, same process | **bit-identical** (state hash `5da0540e4be8dff3`) |
+| run to run, a second process | **bit-identical** (same hash) |
+| one step per submit, waiting each time (a live loop), vs 1,024 per submit | **bit-identical** |
+| play 0→60 s, vs checkpoint at 55 s → continue, vs restore that checkpoint → replay | **all three bit-identical** |
+| production's answer for stateful GPU systems: reset and warm up 240 steps (ADR-360 particles; ADR-032 grids catch up ≤ 240 steps) | **a different organism**: trail-field correlation with the played state **0.011** |
+| the same with a 30 s warm-up | still **0.011**: a chaotic system never converges back |
+
+![played 60 s / 4 s warm-up / 30 s warm-up](gpu-world/p3-c-seek-play-vs-warmup.jpg)
+
+From left: the played state at 60 s, a 4 s warm-up (younger and denser) and a 30 s warm-up (similar
+maturity, different layout). For an independent-particle spray, a warm-up is "statistically the same
+field". For an organism with memory it is a different picture.
+
+**Costs.**
+
+| Agents | per step ms | GPU frame ms (60 fps, 1 step) | state MB | replay ms per simulated second |
+|---|---|---|---|---|
+| 500,000 | 0.33 | 2.03 | 55.6 | 21 |
+| 2,000,000 | 0.66 | 2.49 | 78.5 | 41 |
+| 4,000,000 | 1.05 | 2.95 | 109.0 | 66 |
+
+At 2M agents a checkpoint (agents plus field) is **46.5 MB**. Saving one costs 1.6 ms as a GPU copy,
+or 6.3 ms read back to the CPU. Restoring one and replaying 5 s costs **199 ms**. Without
+checkpoints, a seek to 200 s replays from the start: 8.1 s. With a checkpoint every 5 s, the worst
+seek is ~0.2 s, but the whole song needs 51 × 46.5 MB = **2.4 GB**. At 10 s spacing it needs 1.2 GB
+and the worst seek is ~0.4 s.
+
+**Production alternative, concretely.**
+
+- **Entities:** two million are impossible.
+- **Particles:** GPU particles are stateful, but they never interact. Forces come from gravity, curl
+  noise, wind, attractors and ≤4 field forces. A particle can *sample* an ADR-032 grid, but no
+  particle can *write* one; grids inject only from analytic fields.
+- **Grids:** production's reaction-diffusion grid makes Turing spots and stripes, not transport
+  networks.
+
+So the population-to-field-to-population loop is missing. The smallest production change is "particles
+deposit into a grid": a u32 fixed-point scatter-add into an ADR-032 grid, plus sensing. **More
+important is the seek finding, which applies to production today.** Entities seek exactly from CPU
+checkpoints (ADR-700). Production's stateful GPU systems (particles, ADR-032 grids) reset and warm up
+or catch up ≤240 steps, so past 4 s a scrubbed frame is not the played frame. That already breaks
+ADR-360 ("a scrubbed frame must equal a played one") for any chaotic GPU state. This test shows
+**GPU checkpointing is cheap per checkpoint, exact and simple to build when the simulation is
+designed for it** (integer accumulation, per-step inputs). What it costs is GPU memory per second of
+timeline.
+
+One more input hazard, found by building it: **the camera is state.** Here the camera follows a
+timeline path, so its history is a function of t. With a live, user-driven camera, the organism's
+history would include the user's live gestures, and a seek could not reproduce them unless the
+camera input were recorded. That is ADR-700's `checkpointInputKey` problem, on the GPU.
+
+### Gate 3 decision: **PASS**
+
+The brief's bar is at least one experiment demonstrating a compelling visual capability that would be
+impractical, prohibitively expensive, excessively cumbersome or architecturally unnatural with
+conventional AV Gen entities, and that is more than "a faster way to render some particles". All three
+clear it, against entities and against the existing effector path:
+
+| | Compelling? | With entities | With today's effectors / scatter / particles | Smallest production route |
+|---|---|---|---|---|
+| A. Echo Field | **yes**: the strongest image, and it reads the music | impossible (1M) | **not expressible**: no spectrum, no history, no per-element band in effector inputs | new effector inputs: seed, spectrogram history, delay-by-distance (stateless) |
+| B. Endless Meadow | yes in motion; a weaker still | impossible | **prohibitive**: 13.6M records and 227 layers for one 4-minute corridor; impossible for a free camera | a per-frame GPU *generator* feeding `ProceduralRenderer`'s cull and draw |
+| C. Mycelium | **yes**: a Glowmere-native look, visibly musical | impossible (2M) | **not expressible**: particles do not interact or write fields; grids are not agent-driven | particle → grid deposits **plus GPU checkpoints**, which production's grids and particles need anyway for ADR-360 |
+
+None of the three is "faster particles". The novelty in each is an *input* or a *data flow* that does
+not exist today:
+
+- in A, each element reads audio **history**;
+- in B, the world is a **function** with no stored records;
+- in C, a population **writes the field it reads**, and the state lives on the GPU across the
+  timeline.
+
+The honest boundary, stated with the decision: every capability maps onto an **additive extension of an
+existing GPU subsystem** (effectors, `ProceduralRenderer`, particles plus ADR-032 grids). None needs a
+GPU scene graph, a GPU VM or a replacement "GPU World" architecture. The one genuinely architectural
+item is C's: **stateful GPU systems need GPU checkpoints to keep the seek rule**. That is the place the
+Phase 2 interim said a larger discussion could legitimately reopen, and Phase 3 found it reopens.
+
+**Next on the gate: Phase 4** (procedural world representation). It is not run here; Phases 4-5
+belong to the coordinator. B is relevant evidence for Phase 4, but it is not Phase 4. B shows that one
+layer of a world can be a function, not that a whole scene can stay compact.
+
+### Surprises and failures along the way
+
+- **`atan2(0, 0)` is NaN on Metal.** It silently deleted every instance with zero bend: a whole spire
+  layer and every mote. The GPU counters reported 18,723 spires "visible" while the image showed none.
+  Production's `sdf.wgsl` already carries a comment about this exact hazard; the prototype walked into
+  it anyway.
+- **`f32(i) * goldenAngle` loses about 0.25 rad at i = 1M.** The field rendered as radial spokes and
+  rows. Generating from large integers on the GPU needs fixed-point arithmetic: the golden angle is
+  computed as `(i * 1640531527u) >> 8`.
+- **Fog weighted by the ground density** made every crane shot milky. It has to be integrated along
+  the ray.
+- **Per-bin spectral normalisation erases the song's dynamics.** The quiet intro glowed as hard as
+  the release until a loudness envelope was folded back in.
+- **Three repelling physarum species form marbled lanes, not a single mesh.** It is beautiful and kept,
+  but it is not the textbook network.
+
+### Clips and stills
+
+On the Desktop (`~/Desktop/av-gen-review/33-gpu-world-spike/phase3/`), 1080p30 with the song:
+
+| File | What it shows |
+|---|---|
+| `a-echo-field-release.mp4` | 35.5-49.5 s; the release rolls out across the field as the camera rises from the rim |
+| `a-echo-field-topdown.mp4` | 56-66 s; the record turning outward |
+| `b-endless-meadow-ride.mp4` | 44-56 s |
+| `b-endless-meadow-high.mp4` | 54-62 s |
+| `c-mycelium-glide.mp4` | 36-50 s; through the release |
+| `c-mycelium-crane.mp4` | 56-66 s |
+
+Full-resolution PNG stills and the seek maps (`c-seek-*.png`) are beside them. Smaller JPEGs are in
+`docs/research/gpu-world/p3-*.jpg`.
+
+---
+
 ## Reasons This Might Be A Bad Idea (live)
 
 - **The shipped scenes are GPU-bound.** CPU scene work is 1-1.5 ms of a 3-5 ms CPU frame against
@@ -603,30 +918,80 @@ way to render some particles" does not pass.
 - **(Phase 2) Stateful GPU behaviour (flocking, trails, energy) was not tested.** It is where a real
   architectural need could appear (GPU state checkpointing for seek, ADR-700), and also where the cost
   and the determinism risk are largest.
+- **(Phase 3) Stateful GPU state on the timeline costs GPU memory per second of timeline.** At 2M
+  agents an exact checkpoint is 46.5 MB. A whole song at 5 s spacing is 2.4 GB; at 1 s spacing it
+  would be 11.8 GB. Without checkpoints a seek to 200 s takes 8.1 s. The test answered the
+  stateful-seek question above: exact seek is achievable, and the price is memory. Warm-up (production's
+  current answer) gives a *different picture* for any chaotic system (correlation 0.011), not a
+  similar one.
+- **(Phase 3) Determinism has to be designed in, and it is easy to design out.** Integer (fixed-point)
+  scatter, gather-only kernels and per-step inputs made C bit-exact across processes. A float
+  accumulation, an input sampled at frame time rather than step time, or atomics on anything whose
+  order matters would each break it silently. The append-order nondeterminism of Phases 1-2 is still
+  present in A, B and C's spore pass; it is invisible only because they are opaque.
+- **(Phase 3) The camera, and any live input, becomes simulation state.** C steers away from the
+  camera's gaze. That replays exactly only because the camera follows a timeline path. A user-driven
+  live camera would have to be recorded per step, or a seek cannot reproduce the organism.
+- **(Phase 3) GPU-generated worlds do not exist on the CPU.** Nothing in B can be picked, selected,
+  collided with or ray-queried unless the CPU re-evaluates the same hash and noise functions
+  bit-compatibly. The prototype mirrors the terrain in C++ for the camera; picking, editor selection
+  and shadows would each need the same discipline.
+- **(Phase 3) Silent GPU failure modes cost the most time.** `atan2(0,0)` NaN deleted a whole layer
+  while the counters reported it visible. f32 index arithmetic made a million-element spiral into
+  spokes, and f32 world coordinates quantise to 6 cm at 940 km. GPU-side generation moves bugs to
+  where they are hardest to see, and the counters are not evidence of an image.
+- **(Phase 3) The prototype renderer flatters the cost.** A's million reeds cost 13.8 ms of raster in
+  a renderer with no shadows, no PBR and no clustered lights. Production paid 42 ms for 1M shaded
+  points (Phase 2). In a real scene, A is a 250k effect, not a 1M one, unless it gets cheap far LODs.
+- **(Phase 3) Onset-driven art inherits the analyzer's blind spots.** The kick detector found about
+  20 kicks in the 80 s final chorus. A ping-on-kick system goes quiet exactly where the song is loudest
+  unless the art also reads the spectrum, as A does.
 
 ---
 
-## Final decision (interim, written at the end of Phase 2; Phase 3 may revise only the capability leg)
+## Final decision (written at the end of Phase 2; capability leg revised by Phase 3)
 
-**YELLOW: targeted adoption.**
+**YELLOW: targeted adoption.** Phase 3 widens what "targeted" covers. It does not change the
+architecture conclusion.
 
-**The hypothesis should be abandoned** in its general form. AV Gen should not build GPU Worlds or a
-compact procedural world representation, and it should not move scene and entity management to the
-GPU. The reasons, all measured:
+**The hypothesis should be pursued**, in its narrow form: as additive GPU capabilities inside the
+existing GPU subsystems, for the categories of visual system that Phase 3 showed are impractical
+otherwise. It stays abandoned as a performance argument and as a replacement for the scene
+architecture. That leg is unchanged from Phase 2, and AV Gen should still not move scene and entity
+management to the GPU. The reasons, all measured:
 
 - The shipped scenes are GPU-bound, with 1-1.5 ms of CPU scene update.
 - Large populations are already GPU-resident, GPU-animated, GPU-culled and indirect-drawn at
   microseconds of CPU.
 - The flatten does not run per frame.
 
-What should be pursued is narrow: **per-element audio inputs (seed, spectrum, kick history) for the
-existing GPU effector pass**. That is the one capability Phase 2 found that AV Gen lacks, and the GPU
-provides it at no measurable cost. Adopting it is conditional on Phase 3 showing the behaviour is
-visually worth having. If Phase 3 also finds a stateful GPU behaviour that is compelling, the
-checkpoint/seek question it raises (ADR-700 on the GPU) is the one place a larger architectural
-discussion could legitimately reopen.
+**The capability leg, revised by Phase 3 (Gate 3 PASS, real audio, three systems).** What to pursue,
+smallest first, each one an extension of something that already ships:
 
-Not run: Phases 4 and 5 (out of scope by the coordinator's instruction, and not argued for by the
-evidence). Not done: wiring real audio analysis into the prototype; a production implementation of
-anything. The test suites were not run: no test was added and no production source changed. The only
-shared-file change is an OFF-by-default CMake option, `AVGEN_GPUWORLD_PROTOTYPE`.
+1. **Per-element audio inputs for the effector pass** (from Phase 2, now with history). Add the
+   record's seed, a spectrogram *history* buffer (the whole track offline; a ~288 KB ring live), a
+   kick/onset history and a delay-by-distance sampling op. This enables A (Echo Field): stateless, so
+   seek is exact, and the compute cost is unmeasurable next to drawing.
+2. **A per-frame GPU generator for `ProceduralRenderer`.** A compute kernel writes this frame's
+   records from a compact description around the camera, instead of records uploaded at flatten. This
+   enables B (Endless Meadow): unbounded, zero stored instances, a fixed memory window, and seek exact
+   by construction. It requires a CPU mirror of the generating function for picking and collision, and
+   camera-relative coordinates for very large worlds.
+3. **Stateful GPU populations coupled to fields, with GPU checkpoints.** Let particles deposit into
+   ADR-032 grids (u32 fixed-point scatter-add) and sense them, and checkpoint GPU state (ADR-700 on
+   the GPU). This enables C (Mycelium). The checkpoint half is worth doing even without (1)-(3):
+   production's GPU particles and grids already break ADR-360 on a scrub past 4 s.
+
+The one place Phase 3 reopened an architecture discussion is the one the Phase 2 interim anticipated:
+**GPU state on the timeline**, meaning ownership, checkpoint memory budgets, and live inputs (the
+camera) as recorded state. It is measured here (exact, 46.5 MB per checkpoint at 2M agents, ~0.2 s
+seeks at 5 s spacing) and belongs to Phase 5's proposal if the gates get that far.
+
+**Next on the gate: Phase 4** (procedural world representation, the compact-description half of the
+hypothesis). B is supporting evidence for one layer, not a test of a whole scene. Phases 4 and 5 were
+not run here.
+
+Not done: a production implementation of anything, and a motion test of B at extreme distances. The
+test suites were not run: no test was added and no production source changed. The only shared-file
+change is still the OFF-by-default CMake option `AVGEN_GPUWORLD_PROTOTYPE`. Phase 3 added a second
+prototype target under it.
