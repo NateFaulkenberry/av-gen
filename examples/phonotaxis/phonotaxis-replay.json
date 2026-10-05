@@ -35,7 +35,9 @@
   "temporal/echo/frames": 8.0,
   "temporal/echo/decay": 0.6,
   "camera/mode": 0,
-  "camera/orbitPivotWeight": 1.0
+  "camera/orbitPivotWeight": 1.0,
+  "sources/driftA/rate": 0.019,
+  "sources/driftB/rate": 0.0123
  },
  "sources": [
   {
@@ -68,13 +70,27 @@
    }
   },
   {
+   "kind": "lfo",
+   "name": "driftA",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftB",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
    "kind": "timeline",
    "name": "padGermination",
    "settings": {
     "mode": "event",
     "keys": [
      {
-      "time": 180.0008,
+      "time": 180.0011,
       "value": 1.0,
       "interp": "step"
      }
@@ -88,7 +104,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 186.0012,
+      "time": 186.0008,
       "value": 1.0,
       "interp": "step"
      }
@@ -102,22 +118,22 @@
     "mode": "event",
     "keys": [
      {
-      "time": 196.6287,
+      "time": 196.5402,
       "value": 1.0,
       "interp": "step"
      },
      {
-      "time": 207.5103,
+      "time": 207.4086,
       "value": 1.0,
       "interp": "step"
      },
      {
-      "time": 239.0001,
+      "time": 239.0009,
       "value": 1.0,
       "interp": "step"
      },
      {
-      "time": 241.0005,
+      "time": 241.0011,
       "value": 1.0,
       "interp": "step"
      }
@@ -131,7 +147,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 200.0012,
+      "time": 200.001,
       "value": 1.0,
       "interp": "step"
      }
@@ -145,7 +161,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 213.2746,
+      "time": 213.2949,
       "value": 1.0,
       "interp": "step"
      }
@@ -159,7 +175,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 219.0002,
+      "time": 219.0011,
       "value": 1.0,
       "interp": "step"
      }
@@ -173,7 +189,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 225.3209,
+      "time": 225.2575,
       "value": 1.0,
       "interp": "step"
      }
@@ -187,7 +203,7 @@
     "mode": "event",
     "keys": [
      {
-      "time": 232.0007,
+      "time": 232.0005,
       "value": 1.0,
       "interp": "step"
      }
@@ -227,11 +243,23 @@
    "amount": 1.0,
    "depthSource": "macro.sensitivity",
    "depthMin": 0.0,
-   "depthMax": 2.0,
+   "depthMax": 4.0,
    "chain": {
     "attackMs": 2500,
     "decayMs": 4000
    }
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/height",
+   "op": "add",
+   "amount": 4.5
+  },
+  {
+   "source": "lfo.driftB.bipolar",
+   "target": "camera/distance",
+   "op": "add",
+   "amount": 11.0
   },
   {
    "source": "audio.onsetLow",
@@ -481,7 +509,7 @@
   {
    "name": "sensitivity",
    "label": "SENSITIVITY",
-   "default": 0.5,
+   "default": 0.25,
    "targets": []
   }
  ],
@@ -753,9 +781,9 @@
      44
     ],
     "camera/orbitPivot": [
-     0.0,
+     14.0,
      13,
-     0.0
+     -9.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -1245,7 +1273,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.62,
+      "threshold": 0.58,
       "from": "Surge",
       "falling": true
      }
@@ -1267,13 +1295,13 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.72,
+      "threshold": 0.66,
       "from": "Chorus"
      },
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.72,
+      "threshold": 0.66,
       "from": "Rebirth"
      },
      {
@@ -1322,7 +1350,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.3,
+      "threshold": 0.38,
       "from": "Chorus",
       "falling": true
      },
@@ -1399,9 +1427,9 @@
       "interp": "smooth"
      },
      {
-      "time": 176.0453,
+      "time": 176.0638,
       "value": [
-       0.6
+       0.3
       ],
       "interp": "smooth"
      }
@@ -1423,28 +1451,28 @@
       "interp": "smooth"
      },
      {
-      "time": 190.6286,
+      "time": 190.5402,
       "value": [
        0.5
       ],
       "interp": "smooth"
      },
      {
-      "time": 196.6286,
+      "time": 196.5402,
       "value": [
        0.25
       ],
       "interp": "smooth"
      },
      {
-      "time": 225.7373,
+      "time": 225.6582,
       "value": [
        0.25
       ],
       "interp": "smooth"
      },
      {
-      "time": 229.7373,
+      "time": 229.6582,
       "value": [
        0.5
       ],
@@ -1468,28 +1496,28 @@
       "interp": "smooth"
      },
      {
-      "time": 202.5103,
+      "time": 202.4086,
       "value": [
        0.5
       ],
       "interp": "smooth"
      },
      {
-      "time": 207.5103,
+      "time": 207.4086,
       "value": [
        0.95
       ],
       "interp": "smooth"
      },
      {
-      "time": 210.2746,
+      "time": 210.2948,
       "value": [
        0.95
       ],
       "interp": "smooth"
      },
      {
-      "time": 213.2746,
+      "time": 213.2948,
       "value": [
        0.5
       ],
@@ -1513,28 +1541,28 @@
       "interp": "smooth"
      },
      {
-      "time": 213.6863,
+      "time": 213.6628,
       "value": [
        0.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 217.6863,
+      "time": 217.6628,
       "value": [
        0.7
       ],
       "interp": "smooth"
      },
      {
-      "time": 222.3209,
+      "time": 222.2575,
       "value": [
        0.7
       ],
       "interp": "smooth"
      },
      {
-      "time": 225.3209,
+      "time": 225.2575,
       "value": [
        0.0
       ],
@@ -1558,28 +1586,28 @@
       "interp": "smooth"
      },
      {
-      "time": 234.4321,
+      "time": 234.4043,
       "value": [
        0.5
       ],
       "interp": "smooth"
      },
      {
-      "time": 238.4321,
+      "time": 238.4043,
       "value": [
        0.85
       ],
       "interp": "smooth"
      },
      {
-      "time": 242.3088,
+      "time": 242.2983,
       "value": [
        0.85
       ],
       "interp": "smooth"
      },
      {
-      "time": 245.3088,
+      "time": 245.2983,
       "value": [
        0.5
       ],

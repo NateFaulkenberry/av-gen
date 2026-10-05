@@ -39,9 +39,7 @@
   "volumeSteps": 16,
   "volumeJitter": 0.5,
   "volumeMaxDistance": 600.0,
-  "volumeNoise": 0.35,
-  "volumeNoiseScale": 0.03,
-  "volumeNoiseSpeed": 0.05,
+  "volumeNoise": 0.0,
   "sky": {
    "enabled": true,
    "background": true,
