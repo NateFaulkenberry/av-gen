@@ -5,8 +5,8 @@ Branch `research/gpu-world`, from main `ba0003de`, started 2026-10-04. The brief
 macOS 26, Dawn/WebGPU on Metal. All GPU runs went through `tools/gpu-lock.sh`.
 
 **Status:** Phase 4 complete (code agent, 2026-10-05). Gate 0: PASS (narrow). Gate 1: CONDITIONAL PASS.
-Gate 2: CONDITIONAL PASS. Gate 3: PASS (art agent). **Gate 4: PASS.** Phase 5 (architecture proposal)
-follows.
+Gate 2: CONDITIONAL PASS. Gate 3: PASS (art agent). **Gate 4: PASS.** Phase 5 (architecture proposal) is
+written. **Final decision: GREEN, narrowly scoped** (see "Final decision").
 
 ## Hypothesis (from the brief)
 
@@ -1098,6 +1098,253 @@ source** inside the existing renderer, which is what Phase 5 proposes.
 
 ---
 
+## Phase 5: Architecture Proposal (document only; nothing was refactored)
+
+Every gate passed, so the brief asks for a design and not an implementation. This proposal is
+**additive**. It replaces nothing. Each part extends a GPU subsystem that already ships. The evidence
+asked for no scene IR, no GPU scene graph, no GPU VM and no "GPU World" object, so the proposal has
+none of them.
+
+### The shape
+
+```text
+AV Gen Scene (Composition -> flatten -> scene::Scene)            UNCHANGED: CPU-owned, authored, serialised
+|
++-- Conventional objects                                          unchanged
+|     entities and characters, cameras, lights, terrain, hand-placed props, SDFs, water, UI
+|
++-- GPU populations          = today's ProceduralRenderer objects (records at flatten, effectors, GPU cull/LOD)
+|     + NEW: per-element audio inputs for cs_effectors                       (Phase 2, Phase 3 A)
+|
++-- GPU procedural sources   = NEW distribution kind on ProceduralGeometry: "generator"
+|     a compact description; a per-frame kernel writes this frame's records
+|     into the object's existing live-record buffer, then the existing cull/LOD/draw   (Phase 3 B, Phase 4)
+|
++-- GPU simulations          = today's ParticleRenderer + ADR-032 grids
+      + NEW: GPU checkpoints (exact seek), then particle -> grid deposits              (Phase 3 C)
+```
+
+Two choices are load-bearing:
+
+- **A generator is a `ProceduralGeometry`, not a new node kind.** It inherits the material, the cull
+  and LOD ladder (ADR-029), shadows, the identifier and velocity targets, parameters, the inspector and
+  serialisation. The only new thing is where the records come from: a kernel each frame, instead of a
+  `WriteBuffer` at flatten. Phase 4's compact arm *is* this with the renderer stripped off.
+- **Its kernel writes records, not draws.** The kernel emits `InstanceRecord`s into the
+  object's live buffer, the buffer the effector pass already writes. The existing prefix-scan cull
+  then compacts them. That gives deterministic, atomics-free ordering for free, which the prototypes'
+  atomic append did not have.
+
+### Smallest production steps, in order
+
+| # | Step | Enables | New code (estimated) | Risk |
+|---|---|---|---|---|
+| 1 | Effector inputs: the record's seed (`InstanceRecord::random`, already stored and unread), a spectrogram-history buffer, an onset-history block, and a delay-by-distance sampling op | Phase 3 A (Echo Field), Phase 2's per-element response | small: `points.wgsl`, `FieldUniforms` beside it, the effector op enum | low: stateless, exact seek |
+| 2 | `DistributionKind::Generator`: a registered generator (name, version, parameter block, WGSL entry, **C++ mirror**), with a per-layer camera window and records written per frame into the live buffer | Phase 3 B (Endless Meadow), Phase 4's compact worlds | medium: one kernel stage in `ProceduralRenderer::update`, the generator registry (shaped like `scene::registerGenerator`), the mirror query API | medium: CPU consumers need the mirror |
+| 3a | GPU checkpoints for the *existing* particles and grids, so a scrubbed frame equals a played one | fixes production today (ADR-360 as the project cites it, see ADR-700); **owned by the separate investigation** and only referenced here | (that investigation's) | (that investigation's) |
+| 3b | Particle → grid deposits (u32 fixed-point scatter-add) plus sensing | Phase 3 C (Mycelium) | medium: on top of 3a | medium: memory budget per second of timeline |
+
+Step 1 is independent. Step 2 is independent of step 3. Step 3b must not ship before 3a, because a
+stateful system that cannot seek would break the project's seek rule on day one.
+
+### The design questions the brief lists
+
+**Ownership of state.**
+
+- Everything **authored** stays on the CPU, in the scene file, as parameters: the generator's
+  description, seeds, densities, audio bindings.
+- The GPU owns only **derived** state, which is regenerated every frame and never saved (a
+  generator's records).
+- It also owns **simulated** state, which persists across frames and is checkpointed (particles,
+  grids, agents).
+- Rule: if losing a GPU buffer loses information the author created, the design is wrong.
+
+**CPU/GPU synchronisation.**
+
+- Nothing in the frame loop reads the GPU back. That is today's ADR-029 rule, kept.
+- Per frame the CPU writes uniforms only: the description block, camera windows and audio blocks
+  (≤ a few KB). The spectrogram history is uploaded once per track offline, or as a ~288 KB ring live.
+- Stats stay asynchronous readouts, never inputs.
+- Checkpoint saves are GPU-to-GPU copies (1.6 ms at 46.5 MB, Phase 3). A CPU readback happens only
+  for tests, tools and an optional on-disk cache.
+
+**Serialisation.**
+
+- A generator serialises as a procedural node with `"distribution": {"kind": "generator", "name": …,
+  "version": …, "params": {…}}`, a few hundred bytes. No records are written.
+- Simulation checkpoints are a **cache**, not project data. They are rebuilt by replay, and are
+  optionally cached on disk for offline renders keyed by the scene's structural hash.
+
+**Editor representation.**
+
+- A generator node appears in the World panel like any procedural node. Its parameters appear in the
+  inspector. Its generation region (bounds, or "around the camera") is drawn as a gizmo.
+- A **"bake to scatter"** action converts a region into ordinary records plus an override list. That
+  is the escape hatch for hand edits (Phase 4: rule-generated content is not hand-editable).
+- Simulations show their checkpoint memory and spacing next to their parameters.
+
+**Debugging.** Phase 3's lesson is that the counters are not evidence: a NaN deleted a layer while the
+counters said "visible". So:
+
+- a per-generator debug view (cells visited, cells present, cells culled, as a heat map);
+- a NaN/Inf guard counter written by the kernel;
+- a CPU-mirror parity readout (expected vs drawn count for the current camera), surfaced in
+  `--live-profile`'s resources;
+- `FrameTimeline` labels per generator.
+
+**Determinism.**
+
+- Generators are pure functions of (description, cell, t). Integer hashes are used. Large indices use
+  fixed-point (Phase 3: `f32(i) * goldenAngle` failed at 1M), and there is no `atan2(0,0)`.
+- Compaction is the existing prefix scan, not atomics. Seek is exact by construction.
+- Simulations follow Phase 3 C's recipe:
+  - fixed steps;
+  - per-step inputs, including the camera at the step's time;
+  - integer accumulation;
+  - gather-only kernels;
+  - checkpoints.
+- The test is ADR-700's: play vs seek must be bit-identical.
+
+**Timeline integration.**
+
+- Generators are evaluated at the render time like any uniform, so scrubbing costs nothing.
+- Simulations step on ADR-700's fixed grid. They checkpoint every N seconds of film, with N chosen
+  from a memory budget, and a seek restores and replays. Phase 3 C's numbers: 2M agents need 46.5 MB
+  per checkpoint, giving a ~0.2 s worst seek at 5 s spacing and 2.4 GB for a 4-minute song. The budget
+  has to be a visible, per-project setting.
+
+**Audio integration.**
+
+- Analysis stays on the CPU (`analysis::AnalysisTrack`, the live analyzer). The GPU receives the
+  spectrogram history (whole track offline, 5.8 MB; a ring live), onset lists and band envelopes.
+- Per-element response reads those plus the element's own seed.
+- Description parameters remain ordinary parameters, so **routes modulate them**. There is no second
+  reactivity system (ADR-097's rule).
+- Live and offline differ only in where the history comes from. That is a known gap: Phase 3's art ran
+  offline only.
+
+**Camera interaction.**
+
+- Generator windows are centred on the camera (per-layer view distance), so cost follows the view.
+- Coordinates must become camera-relative before worlds exceed a few hundred km (6 cm quantisation at
+  940 km, Phase 3).
+- For simulations the camera is **input state**. A timeline camera replays exactly; a live,
+  user-driven camera must be recorded per step, or a seek cannot reproduce it (ADR-700's
+  `checkpointInputKey`, on the GPU).
+
+**Picking and selection.**
+
+- The identifier target packs (object id, material id) (ADR-035). A generated element has no stable
+  instance index, because the window moves.
+- So a generator writes **(layer, cell id)** into the identifier. On a click, the CPU mirror
+  regenerates that element from the cell id.
+- Simulation agents are not individually selectable. The system is the selectable unit.
+
+**Offline rendering.** The GPU renderer's offline path (`render_job`) runs the same kernels at the
+same timeline instants, so it is identical. The **CPU path tracer** cannot see generated populations
+unless it queries the mirror along rays. Until then it must state the omission in its output, not
+silently drop the layer. This project has lost features to silent drops before.
+
+**Screenshots and AOVs.**
+
+- Generated records flow through the existing passes, so beauty, emission, identifiers and depth are
+  unchanged.
+- The **velocity AOV and motion blur** need last frame's transform. A stateless generator evaluates
+  the element at `t - dt` too, which is cheap.
+- A simulation keeps its previous positions (it already has them).
+
+**Quality scaling.**
+
+- Generator view distances and density scales map onto the live optimizer's existing levers
+  (`lodBias`, `drawDistanceScale`, ADR-1090s). A quality tier shrinks the window, not the world.
+- Simulations scale by agent count and step rate. Agent count changes the result, so the offline tier
+  must pin it.
+
+**Fallback behaviour.** Compute is guaranteed in WebGPU, so there is no "no-GPU" fallback to design.
+
+| Situation | Fallback |
+|---|---|
+| a window exceeds its buffer | deterministic thinning (production's ADR-085-style `keep` ratio), never truncation |
+| a CPU consumer cannot use the mirror | the bake-to-scatter path |
+| a checkpoint budget is exhausted | longer spacing, so slower seeks, **never** inexact seeks |
+
+**Lifecycle.**
+
+- Pipelines are created at load and pre-warmed (ADR-1102's mechanism), so nothing compiles mid-show.
+- Generator buffers are sized by the window, allocated once, and freed with the node.
+- Simulation state and its checkpoint ring are allocated by budget when the node is created, and
+  invalidated (not migrated) when a structural parameter changes.
+
+**Memory management.**
+
+- Every generator and simulation reports its bytes to the ADR-1091 resource accounting.
+- Windows are fixed-size: 10 MB in Phase 4, 73 MB over-provisioned in Phase 3 B. They should be
+  sized from the layer's view distance and cell size, not a constant cap.
+- Checkpoint memory is the one budget that grows with timeline length, so it gets its own setting and
+  its own line in the live profile.
+
+**Shader versioning.**
+
+- Generator WGSL lives in `shaders/` and is loaded through `ShaderLibrary`.
+- The generator's name and **version** enter the object's structural hash, as
+  `GeneratedSource::generatorVersion` does today. A version bump that changes output changes the hash,
+  so a scene records which generator version it was authored against.
+- Golden images and mirror-parity tests are kept per version.
+
+**WebGPU/Dawn constraints met in this spike.**
+
+| Constraint | Consequence |
+|---|---|
+| `maxStorageBufferBindingSize` (4 GB here; often far less on other GPUs) | set the expanded arm's ceiling, and is a reason not to expand |
+| no float atomics | fixed-point u32, which also gives determinism |
+| `drawIndexedIndirect` with a non-zero first instance needs an optional feature | the prototypes bound 256 B-aligned per-layer slices instead |
+| dispatches are capped at 65,535 groups per dimension | 2-D dispatch |
+| timestamp resolution was ~0.066 ms | sub-tick passes read as 0, so report them as "<1 tick" |
+
+**Metal behaviour met in this spike.**
+
+- `atan2(0,0)` is NaN.
+- Unified memory makes the process footprint count CPU, staging and GPU copies of the same data
+  (17.8 GB footprint for 3.9 GB of records at 4 km).
+- Metal writes no timestamp for an empty pass.
+- First-use pipeline compiles cost 90-180 ms each (the live optimizer's measurement), so pre-warm is
+  mandatory.
+
+**Testing strategy.**
+
+1. **Mirror parity:** for fixed cameras, the CPU mirror's visible set equals the GPU's (Phase 4's
+   per-layer counts, plus a hash of the records).
+2. **Determinism:** two fresh renderers produce identical buffers and frames (ADR-029's existing test
+   shape).
+3. **Seek:** play vs seek is bit-identical, for generators trivially and for simulations through
+   checkpoints (Phase 3 C's `--seektest` shape).
+4. **Golden images** with tolerances, because CPU and GPU diverge in the last bit (Phases 1-2).
+5. **NaN guards** asserted at zero.
+6. **`[.perf]` probes** for window cost and checkpoint save and restore.
+
+All of these go in `avgen_render_tests`, under the lock, with the exit code as the signal.
+
+### What should NOT move to the GPU
+
+- **Entities and characters**: AI, decisions, navigation, perception, locomotion. They are stateful,
+  branching and few, they already seek exactly from CPU checkpoints (ADR-700), and they cost about
+  16 µs each.
+- **The composition and its flatten for authored nodes**, the director, cameras, cuts and the
+  timeline.
+- **Audio analysis, the signal bus, modulation routes and parameters.** The GPU consumes their outputs.
+- **Terrain as it is today** (a baked `WorldMap` with biomes, moisture and water). A generator *reads*
+  it, as textures, rather than replacing it.
+- **Hand-placed or hand-edited content**, heroes and anything the user selects and moves.
+- **Lights and their selection**, including the ecology light field. It needs aggregation over the
+  population, which is CPU work over a mirror query.
+- **Small populations.** Under ~100k elements, expansion at flatten is cheap (Phase 4: ~0.3 s and
+  0.33 ms of cull at 318k), and records are simpler to edit, pick and debug.
+- **Anything that must be read back to make a decision in the same frame.**
+- **The shipped scenes' frame rate.** They are GPU-bound (Phase 0). None of this makes an existing
+  scene faster, and it should not be sold that way.
+
+---
+
 ## Reasons This Might Be A Bad Idea (live)
 
 - **The shipped scenes are GPU-bound.** CPU scene work is 1-1.5 ms of a 3-5 ms CPU frame against
@@ -1182,55 +1429,93 @@ source** inside the existing renderer, which is what Phase 5 proposes.
 - **(Phase 4) Rule-generated content is not hand-editable.** Per-instance edits need an override list,
   and production's scatter reads baked `WorldMap` fields (biome, moisture, water table) that a GPU
   generator would need as textures.
+- **(Phase 5) The proposal's standing costs.**
+  - Every generator ships twice (WGSL plus a C++ mirror) and must be kept in lockstep with parity
+    tests.
+  - Stateful GPU systems bring a memory budget that grows with timeline length.
+  - The CPU path tracer cannot see generated content until it queries mirrors.
+  - These costs are permanent, and they are why the proposal stops at three additive steps.
 - **(Phase 3) Onset-driven art inherits the analyzer's blind spots.** The kick detector found about
   20 kicks in the 80 s final chorus. A ping-on-kick system goes quiet exactly where the song is loudest
   unless the art also reads the spectrum, as A does.
 
 ---
 
-## Final decision (written at the end of Phase 2; capability leg revised by Phase 3)
+## Final decision (after all five phases, 2026-10-05)
 
-**YELLOW: targeted adoption.** Phase 3 widens what "targeted" covers. It does not change the
-architecture conclusion.
+**GREEN, pursue, narrowly scoped.** Earlier interim decisions were YELLOW: at the end of Phase 2, and
+again with a widened capability leg after Phase 3. They are in this document's git history (`5ea20c42`,
+`28234172`). Phase 4 changed the colour, because it supplied the measured technical benefit those
+decisions lacked.
 
-**The hypothesis should be pursued**, in its narrow form: as additive GPU capabilities inside the
-existing GPU subsystems, for the categories of visual system that Phase 3 showed are impractical
-otherwise. It stays abandoned as a performance argument and as a replacement for the scene
-architecture. That leg is unchanged from Phase 2, and AV Gen should still not move scene and entity
-management to the GPU. The reasons, all measured:
+**The hypothesis should be pursued**, in this form: AV Gen gains **GPU procedural sources and GPU
+audio-reactive and simulated populations as additive extensions of the GPU subsystems it already
+has**. It does not gain a GPU World architecture, a scene IR or a replacement for the CPU scene.
 
-- The shipped scenes are GPU-bound, with 1-1.5 ms of CPU scene update.
-- Large populations are already GPU-resident, GPU-animated, GPU-culled and indirect-drawn at
-  microseconds of CPU.
-- The flatten does not run per frame.
+Why GREEN and not YELLOW. The brief reserves GREEN for experiments that show significant measurable
+technical benefits and/or genuinely valuable new audiovisual capabilities. Both were shown:
 
-**The capability leg, revised by Phase 3 (Gate 3 PASS, real audio, three systems).** What to pursue,
-smallest first, each one an extension of something that already ships:
+- **Measured technical benefit (Phase 4).** The meadow held as a 144 B description, against the
+  same meadow through production's real flatten and render path at 2 km:
+  - scatter flatten ~6.0 s → 0;
+  - re-flatten 2,970 ms → 0;
+  - process memory ~4.45 GB → 18 MB;
+  - GPU buffers ~2.7 GB → 10 MB;
+  - per-frame cull 8.0 ms → <0.07 ms;
+  - load 8.0 s → 0;
+  - visible content identical in the matched-renderer comparison.
 
-1. **Per-element audio inputs for the effector pass** (from Phase 2, now with history). Add the
-   record's seed, a spectrogram *history* buffer (the whole track offline; a ~288 KB ring live), a
-   kick/onset history and a delay-by-distance sampling op. This enables A (Echo Field): stateless, so
-   seek is exact, and the compute cost is unmeasurable next to drawing.
-2. **A per-frame GPU generator for `ProceduralRenderer`.** A compute kernel writes this frame's
-   records from a compact description around the camera, instead of records uploaded at flatten. This
-   enables B (Endless Meadow): unbounded, zero stored instances, a fixed memory window, and seek exact
-   by construction. It requires a CPU mirror of the generating function for picking and collision, and
-   camera-relative coordinates for very large worlds.
-3. **Stateful GPU populations coupled to fields, with GPU checkpoints.** Let particles deposit into
-   ADR-032 grids (u32 fixed-point scatter-add) and sense them, and checkpoint GPU state (ADR-700 on
-   the GPU). This enables C (Mycelium). The checkpoint half is worth doing even without (1)-(3):
-   production's GPU particles and grids already break ADR-360 on a scrub past 4 s.
+  The world's size stops mattering: 1,000 km costs what 250 m costs.
+- **New capability (Phase 3, Gate 3 PASS on real audio).** These cannot be built with entities, and
+  are not expressible or are prohibitive with today's effectors, scatter and particles:
+  - per-element audio history (Echo Field);
+  - unbounded camera-centred worlds (Endless Meadow);
+  - a stateful population coupled to the field it writes (Mycelium).
 
-The one place Phase 3 reopened an architecture discussion is the one the Phase 2 interim anticipated:
-**GPU state on the timeline**, meaning ownership, checkpoint memory budgets, and live inputs (the
-camera) as recorded state. It is measured here (exact, 46.5 MB per checkpoint at 2M agents, ~0.2 s
-seeks at 5 s spacing) and belongs to Phase 5's proposal if the gates get that far.
+Why so narrow. The same evidence rules out everything broader:
 
-**Next on the gate: Phase 4** (procedural world representation, the compact-description half of the
-hypothesis). B is supporting evidence for one layer, not a test of a whole scene. Phases 4 and 5 were
-not run here.
+- **Performance of existing scenes: not a reason.** The shipped scenes are GPU-bound with 1-1.5 ms of
+  CPU scene update (Phase 0). GPU population cut CPU work but never sped up a raster-bound frame
+  (Phase 1, −2%).
+- **Much of the "GPU world" already exists.** GPU-resident records, effectors, deterministic cull and
+  LOD, indirect draws and particles all ship. Against production's effector path the prototypes were
+  not faster (Phase 2).
+- **Authoring size is not the win.** Production's scatter layers are already compact descriptions.
+  The win is not expanding them at runtime (Phase 4).
+- **Small worlds and small populations gain little.** Under ~100k elements, expansion is cheap and
+  records are easier to edit, pick and debug.
+- **A CPU tile streamer was not built.** For static content it might capture much of Phase 4's memory
+  and flatten win. Generation on the GPU is decisive for content that changes per frame.
 
-Not done: a production implementation of anything, and a motion test of B at extreme distances. The
-test suites were not run: no test was added and no production source changed. The only shared-file
-change is still the OFF-by-default CMake option `AVGEN_GPUWORLD_PROTOTYPE`. Phase 3 added a second
-prototype target under it.
+**What to build, smallest first** (Phase 5 has the detail):
+
+1. Per-element audio inputs for `cs_effectors` (the record seed, spectrogram history, onset history,
+   delay-by-distance). Stateless, low risk.
+2. A `generator` distribution kind for `ProceduralGeometry`: a per-frame kernel writes records into
+   the existing live buffer and feeds the existing cull, LOD and draw. It comes with a **C++ mirror**
+   for picking, navigation, ecology lights and the path tracer, plus a bake-to-scatter escape hatch.
+3. GPU checkpoints for stateful GPU systems, then particle → grid deposits. The checkpoint half for
+   *today's* particles and grids belongs to the separate ADR-360 seek investigation. Phase 3 found that
+   scrubbing them past 4 s does not reproduce the played frame. This proposal depends on that
+   investigation and does not duplicate it.
+
+**Do not build:**
+
+- a GPU scene graph;
+- a GPU VM or scripting language;
+- GPU entities or characters;
+- GPU-side flattening of authored nodes;
+- any "GPU World" container object.
+
+The test for every future step is the one this spike used: a measured gain over **production's**
+path, not over a straw-man CPU control, at matched content, with the seek rule intact.
+
+**Not done or unverified:**
+
+- No production code was changed. The only shared-file change is the OFF-by-default CMake option
+  `AVGEN_GPUWORLD_PROTOTYPE`, which now builds four prototype targets.
+- No tests were added, so neither suite was run.
+- Phase 4's second camera shot was abandoned for time.
+- The CPU tile-streaming alternative was not built (its cost is estimated in Phase 4).
+- The production scene's frame time is not comparable with the prototype's. Only its scaling is used.
+- Live (non-offline) audio history for step 1 is designed but untested.
