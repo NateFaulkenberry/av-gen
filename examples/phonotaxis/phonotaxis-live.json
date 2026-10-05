@@ -2,15 +2,12 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "PHONOTAXIS"
+  "name": "PHONOTAXIS LIVE"
  },
  "assets": {
   "scene": {
    "kind": "composition",
    "path": "phonotaxis.scene.json"
-  },
-  "audio": {
-   "path": "~/Desktop/All You Got.wav"
   }
  },
  "live": {
@@ -1456,5 +1453,8 @@
   "fps": 30,
   "output": "sequence",
   "path": "renders/phonotaxis"
+ },
+ "sonic": {
+  "live": true
  }
 }

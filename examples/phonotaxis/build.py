@@ -68,6 +68,8 @@ def programs():
         op("power", 0, srcA=0, value=0.55),
         *species_colour_ops(0, 1, (2, 3)),
         op("field", 4, field="kickRing"),
+        op("field", 5, field="strike"),
+        op("add", 4, srcA=4, srcB=5),
         op("constant", 5, constant=[2.5, 2.5, 2.5, 0]),
         op("multiply", 4, srcA=4, srcB=5),
         op("constant", 5, constant=[1, 1, 1, 0]),
@@ -130,8 +132,7 @@ def fields():
     return [
         # what the organism hears: each species its own band (fieldElement = (species + 0.5) / 3)
         field("bands", kind="spectrum", audioBand="element", bandLow=0.0, bandHigh=1.0, strength=1.0),
-        field("kick", kind="onset", onsetSource="low", onsetDecay=3.0, onsetWidth=0.0, strength=1.2),
-        field("hunger", kind="compound", children=["bands", "kick"], combine="add", strength=1.0),
+        field("hunger", kind="compound", children=["bands", "kickRing", "strike"], combine="add", strength=1.0),
         field("wander", kind="curlNoise", frequency=0.035, speed=0.08, strength=1.0),
         field("inflow", kind="spiral", axis=[0, 1, 0], spiralBias=-0.55, strength=0.9,
               falloff={"kind": "smoothstep", "inner": 6.0, "outer": 60.0}),
@@ -147,6 +148,10 @@ def fields():
         # kick fronts racing outward from the Cochlea's foot
         field("kickRing", kind="onset", onsetSource="low", onsetDecay=1.1, onsetWidth=4.0, audioSpeed=RING_SPEED,
               waveGeometry="radial", axis=[0, 1, 0], strength=1.0),
+        # the performer's strike (MIDI pad 36): one shock front from the Cochlea's foot to the horizon
+        field("strike", kind="wave", waveGeometry="radial", waveShape="pulse", axis=[0, 1, 0], amplitude=1.0,
+              wavelength=2000.0, waveSpeed=34.0, waveWidth=5.0, waveOrigin=0.0, strength=1.5,
+              trigger={"source": "signal", "name": "control.strike", "threshold": 0.3}),
         # the Cochlea's three strands, each a band, heard later the higher it is
         field("helixLow", kind="spectrum", audioBand="range", bandLow=0.0, bandHigh=0.3, audioSpeed=HELIX_SPEED,
               waveGeometry="planar", axis=[0, 1, 0], strength=1.0),
@@ -172,8 +177,10 @@ def organism():
 
 def bed():
     return {"name": "bed", "kind": "procedural", "procedural": {
-        "source": {"kind": "box", "size": [2 * BASIN, 0.02, 2 * BASIN], "subdivisions": 1},
-        "distribution": {"kind": "single"},
+        # 4 x 4 tiles of 64 subdivisions: half-metre vertices, so a kick front heaves the floor smoothly
+        "source": {"kind": "box", "size": [BASIN / 2, 0.02, BASIN / 2], "subdivisions": 64},
+        "distribution": {"kind": "grid", "gridCount": [4, 1, 4], "gridSpacing": [BASIN / 2, 1.0, BASIN / 2]},
+        "deformers": [{"kind": "field", "field": "kickRing", "amount": 0.35, "space": "world", "alongNormal": True}],
         "lod": {"cull": False, "count": 1},
         "material": {"baseColor": [0.006, 0.006, 0.009], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                      "roughness": 0.85, "metallic": 0.0, "program": "bed"}}}
@@ -196,6 +203,7 @@ def choir():
             {"field": "echo", "op": "scale", "blend": "add", "strength": 2.2, "scaleAxis": [0, 1, 0]},
             {"field": "echo", "op": "emission", "blend": "add", "strength": 5.0},
             {"field": "kickRing", "op": "emission", "blend": "add", "strength": 3.0},
+            {"field": "strike", "op": "emission", "blend": "add", "strength": 6.0},
         ],
         "lod": {"cull": True, "maxDistance": 95.0, "count": 1},
         "material": {"baseColor": [0.01, 0.01, 0.012], "emissiveColor": [1, 1, 1], "emissiveIntensity": 0.6,
@@ -229,8 +237,8 @@ def helix(name, strand, colour, fieldname, segment):
 def plain():
     """The dark land beyond the basin, so the horizon's spires stand on something."""
     return {"name": "plain", "kind": "procedural", "procedural": {
-        "source": {"kind": "box", "size": [4000.0, 0.02, 4000.0], "subdivisions": 1},
-        "sourceTransform": {"position": [0, -0.03, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+        "source": {"kind": "box", "size": [1000.0, 0.02, 1000.0], "subdivisions": 1},
+        "sourceTransform": {"position": [0, -0.03, 0], "rotation": [0, 0, 0], "scale": [4, 1, 4]},
         "distribution": {"kind": "single"},
         "lod": {"cull": False, "count": 1},
         "material": {"baseColor": [0.004, 0.004, 0.006], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
@@ -258,6 +266,7 @@ def horizon():
         "effectors": [
             {"field": "basinMask", "op": "scale", "blend": "multiply", "strength": 1.0, "scaleAxis": [1, 1, 1]},
             {"field": "kickRing", "op": "emission", "blend": "add", "strength": 120.0},
+            {"field": "strike", "op": "emission", "blend": "add", "strength": 200.0},
         ],
         "lod": {"cull": True, "maxDistance": 420.0, "count": 1},
         "material": {"baseColor": [0.004, 0.004, 0.005], "emissiveColor": [0.75, 0.8, 1.0],
@@ -309,7 +318,9 @@ def scene():
     }
 
 
-# The composition's four default routes, zeroed here and re-routed on purpose below (pitfall 1).
+# ===================================================================================== the performance
+#
+# The composition's four default routes, zeroed and re-routed on purpose below (pitfall 1).
 ZERO_DEFAULTS = [
     {"source": "audio.bass", "target": "root/scale", "op": "add", "amount": 0.0},
     {"source": "audio.mid", "target": "root/rotationSpeed", "op": "add", "amount": 0.0},
@@ -326,29 +337,248 @@ POST = {
     "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0,
     "temporal/echo/enabled": True, "temporal/echo/frames": 8.0, "temporal/echo/strength": 0.0,
     "temporal/echo/decay": 0.6,
+    "camera/mode": 0, "camera/target": [0.0, 10.0, 0.0], "camera/distance": 60.0, "camera/height": 12.0,
+    "camera/orbitSpeed": 0.04, "camera/fov": 42.0,
 }
 
+# What the world listens to as one number: loudness, change and air, read as a mean and shaped. The slow
+# follower that turns it into the piece's energy lives on the route into the `energy` macro.
+LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
+    {"name": "drive", "combine": "mean", "inputs": [
+        {"signal": "audio.rms", "weight": 1.0}, {"signal": "audio.spectralFlux", "weight": 1.0},
+        {"signal": "audio.treble", "weight": 1.0}], "bias": -0.1, "gain": 2.6, "curve": 1.0}]}}
 
-def project(name, audio, extra=None):
+# The performer's knobs. Each is neutral at its default, so a controller that is not plugged in changes
+# nothing; each moves a few parameters that mean one thing together.
+#   (name, label, cc, default, [(path, min, max, op)])
+KNOBS = [
+    ("energy", "ENERGY", 1, 0.0, []),  # targets below: the arc itself
+    ("hunger", "HUNGER", 21, 0.5, [("grid/organism/depositAmount", -0.012, 0.03, "add")]),
+    ("restless", "RESTLESS", 22, 0.5, [("grid/organism/turnAngle", -0.3, 0.6, "add"),
+                                        ("grid/organism/sensorAngle", -0.2, 0.4, "add")]),
+    ("current", "CURRENT", 23, 0.5, [("field/inflow/strength", -1.0, 1.6, "add")]),
+    ("memory", "MEMORY", 24, 0.0, [("temporal/echo/strength", 0.0, 0.6, "add"),
+                                   ("temporal/echo/decay", 0.0, 0.3, "add")]),
+    ("reach", "REACH", 25, 0.5, [("camera/distance", -28.0, 40.0, "add"), ("camera/height", -6.0, 30.0, "add")]),
+    ("orbit", "ORBIT", 26, 0.5, [("camera/orbitSpeed", -0.18, 0.18, "add")]),
+    ("glow", "GLOW", 27, 0.5, [("post/bloom/intensity", -0.3, 0.45, "add"),
+                               ("post/halation/intensity", -0.15, 0.3, "add")]),
+    ("sensitivity", "SENSITIVITY", 28, 0.5, []),  # the depth of the music's push on the energy (a route depth)
+]
+# The energy arc (macro.energy, 0..1) adds this much on top of whatever the state set.
+ENERGY_TARGETS = [
+    ("camera/height", 0.0, 7.0, "add"),
+    ("material/throat/emissionIntensity", 0.0, 0.6, "add"),
+    ("material/choir/emissionIntensity", 0.0, 0.4, "add"),
+    ("particles/spores/spawnRate", 0.0, 500.0, "add"),
+    ("post/bloom/intensity", 0.0, 0.12, "add"),
+]
+
+# Pads (note numbers, General MIDI drum map so any pad controller lands somewhere sensible).
+PADS = {"strike": 36, "scatter": 37, "Dormant": 40, "Germination": 41, "Chorus": 43, "Surge": 45,
+        "Eruption": 47, "Collapse": 48, "Rebirth": 50}
+
+# ------------------------------------------------------------------------------------------ states
+# Each state is a preset: the large-scale configuration of the world. Continuous expression (the energy
+# arc, the bands, the knobs) rides on top as routes. Colour rule kept in every state: colour is frequency.
+DAWN = {"lo": [1.0, 0.22, 0.38], "mid": [1.0, 0.72, 0.22], "hi": [0.45, 0.85, 1.0]}
+NIGHT = {"lo": EMBER, "mid": TEAL, "hi": VIOLET}
+
+COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade", "turn", "gaze", "reach",
+        "inflow", "wander", "spores", "kick", "horizon", "dist", "height", "fov", "target", "exposure", "echo",
+        "bloom", "heart", "orbit"]
+STATES = {
+    #            grow lift  chG  thG  bedG  dep    fade turn gaze rch  infl wand spor  kick hor  dist hgt  fov tgtY  exp   echo bloom heart orbit
+    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.004, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50,   0.3, 25,  30, 1.6, 54, 15, -0.7, 0.00, 0.40, 250, 0.015),
+    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.012, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220,  0.6, 60,  44, 5.0, 46, 12, -0.35, 0.0, 0.45, 600, 0.03),
+    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550,  1.0, 120, 58, 11, 42, 10, 0.0, 0.12, 0.50, 900, 0.04),
+    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.020, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850,  1.3, 180, 80, 32, 38, 6, 0.0, 0.2, 0.55, 1200, 0.06),
+    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.030, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 24, 3.5, 72, 13, 0.15, 0.45, 0.70, 2000, 0.12),
+    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90,   0.5, 60,  20, 95, 40, 0, -0.6, 0.35, 0.45, 200, 0.02),
+    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 66, 2.8, 34, 9, 0.0, 0.12, 0.50, 900, -0.035),
+}
+PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": DAWN}  # only the world-defining states recolour
+
+
+def colour_paths(prog_ops, prog_name, colour):
+    """The bed and choir programs' three species constants: the op paths (1-indexed) holding them."""
+    out = {}
+    for i, o in enumerate(prog_ops, start=1):
+        if o["kind"] == "constant" and o["constant"][:3] in (EMBER, TEAL, VIOLET):
+            key = {tuple(EMBER): "lo", tuple(TEAL): "mid", tuple(VIOLET): "hi"}[tuple(o["constant"][:3])]
+            out[f"material/{prog_name}/op/{i}/constant/constant"] = colour[key] + [0.0]
+    return out
+
+
+def presets():
+    progs = {p["name"]: p["ops"] for p in programs()}
+    out = []
+    for name, row in STATES.items():
+        v = dict(zip(COLS, row))
+        values = {
+            "field/trailN/strength": [v["growth"]],
+            "procedural/choir/effector/2/strength": [v["lift"]],
+            "material/choir/emissionIntensity": [v["choirGain"]],
+            "material/throat/emissionIntensity": [v["throatGain"]],
+            "material/bed/emissionIntensity": [v["bedGain"]],
+            "grid/organism/depositAmount": [v["deposit"]],
+            "grid/organism/dissipation": [v["fade"]],
+            "grid/organism/turnAngle": [v["turn"]],
+            "grid/organism/sensorAngle": [v["gaze"]],
+            "grid/organism/sensorDistance": [v["reach"]],
+            "field/inflow/strength": [v["inflow"]],
+            "field/wander/strength": [v["wander"]],
+            "particles/spores/spawnRate": [v["spores"]],
+            "field/kickRing/strength": [v["kick"]],
+            "procedural/horizon/effector/2/strength": [v["horizon"]],
+            "camera/distance": [v["dist"]],
+            "camera/height": [v["height"]],
+            "camera/fov": [v["fov"]],
+            "camera/target": [0.0, v["target"], 0.0],
+            "camera/exposure/compensation": [v["exposure"]],
+            "temporal/echo/strength": [v["echo"]],
+            "post/bloom/intensity": [v["bloom"]],
+            "lights/heart/intensity": [v["heart"]],
+            "camera/orbitSpeed": [v["orbit"]],
+        }
+        if name in PALETTE_BY_STATE:
+            pal = PALETTE_BY_STATE[name]
+            for prog in ("bed", "choir"):
+                for path, c in colour_paths(progs[prog], prog, pal).items():
+                    values[path] = c
+            for strand, key in (("helixLow", "lo"), ("helixMid", "mid"), ("helixHigh", "hi")):
+                for seg in ("Root", "Bell"):
+                    values[f"procedural/{strand}{seg}/material/emissiveColor"] = pal[key]
+        out.append({"name": name.lower(), "values": values})
+    return out
+
+
+def trig_energy(threshold, frm=None, falling=False):
+    t = {"kind": "macro", "signal": "energy", "threshold": threshold}
+    if frm:
+        t["from"] = frm
+    if falling:
+        t["falling"] = True
+    return t
+
+
+def pad(name):
+    return {"kind": "signal", "signal": f"control.pad{name}", "threshold": 0.3}
+
+
+def states():
+    up = ["Germination", "Chorus", "Surge", "Eruption", "Rebirth"]
+    return {"initial": "Dormant", "states": [
+        {"name": "Dormant", "preset": "dormant", "transition": {"seconds": 10, "easing": "smooth"},
+         "triggers": [pad("Dormant")] + [trig_energy(0.08, frm=f, falling=True) for f in up + ["Collapse"]]},
+        {"name": "Germination", "preset": "germination", "transition": {"seconds": 8, "easing": "smooth"},
+         "triggers": [pad("Germination"), trig_energy(0.15, frm="Dormant")]},
+        {"name": "Chorus", "preset": "chorus", "transition": {"seconds": 6, "easing": "smooth", "quantize": "bar"},
+         "triggers": [pad("Chorus"), trig_energy(0.45, frm="Germination"),
+                      trig_energy(0.62, frm="Surge", falling=True)]},
+        {"name": "Surge", "preset": "surge", "transition": {"seconds": 4, "easing": "easeInOut", "quantize": "bar"},
+         "triggers": [pad("Surge"), trig_energy(0.72, frm="Chorus"), trig_energy(0.72, frm="Rebirth"),
+                      trig_energy(0.7, frm="Eruption", falling=True)]},
+        {"name": "Eruption", "preset": "eruption", "transition": {"seconds": 1.5, "easing": "easeIn", "quantize": "beat"},
+         "triggers": [pad("Eruption"), trig_energy(0.86, frm="Surge")]},
+        {"name": "Collapse", "preset": "collapse", "transition": {"seconds": 3, "easing": "easeOut"},
+         # well below each source state's own entry, so a state never collapses on the wobble that entered it
+         "triggers": [pad("Collapse")] + [trig_energy(t, frm=f, falling=True)
+                                          for f, t in (("Chorus", 0.42), ("Surge", 0.5), ("Eruption", 0.55),
+                                                       ("Rebirth", 0.42))]},
+        {"name": "Rebirth", "preset": "rebirth", "transition": {"seconds": 10, "easing": "smooth"},
+         "triggers": [pad("Rebirth"), trig_energy(0.5, frm="Collapse")]},
+    ]}
+
+
+def macros():
+    out = []
+    for name, label, _cc, default, targets in KNOBS:
+        ts = [{"path": p, "min": lo, "max": hi, "op": op} for p, lo, hi, op in targets]
+        if name == "energy":
+            ts = [{"path": p, "min": lo, "max": hi, "op": op} for p, lo, hi, op in ENERGY_TARGETS]
+        out.append({"name": name, "label": label, "default": default, "targets": ts})
+    return out
+
+
+def midi():
+    bindings = []
+    for name, _label, cc, _d, _t in KNOBS:
+        bindings.append({"source": "*", "channel": -1, "kind": "cc", "number": cc, "parameter": f"macros/{name}",
+                         "component": 0, "min": 0.0, "max": 1.0})
+    for name, note in PADS.items():
+        sig = name if name in ("strike", "scatter") else f"pad{name}"
+        bindings.append({"source": "*", "channel": -1, "kind": "noteEvent", "number": note, "signal": sig})
+    return {"enabled": True, "filter": "*", "bindings": bindings}
+
+
+def routes():
+    r = list(ZERO_DEFAULTS)
+    # The arc: what the music does to the world's energy, slowly, scaled by the SENSITIVITY knob.
+    r.append({"source": "visual.drive", "target": "macros/energy", "op": "add", "amount": 1.0,
+              "depthSource": "macro.sensitivity", "depthMin": 0.0, "depthMax": 2.0,
+              "chain": {"attackMs": 2500, "decayMs": 4000}})
+    # LOW is mass and fronts (the kick fields, the heaving floor, the low strand): it lives in fields.
+    # A heavy kick, when the energy is high, nudges the camera; never in the quiet states.
+    r.append({"source": "audio.onsetLow", "target": "camera/shake/amplitude", "op": "add", "amount": 0.05,
+              "depthSource": "macro.energy", "depthMin": 0.0, "depthMax": 1.0,
+              "chain": {"envelope": "peakhold", "envelopeHoldMs": 30, "envelopeFallPerSecond": 6.0}})
+    # MID is movement: the organism grows restless and wanders with the mids.
+    r.append({"source": "audio.mid", "target": "grid/organism/turnAngle", "op": "add", "amount": 0.22,
+              "chain": {"attackMs": 600, "decayMs": 2500}})
+    r.append({"source": "audio.mid", "target": "field/wander/strength", "op": "add", "amount": 0.6,
+              "chain": {"attackMs": 800, "decayMs": 3000}})
+    # HIGH is emission: spores rise and the forest's tips glint with the air.
+    r.append({"source": "audio.treble", "target": "particles/spores/spawnRate", "op": "add", "amount": 1400.0,
+              "chain": {"attackMs": 80, "decayMs": 700}})
+    r.append({"source": "audio.onsetHigh", "target": "material/choir/emissionIntensity", "op": "add",
+              "amount": 0.35, "chain": {"envelope": "peakhold", "envelopeHoldMs": 20, "envelopeFallPerSecond": 5.0}})
+    # The performer's events: a strike is a front (a field) plus a burst of spores; scatter is the burst alone.
+    r.append({"source": "control.strike", "target": "particles/spores/burst", "op": "add", "amount": 2500.0,
+              "depthSource": "control.strike", "depthMin": 0.4, "depthMax": 1.0,
+              "chain": {"envelope": "peakhold", "envelopeHoldMs": 120, "envelopeFallPerSecond": 8.0}})
+    r.append({"source": "control.strike", "target": "camera/shake/amplitude", "op": "add", "amount": 0.12,
+              "chain": {"envelope": "peakhold", "envelopeHoldMs": 40, "envelopeFallPerSecond": 3.0}})
+    r.append({"source": "control.scatter", "target": "particles/spores/burst", "op": "add", "amount": 1800.0,
+              "chain": {"envelope": "peakhold", "envelopeHoldMs": 200, "envelopeFallPerSecond": 5.0}})
+    return r
+
+
+def project(name, audio, live=False):
     p = {
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
-        "assets": {"scene": {"kind": "composition", "path": "phonotaxis.scene.json"}, "audio": {"path": audio}},
+        "assets": {"scene": {"kind": "composition", "path": "phonotaxis.scene.json"}},
         "live": {"qualityStrategy": "resolution_first", "targetFps": 60},
         "parameters": dict(POST),
-        "routes": list(ZERO_DEFAULTS),
+        "sources": [LISTEN],
+        "routes": routes(),
+        "worldMacros": macros(),
+        "presets": presets(),
+        "states": states(),
+        "control": {"midi": midi()},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "sequence", "path": "renders/phonotaxis"},
     }
-    if extra:
-        p.update(extra)
+    if audio:
+        p["assets"]["audio"] = {"path": audio}
+    if live:
+        p["sonic"] = {"live": True}
     return p
 
 
 def main():
     (HERE / "phonotaxis.scene.json").write_text(json.dumps(scene(), indent=1) + "\n")
-    (HERE / "phonotaxis.json").write_text(
-        json.dumps(project("PHONOTAXIS", "~/Desktop/All You Got.wav"), indent=1) + "\n")
-    print("wrote", HERE / "phonotaxis.scene.json", HERE / "phonotaxis.json")
+    projects = {
+        # development and the review renders: the song the spike's Echo Field was made on
+        "phonotaxis.json": project("PHONOTAXIS", "~/Desktop/All You Got.wav"),
+        # a second, shorter track with a long quiet intro and a breakdown (graceful with other music)
+        "phonotaxis-night-shift.json": project("PHONOTAXIS / Night Shift", "../../assets/audio/night-shift.wav"),
+        # the instrument: live input (pick the device in the Live panel) and MIDI
+        "phonotaxis-live.json": project("PHONOTAXIS LIVE", None, live=True),
+    }
+    for name, p in projects.items():
+        (HERE / name).write_text(json.dumps(p, indent=1) + "\n")
+    print("wrote", HERE / "phonotaxis.scene.json", *projects)
 
 
 if __name__ == "__main__":

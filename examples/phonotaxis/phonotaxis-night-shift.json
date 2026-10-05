@@ -2,7 +2,7 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "PHONOTAXIS"
+  "name": "PHONOTAXIS / Night Shift"
  },
  "assets": {
   "scene": {
@@ -10,7 +10,7 @@
    "path": "phonotaxis.scene.json"
   },
   "audio": {
-   "path": "~/Desktop/All You Got.wav"
+   "path": "../../assets/audio/night-shift.wav"
   }
  },
  "live": {
