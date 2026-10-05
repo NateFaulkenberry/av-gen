@@ -532,3 +532,159 @@ history. Each scene says its purpose in its `_note`.
 Tests: `tests/rendering/test_gpu_regression_scenes_gpu.cpp`, `[gpu][gpu-regression]` in the default run,
 and `[.perf][gpu-regression]` for the benchmark.
 
+
+## Phase 4 handoff (for the art agent)
+
+You own the flagship LIVE scene: brief Phase 4, its research, art direction, MIDI vocabulary, camera,
+post, evaluation and the art pass. This section is what the engine now does for you, how to author
+it, what it costs, and where it bites. Everything below is on `gpu/productionization`. Read ADR-1116
+to ADR-1121 if a detail matters.
+
+### What the engine can do now that it could not before
+
+1. **Audio as a spatial field.** `spectrum` and `onset` field kinds. Any element of anything a field
+   reaches can hear:
+   - its own frequency band, through the element random or angle fans;
+   - the past, through a delay that grows with distance (up to 12 s);
+   - the last eight kicks, snares, hats or beats, as fronts that travel outward and decay.
+
+   Fields reach effectors (procedural records: position, scale, rotation, colour, emission, density),
+   Field deformers (per vertex), emissive fields, particle field forces, grid injection and agent
+   deposits.
+2. **Worlds that are functions.** `distribution.kind: "generator"`: unbounded or bounded lattices of
+   hashed cells, generated every frame around the camera. A layer costs its window, not its extent; a
+   camera can fly forever. Presence, size, tilt, ground and clustering are live parameters, so MIDI and
+   routes reshape a world with **no rebuild**. Layers share a ground through `groundSeed`.
+3. **A living population that remembers.** `grids[].mode: "agents"`: up to 4M agents in up to three
+   species. They sense, turn, steer by a vector field and deposit trails, with the deposit scaled by
+   any field (so audio). The trail is a grid field anything can sample. Seeks are **exact**, from
+   GPU checkpoints.
+4. **Exact time for stateful systems.** Every simulation sub-step reads its own second's inputs, so an
+   audio-driven grid scrubs and renders offline exactly as it played.
+5. **Escape hatches.** Bake a generator region to `points` to hand-edit it. Pick a generated element
+   in the viewport to inspect it, including the field values the GPU applies to it.
+
+### Scene JSON, by example (copy from `examples/gpu-regression/`)
+
+An audio field is a `field` node:
+
+```json
+{"name": "echo", "kind": "field", "position": [0, 0, 0],
+ "field": {"kind": "spectrum", "audioBand": "angle", "bandLow": 0.0, "bandHigh": 1.0, "bandRepeat": 2,
+           "audioSpeed": 9.0, "audioDelay": 0.0, "waveGeometry": "radial", "axis": [0, 1, 0],
+           "strength": 1.0, "falloff": {"kind": "none"}}}
+{"name": "kick", "kind": "field",
+ "field": {"kind": "onset", "onsetSource": "low", "onsetDecay": 3.0, "onsetWidth": 2.5, "audioSpeed": 9.0,
+           "strength": 1.0, "falloff": {"kind": "none"}}}
+```
+
+`audioBand` is one of:
+
+- `range`: the mean over `bandLow..bandHigh` (0 = 32 Hz, 1 = 16 kHz, on a log axis);
+- `element`: each element its own band, from its random;
+- `angle`: fans of frequency about `axis`.
+
+`onsetSource` is `low` (kick), `mid` (snare), `high` (hat) or `beat`. With `onsetWidth` 0 an onset is a
+flash everywhere at once.
+
+A generator layer is a procedural node:
+
+```json
+{"name": "reeds", "kind": "procedural", "procedural": {
+  "source": {"kind": "cylinder", "radius": 0.04, "height": 1.6, "radialSegments": 5, "caps": false},
+  "sourceTransform": {"position": [0, 0.8, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+  "variation": {"seed": 31},
+  "distribution": {"kind": "generator", "generator": {
+    "cellSize": 0.9, "viewDistance": 140.0, "presence": 0.55, "clusterSize": 30.0, "clusterContrast": 0.95,
+    "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.6, "tilt": 0.15,
+    "bounded": false, "regionMin": [-50, -50], "regionMax": [50, 50], "regionRadius": 0.0,
+    "groundHeight": 0.0, "groundAmplitude": 6.0, "groundFrequency": 0.012, "groundSeed": 7}},
+  "effectors": [{"field": "reedBands", "op": "emission", "blend": "add", "strength": 6.0}],
+  "lod": {"cull": true, "maxDistance": 140.0, "count": 1},
+  "material": {"baseColor": [0.05, 0.05, 0.06], "emissiveColor": [0.3, 0.8, 1.0], "emissiveIntensity": 0.4},
+  "materialVariation": {"emissiveRandom": 0.5, "emissiveSparsity": 0.3}}}
+```
+
+An agents grid goes in the top-level `grids` array. Show it through a `grid` field node
+(`{"kind": "grid", "reference": "<grid name>"}`) on effectors, emissive fields or particle forces:
+
+```json
+{"name": "mycelium", "mode": "agents", "wrap": "wrap", "resolution": [512, 1, 512],
+ "boundsMin": [-40, -1, -40], "boundsMax": [40, 1, 40], "agentCount": 1000000, "species": 3,
+ "sensorAngle": 0.5, "sensorDistance": 8.0, "turnAngle": 0.4, "stepSize": 1.0, "depositAmount": 0.02,
+ "repel": 0.7, "depositField": "feed", "velocityField": "flow", "advect": 1.5,
+ "diffusion": 0.35, "dissipation": 2.5, "simRate": 60.0, "maxSubSteps": 4, "seed": 2026, "checkpointInterval": 5.0}
+```
+
+### Live and MIDI hooks
+
+These parameter paths are confirmed by `[.list-params]` on the regression scenes:
+
+- `field/<name>/strength`, `bandLow`, `bandHigh`, `bandRepeat`, `audioDelay`, `audioSpeed`,
+  `onsetDecay`, `onsetWidth`: audio fields.
+- `procedural/<name>/distribution/generator/presence`, `sizeMin`, `sizeMax`, `tilt`, `clusterSize`,
+  `clusterContrast`, `jitter`, `groundHeight`, `groundAmplitude`, `groundFrequency`, `regionRadius`:
+  uniform writes, no rebuild. `cellSize` and `viewDistance` are registered too, but they **reallocate
+  the record buffer** (once, grow-only). Do not put them on a fast MIDI knob.
+- `procedural/<name>/effector/<n>/strength`: how hard a field acts.
+- Grid settings are scene-file only (no parameters). Drive a grid through its fields instead: its
+  deposit field's strength, its velocity field's strength or speed.
+
+A MIDI CC to a parameter, in the project:
+
+```json
+"control": {"midi": {"enabled": true, "filter": "*", "bindings": [
+  {"source": "*", "channel": 0, "kind": "cc", "number": 1,
+   "parameter": "procedural/reeds/distribution/generator/presence", "component": 0, "min": 0.1, "max": 1.0}]}}
+```
+
+Routes work as everywhere (`audio.bass`, `audio.onsetLow`, `control.*`, ...). Use routes for
+continuous signals. Use audio *fields* when each element must hear the music differently: its own band,
+its own moment.
+
+### Budgets (M2 Max, 1920×1080, Realtime tier; see "Regression benchmarks")
+
+See the measured table below. The rules of thumb from it:
+
+- **Drawing dominates; generating is nearly free.** A generator window of 700k cells is about 0.5 ms of
+  compute, but 700k *drawn* reeds are tens of milliseconds of raster at production shading. For
+  60 fps, budget **≤ ~250k visible** thin elements. Use `lod.maxDistance`, a coarser `cellSize` for far
+  layers, and several layers of different scale rather than one dense one.
+- **Agents cost per step.** 1M agents is about 3 ms a step, with one step per frame at 60 fps and a
+  60 Hz `simRate`. 250k is about 4× cheaper. A seek replays up to `checkpointInterval` of steps (5 s =
+  300 steps ≈ 1 s at 1M), and a *fresh* render or a forward seek past the checkpoints replays from the
+  last one it has. Lower `simRate` (30) halves the cost if the motion allows it.
+- **Checkpoints:** 1M agents on 512² is 19.3 MB each, 231 MB per minute at 5 s spacing. The budget
+  defaults to 512 MB (`--sim-checkpoint-mb`).
+- **The audio ring** is 0.38 MB fixed and about 400 B a frame.
+
+### Pitfalls (each one met while building this)
+
+1. **The composition's default audio routes spin and scale the whole world** (`root/rotationSpeed ←
+   audio.mid`, integrated over frames; `root/scale ← bass`; `scene/brightness ← rms`;
+   `root/impulse ← onsets`). A scene that does not route those four itself gets them. The
+   regression projects zero them; your project must decide on purpose. The integrated spin is not a
+   function of t, so it breaks exact seeking for every field and grid hanging off the root.
+2. **Agent trails scale with density.** Physarum packs agents into lanes. A lane holds hundreds of
+   agents per cell, and the trail reaches the thousands unless `depositAmount` is small and
+   `dissipation` is high. A trail that blows the frame white means emission ≈ trail × strength is
+   huge; scale the effector strength to the trail's range (the regression scene uses 0.05).
+3. **A spectrum field hears at most 12 s into the past.** Anything older reads 0.
+4. **Live input is not seekable.** Agents fed by live-input audio never restore a checkpoint. The live
+   spectrogram is stretched by running percentiles, so it is visually equivalent to a file render,
+   not equal.
+5. **Generated elements have no CPU records:**
+   - no navigation obstacles, no ecology lights, no CPU path trace (the tracer says so);
+   - the LOD debug overlay skips them;
+   - `MaterialVariation.hueShift` is not applied; use `chromaDrift`, a colour field or a Color
+     effector;
+   - a baked `points` copy keeps placement, not the random lanes.
+6. **Scale effectors changed meaning (ADR-1121).** `scale` with `add` now multiplies the authored scale by
+   (1 + s·k), as ADR-025 always said. Before, the GPU nearly doubled it. Tune against the new reading.
+7. **f32 positions quantise far out:** 7.8 mm at 100 km. An endless flight is fine for the hashing, but
+   a camera kilometres from the origin should keep its nearby content near the origin.
+8. **Picking is through the CPU mirror.** It resolves an element from the clicked depth position, so it
+   ignores effector offsets (a picked element is where the rule put it, before the effectors moved it).
+9. **A seek on a big agents grid stalls the CPU on purpose** while it replays (it waits per chunk; see
+   Risks). In a performance, prefer cues that do not jump the transport.
+10. **`examples/gpu-regression/` scenes are regression fixtures. Do not art-direct them.** Copy them.
