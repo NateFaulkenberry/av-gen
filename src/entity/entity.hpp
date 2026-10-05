@@ -328,6 +328,8 @@ struct EntityUpdate {
     // herd is a visible defect rather than a saving.
     bool distanceDetail = true;
     float distanceScale = 1.0f; // ADR-1094: scene::DetailLimits::distanceScale
+    // ADR-1109: the hero nodes, sorted. An entity driving one keeps its authored bands (distanceScale 1).
+    const std::vector<std::string>* heroNodes = nullptr;
 };
 
 // What the field pass needs. The bus is not const here because a field *publishes*: occupancy and
@@ -340,7 +342,10 @@ struct FieldUpdate {
     glm::vec3 viewPosition{0.0f}; // the same three-band behaviour LOD the behaviour pass uses
     bool distanceDetail = true;   // ADR-186; see EntityUpdate
     float distanceScale = 1.0f;   // ADR-1094; see EntityUpdate
+    const std::vector<std::string>* heroNodes = nullptr; // ADR-1109; see EntityUpdate
 };
+// ADR-1109: the live draw-distance scale an entity driving `node` takes -- 1 for a hero's node.
+[[nodiscard]] float distanceScaleFor(const std::vector<std::string>* heroNodes, const std::string& node, float scale);
 
 // ---- the Director tier's hold on a body (ADR-210) ----------------------------------------------
 //

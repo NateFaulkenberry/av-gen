@@ -1317,6 +1317,7 @@ void Application::saveSettings() {
 
 Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
     initStart_ = std::chrono::steady_clock::now(); // ADR-1090: the profile's load time starts here
+    executablePath_ = executablePath;              // ADR-1110: the Quality Lab is found beside this build
     if (!options.headless) {
         recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
         if (auto r = recent_.load(); !r) {

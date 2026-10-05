@@ -39,6 +39,8 @@ target_sources(avgen_tests PRIVATE
     # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
     "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/live_profile_hook.cpp"
+    # ADR-1108..1113: the Phase 5 optimizer's logic (contribution, heroes, A/B reading, search). No device.
+    "${CMAKE_SOURCE_DIR}/src/app/live_optimize.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
     # The example index is JSON and paths. It is here so the menu the application builds is the one
     # the test reads: checking the raw JSON instead passed on an index the application then refused.

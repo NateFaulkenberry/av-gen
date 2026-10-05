@@ -2916,6 +2916,7 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
     update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
+    update.heroNodes = &heroNodes_;                                                    // ADR-1109
     const std::size_t signalsBefore = bus.size();
     entityWorld_.updateFields(update, *params_);
     if (!fieldRoutesChecked_) {
@@ -3098,6 +3099,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
     update.distanceScale = std::clamp(scene_.detailLimits.distanceScale, 0.05f, 1.0f); // ADR-1094
+    update.heroNodes = &heroNodes_;                                                    // ADR-1109
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
@@ -6211,6 +6213,14 @@ void Composition::rebuild() {
     }
     scene_.splines.splines.clear();
     scene_.sdfs.clear();
+    // ADR-1109: the hero nodes, sorted, for the entity bands' exemption from the live draw-distance lever.
+    heroNodes_.clear();
+    for (const auto& nodePtr : nodes_) {
+        if (importanceOfNode(*nodePtr) == Importance::Hero) {
+            heroNodes_.push_back(nodePtr->name);
+        }
+    }
+    std::sort(heroNodes_.begin(), heroNodes_.end());
     // Terrain grounds first: the generated ground material has to exist before the programs are
     // copied into the scene, or the terrain names a program that is not there until the next
     // rebuild -- which, for a scene that rebuilds once, is never. Generating it here rather than

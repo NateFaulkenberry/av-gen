@@ -2664,8 +2664,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // refused here is only the "do not update at all" band.
         const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running() ||
                                  entity.director_.active;
+        const float bandScale = distanceScaleFor(ctx.heroNodes, entity.desc_.node.empty() ? entity.desc_.name : entity.desc_.node, ctx.distanceScale); // ADR-1109
         if (!first && !underOrders && ctx.distanceDetail && entity.desc_.cullDistance > 0.0f &&
-            distance > entity.desc_.cullDistance * ctx.distanceScale) {
+            distance > entity.desc_.cullDistance * bandScale) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
             // update: no update, and no parameter write either, so the node stays exactly where
             // the scene put it.
@@ -2676,7 +2677,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
 
         double dt = ctx.dt;
         if (!first && ctx.distanceDetail && entity.desc_.fullDetailDistance > 0.0f &&
-            distance > entity.desc_.fullDetailDistance * ctx.distanceScale) {
+            distance > entity.desc_.fullDetailDistance * bandScale) {
             entity.coarseAccum_ += ctx.dt;
             if (entity.coarseAccum_ < static_cast<double>(entity.desc_.coarseInterval)) {
                 ++counts_.skipped;
@@ -3455,11 +3456,12 @@ void EntityWorld::updateFields(const FieldUpdate& ctx, params::ParameterSet& par
         ++fieldCounts_.governed;
         const glm::vec3 here = e.fieldPosition();
         const float distance = glm::length(here - ctx.viewPosition);
-        if (ctx.distanceDetail && e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance * ctx.distanceScale) {
+        const float bandScale = distanceScaleFor(ctx.heroNodes, e.desc().node.empty() ? e.desc().name : e.desc().node, ctx.distanceScale); // ADR-1109
+        if (ctx.distanceDetail && e.desc().cullDistance > 0.0f && distance > e.desc().cullDistance * bandScale) {
             continue;
         }
         if (ctx.distanceDetail && e.desc().fullDetailDistance > 0.0f &&
-            distance > e.desc().fullDetailDistance * ctx.distanceScale) {
+            distance > e.desc().fullDetailDistance * bandScale) {
             e.fieldAccum_ += ctx.dt;
             if (e.fieldAccum_ < static_cast<double>(e.desc().coarseInterval)) {
                 continue;
@@ -4441,6 +4443,13 @@ nlohmann::json entitiesToJson(const std::vector<EntityDesc>& entities) {
         j.push_back(entityToJson(entity));
     }
     return j;
+}
+
+float distanceScaleFor(const std::vector<std::string>* heroNodes, const std::string& node, float scale) {
+    if (heroNodes != nullptr && std::binary_search(heroNodes->begin(), heroNodes->end(), node)) {
+        return 1.0f;
+    }
+    return scale;
 }
 
 } // namespace avgen::entity

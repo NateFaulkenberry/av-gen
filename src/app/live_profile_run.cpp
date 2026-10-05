@@ -17,6 +17,7 @@
 #include "gpu/readback.hpp"
 #include "gpu/resource_stats.hpp"
 #include "platform/window.hpp"
+#include "rendering/importance.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "scene/composition.hpp"
@@ -240,11 +241,18 @@ void Application::fillLiveProfileResources(LiveProfileRecord& record, const std:
 }
 
 void Application::fillLiveProfileEntities(LiveProfileRecord& record) {
-    // Stage 5 groundwork, data only: every entity's bounding sphere seen from the camera, ranked by screen share. A
-    // later phase ranks contributors with it; nothing here acts on it.
+    // Stage 5 groundwork, and ADR-1108's contribution analysis: every entity's bounding sphere seen from the camera.
+    // The radius in pixels is the caster floor's own (radius x pixels-per-unit at its distance, on the render target),
+    // so the analysis predicts exactly which casters `shadowCasterMinPixels` removes; the coverage is the sphere's disc
+    // over the frame; the box is on the OUTPUT (what the A/B frames are).
     const scene::Scene& sc = engine_->scene();
     const scene::Camera& cam = sc.camera;
-    const float tanHalf = std::tan(cam.effectiveFovY() * 0.5f);
+    const std::uint32_t ow = std::max<std::uint32_t>(record.conditions.outputWidth, 1);
+    const std::uint32_t oh = std::max<std::uint32_t>(record.conditions.outputHeight, 1);
+    const std::uint32_t rh = record.conditions.internalHeight > 0 ? record.conditions.internalHeight : oh;
+    const std::uint32_t rw = record.conditions.internalWidth > 0 ? record.conditions.internalWidth : ow;
+    const rendering::ViewContext renderView = rendering::ViewContext::fromCamera(cam, rw, rh);
+    const rendering::ViewContext outputView = rendering::ViewContext::fromCamera(cam, ow, oh);
     std::vector<LiveProfileEntity> all;
     for (const scene::Entity& e : sc.entities) {
         if (e.mesh == scene::kInvalidMesh) {
@@ -253,33 +261,68 @@ void Application::fillLiveProfileEntities(LiveProfileRecord& record) {
         const auto& [lo, hi] = sc.meshBounds(e.mesh);
         const glm::mat4 m = e.transform.matrix();
         const glm::vec3 centre = glm::vec3(m * glm::vec4((lo + hi) * 0.5f, 1.0f));
-        const float scale = std::max({glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])),
-                                      glm::length(glm::vec3(m[2]))});
+        // The renderer's caster-floor radius: the bounds' half diagonal times the largest authored axis scale.
+        const float scale = std::max({std::abs(e.transform.scale.x), std::abs(e.transform.scale.y),
+                                      std::abs(e.transform.scale.z)});
         const float radius = glm::length(hi - lo) * 0.5f * scale;
         const float distance = glm::length(centre - cam.position);
-        double area = 1.0;
-        if (distance > radius && tanHalf > 0.0f) {
-            // The sphere's projected disc as a fraction of the screen's height-squared times the aspect.
-            const double rNdc = static_cast<double>(radius) / (static_cast<double>(distance) * tanHalf); // of half-height
-            const double aspect = record.conditions.outputHeight > 0
-                                      ? static_cast<double>(record.conditions.outputWidth) / record.conditions.outputHeight
-                                      : 16.0 / 9.0;
-            area = std::min(1.0, 3.14159265358979 * rNdc * rNdc / (4.0 * aspect));
-        }
         LiveProfileEntity out;
         out.name = e.name;
-        out.projectedArea = area;
         out.distance = distance;
         out.hero = e.importance == scene::Importance::Hero;
         out.importance = scene::importanceName(e.importance);
+        out.leverWeight = scene::importanceLeverWeight(e.importance);
         out.castsShadow = e.castsShadow;
         out.visible = e.visible && !e.cameraCulled;
+        if (distance <= radius) {
+            out.projectedArea = 1.0; // the camera is inside it
+            out.radiusPx = 0.0;      // and the caster floor never removes it
+            out.onScreen = true;
+        } else {
+            out.radiusPx = static_cast<double>(radius * renderView.pixelsPerUnitAt(distance));
+            const double r = static_cast<double>(radius * outputView.pixelsPerUnitAt(distance));
+            out.projectedArea = std::min(1.0, 3.14159265358979 * r * r / (static_cast<double>(ow) * oh));
+            glm::vec2 px{0.0f};
+            if (outputView.projectToScreen(centre, px)) {
+                const double x0 = std::clamp(static_cast<double>(px.x) - r, 0.0, static_cast<double>(ow));
+                const double x1 = std::clamp(static_cast<double>(px.x) + r, 0.0, static_cast<double>(ow));
+                const double y0 = std::clamp(static_cast<double>(px.y) - r, 0.0, static_cast<double>(oh));
+                const double y1 = std::clamp(static_cast<double>(px.y) + r, 0.0, static_cast<double>(oh));
+                if (x1 > x0 && y1 > y0) {
+                    out.onScreen = true;
+                    out.haveBox = true;
+                    out.x0 = static_cast<std::uint32_t>(x0);
+                    out.y0 = static_cast<std::uint32_t>(y0);
+                    out.x1 = static_cast<std::uint32_t>(std::ceil(x1));
+                    out.y1 = static_cast<std::uint32_t>(std::ceil(y1));
+                }
+            }
+        }
+        out.contribution = contributionOf(out.onScreen ? out.projectedArea : 0.0, out.leverWeight, out.hero);
         all.push_back(std::move(out));
     }
     std::stable_sort(all.begin(), all.end(), [](const auto& a, const auto& b) { return a.projectedArea > b.projectedArea; });
+    // ADR-1108: the particle emitters, with what `particlelod`'s 60 m cull would stop (the renderer's test).
+    std::vector<ContributionEmitter> emitters;
+    for (const scene::ParticleSystem& sys : sc.particles) {
+        ContributionEmitter em;
+        em.name = sys.name;
+        em.distance = glm::length(sys.position - cam.position);
+        em.reach = std::max({sys.extent.x, sys.extent.y, sys.extent.z, 0.0f});
+        em.importance = scene::importanceName(sys.importance);
+        em.leverWeight = scene::importanceLeverWeight(sys.importance);
+        em.hero = sys.importance == scene::Importance::Hero;
+        em.enabled = sys.enabled;
+        em.beyondCull = em.leverWeight > 0.0f && sys.shape != scene::EmitterShape::Spline &&
+                        !sys.scatterAnchor.active() && em.distance - em.reach > 60.0 / em.leverWeight;
+        emitters.push_back(std::move(em));
+    }
+    record.contribution = analyseContribution(all, emitters);
     const std::size_t keep = options_.liveProfile.deep ? 1000 : 100;
     if (all.size() > keep) {
-        record.notes.push_back(fmt::format("entities: the {} largest on screen of {} are listed", keep, all.size()));
+        record.notes.push_back(fmt::format("entities: the {} largest on screen of {} are listed (the contribution "
+                                           "analysis read all of them)",
+                                           keep, all.size()));
         all.resize(keep);
     }
     record.entities = std::move(all);
@@ -348,6 +391,7 @@ int Application::runLiveProfileHeadless() {
     if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);
     }
+    const rendering::QualitySettings baseWithoutCeilings = base; // ADR-1110: `--compare project`'s ORIGINAL
     if (engine_->liveSettings().overrides) {
         base = applyCeiling(base, *engine_->liveSettings().overrides); // ADR-1100: what Optimize applied
     }
@@ -572,6 +616,26 @@ int Application::runLiveProfileHeadless() {
                         "each after {} settling frames, from the measured start; GPU span medians compared "
                         "(rendering::compareArms, the --ab machinery)",
                         kPairs, blockFrames, kSettle);
+    }
+    // ---- Phase 5: ORIGINAL vs OPTIMIZED, and the search (ADR-1110/1111) ----
+    if (!o.compare.empty() || o.optimize) {
+        LiveAbDriver driver;
+        driver.step = step;
+        driver.restart = [&](double piece) {
+            clock.restartAt(piece);
+            renderer_->resetTemporalHistory();
+        };
+        driver.startPiece = measureStartPiece;
+        driver.base = renderer_->qualitySettings();
+        driver.withoutCeilings =
+            applyLiveRung(renderer_->qualitySettings(), baseWithoutCeilings, ladder[rung], rs.scaleFloor);
+        if (const int rc = runLivePhase5(record, driver); rc != 0) {
+            return rc;
+        }
+        renderer_->setQualitySettings(driver.base);
+        scene::DetailLimits limits = engine_->detailLimits();
+        limits.distanceScale = driver.base.drawDistanceScale;
+        engine_->setDetailLimits(limits);
     }
     return writeLiveProfile(record);
 }

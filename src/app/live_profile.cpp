@@ -49,7 +49,23 @@ std::string liveProfileUsage() {
            "                        --text / --no-text     the human report on stdout (default on)\n"
            "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n"
            "                        --no-prewarm           SDF variants compiled at first use on the main thread (the\n"
-           "                                               behaviour before ADR-1102), for before/after measurements\n";
+           "                                               behaviour before ADR-1102), for before/after measurements\n"
+           "                      Phase 5, headless only (ADR-1108..1112):\n"
+           "                        --compare <levers|project> ORIGINAL vs OPTIMIZED: the levers (comma separated A/B\n"
+           "                                               names) applied as ceilings, or 'project' (the project's\n"
+           "                                               own ceilings vs none); timed (A/B) and imaged (the Quality\n"
+           "                                               Lab's pixel, SSIM, edge, luminance, temporal differences)\n"
+           "                        --optimize             search lever combinations for the least measured visual\n"
+           "                                               change that reaches the target (budget x margin)\n"
+           "                        --hero-policy protect|strict  protect (default): no lever that degrades a hero;\n"
+           "                                               strict: no image-wide lever either\n"
+           "                        --optimize-risk low|medium|high  the riskiest lever tried (default medium)\n"
+           "                        --optimize-margin <f>  the target as a fraction of the budget (default 0.9)\n"
+           "                        --optimize-candidates <n> at most n single levers measured (default 8)\n"
+           "                        --ab-frames <n>        consecutive frames captured per arm (default 12)\n"
+           "                        --ab-dir <dir>         keep the ORIGINAL/OPTIMIZED frames there\n"
+           "                        --ab-critic            also ask the Creative Critic (optional; --critic or\n"
+           "                                               AVGEN_CRITIC names it)\n";
 }
 
 LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
@@ -155,6 +171,42 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
             o.text = false;
         } else if (a == "--no-prewarm") {
             o.prewarm = false;
+        } else if (a == "--compare") {
+            if (!text(i, "--compare", o.compare)) return out;
+        } else if (a == "--optimize") {
+            o.optimize = true;
+        } else if (a == "--hero-policy") {
+            if (!text(i, "--hero-policy", o.heroPolicy)) return out;
+            if (!heroPolicyFromToken(o.heroPolicy)) {
+                out.error = fmt::format("--hero-policy expects protect or strict, got '{}'", o.heroPolicy);
+                return out;
+            }
+        } else if (a == "--optimize-risk") {
+            if (!text(i, "--optimize-risk", o.optimizeRisk)) return out;
+            if (riskRank(o.optimizeRisk) > 2) {
+                out.error = fmt::format("--optimize-risk expects low, medium or high, got '{}'", o.optimizeRisk);
+                return out;
+            }
+        } else if (a == "--optimize-margin") {
+            if (!number(i, "--optimize-margin", o.optimizeMargin)) return out;
+            if (o.optimizeMargin < 0.5 || o.optimizeMargin > 1.0) {
+                out.error = "--optimize-margin must be between 0.5 and 1";
+                return out;
+            }
+        } else if (a == "--optimize-candidates") {
+            double n = 0.0;
+            if (!number(i, "--optimize-candidates", n)) return out;
+            o.optimizeCandidates = std::clamp(static_cast<int>(n), 1, 16);
+        } else if (a == "--ab-frames") {
+            double n = 0.0;
+            if (!number(i, "--ab-frames", n)) return out;
+            o.abFrames = std::clamp(static_cast<int>(n), 2, 120);
+        } else if (a == "--ab-dir") {
+            std::string p;
+            if (!text(i, "--ab-dir", p)) return out;
+            o.abDir = p;
+        } else if (a == "--ab-critic") {
+            o.abCritic = true;
         } else if (a == "--verify-candidates") {
             double n = 0.0;
             if (!number(i, "--verify-candidates", n)) return out;
@@ -169,6 +221,13 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
     }
     if (o.warmupSeconds < 0.0) {
         out.error = "--warmup must not be negative";
+    }
+    if ((o.optimize || !o.compare.empty()) && o.mode == LiveProfileMode::Live) {
+        // ORIGINAL and OPTIMIZED must be the same moments of the piece, which only the fixed-step clock gives.
+        out.error = "--compare and --optimize run headless only (the A/B images need the fixed-step clock)";
+    }
+    if (o.abCritic && o.compare.empty() && !o.optimize) {
+        out.error = "--ab-critic needs --compare or --optimize";
     }
     return out;
 }
@@ -484,6 +543,7 @@ std::vector<LiveProfileCandidate> optimizationCandidates(const CandidateInputs& 
     const auto add = [&](LiveProfileCandidate c) {
         if (c.estimatedHighMs >= 0.1 && c.costMs > 0.0) {
             c.estimatedLowMs = std::max(0.0, std::min(c.estimatedLowMs, c.estimatedHighMs));
+            c.heroEffect = heroEffectName(heroEffectOfLever(c.lever)); // ADR-1109
             out.push_back(std::move(c));
         }
     };
@@ -732,6 +792,12 @@ json definitions() {
         {"criticalPath", "GPU, CPU or sync/present: which one the frame waits on, from the measured medians"},
         {"candidates.estimated*", "ESTIMATED savings from the per-pass scaling model"},
         {"candidates.measured*", "MEASURED savings from an interleaved, counterbalanced A/B in this process"},
+        {"candidates.heroEffect", "ADR-1109: exempt (heroes skipped by the engine), image-wide (every pixel, heroes "
+                                  "included), degrades (a hero's own representation)"},
+        {"contribution", "ADR-1108: screen coverage of bounding spheres over the lever weight; heroes are protected"},
+        {"comparisons", "ADR-1110: ORIGINAL vs OPTIMIZED, MEASURED: timing by A/B, pictures by the Quality Lab"},
+        {"optimization.plans", "ADR-1111: ESTIMATED from measured singles, assumed additive; never a measurement"},
+        {"optimization.measuredCombos", "ADR-1111: MEASURED combinations"},
     };
 }
 
@@ -868,6 +934,7 @@ json liveProfileJson(const LiveProfileRecord& r) {
                 {"estimatedSavingMs", {{"low", k.estimatedLowMs}, {"high", k.estimatedHighMs}}},
                 {"estimateBasis", k.estimateBasis},
                 {"risk", k.risk},
+                {"heroEffect", k.heroEffect},
                 {"verified", k.verified}};
         if (k.verified) {
             cj["measuredSaving"] = {{"ms", k.measuredSavingMs},
@@ -884,10 +951,29 @@ json liveProfileJson(const LiveProfileRecord& r) {
     j["verification"] = r.verificationMode;
     json ents = json::array();
     for (const auto& e : r.entities) {
-        ents.push_back({{"name", e.name}, {"projectedArea", e.projectedArea}, {"distance", e.distance}, {"hero", e.hero},
-                        {"importance", e.importance}, {"castsShadow", e.castsShadow}, {"visible", e.visible}});
+        json ej{{"name", e.name},          {"projectedArea", e.projectedArea}, {"distance", e.distance},
+                {"hero", e.hero},          {"importance", e.importance},       {"castsShadow", e.castsShadow},
+                {"visible", e.visible},    {"radiusPx", e.radiusPx},           {"leverWeight", e.leverWeight},
+                {"onScreen", e.onScreen},
+                {"contribution", std::isfinite(e.contribution) ? json(e.contribution) : json("protected (hero)")}};
+        if (e.haveBox) {
+            ej["box"] = {e.x0, e.y0, e.x1, e.y1};
+        }
+        ents.push_back(std::move(ej));
     }
     j["entities"] = ents;
+    j["contribution"] = contributionJson(r.contribution);
+    if (!r.comparisons.empty()) {
+        json comps = json::array();
+        for (const auto& c : r.comparisons) {
+            comps.push_back(comparisonJson(c));
+        }
+        j["comparisons"] = {{"floor", r.comparisonFloor.raw.is_null() ? json(nullptr) : r.comparisonFloor.raw},
+                            {"runs", comps}};
+    }
+    if (r.optimization.ran) {
+        j["optimization"] = optimizationJson(r.optimization);
+    }
     j["status"] = r.status;
     j["headroom"] = r.headroom;
     j["limits"] = r.limits;
@@ -1014,13 +1100,26 @@ std::string liveProfileText(const LiveProfileRecord& r) {
             line("    MEASURED:  {:+.2f} ms GPU ({:+.1f}%), floor {:.1f}% over {} pair(s) -> {}", k.measuredSavingMs,
                  k.measuredSavingPercent, k.noiseFloorPercent, k.measuredPairs, k.measuredVerdict);
         }
-        line("    risk:      {}{}", k.risk, k.lever.empty() ? "" : "   (lever: " + k.lever + ")");
+        line("    risk:      {}{}   heroes: {}", k.risk, k.lever.empty() ? "" : "   (lever: " + k.lever + ")",
+             k.heroEffect.empty() ? "-" : k.heroEffect);
     }
     if (r.candidates.empty()) {
         line("  none above 0.1 ms");
     }
     if (!r.verificationMode.empty()) {
         line("  verification: {}", r.verificationMode);
+    }
+    if (r.contribution.available) {
+        line("{}", rule);
+        t += contributionText(r.contribution);
+    }
+    for (const auto& c : r.comparisons) {
+        line("{}", rule);
+        t += comparisonText(c, r.comparisonFloor);
+    }
+    if (r.optimization.ran) {
+        line("{}", rule);
+        t += optimizationText(r.optimization);
     }
     line("{}", rule);
     line("LIMITS");

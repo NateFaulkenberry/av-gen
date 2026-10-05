@@ -665,9 +665,17 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
     // suppress timeline evaluation or a character freezes at the frustum boundary and pops when it
     // comes back. The explicit rig cullDistance remains the policy for skipping distant animation.
     std::vector<float> nearest(scene.rigs.size(), std::numeric_limits<float>::max());
+    // ADR-1109: a rig any hero entity is skinned by keeps its authored rates under the live draw-distance lever.
+    std::vector<std::uint8_t> heroRig(scene.rigs.size(), 0);
     const glm::vec3 eye = scene.camera.position;
     for (const Entity& entity : scene.entities) {
-        if (entity.rig >= scene.rigs.size() || !entity.visible) {
+        if (entity.rig >= scene.rigs.size()) {
+            continue;
+        }
+        if (entity.importance == Importance::Hero) {
+            heroRig[entity.rig] = 1;
+        }
+        if (!entity.visible) {
             continue;
         }
         const float distance = glm::distance(eye, entity.transform.position);
@@ -685,9 +693,8 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
         // however far away it is. `rateFor(0)` rather than a bare `updateHz` so the one rule that
         // decides a rate stays in one place -- at zero distance it is the near band by definition.
         // ADR-1094: the live distance scale measures the rig as if it were further away (1 = as authored).
-        const float hz = scene.detailLimits.rigDistanceRate
-                             ? rig.rateFor(nearest[i] / std::clamp(scene.detailLimits.distanceScale, 0.05f, 1.0f))
-                             : rig.rateFor(0.0f);
+        const float distanceScale = heroRig[i] != 0 ? 1.0f : std::clamp(scene.detailLimits.distanceScale, 0.05f, 1.0f);
+        const float hz = scene.detailLimits.rigDistanceRate ? rig.rateFor(nearest[i] / distanceScale) : rig.rateFor(0.0f);
         if (hz < 0.0f) {
             rig.hold();
             ++stats.culled;

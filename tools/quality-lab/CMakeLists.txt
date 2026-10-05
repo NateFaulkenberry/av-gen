@@ -7,6 +7,7 @@
 add_library(avgen_quality_metrics STATIC
     metrics/spatial.cpp
     metrics/temporal.cpp
+    metrics/ab.cpp
     capture/sequence.cpp
     artifacts/masks.cpp
     report/vector.cpp

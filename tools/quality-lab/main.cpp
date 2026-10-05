@@ -16,6 +16,7 @@
 // own ladder when a metric is deliberately broken.
 
 #include "artifacts/masks.hpp"
+#include "metrics/ab.hpp"
 #include "capture/sequence.hpp"
 #include "external/vmaf.hpp"
 #include "metrics/spatial.hpp"
@@ -58,6 +59,9 @@ struct Args {
     std::string reference;
     std::string aovDir;
     std::string out;
+    std::string original;  // ab
+    std::string optimized; // ab
+    std::string regions;   // ab
     std::string profile;
     std::string scene;
     std::string configuration;
@@ -131,6 +135,12 @@ bool parseArgs(int argc, char** argv, Args& args, std::string& error) {
             args.candidate = next(i);
         } else if (flag == "--reference") {
             args.reference = next(i);
+        } else if (flag == "--original") {
+            args.original = next(i);
+        } else if (flag == "--optimized") {
+            args.optimized = next(i);
+        } else if (flag == "--regions") {
+            args.regions = next(i);
         } else if (flag == "--aov-dir") {
             args.aovDir = next(i);
         } else if (flag == "--out") {
@@ -192,6 +202,12 @@ void usage() {
             separately. A scene that calls a shape "the control" is making a claim about
             where a difference may appear; this is the thing that checks it. Without
             --object it surveys the identifier plane and prints what it found.
+
+  ab        --original <dir> --optimized <dir> --out <file.json> [--regions <regions.json>]
+            ADR-1110: the live optimizer's ORIGINAL vs OPTIMIZED differences -- pixel, structural,
+            edge, luminance (and SSIM / pixel at matched luminance), temporal -- per frame and
+            pooled, also inside the regions (the hero boxes). Schema avgen.abdiff/1. Computes;
+            does not decide.
 
   validate  --ladder [--json]
             Runs the distortion ladder and the temporal control arms, and then runs
@@ -987,6 +1003,137 @@ int analyze(const Args& args) {
     return 0;
 }
 
+// ---- ab (ADR-1110) -----------------------------------------------------------------------------
+
+nlohmann::json pooledJson(const AbPooled& p) {
+    const auto num = [](double v) { return std::isfinite(v) ? nlohmann::json(v) : nlohmann::json(nullptr); };
+    return {{"mean", num(p.mean)}, {"worst", num(p.worst)}};
+}
+
+int abCommand(const Args& args) {
+    if (args.original.empty() || args.optimized.empty() || args.out.empty()) {
+        std::cerr << "ab needs --original, --optimized and --out\n";
+        return 2;
+    }
+    auto original = discoverSequence(args.original);
+    if (!original) {
+        std::cerr << original.error().message << "\n";
+        return 1;
+    }
+    auto optimized = discoverSequence(args.optimized);
+    if (!optimized) {
+        std::cerr << optimized.error().message << "\n";
+        return 1;
+    }
+    if (original->size() != optimized->size() || original->empty()) {
+        std::cerr << fmt::format("ab: original has {} frames and optimized {}; the two runs must describe the same "
+                                 "moments\n",
+                                 original->size(), optimized->size());
+        return 1;
+    }
+    std::vector<Region> regions;
+    if (!args.regions.empty()) {
+        std::ifstream in(args.regions);
+        const nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+        if (doc.is_discarded() || !doc.contains("regions")) {
+            std::cerr << fmt::format("ab: '{}' is not a regions file\n", args.regions);
+            return 1;
+        }
+        for (const auto& r : doc["regions"]) {
+            Region region;
+            region.name = r.value("name", std::string());
+            region.x0 = r.value("x0", 0u);
+            region.y0 = r.value("y0", 0u);
+            region.x1 = r.value("x1", 0u);
+            region.y1 = r.value("y1", 0u);
+            regions.push_back(std::move(region));
+        }
+    }
+    std::vector<Frame> a, b;
+    for (std::size_t i = 0; i < original->size(); ++i) {
+        auto fa = readFrame(original->frames[i]);
+        auto fb = readFrame(optimized->frames[i]);
+        if (!fa || !fb) {
+            std::cerr << (fa ? fb.error().message : fa.error().message) << "\n";
+            return 1;
+        }
+        if (!fa->sameShapeAs(*fb)) {
+            std::cerr << fmt::format("ab: frame {} differs in size ({}x{} vs {}x{})\n", i, fa->width, fa->height,
+                                     fb->width, fb->height);
+            return 1;
+        }
+        a.push_back(std::move(*fa));
+        b.push_back(std::move(*fb));
+    }
+    const AbSequence s = abCompareSequence(a, b, regions);
+    const auto num = [](double v) { return std::isfinite(v) ? nlohmann::json(v) : nlohmann::json(nullptr); };
+    nlohmann::json j;
+    j["schema"] = "avgen.abdiff/1";
+    j["tool"] = fmt::format("avgen_quality {}", kVersion);
+    j["original"] = args.original;
+    j["optimized"] = args.optimized;
+    j["frames"] = s.frames;
+    j["definitions"] = {
+        {"meanAbsDiff", "pixel: mean |dRGB| over three channels, 0..255 steps"},
+        {"changedFraction", "pixel: fraction of pixels whose largest channel moved more than 8 steps"},
+        {"psnr", "pixel: dB over RGB; null when every frame pair was identical"},
+        {"ssim", "structural: single-scale SSIM on luma, 8x8 windows"},
+        {"msSsim", "structural: multi-scale SSIM"},
+        {"edgeDifference", "edge: mean |Sobel(a) - Sobel(b)| / mean Sobel(a)"},
+        {"edgeStrengthRatio", "edge: mean Sobel(b) / mean Sobel(a); below 1 is softer"},
+        {"edgesLost", "edge: of a's strong-edge pixels (above its 90th percentile), the fraction b lost"},
+        {"edgesAdded", "edge: b's strong-edge pixels absent in a, as a fraction of a's"},
+        {"lumaDelta", "luminance: |mean luma(b) - mean luma(a)|, 0..255 steps"},
+        {"ssimMatched", "structural at MATCHED luminance: b scaled to a's mean luma first"},
+        {"meanAbsDiffMatched", "pixel at MATCHED luminance"},
+        {"temporalDifference", "temporal: mean | |dL_a/dt| - |dL_b/dt| | between consecutive frames, luma steps"},
+        {"temporalActivityRatio", "temporal: mean frame-to-frame change of b over a's"},
+        {"region*", "the same inside the regions (hero boxes); SSIM area-weighted over boxes of 8 px or more"},
+        {"pooling", "mean over frames, and the worst frame (max for differences, min for SSIM and ratios)"},
+    };
+    j["pooled"] = {
+        {"meanAbsDiff", pooledJson(s.meanAbsDiff)},
+        {"changedFraction", pooledJson(s.changedFraction)},
+        {"psnr", pooledJson(s.psnr)},
+        {"ssim", pooledJson(s.ssim)},
+        {"msSsim", pooledJson(s.msSsim)},
+        {"edgeDifference", pooledJson(s.edgeDifference)},
+        {"edgeStrengthRatio", pooledJson(s.edgeStrengthRatio)},
+        {"edgesLost", pooledJson(s.edgesLost)},
+        {"edgesAdded", pooledJson(s.edgesAdded)},
+        {"lumaDelta", pooledJson(s.lumaDelta)},
+        {"ssimMatched", pooledJson(s.ssimMatched)},
+        {"meanAbsDiffMatched", pooledJson(s.meanAbsDiffMatched)},
+        {"temporalDifference", s.haveTemporal ? pooledJson(s.temporalDifference) : nlohmann::json(nullptr)},
+        {"temporalActivityRatio", s.haveTemporal ? pooledJson(s.temporalActivityRatio) : nlohmann::json(nullptr)},
+        {"regionMeanAbsDiff", s.haveRegions ? pooledJson(s.regionMeanAbsDiff) : nlohmann::json(nullptr)},
+        {"regionLumaDelta", s.haveRegions ? pooledJson(s.regionLumaDelta) : nlohmann::json(nullptr)},
+        {"regionSsim", s.haveRegions ? pooledJson(s.regionSsim) : nlohmann::json(nullptr)},
+        {"regionSsimMatched", s.haveRegions ? pooledJson(s.regionSsimMatched) : nlohmann::json(nullptr)},
+    };
+    j["luma"] = {{"original", s.lumaOriginal}, {"optimized", s.lumaOptimized}};
+    j["regions"] = {{"given", regions.size()}, {"onFrame", s.haveRegions}, {"coverage", s.regionCoverage}};
+    nlohmann::json per = nlohmann::json::array();
+    for (const AbFrame& f : s.perFrame) {
+        per.push_back({{"meanAbsDiff", f.meanAbsDiff}, {"psnr", num(f.psnr)}, {"ssim", f.ssim},
+                       {"ssimMatched", f.ssimMatched}, {"edgeDifference", f.edgeDifference},
+                       {"lumaDelta", f.lumaDelta},
+                       {"temporalDifference", f.haveTemporal ? num(f.temporalDifference) : nlohmann::json(nullptr)},
+                       {"regionSsim", f.haveRegions ? num(f.regionSsim) : nlohmann::json(nullptr)}});
+    }
+    j["perFrame"] = per;
+    std::ofstream out(args.out);
+    if (!out) {
+        std::cerr << fmt::format("ab: cannot write '{}'\n", args.out);
+        return 1;
+    }
+    out << j.dump(2) << "\n";
+    std::cout << fmt::format("ab: {} frame(s): SSIM {:.4f} (matched {:.4f}), mean |d| {:.2f}, luma {:+.2f}\n",
+                             s.frames, s.ssim.mean, s.ssimMatched.mean, s.meanAbsDiff.mean,
+                             s.lumaOptimized - s.lumaOriginal);
+    return 0;
+}
+
 // ---- compare -----------------------------------------------------------------------------------
 
 int compare(const Args& args) {
@@ -1531,6 +1678,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "compare") {
         return compare(args);
+    }
+    if (args.command == "ab") {
+        return abCommand(args);
     }
     if (args.command == "control") {
         return control(args);

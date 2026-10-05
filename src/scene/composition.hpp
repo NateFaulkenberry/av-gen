@@ -963,6 +963,8 @@ public:
     [[nodiscard]] const std::vector<world::HeroPoint>& heroes() const { return heroes_; }
     // ADR-1097: the node's importance as the live levers read it (authored, else Hero for a hero, else Normal).
     [[nodiscard]] Importance importanceOfNode(const CompositionNode& node) const;
+    // ADR-1109: the names of the nodes that are heroes at the last flatten, sorted (the entity bands read it).
+    [[nodiscard]] const std::vector<std::string>& heroNodes() const { return heroNodes_; }
     // The same heroes with their **authored** positions rather than their live ones, which is what
     // every serialiser wants and what `heroes()` cannot give it.
     //
@@ -2099,6 +2101,7 @@ private:
     std::size_t authoredLightFirst_ = 0;
     std::vector<std::size_t> authoredLightNodeIndex_;
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    std::vector<std::string> heroNodes_;     // ADR-1109: hero node names at the last flatten, sorted
     // ADR-834: per entity, in entity order, the last published cinematic signals and their ids.
     struct CinematicSlot {
         std::string name;

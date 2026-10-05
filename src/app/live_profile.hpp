@@ -16,6 +16,7 @@
 //   * nothing is invented. A category the engine cannot time separately is reported as "not separately measurable"
 //     rather than given a share of a neighbour's number.
 
+#include "app/live_optimize.hpp"
 #include "rendering/render_stats.hpp"
 
 #include <nlohmann/json_fwd.hpp>
@@ -56,6 +57,16 @@ struct LiveProfileOptions {
     int verifyCandidates = 0;                      // measure the top N candidates' savings (A/B), 0 = estimate only
     bool prewarm = true; // --no-prewarm: the pre-ADR-1102 behaviour (SDF variants compiled on the main thread at first
                          // use), kept so a before/after can be measured in one build
+    // ---- Phase 5 (ADR-1110..1112), headless only ----
+    std::string compare;          // --compare <lever,lever|project>: ORIGINAL vs OPTIMIZED, timed and imaged
+    bool optimize = false;        // --optimize: the combination search to the target
+    std::string heroPolicy = "protect";  // --hero-policy protect|strict (ADR-1109)
+    std::string optimizeRisk = "medium"; // --optimize-risk low|medium|high: the riskiest lever the search may try
+    double optimizeMargin = 0.9;  // --optimize-margin: the search's target is budget x margin (ADR-1107's 0.9)
+    int optimizeCandidates = 8;   // --optimize-candidates: at most this many singles measured
+    int abFrames = 12;            // --ab-frames: consecutive frames captured per arm (after 10 settling frames)
+    std::optional<std::filesystem::path> abDir; // --ab-dir: where the ORIGINAL/OPTIMIZED frames are kept
+    bool abCritic = false;        // --ab-critic: also ask the Creative Critic (optional; ADR-1112)
 };
 
 // Splits a command line into the profiler's own flags and everything else, which the ordinary parser then reads
@@ -273,6 +284,7 @@ struct LiveProfileCandidate {
     double estimatedLowMs = 0.0, estimatedHighMs = 0.0; // ESTIMATED: from the per-pass scaling model
     std::string estimateBasis;
     std::string risk;         // "low" | "medium" | "high"
+    std::string heroEffect;   // ADR-1109: "exempt" | "image-wide" | "degrades"
     // MEASURED, only after --verify-candidates. Never merged with the estimate.
     bool verified = false;
     double measuredSavingMs = 0.0;
@@ -309,12 +321,19 @@ struct CandidateInputs {
 // 5 (groundwork only): per-entity screen-space data a later phase can rank contributors with.
 struct LiveProfileEntity {
     std::string name;
-    double projectedArea = 0.0; // fraction of the screen its bounds cover (0..1, clipped)
+    double projectedArea = 0.0; // fraction of the screen its bounds cover (0..1, clipped): the coverage
     double distance = 0.0;      // metres from the camera
     bool hero = false;
     std::string importance;     // "hero" | "foreground" | "normal" | "background" | "ambient"
     bool castsShadow = false;
     bool visible = false;
+    // ADR-1108
+    double radiusPx = 0.0;      // the bounding sphere's radius on screen, the caster floor's formula
+    float leverWeight = 1.0f;   // scene::importanceLeverWeight
+    double contribution = 0.0;  // coverage / weight; +inf for a hero
+    bool onScreen = false;      // its centre projects inside the frame (or the camera is inside it)
+    bool haveBox = false;       // a screen box (on screen, in front)
+    std::uint32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 };
 
 struct LiveProfileRecord {
@@ -337,6 +356,10 @@ struct LiveProfileRecord {
     std::vector<std::string> limits;   // what this run cannot see, said plainly
     std::vector<std::string> notes;
     std::vector<LiveProfileEntity> entities;
+    ContributionReport contribution;         // ADR-1108
+    std::vector<AbComparison> comparisons;   // ADR-1110 (--compare)
+    AbVisual comparisonFloor;                // ORIGINAL vs ORIGINAL, for the comparisons
+    OptimizationReport optimization;         // ADR-1111 (--optimize)
     std::string status;                // "UNDER BUDGET" | "OVER BUDGET" | "AT RISK"
     bool headroom = false;
     std::string verificationMode;      // how --verify-candidates measured ("headless interleaved A/B, ...")

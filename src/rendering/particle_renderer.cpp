@@ -607,7 +607,10 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 stats_.anchors += static_cast<std::uint32_t>(anchorTable.size());
             }
         }
-        double rate = static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale);
+        // ADR-1109: a hero's emitter keeps its authored rate under every live spawn scale (the brief's 5.3:
+        // "particles: preserve"); only the levers' weight-0 rule, the same as the distance cull above.
+        const float spawnScale = scene::importanceLeverWeight(sys.importance) <= 0.0f ? 1.0f : frame_.spawnScale;
+        double rate = static_cast<double>(sys.spawnRate) * static_cast<double>(spawnScale);
         if (anchored) {
             // `spawnRate` is the rate with the table full, so a tree's swarm is as dense when three
             // trees are in reach as when sixty are.

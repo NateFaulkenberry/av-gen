@@ -10,6 +10,7 @@
 #include "app/interactive_resolution.hpp"
 #include "app/viewport_camera.hpp"
 #include "app/live_profile.hpp"
+#include "gpu/readback.hpp"
 #include "scene/camera_rig.hpp"
 #include "app/placement.hpp"
 #include "app/viewport_pick.hpp"
@@ -370,6 +371,17 @@ private:
     // Stage 5 groundwork (data only): per-entity projected area, distance and hero flag.
     void fillLiveProfileEntities(LiveProfileRecord& record);
     int writeLiveProfile(LiveProfileRecord& record);
+    // ADR-1110/1111: Phase 5 on the headless loop -- ORIGINAL vs OPTIMIZED (--compare) and the search (--optimize).
+    // `step` renders one frame (an image when asked), `restart` puts the fixed-step clock back at a piece time.
+    struct LiveAbDriver {
+        std::function<bool(LiveProfileFrame&, std::optional<gpu::Image8>*)> step;
+        std::function<void(double)> restart;
+        double startPiece = 0.0;
+        rendering::QualitySettings base;          // what the profile measured (the project's ceilings included)
+        rendering::QualitySettings withoutCeilings; // the same level without the project's ceilings
+    };
+    int runLivePhase5(LiveProfileRecord& record, const LiveAbDriver& driver);
+    std::filesystem::path executablePath_;
     std::chrono::steady_clock::time_point initStart_{};
     // ADR-1100/1101: the Performance panel's Live Performance section, fed from the frames the editor rendered.
     void wireLivePerformancePanel();
