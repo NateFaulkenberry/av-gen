@@ -37,7 +37,7 @@ struct State {
     float appendWeight = 1.0f; // density weight of appendage matter (below ~0.4: strands of dust, not tubes)
     glm::vec3 eye{0.0f, 0.0f, 25.0f}, target{0.0f};
     float fovDeg = 30.0f;
-    float exposure = 0.85f, haze = 0.25f;
+    float exposure = 0.85f, haze = 0.12f;
     std::string label; // camera behaviour / phase, for the log
 };
 
@@ -267,8 +267,12 @@ inline Score buildScore(const SongAnalysis& song) {
 inline float phraseCoherence(const Score& sc, const Phrase& ph, double t) {
     const float u = static_cast<float>((t - ph.start) / std::max(ph.end - ph.start, 1e-3));
     const bool firstOfSection = ph.index == 0 || sc.phrases[static_cast<std::size_t>(ph.index - 1)].section != ph.section;
-    const bool build = (ph.index % 2 == 0) || firstOfSection;
-    if (build) return 0.08f + 0.9f * std::pow(sstep(0.0f, 0.82f, u), 1.25f);
+    // a kick that destroys the form always starts a rebuild (otherwise the collapse is a 90 ms flinch)
+    const bool build = (ph.index % 2 == 0) || firstOfSection || ph.kickOpens;
+    // a phrase opened by a strong kick builds from near chaos (the previous form was destroyed); one that
+    // opens softly only half-dissolves and rebuilds from there
+    const float base = ph.kickOpens ? 0.08f : 0.45f;
+    if (build) return base + (0.98f - base) * std::pow(sstep(0.0f, 0.82f, u), 1.25f);
     return 0.93f + 0.06f * std::sin(u * 6.28f);
 }
 
@@ -294,7 +298,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const float cPrevEnd = phraseCoherence(sc, prev, prev.end - 1e-3);
         const float since = static_cast<float>(t - ph.start);
         // the collapse: from the previous phrase's held form to near chaos in 90 ms, then the new build
-        if (since < 0.09f) C = cPrevEnd + (0.12f - cPrevEnd) * sstep(0.0f, 0.09f, since);
+        if (since < 0.09f) C = cPrevEnd + (0.08f - cPrevEnd) * sstep(0.0f, 0.09f, since);
         s.strobe = 0.7f * pulse(since, 0.0f, 0.07f);
     }
     C += 0.10f * (a.env0.z - 0.5f);

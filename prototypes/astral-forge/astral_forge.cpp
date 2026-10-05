@@ -255,6 +255,18 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "song: %.1f s, %.1f bpm, %zu beats, %zu sections, %zu phrases, %zu kicks, %zu snares (analysis %.1f s)\n",
                  song.duration, song.tempoBpm, song.beats.size(), song.sections.size(), score.phrases.size(), song.kickT.size(),
                  song.snareT.size(), song.analyseSeconds);
+    if (o.debug == 8) {
+        // the conductor as CSV at 60 Hz (CPU only): what the music did to the entity's state
+        const double d = o.to > 0.0 ? o.to : testDuration(o.test);
+        std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera\n");
+        for (double t = o.from; t <= d + 1e-9; t += 1.0 / 60.0) {
+            const astral::State s = conduct(o, static_cast<float>(t), song, score);
+            std::printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%s\n", t, o.songStart + t, s.C, s.S,
+                        s.flash, s.archA, s.morph, s.temper, s.mass, s.breath, s.flow, s.shimmer, s.fold0.x, s.fold0.y, s.fold0.z, s.fold0.w, s.strobe,
+                        s.label.c_str());
+        }
+        return 0;
+    }
     if (o.debug == 9) {
         for (const auto& s : song.sections) std::fprintf(stderr, "  section %6.2f-%6.2f group %d %-12s energy %.2f density %.2f\n", s.start, s.end, s.group, s.label.c_str(), s.energy, s.density);
         for (const auto& p : score.phrases) std::fprintf(stderr, "  phrase %3d %6.2f-%6.2f sec %d kickOpens %d\n", p.index, p.start, p.end, p.section, p.kickOpens);

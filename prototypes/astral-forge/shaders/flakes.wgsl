@@ -151,7 +151,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     let F0 = vec3f(0.5, 0.51, 0.54) * film;
     let Fr = F0 + (vec3f(0.95) - F0) * pow(1.0 - cosV, 5.0);
     // the flake's reflected radiance: dark unless its normal finds a band (a glint)
-    let base = envF(r, 0.012) * Fr * select(0.35 + 0.5 * b, 0.15 + 0.6 * F.ext.w, role == 5);
+    let base = envF(r, 0.012) * Fr * select(0.2 + 0.65 * b, 0.15 + 0.6 * F.ext.w, role == 5);
     // heat shows as sparks: only a third of the matter carries it visibly, so a collapse is a spray, not a fireball
     var glint = heatColor(heat) * select(0.0, 1.4, hz < 0.045);
     // a few hot cores: the field's nervous system
