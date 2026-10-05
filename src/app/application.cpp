@@ -1180,6 +1180,9 @@ void Application::initControlPlane() {
     aiEditSink_ = std::make_unique<EditHistoryTransactionSink>(*engine_, edits_,
                                                                ai_->transactionSink());
     ai_->setTransactionSink(aiEditSink_.get());
+    // ADR-1106/1113: the performance tools run this executable's --live-profile on a scratch copy. Installed in every
+    // session (a headless --ai-script run too), so the tools are reachable wherever the control plane is.
+    ai_->setProfileHook(makeProfileHook(executablePath_, std::filesystem::temp_directory_path() / "avgen-liveprofile"));
     ai_->settings() = settings_.ai;
     if (auto r = ai_->applySettings(); !r) {
         // Not an error: "no provider configured" is the ordinary state (ADR-065), and saying so at
@@ -1629,8 +1632,6 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // configured, so `director.evaluate` answers "no evaluator is configured: --critic ..." rather
         // than claiming the whole capability is absent.
         ai_->setEvaluationHook(makeEvaluationHook(evaluatorOptionsFrom(options_.critic, options_.criticUrl)));
-        // ADR-1106: performance.profile_scene runs this executable's --live-profile on a scratch copy.
-        ai_->setProfileHook(makeProfileHook(executablePath, std::filesystem::temp_directory_path() / "avgen-liveprofile"));
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass

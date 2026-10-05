@@ -225,3 +225,38 @@ TEST_CASE("pipelines are counted where they are created and Dawn reports memory"
     REQUIRE_FALSE(m.largest.empty());
     CHECK(m.largest.front().bytes >= m.largest.back().bytes);
 }
+
+// ADR-1109: the brief's "particles: preserve" for a hero. The live spawn scale (particlelod, the profiles, the lower
+// levels) thins a normal emitter and leaves a hero's at its authored rate.
+TEST_CASE("the live spawn scale thins a normal emitter and never a hero's", "[gpu][live-optimizer]") {
+    auto ctx = makeCtx();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto scene = castersScene();
+    scene::ParticleSystem sys;
+    sys.name = "spray";
+    sys.capacity = 4096;
+    sys.spawnRate = 6000.0f;
+    sys.position = {0.0f, 1.0f, 0.0f};
+    scene.particles = {sys};
+    FrameTime time{};
+    time.renderTime = 1.0;
+    time.deltaTime = 1.0 / 60.0;
+    const auto emitted = [&] {
+        ++time.frameIndex;
+        REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+        return renderer.stats().particles.emittedThisFrame;
+    };
+    const std::uint32_t full = emitted();
+    REQUIRE(full >= 90);
+    rendering::QualitySettings q = renderer.qualitySettings();
+    q.particleSpawnScale = 0.5f;
+    renderer.setQualitySettings(q);
+    const std::uint32_t thinned = emitted();
+    CHECK(thinned <= full / 2 + 1);
+    CHECK(thinned >= full / 2 - 1);
+    scene.particles[0].importance = scene::Importance::Hero;
+    CHECK(emitted() == full);
+    CHECK(ctx->errorCount() == 0);
+}

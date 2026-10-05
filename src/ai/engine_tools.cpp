@@ -3390,6 +3390,94 @@ void registerPerformanceTools(ToolRegistry& registry) {
             ctx.deferResult(std::move(*handle));
             return ToolResult::ok(json{{"profiling", true}}, "profiling");
         });
+    // ---- ADR-1113: Phase 5 for agents -- optimize, apply the low-risk set, benchmark before/after ----
+    const auto startPhase5 = [](ToolContext& ctx, ProfileRequest request, const json& args) -> ToolResult {
+        if (!ctx.profileHook()) {
+            return ToolResult::failure(ToolErrorCode::Unavailable,
+                                       "profiling is not available in this session (the host installed no profiler)");
+        }
+        request.mode = "headless";
+        request.targetFps = args.value("targetFps", 60.0);
+        request.width = static_cast<std::uint32_t>(args.value("width", 1920));
+        request.height = static_cast<std::uint32_t>(args.value("height", 1080));
+        request.start = args.value("start", 0.0);
+        request.quality = args.value("quality", std::string("ultra"));
+        request.heroPolicy = args.value("heroPolicy", std::string("protect"));
+        request.maxRisk = args.value("maxRisk", request.maxRisk);
+        request.critic = args.value("critic", false);
+        if (request.heroPolicy != "protect" && request.heroPolicy != "strict") {
+            return ToolResult::failure(ToolErrorCode::InvalidArguments, "heroPolicy must be protect or strict");
+        }
+        if (request.maxRisk != "low" && request.maxRisk != "medium" && request.maxRisk != "high") {
+            return ToolResult::failure(ToolErrorCode::InvalidArguments, "maxRisk must be low, medium or high");
+        }
+        auto handle = ctx.profileHook()(ctx.engine(), request);
+        if (!handle) {
+            return ToolResult::failure(ToolErrorCode::Internal, "the run did not start: " + handle.error().message);
+        }
+        ctx.deferResult(std::move(*handle));
+        return ToolResult::ok(json{{"running", true}}, "running");
+    };
+    const auto phase5Args = [](json extra) {
+        json fields{
+            {"targetFps", schema::number("the live target, 24..240 (default 60)", 24.0, 240.0)},
+            {"width", schema::integer("the output width in pixels (default 1920)", 16.0, 7680.0)},
+            {"height", schema::integer("the output height in pixels (default 1080)", 16.0, 4320.0)},
+            {"start", schema::number("seconds into the piece to measure from (default 0)", 0.0)},
+            {"quality", schema::string("the level or profile the search starts from (default ultra)")},
+            {"heroPolicy", schema::string("protect (default): no lever that degrades a hero; strict: no image-wide "
+                                          "lever either",
+                                          {"protect", "strict"})},
+            {"critic", schema::boolean("also ask the Creative Critic (optional; unavailable is reported, not an "
+                                       "error)")}};
+        for (auto& [k, v] : extra.items()) {
+            fields[k] = v;
+        }
+        return schema::object(fields);
+    };
+    ToolAnnotations optimizes = sessionWrite();
+    optimizes.expensive = true;
+    optimizes.idempotent = false;
+    add(registry, "performance.optimize_scene", "Optimize the scene for a frame rate",
+        "Search lever combinations (avgen --live-profile --optimize, headless, on a scratch copy) for the least "
+        "MEASURED visual change that reaches the target (budget x 0.9). Every single lever is measured for time (A/B) "
+        "and picture (ORIGINAL vs OPTIMIZED: pixel, SSIM, edge, luminance incl. matched, temporal, inside the hero "
+        "boxes); combinations are ESTIMATED from the singles and then MEASURED. Heroes are never degraded by default. "
+        "With apply=true the chosen levers are added to the project's live ceilings when the answer arrives (never the "
+        "scene; performance.set_live_quality clearOverrides undoes it). Minutes. The editor shares the GPU meanwhile.",
+        phase5Args(json{{"maxRisk", schema::string("the riskiest lever tried (default medium)", {"low", "medium", "high"})},
+                    {"apply", schema::boolean("add the chosen levers to the project's ceilings (default false)")}}),
+        optimizes, [startPhase5](const json& args, ToolContext& ctx) -> ToolResult {
+            ProfileRequest request;
+            request.optimize = true;
+            request.apply = args.value("apply", false) ? ProfileRequest::Apply::Chosen : ProfileRequest::Apply::None;
+            return startPhase5(ctx, request, args);
+        });
+    add(registry, "performance.apply_low_risk_optimizations", "Apply the low-risk optimizations",
+        "Measure every low-risk, hero-safe lever on a scratch copy (time by A/B, picture by the Quality Lab) and add to "
+        "the project's live ceilings only those with a saving outside the noise. Never edits the scene; heroes exempt. "
+        "The answer lists what was applied with its measured saving and visual change. Minutes.",
+        phase5Args(json::object()), optimizes, [startPhase5](const json& args, ToolContext& ctx) -> ToolResult {
+            ProfileRequest request;
+            request.optimize = true;
+            request.maxRisk = "low";
+            request.apply = ProfileRequest::Apply::LowRisk;
+            return startPhase5(ctx, request, args);
+        });
+    add(registry, "performance.benchmark_before_after", "Benchmark before and after",
+        "ORIGINAL vs OPTIMIZED on a scratch copy (avgen --live-profile --compare): \"project\" (default) compares the "
+        "project without and with its live ceilings; or name levers (\"scale85,volumequarter\"). Both are MEASURED: "
+        "frame cost by counterbalanced A/B and the picture by the Quality Lab, with the self-difference floor (ORIGINAL "
+        "rendered twice). Read-only.",
+        phase5Args(json{{"levers", schema::string("\"project\" (default) or comma-separated levers")}}), profiles,
+        [startPhase5](const json& args, ToolContext& ctx) -> ToolResult {
+            ProfileRequest request;
+            request.compare = args.value("levers", std::string("project"));
+            if (request.compare.empty()) {
+                request.compare = "project";
+            }
+            return startPhase5(ctx, request, args);
+        });
     add(registry, "performance.get_live_quality", "Read the live quality settings",
         "The project's live block (ADR-1084/1100): target frame rate, profile (QUALITY/BALANCED/PERFORMANCE), the "
         "strategy, the lowest level the controller may use, the degradation priority, and the ceilings the Optimize "

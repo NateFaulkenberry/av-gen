@@ -157,6 +157,16 @@ struct ProfileRequest {
     std::string quality = "auto";
     bool deep = false;
     int verifyCandidates = 0;
+    // ADR-1113 (Phase 5): the same child, asked for more.
+    std::string compare;               // --compare: levers ("scale85,volumequarter") or "project"; empty = none
+    bool optimize = false;             // --optimize: the combination search
+    std::string heroPolicy = "protect";
+    std::string maxRisk = "medium";
+    bool critic = false;               // --ab-critic (optional; the Critic is never required)
+    // What `settle` does to the project when the answer arrives (main thread): nothing, the search's chosen levers,
+    // or the measured low-risk set -- each added to the project's live ceilings (ADR-1101), never the scene.
+    enum class Apply { None, Chosen, LowRisk };
+    Apply apply = Apply::None;
 };
 using ProfileHook = std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, const ProfileRequest& request)>;
 

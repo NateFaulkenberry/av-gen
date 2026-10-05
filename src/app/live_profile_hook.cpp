@@ -3,6 +3,7 @@
 #include "app/directing_evaluate.hpp"
 #include "app/directing_record.hpp"
 #include "app/engine.hpp"
+#include "app/interactive_resolution.hpp"
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -32,6 +33,15 @@ std::vector<std::string> liveProfileCommand(const fs::path& executable, const fs
         argv.push_back("--verify-candidates");
         argv.push_back(std::to_string(r.verifyCandidates));
     }
+    if (!r.compare.empty()) {
+        argv.insert(argv.end(), {"--compare", r.compare});
+    }
+    if (r.optimize) {
+        argv.insert(argv.end(), {"--optimize", "--hero-policy", r.heroPolicy, "--optimize-risk", r.maxRisk});
+    }
+    if (r.critic && (r.optimize || !r.compare.empty())) {
+        argv.push_back("--ab-critic");
+    }
     return argv;
 }
 
@@ -50,6 +60,7 @@ public:
     }
     Result<void> start(Engine& live, const ai::ProfileRequest& request, const fs::path& executable,
                        const fs::path& scratchDir) {
+        apply_ = request.apply;
         std::error_code ec;
         fs::create_directories(scratchDir, ec);
         auto copy = writeRecordingCopy(live, scratchDir);
@@ -105,11 +116,43 @@ public:
         out["summary"] = fmt::format("{} ({} candidate(s))", result_.value("status", std::string("?")),
                                      result_.contains("candidates") ? result_["candidates"].size() : 0);
         out["contended"] = "the editor was rendering while this ran: the GPU was shared";
+        const std::vector<std::string> levers = leversToApply(out);
+        if (apply_ != ai::ProfileRequest::Apply::None) {
+            out["applying"] = levers;
+            out["applyingBasis"] = apply_ == ai::ProfileRequest::Apply::Chosen
+                                       ? "the search's chosen combination (MEASURED to reach the target)"
+                                       : "the measured low-risk set (low risk, hero-safe, a saving outside the noise)";
+        }
         return out;
+    }
+    // ADR-1113: main thread, once -- the levers become project ceilings (ADR-1101), never scene edits.
+    void settle(Engine& engine, const nlohmann::json& value) override {
+        const std::vector<std::string> levers = leversToApply(value);
+        if (levers.empty()) {
+            return;
+        }
+        LiveProjectSettings s = engine.liveSettings();
+        LiveQualityRung c = s.overrides.value_or(LiveQualityRung{});
+        for (const auto& l : levers) {
+            (void)applyLeverToCeiling(c, l);
+        }
+        s.overrides = c;
+        engine.setLiveSettings(s);
     }
     void cancel() override { cancel_ = true; }
 
 private:
+    [[nodiscard]] std::vector<std::string> leversToApply(const nlohmann::json& record) const {
+        if (apply_ == ai::ProfileRequest::Apply::None || !record.contains("optimization")) {
+            return {};
+        }
+        const nlohmann::json& o = record["optimization"];
+        if (apply_ == ai::ProfileRequest::Apply::Chosen) {
+            return o.value("reached", false) ? o.value("chosen", std::vector<std::string>{}) : std::vector<std::string>{};
+        }
+        return o.value("lowRisk", std::vector<std::string>{});
+    }
+    ai::ProfileRequest::Apply apply_ = ai::ProfileRequest::Apply::None;
     std::thread thread_;
     std::atomic<bool> cancel_{false};
     std::atomic<bool> done_{false};

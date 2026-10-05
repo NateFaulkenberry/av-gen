@@ -912,3 +912,29 @@ TEST_CASE("the modular aliens import as drivable rigs", "[assets][gltf][skeleton
     }
 #endif
 }
+
+// ADR-1109: the live draw-distance lever measures a rig as if it were further away -- except a hero's, which keeps its
+// authored rates (the brief's 5.3, "animation: preserve").
+TEST_CASE("the draw-distance lever culls a far rig sooner, never a hero's", "[scene][animation][live-optimizer]") {
+    scene::Scene s;
+    s.camera.position = glm::vec3(0.0f);
+    s.rigs.push_back(twoStateRig());
+    const scene::MeshId mesh = s.addMesh([] {
+        scene::MeshData m;
+        m.vertices = {{{0, 0, 0}, {0, 0, 1}, {0, 0}}, {{1, 0, 0}, {0, 0, 1}, {1, 0}}, {{0, 1, 0}, {0, 0, 1}, {0, 1}}};
+        m.indices = {0, 1, 2};
+        return m;
+    }());
+    scene::Entity& e = s.addEntity("alien", mesh);
+    e.rig = 0;
+    e.transform.position = glm::vec3(0.0f, 0.0f, -100.0f); // inside the 120 m cull; past it at 0.75
+    FrameTime time;
+    time.renderTime = 1.0;
+    CHECK(scene::updateRigs(s, time).culled == 0);
+    s.detailLimits.distanceScale = 0.75f;
+    time.renderTime = 2.0;
+    CHECK(scene::updateRigs(s, time).culled == 1);
+    e.importance = scene::Importance::Hero;
+    time.renderTime = 3.0;
+    CHECK(scene::updateRigs(s, time).culled == 0);
+}
