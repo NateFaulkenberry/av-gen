@@ -34,6 +34,7 @@
 #include "spatial/point_cloud.hpp"
 #include "spatial/spatial_ops.hpp"
 #include "spatial/spline.hpp"
+#include "scene/generator.hpp"
 #include "scene/grammar.hpp"
 
 #include <glm/glm.hpp>
@@ -271,7 +272,12 @@ struct SourceSpec {
 // evaluates for itself; this one is for arrangements nothing local can derive -- an ecology pass
 // that knows which slopes a fern grows on, a scatter baked in a DCC, a survey of real positions.
 // The cloud is supplied at resolve time, exactly as an imported mesh is.
-enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar, Scatter };
+// Generator (ADR-1117): no CPU placements at all. A GPU kernel writes the records of the cells of a
+// window around the camera every frame from `generator` (scene/generator.hpp, which is also the CPU
+// mirror); `instances` stays empty and the object is drawn through the cull pass.
+// Points (ADR-1118): explicit, serialised placements -- what a generator region is baked into, and
+// the escape hatch for hand edits and for consumers that need CPU records.
+enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar, Scatter, Generator, Points };
 [[nodiscard]] const char* distributionKindName(DistributionKind kind);
 [[nodiscard]] std::optional<DistributionKind> distributionKindFromName(std::string_view name);
 
@@ -318,7 +324,15 @@ struct Distribution {
     bool alignToSpline = true;
     float roll = 0.0f;             // radians about the tangent
     glm::vec3 splineOffset{0.0f};  // in the spline frame (binormal, normal, tangent)
+    // Generator (ADR-1117). Only the window-sizing fields are structural (GeneratorSpec::structuralHash);
+    // everything else is read by the renderer every frame, so a parameter or a route moves it with no
+    // rebuild.
+    GeneratorSpec generator;
+    // Points (ADR-1118): serialised; shared so a per-frame parameter pass copies a pointer, not the list.
+    std::shared_ptr<const std::vector<Transform>> points;
+    std::uint64_t pointsHash = 0; // set with `points` (setPoints); what the structural hash sees
 
+    void setPoints(std::vector<Transform> placements);
     [[nodiscard]] Result<void> validate() const;
     // Spline kind: count when spacing == 0, else floor(length * (end - start) / spacing) + 1
     // (needs the spline; `count` when null). Grammar kind: reported by the owner (ProceduralGeometry).
@@ -430,6 +444,7 @@ struct DeformContext {
 [[nodiscard]] float fbm3(glm::vec3 p, std::uint32_t seed);
 constexpr int kMaxDeformers = 8;
 constexpr std::size_t kKeepCloudMax = 262144;
+constexpr std::size_t kMaxBakedPoints = 65536; // ADR-1118: a Points list, and so a bake, holds at most this
 
 // ---- material variation ------------------------------------------------------------------------
 
@@ -638,6 +653,13 @@ struct ProceduralGeometry {
     [[nodiscard]] std::uint64_t structuralHash() const;
     // Instance world matrix within the object (distribution * placement * variation * source).
     [[nodiscard]] glm::mat4 instanceMatrix(std::uint32_t index) const;
+    // ADR-1117: records come from the GPU kernel, not from `instances`.
+    [[nodiscard]] bool isGenerator() const { return distribution.kind == DistributionKind::Generator; }
+    // The material variation a generator kernel applies (the part of MaterialVariation it supports).
+    [[nodiscard]] GeneratorVariation generatorVariation() const {
+        return GeneratorVariation{materialVariation.valueRandom, materialVariation.emissiveRandom,
+                                  materialVariation.emissiveSparsity};
+    }
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<ProceduralGeometry> fromJson(const nlohmann::json& j);
 };

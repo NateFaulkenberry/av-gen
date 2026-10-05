@@ -317,6 +317,12 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
     // The composition's depth bands: `density` thins this band, `detail` moves the LOD ladder.
     let band = depthBand(dist);
     if (band.x < 1.0 && instanceHash(i) >= max(band.x, 0.0)) { limitsCulled = true; }
+    // ADR-1117: a zero-scale record is an empty cell of a generator window. It draws nothing, so it is
+    // rejected from both lists rather than drawn as a degenerate instance.
+    if (max(max(s.x, s.y), s.z) <= 0.0) {
+        limitsCulled = true;
+        shadowOutside = true;
+    }
     let detail = max(band.y, 1e-3);
     let culled = limitsCulled || cameraOutside;
 

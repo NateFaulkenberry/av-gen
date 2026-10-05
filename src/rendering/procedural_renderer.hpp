@@ -137,7 +137,35 @@ struct ProceduralStats {
     std::uint64_t shadowLodCounts[4] = {0, 0, 0, 0};
     std::uint32_t shadowCullObjects = 0;       // objects that built a shadow caster list this frame
     double cullMs = -1.0;                 // GPU time of the last measured cull pass (-1 = none / unavailable)
+    // ADR-1117: generator objects. `generatorCells` is the windows' total this frame (the records the
+    // kernel wrote, present or not); `generatorBytes` the record buffers they own (capacity, not use).
+    std::uint32_t generatorObjects = 0;
+    std::uint64_t generatorCells = 0;
+    std::uint64_t generatorBytes = 0;
+    std::uint32_t generatorDispatches = 0;
+    double generatorMs = -1.0;            // GPU time of the last measured generator pass
 };
+
+// The generator kernel's parameters (shaders/generator.wgsl `GeneratorParams`, 224 bytes, ADR-1117).
+struct GeneratorUniforms {
+    glm::mat4 genToObject;   // distributionTransform
+    glm::vec4 rotation;      // its rotation (x, y, z, w)
+    glm::vec4 scaleInfo;     // its scale xyz
+    glm::ivec4 window;       // origin x, origin z, count x, count z
+    glm::ivec4 region;       // min x, min z, max x, max z (inclusive cells)
+    glm::uvec4 hashing;      // seed, presence (16-bit), cluster cells, contrast (16-bit)
+    glm::uvec4 flags;        // x = bounded, y = disc
+    glm::vec4 cell;          // cell size, jitter, size min, size max
+    glm::vec4 shape;         // tilt, value random, emissive random, emissive sparsity
+    glm::vec4 ground;        // height, amplitude, frequency, 0
+    glm::vec4 disc;          // centre x, centre z, radius, 0
+};
+static_assert(sizeof(GeneratorUniforms) == 224);
+// Packs one generator object's kernel parameters for `window` (scene/generator.hpp).
+[[nodiscard]] GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const scene::GeneratorWindow& window);
+// The camera in a generator object's own lattice space: inverse(objectMatrix * distributionTransform).
+[[nodiscard]] glm::vec3 generatorCameraSpace(const scene::ProceduralGeometry& object, const glm::mat4& objectMatrix,
+                                             const glm::vec3& cameraWorld);
 
 // Per-object result of the cull pass (blocking readback; tests and tools).
 struct CullCounts {
@@ -363,6 +391,9 @@ public:
     // Blocking readback of the records the draw reads for the object named `name` (the live
     // buffer after the effector pass, else the base buffer). Tests and tools only.
     [[nodiscard]] Result<std::vector<scene::InstanceRecord>> readInstanceRecords(const std::string& name);
+    // ADR-1117: the window the generator kernel evaluated for `name` in the frame just recorded (empty
+    // for a non-generator or an object not drawn).
+    [[nodiscard]] scene::GeneratorWindow generatorWindow(const std::string& name) const;
     // Blocking readback of the last cull pass's per-level counts for the object named `name`.
     // Tests and tools only.
     [[nodiscard]] Result<CullCounts> readCullCounts(const std::string& name);

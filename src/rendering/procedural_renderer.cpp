@@ -255,6 +255,13 @@ struct ProceduralRenderer::Impl {
         std::uint64_t simVersion = ~0ull;   // structureVersion the sim's grid was built from
         spatial::VegetationSim sim;
         bool simActive = false;             // a live active set this frame
+        // ADR-1117: a generator's kernel parameters and its group over `instances` (rebuilt when that
+        // buffer is replaced), and the window it evaluated in `generatorFrame`.
+        wgpu::Buffer generatorUniforms;
+        wgpu::BindGroup generatorGroup;
+        wgpu::Buffer generatorGroupTarget;
+        scene::GeneratorWindow generatorWindow;
+        std::uint64_t generatorFrame = 0;
     };
     struct DrawItem {
         std::size_t objectIndex;        // into scene.procedurals
@@ -289,6 +296,11 @@ struct ProceduralRenderer::Impl {
     struct ComputeItem {
         const ObjectState* state;
         std::uint32_t count;
+    };
+    struct GeneratorItem { // ADR-1117
+        const ObjectState* state;
+        std::uint32_t countX;
+        std::uint32_t countZ;
     };
     struct CullItem {
         const ObjectState* state;
@@ -333,6 +345,8 @@ struct ProceduralRenderer::Impl {
     Result<wgpu::RenderPipeline> createWirePipeline(const wgpu::ShaderModule& module, bool occlude);
     Result<void> createComputePipeline(const wgpu::ShaderModule& module);
     Result<void> createCullPipelines(const wgpu::ShaderModule& module);
+    Result<void> createGeneratorPipeline(const wgpu::ShaderModule& module); // ADR-1117
+    void ensureGeneratorState(ObjectState& state);
     Result<wgpu::ComputePipeline> makeCompute(const wgpu::PipelineLayout& layout, const wgpu::ShaderModule& module,
                                               const char* entry, const char* label);
     CachedMesh uploadMesh(const Result<scene::MeshData>& mesh, const std::string& name);
@@ -369,6 +383,9 @@ struct ProceduralRenderer::Impl {
     wgpu::BindGroupLayout computeLayout;
     wgpu::PipelineLayout computePipelineLayout;
     wgpu::ComputePipeline effectorPipeline;
+    wgpu::BindGroupLayout generatorLayout;          // ADR-1117
+    wgpu::PipelineLayout generatorPipelineLayout;
+    wgpu::ComputePipeline generatorPipeline;
     wgpu::BindGroupLayout cullLayout;
     wgpu::PipelineLayout cullPipelineLayout;
     wgpu::ComputePipeline cullClassifyPipeline;
@@ -406,6 +423,7 @@ struct ProceduralRenderer::Impl {
     std::map<std::string, ObjectState> objects;
     std::vector<DrawItem> items;
     std::vector<ComputeItem> computeItems;
+    std::vector<GeneratorItem> generatorItems;
     std::vector<CullItem> cullItems;
     // Parallel to cullItems. The uniforms are staged rather than written as they are built because
     // a material part reached later in the object loop appends itself to its lead's fanout list
@@ -690,6 +708,35 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     if (auto r = im.createCullPipelines(*cull); !r) {
         return r;
     }
+    {
+        // ADR-1117: the generator kernel. 0 = params, 1 = the object's record buffer (written).
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Compute;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(GeneratorUniforms);
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Compute;
+        entries[1].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[1].buffer.minBindingSize = kInstanceStride;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "procedural-generator-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        im.generatorLayout = im.context.device().CreateBindGroupLayout(&desc);
+        wgpu::PipelineLayoutDescriptor pdesc{};
+        pdesc.label = "procedural-generator-pipeline-layout";
+        pdesc.bindGroupLayoutCount = 1;
+        pdesc.bindGroupLayouts = &im.generatorLayout;
+        im.generatorPipelineLayout = im.context.device().CreatePipelineLayout(&pdesc);
+    }
+    auto generator = im.shaders.load("generator.wgsl");
+    if (!generator) {
+        return std::unexpected(generator.error());
+    }
+    if (auto r = im.createGeneratorPipeline(*generator); !r) {
+        return r;
+    }
     im.initialised = true;
     return {};
 }
@@ -713,7 +760,90 @@ Result<void> ProceduralRenderer::reload() {
     if (!cull) {
         return std::unexpected(cull.error());
     }
-    return impl_->createCullPipelines(*cull);
+    if (auto r = impl_->createCullPipelines(*cull); !r) {
+        return r;
+    }
+    auto generator = impl_->shaders.load("generator.wgsl");
+    if (!generator) {
+        return std::unexpected(generator.error());
+    }
+    return impl_->createGeneratorPipeline(*generator);
+}
+
+Result<void> ProceduralRenderer::Impl::createGeneratorPipeline(const wgpu::ShaderModule& module) {
+    auto pipeline = makeCompute(generatorPipelineLayout, module, "cs_generate", "procedural-generator");
+    if (!pipeline) {
+        return std::unexpected(pipeline.error());
+    }
+    generatorPipeline = *pipeline;
+    return {};
+}
+
+void ProceduralRenderer::Impl::ensureGeneratorState(ObjectState& state) {
+    const auto& device = context.device();
+    if (!state.generatorUniforms) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "procedural-generator-params";
+        desc.size = sizeof(GeneratorUniforms);
+        desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        state.generatorUniforms = device.CreateBuffer(&desc);
+        state.generatorGroup = nullptr;
+    }
+    if (!state.generatorGroup || state.generatorGroupTarget.Get() != state.instances.Get()) {
+        std::array<wgpu::BindGroupEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].buffer = state.generatorUniforms;
+        entries[0].size = sizeof(GeneratorUniforms);
+        entries[1].binding = 1;
+        entries[1].buffer = state.instances;
+        entries[1].size = state.instanceBytes;
+        wgpu::BindGroupDescriptor desc{};
+        desc.label = "procedural-generator-group";
+        desc.layout = generatorLayout;
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        state.generatorGroup = device.CreateBindGroup(&desc);
+        state.generatorGroupTarget = state.instances;
+    }
+}
+
+GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const scene::GeneratorWindow& window) {
+    const scene::GeneratorSpec& g = object.distribution.generator;
+    const scene::GeneratorVariation v = object.generatorVariation();
+    GeneratorUniforms u{};
+    u.genToObject = object.distributionTransform.matrix();
+    const glm::quat r = object.distributionTransform.rotation;
+    u.rotation = glm::vec4(r.x, r.y, r.z, r.w);
+    u.scaleInfo = glm::vec4(object.distributionTransform.scale, 0.0f);
+    u.window = glm::ivec4(window.originX, window.originZ, window.countX, window.countZ);
+    const scene::GeneratorRegionCells cells = scene::generatorRegionCells(g);
+    u.region = glm::ivec4(cells.minX, cells.minZ, cells.maxX, cells.maxZ);
+    const auto presence = static_cast<std::uint32_t>(std::lround(std::clamp(g.presence, 0.0f, 1.0f) * 65535.0f));
+    const auto contrast =
+        static_cast<std::uint32_t>(std::lround(std::clamp(g.clusterContrast, 0.0f, 1.0f) * 65535.0f));
+    u.hashing = glm::uvec4(object.variation.seed, presence, static_cast<std::uint32_t>(scene::generatorClusterCells(g)),
+                           contrast);
+    u.flags = glm::uvec4(g.bounded ? 1u : 0u, (g.bounded && g.regionRadius > 0.0f) ? 1u : 0u, 0u, 0u);
+    u.cell = glm::vec4(g.cellSize, g.jitter, g.sizeMin, g.sizeMax);
+    u.shape = glm::vec4(g.tilt, v.valueRandom, v.emissiveRandom, v.emissiveSparsity);
+    u.ground = glm::vec4(g.groundHeight, g.groundAmplitude, g.groundFrequency, 0.0f);
+    u.disc = glm::vec4((g.regionMin.x + g.regionMax.x) * 0.5f, (g.regionMin.y + g.regionMax.y) * 0.5f, g.regionRadius,
+                       0.0f);
+    return u;
+}
+
+glm::vec3 generatorCameraSpace(const scene::ProceduralGeometry& object, const glm::mat4& objectMatrix,
+                               const glm::vec3& cameraWorld) {
+    const glm::mat4 toWorld = objectMatrix * object.distributionTransform.matrix();
+    return glm::vec3(glm::inverse(toWorld) * glm::vec4(cameraWorld, 1.0f));
+}
+
+scene::GeneratorWindow ProceduralRenderer::generatorWindow(const std::string& name) const {
+    const auto it = impl_->objects.find(name);
+    if (it == impl_->objects.end() || it->second.generatorFrame != impl_->frame) {
+        return {};
+    }
+    return it->second.generatorWindow;
 }
 
 void ProceduralRenderer::setViewport(std::uint32_t width, std::uint32_t height) {
@@ -1438,6 +1568,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     stats_ = ProceduralStats{};
     im.items.clear();
     im.computeItems.clear();
+    im.generatorItems.clear();
     im.cullItems.clear();
     im.cullUniformStaging.clear();
     im.passThisFrame = false;
@@ -1594,7 +1725,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
         const auto& object = scene.procedurals[i];
-        if (!object.visible || object.instances.empty() || object.meshHash == 0) {
+        // ADR-1117: a generator has no CPU records; its kernel writes them below.
+        const bool generated = object.isGenerator();
+        if (!object.visible || (object.instances.empty() && !generated) || object.meshHash == 0) {
             continue;
         }
         if (slot >= kMaxProceduralObjects) {
@@ -1612,10 +1745,17 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // ADR-1094: the live levers on the authored ladder, weighted by the object's importance. A copy, so the scene's
         // own settings (and what an offline render reads) are untouched; at 1, 1 it is the authored ladder exactly.
         scene::LodSettings liveLod = object.lod;
+        // ADR-1117: a generator's records are only ever drawn through the cull pass (an empty cell is a
+        // zero-scale record the pass rejects), and its window shrinks with the draw-distance lever.
+        float generatorReach = 1.0f;
+        if (generated) {
+            liveLod.cull = true;
+        }
         if (liveLodBias_ != 1.0f || liveDrawDistance_ != 1.0f) {
             const float weight = scene::importanceLeverWeight(object.importance);
             const float bias = std::max(0.25f, 1.0f + (liveLodBias_ - 1.0f) * weight);
             const float reach = std::clamp(1.0f - (1.0f - liveDrawDistance_) * weight, 0.05f, 1.0f);
+            generatorReach = reach;
             if (liveLod.maxDistance > 0.0f) {
                 liveLod.maxDistance *= reach;
             }
@@ -1627,7 +1767,20 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const scene::LodSettings& lodSettings = liveLod;
         const std::uint32_t lodCount =
             static_cast<std::uint32_t>(std::clamp(lodSettings.lodCount, 1, scene::kMaxLodLevels));
-        const std::uint32_t instanceCount = static_cast<std::uint32_t>(object.instances.size());
+        const glm::mat4 objectModel = i < objectMatrices.size() ? objectMatrices[i] : glm::mat4(1.0f);
+        scene::GeneratorWindow genWindow;
+        std::uint64_t genCapacity = 0;
+        if (generated) {
+            genWindow = scene::generatorWindow(object.distribution.generator,
+                                               generatorCameraSpace(object, objectModel, scene.camera.position),
+                                               generatorReach);
+            genCapacity = scene::generatorCapacity(object.distribution.generator).cells();
+            if (genWindow.cells() == 0 || genCapacity == 0) {
+                continue; // the camera's window misses the region: nothing exists this frame
+            }
+        }
+        const std::uint32_t instanceCount = generated ? static_cast<std::uint32_t>(genWindow.cells())
+                                                      : static_cast<std::uint32_t>(object.instances.size());
         const bool cullActive = lodSettings.cull || lodCount > 1;
         // ADR-108. Resolved here rather than in the pre-pass because it needs the lead's GPU state,
         // which exists only once the lead has been through this loop -- and a part whose lead was
@@ -1730,13 +1883,16 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         Impl::ObjectState& state = im.objects[key];
         state.lastUsed = im.frame;
-        const std::uint64_t instanceBytes = static_cast<std::uint64_t>(object.instances.size()) * kInstanceStride;
+        // A generator's buffer is sized for its largest window once, so the window can move and shrink
+        // with no reallocation.
+        const std::uint64_t instanceBytes =
+            (generated ? genCapacity : static_cast<std::uint64_t>(object.instances.size())) * kInstanceStride;
         // ---- ADR-056 Tier 1: does this layer ask to be simulated, and is there room ----
         // An object with effectors is excluded: the GPU moves its records after this point, so the
         // CPU positions the level-of-detail decision reads would be the wrong ones.
         const wind::SimLod& simLod = object.motion.simulate;
         const int simShare = std::min(simLod.budget, im.simRemaining);
-        const bool simWanted = simLod.enabled && windActive && !usesLive && simShare > 0;
+        const bool simWanted = simLod.enabled && windActive && !usesLive && !generated && simShare > 0;
         im.ensureObjectBuffers(state, instanceBytes, usesLive, lodCount, cullActive, instanceCount,
                                simWanted ? instanceCount : 0u,
                                simWanted ? static_cast<std::uint32_t>(simShare) : 0u,
@@ -1745,7 +1901,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                leadState != nullptr ? leadState->cullLodCount : 0u);
         state.usesLive = usesLive;
         state.statsSlot = slot;
-        if (state.structureVersion != object.structureVersion || state.uploadedCount != object.instances.size()) {
+        if (!generated &&
+            (state.structureVersion != object.structureVersion || state.uploadedCount != object.instances.size())) {
             queue.WriteBuffer(state.instances, 0, object.instances.data(), instanceBytes);
             state.structureVersion = object.structureVersion;
             state.uploadedCount = object.instances.size();
@@ -1770,7 +1927,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const float lodSourceRadius = std::max(mesh->radius * sourceScaleOf(object),
                                                groupLodRadius[i]);
         const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
-                                        : (cullActive && !usesLive &&
+                                        : (cullActive && !usesLive && !generated &&
                                            objectFullyCulled(lodSettings, planes, cullCamera, model,
                                                              state.bounds, cullRadius,
                                                              scene.detailLimits.proceduralDistanceCull));
@@ -1785,7 +1942,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const bool casts = object.castsShadow && !shadowViewPlanes.empty();
         const bool shadowFullyCulled =
             !casts || (isPart ? shadowFullyCulledOf[leadIndex] != 0
-                              : (cullActive && !usesLive &&
+                              : (cullActive && !usesLive && !generated &&
                                  objectFullyCulledForShadows(lodSettings, shadowViewPlanes, cullCamera, model,
                                                              state.bounds, cullRadius,
                                                              scene.detailLimits.proceduralDistanceCull)));
@@ -1798,7 +1955,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // bounds were taken can prove nothing and records every level.
         LevelRange levels{};
         levels.highest = static_cast<int>(lodCount) - 1;
-        if (cullActive && !usesLive && state.bounds.valid) {
+        if (cullActive && !usesLive && !generated && state.bounds.valid) {
             if (isPart) {
                 levels = levelRangeOf[leadIndex];
             } else {
@@ -1883,12 +2040,25 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (usesLive) {
             eff.objectToWorld = model;
             eff.worldToObjectRotation = glm::mat4(glm::transpose(rotationOf(model)));
-            eff.info = glm::uvec4(static_cast<std::uint32_t>(object.instances.size()), effectorCount, 0u, 0u);
+            eff.info = glm::uvec4(instanceCount, effectorCount, 0u, 0u);
             queue.WriteBuffer(state.effectorUniforms, 0, &eff, sizeof(eff));
-            im.computeItems.push_back(Impl::ComputeItem{&state, static_cast<std::uint32_t>(object.instances.size())});
+            im.computeItems.push_back(Impl::ComputeItem{&state, instanceCount});
             ++stats_.effectorObjects;
-            stats_.effectorInstances += object.instances.size();
+            stats_.effectorInstances += instanceCount;
             stats_.effectors += effectorCount;
+        }
+        // ---- ADR-1117: the generator kernel writes this frame's window into the record buffer ----
+        if (generated) {
+            const GeneratorUniforms gu = packGenerator(object, genWindow);
+            im.ensureGeneratorState(state);
+            queue.WriteBuffer(state.generatorUniforms, 0, &gu, sizeof(gu));
+            im.generatorItems.push_back(Impl::GeneratorItem{&state, static_cast<std::uint32_t>(genWindow.countX),
+                                                            static_cast<std::uint32_t>(genWindow.countZ)});
+            state.generatorWindow = genWindow;
+            state.generatorFrame = im.frame;
+            ++stats_.generatorObjects;
+            stats_.generatorCells += genWindow.cells();
+            stats_.generatorBytes += state.instanceBytes;
         }
 
         // ---- deformer/time block (every frame) ----
@@ -1931,7 +2101,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             }
         }
         u.timeInfo = glm::vec4(static_cast<float>(time.renderTime), static_cast<float>(deformerCount),
-                               1e-3f * mesh->radius, static_cast<float>(object.instances.size()));
+                               1e-3f * mesh->radius, static_cast<float>(instanceCount));
         // ---- ADR-055 Tier 0 vegetation motion ----
         // The whole species model is resolved here, once per draw: two oscillator transfer
         // functions and a phase lag become three gains and a delay, and the vertex stage does
@@ -2165,9 +2335,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // `logicalTriangles` below is deliberately NOT deduplicated -- it is the geometry the
         // object contains, and each part contains its own.
         if (!isPart) {
-            stats_.instances += object.instances.size();
+            stats_.instances += instanceCount;
         }
-        stats_.logicalTriangles += static_cast<std::uint64_t>(mesh->indexCount / 3) * object.instances.size();
+        stats_.logicalTriangles += static_cast<std::uint64_t>(mesh->indexCount / 3) * instanceCount;
         stats_.instanceBufferBytes += state.instanceBytes + (usesLive ? state.liveBytes : 0);
         stats_.deformers += enabled;
         stateOf[i] = &state;
@@ -2182,6 +2352,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     }
     if (slot > 0) {
         queue.WriteBuffer(im.objectUniforms, 0, im.staging.data(), static_cast<std::size_t>(slot) * kObjectStride);
+    }
+
+    // ---- ADR-1117: the generator pass, before the effectors (which read what it writes) ----
+    if (!im.generatorItems.empty()) {
+        wgpu::ComputePassDescriptor desc{};
+        desc.label = "procedural-generators";
+        desc.timestampWrites =
+            im.timeline != nullptr ? im.timeline->mark("generators", gpu::FrameTimeline::PassKind::Compute) : nullptr;
+        wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
+        cp.SetPipeline(im.generatorPipeline);
+        for (const auto& item : im.generatorItems) {
+            cp.SetBindGroup(0, item.state->generatorGroup);
+            cp.DispatchWorkgroups((item.countX + 7) / 8, (item.countZ + 7) / 8);
+            ++stats_.generatorDispatches;
+        }
+        cp.End();
     }
 
     // ---- the effector pass: one compute pass, one dispatch per object with effectors ----
@@ -2527,12 +2713,19 @@ Result<std::vector<scene::InstanceRecord>> ProceduralRenderer::readInstanceRecor
     }
     const Impl::ObjectState& state = it->second;
     const wgpu::Buffer& source = state.usesLive ? state.live : state.instances;
-    const std::uint64_t bytes = static_cast<std::uint64_t>(state.uploadedCount) * kInstanceStride;
+    // ADR-1117: a generator's records are this frame's window, cell (x, z) at z * countX + x.
+    const std::uint64_t count = state.generatorFrame == im.frame && state.generatorFrame != 0
+                                    ? state.generatorWindow.cells()
+                                    : static_cast<std::uint64_t>(state.uploadedCount);
+    const std::uint64_t bytes = count * kInstanceStride;
+    if (bytes == 0) {
+        return std::vector<scene::InstanceRecord>{};
+    }
     auto data = gpu::readBuffer(im.context, source, 0, bytes);
     if (!data) {
         return std::unexpected(data.error());
     }
-    std::vector<scene::InstanceRecord> records(state.uploadedCount);
+    std::vector<scene::InstanceRecord> records(static_cast<std::size_t>(count));
     std::memcpy(records.data(), data->data(), static_cast<std::size_t>(bytes));
     return records;
 }

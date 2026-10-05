@@ -822,6 +822,10 @@ const char* distributionKindName(DistributionKind kind) {
         return "grammar";
     case DistributionKind::Scatter:
         return "scatter";
+    case DistributionKind::Generator:
+        return "generator";
+    case DistributionKind::Points:
+        return "points";
     }
     return "single";
 }
@@ -829,7 +833,8 @@ const char* distributionKindName(DistributionKind kind) {
 std::optional<DistributionKind> distributionKindFromName(std::string_view name) {
     for (const auto kind : {DistributionKind::Single, DistributionKind::Linear, DistributionKind::Grid,
                             DistributionKind::Radial, DistributionKind::Spiral, DistributionKind::Spline,
-                            DistributionKind::Grammar, DistributionKind::Scatter}) {
+                            DistributionKind::Grammar, DistributionKind::Scatter, DistributionKind::Generator,
+                            DistributionKind::Points}) {
         if (name == distributionKindName(kind)) {
             return kind;
         }
@@ -1882,6 +1887,21 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
 // Distributions
 // ================================================================================================
 
+void Distribution::setPoints(std::vector<Transform> placements) {
+    StructHash h;
+    h.u64(placements.size());
+    for (const Transform& t : placements) {
+        h.v3(t.position);
+        h.f32(t.rotation.x);
+        h.f32(t.rotation.y);
+        h.f32(t.rotation.z);
+        h.f32(t.rotation.w);
+        h.v3(t.scale);
+    }
+    pointsHash = h.value();
+    points = std::make_shared<const std::vector<Transform>>(std::move(placements));
+}
+
 Result<void> Distribution::validate() const {
     if (kind == DistributionKind::Grid) {
         if (gridCount.x < 1 || gridCount.y < 1 || gridCount.z < 1) {
@@ -1890,6 +1910,14 @@ Result<void> Distribution::validate() const {
         const long long total = static_cast<long long>(gridCount.x) * gridCount.y * gridCount.z;
         if (total > kMaxInstances) {
             return fail("grid instance count {} exceeds {}", total, kMaxInstances);
+        }
+    } else if (kind == DistributionKind::Generator) {
+        if (auto ok = generator.validate(); !ok) {
+            return ok;
+        }
+    } else if (kind == DistributionKind::Points) {
+        if (points && points->size() > kMaxBakedPoints) {
+            return fail("a points distribution holds at most {} placements (got {})", kMaxBakedPoints, points->size());
         }
     } else if (kind != DistributionKind::Single && kind != DistributionKind::Grammar &&
                kind != DistributionKind::Scatter) {
@@ -1948,6 +1976,10 @@ int Distribution::instanceCount(const spatial::Spline* curve) const {
         return std::max(count, 1); // the owner replaces this with the expansion size
     case DistributionKind::Scatter:
         return scatterCloud ? std::max(static_cast<int>(scatterCloud->count()), 1) : 1;
+    case DistributionKind::Generator:
+        return 1; // records come from the GPU kernel (generatorCapacity is the buffer's size)
+    case DistributionKind::Points:
+        return points ? std::max(static_cast<int>(points->size()), 1) : 1;
     }
     return 1;
 }
@@ -1962,6 +1994,8 @@ Transform Distribution::placement(int index, const spatial::Spline* curve) const
     case DistributionKind::Single:
     case DistributionKind::Grammar: // placements come from the grammar expansion (generateCloud)
     case DistributionKind::Scatter: // placements come from the supplied cloud (generateCloud)
+    case DistributionKind::Generator: // records come from the GPU kernel (ADR-1117)
+    case DistributionKind::Points:    // placements come from the list (generateCloud)
         break;
 
     case DistributionKind::Spline: {
@@ -2097,6 +2131,12 @@ std::uint64_t Distribution::structuralHash() const {
         break; // the owner hashes its grammar (ProceduralGeometry::structuralHash)
     case DistributionKind::Scatter:
         h.u64(scatterHash); // the generator's own summary of the cloud it supplied
+        break;
+    case DistributionKind::Generator:
+        h.u64(generator.structuralHash()); // only what sizes the window; the rest is per frame
+        break;
+    case DistributionKind::Points:
+        h.u64(pointsHash);
         break;
     }
     return h.value();
@@ -2384,6 +2424,12 @@ Result<void> ProceduralGeometry::validate() const {
     if (!(hierarchy.scalePerLevel > 0.0f)) {
         return fail("procedural '{}': hierarchy scalePerLevel must be > 0", name);
     }
+    if (distribution.kind == DistributionKind::Generator &&
+        (hierarchy.recursionDepth > 0 || source.kind == PrimitiveKind::Procedural || !pointOps.empty())) {
+        return fail("procedural '{}': a generator cannot recurse, reference another procedural or run point ops "
+                    "(its records exist only on the GPU)",
+                    name);
+    }
     if (distribution.kind == DistributionKind::Grammar) {
         if (auto ok = grammar.validate(); !ok) {
             return fail("procedural '{}': {}", name, ok.error().message);
@@ -2498,10 +2544,31 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     // point of the kind is that it does not have to.
     const bool fromScatter = distribution.kind == DistributionKind::Scatter && distribution.scatterCloud &&
                              distribution.scatterCloud->count() > 0;
+    // ADR-1117: a generator has no CPU placements; its records are written on the GPU every frame.
+    if (distribution.kind == DistributionKind::Generator) {
+        return spatial::PointCloud(0);
+    }
+    // ADR-1118: a points list is read straight through, as a scatter cloud is.
+    const bool fromPoints = distribution.kind == DistributionKind::Points && distribution.points &&
+                            !distribution.points->empty();
+    spatial::PointCloud listed;
+    if (fromPoints) {
+        listed = spatial::PointCloud(distribution.points->size());
+        auto lp = listed.positions();
+        auto lr = listed.rotations();
+        auto ls = listed.scales();
+        for (std::size_t i = 0; i < distribution.points->size(); ++i) {
+            const Transform& t = (*distribution.points)[i];
+            lp[i] = t.position;
+            lr[i] = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
+            ls[i] = t.scale;
+        }
+    }
     const spatial::PointCloud expanded = fromGrammar    ? grammar.expand()
                                          : fromScatter ? *distribution.scatterCloud
+                                         : fromPoints  ? std::move(listed)
                                                        : spatial::PointCloud();
-    const bool supplied = fromGrammar || fromScatter;
+    const bool supplied = fromGrammar || fromScatter || fromPoints;
     const spatial::Spline* curve = nullptr;
     if (distribution.kind == DistributionKind::Spline && ctx.splines != nullptr) {
         curve = ctx.splines->find(distribution.spline);
@@ -2664,6 +2731,25 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
         lo = hi = glm::vec3(0.0f);
         tlo = thi = glm::vec3(0.0f);
     }
+    // ADR-1117: a bounded generator's bounds are its region, lifted by the ground's relief and the
+    // largest element; an unbounded one has none (the renderer proves nothing about it on the CPU).
+    if (isGenerator() && distribution.generator.bounded) {
+        const GeneratorSpec& g = distribution.generator;
+        const float reach = sourceRadius * g.sizeMax;
+        const glm::vec3 a(g.regionMin.x, g.groundHeight - std::abs(g.groundAmplitude), g.regionMin.y);
+        const glm::vec3 b(g.regionMax.x, g.groundHeight + std::abs(g.groundAmplitude), g.regionMax.y);
+        const glm::mat4 m = distributionTransform.matrix();
+        lo = glm::vec3(std::numeric_limits<float>::max());
+        hi = glm::vec3(std::numeric_limits<float>::lowest());
+        for (int c = 0; c < 8; ++c) {
+            const glm::vec3 corner((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y, (c & 4) ? b.z : a.z);
+            const glm::vec3 w = glm::vec3(m * glm::vec4(corner, 1.0f));
+            lo = glm::min(lo, w - glm::vec3(reach));
+            hi = glm::max(hi, w + glm::vec3(reach));
+        }
+        tlo = lo;
+        thi = hi;
+    }
     float padding = 0.0f;
     for (const spatial::Effector& e : effectors) {
         if (e.enabled && e.op == spatial::EffectorOp::PositionOffset) {
@@ -2778,6 +2864,39 @@ json ProceduralGeometry::toJson() const {
         s["alignToSpline"] = d.alignToSpline;
         s["roll"] = d.roll;
         s["splineOffset"] = vecToJson(d.splineOffset);
+        // ADR-1117/1118: written only for their kinds, so every other file round-trips unchanged.
+        if (d.kind == DistributionKind::Generator) {
+            const GeneratorSpec& g = d.generator;
+            json gj = json::object();
+            gj["name"] = g.name;
+            gj["version"] = g.version;
+            gj["cellSize"] = g.cellSize;
+            gj["viewDistance"] = g.viewDistance;
+            gj["presence"] = g.presence;
+            gj["clusterSize"] = g.clusterSize;
+            gj["clusterContrast"] = g.clusterContrast;
+            gj["jitter"] = g.jitter;
+            gj["sizeMin"] = g.sizeMin;
+            gj["sizeMax"] = g.sizeMax;
+            gj["tilt"] = g.tilt;
+            gj["bounded"] = g.bounded;
+            gj["regionMin"] = json::array({g.regionMin.x, g.regionMin.y});
+            gj["regionMax"] = json::array({g.regionMax.x, g.regionMax.y});
+            gj["regionRadius"] = g.regionRadius;
+            gj["groundHeight"] = g.groundHeight;
+            gj["groundAmplitude"] = g.groundAmplitude;
+            gj["groundFrequency"] = g.groundFrequency;
+            s["generator"] = std::move(gj);
+        }
+        if (d.kind == DistributionKind::Points && d.points) {
+            // One flat array of 10 numbers per placement: position xyz, rotation xyzw, scale xyz.
+            json arr = json::array();
+            for (const Transform& t : *d.points) {
+                arr.push_back(json::array({t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y,
+                                           t.rotation.z, t.rotation.w, t.scale.x, t.scale.y, t.scale.z}));
+            }
+            s["points"] = std::move(arr);
+        }
         j["distribution"] = std::move(s);
     }
     j["distributionTransform"] = transformToJson(distributionTransform);
@@ -3056,6 +3175,62 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(d.alignToSpline, "alignToSpline", readBool);
         AVGEN_PROC_READ(d.roll, "roll", readFloat);
         AVGEN_PROC_READ(d.splineOffset, "splineOffset", readVec3);
+        if (j.contains("generator")) {
+            const json& gjRoot = j.at("generator");
+            if (!gjRoot.is_object()) {
+                return fail("'distribution.generator' must be an object");
+            }
+            GeneratorSpec& gs = d.generator;
+            {
+                const json& j = gjRoot; // the read macro reads `j`
+                AVGEN_PROC_READ(gs.name, "name", readString);
+                AVGEN_PROC_READ(gs.version, "version", readU32);
+                AVGEN_PROC_READ(gs.cellSize, "cellSize", readFloat);
+                AVGEN_PROC_READ(gs.viewDistance, "viewDistance", readFloat);
+                AVGEN_PROC_READ(gs.presence, "presence", readFloat);
+                AVGEN_PROC_READ(gs.clusterSize, "clusterSize", readFloat);
+                AVGEN_PROC_READ(gs.clusterContrast, "clusterContrast", readFloat);
+                AVGEN_PROC_READ(gs.jitter, "jitter", readFloat);
+                AVGEN_PROC_READ(gs.sizeMin, "sizeMin", readFloat);
+                AVGEN_PROC_READ(gs.sizeMax, "sizeMax", readFloat);
+                AVGEN_PROC_READ(gs.tilt, "tilt", readFloat);
+                AVGEN_PROC_READ(gs.bounded, "bounded", readBool);
+                AVGEN_PROC_READ(gs.regionRadius, "regionRadius", readFloat);
+                AVGEN_PROC_READ(gs.groundHeight, "groundHeight", readFloat);
+                AVGEN_PROC_READ(gs.groundAmplitude, "groundAmplitude", readFloat);
+                AVGEN_PROC_READ(gs.groundFrequency, "groundFrequency", readFloat);
+                for (const auto& [key, target] : {std::pair<const char*, glm::vec2*>{"regionMin", &gs.regionMin},
+                                                  std::pair<const char*, glm::vec2*>{"regionMax", &gs.regionMax}}) {
+                    if (!j.contains(key)) {
+                        continue;
+                    }
+                    const json& v = j.at(key);
+                    if (!v.is_array() || v.size() != 2 || !v[0].is_number() || !v[1].is_number()) {
+                        return fail("'distribution.generator.{}' must be [x, z]", key);
+                    }
+                    *target = glm::vec2(v[0].get<float>(), v[1].get<float>());
+                }
+            }
+        }
+        if (j.contains("points")) {
+            const json& arr = j.at("points");
+            if (!arr.is_array()) {
+                return fail("'distribution.points' must be an array");
+            }
+            std::vector<Transform> placements;
+            placements.reserve(arr.size());
+            for (const json& e : arr) {
+                if (!e.is_array() || e.size() != 10) {
+                    return fail("each 'distribution.points' entry is [px, py, pz, qx, qy, qz, qw, sx, sy, sz]");
+                }
+                Transform t;
+                t.position = glm::vec3(e[0].get<float>(), e[1].get<float>(), e[2].get<float>());
+                t.rotation = glm::quat(e[6].get<float>(), e[3].get<float>(), e[4].get<float>(), e[5].get<float>());
+                t.scale = glm::vec3(e[7].get<float>(), e[8].get<float>(), e[9].get<float>());
+                placements.push_back(t);
+            }
+            d.setPoints(std::move(placements));
+        }
     }
     if (root.contains("variation")) {
         const json& j = root.at("variation");
@@ -3427,8 +3602,26 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Distribution
     const Distribution& d = rest.distribution;
-    r.i("distribution/kind", static_cast<int>(d.kind), 0, static_cast<int>(DistributionKind::Scatter), 0,
-        static_cast<int>(DistributionKind::Scatter));
+    r.i("distribution/kind", static_cast<int>(d.kind), 0, static_cast<int>(DistributionKind::Points), 0,
+        static_cast<int>(DistributionKind::Points));
+    // ADR-1117: a generator's description, registered only for a generator. cellSize and viewDistance
+    // size its buffer (structural); the rest are uniforms a route or a MIDI CC moves every frame.
+    if (d.kind == DistributionKind::Generator) {
+        const GeneratorSpec& g = d.generator;
+        r.f("distribution/generator/cellSize", g.cellSize, 0.01f, 1000.0f, 0.05f, 20.0f);
+        r.f("distribution/generator/viewDistance", g.viewDistance, 1.0f, 10000.0f, 10.0f, 1000.0f);
+        r.f("distribution/generator/presence", g.presence, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("distribution/generator/clusterSize", g.clusterSize, 0.0f, 10000.0f, 0.0f, 200.0f);
+        r.f("distribution/generator/clusterContrast", g.clusterContrast, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("distribution/generator/jitter", g.jitter, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("distribution/generator/sizeMin", g.sizeMin, 0.0f, 1000.0f, 0.0f, 10.0f);
+        r.f("distribution/generator/sizeMax", g.sizeMax, 0.0f, 1000.0f, 0.0f, 10.0f);
+        r.f("distribution/generator/tilt", g.tilt, 0.0f, 3.2f, 0.0f, 1.0f);
+        r.f("distribution/generator/regionRadius", g.regionRadius, 0.0f, 100000.0f, 0.0f, 500.0f);
+        r.f("distribution/generator/groundHeight", g.groundHeight, -10000.0f, 10000.0f, -50.0f, 50.0f);
+        r.f("distribution/generator/groundAmplitude", g.groundAmplitude, -1000.0f, 1000.0f, 0.0f, 40.0f);
+        r.f("distribution/generator/groundFrequency", g.groundFrequency, 0.0f, 10.0f, 0.0f, 0.2f);
+    }
     p.distributionCount = r.i("distribution/count", d.count, 1, kMaxInstances, 1, 256);
     r.v3("distribution/start", d.start, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("distribution/end", d.end, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -3675,7 +3868,28 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
 
     // Distribution
     Distribution& d = live.distribution;
-    copyEnum(p, "distribution/kind", d.kind, static_cast<int>(DistributionKind::Scatter));
+    copyEnum(p, "distribution/kind", d.kind, static_cast<int>(DistributionKind::Points));
+    // ADR-1117/1118: the generator's numbers (registered only for a generator) and the list (a pointer).
+    d.generator.name = rest.distribution.generator.name;
+    d.generator.version = rest.distribution.generator.version;
+    d.generator.bounded = rest.distribution.generator.bounded;
+    d.generator.regionMin = rest.distribution.generator.regionMin;
+    d.generator.regionMax = rest.distribution.generator.regionMax;
+    copyValue(p, "distribution/generator/cellSize", d.generator.cellSize);
+    copyValue(p, "distribution/generator/viewDistance", d.generator.viewDistance);
+    copyValue(p, "distribution/generator/presence", d.generator.presence);
+    copyValue(p, "distribution/generator/clusterSize", d.generator.clusterSize);
+    copyValue(p, "distribution/generator/clusterContrast", d.generator.clusterContrast);
+    copyValue(p, "distribution/generator/jitter", d.generator.jitter);
+    copyValue(p, "distribution/generator/sizeMin", d.generator.sizeMin);
+    copyValue(p, "distribution/generator/sizeMax", d.generator.sizeMax);
+    copyValue(p, "distribution/generator/tilt", d.generator.tilt);
+    copyValue(p, "distribution/generator/regionRadius", d.generator.regionRadius);
+    copyValue(p, "distribution/generator/groundHeight", d.generator.groundHeight);
+    copyValue(p, "distribution/generator/groundAmplitude", d.generator.groundAmplitude);
+    copyValue(p, "distribution/generator/groundFrequency", d.generator.groundFrequency);
+    d.points = rest.distribution.points;
+    d.pointsHash = rest.distribution.pointsHash;
     copyValue(p, "distribution/count", d.count);
     copyValue(p, "distribution/start", d.start);
     copyValue(p, "distribution/end", d.end);
