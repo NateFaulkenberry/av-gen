@@ -251,18 +251,21 @@ TEST_CASE("Mycelium seeks to the played state, grid and frame, through the engin
 TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf][gpu-regression]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    // Measured 2026-10-05 (M2 Max, load < 5, 1920x1080 Realtime; docs/research/gpu-world-productionization.md,
+    // "Regression benchmarks"), then widened: a range catches a step change, not a busy afternoon.
     struct Range {
         const char* scene;
-        double cpuMaxMs;      // CPU encode + update per frame (median)
-        double gpuMinMs, gpuMaxMs;
-        double memMaxMb;      // generator + simulation bytes held
-        double popMin;        // generator cells or agents
-        double seekMaxMs;     // seek to 60 s and draw one frame
+        double cpuMaxMs;           // engine update + renderer CPU work per frame, queue waits excluded (median)
+        double gpuMinMs, gpuMaxMs; // GPU frame (median)
+        double memMaxMb;           // generator + simulation + checkpoint + audio-ring bytes held at 60 s
+        double popMin;             // generator window cells or agents
+        double seekForwardMaxMs;   // 20 s -> 60 s, one frame drawn and read back
+        double seekBackMaxMs;      // 60 s -> 58 s (a stateful scene restores its 55 s checkpoint)
     };
     const Range ranges[] = {
-        {"echo-field.scene.json", 4.0, 0.5, 40.0, 140.0, 1.0e6, 2000.0},
-        {"endless-meadow.scene.json", 4.0, 0.5, 40.0, 140.0, 5.0e4, 2000.0},
-        {"mycelium.scene.json", 6.0, 0.5, 40.0, 900.0, 1.0e6, 15000.0},
+        {"echo-field.scene.json", 8.0, 15.0, 90.0, 140.0, 6.0e5, 1000.0, 1000.0},
+        {"endless-meadow.scene.json", 8.0, 4.0, 40.0, 60.0, 2.0e5, 1000.0, 1000.0},
+        {"mycelium.scene.json", 10.0, 10.0, 80.0, 600.0, 1.0e6, 15000.0, 2000.0},
     };
     for (const Range& r : ranges) {
         Rig rig(*ctx, shaders, scenePath(r.scene), 1920, 1080, rendering::QualityTier::Realtime, 60.0);
@@ -272,15 +275,24 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
         }
         std::vector<double> cpu;
         std::vector<double> gpuMs;
+        std::vector<double> procMs;
+        std::vector<double> simMs;
         for (int f = 0; f < 120; ++f) {
             const auto start = std::chrono::steady_clock::now();
             const FrameTime t = rig.advance();
+            const double updateMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
             REQUIRE(rig.renderer.renderFrame(rig.engine.scene(), t, 1920, 1080).has_value());
-            cpu.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+            const auto& c = rig.renderer.stats().cpu;
+            cpu.push_back(updateMs + c.totalMs - c.queueWaitMs);
+            procMs.push_back(c.proceduralMs);
+            simMs.push_back(c.simulationMs);
             if (rig.renderer.stats().gpuFrameMs > 0.0) {
                 gpuMs.push_back(rig.renderer.stats().gpuFrameMs);
             }
         }
+        std::sort(procMs.begin(), procMs.end());
+        std::sort(simMs.begin(), simMs.end());
         std::sort(cpu.begin(), cpu.end());
         std::sort(gpuMs.begin(), gpuMs.end());
         const double cpuMs = cpu[cpu.size() / 2];
@@ -304,10 +316,10 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
         rig.capture();
         const double backMs =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - backStart).count();
-        WARN(fmt::format("{}: CPU {:.2f} ms, GPU {:.2f} ms ({} samples), generator {:.0f} cells / {:.1f} MB, sim "
+        WARN(fmt::format("{}: CPU {:.2f} ms (procedural {:.3f}, simulation {:.3f}), GPU {:.2f} ms ({} samples), generator {:.0f} cells / {:.1f} MB, sim "
                          "{} agents / state {:.1f} MB / {} checkpoints {:.1f} MB, audio ring {:.2f} MB; held {:.1f} MB; "
                          "seek 20->60 s {:.0f} ms (restores {}), back 60->58 s {:.0f} ms (restores {})",
-                         r.scene, cpuMs, gpuMedian, gpuMs.size(), static_cast<double>(s.procedural.generatorCells),
+                         r.scene, cpuMs, procMs[procMs.size() / 2], simMs[simMs.size() / 2], gpuMedian, gpuMs.size(), static_cast<double>(s.procedural.generatorCells),
                          s.procedural.generatorBytes / 1048576.0, s.simulation.agents,
                          s.simulation.stateBytes / 1048576.0, s.simulation.checkpoints,
                          s.simulation.checkpointBytes / 1048576.0, s.fieldAudio.ringBytes / 1048576.0, memMb, seekMs,
@@ -319,8 +331,8 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
         }
         CHECK(memMb <= r.memMaxMb);
         CHECK(population >= r.popMin);
-        CHECK(seekMs <= r.seekMaxMs);
-        CHECK(backMs <= r.seekMaxMs);
+        CHECK(seekMs <= r.seekForwardMaxMs);
+        CHECK(backMs <= r.seekBackMaxMs);
     }
     CHECK(ctx->errorCount() == 0);
 }

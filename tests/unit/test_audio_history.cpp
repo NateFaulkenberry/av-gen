@@ -216,3 +216,54 @@ TEST_CASE("Audio field parameters round-trip through JSON and register only for 
     bad.bandHigh = 1.5f;
     CHECK_FALSE(bad.validate().has_value());
 }
+
+TEST_CASE("The live feed folds each pushed frame into a stretched row and records its latched events",
+          "[unit][audio-fields]") {
+    analysis::AnalyzerConfig config;
+    analysis::LiveAudioHistoryFeed feed(config);
+    const std::size_t bins = config.windowSize / 2 + 1;
+    for (int k = 0; k < 400; ++k) {
+        analysis::AnalysisFrame frame;
+        frame.timeSeconds = 0.5 + k / 93.75;
+        frame.spectrum.assign(bins, 0.1f);
+        // A tone that comes and goes in the low bins, a constant hiss up top.
+        const bool loud = (k / 50) % 2 == 1;
+        for (std::size_t b = 2; b < 12; ++b) {
+            frame.spectrum[b] = loud ? 0.9f : 0.1f;
+        }
+        frame.lowOnset = k % 47 == 0;
+        frame.lowOnsetStrength = 0.8f;
+        frame.beat = k % 94 == 0;
+        feed.push(frame);
+        feed.push(frame); // the same frame twice (a render frame with no new hop): ignored
+    }
+    const auto history = feed.history();
+    REQUIRE(history);
+    CHECK(history->live());
+    const std::int64_t newest = history->newestRow(1e9);
+    CHECK(newest == static_cast<std::int64_t>(std::floor((0.5 + 399 / 93.75) * 93.75 + 1e-9)));
+    float lo = 1.0f;
+    float hi = 0.0f;
+    for (std::int64_t r = newest - 300; r <= newest; ++r) {
+        for (int b = 0; b < spatial::kAudioBins; ++b) {
+            lo = std::min(lo, history->value(r, b));
+            hi = std::max(hi, history->value(r, b));
+        }
+    }
+    CHECK(lo >= 0.0f);
+    CHECK(hi <= 1.0f);
+    CHECK(hi > 0.8f); // the tone reaches the top of its running range
+    CHECK(history->onsets(spatial::OnsetSource::Low).size() == 9);
+    CHECK(history->onsets(spatial::OnsetSource::Beat).size() == 5);
+    // An audio field reads the live history on the input's clock, whatever the transport says.
+    spatial::FieldSet set;
+    set.audio = history;
+    spatial::FieldSpec f;
+    f.name = "live";
+    f.kind = spatial::FieldKind::Spectrum;
+    f.bandLow = 0.0f;
+    f.bandHigh = 0.3f;
+    f.falloff.kind = spatial::FalloffKind::None;
+    CHECK(spatial::sampleScalar(f, glm::vec3(0.0f), 0.0, &set) ==
+          spatial::sampleScalar(f, glm::vec3(0.0f), 1234.5, &set));
+}
