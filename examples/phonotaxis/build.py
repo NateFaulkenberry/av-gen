@@ -75,7 +75,9 @@ def programs():
         op("add", 1, srcA=1, srcB=2),
         # kick fronts lift what they cross
         op("field", 4, field="kickRing"),
-        op("remap", 4, srcA=4, value=0, constant=[0.0, 1.0, 1.0, 5.5]),  # 1 + 4.5 x front
+        op("field", 5, field="strike"),  # the performer's strike: the biggest front there is
+        op("add", 4, srcA=4, srcB=5),
+        op("remap", 4, srcA=4, value=0, constant=[0.0, 1.0, 1.0, 5.5]),  # 1 + 4.5 x fronts
         op("multiply", 1, srcA=1, srcB=4),
         op("constant", 6, constant=[0.004, 0.004, 0.006, 1]),
     ]
@@ -143,7 +145,7 @@ def fields():
               waveGeometry="radial", axis=[0, 1, 0], strength=1.0),
         # the performer's strike (MIDI pad 36): one shock front from the Cochlea's foot to the horizon
         field("strike", kind="wave", waveGeometry="radial", waveShape="pulse", axis=[0, 1, 0], amplitude=1.0,
-              wavelength=2000.0, waveSpeed=34.0, waveWidth=5.0, waveOrigin=0.0, strength=1.5,
+              wavelength=2000.0, waveSpeed=30.0, waveWidth=9.0, waveOrigin=0.0, strength=3.0,
               trigger={"source": "signal", "name": "control.strike", "threshold": 0.3}),
         # the Cochlea's three strands, each a band, heard later the higher it is
         field("helixLow", kind="spectrum", audioBand="range", bandLow=0.0, bandHigh=0.3, audioSpeed=HELIX_SPEED,
@@ -307,11 +309,11 @@ def spores():
         "speedMin": 0.15, "speedMax": 0.6, "gravity": [0, 0.05, 0], "drag": 0.12,
         "turbulence": 0.3, "turbulenceScale": 0.08, "turbulenceSpeed": 0.2,
         # what the veins release is drawn into the throat and spirals up it: floor, forest and tower are one system
-        "attractorPosition": [0, 16, 0], "attractorStrength": 0.35, "attractorRadius": 70.0, "orbit": 0.5,
+        "attractorPosition": [0, 14, 0], "attractorStrength": 0.8, "attractorRadius": 90.0, "orbit": 0.9,
         "velocityStretch": 0.6, "stretchMin": 1.0, "stretchMax": 6.0,
         "emitMaskField": "trail",
-        "sizeStart": 0.09, "sizeEnd": 0.03, "sizeVariance": 0.6, "lifetimeMin": 8.0, "lifetimeMax": 14.0,
-        "colorStart": [1.0, 0.78, 0.5, 1.0], "colorEnd": [0.5, 0.35, 1.0, 0.0], "emissive": 6.0,
+        "sizeStart": 0.06, "sizeEnd": 0.015, "sizeVariance": 0.7, "lifetimeMin": 7.0, "lifetimeMax": 12.0,
+        "colorStart": [1.0, 0.62, 0.3, 1.0], "colorEnd": [0.9, 0.3, 0.5, 0.0], "emissive": 9.0,
         "blend": "additive", "softness": 0.6}}
 
 
@@ -425,13 +427,13 @@ COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade
         "bloom", "heart", "orbit"]
 STATES = {
     #            grow lift  chG  thG  bedG  dep    fade turn gaze rch  infl wand spor  kick hor  dist hgt  fov tgtY  exp   echo bloom heart orbit
-    "Dormant":     (0.0, 0.4, 0.15, 0.06, 0.22, 0.0112, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
-    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.0336, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
-    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
-    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.0560, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
-    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
-    "Collapse":    (0.0, 0.5, 0.2, 0.6, 0.6, 0.0000, 6.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.2, 0.35, 0.45, 100, 0.02),
-    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
+    "Dormant":     (0.0, 0.4, 0.15, 0.06, 0.22, 0.0112, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 25, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
+    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.0336, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 110, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
+    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 275, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
+    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.0560, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 425, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
+    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 1300, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
+    "Collapse":    (0.0, 0.5, 0.2, 0.6, 0.6, 0.0000, 6.0, 0.5, 0.5, 5.0, 0.0, 2.5, 45, 0.5, 60, 16, 108, 46, 0, -0.2, 0.35, 0.45, 100, 0.02),
+    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 275, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
 }
 # Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
 # instead of sitting dead centre in every state.
@@ -527,8 +529,8 @@ def states():
         {"name": "Collapse", "preset": "collapse", "transition": {"seconds": 3, "easing": "easeOut"},
          # well below each source state's own entry, so a state never collapses on the wobble that entered it
          "triggers": [pad("Collapse")] + [trig_energy(t, frm=f, falling=True)
-                                          for f, t in (("Chorus", 0.42), ("Surge", 0.5), ("Eruption", 0.55),
-                                                       ("Rebirth", 0.42))]},
+                                          for f, t in (("Chorus", 0.3), ("Surge", 0.5), ("Eruption", 0.55),
+                                                       ("Rebirth", 0.3))]},
         {"name": "Rebirth", "preset": "rebirth", "transition": {"seconds": 10, "easing": "smooth"},
          "triggers": [pad("Rebirth"), trig_energy(0.5, frm="Collapse")]},
     ]}
@@ -572,7 +574,7 @@ def routes():
     r.append({"source": "audio.mid", "target": "field/wander/strength", "op": "add", "amount": 0.6,
               "chain": {"attackMs": 800, "decayMs": 3000}})
     # HIGH is emission: spores rise and the forest's tips glint with the air.
-    r.append({"source": "audio.treble", "target": "particles/spores/spawnRate", "op": "add", "amount": 1400.0,
+    r.append({"source": "audio.treble", "target": "particles/spores/spawnRate", "op": "add", "amount": 700.0,
               "chain": {"attackMs": 80, "decayMs": 700}})
     r.append({"source": "audio.onsetHigh", "target": "material/choir/emissionIntensity", "op": "add",
               "amount": 0.35, "chain": {"envelope": "peakhold", "envelopeHoldMs": 20, "envelopeFallPerSecond": 5.0}})

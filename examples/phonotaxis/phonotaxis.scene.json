@@ -417,6 +417,17 @@
      "field": "kickRing"
     },
     {
+     "kind": "field",
+     "dst": 5,
+     "field": "strike"
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
      "kind": "remap",
      "dst": 4,
      "srcA": 4,
@@ -810,10 +821,10 @@
     ],
     "amplitude": 1.0,
     "wavelength": 2000.0,
-    "waveSpeed": 34.0,
-    "waveWidth": 5.0,
+    "waveSpeed": 30.0,
+    "waveWidth": 9.0,
     "waveOrigin": 0.0,
-    "strength": 1.5,
+    "strength": 3.0,
     "trigger": {
      "source": "signal",
      "name": "control.strike",
@@ -50442,34 +50453,34 @@
     "turbulenceSpeed": 0.2,
     "attractorPosition": [
      0,
-     16,
+     14,
      0
     ],
-    "attractorStrength": 0.35,
-    "attractorRadius": 70.0,
-    "orbit": 0.5,
+    "attractorStrength": 0.8,
+    "attractorRadius": 90.0,
+    "orbit": 0.9,
     "velocityStretch": 0.6,
     "stretchMin": 1.0,
     "stretchMax": 6.0,
     "emitMaskField": "trail",
-    "sizeStart": 0.09,
-    "sizeEnd": 0.03,
-    "sizeVariance": 0.6,
-    "lifetimeMin": 8.0,
-    "lifetimeMax": 14.0,
+    "sizeStart": 0.06,
+    "sizeEnd": 0.015,
+    "sizeVariance": 0.7,
+    "lifetimeMin": 7.0,
+    "lifetimeMax": 12.0,
     "colorStart": [
      1.0,
-     0.78,
-     0.5,
+     0.62,
+     0.3,
      1.0
     ],
     "colorEnd": [
+     0.9,
+     0.3,
      0.5,
-     0.35,
-     1.0,
      0.0
     ],
-    "emissive": 6.0,
+    "emissive": 9.0,
     "blend": "additive",
     "softness": 0.6
    }

@@ -141,7 +141,7 @@
    "source": "audio.treble",
    "target": "particles/spores/spawnRate",
    "op": "add",
-   "amount": 1400.0,
+   "amount": 700.0,
    "chain": {
     "attackMs": 80,
     "decayMs": 700
@@ -396,7 +396,7 @@
      1.0
     ],
     "particles/spores/spawnRate": [
-     50
+     25
     ],
     "field/kickRing/strength": [
      0.3
@@ -526,7 +526,7 @@
      1.0
     ],
     "particles/spores/spawnRate": [
-     220
+     110
     ],
     "field/kickRing/strength": [
      0.6
@@ -605,7 +605,7 @@
      1.0
     ],
     "particles/spores/spawnRate": [
-     550
+     275
     ],
     "field/kickRing/strength": [
      1.0
@@ -684,7 +684,7 @@
      1.0
     ],
     "particles/spores/spawnRate": [
-     850
+     425
     ],
     "field/kickRing/strength": [
      1.3
@@ -763,7 +763,7 @@
      1.5
     ],
     "particles/spores/spawnRate": [
-     2600
+     1300
     ],
     "field/kickRing/strength": [
      1.5
@@ -842,7 +842,7 @@
      2.5
     ],
     "particles/spores/spawnRate": [
-     90
+     45
     ],
     "field/kickRing/strength": [
      0.5
@@ -921,7 +921,7 @@
      1.0
     ],
     "particles/spores/spawnRate": [
-     550
+     275
     ],
     "field/kickRing/strength": [
      1.0
@@ -1192,7 +1192,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.42,
+      "threshold": 0.3,
       "from": "Chorus",
       "falling": true
      },
@@ -1213,7 +1213,7 @@
      {
       "kind": "macro",
       "signal": "energy",
-      "threshold": 0.42,
+      "threshold": 0.3,
       "from": "Rebirth",
       "falling": true
      }
