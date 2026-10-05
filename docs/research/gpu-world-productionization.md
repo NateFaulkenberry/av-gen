@@ -795,3 +795,14 @@ See the measured table below. The rules of thumb from it:
 10. **Not built:** a velocity AOV for generated elements' own motion, `MaterialVariation.hueShift` for
     generators, a generator registry (no second kernel yet), a lossless live spectrogram (a FrameTap
     feeding an SPSC queue), and per-element picking that includes effector offsets.
+
+## Suites (end of the engine run)
+
+Run at `ba8a0092`, after a reconfigure and a full build, one after the other under `tools/gpu-lock.sh`,
+with each binary's exit code captured in the same shell:
+
+- `avgen_tests`: **exit 0**. 4,127 cases: 4,107 passed, 19 skipped, **1 failed as expected** (the one
+  `[!shouldfail]`, `test_character_lab_slopes.cpp:187`). 10,321,496 assertions.
+- `avgen_render_tests`: **exit 0**. 601 cases: 600 passed, 1 skipped. 633,786 assertions.
+
+Not merged, not pushed.
