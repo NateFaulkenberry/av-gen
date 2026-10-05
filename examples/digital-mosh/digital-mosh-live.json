@@ -1,0 +1,61 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "DIGITAL MOSH LIVE"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "digital-mosh.scene.json"
+  }
+ },
+ "live": {
+  "qualityStrategy": "balanced",
+  "targetFps": 60
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.08,
+  "post/bloom/threshold": 1.2,
+  "post/tonemap/chroma-retention": 0.5,
+  "post/output/vignette": 0.25,
+  "camera/exposure/mode": 0
+ },
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "root/scale",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.mid",
+   "target": "root/rotationSpeed",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.rms",
+   "target": "scene/brightness",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.onset",
+   "target": "root/impulse",
+   "op": "add",
+   "amount": 0.0
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/digital-mosh.mp4"
+ },
+ "sonic": {
+  "live": true
+ }
+}
