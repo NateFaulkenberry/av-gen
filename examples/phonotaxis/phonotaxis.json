@@ -372,7 +372,7 @@
      0.15
     ],
     "material/throat/emissionIntensity": [
-     0.12
+     0.06
     ],
     "material/bed/emissionIntensity": [
      0.22
@@ -472,17 +472,17 @@
      1.0,
      1.0
     ],
-    "procedural/helixLow/material/emissiveColor": [
+    "procedural/towerLow/material/emissiveColor": [
      1.0,
      0.36,
      0.1
     ],
-    "procedural/helixMid/material/emissiveColor": [
+    "procedural/towerMid/material/emissiveColor": [
      0.1,
      0.85,
      0.78
     ],
-    "procedural/helixHigh/material/emissiveColor": [
+    "procedural/towerHigh/material/emissiveColor": [
      0.62,
      0.32,
      1.0
@@ -818,16 +818,16 @@
      0.2
     ],
     "material/throat/emissionIntensity": [
-     0.3
+     0.6
     ],
     "material/bed/emissionIntensity": [
-     0.35
+     0.6
     ],
     "grid/organism/depositAmount": [
      0.0
     ],
     "grid/organism/dissipation": [
-     9.0
+     6.0
     ],
     "grid/organism/turnAngle": [
      0.5
@@ -868,7 +868,7 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.6
+     -0.2
     ],
     "temporal/echo/strength": [
      0.35
@@ -997,17 +997,17 @@
      1.0,
      1.0
     ],
-    "procedural/helixLow/material/emissiveColor": [
+    "procedural/towerLow/material/emissiveColor": [
      1.0,
      0.28,
      0.04
     ],
-    "procedural/helixMid/material/emissiveColor": [
+    "procedural/towerMid/material/emissiveColor": [
      1.0,
      0.66,
      0.2
     ],
-    "procedural/helixHigh/material/emissiveColor": [
+    "procedural/towerHigh/material/emissiveColor": [
      0.88,
      0.9,
      1.0

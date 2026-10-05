@@ -22,8 +22,8 @@ EMBER = [1.00, 0.36, 0.10]   # lows  (species 0, helix strand 0)
 TEAL = [0.10, 0.85, 0.78]    # mids  (species 1, helix strand 1)
 VIOLET = [0.62, 0.32, 1.00]  # highs (species 2, helix strand 2)
 
-BASIN = 64.0          # half extent of the organism's plane (m)
-FOREST_R = 58.0       # radius of the forest disc
+BASIN = 90.0          # half extent of the organism's plane (m)
+FOREST_R = 80.0       # radius of the forest disc
 HELIX_H = 36.0        # height of the Cochlea
 HELIX_SPEED = 3.2     # m/s the present rises up the Cochlea (36 m = 11.3 s of memory)
 ECHO_SPEED = 5.5      # m/s the present spreads over the forest (58 m = 10.5 s)
@@ -75,7 +75,7 @@ def programs():
         op("add", 1, srcA=1, srcB=2),
         # kick fronts lift what they cross
         op("field", 4, field="kickRing"),
-        op("remap", 4, srcA=4, value=0, constant=[0.0, 1.0, 1.0, 3.5]),  # 1 + 2.5 x front
+        op("remap", 4, srcA=4, value=0, constant=[0.0, 1.0, 1.0, 5.5]),  # 1 + 4.5 x front
         op("multiply", 1, srcA=1, srcB=4),
         op("constant", 6, constant=[0.004, 0.004, 0.006, 1]),
     ]
@@ -128,7 +128,7 @@ def fields():
         field("hunger", kind="compound", children=["bands", "kickRing", "strike"], combine="add", strength=1.0),
         field("wander", kind="curlNoise", frequency=0.035, speed=0.08, strength=1.0),
         field("inflow", kind="spiral", axis=[0, 1, 0], spiralBias=-0.55, strength=0.9,
-              falloff={"kind": "smoothstep", "inner": 6.0, "outer": 60.0}),
+              falloff={"kind": "smoothstep", "inner": 6.0, "outer": 85.0}),
         field("drift", kind="compound", children=["wander", "inflow"], combine="add", strength=1.0),
         # the organism's memory, read by the floor, the forest and the spores
         field("trail", kind="grid", reference="organism", strength=1.0),
@@ -139,7 +139,7 @@ def fields():
         field("echo", kind="spectrum", audioBand="element", bandLow=0.0, bandHigh=1.0, audioSpeed=ECHO_SPEED,
               waveGeometry="radial", axis=[0, 1, 0], strength=1.0),
         # kick fronts racing outward from the Cochlea's foot
-        field("kickRing", kind="onset", onsetSource="low", onsetDecay=1.1, onsetWidth=4.0, audioSpeed=RING_SPEED,
+        field("kickRing", kind="onset", onsetSource="low", onsetDecay=0.8, onsetWidth=6.5, audioSpeed=RING_SPEED,
               waveGeometry="radial", axis=[0, 1, 0], strength=1.0),
         # the performer's strike (MIDI pad 36): one shock front from the Cochlea's foot to the horizon
         field("strike", kind="wave", waveGeometry="radial", waveShape="pulse", axis=[0, 1, 0], amplitude=1.0,
@@ -172,7 +172,7 @@ def bed():
     return {"name": "bed", "kind": "procedural", "procedural": {
         # a disc, so the basin's edge needs no mask in the program (a subdivided floor heaved by a field
         # deformer cost 21 ms at 1080p: 0.8M triangles each running the onset loop; the forest heaves instead)
-        "source": {"kind": "cylinder", "radius": BASIN, "height": 0.02, "radialSegments": 128, "caps": True},
+        "source": {"kind": "cylinder", "radius": BASIN, "height": 0.02, "radialSegments": 160, "caps": True},
         "distribution": {"kind": "single"},
         "lod": {"cull": False, "count": 1},
         "material": {"baseColor": [0.006, 0.006, 0.009], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
@@ -195,10 +195,10 @@ def choir():
             # each filament's own band, at its own moment, lifts it
             {"field": "echo", "op": "scale", "blend": "add", "strength": 2.2, "scaleAxis": [0, 1, 0]},
             {"field": "echo", "op": "emission", "blend": "add", "strength": 5.0},
-            {"field": "kickRing", "op": "emission", "blend": "add", "strength": 3.0},
-            {"field": "strike", "op": "emission", "blend": "add", "strength": 6.0},
+            {"field": "kickRing", "op": "emission", "blend": "add", "strength": 8.0},
+            {"field": "strike", "op": "emission", "blend": "add", "strength": 8.0},
             # LOW is mass: the forest heaves as a kick front passes under it
-            {"field": "kickRing", "op": "positionOffset", "blend": "add", "strength": 0.45, "axis": [0, 1, 0]},
+            {"field": "kickRing", "op": "positionOffset", "blend": "add", "strength": 0.6, "axis": [0, 1, 0]},
         ],
         "lod": {"cull": True, "maxDistance": 66.0, "count": 1},
         "material": {"baseColor": [0.01, 0.01, 0.012], "emissiveColor": [1, 1, 1], "emissiveIntensity": 0.6,
@@ -253,6 +253,8 @@ def helix(name, strand, colour, fieldname):
         "effectors": [
             {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.15, 0.6, 0.6]},
             {"field": fieldname, "op": "emission", "blend": "add", "strength": STRAND_GAIN[fieldname]},
+            # a kick's front crosses the foot at once and the rim ~0.9 s later: each kick ripples up and out
+            {"field": "kickRing", "op": "emission", "blend": "add", "strength": 0.9},
         ],
         "lod": {"cull": True, "count": 1},
         "material": {"baseColor": [0.015, 0.015, 0.018], "emissiveColor": colour, "emissiveIntensity": 0.025,
@@ -290,7 +292,7 @@ def horizon():
             "groundHeight": 0.0, "groundAmplitude": 0.0, "groundFrequency": 0.006, "groundSeed": 3}},
         "effectors": [
             {"field": "basinMask", "op": "scale", "blend": "multiply", "strength": 1.0, "scaleAxis": [1, 1, 1]},
-            {"field": "kickRing", "op": "emission", "blend": "add", "strength": 120.0},
+            {"field": "kickRing", "op": "emission", "blend": "add", "strength": 220.0},
             {"field": "strike", "op": "emission", "blend": "add", "strength": 200.0},
         ],
         "lod": {"cull": True, "maxDistance": 420.0, "count": 1},
@@ -342,7 +344,8 @@ def scene():
         "grids": [organism()],
         "materialPrograms": programs(),
         "nodes": [*fields(), bed(), choir(),
-                  *[helix(n, i, c, n)
+                  # objects named apart from their fields: a node name shared with a field node loses its parameters
+                  *[helix(n.replace("helix", "tower"), i, c, n)
                     for i, (n, c) in enumerate([("helixLow", EMBER), ("helixMid", TEAL), ("helixHigh", VIOLET)])],
                   plain(), horizon(), spores()],
     }
@@ -422,12 +425,12 @@ COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade
         "bloom", "heart", "orbit"]
 STATES = {
     #            grow lift  chG  thG  bedG  dep    fade turn gaze rch  infl wand spor  kick hor  dist hgt  fov tgtY  exp   echo bloom heart orbit
-    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.0112, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
+    "Dormant":     (0.0, 0.4, 0.15, 0.06, 0.22, 0.0112, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
     "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.0336, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
     "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
     "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.0560, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
     "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
-    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.0000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.6, 0.35, 0.45, 100, 0.02),
+    "Collapse":    (0.0, 0.5, 0.2, 0.6, 0.6, 0.0000, 6.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.2, 0.35, 0.45, 100, 0.02),
     "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
 }
 # Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
@@ -488,7 +491,7 @@ def presets():
                 for path, c in colour_paths(progs[prog], prog, pal).items():
                     values[path] = c
             for strand, key in (("helixLow", "lo"), ("helixMid", "mid"), ("helixHigh", "hi")):
-                values[f"procedural/{strand}/material/emissiveColor"] = pal[key]
+                values[f"procedural/{strand.replace('helix', 'tower')}/material/emissiveColor"] = pal[key]
         out.append({"name": name.lower(), "values": values})
     return out
 

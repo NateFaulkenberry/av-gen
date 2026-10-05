@@ -141,14 +141,14 @@
     1024
    ],
    "boundsMin": [
-    -64.0,
+    -90.0,
     -1,
-    -64.0
+    -90.0
    ],
    "boundsMax": [
-    64.0,
+    90.0,
     1,
-    64.0
+    90.0
    ],
    "velocityField": "drift",
    "advect": 0.15,
@@ -425,7 +425,7 @@
       0.0,
       1.0,
       1.0,
-      3.5
+      5.5
      ]
     },
     {
@@ -643,7 +643,7 @@
     "falloff": {
      "kind": "smoothstep",
      "inner": 6.0,
-     "outer": 60.0
+     "outer": 85.0
     }
    }
   },
@@ -776,8 +776,8 @@
    "field": {
     "kind": "onset",
     "onsetSource": "low",
-    "onsetDecay": 1.1,
-    "onsetWidth": 4.0,
+    "onsetDecay": 0.8,
+    "onsetWidth": 6.5,
     "audioSpeed": 22.0,
     "waveGeometry": "radial",
     "axis": [
@@ -912,7 +912,7 @@
    ],
    "field": {
     "kind": "sphere",
-    "radius": 104.0,
+    "radius": 130.0,
     "softness": 12.0,
     "invert": true,
     "strength": 1.0,
@@ -927,9 +927,9 @@
    "procedural": {
     "source": {
      "kind": "cylinder",
-     "radius": 64.0,
+     "radius": 90.0,
      "height": 0.02,
-     "radialSegments": 128,
+     "radialSegments": 160,
      "caps": true
     },
     "distribution": {
@@ -1000,14 +1000,14 @@
       "tilt": 0.1,
       "bounded": true,
       "regionMin": [
-       -58.0,
-       -58.0
+       -80.0,
+       -80.0
       ],
       "regionMax": [
-       58.0,
-       58.0
+       80.0,
+       80.0
       ],
-      "regionRadius": 58.0,
+      "regionRadius": 80.0,
       "groundHeight": 0.0,
       "groundAmplitude": 0.0,
       "groundFrequency": 0.01,
@@ -1047,19 +1047,19 @@
       "field": "kickRing",
       "op": "emission",
       "blend": "add",
-      "strength": 3.0
+      "strength": 8.0
      },
      {
       "field": "strike",
       "op": "emission",
       "blend": "add",
-      "strength": 6.0
+      "strength": 8.0
      },
      {
       "field": "kickRing",
       "op": "positionOffset",
       "blend": "add",
-      "strength": 0.45,
+      "strength": 0.6,
       "axis": [
        0,
        1,
@@ -1091,7 +1091,7 @@
    }
   },
   {
-   "name": "helixLow",
+   "name": "towerLow",
    "kind": "procedural",
    "procedural": {
     "source": {
@@ -17448,6 +17448,12 @@
       "op": "emission",
       "blend": "add",
       "strength": 3.1
+     },
+     {
+      "field": "kickRing",
+      "op": "emission",
+      "blend": "add",
+      "strength": 0.9
      }
     ],
     "lod": {
@@ -17473,7 +17479,7 @@
    }
   },
   {
-   "name": "helixMid",
+   "name": "towerMid",
    "kind": "procedural",
    "procedural": {
     "source": {
@@ -33830,6 +33836,12 @@
       "op": "emission",
       "blend": "add",
       "strength": 3.5
+     },
+     {
+      "field": "kickRing",
+      "op": "emission",
+      "blend": "add",
+      "strength": 0.9
      }
     ],
     "lod": {
@@ -33855,7 +33867,7 @@
    }
   },
   {
-   "name": "helixHigh",
+   "name": "towerHigh",
    "kind": "procedural",
    "procedural": {
     "source": {
@@ -50212,6 +50224,12 @@
       "op": "emission",
       "blend": "add",
       "strength": 3.5
+     },
+     {
+      "field": "kickRing",
+      "op": "emission",
+      "blend": "add",
+      "strength": 0.9
      }
     ],
     "lod": {
@@ -50356,7 +50374,7 @@
       "field": "kickRing",
       "op": "emission",
       "blend": "add",
-      "strength": 120.0
+      "strength": 220.0
      },
      {
       "field": "strike",
@@ -50400,9 +50418,9 @@
      0
     ],
     "extent": [
-     58.0,
+     80.0,
      0,
-     58.0
+     80.0
     ],
     "direction": [
      0,
