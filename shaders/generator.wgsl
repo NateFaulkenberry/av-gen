@@ -29,7 +29,7 @@ struct GeneratorParams {
     flags: vec4<u32>,           // x = bounded, y = disc
     cell: vec4<f32>,            // cell size, jitter, size min, size max
     shape: vec4<f32>,           // tilt, value random, emissive random, emissive sparsity
-    ground: vec4<f32>,          // height, amplitude, frequency
+    ground: vec4<f32>,          // height, amplitude, frequency, the ground seed (as f32 bits)
     disc: vec4<f32>,            // centre x, centre z, radius
 };
 
@@ -110,7 +110,7 @@ fn genGround(x: f32, z: f32) -> f32 {
         return gen.ground.x;
     }
     let f = gen.ground.z;
-    let seed = gen.hashing.x;
+    let seed = bitcast<u32>(gen.ground.w);
     let n = (genValueNoise(seed, x * f, z * f) + 0.5 * genValueNoise(seed, x * f * 2.0 + 17.3, z * f * 2.0 - 9.1)) / 1.5;
     return gen.ground.x + gen.ground.y * (n * 2.0 - 1.0);
 }

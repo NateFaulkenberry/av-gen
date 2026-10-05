@@ -827,7 +827,7 @@ GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const s
     u.flags = glm::uvec4(g.bounded ? 1u : 0u, (g.bounded && g.regionRadius > 0.0f) ? 1u : 0u, 0u, 0u);
     u.cell = glm::vec4(g.cellSize, g.jitter, g.sizeMin, g.sizeMax);
     u.shape = glm::vec4(g.tilt, v.valueRandom, v.emissiveRandom, v.emissiveSparsity);
-    u.ground = glm::vec4(g.groundHeight, g.groundAmplitude, g.groundFrequency, 0.0f);
+    u.ground = glm::vec4(g.groundHeight, g.groundAmplitude, g.groundFrequency, std::bit_cast<float>(g.groundSeed));
     u.disc = glm::vec4((g.regionMin.x + g.regionMax.x) * 0.5f, (g.regionMin.y + g.regionMax.y) * 0.5f, g.regionRadius,
                        0.0f);
     return u;

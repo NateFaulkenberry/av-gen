@@ -58,6 +58,7 @@ struct GeneratorSpec {
     float groundHeight = 0.0f;        // y of the ground
     float groundAmplitude = 0.0f;     // value-noise relief, metres (0 = flat)
     float groundFrequency = 0.02f;    // 1 / metres
+    std::uint32_t groundSeed = 1;     // the ground's own seed: layers that share it stand on one ground
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // what changes the buffer size: cell size, window, bounds
@@ -114,7 +115,8 @@ struct GeneratorRegionCells {
     std::int32_t minX = 0, minZ = 0, maxX = -1, maxZ = -1;
 };
 [[nodiscard]] GeneratorRegionCells generatorRegionCells(const GeneratorSpec& spec);
-[[nodiscard]] float generatorGroundHeight(const GeneratorSpec& spec, std::uint32_t seed, float x, float z);
+// The ground at (x, z) in generator space (seeded by `spec.groundSeed`, not the element seed).
+[[nodiscard]] float generatorGroundHeight(const GeneratorSpec& spec, float x, float z);
 
 // ---- the mirror's queries -----------------------------------------------------------------------
 

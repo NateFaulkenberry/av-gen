@@ -126,6 +126,7 @@ std::uint64_t GeneratorSpec::hash() const {
     h.f32(groundHeight);
     h.f32(groundAmplitude);
     h.f32(groundFrequency);
+    h.u32(groundSeed);
     return h.value();
 }
 
@@ -181,10 +182,11 @@ GeneratorRegionCells generatorRegionCells(const GeneratorSpec& spec) {
     return r;
 }
 
-float generatorGroundHeight(const GeneratorSpec& spec, std::uint32_t seed, float x, float z) {
+float generatorGroundHeight(const GeneratorSpec& spec, float x, float z) {
     if (spec.groundAmplitude == 0.0f) {
         return spec.groundHeight;
     }
+    const std::uint32_t seed = spec.groundSeed;
     const float f = spec.groundFrequency;
     const float n = (valueNoise(seed, x * f, z * f) + 0.5f * valueNoise(seed, x * f * 2.0f + 17.3f, z * f * 2.0f - 9.1f)) /
                     1.5f;
@@ -255,7 +257,7 @@ std::optional<GeneratedElement> generatorElement(const GeneratorSpec& spec, std:
     const float u1 = generatorUnit(generatorHash(ix, iz, seed, 2u));
     const float x = (static_cast<float>(ix) + 0.5f + (u0 - 0.5f) * spec.jitter) * spec.cellSize;
     const float z = (static_cast<float>(iz) + 0.5f + (u1 - 0.5f) * spec.jitter) * spec.cellSize;
-    e.position = glm::vec3(x, generatorGroundHeight(spec, seed, x, z), z);
+    e.position = glm::vec3(x, generatorGroundHeight(spec, x, z), z);
     e.size = lerpf(spec.sizeMin, spec.sizeMax, generatorUnit(generatorHash(ix, iz, seed, 3u)));
     const float yaw = generatorUnit(generatorHash(ix, iz, seed, 4u)) * kTwoPi;
     const float lean = generatorUnit(generatorHash(ix, iz, seed, 5u)) * spec.tilt;

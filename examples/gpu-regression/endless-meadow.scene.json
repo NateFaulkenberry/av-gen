@@ -1,0 +1,105 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Endless Meadow (GPU regression)",
+ "_note": "Permanent architectural regression scene (docs/research/gpu-world-productionization.md). The spike's Endless Meadow on PRODUCTION systems: four unbounded generator layers (ADR-1117) -- ground tiles, grass, glow reeds and spires -- that share one ground (groundSeed) and exist only in windows around the camera, so the world costs its windows at any distance. The reeds hear the song in their own band (an element-band spectrum field, ADR-1116); the spires flare with the kicks. The regression test flies the camera kilometres out.",
+ "camera": {
+  "mode": 1,
+  "position": [0, 4, 12],
+  "target": [0, 2, -30],
+  "fov": 55,
+  "orbitSpeed": 0
+ },
+ "environment": {
+  "background": [0.02, 0.02, 0.035],
+  "intensity": 0.35,
+  "sky": {"enabled": false, "background": false}
+ },
+ "nodes": [
+  {
+   "name": "reedBands",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {
+    "kind": "spectrum", "audioBand": "element", "bandLow": 0.05, "bandHigh": 0.95,
+    "audioDelay": 0.0, "audioSpeed": 0.0, "strength": 1.0, "falloff": {"kind": "none"}
+   }
+  },
+  {
+   "name": "kick",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "onset", "onsetSource": "low", "onsetDecay": 3.0, "strength": 1.0, "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "box", "size": [2.0, 0.3, 2.0], "subdivisions": 1},
+    "variation": {"seed": 11},
+    "distribution": {"kind": "generator", "generator": {
+     "cellSize": 2.0, "viewDistance": 220.0, "presence": 1.0, "jitter": 0.0, "sizeMin": 1.0, "sizeMax": 1.0,
+     "groundHeight": 0.0, "groundAmplitude": 6.0, "groundFrequency": 0.012, "groundSeed": 7}},
+    "lod": {"cull": true, "count": 1},
+    "material": {"baseColor": [0.05, 0.06, 0.05], "roughness": 0.9, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.25}
+   }
+  },
+  {
+   "name": "grass",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "cylinder", "radius": 0.012, "height": 0.4, "radialSegments": 3, "heightSegments": 1, "caps": false},
+    "sourceTransform": {"position": [0, 0.2, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+    "variation": {"seed": 21},
+    "distribution": {"kind": "generator", "generator": {
+     "cellSize": 0.18, "viewDistance": 32.0, "presence": 0.85, "clusterSize": 18.0, "clusterContrast": 0.7,
+     "jitter": 1.0, "sizeMin": 0.6, "sizeMax": 1.5, "tilt": 0.25,
+     "groundHeight": 0.0, "groundAmplitude": 6.0, "groundFrequency": 0.012, "groundSeed": 7}},
+    "lod": {"cull": true, "maxDistance": 32.0, "count": 1},
+    "material": {"baseColor": [0.09, 0.14, 0.07], "emissiveColor": [0.2, 0.9, 0.5], "emissiveIntensity": 0.05,
+                 "roughness": 0.7, "metallic": 0.0},
+    "materialVariation": {"valueRandom": 0.3}
+   }
+  },
+  {
+   "name": "reeds",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "cylinder", "radius": 0.04, "height": 1.6, "radialSegments": 5, "heightSegments": 2, "caps": false},
+    "sourceTransform": {"position": [0, 0.8, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
+    "variation": {"seed": 31},
+    "distribution": {"kind": "generator", "generator": {
+     "cellSize": 0.9, "viewDistance": 140.0, "presence": 0.55, "clusterSize": 30.0, "clusterContrast": 0.95,
+     "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.6, "tilt": 0.15,
+     "groundHeight": 0.0, "groundAmplitude": 6.0, "groundFrequency": 0.012, "groundSeed": 7}},
+    "effectors": [
+     {"field": "reedBands", "op": "emission", "blend": "add", "strength": 6.0},
+     {"field": "reedBands", "op": "scale", "blend": "add", "strength": 0.5, "scaleAxis": [0, 1, 0]}
+    ],
+    "lod": {"cull": true, "maxDistance": 140.0, "count": 1},
+    "material": {"baseColor": [0.05, 0.05, 0.06], "emissiveColor": [0.3, 0.8, 1.0], "emissiveIntensity": 0.4,
+                 "roughness": 0.5, "metallic": 0.0},
+    "materialVariation": {"emissiveRandom": 0.5, "emissiveSparsity": 0.3}
+   }
+  },
+  {
+   "name": "spires",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "cylinder", "radius": 0.5, "height": 1.0, "radialSegments": 6, "heightSegments": 1, "caps": true},
+    "sourceTransform": {"position": [0, 0.5, 0], "rotation": [0, 0, 0], "scale": [0.6, 10.0, 0.6]},
+    "variation": {"seed": 41},
+    "distribution": {"kind": "generator", "generator": {
+     "cellSize": 14.0, "viewDistance": 560.0, "presence": 0.3, "clusterSize": 120.0, "clusterContrast": 0.8,
+     "jitter": 0.8, "sizeMin": 0.5, "sizeMax": 1.6, "tilt": 0.12,
+     "groundHeight": -1.0, "groundAmplitude": 6.0, "groundFrequency": 0.012, "groundSeed": 7}},
+    "effectors": [{"field": "kick", "op": "emission", "blend": "add", "strength": 5.0}],
+    "lod": {"cull": true, "maxDistance": 560.0, "count": 1},
+    "material": {"baseColor": [0.03, 0.03, 0.05], "emissiveColor": [1.0, 0.4, 0.7], "emissiveIntensity": 0.3,
+                 "roughness": 0.15, "metallic": 0.4},
+    "materialVariation": {"emissiveRandom": 0.4}
+   }
+  }
+ ]
+}

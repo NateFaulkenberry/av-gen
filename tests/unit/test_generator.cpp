@@ -50,7 +50,7 @@ TEST_CASE("A generator cell is a pure function of its integer coordinates and th
                 // Inside its own cell (jitter < 1) and on the ground.
                 CHECK(std::floor(a->position.x / g.cellSize) == static_cast<float>(ix));
                 CHECK(std::floor(a->position.z / g.cellSize) == static_cast<float>(iz));
-                CHECK(a->position.y == Approx(generatorGroundHeight(g, 7u, a->position.x, a->position.z)));
+                CHECK(a->position.y == Approx(generatorGroundHeight(g, a->position.x, a->position.z)));
                 CHECK(a->size >= g.sizeMin);
                 CHECK(a->size <= g.sizeMax);
             }

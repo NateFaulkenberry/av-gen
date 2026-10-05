@@ -2886,6 +2886,7 @@ json ProceduralGeometry::toJson() const {
             gj["groundHeight"] = g.groundHeight;
             gj["groundAmplitude"] = g.groundAmplitude;
             gj["groundFrequency"] = g.groundFrequency;
+            gj["groundSeed"] = g.groundSeed;
             s["generator"] = std::move(gj);
         }
         if (d.kind == DistributionKind::Points && d.points) {
@@ -3199,6 +3200,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                 AVGEN_PROC_READ(gs.groundHeight, "groundHeight", readFloat);
                 AVGEN_PROC_READ(gs.groundAmplitude, "groundAmplitude", readFloat);
                 AVGEN_PROC_READ(gs.groundFrequency, "groundFrequency", readFloat);
+                AVGEN_PROC_READ(gs.groundSeed, "groundSeed", readU32);
                 for (const auto& [key, target] : {std::pair<const char*, glm::vec2*>{"regionMin", &gs.regionMin},
                                                   std::pair<const char*, glm::vec2*>{"regionMax", &gs.regionMax}}) {
                     if (!j.contains(key)) {
@@ -3873,6 +3875,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     d.generator.name = rest.distribution.generator.name;
     d.generator.version = rest.distribution.generator.version;
     d.generator.bounded = rest.distribution.generator.bounded;
+    d.generator.groundSeed = rest.distribution.generator.groundSeed;
     d.generator.regionMin = rest.distribution.generator.regionMin;
     d.generator.regionMax = rest.distribution.generator.regionMax;
     copyValue(p, "distribution/generator/cellSize", d.generator.cellSize);

@@ -157,7 +157,7 @@ struct GeneratorUniforms {
     glm::uvec4 flags;        // x = bounded, y = disc
     glm::vec4 cell;          // cell size, jitter, size min, size max
     glm::vec4 shape;         // tilt, value random, emissive random, emissive sparsity
-    glm::vec4 ground;        // height, amplitude, frequency, 0
+    glm::vec4 ground;        // height, amplitude, frequency, the ground seed (u32 bits)
     glm::vec4 disc;          // centre x, centre z, radius, 0
 };
 static_assert(sizeof(GeneratorUniforms) == 224);

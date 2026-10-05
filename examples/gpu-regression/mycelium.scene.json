@@ -1,0 +1,106 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Mycelium (GPU regression)",
+ "_note": "Permanent architectural regression scene (docs/research/gpu-world-productionization.md). The spike's Mycelium on PRODUCTION systems: an agents grid (ADR-1120) of 1M agents in three species on a 512 x 512 trail, depositing in their own bands (an element-band spectrum field) and on the kicks (an onset field), steered by moving curl noise, checkpointed every 5 s (ADR-1119). The trail is shown by a generator carpet (ADR-1117) whose emission and colour come from the grid through ordinary fields -- no new draw path. A seek must land on the played state byte for byte.",
+ "camera": {
+  "mode": 1,
+  "position": [0, 34, 46],
+  "target": [0, 0, 0],
+  "fov": 45,
+  "orbitSpeed": 0
+ },
+ "environment": {
+  "background": [0.008, 0.01, 0.018],
+  "intensity": 0.2,
+  "sky": {"enabled": false, "background": false}
+ },
+ "grids": [
+  {
+   "name": "mycelium",
+   "enabled": true,
+   "mode": "agents",
+   "wrap": "wrap",
+   "resolution": [512, 1, 512],
+   "boundsMin": [-40, -1, -40],
+   "boundsMax": [40, 1, 40],
+   "velocityField": "flow",
+   "advect": 1.5,
+   "diffusion": 0.35,
+   "dissipation": 1.6,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "seed": 2026,
+   "agentCount": 1000000,
+   "species": 3,
+   "sensorAngle": 0.5,
+   "sensorDistance": 8.0,
+   "turnAngle": 0.4,
+   "stepSize": 1.0,
+   "depositAmount": 0.25,
+   "repel": 0.7,
+   "depositField": "feed",
+   "checkpointInterval": 5.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "bands",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "spectrum", "audioBand": "element", "bandLow": 0.0, "bandHigh": 1.0, "strength": 1.0,
+             "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "kick",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "onset", "onsetSource": "low", "onsetDecay": 4.0, "strength": 1.5, "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "feed",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "compound", "children": ["bands", "kick"], "combine": "add", "strength": 1.0,
+             "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "flow",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "curlNoise", "frequency": 0.05, "speed": 0.15, "strength": 1.0, "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "trail",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "grid", "reference": "mycelium", "strength": 1.0, "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "trailTint",
+   "kind": "field",
+   "position": [0, 0, 0],
+   "field": {"kind": "noiseColor", "frequency": 0.04, "speed": 0.05, "colorA": [1.0, 0.45, 0.15, 1.0],
+             "colorB": [0.2, 0.9, 1.0, 1.0], "strength": 1.0, "falloff": {"kind": "none"}}
+  },
+  {
+   "name": "carpet",
+   "kind": "procedural",
+   "procedural": {
+    "source": {"kind": "box", "size": [0.16, 0.04, 0.16], "subdivisions": 1},
+    "variation": {"seed": 5},
+    "distribution": {"kind": "generator", "generator": {
+     "cellSize": 0.16, "viewDistance": 41.0, "presence": 1.0, "jitter": 0.0, "sizeMin": 1.0, "sizeMax": 1.0,
+     "bounded": true, "regionMin": [-40, -40], "regionMax": [40, 40]}},
+    "effectors": [
+     {"field": "trailTint", "op": "color", "blend": "add", "strength": 1.0},
+     {"field": "trail", "op": "emission", "blend": "replace", "strength": 1.2},
+     {"field": "trail", "op": "scale", "blend": "add", "strength": 2.0, "scaleAxis": [0, 1, 0]}
+    ],
+    "lod": {"cull": true, "count": 1},
+    "material": {"baseColor": [0.02, 0.02, 0.025], "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 1.0,
+                 "roughness": 0.8, "metallic": 0.0}
+   }
+  }
+ ]
+}

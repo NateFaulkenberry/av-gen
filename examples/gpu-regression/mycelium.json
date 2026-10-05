@@ -1,0 +1,43 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Mycelium (GPU regression)"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "mycelium.scene.json"
+  },
+  "audio": {
+   "path": "../../assets/audio/glowmere-valley.wav"
+  }
+ },
+ "_note": "Regression projects hold the frame to what the GPU systems decide: these routes at amount 0 stop the composition's four default audio routes -- root/scale <- bass, root/rotationSpeed <- mids (an integrated spin, so a function of the frame history rather than of t), scene/brightness <- rms and root/impulse <- onsets -- from moving the whole world. A scene that wants them routes them on purpose.",
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "root/scale",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.mid",
+   "target": "root/rotationSpeed",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.rms",
+   "target": "scene/brightness",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.onset",
+   "target": "root/impulse",
+   "op": "add",
+   "amount": 0.0
+  }
+ ]
+}
