@@ -739,6 +739,13 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             encodeSteps(ahead, w, chunk, first, "simulate-catch-up", nullptr);
             wgpu::CommandBuffer commands = ahead.Finish();
             queue.Submit(1, &commands);
+            // Wait for each chunk before queueing the next. Measured: a fresh `--render` of the Mycelium
+            // regression scene at 32 s queued ~6 s of catch-up GPU work in eight chunks with no sync, and
+            // the frame came back EMPTY -- every pixel 0, "GPU errors: 0", device not lost -- where 28 s
+            // (~5.2 s of work) rendered and the test harness, which happens to wait, rendered 40 s.
+            // Root cause in Dawn/Metal not found; this bounds what is queued to one chunk (<= 4 s of
+            // steps). It runs only while a seek or a fresh render replays a backlog, never in playback.
+            im.context.waitForQueue();
             remaining -= chunk;
         }
         w.steps = remaining; // what is left goes into the frame's own pass

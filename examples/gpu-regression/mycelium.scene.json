@@ -27,7 +27,7 @@
    "velocityField": "flow",
    "advect": 1.5,
    "diffusion": 0.35,
-   "dissipation": 1.6,
+   "dissipation": 2.5,
    "simRate": 60.0,
    "maxSubSteps": 4,
    "seed": 2026,
@@ -37,7 +37,7 @@
    "sensorDistance": 8.0,
    "turnAngle": 0.4,
    "stepSize": 1.0,
-   "depositAmount": 0.25,
+   "depositAmount": 0.02,
    "repel": 0.7,
    "depositField": "feed",
    "checkpointInterval": 5.0
@@ -94,8 +94,8 @@
      "bounded": true, "regionMin": [-40, -40], "regionMax": [40, 40]}},
     "effectors": [
      {"field": "trailTint", "op": "color", "blend": "add", "strength": 1.0},
-     {"field": "trail", "op": "emission", "blend": "replace", "strength": 1.2},
-     {"field": "trail", "op": "scale", "blend": "add", "strength": 2.0, "scaleAxis": [0, 1, 0]}
+     {"field": "trail", "op": "emission", "blend": "replace", "strength": 0.05},
+     {"field": "trail", "op": "scale", "blend": "add", "strength": 0.02, "scaleAxis": [0, 1, 0]}
     ],
     "lod": {"cull": true, "count": 1},
     "material": {"baseColor": [0.02, 0.02, 0.025], "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 1.0,

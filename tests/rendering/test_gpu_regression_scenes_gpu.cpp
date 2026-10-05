@@ -325,3 +325,4 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
     CHECK(ctx->errorCount() == 0);
 }
 
+
