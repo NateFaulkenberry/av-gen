@@ -292,6 +292,10 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
         std::vector<double> gpuMs;
         std::vector<double> procMs;
         std::vector<double> simMs;
+        std::vector<double> genGpu;
+        std::vector<double> effGpu;
+        std::vector<double> cullGpu;
+        std::vector<double> simGpu;
         for (int f = 0; f < 120; ++f) {
             const auto start = std::chrono::steady_clock::now();
             const FrameTime t = rig.advance();
@@ -302,12 +306,24 @@ TEST_CASE("The GPU regression scenes stay inside their expected ranges", "[.perf
             cpu.push_back(updateMs + c.totalMs - c.queueWaitMs);
             procMs.push_back(c.proceduralMs);
             simMs.push_back(c.simulationMs);
+            const auto& st = rig.renderer.stats();
+            if (st.procedural.generatorMs >= 0.0) genGpu.push_back(st.procedural.generatorMs);
+            if (st.procedural.effectorPassMs >= 0.0) effGpu.push_back(st.procedural.effectorPassMs);
+            if (st.procedural.cullMs >= 0.0) cullGpu.push_back(st.procedural.cullMs);
+            if (st.simulation.simulateMs >= 0.0) simGpu.push_back(st.simulation.simulateMs);
             if (rig.renderer.stats().gpuFrameMs > 0.0) {
                 gpuMs.push_back(rig.renderer.stats().gpuFrameMs);
             }
         }
         std::sort(procMs.begin(), procMs.end());
         std::sort(simMs.begin(), simMs.end());
+        const auto med = [](std::vector<double> v) {
+            if (v.empty()) return -1.0;
+            std::sort(v.begin(), v.end());
+            return v[v.size() / 2];
+        };
+        WARN(fmt::format("{}: GPU passes -- generator {:.3f} ms, effectors {:.3f} ms, cull {:.3f} ms, simulation {:.3f} ms",
+                         r.scene, med(genGpu), med(effGpu), med(cullGpu), med(simGpu)));
         std::sort(cpu.begin(), cpu.end());
         std::sort(gpuMs.begin(), gpuMs.end());
         const double cpuMs = cpu[cpu.size() / 2];
