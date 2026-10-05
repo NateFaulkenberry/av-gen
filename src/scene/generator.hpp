@@ -147,4 +147,16 @@ struct GeneratorHit {
                                                            float maxDistance, float sourceRadius,
                                                            const glm::vec3& sourceCentre = glm::vec3(0.0f));
 
+// The element nearest `pointGen` whose bounding sphere (as generatorRaycast's) reaches within `slack` of
+// it: what a click resolves to, given the world position the depth buffer says was clicked.
+[[nodiscard]] std::optional<GeneratedElement> generatorNearest(const GeneratorSpec& spec, std::uint32_t seed,
+                                                              const GeneratorVariation& variation,
+                                                              const glm::vec3& pointGen, float sourceRadius,
+                                                              float slack = 0.25f);
+
+// ADR-1118: a region of a generator as explicit placements in generator space (apply the object's
+// distributionTransform as for any distribution): what "bake to points" writes. At most `cap`.
+[[nodiscard]] std::vector<Transform> generatorBake(const GeneratorSpec& spec, std::uint32_t seed,
+                                                   const glm::vec2& xzMin, const glm::vec2& xzMax, std::size_t cap);
+
 } // namespace avgen::scene

@@ -1405,6 +1405,12 @@ public:
     // A grid is referenced by name from a `FieldKind::Grid` field; only its settings are
     // serialised (`"grids"` in the scene file), never its cell values.
     Result<void> addGrid(spatial::GridField grid);
+    // ADR-1118: bakes the square of half side `radius` about `centreGen` (the generator's own XZ) of the
+    // generator node `nodeName` into a new Points node "<nodeName>-baked" (or "-baked-2" ...) with the
+    // same source, material, transform and effectors, and hides the generator node so the region is not
+    // drawn twice. At most kMaxBakedPoints; returns the new node's name. The escape hatch for hand edits
+    // and for CPU consumers of records (the path tracer, navigation, ecology lights).
+    Result<std::string> bakeGeneratorToPoints(const std::string& nodeName, glm::vec2 centreGen, float radius);
     [[nodiscard]] const std::vector<spatial::GridField>& grids() const { return grids_; }
     [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
 

@@ -224,3 +224,45 @@ TEST_CASE("A points distribution is serialised placements", "[unit][generator]")
     CHECK(glm::vec3(back->instances[1].position) == glm::vec3(1.0f, 2.0f, 3.0f));
     CHECK(back->instances[2].scale.x == Approx(2.0f));
 }
+
+#include "assets/asset_registry.hpp"
+#include "scene/composition.hpp"
+
+#include <filesystem>
+
+TEST_CASE("Bake to points turns a generator region into a saved, editable points node", "[unit][generator]") {
+    assets::AssetRegistry registry{std::filesystem::temp_directory_path()};
+    const nlohmann::json doc = nlohmann::json::parse(R"({
+      "format": "avgen-scene", "version": 1, "name": "bake",
+      "nodes": [{"name": "reeds", "kind": "procedural", "procedural": {
+        "source": {"kind": "cylinder", "radius": 0.05, "height": 1.0},
+        "variation": {"seed": 77},
+        "distribution": {"kind": "generator", "generator": {
+          "cellSize": 0.5, "viewDistance": 40.0, "presence": 0.5, "bounded": true,
+          "regionMin": [-10, -10], "regionMax": [10, 10], "groundAmplitude": 1.0}}}}]})");
+    auto loaded = Composition::fromJson(doc, registry);
+    REQUIRE(loaded.has_value());
+    Composition& comp = **loaded;
+    const CompositionNode* reeds = comp.findNode("reeds");
+    REQUIRE(reeds != nullptr);
+    REQUIRE(reeds->procedural.isGenerator());
+    const auto expected = generatorQueryRegion(reeds->procedural.distribution.generator, 77u, {}, glm::vec2(-5.0f),
+                                               glm::vec2(5.0f));
+    auto baked = comp.bakeGeneratorToPoints("reeds", glm::vec2(0.0f), 5.0f);
+    REQUIRE(baked.has_value());
+    const CompositionNode* node = comp.findNode(*baked);
+    REQUIRE(node != nullptr);
+    CHECK(node->procedural.distribution.kind == DistributionKind::Points);
+    REQUIRE(node->procedural.distribution.points);
+    CHECK(node->procedural.distribution.points->size() == expected.size());
+    CHECK_FALSE(comp.findNode("reeds")->visible);
+    CHECK_FALSE(comp.bakeGeneratorToPoints(*baked, glm::vec2(0.0f), 5.0f).has_value()); // not a generator
+    // It saves and loads as points, with every placement.
+    auto again = Composition::fromJson(comp.toJson(), registry);
+    REQUIRE(again.has_value());
+    const CompositionNode* reloaded = (*again)->findNode(*baked);
+    REQUIRE(reloaded != nullptr);
+    REQUIRE(reloaded->procedural.distribution.points);
+    CHECK(reloaded->procedural.distribution.points->size() == expected.size());
+    CHECK((*(reloaded->procedural.distribution.points))[0].position == expected[0].position);
+}

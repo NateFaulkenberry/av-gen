@@ -4334,6 +4334,27 @@ void Application::serviceViewportPick() {
         return;
     }
     viewportSelectedNode_ = node->name;
+    // ADR-1117: a click on a generated world resolves to one element through the generator's CPU
+    // mirror -- the depth buffer said where the click landed; the mirror says which cell's element is
+    // there. No GPU readback of records, and no records to read.
+    if (panel_ != nullptr) {
+        panel_->world.generatorPick.reset();
+        if (scene::pickSpaceOf(result->objectId) == scene::PickSpace::Procedural) {
+            const std::uint32_t index = scene::pickIndexOf(result->objectId);
+            const auto& procedurals = engine_->scene().procedurals;
+            if (index < procedurals.size() && procedurals[index].isGenerator()) {
+                const scene::ProceduralGeometry& pg = procedurals[index];
+                const glm::vec3 pointGen =
+                    glm::vec3(glm::inverse(pg.distributionTransform.matrix()) * glm::vec4(result->position, 1.0f));
+                const float radius = scene::sourceBoundingRadius(pg.source, pg.sourceTransform.scale);
+                if (auto e = scene::generatorNearest(pg.distribution.generator, pg.variation.seed,
+                                                     pg.generatorVariation(), pointGen, radius)) {
+                    panel_->world.generatorPick = ui::WorldPanel::GeneratorPick{pg.name, *e};
+                    log::info("pick: '{}' element in cell ({}, {})", pg.name, e->ix, e->iz);
+                }
+            }
+        }
+    }
     if (panel_ != nullptr) {
         // The editor decides what a click on this node *means* -- whether it selects the node or
         // the group it is in, and whether it replaces the selection or adds to it (ADR-092). The

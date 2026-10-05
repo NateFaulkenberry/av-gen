@@ -325,6 +325,21 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                "simulation lives in compute shaders, so no positions exist to intersect",
                                static_cast<int>(scene.particles.size()));
     }
+    // ADR-1117: a generator's records exist only on the GPU, for the window of the realtime camera; the
+    // tracer has no records to intersect. Said here, never dropped silently -- bake the region to points
+    // (Composition::bakeGeneratorToPoints) to trace it.
+    {
+        int generators = 0;
+        for (const scene::ProceduralGeometry& proc : scene.procedurals) {
+            generators += proc.isGenerator() && proc.visible ? 1 : 0;
+        }
+        if (generators > 0) {
+            snap.capabilities.note("generator distribution", Support::Unsupported,
+                                   "its records are written by a GPU kernel per frame and exist only on the GPU "
+                                   "(ADR-1117); bake the region to points to trace it",
+                                   generators);
+        }
+    }
     // ---- procedural scatter ----------------------------------------------------------------
     //
     // The realtime renderer resolves these with `scene::makeSourceMesh` on the CPU and then

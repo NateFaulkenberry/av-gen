@@ -489,8 +489,18 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
                 }
                 ImGui::TreePop();
             }
+            drawGeneratorSection(engine, pg);
             drawDeformerStack(engine, pg);
             break;
+        }
+    }
+    // ADR-1117: a generator node picked in the viewport shows its generator section too.
+    if (selection.kind == WorldSelection::Kind::Node) {
+        for (const scene::ProceduralGeometry& pg : engine.scene().procedurals) {
+            if (pg.name == selection.name && pg.isGenerator()) {
+                drawGeneratorSection(engine, pg);
+                break;
+            }
         }
     }
     // ADR-387: the selected object's own controls, editable, grouped by the sub-prefix the
@@ -1557,6 +1567,76 @@ void WorldPanel::drawNavigationOptions(WorldEditor* editor) {
                           "whole cost of the overlay -- see the line below for what it is drawing.");
     }
     ImGui::TextWrapped("%s", editor->navStatus().c_str());
+}
+
+void WorldPanel::drawGeneratorSection(app::Engine& engine, const scene::ProceduralGeometry& object) {
+    if (!object.isGenerator()) {
+        return;
+    }
+    const scene::GeneratorSpec& g = object.distribution.generator;
+    if (!ImGui::TreeNodeEx("Generator", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+    const scene::GeneratorWindow capacity = scene::generatorCapacity(g);
+    ImGui::Text("'%s' v%u, seed %u, %s", g.name.c_str(), g.version, object.variation.seed,
+                g.bounded ? "bounded" : "unbounded (follows the camera)");
+    ImGui::Text("cells of %.2f m, window +/- %.0f m: %llu cells, %.1f MB on the GPU", static_cast<double>(g.cellSize),
+                static_cast<double>(g.viewDistance), static_cast<unsigned long long>(capacity.cells()),
+                static_cast<double>(capacity.cells()) * 96.0 / (1024.0 * 1024.0));
+    ImGui::TextDisabled("no CPU records: click an element in the viewport to inspect it");
+    const glm::mat4 genToWorld = object.distributionTransform.matrix();
+    if (generatorPick && generatorPick->object == object.name) {
+        const scene::GeneratedElement& e = generatorPick->element;
+        const glm::vec3 world = glm::vec3(genToWorld * glm::vec4(e.position, 1.0f));
+        ImGui::Separator();
+        ImGui::Text("element: cell (%d, %d)", e.ix, e.iz);
+        ImGui::Text("world (%.2f, %.2f, %.2f), size %.2f", static_cast<double>(world.x), static_cast<double>(world.y),
+                    static_cast<double>(world.z), static_cast<double>(e.size));
+        ImGui::Text("random (%.3f, %.3f, %.3f, %.3f)  value %.2f  emission %.2f", static_cast<double>(e.random.x),
+                    static_cast<double>(e.random.y), static_cast<double>(e.random.z), static_cast<double>(e.random.w),
+                    static_cast<double>(e.value), static_cast<double>(e.emission));
+        // The derived state: every effector's field as the GPU samples it for THIS element (its world
+        // position and its own random), from the CPU reference -- the same numbers, no readback.
+        const spatial::FieldSet& fields = engine.scene().fields;
+        for (const spatial::Effector& eff : object.effectors) {
+            const spatial::FieldSpec* f = fields.find(eff.field);
+            if (f == nullptr) {
+                continue;
+            }
+            const float s = spatial::sampleScalar(*f, world, engine.positionSeconds(), &fields, e.random.w);
+            bulletWrapped("%s (%s) -> %s: %.3f", f->name.c_str(), spatial::fieldKindName(f->kind),
+                          spatial::effectorOpName(eff.op), static_cast<double>(s));
+        }
+    }
+    // ADR-1118: bake a square of the world around the picked element (or the camera) into points.
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::DragFloat("bake half side (m)", &bakeRadius, 0.5f, 1.0f, 500.0f, "%.1f");
+    glm::vec2 centre(0.0f);
+    if (generatorPick && generatorPick->object == object.name) {
+        centre = glm::vec2(generatorPick->element.position.x, generatorPick->element.position.z);
+    } else {
+        const glm::vec3 cam = glm::vec3(glm::inverse(genToWorld) * glm::vec4(engine.scene().camera.position, 1.0f));
+        centre = glm::vec2(cam.x, cam.z);
+    }
+    auto* composition = engine.composition();
+    const scene::CompositionNode* node = nullptr;
+    if (composition != nullptr) {
+        for (std::size_t i = 0; i < engine.scene().procedurals.size(); ++i) {
+            if (engine.scene().procedurals[i].name == object.name) {
+                node = composition->nodeForProcedural(i);
+                break;
+            }
+        }
+    }
+    if (node != nullptr && ImGui::Button("Bake to points")) {
+        auto baked = composition->bakeGeneratorToPoints(node->name, centre, bakeRadius);
+        bakeStatus_ = baked ? fmt::format("baked into '{}' (the generator is hidden)", *baked) : baked.error().message;
+    }
+    if (!bakeStatus_.empty()) {
+        ImGui::TextWrapped("%s", bakeStatus_.c_str());
+    }
+    ImGui::TreePop();
 }
 
 } // namespace avgen::ui

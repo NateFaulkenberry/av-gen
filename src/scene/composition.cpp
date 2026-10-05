@@ -1016,6 +1016,50 @@ Result<void> Composition::evaluateGraph(double time) {
     return {};
 }
 
+Result<std::string> Composition::bakeGeneratorToPoints(const std::string& nodeName, glm::vec2 centreGen, float radius) {
+    CompositionNode* source = findNode(nodeName);
+    if (source == nullptr || source->kind != NodeKind::Procedural || !source->procedural.isGenerator()) {
+        return fail("'{}' is not a generator node", nodeName);
+    }
+    if (!(radius > 0.0f)) {
+        return fail("bake radius must be > 0");
+    }
+    const ProceduralGeometry& rest = source->procedural;
+    std::vector<Transform> placements =
+        generatorBake(rest.distribution.generator, rest.variation.seed, centreGen - glm::vec2(radius),
+                      centreGen + glm::vec2(radius), kMaxBakedPoints);
+    if (placements.empty()) {
+        return fail("the region of '{}' around ({}, {}) holds no elements", nodeName, centreGen.x, centreGen.y);
+    }
+    CompositionNode baked;
+    baked.kind = NodeKind::Procedural;
+    baked.parent = source->parent;
+    baked.transform = source->transform;
+    baked.tags = source->tags;
+    baked.emissiveBoost = source->emissiveBoost;
+    baked.importance = source->importance;
+    baked.proceduralMaterialAuthored = source->proceduralMaterialAuthored;
+    baked.procedural = rest;
+    baked.procedural.distribution.kind = DistributionKind::Points;
+    baked.procedural.distribution.setPoints(std::move(placements));
+    // A Points object has CPU records, so the cull is the author's choice again; keep the generator's.
+    std::string name = nodeName + "-baked";
+    for (int k = 2; findNode(name) != nullptr; ++k) {
+        name = nodeName + "-baked-" + std::to_string(k);
+    }
+    baked.name = name;
+    baked.procedural.name = name;
+    auto added = addNode(std::move(baked));
+    if (!added) {
+        return std::unexpected(added.error());
+    }
+    if (CompositionNode* again = findNode(nodeName); again != nullptr) {
+        again->visible = false;
+    }
+    dirty_ = true;
+    return name;
+}
+
 Result<void> Composition::addGrid(spatial::GridField grid) {
     if (auto ok = grid.validate(); !ok) {
         return ok;

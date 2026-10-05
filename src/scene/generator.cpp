@@ -364,4 +364,36 @@ std::optional<GeneratorHit> generatorRaycast(const GeneratorSpec& spec, std::uin
     return best;
 }
 
+std::optional<GeneratedElement> generatorNearest(const GeneratorSpec& spec, std::uint32_t seed,
+                                                const GeneratorVariation& variation, const glm::vec3& pointGen,
+                                                float sourceRadius, float slack) {
+    const float reach = sourceRadius * spec.sizeMax + slack;
+    const auto elements = generatorQueryRegion(spec, seed, variation, glm::vec2(pointGen.x, pointGen.z) - glm::vec2(reach + spec.cellSize),
+                                               glm::vec2(pointGen.x, pointGen.z) + glm::vec2(reach + spec.cellSize));
+    std::optional<GeneratedElement> best;
+    float bestGap = std::numeric_limits<float>::max();
+    for (const GeneratedElement& e : elements) {
+        // The gap between the point and the element's sphere (negative inside it).
+        const float gap = glm::length(pointGen - e.position) - sourceRadius * e.size;
+        if (gap <= slack && gap < bestGap) {
+            bestGap = gap;
+            best = e;
+        }
+    }
+    return best;
+}
+
+std::vector<Transform> generatorBake(const GeneratorSpec& spec, std::uint32_t seed, const glm::vec2& xzMin,
+                                     const glm::vec2& xzMax, std::size_t cap) {
+    std::vector<Transform> out;
+    for (const GeneratedElement& e : generatorQueryRegion(spec, seed, {}, xzMin, xzMax, cap)) {
+        Transform t;
+        t.position = e.position;
+        t.rotation = e.rotation;
+        t.scale = glm::vec3(e.size);
+        out.push_back(t);
+    }
+    return out;
+}
+
 } // namespace avgen::scene

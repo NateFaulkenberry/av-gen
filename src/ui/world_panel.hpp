@@ -10,6 +10,7 @@
 #include "ui/effects_panel.hpp"
 #include "ui/ui_logic.hpp"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -88,7 +89,20 @@ public:
     // long Properties list otherwise keeps the section below the fold of a screenshot.
     bool scrollToEffects = false;
 
+    // ADR-1117: the generated element a viewport click resolved to, through the generator's CPU
+    // mirror (no GPU readback, no records): which object, and the element in its cell.
+    struct GeneratorPick {
+        std::string object;
+        scene::GeneratedElement element;
+    };
+    std::optional<GeneratorPick> generatorPick;
+    float bakeRadius = 20.0f; // the half side of the square "Bake to points" writes
+
 private:
+    // ADR-1117/1118: a generator object's description, its picked element with the derived state the GPU
+    // applies to it, and the bake action.
+    void drawGeneratorSection(app::Engine& engine, const scene::ProceduralGeometry& object);
+    std::string bakeStatus_;
     // ADR-421: why the last structural deformer edit was refused, if it was. Held rather than
     // logged, for the reason ADR-420's dead-subscription line is: a refusal an artist cannot see is
     // a refusal that looks like the button not working.
