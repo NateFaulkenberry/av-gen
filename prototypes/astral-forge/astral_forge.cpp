@@ -64,7 +64,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, ext;
 };
 
 std::string readFile(const std::string& path) {
@@ -170,9 +170,9 @@ void setBands(FrameU& f, const astral::State& s) {
         f.bands[2 * k] = glm::vec4(glm::normalize(axis), offset);
         f.bands[2 * k + 1] = glm::vec4(width, intensity * s.bandGain, segments, warm);
     };
-    put(0, {std::cos(ph * 0.5f), 0.35f, std::sin(ph * 0.5f)}, 0.0f, 0.014f, 24.0f, 5.0f, 0.15f * s.warmth);
-    put(1, {0.25f * std::sin(ph * 0.3f), 1.0f, 0.3f}, 0.62f, 0.02f, 13.0f, 0.0f, 0.3f + 0.4f * s.warmth);
-    put(2, {0.2f, -1.0f, 0.45f + 0.2f * std::sin(ph * 0.21f)}, 0.5f, 0.012f, 16.0f, 9.0f, 0.75f * s.warmth + 0.1f);
+    put(0, {std::cos(ph * 0.5f), 0.35f, std::sin(ph * 0.5f)}, 0.0f, 0.014f, 17.0f, 5.0f, 0.15f * s.warmth);
+    put(1, {0.25f * std::sin(ph * 0.3f), 1.0f, 0.3f}, 0.62f, 0.02f, 9.0f, 0.0f, 0.3f + 0.4f * s.warmth);
+    put(2, {0.2f, -1.0f, 0.45f + 0.2f * std::sin(ph * 0.21f)}, 0.5f, 0.012f, 11.0f, 9.0f, 0.75f * s.warmth + 0.1f);
     // the sweep band: a vertical strip that crosses the entity on a snare
     put(3, {1.0f, 0.0f, 0.15f}, s.sweep * 0.85f, 0.018f, 28.0f * s.sweepStrength, 0.0f, 0.0f);
 }
@@ -454,6 +454,7 @@ int main(int argc, char** argv) {
         f.flags = glm::vec4(static_cast<float>(o.debug), s.mass, 1.0f / perCell, s.gratingUm);
         f.entity = glm::vec4(s.centre, s.scale);
         f.misc = glm::vec4(s.fall, s.escape, s.strobe, s.appendWeight);
+        f.ext = glm::vec4(s.sharpSpread, s.bloom, 0.0f, 0.0f);
     };
 
     auto dispatch1D = [&](wgpu::ComputePassEncoder& cp, std::uint32_t n) {
@@ -576,7 +577,7 @@ int main(int argc, char** argv) {
                 r.Draw(3);
                 r.End();
             };
-            const float post[8] = {sLast.exposure, 0.07f, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f};
+            const float post[8] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f};
             queue.WriteBuffer(postBuf, 0, post, sizeof(post));
             fullPass(hdrView, combinePipe, combineGroup, false, "post");
             fullPass(bloomViews[0], downFirst, downGroups[0], false, nullptr);

@@ -29,10 +29,12 @@ struct State {
     float rigPhase = 0.0f, sweep = 0.0f, sweepStrength = 0.0f, flicker = 0.0f;
     float bandGain = 1.0f, warmth = 0.3f;
     float gratingUm = 1.6f;
+    float sharpSpread = 0.6f;  // 1: only the anatomy's centre becomes precise; 0: everywhere (material studies)
+    float bloom = 0.035f;
     float appendWeight = 1.0f; // density weight of appendage matter (below ~0.4: strands of dust, not tubes)
     glm::vec3 eye{0.0f, 0.0f, 25.0f}, target{0.0f};
     float fovDeg = 30.0f;
-    float exposure = 1.0f, haze = 0.25f;
+    float exposure = 0.85f, haze = 0.25f;
     std::string label; // camera behaviour / phase, for the log
 };
 
@@ -93,6 +95,7 @@ inline State test01(float t) {
 inline State test02(float t) {
     State s;
     s.archA = s.archB = kHorns;
+    s.sharpSpread = 0.0f;
     s.C = std::min(0.97f, 0.7f + 0.27f * sstep(0.0f, 2.0f, t)) + 0.03f * std::sin(t * 1.7f);
     defaults(s);
     s.temper = 0.3f + 0.45f * sstep(1.0f, 11.0f, t);

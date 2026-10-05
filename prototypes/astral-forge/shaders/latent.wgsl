@@ -96,9 +96,9 @@ struct FaceP {
     inner: f32,     // the mouth holds a smaller face (0/1)
 };
 
-fn eyeCentreL() -> vec3f { return vec3f(-0.86, 0.52, 0.62); }
-fn eyeCentreR() -> vec3f { return vec3f(0.86, 0.52, 0.62); }
-fn mouthCentre() -> vec3f { return vec3f(0.0, -1.32, 0.66); }
+fn eyeCentreL() -> vec3f { return vec3f(-0.76, 0.72, 0.6); }
+fn eyeCentreR() -> vec3f { return vec3f(0.76, 0.72, 0.6); }
+fn mouthCentre() -> vec3f { return vec3f(0.0, -1.45, 0.62); }
 
 // Filaments from the plate's rim out into the field: the mask has no clean edge, it frays into matter.
 fn maskFilaments(q: vec3f) -> f32 {
@@ -126,7 +126,7 @@ fn maskFilaments(q: vec3f) -> f32 {
 fn facePlate(q: vec3f, fp: FaceP) -> f32 {
     let c = vec3f(0.0, 0.15, -1.25);
     let tear = 0.22 * (vnoise3(q * 1.7 + vec3f(0.0, 0.0, F.cam.w * 0.1), 61u) - 0.5);
-    let r = vec3f(2.25, 3.05, 2.05) * (1.0 + tear * smoothstep(1.4, 2.4, length(q.xy * vec2f(1.0, 0.75))));
+    let r = vec3f(1.95, 3.35, 2.0) * (1.0 + tear * smoothstep(1.4, 2.4, length(q.xy * vec2f(1.0, 0.75))));
     let dRound = abs(sdEllipsoid(q - c, r)) - 0.15;
     let dGeo = abs(sdFacet(q - c, r * vec3f(0.97, 0.97, 1.0))) - 0.15;
     let g = smoothstep(-0.25, 0.35, q.x) * fp.asym;
@@ -134,12 +134,17 @@ fn facePlate(q: vec3f, fp: FaceP) -> f32 {
     d = smax(d, -0.55 - q.z, 0.25); // keep the front: it is a mask
     // eye sockets and the mouth slit cut through
     let eL = eyeCentreL() + vec3f(0.0, 0.0, -fp.eyeDepth * 2.2);
-    d = smax(d, -(length(q - eyeCentreL()) - 0.62 * fp.eyeL), 0.12);
-    d = smax(d, -(length(q - eyeCentreR()) - 0.62 * fp.eyeR), 0.12);
+    // almond sockets, outer corners lifted
+    let sl = q - eyeCentreL();
+    let slr = vec3f(rot2(0.22) * sl.xy, sl.z);
+    let sr = q - eyeCentreR();
+    let srr = vec3f(rot2(-0.22) * sr.xy, sr.z);
+    d = smax(d, -sdEllipsoid(slr, vec3f(0.62, 0.36, 0.55) * fp.eyeL), 0.1);
+    d = smax(d, -sdEllipsoid(srr, vec3f(0.62, 0.36, 0.55) * fp.eyeR), 0.1);
     let m = mouthCentre();
     var mq = q - m;
     mq.z *= 1.0 / (1.0 + 3.0 * fp.tunnel);
-    d = smax(d, -sdEllipsoid(mq, vec3f(1.02, 0.17 + 0.22 * fp.open, 0.9)), 0.08);
+    d = smax(d, -sdEllipsoid(mq, vec3f(0.95, 0.09 + 0.2 * fp.open, 0.85)), 0.06);
     // brow ridge and nose ridge
     let brow = min(sdCone(q, vec3f(0.0, 1.38, 0.78), vec3f(-1.75, 1.02, 0.28), 0.17, 0.07),
                    sdCone(q, vec3f(0.0, 1.38, 0.78), vec3f(1.75, 1.02, 0.28), 0.17, 0.07));
@@ -152,19 +157,19 @@ fn facePlate(q: vec3f, fp: FaceP) -> f32 {
 // eye is an octahedron. The left eye can travel backward through depth (fold0.y).
 fn faceEyes(q: vec3f, fp: FaceP) -> f32 {
     let t = F.cam.w;
-    let eL = eyeCentreL() + vec3f(0.0, 0.0, -0.12 - fp.eyeDepth * 2.2);
-    let eR = eyeCentreR() + vec3f(0.0, 0.0, -0.12);
-    let rL = 0.42 * fp.eyeL;
-    let rR = 0.42 * fp.eyeR;
-    var d = length(q - eL) - rL;
+    let eL = eyeCentreL() + vec3f(0.0, 0.0, -0.2 - fp.eyeDepth * 2.2);
+    let eR = eyeCentreR() + vec3f(0.0, 0.0, -0.2);
+    let rL = 0.4 * fp.eyeL;
+    let rR = 0.4 * fp.eyeR;
+    var d = sdEllipsoid(vec3f(rot2(0.22) * (q - eL).xy, (q - eL).z), vec3f(rL * 1.25, rL * 0.72, rL));
     // three nested pupils: raised rings on the eye's front, slowly counter-rotating via phase
     let lq = q - eL;
     let fz = lq.z - rL * 0.86;
     for (var k = 1; k <= 3; k++) {
-        let rr = rL * (0.22 * f32(k) + 0.02 * sin(t * (0.6 + 0.3 * f32(k))));
+        let rr = rL * (0.2 * f32(k) + 0.02 * sin(t * (0.6 + 0.3 * f32(k))));
         d = min(d, length(vec2f(length(lq.xy) - rr, fz + 0.03 * f32(k))) - 0.028 * rL / 0.42);
     }
-    let organicR = length(q - eR) - rR;
+    let organicR = sdEllipsoid(vec3f(rot2(-0.22) * (q - eR).xy, (q - eR).z), vec3f(rR * 1.25, rR * 0.72, rR));
     let geoR = sdOcta((q - eR) * vec3f(1.0, 0.9, 1.0), rR * 1.25);
     let g = fp.asym;
     var dr = mix(organicR, geoR, g);
@@ -195,9 +200,9 @@ fn faceMouth(q: vec3f, fp: FaceP) -> f32 {
     let m = mouthCentre();
     var mq = q - m;
     mq.z *= 1.0 / (1.0 + 3.0 * fp.tunnel);
-    let hy = 0.17 + 0.22 * fp.open;
-    var d = abs(sdEllipsoid(mq, vec3f(1.1, hy + 0.1, 0.85))) - 0.05;
-    d = smax(d, abs(mq.z - 0.05) - 0.3, 0.05);
+    let hy = 0.09 + 0.2 * fp.open;
+    var d = abs(sdEllipsoid(mq, vec3f(0.97, hy + 0.03, 0.85))) - 0.02;
+    d = smax(d, abs(mq.z - 0.0) - 0.22, 0.03);
     // teeth: one cell per 0.17 units along x
     let cx = clamp(round(mq.x / 0.17), -5.0, 5.0);
     let h = u01(hashu(u32(cx + 20.0) * 7919u + 13u));
@@ -215,7 +220,7 @@ fn faceMouth(q: vec3f, fp: FaceP) -> f32 {
     return d;
 }
 
-fn defaultFace() -> FaceP { return FaceP(0.0, 1.0, 1.0, 0.25, 0.0, 0.0, 1.0); }
+fn defaultFace() -> FaceP { return FaceP(0.0, 1.0, 1.0, 0.18, 0.0, 0.0, 1.0); }
 
 // ---- appendages -----------------------------------------------------------------------------------
 
@@ -271,7 +276,7 @@ fn horn(q: vec3f, root: vec3f, ang: vec2f, len: f32, curl_: f32, r0: f32) -> f32
     lp = vec3f(xy.x, xy.y, lp.z);
     // bend about z, increasing along y
     let b = curl_ * clamp(lp.y, 0.0, len);
-    let bxy = rot2(b * 0.35) * lp.xy;
+    let bxy = rot2(b * 0.6) * lp.xy;
     lp = vec3f(bxy.x, bxy.y, lp.z);
     return sdCone(lp, vec3f(0.0), vec3f(0.0, len, 0.0), r0, 0.01);
 }
@@ -321,48 +326,54 @@ fn machineRings(q: vec3f) -> f32 {
     return d;
 }
 
-// Abstract organism (TEST 02): a twisted core and spiralling horns and blades. No face.
+// Abstract organism (TEST 02): no face. A twisted core with a lipped hollow, long curling horns, and a
+// ribcage of curved blade fins. Parts: eyes -> fins (fine detail binds first), mouth -> the hollow's lip,
+// plate -> the core, appendage -> horns.
 fn hornsBody(q: vec3f) -> f32 {
     let t = F.cam.w;
     var p = q;
     let tw = 0.35 * p.y + 0.2 * sin(t * 0.3);
     let xz = rot2(tw) * p.xz;
     p = vec3f(xz.x, p.y, xz.y);
-    var d = sdEllipsoid(p, vec3f(1.6, 2.6, 1.3));
-    d = smax(d, -sdEllipsoid(p - vec3f(0.0, 0.4, 1.3), vec3f(0.9, 1.6, 0.7)), 0.4); // a hollow cut
+    var d = sdEllipsoid(p, vec3f(1.5, 2.9, 1.25));
+    d = smax(d, -sdEllipsoid(p - vec3f(0.0, 0.5, 1.2), vec3f(0.75, 1.5, 0.75)), 0.35);
     return d;
+}
+fn hornsLip(q: vec3f) -> f32 {
+    let t = F.cam.w;
+    var p = q;
+    let tw = 0.35 * p.y + 0.2 * sin(t * 0.3);
+    let xz = rot2(tw) * p.xz;
+    p = vec3f(xz.x, p.y, xz.y);
+    let e = sdEllipsoid(p - vec3f(0.0, 0.5, 1.2), vec3f(0.85, 1.6, 0.85));
+    return max(abs(e) - 0.05, abs(p.z - 0.95) - 0.25);
 }
 fn hornsAppendages(q: vec3f) -> f32 {
     let t = F.cam.w;
     var d = BIG;
-    for (var k = 0; k < 6; k++) {
+    for (var k = 0; k < 5; k++) {
         let fk = f32(k);
-        let a = fk * TAU / 6.0 + 0.15 * sin(t * 0.25 + fk);
-        let root = vec3f(1.0 * cos(a), -1.2 + 0.5 * fk, 0.8 * sin(a));
-        d = min(d, horn(q, root, vec2f(0.9 * sin(a), -1.1 * cos(a) + 0.3), 3.4 + 0.5 * sin(fk * 1.3), 1.4, 0.36));
+        let a = fk * TAU / 5.0 + 0.35 + 0.12 * sin(t * 0.25 + fk);
+        let root = vec3f(0.9 * cos(a), 0.6 + 0.4 * sin(fk * 1.7), 0.75 * sin(a));
+        let len = 5.2 + 1.2 * sin(fk * 1.3);
+        d = smin(d, horn(q, root, vec2f(0.75 * sin(a), -1.25 * cos(a) + 0.25), len, 1.9 + 0.3 * sin(fk), 0.42), 0.3);
     }
-    // two thin blade sheets wrapping the core
-    var lp = q;
-    let yz = rot2(0.5) * lp.yz;
-    lp = vec3f(lp.x, yz.x, yz.y);
-    let sheet = abs(sdEllipsoid(lp, vec3f(3.3, 1.2, 3.3))) - 0.04;
-    let mask = abs(lp.y + 0.3 * sin(safeAtan2(lp.z, lp.x) * 3.0 + t * 0.4)) - 0.35;
-    d = min(d, smax(sheet, mask, 0.05));
     return d;
 }
 fn hornsRings(q: vec3f) -> f32 {
+    // the "ribcage": curved blade fins around the core, polar-repeated, each a thin bent plate
     let t = F.cam.w;
-    var d = BIG;
-    for (var k = 0; k < 3; k++) {
-        let fk = f32(k);
-        var lp = q - vec3f(0.0, -0.6 + 1.2 * fk, 0.0);
-        let yz = rot2(1.57 + 0.3 * sin(t * 0.3 + fk)) * lp.yz;
-        lp = vec3f(lp.x, yz.x, yz.y);
-        d = min(d, sdTorusZ(lp, 1.9 - 0.25 * fk, 0.05));
-    }
-    return d;
+    var p = q;
+    let n = 9.0;
+    let ang = safeAtan2(p.z, p.x) + 0.08 * sin(t * 0.4);
+    let cell = round(ang / (TAU / n)) * (TAU / n);
+    let r2 = rot2(cell) * p.xz;
+    var lp = vec3f(r2.x - 1.5, p.y, r2.y);
+    // bend the fin backward along its height
+    let b = rot2(0.25 * lp.y) * lp.xz;
+    lp = vec3f(b.x, lp.y, b.y);
+    return sdEllipsoid(lp, vec3f(0.55, 2.6 - 0.4 * abs(sin(cell * 1.7)), 0.035));
 }
-
 // ---- choir: hundreds of small faces on a shell (cube-sphere cells), syncing, then merging ---------
 
 fn choirShell(q: vec3f) -> f32 {
@@ -438,10 +449,10 @@ fn archetypeD(q: vec3f, arch: i32, part: i32) -> f32 {
     }
     if (arch == 6) {
         if (part == 1) { return hornsRings(q); }
-        if (part == 2) { return hornsRings(q * 1.25) / 1.25; }
+        if (part == 2) { return hornsLip(q); }
         if (part == 3) { return hornsBody(q); }
         if (part == 4) { return hornsAppendages(q); }
-        return smin(smin(hornsBody(q), hornsAppendages(q), k), hornsRings(q), k * 0.5);
+        return smin(smin(smin(hornsBody(q), hornsAppendages(q), k), hornsRings(q), k * 0.5), hornsLip(q), k * 0.3);
     }
     if (arch == 3) {
         // three faces at 120 degrees; each sample uses the face whose sector it is in (no front)
@@ -499,11 +510,15 @@ fn featureWeight(q: vec3f) -> f32 {
 }
 
 // ---- engraving: guilloche line fields cut in the warped domain --------------------------------
-// Returns the scalar whose iso-lines are the grooves. Three families:
-//   rose lines around each eye (rosette cam, n = 12 / 18),
-//   contour shells about a point behind the mask (wrap the form like topographic engraving),
-//   a slightly rotated straight-line family (engine turning) for moire.
-fn engraveField(q: vec3f, fam: i32) -> f32 {
+// Each family gives SURFACE COORDINATES (u, v); the line pattern is composed per octave in the surface
+// shader as  L = f v + A sin(n u + drift f v),  with f and n multiplied by 4 per octave: fine lines carrying
+// a wave ~1.5 spacings tall and ~8 long, whose phase drifts across lines (the rose-engine braid / moire),
+// self-similar under zoom.
+//   0: rosettes around each eye (u = angle, v = radius), n = 12 / 18
+//   1: contour rosettes about a point behind the mask (u = angle, v = distance), n = 7
+//   2: engine-turned waves (u, v = two oblique axes), n = 1 (a plain wave)
+struct EUV { uv: vec2f, n: f32, angular: f32, amp: f32, };  // amp fades the wave near a rosette's centre
+fn engraveUV(q: vec3f, fam: i32) -> EUV {
     let t = F.cam.w;
     let crawl = t * (0.03 + 0.12 * F.ent2.w);
     if (fam == 0) {
@@ -512,16 +527,13 @@ fn engraveField(q: vec3f, fam: i32) -> f32 {
         let useL = dot(eL, eL) < dot(eR, eR);
         let e = select(eR, eL, useL);
         let r = length(e.xy);
-        let th = safeAtan2(e.y, e.x);
-        let n = select(18.0, 12.0, useL);
-        return r + 0.035 * cos(n * th + crawl * 6.0) + crawl;
+        return EUV(vec2f(safeAtan2(e.y, e.x) + crawl, r), select(18.0, 12.0, useL), 1.0, smoothstep(0.15, 0.5, r));
     }
     if (fam == 1) {
-        let c = vec3f(0.0, 0.2, -3.0);
-        let d = q - c;
-        let th = safeAtan2(d.y, d.x);
-        return length(d) + 0.04 * cos(7.0 * th - crawl * 3.0) - crawl * 0.5;
+        let d = q - vec3f(0.0, 0.2, -3.0);
+        return EUV(vec2f(safeAtan2(d.y, d.x) - crawl * 0.3, length(d) - crawl * 0.3), 7.0, 1.0, smoothstep(0.4, 1.6, length(d.xy)));
     }
-    let dir = normalize(vec3f(0.94, 0.30, 0.17));
-    return dot(q, dir) + 0.06 * sin(dot(q, vec3f(0.2, 1.3, 0.4)) * 2.0 + crawl * 2.0) + 0.012 * length(q.xy);
+    let s = dot(q, normalize(vec3f(0.94, 0.30, 0.17)));
+    let s2 = dot(q, normalize(vec3f(-0.25, 0.95, 0.2)));
+    return EUV(vec2f(s2 * 3.0 + crawl * 2.0, s), 1.0, 0.0, 1.0);
 }

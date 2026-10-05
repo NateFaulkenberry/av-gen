@@ -41,7 +41,7 @@ fn fieldAt(p: vec3f) -> f32 {
     var S = select(0.0, F.ent0.z, approach == 4);
     if (S > 0.001) {
         let qc = (p - F.entity.xyz) / F.entity.w;
-        S *= clamp(1.3 - 0.55 * length(qc.xy / vec2f(2.0, 2.8)) - 0.2 * abs(qc.z), 0.15, 1.0);
+        S *= mix(1.0, clamp(1.3 - 0.55 * length(qc.xy / vec2f(2.0, 2.8)) - 0.2 * abs(qc.z), 0.15, 1.0), F.ext.x);
     }
     if (S > 0.001 && s > T * 0.12) {
         let L = latent(p);
@@ -86,6 +86,11 @@ fn env(dir: vec3f, alpha: f32) -> vec3f {
         sum += A1.y * g * bandColor(A1.w);
     }
     // the faintest omni term so cavities are not absolute zero, plus the collapse strobe
+    // a broad, dim soft-box sweep (orbiting with the rig): it describes the body's curvature between the
+    // crisp strips, the way a gradient sweep does in product photography of black chrome
+    let key = normalize(vec3f(cos(F.rig.x * 0.23 + 0.8), 0.55, sin(F.rig.x * 0.23 + 0.8)));
+    let soft = exp((dot(dir, key) - 1.0) * 2.6) * 0.55 + 0.08 * smoothstep(-0.3, 1.0, dir.y);
+    sum += soft * vec3f(0.92, 0.95, 1.0);
     return sum * (1.0 + F.rig.w) + vec3f(0.006) + vec3f(F.misc.z * 1.5);
 }
 // The point on band k nearest a direction: the "light direction" for the grating term.
@@ -97,31 +102,45 @@ fn bandDir(k: i32, r: vec3f) -> vec3f {
 // ---- engraving ----------------------------------------------------------------------------------
 struct Groove { n: vec3f, tang: vec3f, across: vec3f, mask: f32, };
 
+fn wrapPi(x: f32) -> f32 { return x - TAU * round(x / TAU); }
+
 fn grooveFamily(p: vec3f, n: vec3f, fam: i32, freq: f32, depth: f32, footprint: f32, groove: ptr<function, Groove>, wfam: f32) {
     if (wfam < 0.02) { return; }
     let e = 0.004 * F.entity.w;
-    let g0 = engraveField(warp(p), fam);
-    let gx = engraveField(warp(p + vec3f(e, 0.0, 0.0)), fam) - g0;
-    let gy = engraveField(warp(p + vec3f(0.0, e, 0.0)), fam) - g0;
-    let gz = engraveField(warp(p + vec3f(0.0, 0.0, e)), fam) - g0;
-    var grad = vec3f(gx, gy, gz) / e;
-    grad -= n * dot(n, grad);
-    let gl = length(grad);
-    if (gl < 1e-5) { return; }
-    let across = grad / gl;
-    // two octaves of lines: the second appears only close up (scale recursion in the material)
-    for (var o = 0; o < 2; o++) {
-        let ff = freq * pow(4.0, f32(o));
-        let aa = ff * gl * footprint;
+    let E0 = engraveUV(warp(p), fam);
+    let Ex = engraveUV(warp(p + vec3f(e, 0.0, 0.0)), fam);
+    let Ey = engraveUV(warp(p + vec3f(0.0, e, 0.0)), fam);
+    let Ez = engraveUV(warp(p + vec3f(0.0, 0.0, e)), fam);
+    // gradients of u and v; an angular u is unwrapped across the atan2 branch cut
+    var du = vec3f(Ex.uv.x - E0.uv.x, Ey.uv.x - E0.uv.x, Ez.uv.x - E0.uv.x);
+    if (E0.angular > 0.5) { du = vec3f(wrapPi(du.x), wrapPi(du.y), wrapPi(du.z)); }
+    du /= e;
+    let dv = vec3f(Ex.uv.y - E0.uv.y, Ey.uv.y - E0.uv.y, Ez.uv.y - E0.uv.y) / e;
+    let u = E0.uv.x;
+    let v = E0.uv.y;
+    let A = 1.5 * E0.amp; // wave height, in line spacings
+    let drift = 0.35; // phase advance per line: the braid
+    for (var o = 0; o < 4; o++) {
+        let sc = pow(4.0, f32(o));
+        let ff = freq * sc;
+        let nn = E0.n * pow(2.0, f32(o)); // petals double per octave while lines quadruple: no spokes
+        let arg = nn * u + drift * ff * v;
+        let L = ff * v + A * sin(arg);
+        var grad = ff * dv + A * cos(arg) * (nn * du + drift * ff * dv);
+        grad -= n * dot(n, grad);
+        let gl = length(grad);
+        if (gl < 1e-5) { continue; }
+        let aa = gl * footprint;          // line cycles per pixel
         let vis = (1.0 - smoothstep(0.12, 0.35, aa)) * wfam;
         if (vis < 0.01) { continue; }
-        let x = fract(g0 * ff) - 0.5;
+        let across = grad / gl;
+        let x = fract(L) - 0.5;
         let w = 0.32;
         let h = max(0.0, 1.0 - abs(x) / w);
         let slope = select(0.0, -sign(x) / w, abs(x) < w);
         (*groove).n = normalize((*groove).n - across * slope * depth * vis / pow(1.6, f32(o)));
-        (*groove).mask = max((*groove).mask, h * vis);
-        if ((*groove).mask == h * vis) {
+        if (h * vis >= (*groove).mask) {
+            (*groove).mask = h * vis;
             (*groove).tang = normalize(cross(n, across));
             (*groove).across = across;
         }
@@ -150,9 +169,9 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
     let panel = smoothstep(0.42, 0.58, vnoise3(q * 0.55 + vec3f(3.1, 0.0, 0.0), 91u));
     // eyeballs are mirror-polished: the rose lines are cut only on the socket rim around them
     let eyeBall = select(0.0, smoothstep(0.42, 0.6, fw), isFace);
-    grooveFamily(p, n0, 0, 14.0, 0.35, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
-    grooveFamily(p, n0, 1, 9.0, 0.30, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
-    grooveFamily(p, n0, 2, 12.0, 0.10, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
+    grooveFamily(p, n0, 0, 12.0, 0.35, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
+    grooveFamily(p, n0, 1, 7.0, 0.28, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
+    grooveFamily(p, n0, 2, 9.0, 0.16, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
     let n = gr.n;
     let cosV = clamp(dot(n, V), 0.0, 1.0);
 
@@ -167,7 +186,7 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
     // temper is a tint on metal, not paint: keep 55% of its chroma, and let it gather at the features
     film = mix(vec3f(dot(film, vec3f(0.2126, 0.7152, 0.0722))), film, 0.35 + 0.4 * fw);
     let F0f = clamp(F0 * film, vec3f(0.0), vec3f(1.0));
-    let edge = vec3f(0.93, 0.94, 0.96);
+    let edge = vec3f(0.80, 0.81, 0.83);
     let Fr = F0f + (edge - F0f) * pow(1.0 - cosV, 5.0);
 
     // anisotropic reflection: grooves smear the reflection ACROSS the grooves
