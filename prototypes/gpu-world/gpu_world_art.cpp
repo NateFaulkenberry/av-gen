@@ -641,7 +641,10 @@ struct System {
                       const wgpu::Buffer& args) = 0;
     virtual void setParams(FrameU& f, double t) = 0;   // fills f.sys, kick origins, ...
     virtual void compute(wgpu::CommandEncoder& enc, const wgpu::BindGroup& frameGroup, gpu::FrameTimeline& tl) = 0;
-    virtual wgpu::Buffer auxBuffer() const { return {}; } // read by the draw/ground shaders as `aux`
+    virtual std::string computeWgsl() const { return ""; } // only in the compute module
+    virtual std::string renderWgsl() const { return ""; }  // only in the draw/ground modules
+    virtual std::vector<wgpu::Buffer> auxBuffers() const { return {}; } // read by draw/ground shaders as `aux`
+    virtual int currentAux() const { return 0; }
     virtual std::uint64_t auxBytes() const { return 0; }
     virtual std::uint64_t gpuStateBytes() const { return 0; }
     virtual std::string extraJson() const { return ""; }
@@ -958,9 +961,9 @@ int main(int argc, char** argv) {
 
     // ---- shaders ----
     const std::string common = kCommonWgsl;
-    wgpu::ShaderModule sysMod = compile(ctx, common + sys->wgsl(), "system");
-    wgpu::ShaderModule drawMod = compile(ctx, common + sys->wgsl() + kInstDrawWgsl, "draw");
-    wgpu::ShaderModule groundMod = compile(ctx, common + sys->wgsl() + kGroundWgsl + kSkyWgsl, "ground");
+    wgpu::ShaderModule sysMod = compile(ctx, common + sys->wgsl() + sys->computeWgsl(), "system");
+    wgpu::ShaderModule drawMod = compile(ctx, common + sys->wgsl() + sys->renderWgsl() + kInstDrawWgsl, "draw");
+    wgpu::ShaderModule groundMod = compile(ctx, common + sys->wgsl() + sys->renderWgsl() + kGroundWgsl + kSkyWgsl, "ground");
     wgpu::ShaderModule postMod = compile(ctx, kPostWgsl, "post");
 
     const auto vfc = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Compute;
@@ -969,10 +972,22 @@ int main(int argc, char** argv) {
     auto instLayout = makeLayout(ctx, {Bind::ReadOnly}, wgpu::ShaderStage::Vertex);
     wgpu::BindGroup frameGroup = makeGroup(ctx, frameLayout, {buf(frameBuf, sizeof(FrameU)), buf(specBuf, song.spec.size() * 4)});
 
+    {   // the spectrogram's clock (misc) must be in the frame block before any simulation step runs
+        FrameU f0{};
+        f0.misc = glm::vec4(song.hopRate, static_cast<float>(song.hops), song.t0, 0.0f);
+        queue.WriteBuffer(frameBuf, 0, &f0, sizeof(f0));
+    }
+    if (auto* o = dynamic_cast<OrganismSystem*>(sys.get())) { o->song = &song; o->shot = shot; }
     sys->init(ctx, sysMod, frameLayout, outBuf, argsBuf);
-    wgpu::Buffer aux = sys->auxBuffer() ? sys->auxBuffer() : dummyAux;
-    const std::uint64_t auxBytes = sys->auxBuffer() ? sys->auxBytes() : 256;
-    wgpu::BindGroup renderGroup0 = makeGroup(ctx, renderLayout0, {buf(frameBuf, sizeof(FrameU)), buf(specBuf, song.spec.size() * 4), buf(aux, auxBytes)});
+    if (auto* o = dynamic_cast<OrganismSystem*>(sys.get())) o->setFrameGroup(frameGroup);
+    std::vector<wgpu::BindGroup> renderGroups0;
+    {
+        auto auxList = sys->auxBuffers();
+        if (auxList.empty()) auxList.push_back(dummyAux);
+        const std::uint64_t auxBytes = sys->auxBuffers().empty() ? 256 : sys->auxBytes();
+        for (const auto& a : auxList)
+            renderGroups0.push_back(makeGroup(ctx, renderLayout0, {buf(frameBuf, sizeof(FrameU)), buf(specBuf, song.spec.size() * 4), buf(a, auxBytes)}));
+    }
     std::vector<wgpu::BindGroup> instGroups;
     for (std::size_t b = 0; b < bucketList.size(); ++b)
         instGroups.push_back(makeGroup(ctx, instLayout, {buf(outBuf, static_cast<std::uint64_t>(cap) * sizeof(Inst), b * static_cast<std::uint64_t>(cap) * sizeof(Inst))}));
@@ -1188,7 +1203,7 @@ int main(int argc, char** argv) {
             rp.depthStencilAttachment = &da;
             rp.timestampWrites = timeline.mark("scene", gpu::FrameTimeline::PassKind::Render);
             auto r = enc.BeginRenderPass(&rp);
-            r.SetBindGroup(0, renderGroup0);
+            r.SetBindGroup(0, renderGroups0[static_cast<std::size_t>(sys->currentAux()) % renderGroups0.size()]);
             r.SetPipeline(instPipe);
             for (std::size_t b = 0; b < bucketList.size(); ++b) {
                 const MeshGpu& m = meshes[bucketList[b].mesh];
