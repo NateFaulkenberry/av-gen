@@ -603,3 +603,30 @@ way to render some particles" does not pass.
 - **(Phase 2) Stateful GPU behaviour (flocking, trails, energy) was not tested.** It is where a real
   architectural need could appear (GPU state checkpointing for seek, ADR-700), and also where the cost
   and the determinism risk are largest.
+
+---
+
+## Final decision (interim, written at the end of Phase 2; Phase 3 may revise only the capability leg)
+
+**YELLOW: targeted adoption.**
+
+**The hypothesis should be abandoned** in its general form. AV Gen should not build GPU Worlds or a
+compact procedural world representation, and it should not move scene and entity management to the
+GPU. The reasons, all measured:
+
+- The shipped scenes are GPU-bound, with 1-1.5 ms of CPU scene update.
+- Large populations are already GPU-resident, GPU-animated, GPU-culled and indirect-drawn at
+  microseconds of CPU.
+- The flatten does not run per frame.
+
+What should be pursued is narrow: **per-element audio inputs (seed, spectrum, kick history) for the
+existing GPU effector pass**. That is the one capability Phase 2 found that AV Gen lacks, and the GPU
+provides it at no measurable cost. Adopting it is conditional on Phase 3 showing the behaviour is
+visually worth having. If Phase 3 also finds a stateful GPU behaviour that is compelling, the
+checkpoint/seek question it raises (ADR-700 on the GPU) is the one place a larger architectural
+discussion could legitimately reopen.
+
+Not run: Phases 4 and 5 (out of scope by the coordinator's instruction, and not argued for by the
+evidence). Not done: wiring real audio analysis into the prototype; a production implementation of
+anything. The test suites were not run: no test was added and no production source changed. The only
+shared-file change is an OFF-by-default CMake option, `AVGEN_GPUWORLD_PROTOTYPE`.
