@@ -2003,6 +2003,12 @@ void SceneRenderer::resetTemporalHistory() {
     if (particles_ != nullptr) {
         particles_->resetAll();
     }
+    // ADR-1114: the simulated grids are world state too, and this call never reached them. A seek
+    // forwards left a grid lagging by the whole gap and paying it back at `maxSubSteps` a frame; a
+    // seek backwards reset it and granted 240 steps. Now the next frame runs the whole backlog.
+    if (simulation_ != nullptr) {
+        simulation_->markDiscontinuity();
+    }
     // Forgetting which scene was last rendered belongs here for the same reason. `render()` reads
     // it as "has the scene been swapped under me", and answering yes makes the next frame call
     // this function again -- which is idempotent, and is how an external `resetTemporalHistory()`

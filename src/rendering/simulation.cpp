@@ -76,6 +76,7 @@ struct Simulation::Impl {
     std::vector<GridState> states;
     std::uint64_t layoutHash = 0;
     double lastRenderTime = -1.0;
+    bool discontinuity = false; // set by markDiscontinuity(); the next update runs the full backlog
     double lastMs = -1.0;
     bool passThisFrame = false;
     bool needsReset = true;
@@ -307,6 +308,8 @@ void Simulation::reset() {
     impl_->lastRenderTime = -1.0;
 }
 
+void Simulation::markDiscontinuity() { impl_->discontinuity = true; }
+
 void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time) {
     Impl& im = *impl_;
     collectTimings();
@@ -343,6 +346,11 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         im.lastRenderTime = -1.0; // the next block treats this as the first frame (full catch-up)
     }
     const bool firstFrame = im.lastRenderTime < 0.0;
+    // A frame that follows a reset or a seek owes the whole backlog, not `maxSubSteps` of it: the
+    // state it draws must be the state a play would have reached (ADR-1114). `maxSubSteps` stays the
+    // stall guard for continuous playback, where a lagging grid catches up over later frames.
+    const bool catchUp = firstFrame || im.discontinuity;
+    im.discontinuity = false;
     im.lastRenderTime = time.renderTime;
     if (im.states.size() != grids.size()) {
         im.states.assign(grids.size(), Impl::GridState{});
@@ -368,11 +376,16 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             state.stepsTaken = target; // a seek backwards; the state re-uploads above
         }
         std::uint64_t backlog = target - state.stepsTaken;
-        const std::uint64_t budget = firstFrame ? kCatchUpSteps : static_cast<std::uint64_t>(grid.maxSubSteps);
-        if (firstFrame && backlog > budget) {
-            log::warn("grid '{}' starts {} sub-steps behind; skipping ahead", grid.name, backlog);
+        const std::uint64_t budget = catchUp ? kMaxCatchUpSteps : static_cast<std::uint64_t>(grid.maxSubSteps);
+        if (catchUp && backlog > budget) {
+            // Beyond the ceiling the frame cannot be the played one, and says so.
+            log::warn("grid '{}' is {} sub-steps behind, beyond the {}-step catch-up ceiling; skipping ahead",
+                      grid.name, backlog, kMaxCatchUpSteps);
             state.stepsTaken = target - budget;
             backlog = budget;
+        }
+        if (catchUp && backlog > 0) {
+            stats_.catchUpSteps += backlog;
         }
         const auto steps = static_cast<std::uint32_t>(std::min<std::uint64_t>(backlog, budget));
         SimUniforms u{};
@@ -403,15 +416,12 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
                                    static_cast<std::size_t>(slot) * kUniformStride);
 
     // ---- encode the sub-steps ----
-    // One compute pass for the whole frame: in a compute pass the usage scope is a single
+    // One compute pass per command buffer: in a compute pass the usage scope is a single
     // dispatch, so the ping-pong buffers may swap between readable and writable between
     // dispatches, and dispatches in one pass are ordered (each reads the previous one's writes).
     std::uint32_t encoded = 0;
-    wgpu::ComputePassDescriptor passDesc{};
-    passDesc.label = "simulate";
-    passDesc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("sim") : nullptr;
-    wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&passDesc);
-    for (const Work& w : work) {
+    // Encodes `count` sub-steps of one grid into `cp`.
+    auto encodeSteps = [&](wgpu::ComputePassEncoder& cp, const Work& w, std::uint32_t count) {
         const spatial::GridField& grid = grids[w.index];
         Impl::GridState& state = im.states[w.index];
         const auto cells = static_cast<std::uint32_t>(grid.cellCount());
@@ -434,7 +444,7 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             ++encoded;
         };
 
-        for (std::uint32_t step = 0; step < w.steps; ++step) {
+        for (std::uint32_t step = 0; step < count; ++step) {
             if (!grid.injectField.empty() && grid.injectRate != 0.0f &&
                 scene.fields.indexOf(grid.injectField) >= 0) {
                 dispatch(im.injectPipeline);
@@ -457,14 +467,42 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
                 dispatch(im.dissipatePipeline);
             }
         }
-        state.stepsTaken += w.steps;
-        stats_.steps += w.steps;
+        state.stepsTaken += count;
+        stats_.steps += count;
+    };
+
+    // A catch-up backlog runs ahead of the frame in command buffers of its own, kStepsPerSubmit
+    // sub-steps each, so a seek to minute five is many bounded submissions rather than one
+    // unbounded one. They are submitted now and therefore execute before this frame's encoder;
+    // the uniforms they read were written above, and nothing else writes them before the frame.
+    for (Work& w : work) {
+        std::uint32_t remaining = w.steps;
+        while (remaining > kStepsPerSubmit) {
+            wgpu::CommandEncoder ahead = im.context.device().CreateCommandEncoder();
+            wgpu::ComputePassDescriptor aheadDesc{};
+            aheadDesc.label = "simulate-catch-up";
+            wgpu::ComputePassEncoder acp = ahead.BeginComputePass(&aheadDesc);
+            encodeSteps(acp, w, kStepsPerSubmit);
+            acp.End();
+            wgpu::CommandBuffer commands = ahead.Finish();
+            im.context.queue().Submit(1, &commands);
+            remaining -= kStepsPerSubmit;
+        }
+        w.steps = remaining; // what is left goes into the frame's own pass
+    }
+
+    wgpu::ComputePassDescriptor passDesc{};
+    passDesc.label = "simulate";
+    passDesc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("sim") : nullptr;
+    wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&passDesc);
+    for (const Work& w : work) {
+        encodeSteps(cp, w, w.steps);
     }
     cp.End();
     // Publish the finished states where fields.wgsl reads them (copies cannot be inside a pass).
     for (const Work& w : work) {
         const spatial::GridField& grid = grids[w.index];
-        if (w.steps == 0 && !firstFrame) {
+        if (w.steps == 0 && !catchUp) {
             continue;
         }
         const Impl::GridState& state = im.states[w.index];
