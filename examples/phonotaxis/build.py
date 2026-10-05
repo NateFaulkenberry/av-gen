@@ -330,7 +330,7 @@ def scene():
             # a thin medium the heart scatters into: the throat glows, the basin's edge dissolves into air
             "volumeDensity": 0.008, "volumeScattering": 1.0, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.35,
             "volumeLocalLights": 0.45, "volumeSteps": 16, "volumeJitter": 0.5, "volumeMaxDistance": 600.0,
-            "volumeNoise": 0.35, "volumeNoiseScale": 0.03, "volumeNoiseSpeed": 0.05,
+            "volumeNoise": 0.0,
             "sky": {"enabled": True, "background": True, "zenithColor": [0.0006, 0.0007, 0.002],
                     "horizonColor": [0.014, 0.009, 0.026], "groundColor": [0.001, 0.001, 0.002], "haze": 0.0,
                     "sunIntensity": 0.0, "intensity": 1.0, "useKeyLight": False}},
