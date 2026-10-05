@@ -827,7 +827,7 @@
     "strength": 3.0,
     "trigger": {
      "source": "signal",
-     "name": "control.strike",
+     "name": "timeline.strike",
      "threshold": 0.3
     },
     "falloff": {

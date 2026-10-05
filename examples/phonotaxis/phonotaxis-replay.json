@@ -2,15 +2,15 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "PHONOTAXIS / Night Shift"
+  "name": "PHONOTAXIS (performance replay)"
  },
  "assets": {
   "scene": {
    "kind": "composition",
-   "path": "phonotaxis.scene.json"
+   "path": "phonotaxis-replay.scene.json"
   },
   "audio": {
-   "path": "../../assets/audio/night-shift.wav"
+   "path": "~/Desktop/All You Got.wav"
   }
  },
  "live": {
@@ -63,6 +63,133 @@
       "bias": -0.1,
       "gain": 2.6,
       "curve": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padGermination",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 180.0008,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padChorus",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 186.0012,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "strike",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 196.6287,
+      "value": 1.0,
+      "interp": "step"
+     },
+     {
+      "time": 207.5103,
+      "value": 1.0,
+      "interp": "step"
+     },
+     {
+      "time": 239.0001,
+      "value": 1.0,
+      "interp": "step"
+     },
+     {
+      "time": 241.0005,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padSurge",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 200.0012,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padEruption",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 213.2746,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "scatter",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 219.0002,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padCollapse",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 225.3209,
+      "value": 1.0,
+      "interp": "step"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "padRebirth",
+   "settings": {
+    "mode": "event",
+    "keys": [
+     {
+      "time": 232.0007,
+      "value": 1.0,
+      "interp": "step"
      }
     ]
    }
@@ -162,11 +289,11 @@
    }
   },
   {
-   "source": "control.strike",
+   "source": "timeline.strike",
    "target": "particles/spores/burst",
    "op": "add",
    "amount": 2500.0,
-   "depthSource": "control.strike",
+   "depthSource": "timeline.strike",
    "depthMin": 0.4,
    "depthMax": 1.0,
    "chain": {
@@ -176,7 +303,7 @@
    }
   },
   {
-   "source": "control.strike",
+   "source": "timeline.strike",
    "target": "camera/shake/amplitude",
    "op": "add",
    "amount": 0.12,
@@ -187,7 +314,7 @@
    }
   },
   {
-   "source": "control.scatter",
+   "source": "timeline.scatter",
    "target": "particles/spores/burst",
    "op": "add",
    "amount": 1800.0,
@@ -1028,7 +1155,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padDormant",
+      "signal": "timeline.padDormant",
       "threshold": 0.3
      },
      {
@@ -1085,7 +1212,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padGermination",
+      "signal": "timeline.padGermination",
       "threshold": 0.3
      },
      {
@@ -1106,7 +1233,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padChorus",
+      "signal": "timeline.padChorus",
       "threshold": 0.3
      },
      {
@@ -1134,7 +1261,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padSurge",
+      "signal": "timeline.padSurge",
       "threshold": 0.3
      },
      {
@@ -1168,7 +1295,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padEruption",
+      "signal": "timeline.padEruption",
       "threshold": 0.3
      },
      {
@@ -1189,7 +1316,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padCollapse",
+      "signal": "timeline.padCollapse",
       "threshold": 0.3
      },
      {
@@ -1232,7 +1359,7 @@
     "triggers": [
      {
       "kind": "signal",
-      "signal": "control.padRebirth",
+      "signal": "timeline.padRebirth",
       "threshold": 0.3
      },
      {
@@ -1245,172 +1372,222 @@
    }
   ]
  },
- "control": {
-  "midi": {
-   "enabled": true,
-   "filter": "*",
-   "bindings": [
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 1,
-     "parameter": "macros/energy",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 21,
-     "parameter": "macros/hunger",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 22,
-     "parameter": "macros/restless",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 23,
-     "parameter": "macros/current",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 24,
-     "parameter": "macros/memory",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 25,
-     "parameter": "macros/reach",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 26,
-     "parameter": "macros/orbit",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 27,
-     "parameter": "macros/glow",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 28,
-     "parameter": "macros/sensitivity",
-     "component": 0,
-     "min": 0.0,
-     "max": 1.0
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 36,
-     "signal": "strike"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 37,
-     "signal": "scatter"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 40,
-     "signal": "padDormant"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 41,
-     "signal": "padGermination"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 43,
-     "signal": "padChorus"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 45,
-     "signal": "padSurge"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 47,
-     "signal": "padEruption"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 48,
-     "signal": "padCollapse"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "noteEvent",
-     "number": 50,
-     "signal": "padRebirth"
-    }
-   ]
-  }
- },
  "render": {
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "output": "sequence",
   "path": "renders/phonotaxis"
- }
+ },
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "macros/sensitivity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 175.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 176.0453,
+      "value": [
+       0.6
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "macros/reach",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 175.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 190.6286,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 196.6286,
+      "value": [
+       0.25
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 225.7373,
+      "value": [
+       0.25
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 229.7373,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "macros/restless",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 175.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 202.5103,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 207.5103,
+      "value": [
+       0.95
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 210.2746,
+      "value": [
+       0.95
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 213.2746,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "macros/memory",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 175.0,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 213.6863,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 217.6863,
+      "value": [
+       0.7
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 222.3209,
+      "value": [
+       0.7
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 225.3209,
+      "value": [
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "macros/orbit",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 175.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 234.4321,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 238.4321,
+      "value": [
+       0.85
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 242.3088,
+      "value": [
+       0.85
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 245.3088,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "_note": "A performance recorded live (performance-2026-10-05.csv), moved onto the timeline so a headless render can play it: pads are timeline events, knobs are tracks on their macros."
 }

@@ -249,11 +249,13 @@ def helix(name, strand, colour, fieldname):
     return {"name": name, "kind": "procedural", "procedural": {
         # a thread segment: end to end they draw the tower as threads of light circling upward; its band's energy
         # at its moment thickens and lights it
-        "source": {"kind": "box", "size": [1.0, 0.05, 0.05], "subdivisions": 1},
+        # round, so a close camera sees a thread, not a stair of box ends (a cylinder's axis is y: turned onto x)
+        "source": {"kind": "cylinder", "radius": 0.028, "height": 1.0, "radialSegments": 5, "caps": False},
+        "sourceTransform": {"position": [0, 0, 0], "rotation": [0, 0, 90], "scale": [1, 1, 1]},
         "variation": {"seed": 40 + strand},
         "distribution": {"kind": "points", "points": pts},
         "effectors": [
-            {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.15, 0.6, 0.6]},
+            {"field": fieldname, "op": "scale", "blend": "add", "strength": 4.0, "scaleAxis": [0.08, 0.3, 0.3]},
             {"field": fieldname, "op": "emission", "blend": "add", "strength": STRAND_GAIN[fieldname]},
             # a kick's front crosses the foot at once and the rim ~0.9 s later: each kick ripples up and out
             {"field": "kickRing", "op": "emission", "blend": "add", "strength": 0.9},
@@ -396,7 +398,7 @@ KNOBS = [
     ("current", "CURRENT", 23, 0.5, [("field/inflow/strength", -1.0, 1.6, "add")]),
     ("memory", "MEMORY", 24, 0.0, [("temporal/echo/strength", 0.0, 0.6, "add"),
                                    ("temporal/echo/decay", 0.0, 0.3, "add")]),
-    ("reach", "REACH", 25, 0.5, [("camera/distance", -28.0, 40.0, "add"), ("camera/height", -6.0, 30.0, "add")]),
+    ("reach", "REACH", 25, 0.5, [("camera/distance", -14.0, 40.0, "add"), ("camera/height", -3.0, 30.0, "add")]),
     ("orbit", "ORBIT", 26, 0.5, [("camera/orbitSpeed", -0.18, 0.18, "add")]),
     ("glow", "GLOW", 27, 0.5, [("post/bloom/intensity", -0.3, 0.45, "add"),
                                ("post/halation/intensity", -0.15, 0.3, "add")]),
@@ -431,7 +433,7 @@ STATES = {
     "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.0336, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 110, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
     "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 275, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
     "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.0560, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 425, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
-    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 1300, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
+    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.0840, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 1300, 1.5, 220, 32, 3.0, 70, 18, 0.15, 0.45, 0.70, 600, 0.12),
     "Collapse":    (0.0, 0.5, 0.2, 0.6, 0.6, 0.0000, 6.0, 0.5, 0.5, 5.0, 0.0, 2.5, 45, 0.5, 60, 16, 108, 46, 0, -0.2, 0.35, 0.45, 100, 0.02),
     "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.0420, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 275, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
 }

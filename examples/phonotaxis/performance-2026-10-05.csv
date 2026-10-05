@@ -1,0 +1,23 @@
+hostNs,kind,what,value
+14363377083,audio-start,/Users/natefaulkenberry/Desktop/All You Got.wav,176.0
+14408652166,cc,sensitivity,0.6
+18364167500,pad,Germination,1.0
+24364575500,pad,Chorus,1.0
+34992009250,sweep,reach,0.25
+34992071458,pad,strike,1.0
+38364533125,pad,Surge,1.0
+45873653375,sweep,restless,0.95
+45873700833,pad,strike,1.0
+51637934000,sweep,restless,0.5
+51638000791,pad,Eruption,1.0
+56049631583,sweep,memory,0.7
+57363561750,pad,scatter,1.0
+63684261791,sweep,memory,0.0
+63684313541,pad,Collapse,1.0
+68100704250,sweep,reach,0.5
+70364112791,pad,Rebirth,1.0
+76795510333,sweep,orbit,0.85
+77363478666,pad,strike,1.0
+79363837541,pad,strike,0.8
+83672161416,sweep,orbit,0.5
+88502759541,audio-end,/Users/natefaulkenberry/Desktop/All You Got.wav,250.0
