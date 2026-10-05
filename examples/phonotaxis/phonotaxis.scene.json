@@ -26,26 +26,34 @@
   ],
   "intensity": 0.05,
   "fogColor": [
+   0.016,
    0.012,
-   0.01,
-   0.026
+   0.034
   ],
-  "fogHeight": 4.0,
-  "fogHeightFalloff": 0.12,
-  "fogHeightAmount": 0.6,
-  "horizonDensity": 0.6,
+  "horizonDensity": 1.0,
+  "volumeDensity": 0.011,
+  "volumeScattering": 1.0,
+  "volumeAbsorption": 0.4,
+  "volumeAnisotropy": 0.35,
+  "volumeLocalLights": 0.45,
+  "volumeSteps": 24,
+  "volumeJitter": 0.5,
+  "volumeMaxDistance": 220.0,
+  "volumeNoise": 0.35,
+  "volumeNoiseScale": 0.03,
+  "volumeNoiseSpeed": 0.05,
   "sky": {
    "enabled": true,
    "background": true,
    "zenithColor": [
-    0.0008,
-    0.0009,
-    0.0026
+    0.0006,
+    0.0007,
+    0.002
    ],
    "horizonColor": [
-    0.006,
-    0.004,
-    0.012
+    0.014,
+    0.009,
+    0.026
    ],
    "groundColor": [
     0.001,
@@ -70,14 +78,14 @@
    ],
    "color": [
     1.0,
-    0.7,
-    0.45
+    0.5,
+    0.24
    ],
    "intensity": 900,
    "range": 70,
    "radius": 1.0,
    "castsShadow": false,
-   "volumetric": 1.0
+   "volumetric": 0.3
   },
   {
    "name": "moon",
@@ -149,7 +157,7 @@
    "simRate": 60.0,
    "maxSubSteps": 4,
    "seed": 2026,
-   "agentCount": 800000,
+   "agentCount": 450000,
    "species": 3,
    "sensorAngle": 0.5,
    "sensorDistance": 5.0,
@@ -187,10 +195,38 @@
      ]
     },
     {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1,
+     "constant": [
+      2.6,
+      4.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
      "kind": "power",
      "dst": 1,
      "srcA": 1,
-     "value": 2.4
+     "value": 2.0
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      60.0,
+      60.0,
+      60.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
     },
     {
      "kind": "multiply",
@@ -230,8 +266,8 @@
      "srcA": 0,
      "value": 1,
      "constant": [
-      0.0,
-      3.0,
+      0.15,
+      4.5,
       0.0,
       1.0
      ]
@@ -240,7 +276,7 @@
      "kind": "power",
      "dst": 0,
      "srcA": 0,
-     "value": 0.55
+     "value": 1.6
     },
     {
      "kind": "swizzle",
@@ -336,52 +372,94 @@
      "srcB": 2
     },
     {
-     "kind": "field",
-     "dst": 4,
-     "field": "kickRing"
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
     },
     {
-     "kind": "field",
-     "dst": 5,
-     "field": "strike"
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      1,
+      1,
+      1,
+      1
+     ]
     },
     {
      "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      2,
+      2,
+      2,
+      2
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 3.0
     },
     {
      "kind": "constant",
-     "dst": 5,
+     "dst": 3,
      "constant": [
-      2.5,
-      2.5,
-      2.5,
+      0.35,
+      0.33,
+      0.3,
       0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      1,
-      1,
-      1,
-      0
-     ]
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
     },
     {
      "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "field",
+     "dst": 4,
+     "field": "kickRing"
+    },
+    {
+     "kind": "remap",
      "dst": 4,
      "srcA": 4,
-     "srcB": 5
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      3.5
+     ]
     },
     {
      "kind": "multiply",
@@ -390,53 +468,12 @@
      "srcB": 4
     },
     {
-     "kind": "input",
-     "dst": 7,
-     "input": "worldPosition"
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 7
-    },
-    {
-     "kind": "gradient",
-     "dst": 7,
-     "srcA": 7,
-     "value": 0.000244140625,
-     "constant": [
-      1,
-      0,
-      1,
-      0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 7,
-     "srcA": 7,
-     "value": 1,
-     "constant": [
-      0.7,
-      1.0,
-      1.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 7
-    },
-    {
      "kind": "constant",
      "dst": 6,
      "constant": [
+      0.004,
+      0.004,
       0.006,
-      0.006,
-      0.009,
       1
      ]
     }
@@ -1054,36 +1091,15 @@
    "kind": "procedural",
    "procedural": {
     "source": {
-     "kind": "box",
-     "size": [
-      32.0,
-      0.02,
-      32.0
-     ],
-     "subdivisions": 64
+     "kind": "cylinder",
+     "radius": 64.0,
+     "height": 0.02,
+     "radialSegments": 128,
+     "caps": true
     },
     "distribution": {
-     "kind": "grid",
-     "gridCount": [
-      4,
-      1,
-      4
-     ],
-     "gridSpacing": [
-      32.0,
-      1.0,
-      32.0
-     ]
+     "kind": "single"
     },
-    "deformers": [
-     {
-      "kind": "field",
-      "field": "kickRing",
-      "amount": 0.35,
-      "space": "world",
-      "alongNormal": true
-     }
-    ],
     "lod": {
      "cull": false,
      "count": 1
@@ -1112,9 +1128,9 @@
    "procedural": {
     "source": {
      "kind": "cylinder",
-     "radius": 0.022,
+     "radius": 0.045,
      "height": 1.0,
-     "radialSegments": 4,
+     "radialSegments": 3,
      "caps": false
     },
     "sourceTransform": {
@@ -1140,7 +1156,7 @@
     "distribution": {
      "kind": "generator",
      "generator": {
-      "cellSize": 0.32,
+      "cellSize": 0.38,
       "viewDistance": 70.0,
       "presence": 1.0,
       "jitter": 1.0,
@@ -1203,11 +1219,22 @@
       "op": "emission",
       "blend": "add",
       "strength": 6.0
+     },
+     {
+      "field": "kickRing",
+      "op": "positionOffset",
+      "blend": "add",
+      "strength": 0.45,
+      "axis": [
+       0,
+       1,
+       0
+      ]
      }
     ],
     "lod": {
      "cull": true,
-     "maxDistance": 95.0,
+     "maxDistance": 80.0,
      "count": 1
     },
     "material": {
@@ -1285,18 +1312,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       1.0,
       0.36,
       0.1
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1358,18 +1385,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       1.0,
       0.36,
       0.1
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1431,18 +1458,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       0.1,
       0.85,
       0.78
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1504,18 +1531,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       0.1,
       0.85,
       0.78
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1577,18 +1604,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       0.62,
       0.32,
       1.0
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1650,18 +1677,18 @@
     },
     "material": {
      "baseColor": [
-      0.02,
-      0.02,
-      0.024
+      0.015,
+      0.015,
+      0.018
      ],
      "emissiveColor": [
       0.62,
       0.32,
       1.0
      ],
-     "emissiveIntensity": 0.05,
-     "roughness": 0.3,
-     "metallic": 0.7,
+     "emissiveIntensity": 0.025,
+     "roughness": 0.22,
+     "metallic": 0.85,
      "program": "throat"
     }
    }
@@ -1889,36 +1916,47 @@
     ],
     "spread": 0.35,
     "spawnRate": 600,
-    "lifetimeMin": 5.0,
-    "lifetimeMax": 10.0,
     "speedMin": 0.15,
     "speedMax": 0.6,
     "gravity": [
      0,
-     0.08,
+     0.05,
      0
     ],
-    "drag": 0.15,
-    "turbulence": 0.35,
+    "drag": 0.12,
+    "turbulence": 0.3,
     "turbulenceScale": 0.08,
     "turbulenceSpeed": 0.2,
+    "attractorPosition": [
+     0,
+     16,
+     0
+    ],
+    "attractorStrength": 0.35,
+    "attractorRadius": 70.0,
+    "orbit": 0.5,
+    "velocityStretch": 0.6,
+    "stretchMin": 1.0,
+    "stretchMax": 6.0,
     "emitMaskField": "trail",
-    "sizeStart": 0.05,
-    "sizeEnd": 0.015,
-    "sizeVariance": 0.5,
+    "sizeStart": 0.09,
+    "sizeEnd": 0.03,
+    "sizeVariance": 0.6,
+    "lifetimeMin": 8.0,
+    "lifetimeMax": 14.0,
     "colorStart": [
      1.0,
-     0.85,
-     0.6,
+     0.78,
+     0.5,
      1.0
     ],
     "colorEnd": [
-     0.55,
-     0.4,
+     0.5,
+     0.35,
      1.0,
      0.0
     ],
-    "emissive": 5.0,
+    "emissive": 6.0,
     "blend": "additive",
     "softness": 0.6
    }

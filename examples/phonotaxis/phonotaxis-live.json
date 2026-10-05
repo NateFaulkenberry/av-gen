@@ -16,7 +16,6 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.5,
   "post/bloom/threshold": 0.9,
   "post/bloom/emissionWeight": 0.8,
   "post/bloom/radius": 0.8,
@@ -29,21 +28,11 @@
   "post/grade/contrast": 1.08,
   "post/grade/saturation": 1.05,
   "camera/exposure/mode": 0,
-  "camera/exposure/compensation": 0.0,
   "temporal/echo/enabled": true,
   "temporal/echo/frames": 8.0,
-  "temporal/echo/strength": 0.0,
   "temporal/echo/decay": 0.6,
   "camera/mode": 0,
-  "camera/target": [
-   0.0,
-   10.0,
-   0.0
-  ],
-  "camera/distance": 60.0,
-  "camera/height": 12.0,
-  "camera/orbitSpeed": 0.04,
-  "camera/fov": 42.0
+  "camera/orbitPivotWeight": 1.0
  },
  "sources": [
   {
@@ -416,15 +405,15 @@
      25
     ],
     "camera/distance": [
-     30
+     28
     ],
     "camera/height": [
-     1.6
+     1.5
     ],
     "camera/fov": [
-     54
+     56
     ],
-    "camera/target": [
+    "camera/orbitPivot": [
      0.0,
      15,
      0.0
@@ -439,7 +428,7 @@
      0.4
     ],
     "lights/heart/intensity": [
-     250
+     125
     ],
     "camera/orbitSpeed": [
      0.015
@@ -561,18 +550,18 @@
      60
     ],
     "camera/distance": [
-     44
+     42
     ],
     "camera/height": [
-     5.0
+     4.0
     ],
     "camera/fov": [
-     46
+     48
     ],
-    "camera/target": [
-     0.0,
-     12,
-     0.0
+    "camera/orbitPivot": [
+     14.0,
+     8,
+     6.0
     ],
     "camera/exposure/compensation": [
      -0.35
@@ -584,7 +573,7 @@
      0.45
     ],
     "lights/heart/intensity": [
-     600
+     300
     ],
     "camera/orbitSpeed": [
      0.03
@@ -640,17 +629,17 @@
      120
     ],
     "camera/distance": [
-     58
+     64
     ],
     "camera/height": [
-     11
+     14
     ],
     "camera/fov": [
-     42
+     44
     ],
-    "camera/target": [
+    "camera/orbitPivot": [
      0.0,
-     10,
+     13,
      0.0
     ],
     "camera/exposure/compensation": [
@@ -663,7 +652,7 @@
      0.5
     ],
     "lights/heart/intensity": [
-     900
+     450
     ],
     "camera/orbitSpeed": [
      0.04
@@ -719,18 +708,18 @@
      180
     ],
     "camera/distance": [
-     80
+     98
     ],
     "camera/height": [
-     32
+     48
     ],
     "camera/fov": [
-     38
+     40
     ],
-    "camera/target": [
-     0.0,
-     6,
-     0.0
+    "camera/orbitPivot": [
+     10.0,
+     4,
+     -8.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -742,7 +731,7 @@
      0.55
     ],
     "lights/heart/intensity": [
-     1200
+     600
     ],
     "camera/orbitSpeed": [
      0.06
@@ -798,17 +787,17 @@
      220
     ],
     "camera/distance": [
-     24
+     21
     ],
     "camera/height": [
-     3.5
+     2.2
     ],
     "camera/fov": [
-     72
+     76
     ],
-    "camera/target": [
+    "camera/orbitPivot": [
      0.0,
-     13,
+     20,
      0.0
     ],
     "camera/exposure/compensation": [
@@ -821,7 +810,7 @@
      0.7
     ],
     "lights/heart/intensity": [
-     2000
+     1000
     ],
     "camera/orbitSpeed": [
      0.12
@@ -877,15 +866,15 @@
      60
     ],
     "camera/distance": [
-     20
+     16
     ],
     "camera/height": [
-     95
+     108
     ],
     "camera/fov": [
-     40
+     46
     ],
-    "camera/target": [
+    "camera/orbitPivot": [
      0.0,
      0,
      0.0
@@ -900,7 +889,7 @@
      0.45
     ],
     "lights/heart/intensity": [
-     200
+     100
     ],
     "camera/orbitSpeed": [
      0.02
@@ -956,18 +945,18 @@
      120
     ],
     "camera/distance": [
-     66
+     78
     ],
     "camera/height": [
-     2.8
+     2.2
     ],
     "camera/fov": [
-     34
+     32
     ],
-    "camera/target": [
-     0.0,
-     9,
-     0.0
+    "camera/orbitPivot": [
+     -16.0,
+     11,
+     10.0
     ],
     "camera/exposure/compensation": [
      0.0
@@ -979,75 +968,75 @@
      0.5
     ],
     "lights/heart/intensity": [
-     900
+     450
     ],
     "camera/orbitSpeed": [
      -0.035
     ],
     "material/bed/op/5/constant/constant": [
      1.0,
-     0.22,
-     0.38,
+     0.28,
+     0.04,
      0.0
     ],
     "material/bed/op/8/constant/constant": [
      1.0,
-     0.72,
-     0.22,
+     0.66,
+     0.2,
      0.0
     ],
     "material/bed/op/12/constant/constant": [
-     0.45,
-     0.85,
+     0.88,
+     0.9,
      1.0,
      0.0
     ],
     "material/choir/op/3/constant/constant": [
      1.0,
-     0.22,
-     0.38,
+     0.28,
+     0.04,
      0.0
     ],
     "material/choir/op/6/constant/constant": [
      1.0,
-     0.72,
-     0.22,
+     0.66,
+     0.2,
      0.0
     ],
     "material/choir/op/10/constant/constant": [
-     0.45,
-     0.85,
+     0.88,
+     0.9,
      1.0,
      0.0
     ],
     "procedural/helixLowRoot/material/emissiveColor": [
      1.0,
-     0.22,
-     0.38
+     0.28,
+     0.04
     ],
     "procedural/helixLowBell/material/emissiveColor": [
      1.0,
-     0.22,
-     0.38
+     0.28,
+     0.04
     ],
     "procedural/helixMidRoot/material/emissiveColor": [
      1.0,
-     0.72,
-     0.22
+     0.66,
+     0.2
     ],
     "procedural/helixMidBell/material/emissiveColor": [
      1.0,
-     0.72,
-     0.22
+     0.66,
+     0.2
     ],
     "procedural/helixHighRoot/material/emissiveColor": [
-     0.45,
-     0.85,
+     0.88,
+     0.9,
      1.0
     ],
     "procedural/helixHighBell/material/emissiveColor": [
-     0.45,
-     0.85,
+     0.88,
+     0.9,
      1.0
     ]
    }
@@ -1139,8 +1128,7 @@
     "preset": "chorus",
     "transition": {
      "seconds": 6,
-     "easing": "smooth",
-     "quantize": "bar"
+     "easing": "smooth"
     },
     "triggers": [
      {
@@ -1168,8 +1156,7 @@
     "preset": "surge",
     "transition": {
      "seconds": 4,
-     "easing": "easeInOut",
-     "quantize": "bar"
+     "easing": "easeInOut"
     },
     "triggers": [
      {
@@ -1203,8 +1190,7 @@
     "preset": "eruption",
     "transition": {
      "seconds": 1.5,
-     "easing": "easeIn",
-     "quantize": "beat"
+     "easing": "easeIn"
     },
     "triggers": [
      {

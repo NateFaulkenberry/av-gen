@@ -63,25 +63,25 @@ def programs():
     # The Bed: the organism's trail, compressed, coloured by species, lifted where a kick front passes.
     bed = [
         op("field", 0, field="trail"),
-        # compress: trail / T, clamped, then a soft knee
-        op("remap", 0, srcA=0, value=1, constant=[0.0, 3.0, 0.0, 1.0]),
-        op("power", 0, srcA=0, value=0.55),
+        # thin the veins: trail / T, clamped, then a convex curve, so only a lane's core is bright
+        op("remap", 0, srcA=0, value=1, constant=[0.15, 4.5, 0.0, 1.0]),
+        op("power", 0, srcA=0, value=1.6),
         *species_colour_ops(0, 1, (2, 3)),
+        # white-hot where the lanes are densest: (x + y + z)^3 of white, so the hierarchy is in value, not hue
+        op("swizzle", 2, srcA=0, constant=[0, 0, 0, 0]),
+        op("swizzle", 3, srcA=0, constant=[1, 1, 1, 1]),
+        op("add", 2, srcA=2, srcB=3),
+        op("swizzle", 3, srcA=0, constant=[2, 2, 2, 2]),
+        op("add", 2, srcA=2, srcB=3),
+        op("power", 2, srcA=2, value=3.0),
+        op("constant", 3, constant=[0.35, 0.33, 0.30, 0]),
+        op("multiply", 2, srcA=2, srcB=3),
+        op("add", 1, srcA=1, srcB=2),
+        # kick fronts lift what they cross
         op("field", 4, field="kickRing"),
-        op("field", 5, field="strike"),
-        op("add", 4, srcA=4, srcB=5),
-        op("constant", 5, constant=[2.5, 2.5, 2.5, 0]),
-        op("multiply", 4, srcA=4, srcB=5),
-        op("constant", 5, constant=[1, 1, 1, 0]),
-        op("add", 4, srcA=4, srcB=5),
+        op("remap", 4, srcA=4, value=0, constant=[0.0, 1.0, 1.0, 3.5]),  # 1 + 2.5 x front
         op("multiply", 1, srcA=1, srcB=4),
-        # the basin is a disc: fade the last 10 m
-        op("input", 7, input="worldPosition"),
-        op("multiply", 7, srcA=7, srcB=7),
-        op("gradient", 7, srcA=7, value=1.0 / (BASIN * BASIN), constant=[1, 0, 1, 0]),  # (r / R)^2
-        op("remap", 7, srcA=7, value=1, constant=[0.7, 1.0, 1.0, 0.0]),
-        op("multiply", 1, srcA=1, srcB=7),
-        op("constant", 6, constant=[0.006, 0.006, 0.009, 1]),
+        op("constant", 6, constant=[0.004, 0.004, 0.006, 1]),
     ]
     # The Choir: each filament takes the colour of whoever walked there (normalised species mix), its
     # brightness from the instance's emission multiplier (echo + kick effectors), brighter at the tip.
@@ -114,7 +114,12 @@ def programs():
         op("input", 0, input="materialEmission"),
         op("input", 1, input="instanceEmissive"),
         op("swizzle", 1, srcA=1, constant=[0, 0, 0, 0]),
-        op("power", 1, srcA=1, value=2.4),
+        # the multiplier is 1 + 3 x band energy; only the loudest part of each band's range lights (energy > ~0.55),
+        # so a loud moment is a bright ring that climbs and fades, and the rest of the tower is dark glass
+        op("remap", 1, srcA=1, value=1, constant=[2.6, 4.0, 0.0, 1.0]),
+        op("power", 1, srcA=1, value=2.0),
+        op("constant", 2, constant=[60.0, 60.0, 60.0, 0.0]),
+        op("multiply", 1, srcA=1, srcB=2),
         op("multiply", 0, srcA=0, srcB=1),
         op("constant", 6, constant=[0.02, 0.02, 0.024, 1]),
     ]
@@ -169,7 +174,7 @@ def organism():
         "name": "organism", "enabled": True, "mode": "agents", "wrap": "wrap",
         "resolution": [1024, 1, 1024], "boundsMin": [-BASIN, -1, -BASIN], "boundsMax": [BASIN, 1, BASIN],
         "velocityField": "drift", "advect": 0.15, "diffusion": 0.12, "dissipation": 3.5,
-        "simRate": 60.0, "maxSubSteps": 4, "seed": 2026, "agentCount": 800000, "species": 3,
+        "simRate": 60.0, "maxSubSteps": 4, "seed": 2026, "agentCount": 450000, "species": 3,
         "sensorAngle": 0.5, "sensorDistance": 5.0, "turnAngle": 0.5, "stepSize": 1.0,
         "depositAmount": 0.015, "repel": 0.7, "depositField": "hunger", "checkpointInterval": 5.0,
     }
@@ -177,10 +182,10 @@ def organism():
 
 def bed():
     return {"name": "bed", "kind": "procedural", "procedural": {
-        # 4 x 4 tiles of 64 subdivisions: half-metre vertices, so a kick front heaves the floor smoothly
-        "source": {"kind": "box", "size": [BASIN / 2, 0.02, BASIN / 2], "subdivisions": 64},
-        "distribution": {"kind": "grid", "gridCount": [4, 1, 4], "gridSpacing": [BASIN / 2, 1.0, BASIN / 2]},
-        "deformers": [{"kind": "field", "field": "kickRing", "amount": 0.35, "space": "world", "alongNormal": True}],
+        # a disc, so the basin's edge needs no mask in the program (a subdivided floor heaved by a field
+        # deformer cost 21 ms at 1080p: 0.8M triangles each running the onset loop; the forest heaves instead)
+        "source": {"kind": "cylinder", "radius": BASIN, "height": 0.02, "radialSegments": 128, "caps": True},
+        "distribution": {"kind": "single"},
         "lod": {"cull": False, "count": 1},
         "material": {"baseColor": [0.006, 0.006, 0.009], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                      "roughness": 0.85, "metallic": 0.0, "program": "bed"}}}
@@ -188,11 +193,11 @@ def bed():
 
 def choir():
     return {"name": "choir", "kind": "procedural", "procedural": {
-        "source": {"kind": "cylinder", "radius": 0.022, "height": 1.0, "radialSegments": 4, "caps": False},
+        "source": {"kind": "cylinder", "radius": 0.045, "height": 1.0, "radialSegments": 3, "caps": False},
         "sourceTransform": {"position": [0, 0.5, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
         "variation": {"seed": 11},
         "distribution": {"kind": "generator", "generator": {
-            "cellSize": 0.32, "viewDistance": 70.0, "presence": 1.0, "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.5,
+            "cellSize": 0.38, "viewDistance": 70.0, "presence": 1.0, "jitter": 1.0, "sizeMin": 0.7, "sizeMax": 1.5,
             "tilt": 0.1, "bounded": True, "regionMin": [-FOREST_R, -FOREST_R], "regionMax": [FOREST_R, FOREST_R],
             "regionRadius": FOREST_R, "groundHeight": 0.0, "groundAmplitude": 0.0, "groundFrequency": 0.01,
             "groundSeed": 7}},
@@ -204,8 +209,10 @@ def choir():
             {"field": "echo", "op": "emission", "blend": "add", "strength": 5.0},
             {"field": "kickRing", "op": "emission", "blend": "add", "strength": 3.0},
             {"field": "strike", "op": "emission", "blend": "add", "strength": 6.0},
+            # LOW is mass: the forest heaves as a kick front passes under it
+            {"field": "kickRing", "op": "positionOffset", "blend": "add", "strength": 0.45, "axis": [0, 1, 0]},
         ],
-        "lod": {"cull": True, "maxDistance": 95.0, "count": 1},
+        "lod": {"cull": True, "maxDistance": 80.0, "count": 1},
         "material": {"baseColor": [0.01, 0.01, 0.012], "emissiveColor": [1, 1, 1], "emissiveIntensity": 0.6,
                      "roughness": 0.4, "metallic": 0.0, "program": "choir"}}}
 
@@ -230,8 +237,8 @@ def helix(name, strand, colour, fieldname, segment):
             {"field": fieldname, "op": "emission", "blend": "add", "strength": 3.0},
         ],
         "lod": {"cull": True, "count": 1},
-        "material": {"baseColor": [0.02, 0.02, 0.024], "emissiveColor": colour, "emissiveIntensity": 0.05,
-                     "roughness": 0.3, "metallic": 0.7, "program": "throat"}}}
+        "material": {"baseColor": [0.015, 0.015, 0.018], "emissiveColor": colour, "emissiveIntensity": 0.025,
+                     "roughness": 0.22, "metallic": 0.85, "program": "throat"}}}
 
 
 def plain():
@@ -276,12 +283,15 @@ def horizon():
 def spores():
     return {"name": "spores", "kind": "particles", "particles": {
         "capacity": 65536, "seed": 9, "shape": "disc", "position": [0, 0.15, 0], "extent": [FOREST_R, 0, FOREST_R],
-        "direction": [0, 1, 0], "spread": 0.35, "spawnRate": 600, "lifetimeMin": 5.0, "lifetimeMax": 10.0,
-        "speedMin": 0.15, "speedMax": 0.6, "gravity": [0, 0.08, 0], "drag": 0.15,
-        "turbulence": 0.35, "turbulenceScale": 0.08, "turbulenceSpeed": 0.2,
+        "direction": [0, 1, 0], "spread": 0.35, "spawnRate": 600,
+        "speedMin": 0.15, "speedMax": 0.6, "gravity": [0, 0.05, 0], "drag": 0.12,
+        "turbulence": 0.3, "turbulenceScale": 0.08, "turbulenceSpeed": 0.2,
+        # what the veins release is drawn into the throat and spirals up it: floor, forest and tower are one system
+        "attractorPosition": [0, 16, 0], "attractorStrength": 0.35, "attractorRadius": 70.0, "orbit": 0.5,
+        "velocityStretch": 0.6, "stretchMin": 1.0, "stretchMax": 6.0,
         "emitMaskField": "trail",
-        "sizeStart": 0.05, "sizeEnd": 0.015, "sizeVariance": 0.5,
-        "colorStart": [1.0, 0.85, 0.6, 1.0], "colorEnd": [0.55, 0.4, 1.0, 0.0], "emissive": 5.0,
+        "sizeStart": 0.09, "sizeEnd": 0.03, "sizeVariance": 0.6, "lifetimeMin": 8.0, "lifetimeMax": 14.0,
+        "colorStart": [1.0, 0.78, 0.5, 1.0], "colorEnd": [0.5, 0.35, 1.0, 0.0], "emissive": 6.0,
         "blend": "additive", "softness": 0.6}}
 
 
@@ -292,14 +302,17 @@ def scene():
         "camera": {"mode": 1, "position": [30, 4, 34], "target": [0, 12, 0], "fov": 42, "orbitSpeed": 0.0},
         "environment": {
             "background": [0.0015, 0.0016, 0.004], "intensity": 0.05,
-            "fogColor": [0.012, 0.010, 0.026], "fogHeight": 4.0, "fogHeightFalloff": 0.12, "fogHeightAmount": 0.6,
-            "horizonDensity": 0.6,
-            "sky": {"enabled": True, "background": True, "zenithColor": [0.0008, 0.0009, 0.0026],
-                    "horizonColor": [0.006, 0.004, 0.012], "groundColor": [0.001, 0.001, 0.002], "haze": 0.0,
+            "fogColor": [0.016, 0.012, 0.034], "horizonDensity": 1.0,
+            # a thin medium the heart scatters into: the throat glows, the basin's edge dissolves into air
+            "volumeDensity": 0.011, "volumeScattering": 1.0, "volumeAbsorption": 0.4, "volumeAnisotropy": 0.35,
+            "volumeLocalLights": 0.45, "volumeSteps": 24, "volumeJitter": 0.5, "volumeMaxDistance": 220.0,
+            "volumeNoise": 0.35, "volumeNoiseScale": 0.03, "volumeNoiseSpeed": 0.05,
+            "sky": {"enabled": True, "background": True, "zenithColor": [0.0006, 0.0007, 0.002],
+                    "horizonColor": [0.014, 0.009, 0.026], "groundColor": [0.001, 0.001, 0.002], "haze": 0.0,
                     "sunIntensity": 0.0, "intensity": 1.0, "useKeyLight": False}},
         "lights": [
-            {"name": "heart", "id": "heart", "type": "point", "position": [0, 4.0, 0], "color": [1.0, 0.7, 0.45],
-             "intensity": 900, "range": 70, "radius": 1.0, "castsShadow": False, "volumetric": 1.0},
+            {"name": "heart", "id": "heart", "type": "point", "position": [0, 4.0, 0], "color": [1.0, 0.5, 0.24],
+             "intensity": 900, "range": 70, "radius": 1.0, "castsShadow": False, "volumetric": 0.3},
             {"name": "moon", "id": "moon", "type": "directional", "direction": [-0.3, -0.8, -0.5],
              "color": [0.55, 0.65, 1.0], "intensity": 0.35, "castsShadow": False, "volumetric": 0.0},
         ],
@@ -329,17 +342,19 @@ ZERO_DEFAULTS = [
 ]
 
 POST = {
-    "post/bloom/enabled": True, "post/bloom/intensity": 0.5, "post/bloom/threshold": 0.9,
+    "post/bloom/enabled": True, "post/bloom/threshold": 0.9,
     "post/bloom/emissionWeight": 0.8, "post/bloom/radius": 0.8,
     "post/tonemap/chroma-retention": 0.65, "post/output/vignette": 0.45, "post/output/grain": 0.015,
     "post/halation/enabled": True, "post/halation/intensity": 0.18, "post/halation/warmth": 0.5,
     "post/grade/contrast": 1.08, "post/grade/saturation": 1.05,
-    "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0,
-    "temporal/echo/enabled": True, "temporal/echo/frames": 8.0, "temporal/echo/strength": 0.0,
+    "camera/exposure/mode": 0,
+    "temporal/echo/enabled": True, "temporal/echo/frames": 8.0,
     "temporal/echo/decay": 0.6,
-    "camera/mode": 0, "camera/target": [0.0, 10.0, 0.0], "camera/distance": 60.0, "camera/height": 12.0,
-    "camera/orbitSpeed": 0.04, "camera/fov": 42.0,
+    "camera/mode": 0, "camera/orbitPivotWeight": 1.0,
 }
+# Owned by the states (presets), so never set here: a project's parameters apply after the initial state's
+# preset and would pin them. camera/distance, height, fov, orbitPivot, orbitSpeed, exposure compensation,
+# temporal/echo/strength, post/bloom/intensity.
 
 # What the world listens to as one number: loudness, change and air, read as a mean and shaped. The slow
 # follower that turns it into the piece's energy lives on the route into the `energy` macro.
@@ -381,7 +396,7 @@ PADS = {"strike": 36, "scatter": 37, "Dormant": 40, "Germination": 41, "Chorus":
 # ------------------------------------------------------------------------------------------ states
 # Each state is a preset: the large-scale configuration of the world. Continuous expression (the energy
 # arc, the bands, the knobs) rides on top as routes. Colour rule kept in every state: colour is frequency.
-DAWN = {"lo": [1.0, 0.22, 0.38], "mid": [1.0, 0.72, 0.22], "hi": [0.45, 0.85, 1.0]}
+GILDED = {"lo": [1.0, 0.28, 0.04], "mid": [1.0, 0.66, 0.2], "hi": [0.88, 0.9, 1.0]}  # one hue family: molten
 NIGHT = {"lo": EMBER, "mid": TEAL, "hi": VIOLET}
 
 COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade", "turn", "gaze", "reach",
@@ -389,15 +404,19 @@ COLS = ["growth", "lift", "choirGain", "throatGain", "bedGain", "deposit", "fade
         "bloom", "heart", "orbit"]
 STATES = {
     #            grow lift  chG  thG  bedG  dep    fade turn gaze rch  infl wand spor  kick hor  dist hgt  fov tgtY  exp   echo bloom heart orbit
-    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.004, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50,   0.3, 25,  30, 1.6, 54, 15, -0.7, 0.00, 0.40, 250, 0.015),
-    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.012, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220,  0.6, 60,  44, 5.0, 46, 12, -0.35, 0.0, 0.45, 600, 0.03),
-    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550,  1.0, 120, 58, 11, 42, 10, 0.0, 0.12, 0.50, 900, 0.04),
-    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.020, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850,  1.3, 180, 80, 32, 38, 6, 0.0, 0.2, 0.55, 1200, 0.06),
-    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.030, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 24, 3.5, 72, 13, 0.15, 0.45, 0.70, 2000, 0.12),
-    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90,   0.5, 60,  20, 95, 40, 0, -0.6, 0.35, 0.45, 200, 0.02),
-    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 66, 2.8, 34, 9, 0.0, 0.12, 0.50, 900, -0.035),
+    "Dormant":     (0.0, 0.4, 0.15, 0.12, 0.22, 0.004, 1.6, 0.35, 0.5, 5.0, 0.4, 1.0, 50, 0.3, 25, 28, 1.5, 56, 15, -0.7, 0.00, 0.40, 125, 0.015),
+    "Germination": (0.35, 1.2, 0.55, 0.45, 0.6, 0.012, 2.5, 0.45, 0.5, 5.0, 0.7, 1.0, 220, 0.6, 60, 42, 4.0, 48, 8, -0.35, 0.0, 0.45, 300, 0.03),
+    "Chorus":      (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.5, 0.5, 5.0, 0.9, 1.0, 550, 1.0, 120, 64, 14, 44, 13, 0.0, 0.12, 0.50, 450, 0.04),
+    "Surge":       (1.0, 3.0, 1.25, 1.3, 1.0, 0.020, 3.5, 0.6, 0.55, 5.0, 1.1, 1.0, 850, 1.3, 180, 98, 48, 40, 4, 0.0, 0.2, 0.55, 600, 0.06),
+    "Eruption":    (1.25, 3.6, 1.7, 2.0, 1.2, 0.030, 3.0, 0.9, 0.7, 4.0, 1.8, 1.5, 2600, 1.5, 220, 21, 2.2, 76, 20, 0.15, 0.45, 0.70, 1000, 0.12),
+    "Collapse":    (0.0, 0.5, 0.2, 0.3, 0.35, 0.000, 9.0, 0.5, 0.5, 5.0, 0.0, 2.5, 90, 0.5, 60, 16, 108, 46, 0, -0.6, 0.35, 0.45, 100, 0.02),
+    "Rebirth":     (0.8, 2.2, 1.0, 1.0, 1.0, 0.015, 3.5, 0.25, 0.25, 14.0, 0.5, 1.0, 550, 1.0, 120, 78, 2.2, 32, 11, 0.0, 0.12, 0.50, 450, -0.035),
 }
-PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": DAWN}  # only the world-defining states recolour
+# Off-hero pivots: the orbit circles a point beside the Cochlea, so the hero drifts through the frame with parallax
+# instead of sitting dead centre in every state.
+PIVOT_X = {"Germination": 14.0, "Rebirth": -16.0, "Surge": 10.0}
+PIVOT_Z = {"Germination": 6.0, "Rebirth": 10.0, "Surge": -8.0}
+PALETTE_BY_STATE = {"Dormant": NIGHT, "Rebirth": GILDED}  # only the world-defining states recolour
 
 
 def colour_paths(prog_ops, prog_name, colour):
@@ -434,7 +453,7 @@ def presets():
             "camera/distance": [v["dist"]],
             "camera/height": [v["height"]],
             "camera/fov": [v["fov"]],
-            "camera/target": [0.0, v["target"], 0.0],
+            "camera/orbitPivot": [PIVOT_X.get(name, 0.0), v["target"], PIVOT_Z.get(name, 0.0)],
             "camera/exposure/compensation": [v["exposure"]],
             "temporal/echo/strength": [v["echo"]],
             "post/bloom/intensity": [v["bloom"]],
@@ -473,13 +492,13 @@ def states():
          "triggers": [pad("Dormant")] + [trig_energy(0.08, frm=f, falling=True) for f in up + ["Collapse"]]},
         {"name": "Germination", "preset": "germination", "transition": {"seconds": 8, "easing": "smooth"},
          "triggers": [pad("Germination"), trig_energy(0.15, frm="Dormant")]},
-        {"name": "Chorus", "preset": "chorus", "transition": {"seconds": 6, "easing": "smooth", "quantize": "bar"},
+        {"name": "Chorus", "preset": "chorus", "transition": {"seconds": 6, "easing": "smooth"},
          "triggers": [pad("Chorus"), trig_energy(0.45, frm="Germination"),
                       trig_energy(0.62, frm="Surge", falling=True)]},
-        {"name": "Surge", "preset": "surge", "transition": {"seconds": 4, "easing": "easeInOut", "quantize": "bar"},
+        {"name": "Surge", "preset": "surge", "transition": {"seconds": 4, "easing": "easeInOut"},
          "triggers": [pad("Surge"), trig_energy(0.72, frm="Chorus"), trig_energy(0.72, frm="Rebirth"),
                       trig_energy(0.7, frm="Eruption", falling=True)]},
-        {"name": "Eruption", "preset": "eruption", "transition": {"seconds": 1.5, "easing": "easeIn", "quantize": "beat"},
+        {"name": "Eruption", "preset": "eruption", "transition": {"seconds": 1.5, "easing": "easeIn"},
          "triggers": [pad("Eruption"), trig_energy(0.86, frm="Surge")]},
         {"name": "Collapse", "preset": "collapse", "transition": {"seconds": 3, "easing": "easeOut"},
          # well below each source state's own entry, so a state never collapses on the wobble that entered it
