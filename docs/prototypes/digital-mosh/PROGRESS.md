@@ -22,7 +22,11 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 | Art pass 2: Critic fixes (shimmer, wobble, beat moves, varied vantages), liquid skin, double scale, MIDI | done | 95c6b672..49cf8d28 |
 | Performance: per-stage offline profile (auto, Ultra), SDF-shadow A/B, live-mode profile, two live sessions | done | `04-evaluation.md` |
 | Art pass 3: warm Dream haze, simpler Pixels stratum, liquid mask inside its skin and sunk by its mean swell, Light not clipped | done | 3957ec05..(final) |
-| Final renders (1080p, both tracks), Critic, evaluation, full suites | done | `04-evaluation.md` |
+| Pass 4 (owner notes): sculpted land, altitude, raking light, contagion spreads; ADR-1165 SDF shadows at a fraction of the map | done | 982af134, bbf6ed62 |
+| Pass 5: the soaring flight (ADR-1166 banking), landmarks, sand texture, in-world collapse | done | 9aef84b3..afbfb690 |
+| Pass 6: the mirror tableaux (owner's correction) | tried and abandoned by the owner; reverted | 828ed6c5..c326a0f2, reverted 5f75c89e..1b32bcea |
+| Pass 5b: the floating eye, circling the stain, ADR-1168 (seek replays the control layer) | done | bd930b97..089eaab8, b4323355 |
+| Final renders (1080p, both tracks), Critic, evaluation, full suites | see `04-evaluation.md` | |
 
 ## How to work on it
 
@@ -76,3 +80,6 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 16. Raymarched SDF shadows are the scene's largest cost (each caster is marched per shadow texel per cascade), and
     the shadow atlas does not shrink with LIVE AUTO's render scale.
 17. A `box` field's `size` is a HALF extent, and `softness` extends past it.
+18. A seek used to reset the scene states, the macros and every route on a non-pure source, so a range render framed a
+    different shot from a full render. ADR-1168 replays them (offline only).
+19. A transparent `blend` surface occludes raymarched SDFs behind it (found in pass 6).
