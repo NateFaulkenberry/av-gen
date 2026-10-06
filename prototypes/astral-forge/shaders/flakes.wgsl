@@ -144,7 +144,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
         let d = s1.xy - s0.xy;
         let L = length(d);
         if (L > 60.0) { s1 = vec3f(s0.xy + d * (60.0 / L), s1.z); }
-        n = clamp(i32(ceil(min(L, 60.0) / 1.2)), 1, 14);
+        n = clamp(i32(ceil(min(L, 60.0) / 2.0)), 1, 8); // iteration 2: 2 px spacing, 8 samples (was 1.2 px, 14)
     }
     // as the form sharpens, bound matter FUSES into the surface: its flakes thin out to a residual sparkle
     let fuse = 1.0 - 0.97 * F.ent0.z * smoothstep(0.6, 1.0, b);
@@ -152,7 +152,8 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     // fused matter still leaves 30% of its plates resting on the surface: engraved debris, the micro scale's
     // proof that the surface is made of matter
     let shardW = max(fuse, 0.3);
-    if (F.it2.y > 0.5 && rpx0 > F.it2.z && b > 0.3) { // only matter that belongs to the entity: near free dust would be confetti
+    // a quarter of the near bound matter resolves as plates; the rest keeps fading as dust
+    if (F.it2.y > 0.5 && rpx0 > F.it2.z && b > 0.3 && hz < 0.25) { // only matter that belongs to the entity: near free dust would be confetti
         let idx = atomicAdd(&shardArgs.instanceCount, 1u);
         if (idx < SHARD_MAX) {
             shards[idx] = Shard(vec4f(p, rw), vec4f(nf, heat), vec4f(b, hz, f32(role), shardW * smoothstep(F.it2.z, F.it2.z + 1.0, rpx0) * (1.0 - smoothstep(60.0, 80.0, rpx0))));

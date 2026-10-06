@@ -41,7 +41,7 @@ fn corner(h: u32, k: u32) -> vec2f {
     let t1 = e1 * cos(rot) + e2 * sin(rot);
     let t2 = cross(n, t1);
     // shards are a little larger than the splat footprint: a flake that is resolved is a plate, not a point
-    let size = s.a.w * 1.8;
+    let size = s.a.w * 1.0;
     let wp = s.a.xyz + (t1 * lp.x + t2 * lp.y) * size;
     var o: VOut;
     o.clip = F.viewProj * vec4f(wp, 1.0);
@@ -85,9 +85,10 @@ fn corner(h: u32, k: u32) -> vec2f {
     let Fr = F0 + (vec3f(0.95) - F0) * pow(1.0 - cosV, 5.0);
     // anisotropic: the grooves smear the reflection across them
     var spec = vec3f(0.0);
-    for (var j = -1; j <= 1; j++) { spec += envF(normalize(r + t1 * f32(j) * 0.06), 0.02); }
+    // strips only: the soft-box sweep that describes the big surface would light every small plate a uniform grey
+    for (var j = -1; j <= 1; j++) { spec += envBands(normalize(r + t1 * f32(j) * 0.06), 0.02); }
     // metal: dark unless a band is caught (no fill on debris, or it reads as grey confetti)
-    var col = spec / 3.0 * Fr * (0.45 + 0.55 * b) * smoothstep(0.05, 0.4, dot(spec / 3.0, vec3f(0.33))) + vec3f(0.003);
+    var col = spec / 3.0 * Fr * (0.45 + 0.55 * b) + vec3f(0.002);
     col += heatColor(heat) * select(0.0, 1.4, i.data.z < 0.045);
     return vec4f(col, 1.0);
 }

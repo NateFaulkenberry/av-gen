@@ -239,7 +239,8 @@ inline State test07(float t) {
     s.sharpSpread = 0.3f;
     // one continuous orbit: 400 degrees over the test, a slow dolly in, a low-to-level pass
     const float az = -40.0f + 400.0f * sstep(0.0f, 17.0f, t);
-    const float d = 17.0f - 3.0f * std::sin(t * 0.37f);
+    // the Chimera is seen closer: its three faces must be read as the orbit discovers them
+    const float d = glm::mix(17.0f - 3.0f * std::sin(t * 0.37f), 11.0f, sstep(8.5f, 11.0f, t));
     const float el = 12.0f * std::sin(t * 0.25f);
     s.eye = orbit(d, az, el, {0.0f, 0.2f, 0.0f});
     s.target = {0.0f, 0.1f, 0.0f};

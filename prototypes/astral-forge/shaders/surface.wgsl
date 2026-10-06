@@ -112,13 +112,16 @@ struct Groove { n: vec3f, tang: vec3f, across: vec3f, mask: f32, };
 
 fn wrapPi(x: f32) -> f32 { return x - TAU * round(x / TAU); }
 
-fn grooveFamily(p: vec3f, n: vec3f, fam: i32, freq: f32, depth: f32, footprint: f32, groove: ptr<function, Groove>, wfam: f32) {
+// The warp and its Jacobian columns at the shading point, computed once and shared by all groove families
+// (iteration 2: 12 warp evaluations -> 4).
+struct WJ { q: vec3f, jx: vec3f, jy: vec3f, jz: vec3f, };
+fn grooveFamily(wj: WJ, n: vec3f, fam: i32, freq: f32, depth: f32, footprint: f32, groove: ptr<function, Groove>, wfam: f32) {
     if (wfam < 0.02) { return; }
     let e = 0.004 * F.entity.w;
-    let E0 = engraveUV(warp(p), fam);
-    let Ex = engraveUV(warp(p + vec3f(e, 0.0, 0.0)), fam);
-    let Ey = engraveUV(warp(p + vec3f(0.0, e, 0.0)), fam);
-    let Ez = engraveUV(warp(p + vec3f(0.0, 0.0, e)), fam);
+    let E0 = engraveUV(wj.q, fam);
+    let Ex = engraveUV(wj.q + wj.jx * e, fam);
+    let Ey = engraveUV(wj.q + wj.jy * e, fam);
+    let Ez = engraveUV(wj.q + wj.jz * e, fam);
     // gradients of u and v; an angular u is unwrapped across the atan2 branch cut
     var du = vec3f(Ex.uv.x - E0.uv.x, Ey.uv.x - E0.uv.x, Ez.uv.x - E0.uv.x);
     if (E0.angular > 0.5) { du = vec3f(wrapPi(du.x), wrapPi(du.y), wrapPi(du.z)); }
@@ -177,9 +180,15 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
     let panel = smoothstep(0.42, 0.58, vnoise3(q * 0.55 + vec3f(3.1, 0.0, 0.0), 91u));
     // eyeballs are mirror-polished: the rose lines are cut only on the socket rim around them
     let eyeBall = select(0.0, smoothstep(0.42, 0.6, fw), isFace);
-    grooveFamily(p, n0, 0, 12.0, 0.35, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
-    grooveFamily(p, n0, 1, 7.0, 0.28, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
-    grooveFamily(p, n0, 2, 9.0, 0.16, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
+    let ew = 0.004 * F.entity.w;
+    var wj: WJ;
+    wj.q = q;
+    wj.jx = (warp(p + vec3f(ew, 0.0, 0.0)) - q) / ew;
+    wj.jy = (warp(p + vec3f(0.0, ew, 0.0)) - q) / ew;
+    wj.jz = (warp(p + vec3f(0.0, 0.0, ew)) - q) / ew;
+    grooveFamily(wj, n0, 0, 12.0, 0.35, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
+    grooveFamily(wj, n0, 1, 7.0, 0.28, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
+    grooveFamily(wj, n0, 2, 9.0, 0.16, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
     let n = gr.n;
     let cosV = clamp(dot(n, V), 0.0, 1.0);
 
@@ -310,21 +319,26 @@ struct FOut { @location(0) color: vec4f, @location(1) depth: vec4f, };
         if (f < 0.0015 * t + 0.002) { hit = true; break; }
         tPrev = t;
         if (approach == 3) { t += max(f * 0.75, 0.002 * t); }
-        else { t += clamp(f * 0.7, cell * 0.3, cell * 3.0); }
+        else { t += clamp(f * 0.8, cell * F.it2.w, cell * 3.0); } // it2.w: minimum step in cells (iteration 2: 0.65, refined by bisection)
     }
     var col = vec3f(0.0);
     if (hit) {
         // refine by bisection
         var lo = tPrev; var hi = t;
-        for (var k = 0; k < 6; k++) {
+        // the first five halvings on the cached field, the last two on the exact latent (iteration 2)
+        for (var k = 0; k < 7; k++) {
             let mid = 0.5 * (lo + hi);
-            if (fieldAt(ro + rd * mid) < 0.0) { hi = mid; } else { lo = mid; }
+            if (fieldAtMode(ro + rd * mid, k >= 5) < 0.0) { hi = mid; } else { lo = mid; }
         }
         t = hi;
         let p = ro + rd * t;
         let S = select(0.0, F.ent0.z, approach == 4);
         let e = select(mix(cell * 0.7, 0.01 * F.entity.w, S), 0.004 * F.entity.w, approach == 3);
-        let n = normalAt(p, e);
+        // the bisected point lies on the zero set (to 1/128 of a step), so a forward difference needs 3 exact evaluations
+        let f0 = 0.0;
+        let gN = vec3f(fieldAt(p + vec3f(e, 0.0, 0.0)) - f0, fieldAt(p + vec3f(0.0, e, 0.0)) - f0, fieldAt(p + vec3f(0.0, 0.0, e)) - f0);
+        var n = vec3f(0.0, 0.0, 1.0);
+        if (length(gN) > 1e-9) { n = gN / length(gN); } else { n = normalAt(p, e); } // select() would evaluate both
         if (i32(F.flags.x) == 3) {
             col = vec3f(0.0);
         } else if (i32(F.flags.x) == 1) {

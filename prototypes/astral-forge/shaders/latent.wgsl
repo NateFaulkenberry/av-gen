@@ -303,7 +303,7 @@ fn chimeraHorns(q: vec3f) -> f32 {
         let fk = f32(k);
         let a = fk * TAU / 4.0 + 0.4;
         let root = vec3f(1.1 * cos(a), 1.6, 1.1 * sin(a));
-        d = min(d, horn(q, root, vec2f(0.4 * sin(a), -0.7 * cos(a)), 3.6, 0.9, 0.3));
+        d = min(d, horn(q, root, vec2f(0.4 * sin(a), -0.7 * cos(a)), 4.2, 1.6, 0.34)); // longer, curling through the faces
     }
     return d;
 }

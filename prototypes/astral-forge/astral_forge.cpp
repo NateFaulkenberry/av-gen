@@ -199,6 +199,7 @@ struct Options {
     bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
     bool noShards = false; // iteration 2: near flakes stay splats
     float shardPx = 12.0f;
+    float minStep = 0.65f; // surface march minimum step, in density cells (iteration 1: 0.3)
     int archOverride = -1; // substitute an archetype into a scripted test (art direction)  // footprint (px) above which a flake becomes a shard
     double songStart = -1.0; // TEST 06: where the excerpt starts in the song (default per track)
 };
@@ -261,8 +262,9 @@ int main(int argc, char** argv) {
         else if (a == "--no-cache") o.noCache = true;
         else if (a == "--arch") o.archOverride = std::stoi(next());
         else if (a == "--no-shards") o.noShards = true;
+        else if (a == "--min-step") o.minStep = std::stof(next());
         else if (a == "--shard-px") o.shardPx = std::stof(next());
-        else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = true; }
+        else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = true; o.minStep = 0.3f; }
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &o.width, &o.height); }
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
@@ -540,7 +542,7 @@ int main(int argc, char** argv) {
         f.fp1 = sPrev.fold1;
         f.fp2 = glm::vec4(static_cast<float>(tPrev), sPrev.breath, s.warpAdvect, 0.0f);
         f.ext = glm::vec4(s.sharpSpread, s.tendonWeight, s.metaRadius, s.metaFace);
-        f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, 0.0f);
+        f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, o.minStep);
         f.fp2.w = s.tendonFlow;
     };
 
