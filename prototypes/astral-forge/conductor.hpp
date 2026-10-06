@@ -33,6 +33,11 @@ struct State {
     float sharpSpread = 0.6f;  // 1: only the anatomy's centre becomes precise; 0: everywhere (material studies)
     float bloom = 0.035f;
     float collapseAt = -1e9f; // iteration 3: time of the last collapse (heat lives on its release front)
+    // v2 look (defaults off: the scripted tests keep their iteration-3 look unless they opt in)
+    float paletteStrength = 0.0f; // per-god palette on light bands and region temper
+    float rimLight = 0.0f, eyeGlow = 0.0f, keyLight = 0.0f, absorb = 0.0f;
+    float atmosphere = 0.0f, godRays = 0.0f;
+    float legible = 0.0f; // v2: face legibility at a formed peak (quiet engraving, dark sockets, frontal key)
     float metaRadius = 22.0f;  // how far the unbound dust field extends
     float metaFace = 0.0f;     // the dust condenses into a giant ghost mask (0..1)
     float tendonWeight = 0.22f; // density weight of tendon matter: low, so tendons read as streams of flakes, thickening only where dense
@@ -333,7 +338,9 @@ inline float phraseCoherence(const Score& sc, const Phrase& ph, double t, const 
     // a phrase opened by a strong kick builds from near chaos (the previous form was destroyed); one that
     // opens softly only half-dissolves and rebuilds from there
     const float base = ph.kickOpens ? 0.08f : 0.45f;
-    if (build) return base + (0.98f - base) * std::pow(sstep(0.0f, 0.82f, u), 1.25f);
+    // v2: the build reaches its peak by 60% of the phrase, so the face HOLDS at high coherence for ~4 s before any
+    // collapse on the next downbeat (the owner: 'we never really get to make out that it's a face')
+    if (build) return base + (0.98f - base) * std::pow(sstep(0.0f, 0.6f, u), 1.25f);
     return 0.93f + 0.06f * std::sin(u * 6.28f);
 }
 
@@ -363,6 +370,8 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     // iteration 4: the song's shots are mostly wide, and at 22 units the drifters' containment shell read as a
     // glowing sphere around the god (the banned 'particle sphere'). The meta field is wider for the song.
     s.metaRadius = 60.0f;
+    // v2 look: palette, raking key, rim, eye glow, dust absorbed into a formed face, atmosphere and god rays
+    s.paletteStrength = 0.9f; s.keyLight = 1.0f; s.rimLight = 1.0f; s.eyeGlow = 1.0f; s.atmosphere = 1.0f; s.godRays = 1.0f;
 
     float C = phraseCoherence(sc, ph, t, &song);
     const bool collapseOpen = ph.kickOpens && pi > 0;
@@ -384,6 +393,8 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     if (!withhold) C += 0.10f * (a.env0.z - 0.5f);
     s.C = std::clamp(C, 0.0f, 1.0f);
     defaults(s);
+    s.legible = sstep(0.82f, 0.95f, s.C);
+    s.absorb = sstep(0.7f, 0.95f, s.C); // loose dust is drawn into a formed face (thinner background)
     const float sinceSnare = static_cast<float>(t - a.lastSnare);
     // snares flash the face while it is forming; in a withhold the flash is the ONLY time the face appears
     const float flashGain = withhold ? 0.6f : 0.38f;
@@ -409,7 +420,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         s.fold1.x = 0.7f * f;
         s.fold0.w = 0.6f * sstep(0.8f, 0.98f, u) * (ph.index % 4 == 3 ? 1.0f : 0.0f);
     }
-    if (arch == kChoir) { s.fold1.z = sstep(0.3f, 0.7f, u); s.fold1.w = hold ? sstep(0.0f, 0.5f, u) : 0.0f; }
+    if (arch == kChoir) { s.fold1.z = sstep(0.3f, 0.7f, u); s.fold1.w = hold ? sstep(0.0f, 0.2f, u) : sstep(0.3f, 0.5f, u); } // v2: the choir merges into one face at every peak
     if (arch == kAbyss) s.fall = 1.5f;
     s.rigPhase = static_cast<float>(t) * 0.3f + static_cast<float>(ph.index) * 0.7f;
     s.sweep = std::clamp(-1.0f + 2.0f * sinceSnare / 0.35f, -1.0f, 1.0f);
@@ -423,6 +434,12 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     // full coherence just before the collapse) -- at most one per section. The subject stays on a third (side by
     // phrase), and a held phrase still cuts at its midpoint, but between two mid/wide framings (another side and
     // scale), never into the dust at close range. Smoothing never crosses a cut.
+    // v2 SHOT SIZES (the owner: "now faces get too far away"). Distances come from a target screen FILL (the face's
+    // ~6.8-unit height over the frame height at a 30-degree lens): d = 12.69 / fill. Target mix over the song:
+    // ~50% PORTRAIT (fill 0.4-0.6), ~30% MEDIUM-WIDE (0.2-0.4), ~15% WIDE reveals (<0.2), ~5% CLOSE accents (>0.6).
+    // Build phrases open medium-wide while the matter is chaos and push into a portrait as the face forms; held
+    // phrases are portraits (one in four stays medium-wide); sections open with a wide reveal; close-ups are accents.
+    auto fillD = [](float fill) { return 12.69f / fill; };
     auto camAt = [&](double tc, glm::vec3& eye, glm::vec3& tgt, std::string& lab) -> int {
         std::size_t k = 0;
         while (k + 1 < sc.phrases.size() && tc >= sc.phrases[k + 1].start) ++k;
@@ -435,52 +452,55 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const float side = (p.index % 2 == 0) ? 1.0f : -1.0f;
         const int choice = (p.index * 7 + std::max(p.section, 0) * 5) % 3;
         glm::vec3 focus{0.0f, 0.2f, 0.0f};
-        float d = 24.0f, el = 6.0f, az = 0.0f;
+        float d = fillD(0.5f), el = 6.0f, az = 0.0f;
         float thirdX = ((p.index * 3 + 1) % 2 == 0) ? 1.0f : -1.0f, thirdY = 0.0f;
         int seg = 0;
-        tgt = {0.0f, -0.1f, 0.0f};
-        // the accent: is this phrase's end destroyed by a kick, and is it the first such in its section?
+        tgt = {0.0f, 0.0f, 0.0f};
         bool accentPhrase = false;
         if (build && next && next->kickOpens && !wh) {
             accentPhrase = true;
-            for (std::size_t j = 0; j < k; ++j) {
-                const Phrase& q = sc.phrases[j];
-                if (q.section == p.section && j + 1 < sc.phrases.size() && sc.phrases[j + 1].kickOpens) { accentPhrase = false; break; }
-            }
         }
+        // v2: also an accent at the peak of every third held phrase (the face fully formed, ~4 beats)
+        const bool heldAccent = !build && !wh && (p.index % 6) == 3;
         const float beatsLeft = static_cast<float>((p.end - tc) / sc.beatSeconds);
         if (wh) {
-            // a withheld break: the held eyes are seen at MID range, small in the void
-            d = 15.0f - 3.0f * v; el = 4.0f; az = side * (16.0f - 12.0f * v); focus = tgt = glm::vec3(0.0f, 0.5f, 0.3f); lab = "HOVER";
-            thirdX *= 0.7f;
+            d = fillD(0.42f + 0.06f * v); el = 3.0f; az = side * (14.0f - 10.0f * v); focus = tgt = glm::vec3(0.0f, 0.5f, 0.3f); lab = "HOVER";
+            thirdX *= 0.6f;
         } else if (build) {
-            if (choice == 0) { d = 36.0f - 12.0f * v; el = 7.0f; az = side * (22.0f - 8.0f * v); lab = "OBSERVER"; }
-            else if (choice == 1) { d = 24.0f - 4.0f * v; el = 1.0f; az = side * (70.0f - 16.0f * v); lab = "PROFILE"; }
-            else { d = 28.0f - 6.0f * v; el = -22.0f + 14.0f * v; az = side * (26.0f - 10.0f * v); lab = "LOW"; thirdY = 1.0f; }
-            if (accentPhrase && beatsLeft <= 2.0f) { // the accent: the eyes, close, as the face snaps into coherence
-                seg = 1; focus = tgt = glm::vec3(0.0f, 0.72f, 0.6f); d = 7.5f; el = 2.0f; az = side * 8.0f;
+            const float push = sstep(0.3f, 0.62f, v); // medium-wide while forming, portrait once formed
+            d = fillD(glm::mix(0.27f, 0.52f, push));
+            if (choice == 0) { el = 6.0f; az = side * (20.0f - 8.0f * v); lab = "OBSERVER"; }
+            else if (choice == 1) { el = 2.0f; az = side * (48.0f - 20.0f * v); lab = "THREE-QUARTER"; }
+            else { el = -16.0f + 10.0f * v; az = side * (24.0f - 10.0f * v); lab = "LOW"; thirdY = 1.0f; }
+            if (accentPhrase && beatsLeft <= 2.5f) {
+                seg = 1; focus = tgt = glm::vec3(0.0f, 0.6f, 0.5f); d = fillD(0.78f); el = 2.0f; az = side * 8.0f;
                 thirdX = 0.0f; thirdY = 0.0f; lab += "+ACCENT";
             }
         } else {
-            if (choice == 0) { d = 20.0f - 3.0f * v; el = 26.0f - 18.0f * v; az = side * 18.0f; lab = "DESCENT"; }
-            else if (choice == 1) { d = 19.0f; el = 10.0f; az = side * (-55.0f + 110.0f * v); lab = "ORBIT"; }
-            else { d = 42.0f - 6.0f * v; el = 14.0f; az = side * (35.0f - 20.0f * v); lab = "WIDE"; }
-            if (v >= 0.5f) { // a cut between mid and wide, to the other side
-                seg = 1;
-                if (choice == 2) { d = 22.0f; el = 4.0f; az = -side * 40.0f; lab += "+CUT:MID"; }
-                else { d = 38.0f; el = 12.0f; az = -side * 30.0f; lab += "+CUT:WIDE"; }
-                thirdX = -thirdX;
-            }
+            const bool mediumHold = (p.index % 8) == 5; // one held phrase in four is a WIDE tableau (the god small in its void)
+            const float fill = mediumHold ? 0.15f : 0.5f + 0.06f * std::sin(v * 3.1416f);
+            d = fillD(fill);
+            if (choice == 0) { el = 18.0f - 12.0f * v; az = side * 16.0f; lab = "DESCENT"; }
+            else if (choice == 1) { el = 8.0f; az = side * (-40.0f + 80.0f * v); lab = "ORBIT"; }
+            else { el = 4.0f; az = side * (30.0f - 14.0f * v); lab = "PORTRAIT"; }
+            if (mediumHold) lab += "-WIDE";
+            if (v >= 0.5f) { seg = 1; az = -az * 0.8f - side * 20.0f; el += 4.0f; thirdX = -thirdX; lab += "+CUT"; }
+            if (heldAccent && v >= 0.25f && v < 0.42f) { seg = 2; focus = tgt = glm::vec3(0.0f, 0.6f, 0.5f); d = fillD(0.75f); el = 3.0f; az = side * 6.0f; thirdX = 0.0f; lab += "+ACCENT"; }
         }
         const float since = static_cast<float>(tc - p.start);
-        if (first && since < 4.5f && !wh) { d += 26.0f * std::sin(glm::pi<float>() * since / 4.5f); el += 6.0f; lab = "REVEAL"; }
+        if (first && since < 7.0f && !wh) { // a wide reveal opens every section
+            const float r = std::sin(glm::pi<float>() * std::min(since / 7.0f, 1.0f));
+            d = glm::mix(d, fillD(0.12f), r); el += 8.0f * r; lab = "REVEAL";
+        }
         if (p.kickOpens && since < 1.4f) { d -= 4.0f * (1.0f - since / 1.4f); lab = "COLLISION"; thirdX = 0.0f; thirdY = 0.0f; }
         eye = orbit(d, az, el, focus);
         const glm::vec3 fwd = glm::normalize(tgt - eye);
         const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)));
         const glm::vec3 upv = glm::cross(right, fwd);
         const float dist = glm::length(tgt - eye);
-        tgt += right * (thirdX * 0.157f * dist) - upv * (thirdY * 0.088f * dist);
+        // thirds, but gentler at portrait scale so the face stays inside the frame
+        const float tx = 0.157f * std::min(1.0f, 0.4f * dist / 12.0f);
+        tgt += right * (thirdX * tx * dist) - upv * (thirdY * 0.07f * dist);
         return p.index * 4 + seg;
     };
     glm::vec3 eyeAcc{0.0f}, tgtAcc{0.0f};
@@ -518,7 +538,7 @@ inline State test08(float t, const SongAnalysis& song, const Score& sc) {
     const float pull = sstep(dur - 7.0f, dur - 0.5f, t);      // the ending: pull back, the god small in the void
     if (pull > 0.0f) {
         const glm::vec3 dir = s.eye - s.target;
-        s.eye = s.target + dir * (1.0f + 1.6f * pull);
+        s.eye = s.target + dir * (1.0f + 0.9f * pull);
         s.label += "+ENDING";
     }
     s.exposure *= 1.0f - sstep(dur - 2.2f, dur - 0.1f, t);   // fade with the last note

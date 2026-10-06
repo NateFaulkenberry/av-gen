@@ -123,6 +123,7 @@ struct FaceP {
     tunnel: f32,    // the mouth stretches into a tunnel through depth
     eyeDepth: f32,  // the left eye travels backward through the skull
     inner: f32,     // the mouth holds a smaller face (0/1)
+    shape: f32,     // v2: the god's plate silhouette (archetype id; 0 = the iteration-1 mask)
 };
 
 fn eyeCentreL() -> vec3f { return vec3f(-0.76, 0.72, 0.6); }
@@ -130,10 +131,18 @@ fn eyeCentreR() -> vec3f { return vec3f(0.76, 0.72, 0.6); }
 fn mouthCentre() -> vec3f { return vec3f(0.0, -1.45, 0.62); }
 
 // The plate: a curved mask (thick shell of an ellipsoid) with no skull behind it. Its rim is torn.
-fn facePlate(q: vec3f, fp: FaceP) -> f32 {
+fn facePlate(q0: vec3f, fp: FaceP) -> f32 {
     let c = vec3f(0.0, 0.15, -1.25);
+    // v2: distinct silhouettes at mid range (no more repeated egg-mask): the Seraph narrow and tall, the Abyss wide
+    // and LOPSIDED (sheared), the Machine God broad and square-jawed
+    var q = q0;
+    var rr = vec3f(1.95, 3.35, 2.0);
+    let sh = i32(fp.shape + 0.5);
+    if (sh == 1) { rr = vec3f(1.7, 3.75, 2.0); }
+    if (sh == 2) { q.x += 0.38 * (q.y - 0.15); rr = vec3f(2.5, 2.85, 2.1); }
+    if (sh == 4) { rr = vec3f(2.35, 3.05, 2.0); }
     let tear = 0.22 * (vnoise3(q * 1.7 + vec3f(0.0, 0.0, F.cam.w * 0.1), 61u) - 0.5);
-    let r = vec3f(1.95, 3.35, 2.0) * (1.0 + tear * smoothstep(1.4, 2.4, length(q.xy * vec2f(1.0, 0.75))));
+    let r = rr * (1.0 + tear * smoothstep(1.4, 2.4, length(q.xy * vec2f(1.0, 0.75))));
     let dRound = abs(sdEllipsoid(q - c, r)) - 0.15;
     let dGeo = abs(sdFacet(q - c, r * vec3f(0.97, 0.97, 1.0))) - 0.15;
     // asym 2 (the Machine God): faceted everywhere
@@ -236,7 +245,7 @@ fn faceMouth(q: vec3f, fp: FaceP) -> f32 {
     return d;
 }
 
-fn defaultFace() -> FaceP { return FaceP(0.0, 1.0, 1.0, 0.18, 0.0, 0.0, 1.0); }
+fn defaultFace() -> FaceP { return FaceP(0.0, 1.0, 1.0, 0.18, 0.0, 0.0, 1.0, 0.0); }
 
 // ---- appendages -----------------------------------------------------------------------------------
 
@@ -257,7 +266,7 @@ fn seraphWings(q: vec3f) -> f32 {
         lp = vec3f(xy.x, xy.y, lp.z);
         let xz = rot2(0.35 + 0.1 * fk) * lp.xz;
         lp = vec3f(xz.x, lp.y, xz.y);
-        let len = 4.6 - 0.6 * fk;
+        let len = 6.4 - 0.8 * fk; // v2: longer wings: the Seraph reads by its wingspan at mid range
         // a blade: long thin ellipsoid, slightly curved
         lp.z += 0.04 * lp.y * lp.y;
         let b = sdBlade(lp - vec3f(0.0, len, 0.0), vec3f(0.42 - 0.06 * fk, len, 0.045));
@@ -324,9 +333,11 @@ fn machineRings(q: vec3f) -> f32 {
         var lp = q;
         let rxy = rot2((0.18 + 0.1 * fk) * open * select(1.0, -1.0, k == 1) + 0.05 * sin(t * 0.3 + fk)) * lp.xy;
         lp = vec3f(rxy.x, rxy.y, lp.z);
-        let off = (0.32 + 0.42 * fk) * open;
+        // v2: at a formed peak the lamellae withdraw BEHIND the face (a stepped halo around it) so the face reads
+        let lg = F.lg0.x;
+        let off = mix((0.32 + 0.42 * fk) * open, -(0.7 + 0.55 * fk), lg);
         // a shell of the face plate, scaled up so it nests outside it
-        let sc = 1.0 + 0.12 * (fk + 1.0) * open;
+        let sc = 1.0 + 0.12 * (fk + 1.0) * open + 0.16 * (fk + 1.0) * lg;
         let shell = abs(facePlate((lp - vec3f(0.0, 0.0, off)) / sc, fp) * sc) - 0.035;
         // the angular window: a rotating gap, so each layer is a crescent that peels away
         let ang = safeAtan2(lp.y - 0.15, lp.x) + t * (0.12 + 0.05 * fk) * select(1.0, -1.0, k == 1) + fk * 2.1;
@@ -424,6 +435,7 @@ fn faceParamsFor(arch: i32) -> FaceP {
     fp.eyeDepth = F.fold0.y;
     fp.tunnel = F.fold0.z;
     fp.open += F.fold1.y; // the mouth as a portal (TEST 05)
+    fp.shape = f32(arch);
     if (arch == 0) { fp.asym = 0.85; }
     if (arch == 1) { fp.asym = 0.0; fp.open = 0.1; }
     if (arch == 2) { fp.asym = 0.5; fp.eyeL = 1.55; fp.eyeR = 0.55; fp.open = 1.6; fp.tunnel = max(fp.tunnel, 0.6); }
@@ -459,7 +471,7 @@ fn archetypeD(q: vec3f, arch: i32, part: i32) -> f32 {
         let a = safeAtan2(q.x, q.z);
         let sector = round(a / (TAU / 3.0));
         let lq2 = rot2(sector * TAU / 3.0) * q.xz;
-        var lq = vec3f(lq2.x, q.y, lq2.y) - vec3f(0.0, 0.0, 1.0);
+        var lq = vec3f(lq2.x, q.y, lq2.y) - vec3f(0.0, 0.0, 1.7);
         var fp = defaultFace();
         fp.asym = fract(sector * 0.37 + 0.2);
         fp.eyeDepth = F.fold0.y; fp.tunnel = F.fold0.z;
@@ -627,7 +639,7 @@ fn tendonQ(q: vec3f, arch: i32) -> vec3f {
         let ang = safeAtan2(q.x, q.z);
         let sector = round(ang / (TAU / 3.0));
         let lq2 = rot2(sector * TAU / 3.0) * q.xz;
-        return vec3f(lq2.x, q.y, lq2.y) - vec3f(0.0, 0.0, 1.0);
+        return vec3f(lq2.x, q.y, lq2.y) - vec3f(0.0, 0.0, 1.7);
     }
     return q;
 }

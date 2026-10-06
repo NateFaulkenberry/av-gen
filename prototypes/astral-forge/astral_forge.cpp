@@ -64,7 +64,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox, it3;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox, it3, pal0, pal1, pal2, pal3, pal4, atm0, lg0;
 };
 
 std::string readFile(const std::string& path) {
@@ -182,6 +182,21 @@ void setBands(FrameU& f, const astral::State& s) {
     put(3, {1.0f, 0.0f, 0.15f}, s.sweep * 0.85f, 0.018f, 28.0f * s.sweepStrength, 0.0f, 0.0f);
 }
 
+// v2: each god's palette, carried by broad features (light-band tints, rim, eyes, region temper zones, atmosphere).
+// Tints are normalised to unit luminance so the greyscale image is unchanged by them.
+struct GodPalette { glm::vec3 key, rim, eye, zoneA, zoneB, fog; };
+glm::vec3 unitLuma(glm::vec3 c) { return c / std::max(glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f)), 1e-4f); }
+GodPalette godPalette(int arch) {
+    switch (arch) {
+    case 1: return {{0.80f, 0.97f, 1.12f}, {0.80f, 0.60f, 1.20f}, {0.35f, 0.90f, 1.15f}, {0.78f, 1.00f, 1.20f}, {0.92f, 0.76f, 1.20f}, {0.07f, 0.10f, 0.17f}}; // Seraph
+    case 2: return {{0.78f, 0.50f, 1.05f}, {1.25f, 0.22f, 0.18f}, {1.10f, 0.10f, 0.06f}, {0.74f, 0.42f, 1.12f}, {1.22f, 0.28f, 0.28f}, {0.11f, 0.02f, 0.06f}}; // Abyss
+    case 3: return {{0.55f, 1.15f, 0.78f}, {1.15f, 0.80f, 0.48f}, {0.20f, 1.05f, 0.50f}, {0.48f, 1.16f, 0.68f}, {1.22f, 0.80f, 0.42f}, {0.03f, 0.09f, 0.06f}}; // Chimera
+    case 4: return {{1.18f, 0.92f, 0.52f}, {1.10f, 0.95f, 0.68f}, {1.05f, 0.70f, 0.18f}, {1.28f, 0.94f, 0.40f}, {0.74f, 0.86f, 1.04f}, {0.11f, 0.08f, 0.04f}}; // Machine God
+    case 5: return {{1.15f, 0.80f, 0.75f}, {0.48f, 1.02f, 0.98f}, {0.28f, 1.02f, 0.92f}, {1.26f, 0.74f, 0.58f}, {0.52f, 1.06f, 1.02f}, {0.11f, 0.06f, 0.08f}}; // Choir
+    default: return {{0.85f, 0.90f, 1.05f}, {0.78f, 0.58f, 1.12f}, {0.65f, 0.42f, 1.05f}, {1.0f, 1.0f, 1.03f}, {0.86f, 0.76f, 1.10f}, {0.08f, 0.08f, 0.13f}};
+    }
+}
+
 struct Options {
     int test = 1;
     char approach = 'E';
@@ -294,12 +309,14 @@ int main(int argc, char** argv) {
     if (o.debug == 8) {
         // the conductor as CSV at 60 Hz (CPU only): what the music did to the entity's state
         const double d = o.to > 0.0 ? o.to : (o.test == 8 ? song.duration : testDuration(o.test));
-        std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera\n");
+        std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera,fill,merge,legible\n");
         for (double t = o.from; t <= d + 1e-9; t += 1.0 / 60.0) {
             const astral::State s = conduct(o, static_cast<float>(t), song, score);
-            std::printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%s\n", t, o.songStart + t, s.C, s.S,
+            // the face's projected screen FILL: its ~6.8-unit anatomical height over the frame height
+            const float fill = 6.8f * s.scale / (2.0f * glm::length(s.eye - s.centre) * std::tan(glm::radians(s.fovDeg) * 0.5f));
+            std::printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%s,%.4f,%.3f,%.3f\n", t, (o.test == 8 ? 0.0 : o.songStart) + t, s.C, s.S,
                         s.flash, s.archA, s.morph, s.temper, s.mass, s.breath, s.flow, s.shimmer, s.fold0.x, s.fold0.y, s.fold0.z, s.fold0.w, s.strobe,
-                        s.label.c_str());
+                        s.label.c_str(), fill, s.fold1.w, s.legible);
         }
         return 0;
     }
@@ -489,7 +506,7 @@ int main(int argc, char** argv) {
     }
     auto shardGroup = makeGroup(ctx, shardLayout, {buf(shardBuf, shardBytes), tex(surfDepthView)});
 
-    auto postLayout = makeLayout(ctx, {B::Tex2D, B::Sampler, B::Uniform, B::Tex2D, B::ReadOnly}, wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex);
+    auto postLayout = makeLayout(ctx, {B::Tex2D, B::Sampler, B::Uniform, B::Tex2D, B::ReadOnly, B::Tex2DUnfilt}, wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex);
     auto postPL = makePL(ctx, {postLayout});
     auto postPipe = [&](const char* fs, wgpu::TextureFormat fmt, bool additive) {
         wgpu::BlendState blend{};
@@ -515,11 +532,11 @@ int main(int argc, char** argv) {
     auto down = postPipe("fs_down", hdrFmt, false);
     auto up = postPipe("fs_up", hdrFmt, true);
     auto composite = postPipe("fs_composite", wgpu::TextureFormat::RGBA8Unorm, false);
-    wgpu::Buffer postBuf = makeBuffer(ctx, 32, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, "post");
+    wgpu::Buffer postBuf = makeBuffer(ctx, 96, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, "post");
     wgpu::Texture dummyTex = makeTex({1, 1, 1}, hdrFmt, wgpu::TextureUsage::TextureBinding);
     wgpu::TextureView dummyView = dummyTex.CreateView();
     auto pg = [&](const wgpu::TextureView& src, const wgpu::TextureView& bl) {
-        return makeGroup(ctx, postLayout, {tex(src), smp(sampler), buf(postBuf, 32), tex(bl), buf(accumBuf, accumBytes)});
+        return makeGroup(ctx, postLayout, {tex(src), smp(sampler), buf(postBuf, 96), tex(bl), buf(accumBuf, accumBytes), tex(surfDepthView)});
     };
     auto combineGroup = pg(surfColorView, dummyView);
     std::vector<wgpu::BindGroup> downGroups, upGroups;
@@ -579,6 +596,18 @@ int main(int argc, char** argv) {
             const glm::vec3 lo = s.centre - glm::vec3(o.gridSize * 0.5f);
             const glm::vec3 c = glm::clamp(s.target, lo + half, lo + glm::vec3(o.gridSize) - half);
             f.cbox = glm::vec4(c - half, 2.0f * half);
+        }
+        {
+            const GodPalette a = godPalette(static_cast<int>(s.archA)), b = godPalette(static_cast<int>(s.archB));
+            const float m = s.morph;
+            auto mx = [&](glm::vec3 x, glm::vec3 y) { return unitLuma(glm::mix(x, y, m)); };
+            f.pal0 = glm::vec4(mx(a.key, b.key), s.paletteStrength);
+            f.pal1 = glm::vec4(mx(a.rim, b.rim), s.rimLight);
+            f.pal2 = glm::vec4(mx(a.eye, b.eye), s.eyeGlow);
+            f.pal3 = glm::vec4(mx(a.zoneA, b.zoneA), s.keyLight);
+            f.pal4 = glm::vec4(mx(a.zoneB, b.zoneB), s.absorb);
+            f.atm0 = glm::vec4(glm::mix(a.fog, b.fog, m), s.atmosphere);
+            f.lg0 = glm::vec4(s.legible, 0.0f, 0.0f, 0.0f);
         }
         f.it3 = glm::vec4(o.noHalf ? 0.0f : 1.0f, s.collapseAt > -1e8f ? static_cast<float>(t) - s.collapseAt : -1.0f, 0.0f, 0.0f);
         f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, o.minStep);
@@ -733,7 +762,18 @@ int main(int argc, char** argv) {
                 r.Draw(3);
                 r.End();
             };
-            const float post[8] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f};
+            // v2 atmosphere: an off-screen source behind and above the god (god rays through the haze and through the
+            // gaps in the forming matter), and a palette-tinted ambient gradient in the void
+            const glm::vec3 lightW = sLast.centre + glm::vec3(0.0f, 10.0f, -16.0f) * sLast.scale;
+            const glm::vec4 lc = fu.viewProj * glm::vec4(lightW, 1.0f);
+            glm::vec2 luv(0.5f, -0.3f);
+            float lvis = 0.0f;
+            if (lc.w > 0.1f) { luv = glm::vec2(lc.x / lc.w * 0.5f + 0.5f, 0.5f - lc.y / lc.w * 0.5f); lvis = 1.0f; }
+            const GodPalette gp = godPalette(static_cast<int>(sLast.archA));
+            const glm::vec3 rayC = unitLuma(glm::mix(gp.key, glm::vec3(1.0f), 0.3f));
+            const float post[24] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f,
+                                    luv.x, luv.y, lvis, sLast.godRays, fu.atm0.x, fu.atm0.y, fu.atm0.z, sLast.atmosphere,
+                                    rayC.x, rayC.y, rayC.z, 0.12f, 0.0f, 0.0f, 0.0f, 0.0f};
             queue.WriteBuffer(postBuf, 0, post, sizeof(post));
             fullPass(hdrView, combinePipe, combineGroup, false, "post");
             if (!o.noShards) {
