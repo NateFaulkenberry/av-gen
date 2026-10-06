@@ -27,6 +27,7 @@ ROSE = lin("#c99a92")
 IRIS = [lin("#2f4f53"), lin("#5f9aa0"), lin("#c1ae5e")]   # the Bee's turquoise warming to ochre at the pupil
 LIMBUS = lin("#1f2a2c")
 INK = lin("#2d0c1f")
+PUPIL = lin("#0c0a0e")
 MOON = lin("#c9cdd0")
 
 
@@ -73,7 +74,7 @@ def program(strain):
         op("multiply", 5, srcA=5, srcB=7),
         op("constant", 7, constant=LIMBUS + [1]),
         op("mixBy", 6, srcA=6, srcB=7, srcC=5),
-        op("constant", 7, constant=INK + [1]),
+        op("constant", 7, constant=PUPIL + [1]),
         op("mixBy", 6, srcA=6, srcB=7, srcC=3),                                     # the pupil
         # the moon: craters on a cold white, the iris gone
         op("constant", 5, constant=[0.0, 0.0, 0.0, 0.0]),                           # MOON amount (stage)

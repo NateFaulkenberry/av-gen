@@ -646,7 +646,7 @@
    "source": "lfo.circleA.bipolar",
    "target": "camera/position",
    "op": "add",
-   "amount": 46.0,
+   "amount": 92.0,
    "component": 0,
    "depthSource": "macro.circle",
    "depthMin": 0.0,
@@ -656,7 +656,7 @@
    "source": "lfo.circleB.bipolar",
    "target": "camera/position",
    "op": "add",
-   "amount": 46.0,
+   "amount": 92.0,
    "component": 2,
    "depthSource": "macro.circle",
    "depthMin": 0.0,
@@ -3268,29 +3268,25 @@
      0.4
     ],
     "macros/circle": [
-     0.0
+     1.0
     ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
-     0.0,
-     0.0
+    "camera/position": [
+     4.0,
+     16.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     30
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     42
-    ],
-    "camera/splineBank": [
-     10
+     38
     ],
     "camera/roll": [
-     0.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -3622,29 +3618,25 @@
      0.4
     ],
     "macros/circle": [
-     0.0
+     1.0
     ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
-     3.0,
-     0.0
+    "camera/position": [
+     4.0,
+     28.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     32
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     44
-    ],
-    "camera/splineBank": [
-     9
+     40
     ],
     "camera/roll": [
-     0.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -3976,29 +3968,25 @@
      0.4
     ],
     "macros/circle": [
-     0.0
+     1.0
     ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
-     -2.0,
-     0.0
+    "camera/position": [
+     4.0,
+     10.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     26
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     40
-    ],
-    "camera/splineBank": [
-     12
+     36
     ],
     "camera/roll": [
-     0.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -4330,7 +4318,7 @@
      0.5
     ],
     "macros/circle": [
-     1.0
+     0.5
     ],
     "camera/mode": [
      1
@@ -4680,7 +4668,7 @@
      0.5
     ],
     "macros/circle": [
-     1.0
+     0.5
     ],
     "camera/mode": [
      1
@@ -5030,7 +5018,7 @@
      0.5
     ],
     "macros/circle": [
-     1.0
+     0.5
     ],
     "camera/mode": [
      1
@@ -5175,7 +5163,7 @@
      0.3
     ],
     "temporal/mosh/amount": [
-     0.03
+     0.0
     ],
     "temporal/mosh/block": [
      24.0
@@ -5245,7 +5233,7 @@
      1.0
     ],
     "macros/gMosh": [
-     0.85
+     0.0
     ],
     "macros/gGlitch": [
      0.6
@@ -5529,7 +5517,7 @@
      0.3
     ],
     "temporal/mosh/amount": [
-     0.03
+     0.0
     ],
     "temporal/mosh/block": [
      24.0
@@ -5599,7 +5587,7 @@
      1.0
     ],
     "macros/gMosh": [
-     0.85
+     0.0
     ],
     "macros/gGlitch": [
      0.6
@@ -5883,7 +5871,7 @@
      0.3
     ],
     "temporal/mosh/amount": [
-     0.03
+     0.0
     ],
     "temporal/mosh/block": [
      24.0
@@ -5953,7 +5941,7 @@
      1.0
     ],
     "macros/gMosh": [
-     0.85
+     0.0
     ],
     "macros/gGlitch": [
      0.6

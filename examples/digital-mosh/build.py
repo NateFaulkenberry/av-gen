@@ -472,7 +472,7 @@ def land_blocks():
 # Magritte's clouds (pass 5): sculpted, solid-looking cumulus far out over the land, lit by the same raking sun.
 # Magritte's clouds, pass 5b: few and far -- four long banks 3-4 km out, low over the horizon, each built of many
 # overlapping, flattened masses (no single puff reads), so the haze takes them into the sky's own colour.
-CLOUDS = [(-2200, 260, -2800, 1.5), (2800, 230, -1900, 1.3), (2600, 280, 2200, 1.4), (-2600, 250, 1600, 1.2)]
+CLOUDS = [(-3400, 300, -3600, 1.9), (3800, 260, -2600, 1.7)]
 
 
 def clouds():
@@ -643,8 +643,8 @@ STAGES = {
     "Nightmare": stage(pal="nightmare", landPal="nightmare", eyeGaze="stone", moon=1.0, hole=1.0, rock=True, drift=2.0, inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
                        melt=[0.26, 0.18, -0.14], lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8,
                        tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=3.0,
-                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.03, moshBlock=24.0, exposure=-0.7,
-                       gMicro=1.0, gRhythm=1.0, gMosh=0.85, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0, spores=320.0, fracRange=50.0,
+                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.0, moshBlock=24.0, exposure=-0.7,
+                       gMicro=1.0, gRhythm=1.0, gMosh=0.0, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0, spores=320.0, fracRange=50.0,
                        volDen=0.0014),
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
     # geometry...
@@ -760,14 +760,16 @@ def presets():
         for k, vname in enumerate(variant_names(name)):
             vals = dict(base)
             vals["macros/flight"] = [FLIGHT_SPEED[name] / 20.0]
-            vals["macros/circle"] = [1.0 if name == "Corruption" else 0.0]
-            if name == "Corruption":
-                # pass 5b: the Corruption circles the spreading stain, looking at it (LFO routes: seek-exact)
-                h, fov = [(12.0, 44), (21.0, 48), (8.0, 50)][k]
+            vals["macros/circle"] = [{"Corruption": 0.5, "Infection": 1.0}.get(name, 0.0)]
+            if name in ("Corruption", "Infection"):
+                # pass 5b: the Infection circles wide round the stone, the Corruption close round the spreading
+                # stain, both looking at it (LFO routes: seek-exact). Radius = 92 m x macros/circle.
+                h, fov = ([(12.0, 44), (21.0, 48), (8.0, 50)] if name == "Corruption"
+                          else [(16.0, 38), (28.0, 40), (10.0, 36)])[k]
                 vals.update({"camera/mode": [1], "camera/position": [PAN_C[0], land.height(*PAN_C) + h, PAN_C[1]],
                              "camera/target": [TANGUY_AT[0], TANGUY_AT[1] - 1.0, TANGUY_AT[2]], "camera/fov": [fov],
                              "camera/roll": [0.0]})
-            elif name in FLY:
+            elif name in FLY and name not in ("Corruption", "Infection"):
                 f = FLY[name][k]
                 vals.update({"camera/mode": [2], "camera/splineOffset": [0.0, f["lift"], 0.0],
                              "camera/lookAhead": [f["look"]], "camera/fov": [f["fov"]],
@@ -947,7 +949,7 @@ def routes():
                   "component": comp, "depthSource": "macro.energy", "depthMin": 0.5, "depthMax": 1.0})
     # ---- the Corruption's circle round the stain (pass 5b): sine and cosine of time, so a seek lands where play does
     for src, comp in (("circleA", 0), ("circleB", 2)):
-        r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": 46.0,
+        r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": 92.0,
                   "component": comp, "depthSource": "macro.circle", "depthMin": 0.0, "depthMax": 1.0})
     # ---- the held camera floats between its moves: slow incommensurate drifts, deeper as the music grows
     for src, comp, amt in (("driftA", 0, 1.6), ("driftB", 2, 1.6), ("driftC", 1, 0.3)):
