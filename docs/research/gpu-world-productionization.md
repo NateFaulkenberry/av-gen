@@ -6,6 +6,14 @@ engine agent (brief Phases 0-3). Phase 4, the flagship LIVE scene and its art, b
 agent, and the handoff to it is at the end of this file. Machine: Apple M2 Max (38-core GPU, 64 GB),
 macOS 26, Dawn/WebGPU on Metal. Every GPU run goes through `tools/gpu-lock.sh`.
 
+> **Status: PHONOTAXIS (Phase 4, the flagship LIVE scene) was dropped by the owner on 2026-10-05.** The scene
+> (`examples/phonotaxis/`: its build script, projects, performer, replay and recorded performance) and its
+> `examples/index.json` entries were deleted before the merge to main. Every PHONOTAXIS section below is kept as
+> history only; the files it names no longer exist. What the scene produced and stays on main: ADR-1122 (a
+> grid's behaviour is parameters), ADR-1123 (orbit camera pivot), ADR-1124 (scene states read the bus after the
+> sources), `tools/frame_coverage.py` (the dead-space check), and the engine findings recorded below (the
+> compound-field typing defect and the "Found and recorded" list). Phases 0-3 are unaffected.
+
 Read with: `docs/research/gpu-world-architecture-spike.md` (the spike, final decision GREEN, narrowly
 scoped), `docs/development/gpu-sim-seek-investigation.md`, ADR-1114 and ADR-1115.
 
@@ -17,9 +25,136 @@ scoped), `docs/development/gpu-sim-seek-investigation.md`, ADR-1114 and ADR-1115
 | 1. CPU/GPU bridge research | done (primary sources plus measurements on this machine) | §Phase 1 |
 | 2. Architecture decision | done: three additive extensions, no container | §Phase 2 |
 | 3. Production hardening | done: ADR-1116 to ADR-1121, three regression scenes, benchmarks | §Phase 3, §Regression benchmarks |
-| 4. Flagship LIVE scene | handed to the art agent | §Phase 4 handoff |
+| 4. Flagship LIVE scene | **DROPPED by the owner 2026-10-05** (scene deleted; history below). Earlier: **PAUSED by the owner 2026-10-05** ("I'm not sure I want to use that one"). PHONOTAXIS was redesigned as a flight and passes the dead-space check; no final measurements or deliverables for the flight. ADR-1122 to ADR-1124 and the Critic's LIVE mode are done | §PHONOTAXIS: where it stood (below), §Phase 4 |
 
-Resume points, if anything has to be picked up cold:
+### PHONOTAXIS: where it stood (paused, then dropped by the owner on 2026-10-05)
+
+*History: the scene was dropped by the owner on 2026-10-05 and `examples/phonotaxis/` was deleted.*
+
+**How the design got here.** The owner redirected the design three times:
+
+1. No dead space in any frame, and no vortex hero.
+2. No centrepiece at all: "a huge reactive world the camera is flying through".
+3. The track is **Feline Footwear** (`assets/audio/feline-footwear.wav`: gitignored, symlinked, never
+   committed). Trench and All You Got are out of this scene.
+
+The Phase 4 text further down still describes the earlier design, the orbit around the Cochlea tower.
+It is history: where it differs from this section, this section is right.
+
+**The flight design (`examples/phonotaxis/build.py`; never edit the generated JSON).**
+
+- **The camera.** It flies forward continuously, with no orbit and no hero.
+  - Speed comes from the `speed` macro (x 50 m/s), integrated into distance. Every layer that travels
+    with the camera follows it: the floor, the roof, the fields around the traveller, the spores and the
+    lantern.
+  - Two incommensurate LFOs weave the camera sideways. The heading leads the weave, the camera banks
+    with it, and a slow crane LFO moves it up and down.
+  - Each state is a stage of the journey with its own speed, altitude, look target and field of view,
+    so every state change is a climb, a dive or a change of pace.
+  - Three knobs fly it: ALTITUDE (CC 25, +-30 m), SPEED (CC 26) and STRIKE (pad 36, a lunge forward).
+- **The layers.**
+  - **Floor:** the 420k-agent organism's trail on a 2 km plane that follows the camera. It is
+    sampled twice, the second read rotated and scaled, so the wrapping tile never shows.
+  - **Roof:** the same trail again, 85 m up. Looking up is never looking into nothing.
+  - **Fossil roads:** a dim voronoi web in the floor program, so ground the organism has not reached is
+    dark but never a void.
+  - **Reeds:** they grow where the organism walked. Each one hears its own band, at a delay set by its
+    distance from the traveller.
+  - **Sea whips:** tube groves. A corridor field keeps the flight line clear.
+  - **Colossal horns:** 80-230 m tall, with the music climbing them. They have a faint fresnel rim.
+  - **Drifters and spores:** drifters float 20-55 m up; spores rise around the traveller.
+  - **Kick fronts and the strike:** they race outward from the traveller.
+  - **Colour:** colour is frequency everywhere. Ember is the lows, teal the mids, violet the highs.
+    Rebirth uses ember, gold and white.
+- **The states on Feline Footwear.** These come from production's analysis and a `--sonic-trace` of
+  `visual.drive`, with the state machine simulated offline; they are not yet confirmed in a render.
+
+  | Time | State |
+  |---|---|
+  | 0 s | Dormant |
+  | 7 s | Germination |
+  | 32 s | Chorus |
+  | 80 s | Surge |
+  | 159 s | Eruption |
+  | 178 s | Surge |
+  | 193 s | Eruption (climax) |
+  | 203-206 s | a fast fall through Surge and Chorus to Collapse, as the song stops |
+
+  Rebirth is reached only by pad or live input. On Night Shift, at sensitivity 0.8, the sequence is
+  Germination, Chorus, Collapse at 77 s, Rebirth at 84 s and Collapse at 102 s.
+
+**The dead-space check: `tools/frame_coverage.py`.**
+
+- **The method.** It box-blurs the frame and splits it into a 32x18 tile grid. A tile is empty when its
+  p99 luma is under 6/255 and its p99-p1 spread is under 3/255. That separates empty from dark: grain
+  does not count as content. A frame fails above 3% empty, or with an empty region larger than 1.5%.
+  Exit code 1 means a failure.
+- **It catches the failures it should.** It fails the owner's screenshot at 53.6% and every still
+  from the Cochlea era.
+- **Results on the final flight design.**
+
+  | Sample | Frames | Failed | Worst empty |
+  |---|---|---|---|
+  | Whole song on Feline Footwear, every 0.5 s | 422 | 1 (19.4 s) | 1.7%, as one 1.7% region (limit 1.5%) |
+  | Whole song on Night Shift, every 0.5 s | 210 | 0 | 0.9% |
+  | Each of the 7 states held for 40 s, every 1 s | 280 | 7 | see below |
+  | Single stills at t = 40 | 7 | 0 | 0.4% |
+  | Song start (t = 0) | 1 | 0 | 0.9% |
+
+  The 7 state failures are all `frame_000001`, the first frame after the render seeks into the range.
+  All seven are identical (9.4% empty), so they are an artefact of landing after a seek, not a view.
+- **Before the fixes.** Dormant was 24.1% empty, Germination 11.6% and Collapse 19.6%. The end of the
+  song reached 77%.
+- **The fixes:** the roof; the fossil roads; a base appetite, so silence thins the roads but never
+  erases them; a stalk is never a black silhouette; a brighter fog colour; dark floor albedo that the
+  lantern can light.
+- **Not done:** live (editor-path) frames have not been checked. The Critic gained the same rule,
+  `still_dead_space`, on branch `live-critic` (commit `2040e62`).
+
+**Weakest points when paused.**
+
+- The look runs lavender. The fossil web plus the brighter fog lift the mean luma to 0.18-0.27, and
+  Eruption to 0.56. "Darkness is the canvas" has been partly given up to pass the check.
+- The roof and floor make two parallel planes, which risks reading as a tunnel or slit-scan look.
+- The horns read mostly as dark silhouettes.
+- Eruption's temporal echo smears.
+
+**What was not done for the flight design.**
+
+- Flight performance on the live path. The numbers further down are the Cochlea's. The roof doubles
+  the per-fragment trail sampling, and the fossil voronoi adds more.
+- A live capture, a new performance or replay, and a Critic LIVE run.
+- The review deliverables in `~/Desktop/av-gen-review/36-flagship-live/`, which are still the
+  Cochlea's.
+- The final suites.
+- The stale `phonotaxis-replay*.json` files (the Cochlea design on All You Got) were deleted.
+  `performance-2026-10-05.csv` is kept as a record of the Cochlea-era performance.
+
+**An engine defect worked around, not fixed: a compound field is always typed scalar on the GPU.**
+
+- **Where it lives:**
+  - `spatial::packField` in `src/spatial/field.cpp` sets `g.type` from `fieldTypeOf(kind)`, which
+    returns Scalar for `compound`. Only grid fields override the type, from their bound grid.
+  - `materialFieldValue` in `shaders/material.wgsl` dispatches on that type.
+- **What goes wrong:** a material program's `field` op on a compound of vector children (for example
+  two agents-grid reads combined with `max`) receives `vec4(length)` instead of the vector. On the CPU,
+  `effector.cpp` uses the spec's `type()` in the same way, so an effector on a compound is scalar too.
+- **The effect:** PHONOTAXIS's floor rendered grey, because the species, and so the colour, were lost.
+- **Who else is exposed:** any scene that reads a compound of vector, agents-grid or colour children
+  through a material program. Compounds of scalar fields are unaffected.
+- **The workaround here:** two `field` ops added together in the program.
+- **The proper fix:** type a compound from its children, for example Vector if any child is a vector
+  and Color if all are colour, on both the CPU and the GPU. It needs an ADR, because existing programs
+  that read such compounds would change.
+
+Resume points, if anything has to be picked up cold (the PHONOTAXIS points are history: the scene was dropped
+by the owner on 2026-10-05 and its files deleted):
+
+- PHONOTAXIS is generated: edit `examples/phonotaxis/build.py`, then run `python3 examples/phonotaxis/build.py`.
+  Never edit the JSON it writes. `perform.py` is the scripted performer (audio into BlackHole, MIDI from a
+  virtual source). `replay.py` turns a recorded performance into an offline project. The review stills
+  and the clips are in `~/Desktop/av-gen-review/36-flagship-live/`.
+- The Critic's LIVE mode is on branch `live-critic` of `~/Documents/GitHub/creative-critic` (not pushed).
 
 - Every GPU run goes through `tools/gpu-lock.sh`.
 - Tests: `avgen_tests "[audio-fields],[generator]"`; `avgen_render_tests "[audio-fields],[generator],[effectors],[simulation],[gpu-regression]"`.
@@ -688,7 +823,8 @@ These parameter paths are confirmed by `[.list-params]` on the regression scenes
   uniform writes, no rebuild. `cellSize` and `viewDistance` are registered too, but they **reallocate
   the record buffer** (once, grow-only). Do not put them on a fast MIDI knob.
 - `procedural/<name>/effector/<n>/strength`: how hard a field acts.
-- Grid settings are scene-file only (no parameters). Drive a grid through its fields instead: its
+- (Superseded by ADR-1122: a grid's behaviour is now `grid/<name>/<leaf>` parameters, and only its layout
+  re-seeds it.) Grid settings are scene-file only (no parameters). Drive a grid through its fields instead: its
   deposit field's strength, its velocity field's strength or speed.
 
 A MIDI CC to a parameter, in the project:
@@ -806,3 +942,209 @@ with each binary's exit code captured in the same shell:
 - `avgen_render_tests`: **exit 0**. 601 cases: 600 passed, 1 skipped. 633,786 assertions.
 
 Not merged, not pushed.
+
+---
+
+## Phase 4: PHONOTAXIS (the flagship LIVE scene) -- dropped by the owner on 2026-10-05
+
+*History only: the scene was dropped by the owner on 2026-10-05 and `examples/phonotaxis/` was deleted. ADR-1122,
+ADR-1123, ADR-1124 and `tools/frame_coverage.py` stay.*
+
+The art agent's run, 2026-10-05: brief Phase 4, from the handoff above.
+
+- **Scene:** `examples/phonotaxis/` (generated by `build.py`).
+- **Engine work it needed:** ADR-1122, ADR-1123 and ADR-1124.
+- **Critic:** the new LIVE mode, branch `live-critic` of the Creative Critic.
+- **Review material:** `~/Desktop/av-gen-review/36-flagship-live/`.
+
+### Art research
+
+- **What I studied:**
+  - the spike's own Phase 3 stills and clips. These are the strongest evidence, because they were made
+    in this engine's data model;
+  - Notch concert practice, TouchDesigner GPU and feedback practice, and Unreal Niagara simulation
+    stages;
+  - Ryoji Ikeda and Robert Henke (restraint; darkness as material);
+  - Max Cooper (systems that grow; slow structural reveals);
+  - Tarik Barri's Versum (sounds as places; moving the camera is part of performing);
+  - Robert Hodgin's Magnetosphere (each particle listens to its own frequency);
+  - Sage Jenson's physarum work, through Bleuje's write-up (density-dependent behaviour; contrast curves
+    on density);
+  - the NIME/ICMC mapping literature (avoid one-to-one mappings);
+  - Ableton's "A/V Interchange" interviews (Rick Feds: "play much less", or the picture turns to chaos).
+- **The rules I took from it and kept throughout:**
+  1. **Darkness is the canvas.** One region per frame is bright. The climax is earned by the dark
+     before it.
+  2. **Three scales, always.** A hero structure (tens of metres), the organism's roads (metres), and the
+     forest and spores (decimetres). Never three things competing at one scale.
+  3. **Memory beats amplitude.** The primary audio relationships are remembered ones (a band at a delay
+     that grows with distance, onset fronts, trails), not the current RMS.
+  4. **Sound is a place.** Frequency has a location and a colour, everywhere the same.
+  5. **Few mappings, used compositionally.** One meaning per band, each with its own envelope; most
+     parameters are never modulated.
+  6. **A state change is a system growing or dying,** not a crossfade between two pictures.
+  7. **The camera is a performer.** Its vantage belongs to the musical state.
+  8. **No visualizer tells:** no bars, tunnels, rainbow cycling, constant pulsing or white flash on
+     every kick.
+
+### The concept
+
+**PHONOTAXIS** is the movement of an organism toward sound. The scene is a night basin. A physarum-like
+organism of 380,000 agents in three species crawls over it, and each species feeds on one band: lows,
+mids or highs. It draws veins of light that spiral inward, by an inflow field, toward the **Cochlea**.
+
+The Cochlea is a funnel 36 m tall made of threads of light. Each band is two counter-wound threads, so
+the tower is a woven lattice. Every point on a thread hears its band at a delay set by its height
+(3.2 m/s), so the last eleven seconds of the music climb the tower. A loud moment is a bright ring that
+rises through the weave and fades.
+
+A generated forest of 80 m radius grows only where the organism has walked. Each reed hears its own band
+at its own distance-delay (5.5 m/s outward), and takes that band's colour. Kick fronts race out from the
+Cochlea's foot across the veins and the forest, and on to a generated horizon of dark spires, which flare
+in sequence. Warm spores rise from the veins and are drawn up the throat.
+
+One colour rule holds everywhere: **colour is frequency**. Ember is the lows, teal the mids, violet the
+highs; the reborn world transposes this into ember, gold and white. The image this aims at is a living
+instrument: the floor writes the music down, the tower remembers it, and the forest repeats it.
+
+### What the GPU systems do in it
+
+| GPU system (ADR) | In PHONOTAXIS | Scale |
+|---|---|---|
+| Agents grid (1120), checkpointed (1119) | the organism: three species, each depositing by its own band, swirled by curl noise plus an inflow spiral; its trail colours the floor, sizes the forest and emits the spores | 380k agents at 30 Hz on 1024² over 180 m; 73 MB of state |
+| Generator distribution (1117) | the forest (80 m disc, 0.52 m cells, a camera window of 62 m) and the horizon (unbounded, 9 m cells, a 420 m window) | 23k-62k generated cells per frame, no records stored |
+| Spectrum field, element and range bands, delay by distance (1116) | the forest's echo (each reed its own band, delayed by its distance); the tower's three strands (each its band, delayed by height); the organism's diet (each species its band) | a 64-bin ring, 0.4 MB |
+| Onset field (1116) | kick fronts across the floor, forest, horizon and tower, and into the organism's deposits | the last 8 kicks |
+| Fields everywhere (025) | material programs read the trail grid per fragment (floor colour by species, white-hot cores); effectors read the trail to grow the forest; the spores are emitted where the trail is | 16 GPU fields, the engine's limit |
+| Grid behaviour as parameters (1122, new) | MIDI knobs and routes change how the organism behaves (gaze, turn, hunger, fade) without replacing it; the scene states set its character | 6 behaviour leaves live |
+
+None of these is a "faster particle". Four things are new compared with the regression scenes:
+
+- the organism's trail is the map the forest grows on;
+- the forest and the tower hear the music's past, not its present;
+- a performer changes the organism's behaviour while it runs;
+- every layer answers one shared colour rule.
+
+### The performance vocabulary
+
+**Audio (automatic, on any input):**
+
+| Signal | Role | Shaping |
+|---|---|---|
+| LOW: the kick onsets (`onset` field, `low` source) | mass and fronts. Rings race outward over the floor (up to 5.5x lift), forest (they heave 0.6 m), horizon and tower, and into the organism's deposit; a heavy kick nudges the camera only when the energy is high | front width 6.5 m, decay 0.8 s, 22 m/s; shake by peakhold, depth = energy |
+| MID: `audio.mid` | movement. The organism grows restless (turn angle +0.22) and wanders | attack 0.6-0.8 s, decay 2.5-3 s |
+| HIGH: `audio.treble`, `audio.onsetHigh` | emission. Spores rise; the forest's tips glint | attack 80 ms, decay 0.7 s; peakhold glints |
+| Per band, through fields | each species eats its band; each reed and each tower strand shows its band at its moment | the spectrum ring's own per-bin stretch |
+| ENERGY: an interpreter of `audio.rms`, `spectralFlux` and `treble`, slow-followed into the `energy` macro | the arc. It moves the seven states and lifts the tower, forest, spores and bloom a little within a state | attack 2.5 s, decay 4 s; depth = SENSITIVITY |
+
+**States (scene states, ADR-031).** Each is a preset of the world's configuration and its camera vantage:
+
+| State | What it is | Vantage |
+|---|---|---|
+| Dormant | the tower a dark silhouette with embers; faint veins | low and close, looking up |
+| Germination | the organism feeds; the first reeds | 42 m, off-tower pivot |
+| Chorus | the full world | 64 m, a wide hero shot circling an off-tower pivot |
+| Surge | bolder veins; the horizon flares on kicks | high and wide (98 m, 48 m up) |
+| Eruption | spores stream up the throat; trails; the tower and forest at full | inside the forest, under the crown |
+| Collapse | the organism starves and fades; the tower dims | near top-down: the eye |
+| Rebirth | a new organism (long gaze, straight highways), the gilded palette | a long lens, grazing |
+
+The music moves the states through energy thresholds with hysteresis (entering a state needs more than
+leaving it). A performer moves them with pads. Transitions are preset morphs of 1.5-10 s, and since the
+vantage is in the preset, every transition is also a camera move.
+
+**MIDI (`phonotaxis-live.json`).** Every knob is neutral at its default, so an unplugged controller
+changes nothing.
+
+| Control | Name | Moves |
+|---|---|---|
+| CC 1 | ENERGY | pushes the arc (the `energy` macro's base) |
+| CC 21 | HUNGER | the organism's deposit (more or fewer roads) |
+| CC 22 | RESTLESS | its turn and gaze angles (calm lanes to frantic mesh) |
+| CC 23 | CURRENT | the inflow (drained into the throat, or wandering) |
+| CC 24 | MEMORY | temporal echo strength and decay (afterimages) |
+| CC 25 | REACH | camera distance and height |
+| CC 26 | ORBIT | camera orbit speed and direction |
+| CC 27 | GLOW | bloom and halation |
+| CC 28 | SENSITIVITY | how hard the music pushes the energy (depth 0-4; 0.25 = 1) |
+| note 36 | STRIKE | one shock front (30 m/s, 9 m wide) across floor, forest and horizon, a burst of spores, a camera jolt |
+| note 37 | SCATTER | a burst of spores |
+| notes 40, 41, 43, 45, 47, 48, 50 | states | Dormant, Germination, Chorus, Surge, Eruption, Collapse, Rebirth |
+
+**Camera.** The camera is an integrated orbit around a pivot (ADR-1123), and it moves in four ways:
+
+- each state owns a distance, height, field of view and pivot;
+- two slow, incommensurate LFO drifts dolly and crane it;
+- the energy lifts it;
+- a heavy kick at high energy nudges it, and the performer's REACH and ORBIT knobs move it too.
+
+**Post.**
+
+- Exposure, bloom and the temporal echo strength are per state.
+- Bloom 0.4-0.7, halation 0.18, chroma retention 0.65, vignette 0.45, grain 0.015.
+- A thin noise-free medium (density 0.008) scatters the heart's ember light only near the tower.
+- The strategy is `effects_first`, so the thin threads keep their resolution when LIVE AUTO trims.
+
+### Engine work the scene needed (the CRITICAL DEVELOPMENT RULE)
+
+Three reusable changes. Each has an ADR and tests, and each is reachable from scene JSON, project
+parameters, routes, MIDI, OSC and the editor. Everything specific to the scene stays in
+`examples/phonotaxis/`.
+
+- **ADR-1122: a grid's behaviour is parameters, and only its layout re-seeds it.**
+  - The problem: any change to an agents grid's settings changed the one hash the simulation compares,
+    so it replaced a running organism with noise; and the settings had no parameters at all.
+  - The fix: `GridField::layoutHash()` now decides a re-seed, and behaviour registers as
+    `grid/<name>/<leaf>`.
+  - Tests: unit and GPU. A behaviour change mid-play moves no agent more than two steps allow
+    (0 of 20,000), and 10,278 turn differently; a seed change re-seeds the grid.
+- **ADR-1123: an orbit camera circles its pivot.**
+  - The problem: the orbit always looked at the scene's bounds centre, so a state could not aim the live
+    camera.
+  - The fix: `camera/orbitPivot` and `camera/orbitPivotWeight`. Weight 0 is the old orbit, byte for
+    byte, and saves stay unchanged.
+- **ADR-1124: scene states read the bus after the sources.**
+  - The problem: found on the live path, a MIDI pad bound as `noteEvent` could never change a state,
+    although the docs said it could. The state machine ran before the sources published the pulse, and
+    the bus cleared it at the end of the frame. Eleven pad hits reached the engine and moved nothing.
+  - The test fails on the old order and passes on the new one.
+
+Also built in the scene's own folder:
+
+- `perform.py`: a scripted performer (audio into BlackHole, MIDI from a CoreMIDI virtual source, events
+  logged on the host clock).
+- `replay.py`: turns a recorded performance into a deterministic offline project (pads become timeline
+  events, knobs become tracks).
+
+### Found and recorded (not fixed here)
+
+- **A bar- or beat-quantized state transition never fires on live input.** No reliable bar clock is
+  running, and while the transition is pending every other trigger, pads included, is refused. The
+  scene does not quantize. The Critic now flags it (`quantized_transition_live`).
+- **A node name shared by a field node and a procedural node silently drops the procedural's
+  parameters.** The tower was named like its fields, so the Rebirth palette never reached it. There
+  is no warning.
+- **A preset applied as the initial state lands before material-program parameters exist.** A pinned
+  "Rebirth" opened with the night palette. Transitions are fine.
+- **The live capture (`--live-capture`) re-renders the editor's viewpoint,** which is the film only when
+  an output is open or the preview shows the output frame. Captures must pass
+  `--preview-mode outputFrame`.
+- **A vectorised grid gather was measured slower.** Reading three channels per corner and skipping the
+  y lerp for a plane was 1.5 ms slower in three interleaved pairs (it is bit-identical), so it was
+  reverted.
+- **The effector warning "no field of that name reached the GPU field table"** fires once at start for
+  a triggered field that has not fired yet. It is harmless noise.
+
+### Art passes
+
+| Pass | What changed | Weakest remaining after it |
+|---|---|---|
+| First build | organism, Cochlea, forest, horizon, the colour rule | the hero read as a Christmas tree, then a neon spring; marbled-oil floor |
+| 1 | the tower became a woven lattice of threads lit only above each band's loud threshold; veins with white-hot cores; air that glows only near the heart; a vantage per state through ADR-1123 | live cost (Emergency); the floor dominated |
+| 1b (budget) | one object per band (points), a 30 Hz organism, band-coloured reeds, effects first | LIVE AUTO at Low |
+| 2 (from the first LIVE Critic report) | kicks you can see (the onset response had been 0.76% of luma); a 90 m basin whose edge recedes; Collapse keeps embers; the Rebirth palette fixed | the strike was invisible; spores read as snow |
+| 3 | the strike is the biggest front; spores are warm sparks drawn up the throat; no state flapping after a pad | blocky thread ends up close; the camera inside the tower |
+| 4 | round threads; Eruption's vantage outside the tower; the performance replay | one framing held for 112 s of Chorus |
+| 5 | an arc for the whole song (Surge comes and goes; Collapse at the breakdowns), off-tower Chorus, slow camera drift; Night Shift trimmed and finding its own arc | see the weaknesses below |
+
+<!-- PHONOTAXIS-RESULTS -->

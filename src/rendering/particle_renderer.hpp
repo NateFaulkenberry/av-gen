@@ -8,8 +8,10 @@
 
 #include "core/error.hpp"
 #include "core/time.hpp"
+#include "scene/reflection_bands.hpp"
 #include "scene/scatter_anchors.hpp"
 #include "scene/scene.hpp"
+#include "spatial/sdf.hpp"
 
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
@@ -17,6 +19,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace avgen::gpu {
@@ -97,9 +100,29 @@ struct ParticleUniforms {
     // ADR-717: x = fogPooling (0 without a terrain), yzw = 0 -- the lane `FrameUniforms::fogPool`
     // carries, so this estimate pools where the march and the surface fog pool. Appended last.
     glm::vec4 fogPool;
+    // ADR-1140: the latent SDF force, read only by cs_latent (which is not dispatched without one).
+    glm::mat4 latentModel{0.0f};   // the SDF object's local -> world
+    glm::mat4 latentInverse{0.0f}; // world -> local
+    glm::mat4 latentNormal{0.0f};  // transpose(inverse(model))
+    glm::vec4 latent0{0.0f};       // coherence, previous frame's coherence, width, strength
+    glm::vec4 latent1{0.0f};       // flow, release, gradient epsilon (local units), 0
+    glm::uvec4 latentInfo{0u};     // x = packed node count, y = 1 when cs_latent stores the latent normal (ADR-1153)
+    // ADR-1153: glint flakes, read only by vs_flake (a flake system draws with its own pipelines).
+    glm::vec4 flake0{0.0f};        // metal f0 rgb, 1 = a flake system
+    glm::vec4 flake1{0.0f};        // temper (nm), film ior, glint alpha, tumble (rad/s)
+    glm::vec4 flake2{0.0f};        // free brightness, bound brightness, latent-normal share, sparkle fraction
+    glm::vec4 flake3{0.0f};        // sparkle radiance, fuse, 0, 0
+    // ADR-1151: the scene's reflection-only bands, copied in as the wind is (the particle pipelines
+    // bind no frame block): scene::ReflectionBandLanes.
+    glm::vec4 bandsInfo{0.0f};
+    glm::vec4 bandsSoft{0.0f};
+    glm::vec4 bandsSoft2{0.0f};
+    glm::vec4 bandsRate{0.0f};
+    glm::vec4 bands[8]{};
 };
 static_assert(sizeof(ParticleUniforms) == 128 + 16 * 41 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
-                                              16 * scene::kMaxScatterAnchors + 16);
+                                              16 * scene::kMaxScatterAnchors + 16 + 3 * 64 + 3 * 16 +
+                                              4 * 16 + 12 * 16); // ADR-1153 flakes, ADR-1151 bands
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -152,6 +175,8 @@ struct ParticleFrameContext {
     // scatter along, and inventing one would make dust that blazes at a light that is not there.
     glm::vec3 sunDirection{0.0f};
     glm::vec3 sunColor{0.0f}; // already multiplied by intensity
+    // ADR-1151: the scene's reflection-only bands, which flake systems (ADR-1153) reflect.
+    scene::ReflectionBandLanes bands{};
 };
 
 struct ParticleStats {
@@ -166,6 +191,35 @@ struct ParticleStats {
     std::uint32_t simulationSteps = 0;  // ADR-1091: simulation steps run this frame, over every system
     std::uint32_t culledByDistance = 0; // ADR-1098: systems beyond QualitySettings::particleCullDistance
     double simulateMs = -1.0;           // GPU time of the compute passes (emit..compaction) of the last measured frame; -1 = none / unavailable
+    std::uint32_t latentSystems = 0;    // ADR-1140: systems whose latent SDF force ran this frame
+    std::uint32_t densityVolumes = 0;   // ADR-1141: density volumes resolved this frame
+    std::uint64_t densityBytes = 0;     // ADR-1141: GPU memory the allocated density volumes hold
+    double densityMs = -1.0;            // ADR-1141: GPU time of the density passes (splat + resolve); -1 = none
+};
+
+// ADR-1141: a particle system's density volume, as another renderer binds it. `view` is a 3-D
+// rgba16float texture (r = density) covering [boundsMin, boundsMax] in world space; `valid` false
+// means the system has none (or the renderer has not resolved it yet) and `view` is then the
+// 1x1x1 zero placeholder, which reads as "no matter anywhere".
+struct ParticleDensityVolume {
+    wgpu::TextureView view;
+    // ADR-1150: the coarse max-occupancy grid, one texel per 8^3 block (r = the largest density a linear
+    // lookup inside the block can return); the placeholder (a zero texel) when `valid` is false.
+    wgpu::TextureView coarseView;
+    glm::vec3 boundsMin{0.0f};
+    glm::vec3 boundsMax{1.0f};
+    int resolution = 1;
+    bool valid = false;
+};
+
+// One live record of a pool, as `readParticles` returns it (tests and tools only).
+struct ParticleSnapshot {
+    glm::vec3 position{0.0f};
+    float age = 0.0f;
+    glm::vec3 velocity{0.0f};
+    float life = 0.0f; // 0 = a dead slot
+    float seed = 0.0f;
+    glm::vec4 home{0.0f}; // the record's last lane: an anchored system's crown, or a flake's latent normal (ADR-1153)
 };
 
 // GPU-side pool occupancy after the last update(); alive + dead == capacity.
@@ -234,6 +288,19 @@ public:
     // The emissive aggregates the volume march reads: per system slot, (centre.xyz, radius) then
     // (colour.rgb, power) (tests and tools only).
     [[nodiscard]] Result<std::vector<float>> readGlow();
+    // Every slot of a pool, alive or dead, in slot order (tests and tools only; waits for the GPU).
+    [[nodiscard]] Result<std::vector<ParticleSnapshot>> readParticles(std::size_t systemIndex);
+
+    // ADR-1141: the density volume of system `systemIndex` of the last update(), or of the system
+    // named `name` in `scene` (the name `scene.particles` carries, i.e. after nesting prefixes).
+    // Render-transient: rebuilt from the live particles every frame, owned by this renderer, and
+    // dropped when the pool is (a capacity change, a scene switch re-creates it on the next frame).
+    [[nodiscard]] ParticleDensityVolume densityVolume(std::size_t systemIndex) const;
+    [[nodiscard]] ParticleDensityVolume densityVolume(const scene::Scene& scene, const std::string& name) const;
+    // The r channel of a system's density texture, x fastest (tests and tools only; waits for the GPU).
+    [[nodiscard]] Result<std::vector<float>> readDensity(std::size_t systemIndex);
+    // ADR-1150: the r channel of the system's coarse occupancy grid, x fastest (tests and tools only).
+    [[nodiscard]] Result<std::vector<float>> readDensityCoarse(std::size_t systemIndex);
 
 private:
     struct Pool {
@@ -265,6 +332,29 @@ private:
         std::vector<scene::ScatterAnchorPoint> anchorPoints;
         std::uint64_t anchorVersion = 0;
         bool anchorBuilt = false;
+        // ADR-1140: the latent SDF's packed program (a one-record stub when the system has none, so
+        // the compute group always has binding 10), and the coherence the last step used, for the
+        // release impulse. `latentPrevValid` false (a reset) makes the first step release nothing.
+        wgpu::Buffer latentNodes;
+        std::uint64_t latentBytes = 0;
+        float latentPrevCoherence = 0.0f;
+        bool latentPrevValid = false;
+        bool latentWarned = false;
+        // ADR-1141: the render-transient density volume (empty unless the system has a density block).
+        struct Density {
+            int resolution = 0;
+            wgpu::Buffer params;
+            wgpu::Buffer grid;
+            wgpu::Texture texture;
+            wgpu::TextureView view;
+            wgpu::BindGroup group;
+            wgpu::Texture coarse;          // ADR-1150: ceil(res / 8)^3, the block maxima
+            wgpu::TextureView coarseView;
+            wgpu::BindGroup coarseGroup;
+            glm::vec3 boundsMin{0.0f};
+            glm::vec3 boundsMax{1.0f};
+            bool resolved = false; // a resolve has run since the texture was created
+        } density;
     };
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);
@@ -278,6 +368,13 @@ private:
     void ensurePool(std::size_t index, std::uint32_t capacity, std::uint32_t historyPoints);
     void ensureRenderGroup(Pool& pool);
     void resetPool(Pool& pool);
+    void buildComputeGroup(Pool& pool);
+    void ensureLatentBuffer(Pool& pool, std::uint64_t bytes);
+    void ensureDensity(Pool& pool, const scene::ParticleDensity& density);
+    Result<std::vector<float>> readVolumeR(const wgpu::Texture& texture, std::uint32_t res); // rgba16float r, x fastest
+    // ADR-1141: clears the grid, splats the live particles (unless `splat` is false: a disabled
+    // system's volume is resolved empty) and resolves the texture.
+    void encodeDensity(wgpu::CommandEncoder& encoder, Pool& pool, const scene::ParticleDensity& density, bool splat);
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
@@ -305,10 +402,26 @@ private:
     wgpu::ComputePipeline scanScatterPipeline_;
     wgpu::ComputePipeline glowReducePipeline_;
     wgpu::ComputePipeline glowTopPipeline_;
+    wgpu::ComputePipeline latentPipeline_; // ADR-1140
+    // ADR-1141: the density passes have their own layout (particle_density.wgsl).
+    wgpu::BindGroupLayout densityLayout_;
+    wgpu::PipelineLayout densityPipelineLayout_;
+    wgpu::ComputePipeline densitySplatPipeline_;
+    wgpu::ComputePipeline densityResolvePipeline_;
+    wgpu::BindGroupLayout densityCoarseLayout_;           // ADR-1150: 0 params, 4 the volume, 5 the coarse grid
+    wgpu::PipelineLayout densityCoarsePipelineLayout_;
+    wgpu::ComputePipeline densityCoarsePipeline_;
+    wgpu::Texture densityPlaceholder_;
+    wgpu::TextureView densityPlaceholderView_;
+    double lastDensityMs_ = -1.0;
+    bool densityThisFrame_ = false;
+    std::vector<spatial::SdfNodeGpu> latentScratch_;
     wgpu::RenderPipeline additivePipeline_;
     wgpu::RenderPipeline alphaPipeline_;
     wgpu::RenderPipeline ribbonAdditivePipeline_;
     wgpu::RenderPipeline ribbonAlphaPipeline_;
+    wgpu::RenderPipeline flakeAdditivePipeline_; // ADR-1153: vs_flake
+    wgpu::RenderPipeline flakeAlphaPipeline_;
     std::vector<Pool> pools_;
     const scene::Scene* scene_ = nullptr;
     ParticleStats stats_;

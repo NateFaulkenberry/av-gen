@@ -108,6 +108,52 @@ std::uint64_t trailMemoryBytes(const ParticleSystem& s) {
     return static_cast<std::uint64_t>(s.capacity) * trailHistoryPoints(s) * kTrailBytesPerPoint;
 }
 
+std::uint64_t densityMemoryBytes(int resolution) {
+    const auto r = static_cast<std::uint64_t>(std::max(resolution, 0));
+    const auto c = static_cast<std::uint64_t>(densityCoarseResolution(resolution));
+    return r * r * r * (4 + 8) + c * c * c * 8; // u32 splat cell + rgba16float texel; ADR-1150's coarse grid
+}
+
+Result<void> validateLatentAndDensity(const ParticleSystem& s) {
+    const ParticleLatent& l = s.latent;
+    if (l.active()) {
+        const auto finite = [](float v) { return std::isfinite(v); };
+        if (!finite(l.coherence) || l.coherence < 0.0f || l.coherence > 1.0f) {
+            return fail("particle system '{}': latent.coherence must be in 0..1, got {}", s.name, l.coherence);
+        }
+        if (!finite(l.width) || l.width < 0.005f || l.width > 0.5f) {
+            return fail("particle system '{}': latent.width must be in 0.005..0.5, got {}", s.name, l.width);
+        }
+        if (!finite(l.strength) || l.strength < 0.0f || l.strength > 100.0f) {
+            return fail("particle system '{}': latent.strength must be in 0..100, got {}", s.name, l.strength);
+        }
+        if (!finite(l.flow) || l.flow < 0.0f || l.flow > 100.0f) {
+            return fail("particle system '{}': latent.flow must be in 0..100, got {}", s.name, l.flow);
+        }
+        if (!finite(l.release) || l.release < 0.0f || l.release > 1000.0f) {
+            return fail("particle system '{}': latent.release must be in 0..1000, got {}", s.name, l.release);
+        }
+    }
+    const ParticleDensity& d = s.density;
+    if (d.enabled) {
+        if (d.resolution < kMinDensityResolution || d.resolution > kMaxDensityResolution) {
+            return fail("particle system '{}': density.resolution must be in {}..{} (a {}^3 volume costs {} MiB; got {})",
+                        s.name, kMinDensityResolution, kMaxDensityResolution, kMaxDensityResolution,
+                        densityMemoryBytes(kMaxDensityResolution) >> 20, d.resolution);
+        }
+        for (int a = 0; a < 3; ++a) {
+            if (!std::isfinite(d.boundsMin[a]) || !std::isfinite(d.boundsMax[a]) || !(d.boundsMax[a] > d.boundsMin[a])) {
+                return fail("particle system '{}': density bounds must be finite with boundsMax > boundsMin on every axis",
+                            s.name);
+            }
+        }
+        if (!std::isfinite(d.weight) || d.weight < 0.0f || d.weight > 1.0e4f) {
+            return fail("particle system '{}': density.weight must be in 0..10000, got {}", s.name, d.weight);
+        }
+    }
+    return Result<void>{};
+}
+
 Result<void> validateParticleSystem(const ParticleSystem& s) {
     auto checkCurve = [&](const char* what, std::size_t count, auto at) -> Result<void> {
         if (count > static_cast<std::size_t>(kMaxCurveKeys)) {
@@ -301,6 +347,25 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.pauseFraction = &params.add(f(base, "pauseFraction", s.pauseFraction, 0.0f, 1.0f, 0.0f, 1.0f));
     p.scatterStrength = &params.add(f(base, "scatterStrength", s.scatterStrength, 0.0f, 20.0f, 0.0f, 6.0f));
     p.scatterAnisotropy = &params.add(f(base, "scatterAnisotropy", s.scatterAnisotropy, -0.95f, 0.95f, -0.9f, 0.9f));
+    if (s.latent.active()) { // ADR-1140: a performance control (the "summon" fader), so it is reachable
+        p.latentCoherence = &params.add(f(base, "latent/coherence", s.latent.coherence, 0.0f, 1.0f, 0.0f, 1.0f));
+        p.latentStrength = &params.add(f(base, "latent/strength", s.latent.strength, 0.0f, 100.0f, 0.0f, 4.0f));
+        p.latentFlow = &params.add(f(base, "latent/flow", s.latent.flow, 0.0f, 100.0f, 0.0f, 4.0f));
+        p.latentRelease = &params.add(f(base, "latent/release", s.latent.release, 0.0f, 1000.0f, 0.0f, 40.0f));
+        p.latentWidth = &params.add(f(base, "latent/width", s.latent.width, 0.005f, 0.5f, 0.01f, 0.3f));
+    }
+    if (s.density.enabled) { // ADR-1141
+        p.densityWeight = &params.add(f(base, "density/weight", s.density.weight, 0.0f, 1.0e4f, 0.0f, 8.0f));
+    }
+    if (s.shape2d == ParticleShape::Flake) { // ADR-1153
+        p.flakeTemper = &params.add(f(base, "flake/temper", s.flake.temper, 0.0f, 2000.0f, 0.0f, 120.0f));
+        p.flakeGlint = &params.add(f(base, "flake/glint", s.flake.glint, 0.001f, 1.0f, 0.002f, 0.1f));
+        p.flakeTumble = &params.add(f(base, "flake/tumble", s.flake.tumble, 0.0f, 100.0f, 0.0f, 8.0f));
+        p.flakeFree = &params.add(f(base, "flake/free", s.flake.free, 0.0f, 100.0f, 0.0f, 2.0f));
+        p.flakeBound = &params.add(f(base, "flake/bound", s.flake.bound, 0.0f, 100.0f, 0.0f, 2.0f));
+        p.flakeSparkle = &params.add(f(base, "flake/sparkle", s.flake.sparkle, 0.0f, 1.0f, 0.0f, 0.05f));
+        p.flakeFuse = &params.add(f(base, "flake/fuse", s.flake.fuse, 0.0f, 1.0f, 0.0f, 1.0f));
+    }
     {
         params::ParamDesc<bool> d;
         d.path = base + "enabled";
@@ -369,6 +434,23 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     if (p.pauseFraction != nullptr) { s.pauseFraction = p.pauseFraction->value(); }
     if (p.scatterStrength != nullptr) { s.scatterStrength = p.scatterStrength->value(); }
     if (p.scatterAnisotropy != nullptr) { s.scatterAnisotropy = p.scatterAnisotropy->value(); }
+    // ADR-1140 / ADR-1141: the block itself is structural (from rest); only its levels are live.
+    s.latent = rest.latent;
+    s.density = rest.density;
+    if (p.latentCoherence != nullptr) { s.latent.coherence = p.latentCoherence->value(); }
+    if (p.latentStrength != nullptr) { s.latent.strength = p.latentStrength->value(); }
+    if (p.latentFlow != nullptr) { s.latent.flow = p.latentFlow->value(); }
+    if (p.latentRelease != nullptr) { s.latent.release = p.latentRelease->value(); }
+    if (p.latentWidth != nullptr) { s.latent.width = p.latentWidth->value(); }
+    if (p.densityWeight != nullptr) { s.density.weight = p.densityWeight->value(); }
+    s.flake = rest.flake; // ADR-1153
+    if (p.flakeTemper != nullptr) { s.flake.temper = p.flakeTemper->value(); }
+    if (p.flakeGlint != nullptr) { s.flake.glint = p.flakeGlint->value(); }
+    if (p.flakeTumble != nullptr) { s.flake.tumble = p.flakeTumble->value(); }
+    if (p.flakeFree != nullptr) { s.flake.free = p.flakeFree->value(); }
+    if (p.flakeBound != nullptr) { s.flake.bound = p.flakeBound->value(); }
+    if (p.flakeSparkle != nullptr) { s.flake.sparkle = p.flakeSparkle->value(); }
+    if (p.flakeFuse != nullptr) { s.flake.fuse = p.flakeFuse->value(); }
     s.enabled = p.enabled->value();
 }
 

@@ -2,6 +2,7 @@
 
 - Status: Accepted (gpu/productionization, the flagship LIVE scene)
 - Amends ADR-031 (scene states). Found by: PHONOTAXIS, whose MIDI pads move between scene states.
+- PHONOTAXIS was dropped by the owner on 2026-10-05 and its scene deleted; this capability stays.
 
 ## Problem
 

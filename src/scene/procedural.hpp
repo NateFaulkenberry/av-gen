@@ -23,6 +23,7 @@
 #include "core/wind.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/material_optics.hpp"
 #include "scene/toon_shading.hpp"
 #include "scene/wire_lines.hpp"
 #include "spatial/effector.hpp"
@@ -712,6 +713,7 @@ struct ProceduralParameters {
     std::vector<params::IParameter*> all; // everything registered (for unregister)
     ToonParameters toon;                  // ADR-1071: toon/* (the material's cel lighting)
     WireParameters wire;                  // ADR-1073: wire/* (the surface's edges as lines)
+    MaterialOpticsParameters optics;      // ADR-1143: material/thinFilm/*, material/anisotropy/*
     // ADR-331: every authored value this table's ranges overruled, in registration order.
     // `registerProceduralParameters` fills it and warns once per entry.
     //

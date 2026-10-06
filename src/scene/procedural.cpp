@@ -2994,6 +2994,7 @@ json ProceduralGeometry::toJson() const {
         if (!wireLinesIsDefault(material.wire)) {
             s["wire"] = wireLinesToJson(material.wire); // ADR-1073
         }
+        writeMaterialOptics(material, s); // ADR-1143: thinFilm, anisotropy (only when authored)
         if (!material.program.empty()) {
             s["program"] = material.program; // ADR-030 material program name
         }
@@ -3375,6 +3376,12 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             if (auto wire = readWireLines(j.at("wire"), m.wire); !wire) {
                 return fail("material: {}", wire.error().message);
             }
+        }
+        if (auto optics = readMaterialOptics(j, m); !optics) { // ADR-1143
+            return fail("material: {}", optics.error().message);
+        }
+        if (j.contains("engraving")) { // ADR-1152: only the SDF raymarch cuts an engraving
+            return fail("material: 'engraving' is drawn on SDF objects only (ADR-1152); a procedural node cannot carry it");
         }
         if (j.contains("alphaMode")) {
             if (!j.at("alphaMode").is_string()) {
@@ -3821,6 +3828,8 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     p.toon = registerToonParameters(params, prefix, group, m.toon, &p.all);
     // ADR-1073: the surface's edges as lines, wire/* (`wire/mode` 0 is off).
     p.wire = registerWireParameters(params, prefix, group, m.wire, &p.all);
+    // ADR-1143: thin film and anisotropy, material/thinFilm/* and material/anisotropy/* (0 = off).
+    p.optics = registerMaterialOpticsParameters(params, prefix, group, m, &p.all);
 
     // Material variation
     const MaterialVariation& mv = rest.materialVariation;
@@ -4007,6 +4016,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     copyValue(p, "material/metallic", m.metallic);
     applyToonParameters(p.toon, m.toon); // ADR-1071
     applyWireParameters(p.wire, m.wire); // ADR-1073
+    applyMaterialOpticsParameters(p.optics, m); // ADR-1143
 
     MaterialVariation& mv = live.materialVariation;
     copyValue(p, "materialVariation/hueShift", mv.hueShift);

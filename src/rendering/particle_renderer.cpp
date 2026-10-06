@@ -12,6 +12,8 @@
 #include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
+#include "gpu/texture.hpp"
+#include "scene/particle_latent.hpp"
 
 #include <algorithm>
 #include <array>
@@ -28,12 +30,21 @@ constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
 // 0 uniforms, 1 particles, 2 dead list, 3 counters + indirect draw args, 4 alive list,
 // 5 trail history, 6 glow scratch (ADR-040), 7 compaction scratch (flags then block sums),
-// 8 field block, 9 spline tables, 15 the simulated-grid table (declared by fields.wgsl; ADR-032).
-// That is nine storage buffers in the compute stage, the same as before ADR-040: this adapter
-// allows ten, which is why history, glow scratch, the counters and the compaction flags share
-// buffers with their neighbours.
-constexpr std::uint32_t kComputeBindings = 11;
-constexpr std::uint32_t kComputeBindingSlots[kComputeBindings] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15};
+// 8 field block, 9 spline tables, 15 the simulated-grid table (declared by fields.wgsl; ADR-032),
+// 10 the latent SDF's packed program (ADR-1140).
+// That is TEN storage buffers in the compute stage: this adapter allows ten, which is why history,
+// glow scratch, the counters and the compaction flags share buffers with their neighbours, and why
+// ADR-1140's program spent the last slot. ADR-1141's density passes have a layout of their own.
+constexpr std::uint32_t kComputeBindings = 12;
+constexpr std::uint32_t kComputeBindingSlots[kComputeBindings] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 10};
+constexpr std::uint64_t kSdfNodeBytes = sizeof(spatial::SdfNodeGpu); // 112
+// ADR-1141: particle_density.wgsl's DensityParams.
+struct DensityParamsGpu {
+    glm::vec4 boundsMin; // xyz, 0
+    glm::vec4 boundsMax; // xyz, weight
+    glm::uvec4 counts;   // capacity, resolution, 0, 0
+};
+static_assert(sizeof(DensityParamsGpu) == 48);
 // counters (16 bytes) then the billboard and ribbon DrawArgs.
 constexpr std::uint32_t kCountersBytes = 48;
 constexpr std::uint32_t kBillboardIndirectOffset = 16;
@@ -54,8 +65,13 @@ void ParticleRenderer::collectTimings() {
         if (ms >= 0.0) {
             lastSimulateMs_ = ms;
         }
+        const double densityMs = timeline_->msFor("particle-density");
+        if (densityMs >= 0.0) {
+            lastDensityMs_ = densityMs;
+        }
     }
     stats_.simulateMs = passThisFrame_ ? lastSimulateMs_ : -1.0;
+    stats_.densityMs = densityThisFrame_ ? lastDensityMs_ : -1.0;
 }
 
 Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer splineTable, wgpu::Buffer gridTable) {
@@ -137,6 +153,10 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         entries[10].binding = 15;
         entries[10].visibility = wgpu::ShaderStage::Compute;
         entries[10].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[11].binding = 10; // ADR-1140: the latent SDF program
+        entries[11].visibility = wgpu::ShaderStage::Compute;
+        entries[11].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[11].buffer.minBindingSize = kSdfNodeBytes;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-compute-layout";
         desc.entryCount = entries.size();
@@ -170,12 +190,86 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         renderLayout_ = device.CreateBindGroupLayout(&desc);
     }
     {
+        // ADR-1141: 0 DensityParams, 1 the pool (read), 2 the u32 grid, 3 the 3-D texture (write).
+        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Compute;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(DensityParamsGpu);
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Compute;
+        entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[2].binding = 2;
+        entries[2].visibility = wgpu::ShaderStage::Compute;
+        entries[2].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[3].binding = 3;
+        entries[3].visibility = wgpu::ShaderStage::Compute;
+        entries[3].storageTexture.access = wgpu::StorageTextureAccess::WriteOnly;
+        entries[3].storageTexture.format = wgpu::TextureFormat::RGBA16Float;
+        entries[3].storageTexture.viewDimension = wgpu::TextureViewDimension::e3D;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "particles-density-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        densityLayout_ = device.CreateBindGroupLayout(&desc);
+    }
+    {
+        // ADR-1150: the coarse occupancy dispatch reads the resolved volume, so it cannot share the
+        // resolve's group (which binds that texture as a storage target): 0 DensityParams, 4 the volume
+        // (textureLoad), 5 the coarse grid (write).
+        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Compute;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(DensityParamsGpu);
+        entries[1].binding = 4;
+        entries[1].visibility = wgpu::ShaderStage::Compute;
+        entries[1].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        entries[1].texture.viewDimension = wgpu::TextureViewDimension::e3D;
+        entries[2].binding = 5;
+        entries[2].visibility = wgpu::ShaderStage::Compute;
+        entries[2].storageTexture.access = wgpu::StorageTextureAccess::WriteOnly;
+        entries[2].storageTexture.format = wgpu::TextureFormat::RGBA16Float;
+        entries[2].storageTexture.viewDimension = wgpu::TextureViewDimension::e3D;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "particles-density-coarse-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        densityCoarseLayout_ = device.CreateBindGroupLayout(&desc);
+    }
+    {
+        // ADR-1141: what a consumer binds when the system it names has no volume (yet): one zero
+        // texel, which reads as "no matter anywhere".
+        wgpu::TextureDescriptor desc{};
+        desc.label = "particles-density-placeholder";
+        desc.dimension = wgpu::TextureDimension::e3D;
+        desc.size = {1, 1, 1};
+        desc.format = wgpu::TextureFormat::RGBA16Float;
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        densityPlaceholder_ = device.CreateTexture(&desc);
+        wgpu::TextureViewDescriptor view{};
+        view.dimension = wgpu::TextureViewDimension::e3D;
+        densityPlaceholderView_ = densityPlaceholder_.CreateView(&view);
+        const std::array<std::uint16_t, 4> zero{};
+        wgpu::TexelCopyTextureInfo dst{};
+        dst.texture = densityPlaceholder_;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 8;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D extent{1, 1, 1};
+        context_.queue().WriteTexture(&dst, zero.data(), sizeof(zero), &layout, &extent);
+    }
+    {
         wgpu::PipelineLayoutDescriptor desc{};
         desc.bindGroupLayoutCount = 1;
         desc.bindGroupLayouts = &computeLayout_;
         computePipelineLayout_ = device.CreatePipelineLayout(&desc);
         desc.bindGroupLayouts = &renderLayout_;
         renderPipelineLayout_ = device.CreatePipelineLayout(&desc);
+        desc.bindGroupLayouts = &densityLayout_;
+        densityPipelineLayout_ = device.CreatePipelineLayout(&desc);
+        desc.bindGroupLayouts = &densityCoarseLayout_;
+        densityCoarsePipelineLayout_ = device.CreatePipelineLayout(&desc);
     }
     auto module = shaders_.load("particles.wgsl");
     if (!module) {
@@ -198,11 +292,12 @@ Result<void> ParticleRenderer::reload() {
 
 Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module) {
     const auto& device = context_.device();
-    auto makeCompute = [&](const char* entry) -> Result<wgpu::ComputePipeline> {
+    auto makeCompute = [&](const char* entry, const wgpu::ShaderModule* other = nullptr,
+                           const wgpu::PipelineLayout* layout = nullptr) -> Result<wgpu::ComputePipeline> {
         wgpu::ComputePipelineDescriptor desc{};
         desc.label = entry;
-        desc.layout = computePipelineLayout_;
-        desc.compute.module = module;
+        desc.layout = layout != nullptr ? *layout : computePipelineLayout_;
+        desc.compute.module = other != nullptr ? *other : module;
         desc.compute.entryPoint = entry;
         device.PushErrorScope(wgpu::ErrorFilter::Validation);
         wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
@@ -281,6 +376,16 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!glowReduce) return std::unexpected(glowReduce.error());
     auto glowTop = makeCompute("cs_glow_top");
     if (!glowTop) return std::unexpected(glowTop.error());
+    auto latent = makeCompute("cs_latent"); // ADR-1140
+    if (!latent) return std::unexpected(latent.error());
+    auto densityModule = shaders_.load("particle_density.wgsl"); // ADR-1141
+    if (!densityModule) return std::unexpected(densityModule.error());
+    auto densitySplat = makeCompute("cs_density_splat", &*densityModule, &densityPipelineLayout_);
+    if (!densitySplat) return std::unexpected(densitySplat.error());
+    auto densityResolve = makeCompute("cs_density_resolve", &*densityModule, &densityPipelineLayout_);
+    if (!densityResolve) return std::unexpected(densityResolve.error());
+    auto densityCoarse = makeCompute("cs_density_coarse", &*densityModule, &densityCoarsePipelineLayout_); // ADR-1150
+    if (!densityCoarse) return std::unexpected(densityCoarse.error());
     auto additive = makeRender(true, "vs_particle");
     if (!additive) return std::unexpected(additive.error());
     auto alpha = makeRender(false, "vs_particle");
@@ -289,6 +394,10 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!ribbonAdditive) return std::unexpected(ribbonAdditive.error());
     auto ribbonAlpha = makeRender(false, "vs_ribbon");
     if (!ribbonAlpha) return std::unexpected(ribbonAlpha.error());
+    auto flakeAdditive = makeRender(true, "vs_flake"); // ADR-1153
+    if (!flakeAdditive) return std::unexpected(flakeAdditive.error());
+    auto flakeAlpha = makeRender(false, "vs_flake");
+    if (!flakeAlpha) return std::unexpected(flakeAlpha.error());
     emitPipeline_ = *emit;
     simulatePipeline_ = *simulate;
     scanReducePipeline_ = *reduce;
@@ -296,10 +405,16 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     scanScatterPipeline_ = *scatter;
     glowReducePipeline_ = *glowReduce;
     glowTopPipeline_ = *glowTop;
+    latentPipeline_ = *latent;
+    densitySplatPipeline_ = *densitySplat;
+    densityResolvePipeline_ = *densityResolve;
+    densityCoarsePipeline_ = *densityCoarse;
     additivePipeline_ = *additive;
     alphaPipeline_ = *alpha;
     ribbonAdditivePipeline_ = *ribbonAdditive;
     ribbonAlphaPipeline_ = *ribbonAlpha;
+    flakeAdditivePipeline_ = *flakeAdditive;
+    flakeAlphaPipeline_ = *flakeAlpha;
     return {};
 }
 
@@ -329,7 +444,9 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity, std
     const std::uint64_t scratchBytes = listBytes + static_cast<std::uint64_t>(pool.blocks) * 4;
     constexpr auto kStorage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     pool.uniforms = buffer("particles-uniforms", sizeof(ParticleUniforms), wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst);
-    pool.particles = buffer("particles-pool", static_cast<std::uint64_t>(capacity) * kParticleStride, kStorage);
+    // CopySrc: readParticles (tests and tools) copies the pool out; no frame path reads it that way.
+    pool.particles = buffer("particles-pool", static_cast<std::uint64_t>(capacity) * kParticleStride,
+                            kStorage | wgpu::BufferUsage::CopySrc);
     pool.deadList = buffer("particles-dead", listBytes, kStorage);
     pool.counters = buffer("particles-counters", kCountersBytes,
                            kStorage | wgpu::BufferUsage::CopySrc | wgpu::BufferUsage::Indirect);
@@ -343,18 +460,32 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity, std
     // Two vec4 per block, then the two-vec4 aggregate cs_glow_top writes past them.
     const std::uint64_t glowScratchBytes = (static_cast<std::uint64_t>(pool.blocks) + 1) * kGlowBlockBytes;
     pool.glowScratch = buffer("particles-glow-scratch", glowScratchBytes, kStorage | wgpu::BufferUsage::CopySrc);
+    // ADR-1140: one record until a latent asks for more (ensureLatentBuffer re-creates the group).
+    pool.latentBytes = kSdfNodeBytes;
+    pool.latentNodes = buffer("particles-latent-sdf", pool.latentBytes, kStorage);
+    buildComputeGroup(pool);
+    pool.renderGroup = nullptr;
+    pool.needsReset = true;
+}
 
+void ParticleRenderer::buildComputeGroup(Pool& pool) {
+    const std::uint64_t listBytes = static_cast<std::uint64_t>(pool.capacity) * 4;
+    const std::uint64_t scratchBytes = listBytes + static_cast<std::uint64_t>(pool.blocks) * 4;
+    const std::uint64_t historyBytes =
+        pool.historyPoints > 0 ? static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints * scene::kTrailBytesPerPoint
+                               : 16;
+    const std::uint64_t glowScratchBytes = (static_cast<std::uint64_t>(pool.blocks) + 1) * kGlowBlockBytes;
     std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
     const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms,  &pool.particles,  &pool.deadList,
                                                      &pool.counters,  &pool.aliveList,  &pool.history,
                                                      &pool.glowScratch, &pool.scratch,  &fieldBlock_,
-                                                     &splineTable_,   &gridTable_};
+                                                     &splineTable_,   &gridTable_,     &pool.latentNodes};
     const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
-                                                   static_cast<std::uint64_t>(capacity) * kParticleStride,
+                                                   static_cast<std::uint64_t>(pool.capacity) * kParticleStride,
                                                    listBytes, kCountersBytes, listBytes, historyBytes,
                                                    glowScratchBytes, scratchBytes,
                                                    FieldUniforms::kBufferSize, SplineBuffers::kBufferSize,
-                                                   FieldUniforms::kGridBufferSize};
+                                                   FieldUniforms::kGridBufferSize, pool.latentBytes};
     for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
         entries[i].binding = kComputeBindingSlots[i];
         entries[i].buffer = *buffers[i];
@@ -365,9 +496,145 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity, std
     cdesc.layout = computeLayout_;
     cdesc.entryCount = entries.size();
     cdesc.entries = entries.data();
-    pool.computeGroup = device.CreateBindGroup(&cdesc);
-    pool.renderGroup = nullptr;
-    pool.needsReset = true;
+    pool.computeGroup = context_.device().CreateBindGroup(&cdesc);
+}
+
+void ParticleRenderer::ensureLatentBuffer(Pool& pool, std::uint64_t bytes) {
+    if (pool.latentNodes && pool.latentBytes >= bytes) {
+        return;
+    }
+    wgpu::BufferDescriptor desc{};
+    desc.label = "particles-latent-sdf";
+    desc.size = std::max<std::uint64_t>(bytes, kSdfNodeBytes);
+    desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+    pool.latentNodes = context_.device().CreateBuffer(&desc);
+    pool.latentBytes = desc.size;
+    buildComputeGroup(pool);
+}
+
+void ParticleRenderer::ensureDensity(Pool& pool, const scene::ParticleDensity& density) {
+    Pool::Density& d = pool.density;
+    const int res = std::clamp(density.resolution, scene::kMinDensityResolution, scene::kMaxDensityResolution);
+    d.boundsMin = density.boundsMin;
+    d.boundsMax = density.boundsMax;
+    if (d.texture && d.resolution == res && d.group) {
+        return;
+    }
+    const auto& device = context_.device();
+    const auto r = static_cast<std::uint64_t>(res);
+    d = Pool::Density{};
+    d.resolution = res;
+    d.boundsMin = density.boundsMin;
+    d.boundsMax = density.boundsMax;
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "particles-density-params";
+        desc.size = sizeof(DensityParamsGpu);
+        desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        d.params = device.CreateBuffer(&desc);
+        desc.label = "particles-density-grid";
+        desc.size = r * r * r * 4;
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+        d.grid = device.CreateBuffer(&desc);
+    }
+    {
+        // rgba16float: filterable (a linear sampler can read it, which r32float cannot be in core
+        // WebGPU) and usable as a write-only storage texture, so one compute pass writes what the
+        // raymarch samples. Only r carries the density; the format has no one-channel half that is
+        // both.
+        wgpu::TextureDescriptor desc{};
+        desc.label = "particles-density-volume";
+        desc.dimension = wgpu::TextureDimension::e3D;
+        desc.size = {static_cast<std::uint32_t>(res), static_cast<std::uint32_t>(res), static_cast<std::uint32_t>(res)};
+        desc.format = wgpu::TextureFormat::RGBA16Float;
+        desc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc;
+        d.texture = device.CreateTexture(&desc);
+        wgpu::TextureViewDescriptor view{};
+        view.dimension = wgpu::TextureViewDimension::e3D;
+        d.view = d.texture.CreateView(&view);
+    }
+    std::array<wgpu::BindGroupEntry, 4> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = d.params;
+    entries[0].size = sizeof(DensityParamsGpu);
+    entries[1].binding = 1;
+    entries[1].buffer = pool.particles;
+    entries[1].size = static_cast<std::uint64_t>(pool.capacity) * kParticleStride;
+    entries[2].binding = 2;
+    entries[2].buffer = d.grid;
+    entries[2].size = r * r * r * 4;
+    entries[3].binding = 3;
+    entries[3].textureView = d.view;
+    wgpu::BindGroupDescriptor desc{};
+    desc.label = "particles-density-group";
+    desc.layout = densityLayout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    d.group = device.CreateBindGroup(&desc);
+    {
+        // ADR-1150: the coarse max-occupancy grid, one texel per 8^3 block. rgba16float for the same reason
+        // as the volume (storage-writable in core); 1/512 of the volume's texels.
+        const auto cr = static_cast<std::uint32_t>(scene::densityCoarseResolution(res));
+        wgpu::TextureDescriptor tdesc{};
+        tdesc.label = "particles-density-coarse";
+        tdesc.dimension = wgpu::TextureDimension::e3D;
+        tdesc.size = {cr, cr, cr};
+        tdesc.format = wgpu::TextureFormat::RGBA16Float;
+        tdesc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc;
+        d.coarse = device.CreateTexture(&tdesc);
+        wgpu::TextureViewDescriptor view{};
+        view.dimension = wgpu::TextureViewDimension::e3D;
+        d.coarseView = d.coarse.CreateView(&view);
+        std::array<wgpu::BindGroupEntry, 3> ce{};
+        ce[0].binding = 0;
+        ce[0].buffer = d.params;
+        ce[0].size = sizeof(DensityParamsGpu);
+        ce[1].binding = 4;
+        ce[1].textureView = d.view;
+        ce[2].binding = 5;
+        ce[2].textureView = d.coarseView;
+        wgpu::BindGroupDescriptor cdesc{};
+        cdesc.label = "particles-density-coarse-group";
+        cdesc.layout = densityCoarseLayout_;
+        cdesc.entryCount = ce.size();
+        cdesc.entries = ce.data();
+        d.coarseGroup = device.CreateBindGroup(&cdesc);
+    }
+}
+
+void ParticleRenderer::encodeDensity(wgpu::CommandEncoder& encoder, Pool& pool, const scene::ParticleDensity& density,
+                                     bool splat) {
+    ensureDensity(pool, density);
+    Pool::Density& d = pool.density;
+    const auto res = static_cast<std::uint32_t>(d.resolution);
+    DensityParamsGpu u{};
+    u.boundsMin = glm::vec4(d.boundsMin, 0.0f);
+    u.boundsMax = glm::vec4(d.boundsMax, std::max(density.weight, 0.0f));
+    u.counts = glm::uvec4(pool.capacity, res, 0u, 0u);
+    context_.queue().WriteBuffer(d.params, 0, &u, sizeof(u));
+    encoder.ClearBuffer(d.grid, 0, static_cast<std::uint64_t>(res) * res * res * 4);
+    wgpu::ComputePassDescriptor cdesc{};
+    cdesc.label = "particles-density";
+    cdesc.timestampWrites = (timeline_ != nullptr && !warming_) ? timeline_->mark("particle-density") : nullptr;
+    wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
+    cp.SetBindGroup(0, d.group);
+    if (splat) {
+        cp.SetPipeline(densitySplatPipeline_);
+        cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+    }
+    cp.SetPipeline(densityResolvePipeline_);
+    const std::uint32_t groups = (res + 3) / 4;
+    cp.DispatchWorkgroups(groups, groups, groups);
+    // ADR-1150: the block maxima, from the volume just resolved (a separate dispatch, so the texture the
+    // resolve wrote is complete and readable).
+    cp.SetBindGroup(0, d.coarseGroup);
+    cp.SetPipeline(densityCoarsePipeline_);
+    const std::uint32_t coarseGroups = (static_cast<std::uint32_t>(scene::densityCoarseResolution(d.resolution)) + 3) / 4;
+    cp.DispatchWorkgroups(coarseGroups, coarseGroups, coarseGroups);
+    cp.End();
+    d.resolved = true;
+    densityThisFrame_ = true;
+    ++stats_.densityVolumes;
 }
 
 void ParticleRenderer::ensureRenderGroup(Pool& pool) {
@@ -434,6 +701,7 @@ void ParticleRenderer::resetPool(Pool& pool) {
                                           0);
         context_.queue().WriteBuffer(pool.history, 0, history.data(), history.size());
     }
+    pool.latentPrevValid = false; // ADR-1140: a reset is not a coherence drop
     pool.needsReset = false;
 }
 
@@ -484,6 +752,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
     if (!warming_) {
         stats_ = ParticleStats{};
         passThisFrame_ = false;
+        densityThisFrame_ = false;
     }
     if (!initialised_) {
         return;
@@ -558,6 +827,11 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 // relied on later, and the GPU test asserts the frame this says it does.
                 resetPool(pool);
                 pool.wasEnabled = false;
+            }
+            // ADR-1141: a system that is off has no matter, so a consumer of its volume must see none
+            // -- not the last frame it was on. Resolved empty (no splat), and only outside a warm-up.
+            if (sys.density.enabled && !warming_) {
+                encodeDensity(encoder, pool, sys.density, false);
             }
             continue;
         }
@@ -658,6 +932,22 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
     u.leaf = sys.shape2d == scene::ParticleShape::Leaf
                  ? glm::vec4(1.0f, sys.tumbleRate, sys.leafAspect, glm::clamp(sys.twoSided, 0.0f, 1.0f))
                  : glm::vec4(0.0f);
+    if (sys.shape2d == scene::ParticleShape::Flake) { // ADR-1153; all zero otherwise
+        const scene::ParticleFlake& f = sys.flake;
+        u.flake0 = glm::vec4(glm::clamp(f.metal, glm::vec3(0.0f), glm::vec3(1.0f)), 1.0f);
+        u.flake1 = glm::vec4(std::max(f.temper, 0.0f), std::max(f.filmIor, 1.0f), std::max(f.glint, 1e-3f),
+                             std::max(f.tumble, 0.0f));
+        u.flake2 = glm::vec4(std::max(f.free, 0.0f), std::max(f.bound, 0.0f), glm::clamp(f.latentNormal, 0.0f, 1.0f),
+                             glm::clamp(f.sparkle, 0.0f, 1.0f));
+        u.flake3 = glm::vec4(std::max(f.sparkleGain, 0.0f), glm::clamp(f.fuse, 0.0f, 1.0f), 0.0f, 0.0f);
+        u.bandsInfo = frame_.bands.info;
+        u.bandsSoft = frame_.bands.soft;
+        u.bandsSoft2 = frame_.bands.soft2;
+        u.bandsRate = frame_.bands.rate;
+        for (std::size_t k = 0; k < frame_.bands.bands.size(); ++k) {
+            u.bands[k] = frame_.bands.bands[k];
+        }
+    }
         u.attractor = glm::vec4(sys.attractorPosition, sys.attractorStrength);
         u.attractor2 = glm::vec4(sys.attractorRadius, sys.orbit, sys.sizeStart, sys.sizeEnd);
         u.colorStart = sys.colorStart;
@@ -757,9 +1047,78 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         for (std::size_t k = 0; k < anchorTable.size(); ++k) {
             u.anchors[k] = glm::vec4(anchorTable[k], 1.0f);
         }
+        // ADR-1140: the latent SDF force. The object is looked up by its flattened name every frame
+        // (its tree's parameters are live) and packed into this pool's own buffer -- never
+        // SdfRenderer's, which holds only the visible raymarch objects and reallocates. A latent is
+        // typically invisible, which is exactly the object SdfRenderer skips.
+        bool latentOn = false;
+        if (sys.latent.active()) {
+            const scene::SdfObject* object = nullptr;
+            for (const scene::SdfObject& candidate : scene.sdfs) {
+                if (candidate.name == sys.latent.sdf) {
+                    object = &candidate;
+                    break;
+                }
+            }
+            std::optional<std::string> why;
+            int count = 0;
+            if (object == nullptr) {
+                why = "names no sdf object in the scene";
+            } else if (auto fits = object->tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                why = fits.error().message;
+            } else {
+                count = spatial::packSdfTree(object->tree, latentScratch_, &scene.fields);
+                if (count <= 0) {
+                    why = "its tree packs to no enabled node";
+                }
+            }
+            if (why) {
+                // Composition refuses these at load; a scene edited live can still get here.
+                if (!pool.latentWarned) {
+                    log::warn("particles '{}': latent sdf '{}' {}; the latent force is off", sys.name, sys.latent.sdf, *why);
+                    pool.latentWarned = true;
+                }
+            } else {
+                // DisplaceField references: FieldSet indices -> GPU slots, exactly as SdfRenderer maps them.
+                for (auto& g : latentScratch_) {
+                    if (g.kind == static_cast<std::uint32_t>(spatial::SdfNodeKind::DisplaceField) && g.fieldSlot >= 0) {
+                        int gpuSlot = -1;
+                        if (fields != nullptr && static_cast<std::size_t>(g.fieldSlot) < scene.fields.fields.size()) {
+                            gpuSlot = fields->slotOf(scene.fields.fields[static_cast<std::size_t>(g.fieldSlot)].name);
+                        }
+                        g.fieldSlot = gpuSlot;
+                    }
+                }
+                const std::uint64_t bytes = latentScratch_.size() * kSdfNodeBytes;
+                ensureLatentBuffer(pool, bytes);
+                context_.queue().WriteBuffer(pool.latentNodes, 0, latentScratch_.data(), bytes);
+                const glm::mat4 model = object->transform.matrix();
+                const float coherence = std::clamp(sys.latent.coherence, 0.0f, 1.0f);
+                const float previous = pool.latentPrevValid ? pool.latentPrevCoherence : coherence;
+                u.latentModel = model;
+                u.latentInverse = glm::inverse(model);
+                u.latentNormal = glm::transpose(u.latentInverse);
+                u.latent0 = glm::vec4(coherence, previous, std::clamp(sys.latent.width, 0.005f, 0.5f),
+                                      std::max(sys.latent.strength, 0.0f));
+                u.latent1 = glm::vec4(std::max(sys.latent.flow, 0.0f), std::max(sys.latent.release, 0.0f),
+                                      scene::latentGradientEpsilon(object->boundsMin, object->boundsMax), 0.0f);
+                // ADR-1153: a flake system's bound plates take the latent normal, which cs_latent then stores in
+                // the record's `home` lane (w stays 0, so the attractor reads it as "no home"); never for an
+                // anchored system, whose `home` is its crown centre.
+                const bool storeNormal = sys.shape2d == scene::ParticleShape::Flake && !anchored;
+                u.latentInfo = glm::uvec4(static_cast<std::uint32_t>(count), storeNormal ? 1u : 0u, 0u, 0u);
+                pool.latentPrevCoherence = coherence;
+                pool.latentPrevValid = true;
+                pool.latentWarned = false;
+                latentOn = true;
+                if (!warming_) {
+                    ++stats_.latentSystems;
+                }
+            }
+        }
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
-        // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.
+        // Pass order (see particles.wgsl): emit -> [latent] -> simulate -> reduce -> top scan -> scatter.
         // Dispatches in one compute pass are ordered, so each reads the previous one's writes;
         // emit consumes last frame's dead list before scatter rewrites it.
         wgpu::ComputePassDescriptor cdesc{};
@@ -775,6 +1134,12 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         if (emitCount > 0) {
             cp.SetPipeline(emitPipeline_);
             cp.DispatchWorkgroups((emitCount + kWorkgroup - 1) / kWorkgroup);
+        }
+        if (latentOn) {
+            // ADR-1140: adds the spring toward the latent's projection to the velocity, which the
+            // simulate dispatch then integrates. Not dispatched at all for a system without one.
+            cp.SetPipeline(latentPipeline_);
+            cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
         }
         cp.SetPipeline(simulatePipeline_);
         cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
@@ -798,6 +1163,11 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                                        glowBuffer_, static_cast<std::uint64_t>(mySlot) * kGlowBlockBytes,
                                        kGlowBlockBytes);
         }
+        // ADR-1141: the volume is a picture of THIS frame's particles, so it is skipped inside a
+        // warm-up (only the arriving frame's is ever read) and rebuilt from scratch every frame.
+        if (sys.density.enabled && !warming_) {
+            encodeDensity(encoder, pool, sys.density, true);
+        }
 
         ++stats_.systems;
         stats_.capacity += pool.capacity;
@@ -810,6 +1180,119 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         passThisFrame_ = true;
         stats_.simulateMs = lastSimulateMs_;
     }
+    if (densityThisFrame_) {
+        stats_.densityMs = lastDensityMs_;
+    }
+    if (!warming_) {
+        for (const Pool& pool : pools_) {
+            if (pool.density.texture) {
+                stats_.densityBytes += scene::densityMemoryBytes(pool.density.resolution);
+            }
+        }
+    }
+}
+
+ParticleDensityVolume ParticleRenderer::densityVolume(std::size_t systemIndex) const {
+    ParticleDensityVolume v;
+    v.view = densityPlaceholderView_;
+    v.coarseView = densityPlaceholderView_;
+    if (systemIndex < pools_.size()) {
+        const Pool::Density& d = pools_[systemIndex].density;
+        if (d.view && d.resolved) {
+            v.view = d.view;
+            v.coarseView = d.coarseView;
+            v.boundsMin = d.boundsMin;
+            v.boundsMax = d.boundsMax;
+            v.resolution = d.resolution;
+            v.valid = true;
+        }
+    }
+    return v;
+}
+
+ParticleDensityVolume ParticleRenderer::densityVolume(const scene::Scene& scene, const std::string& name) const {
+    for (std::size_t i = 0; i < scene.particles.size(); ++i) {
+        if (scene.particles[i].name == name) {
+            return densityVolume(i);
+        }
+    }
+    return densityVolume(pools_.size()); // the placeholder
+}
+
+Result<std::vector<ParticleSnapshot>> ParticleRenderer::readParticles(std::size_t systemIndex) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].particles) {
+        return fail("particle system {} has no pool", systemIndex);
+    }
+    const Pool& pool = pools_[systemIndex];
+    auto bytes = gpu::readBuffer(context_, pool.particles, 0, static_cast<std::uint64_t>(pool.capacity) * kParticleStride);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::vector<ParticleSnapshot> out(pool.capacity);
+    for (std::uint32_t i = 0; i < pool.capacity; ++i) {
+        float rec[16];
+        std::memcpy(rec, bytes->data() + static_cast<std::size_t>(i) * kParticleStride, sizeof(rec));
+        out[i].position = glm::vec3(rec[0], rec[1], rec[2]);
+        out[i].age = rec[3];
+        out[i].velocity = glm::vec3(rec[4], rec[5], rec[6]);
+        out[i].life = rec[7];
+        out[i].seed = rec[8];
+        out[i].home = glm::vec4(rec[12], rec[13], rec[14], rec[15]);
+    }
+    return out;
+}
+
+Result<std::vector<float>> ParticleRenderer::readDensity(std::size_t systemIndex) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].density.texture) {
+        return fail("particle system {} has no density volume", systemIndex);
+    }
+    const Pool::Density& d = pools_[systemIndex].density;
+    return readVolumeR(d.texture, static_cast<std::uint32_t>(d.resolution));
+}
+
+Result<std::vector<float>> ParticleRenderer::readDensityCoarse(std::size_t systemIndex) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].density.coarse) {
+        return fail("particle system {} has no density volume", systemIndex);
+    }
+    const Pool::Density& d = pools_[systemIndex].density;
+    return readVolumeR(d.coarse, static_cast<std::uint32_t>(scene::densityCoarseResolution(d.resolution)));
+}
+
+Result<std::vector<float>> ParticleRenderer::readVolumeR(const wgpu::Texture& texture, std::uint32_t res) {
+    const std::uint32_t rowBytes = ((res * 8 + 255) / 256) * 256; // bytesPerRow must be a multiple of 256
+    const std::uint64_t total = static_cast<std::uint64_t>(rowBytes) * res * res;
+    wgpu::BufferDescriptor bdesc{};
+    bdesc.label = "particles-density-readback";
+    bdesc.size = total;
+    bdesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+    wgpu::Buffer staging = context_.device().CreateBuffer(&bdesc);
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    wgpu::TexelCopyTextureInfo src{};
+    src.texture = texture;
+    wgpu::TexelCopyBufferInfo dst{};
+    dst.buffer = staging;
+    dst.layout.bytesPerRow = rowBytes;
+    dst.layout.rowsPerImage = res;
+    const wgpu::Extent3D extent{res, res, res};
+    encoder.CopyTextureToBuffer(&src, &dst, &extent);
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context_.queue().Submit(1, &commands);
+    auto bytes = gpu::readBuffer(context_, staging, 0, total);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::vector<float> out(static_cast<std::size_t>(res) * res * res);
+    for (std::uint32_t z = 0; z < res; ++z) {
+        for (std::uint32_t y = 0; y < res; ++y) {
+            const std::uint8_t* row = bytes->data() + (static_cast<std::size_t>(z) * res + y) * rowBytes;
+            for (std::uint32_t x = 0; x < res; ++x) {
+                std::uint16_t half = 0;
+                std::memcpy(&half, row + static_cast<std::size_t>(x) * 8, sizeof(half));
+                out[x + static_cast<std::size_t>(res) * (y + static_cast<std::size_t>(res) * z)] = gpu::halfToFloat(half);
+            }
+        }
+    }
+    return out;
 }
 
 void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene) {
@@ -831,7 +1314,11 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
             pass.SetPipeline(additive ? ribbonAdditivePipeline_ : ribbonAlphaPipeline_);
             pass.DrawIndirect(pool.counters, kRibbonIndirectOffset);
         }
-        pass.SetPipeline(additive ? additivePipeline_ : alphaPipeline_);
+        if (sys.shape2d == scene::ParticleShape::Flake) { // ADR-1153: its own entry point, so no other system's
+            pass.SetPipeline(additive ? flakeAdditivePipeline_ : flakeAlphaPipeline_); // vertex code changes
+        } else {
+            pass.SetPipeline(additive ? additivePipeline_ : alphaPipeline_);
+        }
         pass.DrawIndirect(pool.counters, kBillboardIndirectOffset);
     }
 }

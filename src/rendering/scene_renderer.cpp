@@ -1,5 +1,6 @@
 #include "rendering/scene_renderer.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
@@ -3162,6 +3163,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-717: x is the pooling, 0 -- ADR-715's branch, its frame to the bit -- whenever there is no
     // basin to pool in. The march reads this same lane.
     frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), 0.0f, 0.0f, 0.0f);
+    {
+        // ADR-1151: the reflection-only bands; all zero (the gate closed) unless the scene authored them.
+        const scene::ReflectionBandLanes lanes = scene::packReflectionBands(scene.environment.bands);
+        frame.bandsInfo = lanes.info;
+        frame.bandsSoft = lanes.soft;
+        frame.bandsSoft2 = lanes.soft2;
+        frame.bandsRate = lanes.rate;
+        frame.bands = lanes.bands;
+    }
     // ADR-918: the surface fog's colour from the sky. Only when there is air to colour and the
     // scene asks; otherwise the lane is zero, `applyFog` never reads the map and the map's pass is
     // skipped, so the frame is the one every scene had before, to the bit. `y` says whether the
@@ -3578,6 +3588,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.toon1 = toon[1];
             obj.toon2 = toon[2];
         }
+        obj.optics = packOptics(m); // ADR-1143
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();
@@ -3938,6 +3949,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         particleFrame.spawnScale = std::max(qualitySettings_.particleSpawnScale, 0.0f); // ADR-382
         particleFrame.cullDistance = std::max(qualitySettings_.particleCullDistance, 0.0f); // ADR-1098
         particleFrame.warmUpFrames = particleWarmUpFrames_; // ADR-360, 0 unless asked
+        particleFrame.bands = scene::packReflectionBands(scene.environment.bands); // ADR-1151, for flakes
         particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
                                        std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
         // ADR-387: `enabled(scene)`, not `enabled(environment)`. The vortex used to live on the
@@ -4018,7 +4030,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // nothing has ever read. Per frame, for the same reason the cull ladder's hysteresis is.
     sdfs_->setSdfShadowSteps(qualitySettings_.sdfShadowSteps);
     sdfs_->setSdfShadowScale(qualitySettings_.sdfShadowScale); // ADR-1165
-    sdfs_->update(scene, time, frame.viewProj, fields_.get());
+    sdfs_->update(scene, time, frame.viewProj, fields_.get(), particles_.get()); // ADR-1142: density sources
     stats_.sdf = sdfs_->stats();
     stage(cpu.sdfMs);
 

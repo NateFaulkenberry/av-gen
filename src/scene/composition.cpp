@@ -18,6 +18,7 @@
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/asset_parts.hpp"
+#include "scene/material_optics.hpp"
 #include "scene/mesh_metrics.hpp"
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
@@ -78,7 +79,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
-    "vortex"};
+    "vortex", "bands"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
     "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
@@ -625,6 +626,8 @@ void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
     ps.spline = prefixed(prefix, ps.spline);
     // The terrain's scatter objects are named with the same prefix (scatterObjectName below).
     ps.scatterAnchor.terrain = prefixed(prefix, ps.scatterAnchor.terrain);
+    // ADR-1140: the latent names an SDF node of the same scene file, which is flattened under the same prefix.
+    ps.latent.sdf = prefixed(prefix, ps.latent.sdf);
 }
 void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
     node.reference = prefixed(prefix, node.reference);
@@ -635,6 +638,7 @@ void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
 void prefixFieldReferences(SdfObject& so, const std::string& prefix) {
     prefixSdfReferences(so.tree.root, prefix);
     so.material.program = prefixed(prefix, so.material.program);
+    so.density.particles = prefixed(prefix, so.density.particles); // ADR-1142: a particles node of the same file
 }
 void prefixFieldReferences(MaterialProgram& mp, const std::string& prefix) {
     for (auto& op : mp.ops) {
@@ -4759,6 +4763,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // where it reads as distance; the hard 8 is `kHorizonDensityMax`.
     horizonDensity_ = &params.add(floatDesc(prefix_ + "scene/horizonDensity", volumeSetting_.horizonDensity, 0.0f,
                                             scene::kHorizonDensityMax, 0.0f, 2.0f));
+    // ADR-1151: the reflection-only bands' knobs, registered only when the scene authored the block.
+    bandParams_ = scene::registerReflectionBandParameters(params, prefix_ + "scene/", volumeSetting_.bands, nullptr);
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -5932,6 +5938,7 @@ void Composition::detach() {
     fogGroundFollow_ = nullptr;
     fogPooling_ = nullptr;
     horizonDensity_ = nullptr;
+    bandParams_ = {}; // ADR-1151
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -9045,6 +9052,8 @@ void Composition::applyParameters() {
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
+        env.bands = volumeSetting_.bands; // ADR-1151
+        scene::applyReflectionBandParameters(bandParams_, env.bands);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -10223,6 +10232,29 @@ nlohmann::json Composition::toJson() const {
             environment["fogPooling"] = pooling;
         }
     }
+    // ADR-1151: written only when authored, with the parameters' base values, so a scene without bands
+    // saves exactly the file it had.
+    if (volumeSetting_.bands.enabled) {
+        scene::ReflectionBands saved = volumeSetting_.bands;
+        const auto base = [](const params::Parameter<float>* p, float& out) {
+            if (p != nullptr) {
+                out = p->base();
+            }
+        };
+        base(bandParams_.phase, saved.phase);
+        base(bandParams_.rotation, saved.rotation);
+        base(bandParams_.gain, saved.gain);
+        base(bandParams_.softboxIntensity, saved.softbox.intensity);
+        base(bandParams_.softboxAzimuth, saved.softbox.azimuth);
+        base(bandParams_.softboxElevation, saved.softbox.elevation);
+        for (std::size_t k = 0; k < bandParams_.strips.size() && k < saved.strips.size(); ++k) {
+            base(bandParams_.strips[k].intensity, saved.strips[k].intensity);
+            base(bandParams_.strips[k].offset, saved.strips[k].offset);
+            base(bandParams_.strips[k].width, saved.strips[k].width);
+            base(bandParams_.strips[k].warmth, saved.strips[k].warmth);
+        }
+        environment["bands"] = scene::reflectionBandsToJson(saved);
+    }
     j["environment"] = std::move(environment);
     // ADR-278: the lights the scene authored, written back so a save cannot silently delete them --
     // which is ADR-207/230's world-effects bug, and the reason `environment["lightRig"]` twenty
@@ -10705,6 +10737,7 @@ nlohmann::json Composition::toJson() const {
             if (!m.program.empty()) {
                 mat["program"] = m.program;
             }
+            writeMaterialOptics(m, mat); // ADR-1143: thinFilm, anisotropy (only when authored)
             n["material"] = std::move(mat);
         }
         nodes.push_back(std::move(n));
@@ -11288,6 +11321,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return std::unexpected(value.error());
                 }
                 *fk.target = *value;
+            }
+            if (e.contains("bands")) { // ADR-1151
+                auto bands = scene::readReflectionBands(e.at("bands"));
+                if (!bands) {
+                    return std::unexpected(bands.error());
+                }
+                v.bands = std::move(*bands);
             }
             // ADR-387, consolidation §19: the legacy `environment.vortex` block. It was ADR-371's
             // singleton; the vortex is an authored atmospheric effect now. Reading it here and
@@ -12466,6 +12506,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     }
                     mat.program = m.at("program").get<std::string>();
                 }
+                if (auto optics = readMaterialOptics(m, mat); !optics) { // ADR-1143
+                    return fail("node '{}': material: {}", node.name, optics.error().message);
+                }
+                if (m.contains("engraving")) { // ADR-1152: only the SDF raymarch cuts an engraving
+                    return fail("node '{}': material 'engraving' is drawn on SDF objects only (ADR-1152)", node.name);
+                }
                 if (m.contains("alphaMode")) {
                     // Parsed here rather than nowhere. A scene that wrote `"alphaMode":
                     // "blend"` was validated, ignored, and drawn opaque: RendererQA's
@@ -12716,6 +12762,36 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                           parentName);
             }
             comp->findNode(child)->parent = parentName;
+        }
+        // ADR-1140 / ADR-1142: cross-object references are refused at load, by name, rather than
+        // left to draw nothing (ADR-704: a binding that silently answers 0 is the defect). Both
+        // name a node of THIS file; nesting prefixes them together when the scene is flattened.
+        for (const auto& nodePtr : comp->nodes_) {
+            const CompositionNode& n = *nodePtr;
+            if (n.kind == NodeKind::Particles && n.particleRest.latent.active()) {
+                const std::string& target = n.particleRest.latent.sdf;
+                const CompositionNode* sdfNode = comp->findNode(target);
+                if (sdfNode == nullptr || sdfNode->kind != NodeKind::Sdf) {
+                    return fail("node '{}': latent.sdf '{}' names no sdf node in this scene", n.name, target);
+                }
+                if (auto fits = sdfNode->sdfRest.tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                    return fail("node '{}': latent.sdf '{}' cannot be evaluated by the particle simulation's "
+                                "interpreter: {}",
+                                n.name, target, fits.error().message);
+                }
+            }
+            if (n.kind == NodeKind::Sdf && n.sdfRest.density.active()) {
+                const std::string& target = n.sdfRest.density.particles;
+                const CompositionNode* pNode = comp->findNode(target);
+                if (pNode == nullptr || pNode->kind != NodeKind::Particles) {
+                    return fail("node '{}': density.particles '{}' names no particles node in this scene", n.name,
+                                target);
+                }
+                if (!pNode->particleRest.density.enabled) {
+                    return fail("node '{}': density.particles '{}' has no density volume (give it a 'density' block)",
+                                n.name, target);
+                }
+            }
         }
     }
     return comp;

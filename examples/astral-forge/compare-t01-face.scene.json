@@ -1,0 +1,1451 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "compare-t01-face",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -0.06515,
+   1.11353,
+   13.06391
+  ],
+  "target": [
+   0.0,
+   -0.1,
+   0.0
+  ],
+  "fov": 26.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0,
+   0,
+   0
+  ],
+  "intensity": 0.0,
+  "bands": {
+   "phase": 3.78,
+   "rotation": 0.0,
+   "gain": 1.0,
+   "softbox": {
+    "intensity": 0.55,
+    "azimuth": 1.6694,
+    "elevation": 0.5028,
+    "falloff": 2.6,
+    "skyFill": 0.08
+   },
+   "strips": [
+    {
+     "axis": [
+      -0.29619,
+      0.33035,
+      0.89618
+     ],
+     "offset": 0.0,
+     "width": 0.014,
+     "intensity": 17.0,
+     "segments": 5,
+     "warmth": 0.045,
+     "rate": 0.07
+    },
+    {
+     "axis": [
+      0.21204,
+      0.93605,
+      0.28081
+     ],
+     "offset": 0.62,
+     "width": 0.02,
+     "intensity": 9.0,
+     "segments": 0,
+     "warmth": 0.42,
+     "rate": 0.12
+    },
+    {
+     "axis": [
+      0.16957,
+      -0.84783,
+      0.50243
+     ],
+     "offset": 0.5,
+     "width": 0.012,
+     "intensity": 11.0,
+     "segments": 9,
+     "warmth": 0.325,
+     "rate": 0.17
+    }
+   ]
+  }
+ },
+ "post": {
+  "bloomIntensity": 0.05
+ },
+ "lights": [],
+ "nodes": [
+  {
+   "name": "latent",
+   "kind": "sdf",
+   "sdf": {
+    "visible": false,
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.22,
+        "children": [
+         {
+          "kind": "smoothDifference",
+          "smooth": 0.1,
+          "children": [
+           {
+            "kind": "smoothIntersection",
+            "smooth": 0.25,
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.3,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 0.15,
+                 -1.25
+                ],
+                "children": [
+                 {
+                  "kind": "capsule",
+                  "radius": 1.95,
+                  "height": 1.4
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "plane",
+              "axis": [
+               0.0,
+               0.0,
+               -1.0
+              ],
+              "offset": 0.55
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.76,
+             0.72,
+             0.6
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               0.0,
+               -12.6
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.62,
+                 0.36,
+                 0.55
+                ],
+                "rounding": 0.3
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.76,
+             0.72,
+             0.6
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               0.0,
+               12.6
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.62,
+                 0.36,
+                 0.55
+                ],
+                "rounding": 0.3
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             -1.45,
+             0.62
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.95,
+               0.13,
+               0.85
+              ],
+              "rounding": 0.1
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.875,
+           1.2,
+           0.53
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             -15.6345,
+             0.0,
+             101.6244
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.12,
+              "height": 0.9276448673926893
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.875,
+           1.2,
+           0.53
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             -15.6345,
+             0.0,
+             -101.6244
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.12,
+              "height": 0.9276448673926893
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.25,
+           0.97
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             7.82908,
+             0.0,
+             -180.0
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.1,
+              "height": 0.8075270893288968
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.4
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             0.0,
+             0.0,
+             -12.6
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.5,
+               0.288,
+               0.4
+              ],
+              "rounding": 0.27
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.714
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.08,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.684
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.16,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.654
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.24,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.4
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             0.0,
+             0.0,
+             12.6
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.5,
+               0.288,
+               0.4
+              ],
+              "rounding": 0.27
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.714
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.08,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.684
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.16,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.654
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.24,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           -1.45,
+           0.62
+          ],
+          "children": [
+           {
+            "kind": "intersection",
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.04,
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.97,
+                 0.156,
+                 0.85
+                ],
+                "rounding": 0.14
+               }
+              ]
+             },
+             {
+              "kind": "box",
+              "size": [
+               1.2,
+               0.6,
+               0.22
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           -1.404,
+           0.7
+          ],
+          "children": [
+           {
+            "kind": "repeat",
+            "size": [
+             0.17,
+             0.0,
+             0.0
+            ],
+            "count": 5,
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               180.0,
+               0.0,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "cone",
+                "radius": 0.05,
+                "height": 0.28
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.08,
+           -1.506,
+           0.7
+          ],
+          "children": [
+           {
+            "kind": "repeat",
+            "size": [
+             0.17,
+             0.0,
+             0.0
+            ],
+            "count": 5,
+            "children": [
+             {
+              "kind": "cone",
+              "radius": 0.05,
+              "height": 0.26
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "boundsMin": [
+     -10.0,
+     -10.0,
+     -10.0
+    ],
+    "boundsMax": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "matter",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2000000,
+    "seed": 11,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "extent": [
+     6.0,
+     6.0,
+     6.0
+    ],
+    "spawnRate": 0.0,
+    "burst": 2000000.0,
+    "lifetimeMin": 1000.0,
+    "lifetimeMax": 1000.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.3,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.4,
+    "turbulence": 0.5,
+    "turbulenceScale": 0.6,
+    "turbulenceSpeed": 0.2,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.013,
+    "colorStart": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "colorEnd": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "shape2d": "flake",
+    "flake": {
+     "metal": [
+      0.5,
+      0.51,
+      0.54
+     ],
+     "temper": 30.0,
+     "filmIor": 2.4,
+     "glint": 0.012,
+     "tumble": 0.4,
+     "free": 0.2,
+     "bound": 0.65,
+     "latentNormal": 1.0,
+     "sparkle": 0.008,
+     "sparkleGain": 0.6,
+     "fuse": 0.97
+    },
+    "latent": {
+     "sdf": "latent",
+     "coherence": 1.0,
+     "width": 0.08,
+     "strength": 1.0,
+     "flow": 0.3,
+     "release": 12.0
+    },
+    "density": {
+     "boundsMin": [
+      -10.0,
+      -10.0,
+      -10.0
+     ],
+     "boundsMax": [
+      10.0,
+      10.0,
+      10.0
+     ],
+     "resolution": 192,
+     "weight": 0.05
+    }
+   }
+  },
+  {
+   "name": "dust",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 250000,
+    "seed": 23,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "extent": [
+     22.0,
+     22.0,
+     22.0
+    ],
+    "spawnRate": 0.0,
+    "burst": 250000.0,
+    "lifetimeMin": 1000.0,
+    "lifetimeMax": 1000.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.05,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.2,
+    "turbulence": 0.15,
+    "turbulenceScale": 0.3,
+    "turbulenceSpeed": 0.1,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.013,
+    "colorStart": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "colorEnd": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "shape2d": "flake",
+    "flake": {
+     "metal": [
+      0.5,
+      0.51,
+      0.54
+     ],
+     "temper": 0.0,
+     "filmIor": 2.4,
+     "glint": 0.012,
+     "tumble": 0.4,
+     "free": 0.35,
+     "bound": 0.0,
+     "latentNormal": 0.0,
+     "sparkle": 0.012,
+     "sparkleGain": 0.5,
+     "fuse": 0.0
+    }
+   }
+  },
+  {
+   "name": "entity",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "union",
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.22,
+        "children": [
+         {
+          "kind": "smoothDifference",
+          "smooth": 0.1,
+          "children": [
+           {
+            "kind": "smoothIntersection",
+            "smooth": 0.25,
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.3,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.0,
+                 0.15,
+                 -1.25
+                ],
+                "children": [
+                 {
+                  "kind": "capsule",
+                  "radius": 1.95,
+                  "height": 1.4
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "plane",
+              "axis": [
+               0.0,
+               0.0,
+               -1.0
+              ],
+              "offset": 0.55
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.76,
+             0.72,
+             0.6
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               0.0,
+               -12.6
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.62,
+                 0.36,
+                 0.55
+                ],
+                "rounding": 0.3
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.76,
+             0.72,
+             0.6
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               0.0,
+               0.0,
+               12.6
+              ],
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.62,
+                 0.36,
+                 0.55
+                ],
+                "rounding": 0.3
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             -1.45,
+             0.62
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.95,
+               0.13,
+               0.85
+              ],
+              "rounding": 0.1
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.875,
+           1.2,
+           0.53
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             -15.6345,
+             0.0,
+             101.6244
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.12,
+              "height": 0.9276448673926893
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.875,
+           1.2,
+           0.53
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             -15.6345,
+             0.0,
+             -101.6244
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.12,
+              "height": 0.9276448673926893
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.25,
+           0.97
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             7.82908,
+             0.0,
+             -180.0
+            ],
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 0.1,
+              "height": 0.8075270893288968
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.4
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             0.0,
+             0.0,
+             -12.6
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.5,
+               0.288,
+               0.4
+              ],
+              "rounding": 0.27
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.714
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.08,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.684
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.16,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           -0.76,
+           0.72,
+           0.654
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.24,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.4
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             0.0,
+             0.0,
+             12.6
+            ],
+            "children": [
+             {
+              "kind": "roundedBox",
+              "size": [
+               0.5,
+               0.288,
+               0.4
+              ],
+              "rounding": 0.27
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.714
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.08,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.684
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.16,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.76,
+           0.72,
+           0.654
+          ],
+          "children": [
+           {
+            "kind": "rotate",
+            "rotation": [
+             90.0,
+             0.0,
+             0.0
+            ],
+            "children": [
+             {
+              "kind": "torus",
+              "radius": 0.24,
+              "rounding": 0.027
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "union",
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           -1.45,
+           0.62
+          ],
+          "children": [
+           {
+            "kind": "intersection",
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.04,
+              "children": [
+               {
+                "kind": "roundedBox",
+                "size": [
+                 0.97,
+                 0.156,
+                 0.85
+                ],
+                "rounding": 0.14
+               }
+              ]
+             },
+             {
+              "kind": "box",
+              "size": [
+               1.2,
+               0.6,
+               0.22
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           -1.404,
+           0.7
+          ],
+          "children": [
+           {
+            "kind": "repeat",
+            "size": [
+             0.17,
+             0.0,
+             0.0
+            ],
+            "count": 5,
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               180.0,
+               0.0,
+               0.0
+              ],
+              "children": [
+               {
+                "kind": "cone",
+                "radius": 0.05,
+                "height": 0.28
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "translate",
+          "translation": [
+           0.08,
+           -1.506,
+           0.7
+          ],
+          "children": [
+           {
+            "kind": "repeat",
+            "size": [
+             0.17,
+             0.0,
+             0.0
+            ],
+            "count": 5,
+            "children": [
+             {
+              "kind": "cone",
+              "radius": 0.05,
+              "height": 0.26
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "boundsMin": [
+     -10.0,
+     -10.0,
+     -10.0
+    ],
+    "boundsMax": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "material": {
+     "baseColor": [
+      0.36,
+      0.37,
+      0.4
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.2,
+     "metallic": 1.0,
+     "thinFilm": {
+      "thickness": 30.0,
+      "ior": 2.4
+     },
+     "anisotropy": {
+      "strength": -0.4,
+      "rotation": 0.0
+     },
+     "engraving": {
+      "depth": 0.3,
+      "crawl": 0.072,
+      "grating": 1.0,
+      "spacing": 1600.0,
+      "panels": 0.55,
+      "layers": [
+       {
+        "family": "rosette",
+        "center": [
+         -0.76,
+         0.72,
+         0.6
+        ],
+        "petals": 12,
+        "frequency": 12.0,
+        "weight": 1.0,
+        "depth": 0.35,
+        "inner": 0.36,
+        "outer": 0.85
+       },
+       {
+        "family": "rosette",
+        "center": [
+         0.76,
+         0.72,
+         0.6
+        ],
+        "petals": 18,
+        "frequency": 12.0,
+        "weight": 1.0,
+        "depth": 0.35,
+        "inner": 0.36,
+        "outer": 0.85
+       },
+       {
+        "family": "contour",
+        "center": [
+         0.0,
+         0.2,
+         -3.0
+        ],
+        "petals": 7,
+        "frequency": 7.0,
+        "weight": 1.0,
+        "depth": 0.28,
+        "inner": 0.15,
+        "outer": 0.8
+       },
+       {
+        "family": "engine",
+        "axis": [
+         0.94,
+         0.3,
+         0.17
+        ],
+        "frequency": 9.0,
+        "weight": 0.25,
+        "depth": 0.16,
+        "inner": 0.15,
+        "outer": 0.8
+       }
+      ]
+     }
+    },
+    "maxSteps": 448,
+    "stepScale": 0.6,
+    "epsilon": 0.0006,
+    "normalEpsilon": 0.004,
+    "castShadows": false,
+    "look": {
+     "aoStrength": 0.6,
+     "aoDistance": 0.25
+    },
+    "density": {
+     "particles": "matter",
+     "iso": 1.0,
+     "sharpness": 1.0
+    }
+   }
+  }
+ ]
+}

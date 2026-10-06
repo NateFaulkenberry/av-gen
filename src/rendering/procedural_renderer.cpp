@@ -1,10 +1,11 @@
 #include "rendering/procedural_renderer.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
 #include "scene/wire_edges.hpp"
 
 #include "rendering/field_uniforms.hpp"
-#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
+#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared object slot layout)
 #include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 #include "rendering/spline_buffers.hpp"
 
@@ -2297,6 +2298,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             obj.toon1 = toon[1];
             obj.toon2 = toon[2];
         }
+        obj.optics = packOptics(m); // ADR-1143
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < scene.textures.size() && !scene.textures[ref.texture].isHdr();

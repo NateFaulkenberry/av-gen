@@ -150,7 +150,106 @@ struct ShadeContext {
     // PBR paths -- has toon.x == 0 and takes the paths it always took.
     toon: vec4<f32>,       // x = lit bands (0 = off), y = edge softness, z = terminator, w = highlight strength
     toonHighlight: f32,    // highlight size (0 = a point, 1 = the whole lit side)
+    // ADR-1143: anisotropic GGX. `anisotropy` 0 (a zero-initialised context, and every material that
+    // does not ask) takes the isotropic lobe exactly as before; otherwise the lobe is stretched along
+    // `anisoT` (> 0) or `anisoB` (< 0), both unit vectors in the tangent plane of `normal`.
+    anisotropy: f32,
+    anisoT: vec3<f32>,
+    anisoB: vec3<f32>,
 };
+
+// ---- ADR-1143: anisotropic GGX and the thin-film tint ----------------------------------------------
+//
+// Anisotropic GGX after Burley (2012) with Kulla and Conty's (2017) parameterisation:
+// alpha_t = alpha (1 + s), alpha_b = alpha (1 - s), floored so s = +-1 stays finite. The visibility
+// term is the height-correlated anisotropic Smith (Heitz 2014). `alpha` is the lobe's isotropic alpha,
+// already widened by a sphere or tube light's angular size, so the representative-point lights keep
+// their normalisation. Returns D * V.
+fn anisotropicGgxDV(ctx: ShadeContext, l: vec3<f32>, h: vec3<f32>, nDotH: f32, nDotL: f32, alpha: f32) -> f32 {
+    let s = clamp(ctx.anisotropy, -1.0, 1.0);
+    let at = max(alpha * (1.0 + s), 2e-3);
+    let ab = max(alpha * (1.0 - s), 2e-3);
+    let tH = dot(ctx.anisoT, h);
+    let bH = dot(ctx.anisoB, h);
+    let a2 = at * ab;
+    let d = vec3<f32>(ab * tH, at * bH, a2 * nDotH);
+    let w2 = a2 / max(dot(d, d), 1e-12);
+    let distribution = a2 * w2 * w2 / PI;
+    let tV = dot(ctx.anisoT, ctx.view);
+    let bV = dot(ctx.anisoB, ctx.view);
+    let tL = dot(ctx.anisoT, l);
+    let bL = dot(ctx.anisoB, l);
+    let lambdaV = nDotL * length(vec3<f32>(at * tV, ab * bV, ctx.nDotV));
+    let lambdaL = ctx.nDotV * length(vec3<f32>(at * tL, ab * bL, nDotL));
+    let visibility = 0.5 / max(lambdaV + lambdaL, 1e-5);
+    return distribution * visibility;
+}
+
+// The specular lobe's D * V: the isotropic expression the lit path has always used, or the
+// anisotropic one when the material asks (a uniform branch: the strength is the draw's).
+fn specularLobeDV(ctx: ShadeContext, l: vec3<f32>, h: vec3<f32>, nDotH: f32, nDotL: f32, alpha: f32) -> f32 {
+    if (ctx.anisotropy != 0.0) {
+        return anisotropicGgxDV(ctx, l, h, nDotH, nDotL, alpha);
+    }
+    return distributionGgxL(nDotH, alpha) * visibilitySmithL(ctx.nDotV, nDotL, alpha);
+}
+
+// Wyman, Sloan and Shirley (2013): the multi-lobe fit of the CIE 1931 2-degree matching functions.
+// scene/material_optics.cpp's `cieXyz` is this, line for line.
+fn thinFilmLobe(x: f32, mu: f32, lo: f32, hi: f32) -> f32 {
+    let t = (x - mu) * select(hi, lo, x < mu);
+    return exp(-0.5 * t * t);
+}
+
+fn thinFilmCmf(lambda: f32) -> vec3<f32> {
+    let x = 0.362 * thinFilmLobe(lambda, 442.0, 0.0624, 0.0374) + 1.056 * thinFilmLobe(lambda, 599.8, 0.0264, 0.0323)
+          - 0.065 * thinFilmLobe(lambda, 501.1, 0.0490, 0.0382);
+    let y = 0.821 * thinFilmLobe(lambda, 568.8, 0.0213, 0.0247) + 0.286 * thinFilmLobe(lambda, 530.9, 0.0613, 0.0322);
+    let z = 1.217 * thinFilmLobe(lambda, 437.0, 0.0845, 0.0278) + 0.681 * thinFilmLobe(lambda, 459.0, 0.0385, 0.0725);
+    return vec3<f32>(x, y, z);
+}
+
+fn thinFilmXyzToRgb(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(3.2406 * c.x - 1.5372 * c.y - 0.4986 * c.z,
+                     -0.9689 * c.x + 1.8758 * c.y + 0.0415 * c.z,
+                     0.0557 * c.x - 0.2040 * c.y + 1.0570 * c.z);
+}
+
+// Thin-film interference as a tint on f0 (the Astral Forge prototype's `thinFilm`, generalised to any
+// film ior and substrate). Airy reflectance of air | film | substrate at 16 wavelengths, 380..680 nm,
+// folded to XYZ with the CIE fit and divided by the bare substrate's reflectance, so a film of zero
+// thickness is exactly neutral. The substrate is one real amplitude: -sqrt(f0) for a conductor (a
+// metal's phase flip), the Fresnel amplitude from the film into a dielectric of f0's ior otherwise.
+// Evaluated once per fragment at N.V -- the angle of the mirror direction, so exact for the IBL lobe
+// and for a sharp highlight; Belcour and Barla (2017) evaluate it per light at V.H and prefilter the
+// spectrum analytically, which this does not. scene::thinFilmTint is the CPU twin.
+fn thinFilmTint(cosView: f32, thicknessNm: f32, filmIor: f32, substrateF0: f32, metallic: f32) -> vec3<f32> {
+    if (!(thicknessNm > 0.0)) {
+        return vec3<f32>(1.0);
+    }
+    let n = max(filmIor, 1.0);
+    let cosI = clamp(cosView, 0.0, 1.0);
+    let sinT2 = (1.0 - cosI * cosI) / (n * n);
+    let cosT = sqrt(max(1.0 - sinT2, 0.0));
+    let r1 = (1.0 - n) / (1.0 + n);
+    let a = sqrt(clamp(substrateF0, 1e-4, 0.98));
+    let nb = (1.0 + a) / (1.0 - a);
+    let r2 = metallic * (-a) + (1.0 - metallic) * ((n - nb) / (n + nb));
+    let r0 = (r1 + r2) * (r1 + r2) / ((1.0 + r1 * r2) * (1.0 + r1 * r2));
+    var acc = vec3<f32>(0.0);
+    var norm = vec3<f32>(0.0);
+    for (var k = 0; k < 16; k = k + 1) {
+        let lambda = 380.0 + 20.0 * f32(k);
+        let delta = 4.0 * PI * n * thicknessNm * cosT / lambda;
+        let c = cos(delta);
+        let r = (r1 * r1 + r2 * r2 + 2.0 * r1 * r2 * c) / (1.0 + r1 * r1 * r2 * r2 + 2.0 * r1 * r2 * c);
+        let w = thinFilmCmf(lambda);
+        acc = acc + w * (r / max(r0, 1e-6));
+        norm = norm + w;
+    }
+    let white = thinFilmXyzToRgb(vec3<f32>(1.0));
+    return max(thinFilmXyzToRgb(acc / norm) / max(white, vec3<f32>(1e-3)), vec3<f32>(0.0));
+}
 
 // ---- ADR-1071: cel lighting ----------------------------------------------------------------------
 //
@@ -248,7 +347,7 @@ fn shadePunctual(light: GpuLight, ctx: ShadeContext, l: vec3<f32>, attenuation: 
     let nDotH = max(dot(ctx.normal, h), 0.0);
     let vDotH = max(dot(ctx.view, h), 0.0);
     let f = fresnelSchlickL(vDotH, ctx.f0);
-    let spec = distributionGgxL(nDotH, alphaOverride) * visibilitySmithL(ctx.nDotV, nDotL, alphaOverride) * f;
+    let spec = specularLobeDV(ctx, l, h, nDotH, nDotL, alphaOverride) * f;
     let diff = (vec3<f32>(1.0) - f) * ctx.diffuseColor / PI;
     let radiance = light.colorIntensity.rgb * attenuation * nDotL;
     out.diffuse = diff * radiance;
@@ -549,7 +648,7 @@ fn shadeUniform(light: Light, ctx: ShadeContext, l: vec3<f32>, attenuation: f32)
     let nDotH = max(dot(ctx.normal, h), 0.0);
     let vDotH = max(dot(ctx.view, h), 0.0);
     let f = fresnelSchlickL(vDotH, ctx.f0);
-    let spec = distributionGgxL(nDotH, ctx.alpha) * visibilitySmithL(ctx.nDotV, nDotL, ctx.alpha) * f;
+    let spec = specularLobeDV(ctx, l, h, nDotH, nDotL, ctx.alpha) * f;
     let diff = (vec3<f32>(1.0) - f) * ctx.diffuseColor / PI;
     let radiance = light.colorIntensity.rgb * attenuation * nDotL;
     out.diffuse = diff * radiance;

@@ -1,0 +1,29 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Astral Forge: a latent entity"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "latent-entity.scene.json"
+  }
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "parameters": {},
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/latent-entity"
+ }
+}

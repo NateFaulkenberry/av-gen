@@ -1063,14 +1063,18 @@ TEST_CASE("the object slot count is not the renderer's binding limit on entities
         CHECK(renderer.find("kMaxObjects") == std::string::npos);
     }
 
-    SECTION("a small scene still allocates exactly the 128 KB it used to") {
-        // The initial allocation is the old cap's size, deliberately: growth is the new behaviour,
-        // and a scene under 256 entities should not pay a byte more than it did before ADR-128.
+    SECTION("a small scene still allocates exactly the 256 slots it used to") {
+        // The initial allocation is the old cap's slot count, deliberately: growth is the new
+        // behaviour, and a scene under 256 entities should never reallocate. ADR-128 pinned this as
+        // 128 KB (256 x 512); ADR-1143 grew the slot to 768 bytes for the material's optics lane, so
+        // the bytes moved to 192 KB and the count -- the half of the contract that decides whether a
+        // small scene ever grows the buffer -- is what stays pinned.
         const auto initial = rendererConstants.find("kInitialObjects");
         const auto stride = rendererConstants.find("kObjectStride");
         REQUIRE(initial != rendererConstants.end());
         REQUIRE(stride != rendererConstants.end());
-        CHECK(initial->second * stride->second == 128 * 1024);
+        CHECK(initial->second == 256);
+        CHECK(initial->second * stride->second == 192 * 1024);
     }
 
     SECTION("the remaining ceiling is above the identifier target's naming capacity") {

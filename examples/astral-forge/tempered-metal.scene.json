@@ -1,0 +1,68 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "tempered-metal",
+  "camera": { "mode": 1, "position": [0, 0.2, 15.5], "target": [0, 0.1, 0], "fov": 40.0 },
+  "environment": { "background": [0, 0, 0], "intensity": 0.0 },
+  "post": { "bloomIntensity": 0.04 },
+  "lights": [
+    { "id": "strip-top", "name": "strip-top", "type": "tube", "position": [0, 6, 7], "direction": [0, -0.6, -0.8],
+      "up": [0, 0.8, -0.6], "width": 22.0, "radius": 0.12, "color": [1, 0.97, 0.92], "intensity": 70.0, "castsShadow": false, "contactShadow": false },
+    { "id": "strip-left", "name": "strip-left", "type": "tube", "position": [-9, 0, 6], "direction": [0.8, 0, -0.6],
+      "up": [0, 1, 0], "width": 14.0, "radius": 0.08, "color": [0.85, 0.9, 1], "intensity": 45.0, "castsShadow": false, "contactShadow": false },
+    { "id": "strip-low", "name": "strip-low", "type": "tube", "position": [0, -6, 6], "direction": [0, 0.7, -0.7],
+      "up": [0, 0.7, 0.7], "width": 22.0, "radius": 0.06, "color": [1, 0.9, 0.8], "intensity": 25.0, "castsShadow": false, "contactShadow": false },
+    { "id": "key", "name": "key", "type": "directional", "direction": [-0.35, -0.45, -0.82],
+      "color": [1, 0.96, 0.9], "intensity": 2.5, "castsShadow": false, "contactShadow": false }
+  ],
+  "nodes": [
+    { "name": "film-00", "kind": "sdf", "position": [-6.6, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22 } } },
+    { "name": "film-30", "kind": "sdf", "position": [-4.4, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 30, "ior": 2.4 } } } },
+    { "name": "film-40", "kind": "sdf", "position": [-2.2, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 40, "ior": 2.4 } } } },
+    { "name": "film-48", "kind": "sdf", "position": [0, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 48, "ior": 2.4 } } } },
+    { "name": "film-55", "kind": "sdf", "position": [2.2, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 55, "ior": 2.4 } } } },
+    { "name": "film-62", "kind": "sdf", "position": [4.4, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 62, "ior": 2.4 } } } },
+    { "name": "film-72", "kind": "sdf", "position": [6.6, 1.6, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 0.95 } }, "boundsMin": [-1.1, -1.1, -1.1], "boundsMax": [1.1, 1.1, 1.1],
+        "material": { "baseColor": [0.56, 0.56, 0.57], "metallic": 1, "roughness": 0.22,
+                      "thinFilm": { "thickness": 72, "ior": 2.4 } } } },
+
+    { "name": "brushed-0", "kind": "sdf", "position": [-5.6, -1.5, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 1.1 } }, "boundsMin": [-1.3, -1.3, -1.3], "boundsMax": [1.3, 1.3, 1.3],
+        "material": { "baseColor": [0.6, 0.6, 0.62], "metallic": 1, "roughness": 0.38 } } },
+    { "name": "brushed-meridian", "kind": "sdf", "position": [-2.8, -1.5, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 1.1 } }, "boundsMin": [-1.3, -1.3, -1.3], "boundsMax": [1.3, 1.3, 1.3],
+        "material": { "baseColor": [0.6, 0.6, 0.62], "metallic": 1, "roughness": 0.38,
+                      "anisotropy": { "strength": 0.85, "rotation": 0.0 } } } },
+    { "name": "brushed-turned", "kind": "sdf", "position": [0, -1.5, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 1.1 } }, "boundsMin": [-1.3, -1.3, -1.3], "boundsMax": [1.3, 1.3, 1.3],
+        "material": { "baseColor": [0.6, 0.6, 0.62], "metallic": 1, "roughness": 0.38,
+                      "anisotropy": { "strength": 0.85, "rotation": 1.5708 } } } },
+    { "name": "brushed-across", "kind": "sdf", "position": [2.8, -1.5, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 1.1 } }, "boundsMin": [-1.3, -1.3, -1.3], "boundsMax": [1.3, 1.3, 1.3],
+        "material": { "baseColor": [0.6, 0.6, 0.62], "metallic": 1, "roughness": 0.38,
+                      "anisotropy": { "strength": -0.85, "rotation": 0.0 } } } },
+    { "name": "brushed-blued", "kind": "sdf", "position": [5.6, -1.5, 0], "sdf": {
+        "tree": { "root": { "kind": "sphere", "radius": 1.1 } }, "boundsMin": [-1.3, -1.3, -1.3], "boundsMax": [1.3, 1.3, 1.3],
+        "material": { "baseColor": [0.6, 0.6, 0.62], "metallic": 1, "roughness": 0.38,
+                      "thinFilm": { "thickness": 300, "ior": 2.4 },
+                      "anisotropy": { "strength": 0.85, "rotation": 0.0 } } } }
+  ]
+}

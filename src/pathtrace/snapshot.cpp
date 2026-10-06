@@ -348,6 +348,57 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                "fields, so what the grid drives is traced at rest",
                                static_cast<int>(scene.fields.grids.size()));
     }
+    // ADR-1143: a material's thin film and anisotropy are terms of the realtime lit shader only. The
+    // tracer's BSDF (bsdf.hpp) has neither, so such a surface is traced as its bare material: no temper
+    // colour, an isotropic highlight. Said here rather than dropped silently.
+    {
+        int thinFilm = 0;
+        int anisotropic = 0;
+        const auto count = [&](const scene::Material& m) {
+            thinFilm += m.thinFilm.enabled() ? 1 : 0;
+            anisotropic += m.anisotropy.enabled() ? 1 : 0;
+        };
+        for (const scene::Entity& e : scene.entities) {
+            if (e.visible) count(e.material);
+        }
+        for (const scene::ProceduralGeometry& proc : scene.procedurals) {
+            if (proc.visible) count(proc.material);
+        }
+        for (const scene::SdfObject& sdf : scene.sdfs) {
+            if (sdf.visible) count(sdf.material);
+        }
+        if (thinFilm > 0) {
+            snap.capabilities.note("thin-film material", Support::Degraded,
+                                   "the BSDF has no thin-film term (ADR-1143): traced as the bare material, "
+                                   "without its interference colour",
+                                   thinFilm);
+        }
+        if (anisotropic > 0) {
+            snap.capabilities.note("anisotropic material", Support::Degraded,
+                                   "the BSDF's GGX lobe is isotropic (ADR-1143): the highlight is not stretched",
+                                   anisotropic);
+        }
+    }
+    // ADR-1151..1153: the reflection-only bands, an SDF material's engraving and flake particles are terms of the
+    // realtime shaders only.
+    if (scene.environment.bands.enabled) {
+        snap.capabilities.note("reflection bands", Support::Unsupported,
+                               "the environment's reflection-only bands (ADR-1151) are not in the tracer's "
+                               "environment: surfaces lit only by them trace dark",
+                               static_cast<int>(scene.environment.bands.strips.size()));
+    }
+    {
+        int engraved = 0;
+        for (const scene::SdfObject& sdf : scene.sdfs) {
+            engraved += sdf.visible && sdf.material.engraving.enabled() ? 1 : 0;
+        }
+        if (engraved > 0) {
+            snap.capabilities.note("engraved material", Support::Degraded,
+                                   "the guilloche engraving (ADR-1152) is a shading term of the raymarch: traced "
+                                   "as the smooth surface",
+                                   engraved);
+        }
+    }
     // ---- procedural scatter ----------------------------------------------------------------
     //
     // The realtime renderer resolves these with `scene::makeSourceMesh` on the CPU and then

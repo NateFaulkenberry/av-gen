@@ -2552,8 +2552,10 @@ void registerEnvironmentTools(ToolRegistry& registry) {
     add(registry, "material.list", "List material controls",
         "The material parameters this scene exposes: per-node emissive boost and roughness scale, "
         "and for procedural nodes the per-part tint, emissive colour, emissive gain, roughness and "
-        "opacity. Emissive colour is HDR -- values well above 1 are correct and are what makes "
-        "something glow.",
+        "opacity; for procedural nodes and SDF objects also material/thinFilm/* (oxide thickness in nm, "
+        "0 = off: about 25 straw, 48 bronze, 55 purple, 65 blue at ior 2.4) and material/anisotropy/* "
+        "(strength -1..1, 0 = off; rotation in radians) (ADR-1143). Emissive colour is HDR -- values well "
+        "above 1 are correct and are what makes something glow.",
         schema::object({{"node", schema::string("Restrict to one node")},
                         {"limit", schema::integer("Maximum results", 1, kMaxLimit)}}),
         readOnly(),
@@ -2567,7 +2569,8 @@ void registerEnvironmentTools(ToolRegistry& registry) {
                 const bool material =
                     containsNoCase(path, "emissive") || containsNoCase(path, "roughness") ||
                     containsNoCase(path, "tint") || containsNoCase(path, "opacity") ||
-                    containsNoCase(path, "metallic") || containsNoCase(path, "baseColor");
+                    containsNoCase(path, "metallic") || containsNoCase(path, "baseColor") ||
+                    containsNoCase(path, "thinFilm") || containsNoCase(path, "anisotropy"); // ADR-1143
                 if (!material) {
                     continue;
                 }

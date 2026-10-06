@@ -460,6 +460,20 @@ Result<void> SdfObject::validate() const {
     if (look.shadowSteps < 1 || look.shadowSteps > 256) {
         return fail("sdf '{}': look shadowSteps must be in 1..256 (got {})", name, look.shadowSteps);
     }
+    if (material.engraving.enabled() && renderMode != SdfRenderMode::Raymarch) { // ADR-1152
+        return fail("sdf '{}': an engraving is cut by the raymarch; renderMode must be raymarch", name);
+    }
+    if (density.active()) { // ADR-1142
+        if (renderMode != SdfRenderMode::Raymarch) {
+            return fail("sdf '{}': a density source draws by raymarching; renderMode must be raymarch", name);
+        }
+        if (!(density.iso > 0.0f) || !std::isfinite(density.iso)) {
+            return fail("sdf '{}': density.iso must be > 0 (got {})", name, density.iso);
+        }
+        if (!(density.sharpness >= 0.0f && density.sharpness <= 1.0f)) {
+            return fail("sdf '{}': density.sharpness must be in 0..1 (got {})", name, density.sharpness);
+        }
+    }
     return {};
 }
 
@@ -518,6 +532,10 @@ json SdfObject::toJson() const {
         if (!toonShadingIsDefault(material.toon)) {
             m["toon"] = toonShadingToJson(material.toon); // ADR-1071
         }
+        writeMaterialOptics(material, m); // ADR-1143: thinFilm, anisotropy (only when authored)
+        if (material.engraving.enabled()) {
+            m["engraving"] = engravingToJson(material.engraving); // ADR-1152 (only when authored)
+        }
         j["material"] = std::move(m);
     }
     j["renderMode"] = sdfRenderModeName(renderMode);
@@ -569,6 +587,9 @@ json SdfObject::toJson() const {
         j["look"]["staticRate"] = look.staticRate;
         j["look"]["staticRoll"] = look.staticRoll;
     }
+    if (density.active()) { // ADR-1142: written only when present
+        j["density"] = json{{"particles", density.particles}, {"iso", density.iso}, {"sharpness", density.sharpness}};
+    }
     return j;
 }
 
@@ -618,6 +639,16 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
             if (auto r = readToonShading(m.at("toon"), o.material.toon); !r) {
                 return fail("material: {}", r.error().message);
             }
+        }
+        if (auto r = readMaterialOptics(m, o.material); !r) { // ADR-1143
+            return fail("material: {}", r.error().message);
+        }
+        if (m.contains("engraving")) { // ADR-1152
+            auto engraving = readEngraving(m.at("engraving"));
+            if (!engraving) {
+                return fail("material: {}", engraving.error().message);
+            }
+            o.material.engraving = std::move(*engraving);
         }
     }
     if (j.contains("renderMode")) {
@@ -702,6 +733,32 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         if (!steps) return std::unexpected(steps.error());
         o.look.shadowSteps = *steps;
     }
+    if (j.contains("density")) { // ADR-1142
+        const json& dj = j.at("density");
+        if (!dj.is_object()) {
+            return fail("'density' must be an object {particles, iso, sharpness}");
+        }
+        for (const auto& [key, value] : dj.items()) {
+            if (key != "particles" && key != "iso" && key != "sharpness") {
+                return fail("'density': unknown key '{}' (expected particles, iso, sharpness)", key);
+            }
+        }
+        auto particles = readString(dj, "particles", "");
+        if (!particles) {
+            return fail("'density.particles': {}", particles.error().message);
+        }
+        if (particles->empty()) {
+            return fail("'density' needs 'particles', the particle system whose density volume this object draws");
+        }
+        o.density.particles = *particles;
+        auto iso = readFloat(dj, "iso", o.density.iso);
+        auto sharpness = readFloat(dj, "sharpness", o.density.sharpness);
+        if (!iso || !sharpness) {
+            return fail("'density': iso and sharpness must be numbers");
+        }
+        o.density.iso = *iso;
+        o.density.sharpness = *sharpness;
+    }
     if (auto ok = o.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -732,6 +789,8 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("material/roughness", "material/roughness", rest.material.roughness, 0.0f, 1.0f, 0.0f, 1.0f);
     r.f("material/metallic", "material/metallic", rest.material.metallic, 0.0f, 1.0f, 0.0f, 1.0f);
     p.toon = registerToonParameters(params, prefix, group, rest.material.toon, &p.all); // ADR-1071
+    p.optics = registerMaterialOpticsParameters(params, prefix, group, rest.material, &p.all); // ADR-1143
+    p.engraving = registerEngravingParameters(params, prefix, group, rest.material.engraving, &p.all); // ADR-1152
     r.v3("bounds/min", "bounds/min", rest.boundsMin, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("bounds/max", "bounds/max", rest.boundsMax, -1e4f, 1e4f, -20.0f, 20.0f);
     r.i("resolution", rest.resolution, 2, 256, 8, 128);
@@ -769,6 +828,10 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("look/shadow/softness", "look/shadow/softness", rest.look.shadowSoftness, 0.1f, 256.0f, 1.0f, 64.0f);
     r.v3("look/shadow/direction", "look/shadow/direction", rest.look.shadowDirection, -1.0f, 1.0f, -1.0f, 1.0f);
     r.i("look/shadow/steps", rest.look.shadowSteps, 1, 256, 8, 96);
+    if (rest.density.active()) { // ADR-1142: the iso level and the sharpening are performance controls
+        r.f("density/iso", "density/iso", rest.density.iso, 1e-4f, 1.0e4f, 0.05f, 8.0f);
+        r.f("density/sharpness", "density/sharpness", rest.density.sharpness, 0.0f, 1.0f, 0.0f, 1.0f);
+    }
 
     const int nodeCount = rest.tree.nodeCount();
     p.nodeAmount.assign(static_cast<std::size_t>(nodeCount), nullptr);
@@ -861,6 +924,8 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("material/roughness", live.material.roughness);
     index.copy("material/metallic", live.material.metallic);
     applyToonParameters(p.toon, live.material.toon); // ADR-1071
+    applyMaterialOpticsParameters(p.optics, live.material); // ADR-1143
+    applyEngravingParameters(p.engraving, live.material.engraving); // ADR-1152
     index.copy("bounds/min", live.boundsMin);
     index.copy("bounds/max", live.boundsMax);
     index.copy("resolution", live.resolution);
@@ -893,6 +958,8 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("look/shadow/softness", live.look.shadowSoftness);
     index.copy("look/shadow/direction", live.look.shadowDirection);
     index.copy("look/shadow/steps", live.look.shadowSteps);
+    index.copy("density/iso", live.density.iso); // ADR-1142 (absent when the object has no density source)
+    index.copy("density/sharpness", live.density.sharpness);
 
     char buf[128];
     int i = 0;

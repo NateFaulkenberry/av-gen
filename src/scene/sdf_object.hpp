@@ -10,6 +10,8 @@
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/material_engraving.hpp"
+#include "scene/material_optics.hpp"
 #include "scene/toon_shading.hpp"
 #include "spatial/sdf.hpp"
 
@@ -60,6 +62,19 @@ struct SdfLook {
     int shadowSteps = 32;
 };
 
+// ADR-1142: "density iso (+) SDF". The object draws the iso-surface of a particle system's density
+// volume (ADR-1141) instead of its own tree, sharpened toward its own tree where matter already is:
+//     dRho = (iso - rho) * cell * 1.6
+//     f    = sharpness > 0 && rho > 0.12 * iso ? mix(dRho, max(sdf, (0.38 * iso - rho) * cell * 3), sharpness) : dRho
+// (cell = one density voxel in the object's local units). With no matter there is no surface,
+// whatever the tree says. Raymarch only. Absent (empty `particles`) = the object as it always was.
+struct SdfDensitySource {
+    std::string particles;  // the particle system (with a `density` block) whose volume is drawn
+    float iso = 1.0f;       // the density level the surface sits at (> 0)
+    float sharpness = 0.0f; // 0..1: how far the surface is pulled onto the tree's zero set
+    [[nodiscard]] bool active() const { return !particles.empty(); }
+};
+
 struct SdfObject {
     std::string name = "sdf";
     bool visible = true;
@@ -87,6 +102,7 @@ struct SdfObject {
     bool compile = false;
     bool castShadows = true;
     SdfLook look;                        // ADR-1002
+    SdfDensitySource density;            // ADR-1142
     // ADR-1044: surfaces. Empty = one surface, the material as it always was. Otherwise a compiled tree's
     // node `material` ids pick one per hit, and its `color` multiplies the material's base colour and its
     // `emission` the material's emission (colour x intensity) -- so author the material white with emission
@@ -122,6 +138,8 @@ struct SdfParameters {
     std::string prefix;
     std::vector<params::IParameter*> all;
     ToonParameters toon; // ADR-1071: toon/* (the material's cel lighting)
+    MaterialOpticsParameters optics; // ADR-1143: material/thinFilm/*, material/anisotropy/*
+    EngravingParameters engraving;   // ADR-1152: material/engraving/* (only when the block is present)
     params::Parameter<bool>* visible = nullptr;
     params::Parameter<glm::vec3>* position = nullptr;
     params::Parameter<glm::vec3>* rotation = nullptr;

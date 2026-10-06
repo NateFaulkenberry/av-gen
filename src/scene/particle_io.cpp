@@ -4,8 +4,11 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -69,6 +72,9 @@ Result<EmitterShape> shapeFromName(const std::string& name) {
 // ADR-370: the leaf card's silhouette. Written and read only when it is not Round, so a scene that
 // never asks for a leaf is byte-identical on a re-save.
 const char* particleShape2dName(ParticleShape shape) {
+    if (shape == ParticleShape::Flake) {
+        return "flake"; // ADR-1153
+    }
     return shape == ParticleShape::Leaf ? "leaf" : "round";
 }
 
@@ -79,7 +85,10 @@ Result<ParticleShape> particleShape2dFromName(const std::string& name) {
     if (name == "leaf") {
         return ParticleShape::Leaf;
     }
-    return fail("unknown particle shape '{}' (expected round or leaf)", name);
+    if (name == "flake") {
+        return ParticleShape::Flake; // ADR-1153
+    }
+    return fail("unknown particle shape '{}' (expected round, leaf or flake)", name);
 }
 
 const char* blendName(ParticleBlend blend) {
@@ -226,6 +235,24 @@ json particlesToJson(const ParticleSystem& s) {
     }
     if (s.volumeGlow != 0.0f) {
         j["volumeGlow"] = s.volumeGlow;
+    }
+    if (s.shape2d == ParticleShape::Flake) { // ADR-1153: written only for a flake system
+        const ParticleFlake& f = s.flake;
+        j["flake"] = json{{"metal", {f.metal.x, f.metal.y, f.metal.z}}, {"temper", f.temper}, {"filmIor", f.filmIor},
+                          {"glint", f.glint}, {"tumble", f.tumble}, {"free", f.free}, {"bound", f.bound},
+                          {"latentNormal", f.latentNormal}, {"sparkle", f.sparkle}, {"sparkleGain", f.sparkleGain},
+                          {"fuse", f.fuse}};
+    }
+    if (s.latent.active()) { // ADR-1140: written only when present, so a file without it stays as it was
+        j["latent"] = json{{"sdf", s.latent.sdf},           {"coherence", s.latent.coherence},
+                           {"width", s.latent.width},       {"strength", s.latent.strength},
+                           {"flow", s.latent.flow},         {"release", s.latent.release}};
+    }
+    if (s.density.enabled) { // ADR-1141
+        j["density"] = json{{"boundsMin", vecToJson(s.density.boundsMin)},
+                            {"boundsMax", vecToJson(s.density.boundsMax)},
+                            {"resolution", s.density.resolution},
+                            {"weight", s.density.weight}};
     }
     auto scalarCurve = [](const ParticleCurve& c) {
         json keys = json::array();
@@ -491,6 +518,112 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
                 s.colorCurve.keys.push_back(ColorKey{*t, *c});
             }
         }
+    }
+    if (j.contains("flake")) { // ADR-1153
+        const json& fj = j.at("flake");
+        if (!fj.is_object()) {
+            return fail("'flake' must be an object");
+        }
+        if (s.shape2d != ParticleShape::Flake) {
+            return fail("'flake' is read only with \"shape2d\": \"flake\"");
+        }
+        static constexpr const char* kKeys[] = {"metal", "temper", "filmIor", "glint", "tumble", "free",
+                                                "bound", "latentNormal", "sparkle", "sparkleGain", "fuse"};
+        for (const auto& [key, value] : fj.items()) {
+            if (std::find_if(std::begin(kKeys), std::end(kKeys), [&](const char* k) { return key == k; }) ==
+                std::end(kKeys)) {
+                return fail("'flake': unknown key '{}' (expected metal, temper, filmIor, glint, tumble, free, bound, "
+                            "latentNormal, sparkle, sparkleGain, fuse)", key);
+            }
+        }
+        auto metal = readVec<3>(fj, "metal", s.flake.metal);
+        if (!metal) {
+            return fail("'flake.metal': {}", metal.error().message);
+        }
+        s.flake.metal = *metal;
+        for (const auto& [key, target] : {std::pair<const char*, float*>{"temper", &s.flake.temper},
+                                          std::pair<const char*, float*>{"filmIor", &s.flake.filmIor},
+                                          std::pair<const char*, float*>{"glint", &s.flake.glint},
+                                          std::pair<const char*, float*>{"tumble", &s.flake.tumble},
+                                          std::pair<const char*, float*>{"free", &s.flake.free},
+                                          std::pair<const char*, float*>{"bound", &s.flake.bound},
+                                          std::pair<const char*, float*>{"latentNormal", &s.flake.latentNormal},
+                                          std::pair<const char*, float*>{"sparkle", &s.flake.sparkle},
+                                          std::pair<const char*, float*>{"sparkleGain", &s.flake.sparkleGain},
+                                          std::pair<const char*, float*>{"fuse", &s.flake.fuse}}) {
+            auto v = readFloat(fj, key, *target);
+            if (!v || !std::isfinite(*v)) {
+                return fail("'flake.{}' must be a finite number", key);
+            }
+            *target = *v;
+        }
+        const ParticleFlake& f = s.flake;
+        if (f.temper < 0.0f || f.filmIor < 1.0f || !(f.glint > 0.0f) || f.free < 0.0f || f.bound < 0.0f ||
+            f.latentNormal < 0.0f || f.latentNormal > 1.0f || f.sparkle < 0.0f || f.sparkle > 1.0f ||
+            f.sparkleGain < 0.0f || f.tumble < 0.0f || f.fuse < 0.0f || f.fuse > 1.0f) {
+            return fail("'flake': temper, free, bound, tumble and sparkleGain must be >= 0, filmIor >= 1, glint > 0, "
+                        "latentNormal, sparkle and fuse in 0..1");
+        }
+    }
+    if (j.contains("latent")) { // ADR-1140
+        const json& l = j.at("latent");
+        if (!l.is_object()) {
+            return fail("'latent' must be an object {sdf, coherence, width, strength, flow, release}");
+        }
+        for (const auto& [key, value] : l.items()) {
+            static constexpr const char* kKeys[] = {"sdf", "coherence", "width", "strength", "flow", "release"};
+            if (std::find_if(std::begin(kKeys), std::end(kKeys), [&](const char* k) { return key == k; }) ==
+                std::end(kKeys)) {
+                return fail("'latent': unknown key '{}' (expected sdf, coherence, width, strength, flow, release)", key);
+            }
+        }
+        auto sdf = readString(l, "sdf", "");
+        if (!sdf) {
+            return fail("'latent.sdf': {}", sdf.error().message);
+        }
+        if (sdf->empty()) {
+            return fail("'latent' needs 'sdf', the name of the SDF object whose zero set binds the particles");
+        }
+        s.latent.sdf = *sdf;
+        for (const auto& [key, target] : {std::pair<const char*, float*>{"coherence", &s.latent.coherence},
+                                          std::pair<const char*, float*>{"width", &s.latent.width},
+                                          std::pair<const char*, float*>{"strength", &s.latent.strength},
+                                          std::pair<const char*, float*>{"flow", &s.latent.flow},
+                                          std::pair<const char*, float*>{"release", &s.latent.release}}) {
+            auto v = readFloat(l, key, *target);
+            if (!v) {
+                return fail("'latent.{}': {}", key, v.error().message);
+            }
+            *target = *v;
+        }
+    }
+    if (j.contains("density")) { // ADR-1141
+        const json& d = j.at("density");
+        if (!d.is_object()) {
+            return fail("'density' must be an object {boundsMin, boundsMax, resolution, weight}");
+        }
+        if (!d.contains("boundsMin") || !d.contains("boundsMax")) {
+            return fail("'density' needs 'boundsMin' and 'boundsMax' (world space)");
+        }
+        s.density.enabled = true;
+        auto lo = readVec<3>(d, "boundsMin", s.density.boundsMin);
+        auto hi = readVec<3>(d, "boundsMax", s.density.boundsMax);
+        auto weight = readFloat(d, "weight", s.density.weight);
+        if (!lo || !hi || !weight) {
+            return fail("'density': boundsMin and boundsMax must be [x, y, z] and weight a number");
+        }
+        s.density.boundsMin = *lo;
+        s.density.boundsMax = *hi;
+        s.density.weight = *weight;
+        if (d.contains("resolution")) {
+            if (!d.at("resolution").is_number_integer()) {
+                return fail("'density.resolution' must be an integer");
+            }
+            s.density.resolution = d.at("resolution").get<int>();
+        }
+    }
+    if (auto r = validateLatentAndDensity(s); !r) {
+        return std::unexpected(r.error());
     }
     if (auto r = validateParticleSystem(s); !r) {
         return std::unexpected(r.error());

@@ -3,6 +3,7 @@
 - Status: Accepted (gpu/productionization, the flagship LIVE scene)
 - Found by: PHONOTAXIS, whose camera language is a live orbit whose vantage and look point belong to the musical
   state.
+- PHONOTAXIS was dropped by the owner on 2026-10-05 and its scene deleted; this capability stays.
 
 ## Problem
 

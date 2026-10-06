@@ -1,9 +1,11 @@
 #include "rendering/sdf_renderer.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
 
 #include "rendering/field_uniforms.hpp"
-#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
+#include "rendering/particle_renderer.hpp" // ADR-1142: density volumes
+#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared object slot layout)
 #include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 
 #include "core/log.hpp"
@@ -15,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <map>
@@ -82,6 +85,7 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
         obj.toon1 = toon[1];
         obj.toon2 = toon[2];
     }
+    obj.optics = packOptics(m); // ADR-1143
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
@@ -121,6 +125,11 @@ struct SdfRenderer::Impl {
         // shadow maps (a caster out of frame still throws its shadow into frame), but the lit pass and the
         // depth prepass skip it.
         bool onCamera = true;
+        // ADR-1142: the density volume this object draws (null: sdfGroup, which binds the placeholder).
+        // A view, not a group: the node buffer may be re-created after the items are collected, and
+        // that re-creates every group, so the group is looked up when the pass is encoded.
+        wgpu::TextureView densityView;
+        wgpu::TextureView coarseView; // ADR-1150: its coarse occupancy grid
     };
     struct MeshItem {
         std::size_t objectIndex;
@@ -139,8 +148,25 @@ struct SdfRenderer::Impl {
     // ADR-1102: the same three pipelines, created asynchronously into `slot` (kept alive by the shared pointer).
     void buildPipelinesAsync(const wgpu::ShaderModule& module, const std::shared_ptr<Pipelines>& slot);
     const Pipelines* compiledPipelines(const scene::SdfObject& object, const spatial::FieldSet* fields);
+    // ADR-1142: the interpreter's density-mode variant (built on first use, synchronously), or null
+    // when its module failed.
+    // ADR-1142 / ADR-1152: the interpreter's variant for a set of surface flags (built on first use,
+    // synchronously), or null when it failed. Flags 0 is the default pipelines and never asked for here.
+    const Pipelines* interpreterVariantPipelines(unsigned flags);
+    // ADR-1142 / ADR-1150 / ADR-1152: `source` with the @@SDF_SURFACE@@ block replaced: the density-mode
+    // field and march (kSurfaceDensity), the engraving (kSurfaceEngraved). Empty when the markers are missing.
+    static std::string spliceSurface(const std::string& source, unsigned flags);
+    static constexpr unsigned kSurfaceDensity = 1u;
+    static constexpr unsigned kSurfaceEngraved = 2u;
+    static unsigned surfaceFlags(const scene::SdfObject& object) {
+        return (object.density.active() ? kSurfaceDensity : 0u) |
+               (object.material.engraving.enabled() ? kSurfaceEngraved : 0u);
+    }
     void ensureNodeBuffer(std::uint64_t bytes);
     void rebuildGroups();
+    // ADR-1142: group 1 with `densityView` at binding 5 (the placeholder for sdfGroup itself).
+    wgpu::BindGroup makeSdfGroup(const wgpu::TextureView& densityView, const wgpu::TextureView& coarseView);
+    wgpu::BindGroup densityGroup(const wgpu::TextureView& densityView, const wgpu::TextureView& coarseView);
 
     gpu::Context& context;
     gpu::ShaderLibrary& shaders;
@@ -179,6 +205,12 @@ struct SdfRenderer::Impl {
     SdfStats lastStepStats;
     wgpu::BindGroup sdfGroup;
     wgpu::BindGroup meshGroup;
+    // ADR-1142: a 1x1x1 zero volume (every object not in density mode binds it), the linear sampler,
+    // and one group per density view in use, dropped whenever the node buffer re-creates the groups.
+    wgpu::Texture densityPlaceholder;
+    wgpu::TextureView densityPlaceholderView;
+    wgpu::Sampler densitySampler;
+    std::map<WGPUTextureView, wgpu::BindGroup> densityGroups;
     // ADR-703: the entity object layout's binding 2 (FXL's per-entity effect records). A meshed SDF
     // is drawn with the entity lit pipelines, whose fragment stage declares it, but it never carries
     // effect lanes (its `fxA` is zero, so the shader never reads the buffer) -- one neutral record
@@ -196,9 +228,11 @@ struct SdfRenderer::Impl {
     // ADR-1003: compiled variants by spatial::sdfCompileKey, and the resolved pass source they splice.
     std::map<std::uint64_t, std::shared_ptr<Pipelines>> compiledVariants;
     bool asyncCompile = false; // ADR-1102: off by default (offline renders and tests compile before drawing)
+    bool occupancySkipping = true; // ADR-1150
     bool prewarm = true;       // ADR-1102: every compile-flagged object compiled as soon as the scene has it
     double pieceSeconds = 0.0; // the frame's render time, for the compile log
     std::string raymarchSource;
+    std::map<unsigned, std::shared_ptr<Pipelines>> interpreterVariants; // ADR-1142 / ADR-1152, by surface flags
     std::vector<spatial::SdfNodeGpu> compileScratch;
     std::uint32_t compilesThisFrame = 0;
     double lastRaymarchMs = -1.0;
@@ -258,8 +292,9 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     }
     {
         // Raymarch group 1: 0 = ObjectUniforms (dynamic), 1 = SdfObjectUniforms (dynamic),
-        // 2 = packed nodes (read-only storage), 3 = field block, 4 = step statistics (ADR-1002).
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        // 2 = packed nodes (read-only storage), 3 = field block, 4 = step statistics (ADR-1002),
+        // 5 + 6 = the density volume and its sampler (ADR-1142), 7 = its coarse occupancy grid (ADR-1150).
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -282,6 +317,17 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
         entries[4].visibility = wgpu::ShaderStage::Fragment;
         entries[4].buffer.type = wgpu::BufferBindingType::Storage;
         entries[4].buffer.minBindingSize = Impl::kStatsBytes;
+        entries[5].binding = 5; // ADR-1142: the density volume
+        entries[5].visibility = wgpu::ShaderStage::Fragment;
+        entries[5].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[5].texture.viewDimension = wgpu::TextureViewDimension::e3D;
+        entries[6].binding = 6;
+        entries[6].visibility = wgpu::ShaderStage::Fragment;
+        entries[6].sampler.type = wgpu::SamplerBindingType::Filtering;
+        entries[7].binding = 7; // ADR-1150: the coarse occupancy grid (textureLoad only)
+        entries[7].visibility = wgpu::ShaderStage::Fragment;
+        entries[7].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[7].texture.viewDimension = wgpu::TextureViewDimension::e3D;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "sdf-object-layout";
         desc.entryCount = entries.size();
@@ -318,6 +364,35 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
             readDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
             slot.read = device.CreateBuffer(&readDesc);
         }
+    }
+    {
+        // ADR-1142: before the first ensureNodeBuffer, which builds the groups that bind them.
+        wgpu::TextureDescriptor desc{};
+        desc.label = "sdf-density-placeholder";
+        desc.dimension = wgpu::TextureDimension::e3D;
+        desc.size = {1, 1, 1};
+        desc.format = wgpu::TextureFormat::RGBA16Float;
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        im.densityPlaceholder = device.CreateTexture(&desc);
+        wgpu::TextureViewDescriptor view{};
+        view.dimension = wgpu::TextureViewDimension::e3D;
+        im.densityPlaceholderView = im.densityPlaceholder.CreateView(&view);
+        const std::array<std::uint16_t, 4> zero{};
+        wgpu::TexelCopyTextureInfo dst{};
+        dst.texture = im.densityPlaceholder;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 8;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D extent{1, 1, 1};
+        im.context.queue().WriteTexture(&dst, zero.data(), sizeof(zero), &layout, &extent);
+        wgpu::SamplerDescriptor sampler{};
+        sampler.label = "sdf-density-sampler";
+        sampler.magFilter = wgpu::FilterMode::Linear;
+        sampler.minFilter = wgpu::FilterMode::Linear;
+        sampler.addressModeU = wgpu::AddressMode::ClampToEdge;
+        sampler.addressModeV = wgpu::AddressMode::ClampToEdge;
+        sampler.addressModeW = wgpu::AddressMode::ClampToEdge;
+        im.densitySampler = device.CreateSampler(&sampler);
     }
     im.ensureNodeBuffer(kNodeStride * 128);
     auto raymarch = im.shaders.load("sdf_raymarch.wgsl");
@@ -643,6 +718,7 @@ Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule&
     raymarchDepthPipeline = built->depth;
     raymarchShadowPipeline = built->shadow;
     compiledVariants.clear(); // a reload changes the pass source every variant was spliced into
+    interpreterVariants.clear();
     if (auto source = shaders.loadSource("sdf_raymarch.wgsl")) {
         raymarchSource = std::move(*source);
     }
@@ -656,7 +732,10 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     if (!object.compile || raymarchSource.empty()) {
         return nullptr;
     }
-    const std::uint64_t key = spatial::sdfCompileKey(object.tree);
+    // ADR-1142: a density-mode object's compiled tree is a different module (the density field spliced
+    // in as well), so it is a different variant; so is an engraved one (ADR-1152).
+    const unsigned flags = surfaceFlags(object);
+    const std::uint64_t key = spatial::sdfCompileKey(object.tree) ^ (static_cast<std::uint64_t>(flags) * 0x9e3779b97f4a7c15ull);
     if (auto it = compiledVariants.find(key); it != compiledVariants.end()) {
         return it->second->failed || it->second->pending > 0 ? nullptr : it->second.get();
     }
@@ -674,7 +753,10 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     }
     const auto start = std::chrono::steady_clock::now();
     const std::string field = spatial::sdfCompileWgsl(object.tree, compileScratch, fields);
-    const std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
+    std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
+    if (flags != 0u) {
+        source = spliceSurface(source, flags);
+    }
     auto module = shaders.compile(source, "sdf-raymarch-compiled");
     // ADR-1102: live, a tree the interpreter can also draw compiles on Dawn's workers and is drawn interpreted until
     // its pipelines exist -- no main-thread stall mid-performance. A tree the interpreter cannot draw (ADR-1005) still
@@ -704,6 +786,56 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
 
 
 
+std::string SdfRenderer::Impl::spliceSurface(const std::string& source, unsigned flags) {
+    constexpr std::string_view kBegin = "// @@SDF_SURFACE_BEGIN@@";
+    constexpr std::string_view kEnd = "// @@SDF_SURFACE_END@@";
+    const auto b = source.find(kBegin);
+    const auto e = source.find(kEnd);
+    if (b == std::string::npos || e == std::string::npos || e < b) {
+        return {};
+    }
+    const bool density = (flags & kSurfaceDensity) != 0u;
+    const bool engraved = (flags & kSurfaceEngraved) != 0u;
+    std::string block;
+    block += density ? "const kSdfDensityMode: bool = true;\n" : "const kSdfDensityMode: bool = false;\n"; // ADR-1150
+    block += engraved ? "const kSdfEngraved: bool = true;\n" : "const kSdfEngraved: bool = false;\n";      // ADR-1152
+    block += "fn sdfSurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {\n";
+    block += density ? "    return sdfDensitySurfaceField(offset, count, p, t, world);\n"
+                     : "    return sdfField(offset, count, p, t, world);\n";
+    block += "}\n";
+    return source.substr(0, b) + block + source.substr(e + kEnd.size());
+}
+
+const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::interpreterVariantPipelines(unsigned flags) {
+    if (auto it = interpreterVariants.find(flags); it != interpreterVariants.end()) {
+        return it->second->failed ? nullptr : it->second.get();
+    }
+    auto slotPtr = std::make_shared<Pipelines>();
+    interpreterVariants[flags] = slotPtr;
+    Pipelines& slot = *slotPtr;
+    const std::string source = raymarchSource.empty() ? std::string() : spliceSurface(raymarchSource, flags);
+    if (source.empty()) {
+        slot.failed = true;
+        log::warn("sdf: the raymarch shader has no sdfSurfaceField markers; variant {} objects are not drawn", flags);
+        return nullptr;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    auto module = shaders.compile(source, "sdf-raymarch-variant");
+    Result<Pipelines> built = module ? buildPipelines(*module) : Result<Pipelines>(std::unexpected(module.error()));
+    if (!built) {
+        slot.failed = true;
+        log::warn("sdf: the raymarch variant {} (1 = density, 2 = engraved) failed; its objects are not drawn: {}",
+                  flags, built.error().message);
+        return nullptr;
+    }
+    slot.lit = built->lit;
+    slot.depth = built->depth;
+    slot.shadow = built->shadow;
+    log::info("sdf: raymarch variant {} (1 = density, 2 = engraved) built in {:.1f} ms", flags,
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    return &slot;
+}
+
 void SdfRenderer::Impl::ensureNodeBuffer(std::uint64_t bytes) {
     if (nodes && nodeBytes >= bytes) {
         return;
@@ -717,32 +849,58 @@ void SdfRenderer::Impl::ensureNodeBuffer(std::uint64_t bytes) {
     rebuildGroups();
 }
 
+wgpu::BindGroup SdfRenderer::Impl::makeSdfGroup(const wgpu::TextureView& densityView,
+                                                const wgpu::TextureView& coarseView) {
+    std::array<wgpu::BindGroupEntry, 8> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = objectUniforms;
+    entries[0].size = sizeof(ObjectUniforms);
+    entries[1].binding = 1;
+    entries[1].buffer = sdfUniforms;
+    entries[1].size = sizeof(SdfObjectUniforms);
+    entries[2].binding = 2;
+    entries[2].buffer = nodes;
+    entries[2].size = nodeBytes;
+    entries[3].binding = 3;
+    entries[3].buffer = fieldBlock;
+    entries[3].size = FieldUniforms::kBufferSize;
+    entries[4].binding = 4;
+    entries[4].buffer = stats;
+    entries[4].size = kStatsBytes;
+    entries[5].binding = 5;
+    entries[5].textureView = densityView;
+    entries[6].binding = 6;
+    entries[6].sampler = densitySampler;
+    entries[7].binding = 7;
+    entries[7].textureView = coarseView;
+    wgpu::BindGroupDescriptor desc{};
+    desc.label = "sdf-object-group";
+    desc.layout = sdfLayout;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    return context.device().CreateBindGroup(&desc);
+}
+
+wgpu::BindGroup SdfRenderer::Impl::densityGroup(const wgpu::TextureView& densityView,
+                                                const wgpu::TextureView& coarseView) {
+    auto it = densityGroups.find(densityView.Get());
+    if (it != densityGroups.end()) {
+        return it->second;
+    }
+    // A view the particle renderer has since dropped would keep its texture alive through a stale
+    // entry; the map is bounded by clearing it whenever it grows past a handful of volumes.
+    if (densityGroups.size() >= 16) {
+        densityGroups.clear();
+    }
+    wgpu::BindGroup group = makeSdfGroup(densityView, coarseView);
+    densityGroups.emplace(densityView.Get(), group);
+    return group;
+}
+
 void SdfRenderer::Impl::rebuildGroups() {
     const auto& device = context.device();
-    {
-        std::array<wgpu::BindGroupEntry, 5> entries{};
-        entries[4].binding = 4;
-        entries[4].buffer = stats;
-        entries[4].size = kStatsBytes;
-        entries[0].binding = 0;
-        entries[0].buffer = objectUniforms;
-        entries[0].size = sizeof(ObjectUniforms);
-        entries[1].binding = 1;
-        entries[1].buffer = sdfUniforms;
-        entries[1].size = sizeof(SdfObjectUniforms);
-        entries[2].binding = 2;
-        entries[2].buffer = nodes;
-        entries[2].size = nodeBytes;
-        entries[3].binding = 3;
-        entries[3].buffer = fieldBlock;
-        entries[3].size = FieldUniforms::kBufferSize;
-        wgpu::BindGroupDescriptor desc{};
-        desc.label = "sdf-object-group";
-        desc.layout = sdfLayout;
-        desc.entryCount = entries.size();
-        desc.entries = entries.data();
-        sdfGroup = device.CreateBindGroup(&desc);
-    }
+    densityGroups.clear(); // they bind the node buffer this call is replacing
+    sdfGroup = makeSdfGroup(densityPlaceholderView, densityPlaceholderView);
     if (!meshGroup) {
         if (!neutralEntityFx) {
             wgpu::BufferDescriptor bufferDesc{};
@@ -846,12 +1004,14 @@ std::size_t SdfRenderer::pendingCompiles() const {
     return n;
 }
 
+void SdfRenderer::setDensityOccupancySkipping(bool on) { impl_->occupancySkipping = on; }
+
 void SdfRenderer::setAsyncCompile(bool async) { impl_->asyncCompile = async; }
 
 void SdfRenderer::setPrewarm(bool prewarm) { impl_->prewarm = prewarm; }
 
 void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const glm::mat4& viewProj,
-                         const FieldUniforms* fields) {
+                         const FieldUniforms* fields, const ParticleRenderer* particles) {
     const auto start = std::chrono::steady_clock::now();
     Impl& im = *impl_;
     stats_ = SdfStats{};
@@ -912,6 +1072,16 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             }
             // ADR-1003: a compiled object uploads its per-node parameter table; the interpreter its program.
             const Impl::Pipelines* compiled = im.compiledPipelines(object, &scene.fields);
+            // ADR-1142: the pipelines this object draws with. A compiled tree's variant already carries
+            // the density field when the object asks for it; an interpreted density-mode object takes
+            // the interpreter's density variant. Every other object keeps the default pipelines.
+            const Impl::Pipelines* variant = compiled;
+            if (const unsigned flags = Impl::surfaceFlags(object); variant == nullptr && flags != 0u) {
+                variant = im.interpreterVariantPipelines(flags);
+                if (variant == nullptr) {
+                    continue;
+                }
+            }
             int count = 0;
             if (compiled != nullptr) {
                 spatial::sdfCompileTable(object.tree, im.packScratch, &scene.fields);
@@ -958,6 +1128,32 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                     im.packScratch.push_back(rec);
                 }
             }
+            // ADR-1152: an engraved object's line fields ride after its node (and surface) records: a header
+            // (p0 = depth, crawl, grating, spacing; p1 = panels, layers) and one record per layer (kind = the
+            // family; p0 = centre, frequency; p1 = unit axis, petals; p2 = weight, depth, inner, outer).
+            if (const scene::Engraving& eng = object.material.engraving; eng.enabled()) {
+                const auto layers = std::min<std::size_t>(eng.layers.size(), scene::kMaxEngravingLayers);
+                u.surfaces.z = static_cast<std::uint32_t>(im.packScratch.size());
+                u.surfaces.w = static_cast<std::uint32_t>(1 + layers);
+                spatial::SdfNodeGpu head{};
+                head.fieldSlot = -1;
+                head.p0 = glm::vec4(std::max(eng.depth, 0.0f), eng.crawl, std::max(eng.grating, 0.0f),
+                                    std::max(eng.spacing, 1.0f));
+                head.p1 = glm::vec4(std::max(eng.panels, 0.0f), static_cast<float>(layers), 0.0f, 0.0f);
+                im.packScratch.push_back(head);
+                for (std::size_t k = 0; k < layers; ++k) {
+                    const scene::EngravingLayer& l = eng.layers[k];
+                    spatial::SdfNodeGpu rec{};
+                    rec.kind = static_cast<std::uint32_t>(l.family);
+                    rec.fieldSlot = -1;
+                    const float len = glm::length(l.axis);
+                    rec.p0 = glm::vec4(l.center, std::max(l.frequency, 1e-3f));
+                    rec.p1 = glm::vec4(len > 1e-6f ? l.axis / len : glm::vec3(1.0f, 0.0f, 0.0f), std::max(l.petals, 0.0f));
+                    rec.p2 = glm::vec4(std::clamp(l.weight, 0.0f, 1.0f), l.depth >= 0.0f ? l.depth : eng.depth,
+                                       std::max(l.inner, 0.0f), std::max(l.outer, l.inner + 1e-4f));
+                    im.packScratch.push_back(rec);
+                }
+            }
             u.worldToLocal = glm::inverse(obj.model);
             u.boundsMin = glm::vec4(object.boundsMin, 0.0f);
             u.boundsMax = glm::vec4(object.boundsMax, 0.0f);
@@ -991,10 +1187,40 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 u.wave3 = glm::vec4(ps.waveTrailColor, std::clamp(ps.waveTrail, 0.0f, 1.0f));
                 u.wave4 = glm::vec4(ps.waveHue, ps.waveHueSpan, std::clamp(ps.waveEdgeTint, 0.0f, 1.0f), on ? 1.0f : 0.0f);
             }
+            wgpu::TextureView densityView;
+            wgpu::TextureView coarseView;
+            if (object.density.active()) {
+                // ADR-1142: the named system's volume, resolved by the particle renderer this frame
+                // (it runs before this update). No volume is no matter, and no matter is no surface:
+                // the object is simply not drawn, which is what its field would say everywhere.
+                ParticleDensityVolume volume;
+                if (particles != nullptr) {
+                    volume = particles->densityVolume(scene, object.density.particles);
+                }
+                if (!volume.valid) {
+                    if (im.warnedObjects.insert(object.name + "#density").second) {
+                        log::warn("sdf '{}': density source '{}' has no density volume this frame; not drawn", object.name,
+                                  object.density.particles);
+                    }
+                    continue;
+                }
+                const glm::vec3 extent = glm::max(volume.boundsMax - volume.boundsMin, glm::vec3(1e-6f));
+                const float cellWorld = (extent.x + extent.y + extent.z) / (3.0f * static_cast<float>(std::max(volume.resolution, 1)));
+                const float scale = std::cbrt(std::max(std::abs(glm::determinant(glm::mat3(obj.model))), 1e-12f));
+                u.density0 = glm::vec4(object.density.iso, std::clamp(object.density.sharpness, 0.0f, 1.0f),
+                                       cellWorld / scale, 1.0f);
+                // ADR-1150: the volume's resolution and whether its coarse occupancy grid is bound.
+                const bool coarse = im.occupancySkipping && volume.coarseView != nullptr && volume.resolution >= 8;
+                u.density1 = glm::vec4(volume.boundsMin, static_cast<float>(volume.resolution));
+                u.density2 = glm::vec4(1.0f / extent, coarse ? 1.0f : 0.0f);
+                densityView = volume.view;
+                coarseView = coarse ? volume.coarseView : im.densityPlaceholderView;
+                ++stats_.densityObjects;
+            }
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
-            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, compiled, onCamera});
+            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, variant, onCamera, densityView, coarseView});
             drawnOnCamera = onCamera;
             if (onCamera) {
                 ++stats_.raymarchObjects;
@@ -1131,7 +1357,8 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
         }
         pass.SetPipeline(item.compiled != nullptr ? item.compiled->lit : im.raymarchPipeline);
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
-        pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());
+        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView, item.coarseView) : im.sdfGroup, offsets.size(),
+                          offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
         pass.Draw(6);
     }
@@ -1167,7 +1394,8 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
             continue; // ADR-1160: the prepass is the camera's; a shadow-only item is marched for the lights alone
         }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
-        pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());
+        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView, item.coarseView) : im.sdfGroup, offsets.size(),
+                          offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
         pass.Draw(6);
     }

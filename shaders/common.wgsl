@@ -164,6 +164,13 @@ struct FrameUniforms {
     // than its cube, y = the sun's intensity, z = the sky's intensity, w = the sun disc's floor
     // radius. Mirrors FrameUniforms; zero offline.
     skyLive: vec4<f32>,
+    // ADR-1151: the reflection-only light bands (reflection_bands.wgsl). All zero unless the scene
+    // authored `environment.bands`; bandsSoft2.w = 1 is the gate. Mirrors FrameUniforms; appended last.
+    bandsInfo: vec4<f32>,   // x = strips, y = phase, z = gain, w = rotation about +Y (radians)
+    bandsSoft: vec4<f32>,   // xyz = the soft box's key direction, w = its intensity
+    bandsSoft2: vec4<f32>,  // x = falloff, y = sky fill, z = 0, w = 1 when the bands are on
+    bandsRate: vec4<f32>,   // the strips' dash rates
+    bands: array<vec4<f32>, 8>, // strip k: [2k] axis xyz + offset, [2k + 1] width, intensity, segments, warmth
 };
 
 struct ObjectUniforms {
@@ -211,10 +218,15 @@ struct ObjectUniforms {
     // hueOffset. (1, 0) is the identity.
     emission: vec4<f32>,
     // ADR-1071: the material's cel lighting (rendering/toon_pack.hpp). toon0.x is the gate: 0 and
-    // shadeSurface never enters the toon branch. The struct now fills its 512-byte slot.
+    // shadeSurface never enters the toon branch. These filled the original 512-byte slot.
     toon0: vec4<f32>,          // x = lit bands, y = edge softness, z = terminator, w = highlight strength
     toon1: vec4<f32>,          // rgb = shadow tone (shadowColor x ambient), w = rim width
     toon2: vec4<f32>,          // rgb = rim colour x intensity, w = highlight size
+    // ADR-1143: the material's thin film and anisotropy (rendering/optics_pack.hpp), the first lane past
+    // the 512 bytes ADR-1071 filled (kObjectStride grew to 768). All zero on every material that does
+    // not ask: x == 0 and z == 0 are the two gates, and shadeSurface takes the paths it always took.
+    optics: vec4<f32>,         // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
+                               // (0 = off), w = anisotropy rotation (radians)
 };
 
 // ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the
@@ -238,7 +250,8 @@ struct EntityFx {
 //
 // ADR-703 note for whoever does Phase E: two of the six padding vec4s after `energyB` are now
 // FXL's `fxA`/`fxB` (the struct is 448 of its 512-byte slot). Four remain, so ADR-135's `tiering`
-// lane still fits without growing the stride.
+// lane still fits without growing the stride. (ADR-1071 then took the last three; ADR-1143 grew the
+// stride to 768 bytes, so a per-draw tier lane now fits again.)
 fn materialTierOf() -> u32 {
     return u32(frame.materialTier.x + 0.5);
 }
