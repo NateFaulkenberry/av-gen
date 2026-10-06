@@ -360,6 +360,9 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         }
     }
     s.archA = s.archB = static_cast<float>(arch);
+    // iteration 4: the song's shots are mostly wide, and at 22 units the drifters' containment shell read as a
+    // glowing sphere around the god (the banned 'particle sphere'). The meta field is wider for the song.
+    s.metaRadius = 60.0f;
 
     float C = phraseCoherence(sc, ph, t, &song);
     const bool collapseOpen = ph.kickOpens && pi > 0;
@@ -372,6 +375,12 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         s.strobe = 0.6f * pulse(since, 0.0f, 0.045f);
         s.collapseAt = static_cast<float>(ph.start - songT0);
     }
+    // iteration 4: heat lives on the release front of the MOST RECENT collapse; a soft phrase's half-dissolve releases
+    // matter far from any front, so it flies cold (before, no collapse time meant 'heat everything': orange clouds)
+    for (std::size_t j = pi + 1; j-- > 1;) {
+        if (sc.phrases[j].kickOpens && sc.phrases[j].start <= t) { s.collapseAt = static_cast<float>(sc.phrases[j].start - songT0); break; }
+    }
+    if (s.collapseAt < -1e8f) s.collapseAt = static_cast<float>(-1000.0 - songT0);
     if (!withhold) C += 0.10f * (a.env0.z - 0.5f);
     s.C = std::clamp(C, 0.0f, 1.0f);
     defaults(s);

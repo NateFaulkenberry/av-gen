@@ -267,8 +267,12 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     }
     // weak containment: the meta field stays around the entity
     let rel = p - F.entity.xyz;
-    let rmax = select(11.0, F.ext.z * 1.1, role == 5) * F.entity.w;
-    acc -= rel * 0.6 * smoothstep(rmax * 0.8, rmax * 1.3, length(rel));
+    // iteration 4: released body matter used to pile up on an 11-unit containment sphere and read as a glowing shell;
+    // with a wide meta field (the song tests) the body matter's bound scales with it
+    let rmax = select(max(11.0, F.ext.z * 0.5), F.ext.z * 1.1, role == 5) * F.entity.w;
+    // iteration 4: a soft, noisy containment (no crisp shell edge)
+    let rn = rmax * (0.85 + 0.3 * vnoise3(normalize(rel + vec3f(1e-3)) * 2.0 + vec3f(t * 0.02), 97u));
+    acc -= rel * 0.35 * smoothstep(rn * 0.5, rn * 1.6, length(rel));
 
     let drag = 0.35 + 1.4 * b;
     v = (v + acc * dt) * exp(-drag * dt);
