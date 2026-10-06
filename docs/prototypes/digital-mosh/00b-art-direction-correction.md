@@ -1,5 +1,19 @@
 # CRITICAL ART DIRECTION CORRECTION
 
+> **Tried and abandoned by the owner on 2026-10-06; the scene returned to pass 5.** The owner's words: "go back to the
+> work it was doing on pass 5 - I think that scene has more promise, these new updates won't work." One idea was
+> kept: the colossal eye, which now floats over the pass-5 land (`03-implementation.md`, pass 5b).
+>
+> What was learned:
+> - A ground-free mirror world reads as objects floating in fog unless the reflection is visibly darker than the
+>   sky above. The volumetric haze erased the horizon entirely.
+> - Built reflections (SDF `mirror` copies) are cheap and allow a reflection to differ from its object.
+> - A transparent `blend` plane occludes raymarched SDFs behind it.
+> - A scene whose extent shrinks (no far geometry) made the raymarched SDFs speckle. That engine behaviour is
+>   recorded but not investigated.
+> - The engine change it needed (ADR-1167, the sky mirror) was reverted with it.
+
+
 (The owner's correction, verbatim, 2026-10-06, after pass 5. The owner said: "digital mosh doesn't look all that good, let's try giving it a bit more direction and then abandon this scene if it doesn't look good after this." This is the last pass before the scene is abandoned.)
 
 The current result is too boring and is falling back into a conventional procedural valley with a few unusual objects and digital glitch effects.
