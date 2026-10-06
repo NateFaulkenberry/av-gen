@@ -13,6 +13,7 @@
 @group(1) @binding(0) var densTex: texture_3d<f32>;
 @group(1) @binding(1) var densSamp: sampler;
 @group(1) @binding(2) var coarseTex: texture_3d<f32>;
+@group(1) @binding(3) var latentCache: texture_3d<f32>; // iteration 2
 
 struct VOut { @builtin(position) clip: vec4f, @location(0) uv: vec2f, };
 @vertex fn vs_full(@builtin(vertex_index) vi: u32) -> VOut {
@@ -29,8 +30,9 @@ fn density(p: vec3f) -> vec2f {
     return textureSampleLevel(densTex, densSamp, uvw, 0.0).rg;
 }
 
-// The reconstructed field (positive outside).
-fn fieldAt(p: vec3f) -> f32 {
+// The reconstructed field (positive outside). `exact` selects the analytic latent; otherwise the cached volume
+// is used when it is enabled (iteration 2): the march steps on the cache, the bisection and normal are exact.
+fn fieldAtMode(p: vec3f, exact: bool) -> f32 {
     let approach = i32(F.sim.w);
     if (approach == 3) { return latent(p); }
     let s = density(p).r;
@@ -44,12 +46,18 @@ fn fieldAt(p: vec3f) -> f32 {
         S *= mix(1.0, clamp(1.3 - 0.55 * length(qc.xy / vec2f(2.0, 2.8)) - 0.2 * abs(qc.z), 0.15, 1.0), F.ext.x);
     }
     if (S > 0.001 && s > T * 0.12) {
-        let L = latent(p);
+        var L = 0.0;
+        if (exact || F.it2.x < 0.5) {
+            L = latent(p);
+        } else {
+            L = textureSampleLevel(latentCache, densSamp, (p - F.grid0.xyz) / boxExtent(), 0.0).r;
+        }
         let dil = (T * 0.38 - s) * cell * 3.0;
         return mix(dRho, max(L, dil), S);
     }
     return dRho;
 }
+fn fieldAt(p: vec3f) -> f32 { return fieldAtMode(p, true); }
 
 fn normalAt(p: vec3f, e: f32) -> vec3f {
     let k0 = vec3f(1.0, -1.0, -1.0); let k1 = vec3f(-1.0, -1.0, 1.0);
@@ -293,7 +301,7 @@ struct FOut { @location(0) color: vec4f, @location(1) depth: vec4f, };
                 continue;
             }
         }
-        let f = fieldAt(p);
+        let f = fieldAtMode(p, false);
         if (approach >= 2) {
             let s = density(p).rg;
             haze += min(s.r, T) * cell;

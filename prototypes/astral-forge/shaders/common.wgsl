@@ -24,7 +24,11 @@ struct Frame {
     flags: vec4f,    // debug view, density weight, density norm, grating spacing (um)
     entity: vec4f,   // centre xyz, scale
     misc: vec4f,     // fall (abyss sink), escape rate, strobe, appendage density weight
-    ext: vec4f,      // sharpness spread (1 = only the anatomy's centre sharpens, 0 = everywhere), mask filaments on/off, meta-field radius, meta-face strength
+    fp0: vec4f,      // the PREVIOUS step's fold0 (for advecting matter through the warp)
+    fp1: vec4f,      // the previous step's fold1
+    fp2: vec4f,      // previous step: time, breath, warp-advection gain; tendon flow speed
+    ext: vec4f,      // sharpness spread (1 = only the anatomy's centre sharpens, 0 = everywhere), tendon density weight, meta-field radius, meta-face strength
+    it2: vec4f,      // iteration 2: latent cache on, shards on, shard threshold (px), -
 };
 
 @group(0) @binding(0) var<uniform> F: Frame;

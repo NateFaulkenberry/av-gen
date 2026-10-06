@@ -12,47 +12,26 @@
 @group(1) @binding(2) var<storage, read> A: array<vec4f>;
 @group(1) @binding(3) var<storage, read_write> accum: array<atomic<u32>>;
 @group(1) @binding(4) var surfDepth: texture_2d<f32>;
+// iteration 2: NEAR flakes become real lit shards, drawn as geometry by shards.wgsl (an indirect draw)
+struct Shard { a: vec4f, b: vec4f, c: vec4f, };  // a: pos, world size; b: normal, heat; c: binding, hash, role, weight
+struct ShardArgs { vertexCount: u32, instanceCount: atomic<u32>, firstVertex: u32, firstInstance: u32, };
+@group(1) @binding(5) var<storage, read_write> shards: array<Shard>;
+@group(1) @binding(6) var<storage, read_write> shardArgs: ShardArgs;
+const SHARD_MAX: u32 = 262144u;
 
 const SW: f32 = 4096.0;  // coverage scale
 const SG: f32 = 1024.0;  // glint scale (HDR)
 
 fn roleOfF(i: u32) -> i32 {
-    let r = u01(hashu(i * 0x9e3779b9u + 0x632be5abu));
+    // roles are assigned per BLOCK of 64 particles (one workgroup quarter): a warp then runs one branch, not
+    // all of them (per-particle roles made every warp pay for the tendon AND the latent path: measured 19 ms)
+    let r = u01(hashu((i >> 6u) * 0x9e3779b9u + 0x632be5abu));
     if (r < 0.10) { return 1; }
     if (r < 0.18) { return 2; }
-    if (r < 0.64) { return 3; }
-    if (r < 0.91) { return 4; }
+    if (r < 0.56) { return 3; }
+    if (r < 0.75) { return 4; }
+    if (r < 0.91) { return 6; }
     return 5;
-}
-
-fn bandBasisF(a: vec3f) -> mat2x3f {
-    let up = select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(a.y) > 0.9);
-    let e1 = normalize(cross(up, a));
-    return mat2x3f(e1, cross(a, e1));
-}
-fn envF(dir: vec3f, alpha: f32) -> vec3f {
-    var sum = vec3f(0.0);
-    for (var k = 0; k < 4; k++) {
-        let A0 = F.bands[2 * k];
-        let A1 = F.bands[2 * k + 1];
-        if (A1.y <= 0.0) { continue; }
-        let x = dot(dir, A0.xyz) - A0.w;
-        let ww = A1.x * A1.x + alpha * alpha;
-        var g = exp(-x * x / (2.0 * ww)) * A1.x / sqrt(ww);
-        if (A1.z > 0.5) {
-            let bb = bandBasisF(A0.xyz);
-            let ph = safeAtan2(dot(dir, bb[1]), dot(dir, bb[0]));
-            let s = fract(ph * A1.z / TAU + F.rig.x * (0.07 + 0.05 * f32(k)));
-            g *= smoothstep(0.0, 0.04 + alpha, s) * smoothstep(0.0, 0.04 + alpha, 0.72 - s);
-        }
-        sum += A1.y * g * mix(vec3f(0.80, 0.90, 1.08), vec3f(1.08, 0.93, 0.78), A1.w);
-    }
-    // a broad, dim soft-box sweep (orbiting with the rig): it describes the body's curvature between the
-    // crisp strips, the way a gradient sweep does in product photography of black chrome
-    let key = normalize(vec3f(cos(F.rig.x * 0.23 + 0.8), 0.55, sin(F.rig.x * 0.23 + 0.8)));
-    let soft = exp((dot(dir, key) - 1.0) * 2.6) * 0.55 + 0.08 * smoothstep(-0.3, 1.0, dir.y);
-    sum += soft * vec3f(0.92, 0.95, 1.0);
-    return sum * (1.0 + F.rig.w) + vec3f(F.misc.z * 1.5);
 }
 
 fn toScreen(p: vec3f) -> vec3f {
@@ -169,6 +148,17 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     }
     // as the form sharpens, bound matter FUSES into the surface: its flakes thin out to a residual sparkle
     let fuse = 1.0 - 0.97 * F.ent0.z * smoothstep(0.6, 1.0, b);
+    // near enough to resolve as an object: hand it to the shard pass (it fades in over 1 px of footprint)
+    // fused matter still leaves 30% of its plates resting on the surface: engraved debris, the micro scale's
+    // proof that the surface is made of matter
+    let shardW = max(fuse, 0.3);
+    if (F.it2.y > 0.5 && rpx0 > F.it2.z && b > 0.3) { // only matter that belongs to the entity: near free dust would be confetti
+        let idx = atomicAdd(&shardArgs.instanceCount, 1u);
+        if (idx < SHARD_MAX) {
+            shards[idx] = Shard(vec4f(p, rw), vec4f(nf, heat), vec4f(b, hz, f32(role), shardW * smoothstep(F.it2.z, F.it2.z + 1.0, rpx0) * (1.0 - smoothstep(60.0, 80.0, rpx0))));
+        }
+        if (rpx0 > F.it2.z + 1.0) { return; }
+    }
     let w = fuse * nearFade / f32(n);
     for (var k = 0; k < n; k++) {
         let c = mix(s0.xy, s1.xy, (f32(k) + 0.5) / f32(n));

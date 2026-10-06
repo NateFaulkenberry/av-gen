@@ -64,7 +64,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, ext;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2;
 };
 
 std::string readFile(const std::string& path) {
@@ -74,7 +74,12 @@ std::string readFile(const std::string& path) {
     ss << f.rdbuf();
     return ss.str();
 }
-std::string shader(const char* name) { return readFile(std::string(ASTRAL_SHADER_DIR) + "/" + name); }
+// ASTRAL_SHADERS overrides the source-tree shader directory (a frozen snapshot for long queued renders).
+std::string shaderDir() {
+    const char* e = std::getenv("ASTRAL_SHADERS");
+    return e && *e ? std::string(e) : std::string(ASTRAL_SHADER_DIR);
+}
+std::string shader(const char* name) { return readFile(shaderDir() + "/" + name); }
 
 wgpu::ShaderModule compile(gpu::Context& ctx, const std::string& src, const char* label) {
     wgpu::ShaderSourceWGSL wgsl{};
@@ -190,18 +195,30 @@ struct Options {
     std::uint32_t benchFrames = 240, benchWarm = 60;
     float preroll = 6.0f;
     int debug = 0;
+    bool noAdvect = false; // iteration-1 behaviour for before/after comparisons
+    bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
+    bool noShards = false; // iteration 2: near flakes stay splats
+    float shardPx = 12.0f;
+    int archOverride = -1; // substitute an archetype into a scripted test (art direction)  // footprint (px) above which a flake becomes a shard
     double songStart = -1.0; // TEST 06: where the excerpt starts in the song (default per track)
 };
 
-astral::State conduct(const Options& o, float t, const astral::SongAnalysis& song, const astral::Score& score) {
+astral::State conductRaw(const Options& o, float t, const astral::SongAnalysis& song, const astral::Score& score) {
     switch (o.test) {
     case 1: return astral::test01(t);
     case 2: return astral::test02(t);
     case 3: return astral::test03(t);
     case 4: return astral::test04(t);
     case 5: return astral::test05(t);
+    case 7: return astral::test07(t);
     default: return astral::test06(t, o.songStart, song, score);
     }
+}
+astral::State conduct(const Options& o, float t, const astral::SongAnalysis& song, const astral::Score& score) {
+    astral::State s = conductRaw(o, t, song, score);
+    if (o.noAdvect) s.warpAdvect = 0.0f;
+    if (o.archOverride >= 0) { s.archA = s.archB = static_cast<float>(o.archOverride); }
+    return s;
 }
 double testDuration(int test) {
     switch (test) {
@@ -210,6 +227,7 @@ double testDuration(int test) {
     case 3: return 14.0;
     case 4: return 15.0;
     case 5: return 16.0;
+    case 7: return 17.0;
     default: return 48.0;
     }
 }
@@ -239,6 +257,12 @@ int main(int argc, char** argv) {
         else if (a == "--warm") o.benchWarm = static_cast<std::uint32_t>(std::stoul(next()));
         else if (a == "--preroll") o.preroll = std::stof(next());
         else if (a == "--debug") o.debug = std::stoi(next());
+        else if (a == "--no-advect") o.noAdvect = true;
+        else if (a == "--no-cache") o.noCache = true;
+        else if (a == "--arch") o.archOverride = std::stoi(next());
+        else if (a == "--no-shards") o.noShards = true;
+        else if (a == "--shard-px") o.shardPx = std::stof(next());
+        else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = true; }
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &o.width, &o.height); }
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
@@ -298,10 +322,15 @@ int main(int argc, char** argv) {
     wgpu::Buffer Vb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "V");
     wgpu::Buffer Ab = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "A");
     wgpu::Buffer TGb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "TG");
+    wgpu::Buffer TDb = makeBuffer(ctx, stateBytes, wgpu::BufferUsage::Storage, "TD");
     const std::uint64_t gridBytes = static_cast<std::uint64_t>(R) * R * R * 2 * 4;
     wgpu::Buffer gridBuf = makeBuffer(ctx, gridBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, "grid");
     const std::uint64_t accumBytes = static_cast<std::uint64_t>(W) * H * 7 * 4;
     wgpu::Buffer accumBuf = makeBuffer(ctx, accumBytes, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, "accum");
+    constexpr std::uint64_t kShardMax = 262144; // must match SHARD_MAX in flakes.wgsl
+    const std::uint64_t shardBytes = kShardMax * 48;
+    wgpu::Buffer shardBuf = makeBuffer(ctx, shardBytes, wgpu::BufferUsage::Storage, "shards");
+    wgpu::Buffer shardArgs = makeBuffer(ctx, 16, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst, "shardArgs");
 
     auto makeTex = [&](wgpu::Extent3D size, wgpu::TextureFormat f, wgpu::TextureUsage u, wgpu::TextureDimension dim = wgpu::TextureDimension::e2D) {
         wgpu::TextureDescriptor td{};
@@ -316,6 +345,10 @@ int main(int argc, char** argv) {
                                     wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
     wgpu::Texture coarseTex = makeTex({std::uint32_t(RC), std::uint32_t(RC), std::uint32_t(RC)}, wgpu::TextureFormat::R32Float,
                                       wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
+    constexpr int kCacheRes = 128; // must match CACHE_RES in latent_cache.wgsl
+    wgpu::Texture cacheTex = makeTex({kCacheRes, kCacheRes, kCacheRes}, hdrFmt,
+                                     wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
+    wgpu::Texture shardDepth = makeTex({W, H, 1}, wgpu::TextureFormat::Depth32Float, wgpu::TextureUsage::RenderAttachment);
     wgpu::Texture surfColor = makeTex({W, H, 1}, hdrFmt, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
     wgpu::Texture surfDepth = makeTex({W, H, 1}, wgpu::TextureFormat::R32Float, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
     wgpu::Texture hdr = makeTex({W, H, 1}, hdrFmt, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
@@ -329,6 +362,7 @@ int main(int argc, char** argv) {
         bloomViews.push_back(bloom.back().CreateView());
     }
     wgpu::TextureView densView = densTex.CreateView(), coarseView = coarseTex.CreateView();
+    wgpu::TextureView cacheView = cacheTex.CreateView(), shardDepthView = shardDepth.CreateView();
     wgpu::TextureView surfColorView = surfColor.CreateView(), surfDepthView = surfDepth.CreateView();
     wgpu::TextureView hdrView = hdr.CreateView(), ldrView = ldr.CreateView();
     wgpu::SamplerDescriptor sd{};
@@ -344,7 +378,10 @@ int main(int argc, char** argv) {
     wgpu::ShaderModule resMod = compile(ctx, common + shader("resolve.wgsl"), "resolve");
     wgpu::ShaderModule coarseMod = compile(ctx, common + shader("coarse.wgsl"), "coarse");
     wgpu::ShaderModule surfMod = compile(ctx, common + latent + shader("surface.wgsl"), "surface");
-    wgpu::ShaderModule flakeMod = compile(ctx, common + shader("flakes.wgsl"), "flakes");
+    const std::string lighting = shader("lighting.wgsl");
+    wgpu::ShaderModule flakeMod = compile(ctx, common + lighting + shader("flakes.wgsl"), "flakes");
+    wgpu::ShaderModule shardMod = compile(ctx, common + lighting + shader("shards.wgsl"), "shards");
+    wgpu::ShaderModule cacheMod = compile(ctx, common + latent + shader("latent_cache.wgsl"), "latentCache");
     wgpu::ShaderModule postMod = compile(ctx, shader("post.wgsl"), "post");
 
     const auto CS = wgpu::ShaderStage::Compute;
@@ -353,12 +390,12 @@ int main(int argc, char** argv) {
     std::array<wgpu::BindGroup, kSlots> frameGroups;
     for (int k = 0; k < kSlots; ++k) frameGroups[k] = makeGroup(ctx, frameLayout, {buf(frameBufs[k], sizeof(FrameU))});
 
-    auto simLayout = makeLayout(ctx, {B::Storage, B::Storage, B::Storage, B::Storage, B::Tex3D, B::Sampler, B::Storage}, CS);
+    auto simLayout = makeLayout(ctx, {B::Storage, B::Storage, B::Storage, B::Storage, B::Tex3D, B::Sampler, B::Storage, B::Storage}, CS);
     auto simPL = makePL(ctx, {frameLayout, simLayout});
     auto initPipe = makeCompute(ctx, simMod, "cs_init", simPL);
     auto stepPipe = makeCompute(ctx, simMod, "cs_step", simPL);
     auto splatPipe = makeCompute(ctx, simMod, "cs_splat", simPL);
-    auto simGroup = makeGroup(ctx, simLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(gridBuf, gridBytes), tex(densView), smp(sampler), buf(TGb, stateBytes)});
+    auto simGroup = makeGroup(ctx, simLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(gridBuf, gridBytes), tex(densView), smp(sampler), buf(TGb, stateBytes), buf(TDb, stateBytes)});
 
     auto resLayout = makeLayout(ctx, {B::ReadOnly, B::StoreTex3D_RGBA16F}, CS);
     auto resPipe = makeCompute(ctx, resMod, "cs_resolve", makePL(ctx, {frameLayout, resLayout}));
@@ -366,12 +403,15 @@ int main(int argc, char** argv) {
     auto coarseLayout = makeLayout(ctx, {B::Tex3D, B::StoreTex3D_R32F}, CS);
     auto coarsePipe = makeCompute(ctx, coarseMod, "cs_coarse", makePL(ctx, {frameLayout, coarseLayout}));
     auto coarseGroup = makeGroup(ctx, coarseLayout, {tex(densView), tex(coarseView)});
+    auto cacheLayout = makeLayout(ctx, {B::Tex3DUnfilt, B::StoreTex3D_RGBA16F}, CS);
+    auto cachePipe = makeCompute(ctx, cacheMod, "cs_latent_cache", makePL(ctx, {frameLayout, cacheLayout}));
+    auto cacheGroup = makeGroup(ctx, cacheLayout, {tex(coarseView), tex(cacheView)});
 
-    auto flakeLayout = makeLayout(ctx, {B::ReadOnly, B::ReadOnly, B::ReadOnly, B::Storage, B::Tex2DUnfilt}, CS);
+    auto flakeLayout = makeLayout(ctx, {B::ReadOnly, B::ReadOnly, B::ReadOnly, B::Storage, B::Tex2DUnfilt, B::Storage, B::Storage}, CS);
     auto flakePipe = makeCompute(ctx, flakeMod, "cs_flakes", makePL(ctx, {frameLayout, flakeLayout}));
-    auto flakeGroup = makeGroup(ctx, flakeLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(accumBuf, accumBytes), tex(surfDepthView)});
+    auto flakeGroup = makeGroup(ctx, flakeLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(accumBuf, accumBytes), tex(surfDepthView), buf(shardBuf, shardBytes), buf(shardArgs, 16)});
 
-    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt}, wgpu::ShaderStage::Fragment);
+    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt, B::Tex3D}, wgpu::ShaderStage::Fragment);
     wgpu::RenderPipeline surfPipe;
     {
         std::array<wgpu::ColorTargetState, 2> cts{};
@@ -389,7 +429,32 @@ int main(int argc, char** argv) {
         rpd.fragment = &fst;
         surfPipe = dev.CreateRenderPipeline(&rpd);
     }
-    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView)});
+    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView)});
+    // the shard pass: instanced fans, depth-tested among themselves, culled against the surface's ray depth
+    auto shardLayout = makeLayout(ctx, {B::ReadOnly, B::Tex2DUnfilt}, wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+    wgpu::RenderPipeline shardPipe;
+    {
+        wgpu::ColorTargetState cts{};
+        cts.format = hdrFmt;
+        wgpu::FragmentState fst{};
+        fst.module = shardMod;
+        fst.entryPoint = "fs_shard";
+        fst.targetCount = 1;
+        fst.targets = &cts;
+        wgpu::DepthStencilState ds{};
+        ds.format = wgpu::TextureFormat::Depth32Float;
+        ds.depthWriteEnabled = wgpu::OptionalBool::True;
+        ds.depthCompare = wgpu::CompareFunction::Less;
+        wgpu::RenderPipelineDescriptor rpd{};
+        rpd.layout = makePL(ctx, {frameLayout, shardLayout});
+        rpd.vertex.module = shardMod;
+        rpd.vertex.entryPoint = "vs_shard";
+        rpd.fragment = &fst;
+        rpd.depthStencil = &ds;
+        rpd.primitive.cullMode = wgpu::CullMode::None;
+        shardPipe = dev.CreateRenderPipeline(&rpd);
+    }
+    auto shardGroup = makeGroup(ctx, shardLayout, {buf(shardBuf, shardBytes), tex(surfDepthView)});
 
     auto postLayout = makeLayout(ctx, {B::Tex2D, B::Sampler, B::Uniform, B::Tex2D, B::ReadOnly}, wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex);
     auto postPL = makePL(ctx, {postLayout});
@@ -437,7 +502,8 @@ int main(int argc, char** argv) {
     const double simRate = 60.0;
     const double dur = testDuration(o.test);
     if (o.to < 0.0) o.to = dur;
-    auto fillFrame = [&](FrameU& f, const astral::State& s, float Cprev, double t, std::uint64_t step) {
+    auto fillFrame = [&](FrameU& f, const astral::State& s, const astral::State& sPrev, double tPrev, double t, std::uint64_t step) {
+        const float Cprev = sPrev.C;
         const glm::mat4 view = glm::lookAt(s.eye, s.target, glm::vec3(0, 1, 0));
         const float nearZ = std::clamp(glm::length(s.eye - s.target) * 0.01f, 0.003f, 0.1f);
         const glm::mat4 proj = glm::perspectiveZO(glm::radians(s.fovDeg), static_cast<float>(W) / H, nearZ, 4000.0f);
@@ -470,7 +536,12 @@ int main(int argc, char** argv) {
         f.flags = glm::vec4(static_cast<float>(o.debug), s.mass, 1.0f / perCell, s.gratingUm);
         f.entity = glm::vec4(s.centre, s.scale);
         f.misc = glm::vec4(s.fall, s.escape, s.strobe, s.appendWeight);
-        f.ext = glm::vec4(s.sharpSpread, s.filaments, s.metaRadius, s.metaFace);
+        f.fp0 = sPrev.fold0;
+        f.fp1 = sPrev.fold1;
+        f.fp2 = glm::vec4(static_cast<float>(tPrev), sPrev.breath, s.warpAdvect, 0.0f);
+        f.ext = glm::vec4(s.sharpSpread, s.tendonWeight, s.metaRadius, s.metaFace);
+        f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, 0.0f);
+        f.fp2.w = s.tendonFlow;
     };
 
     auto dispatch1D = [&](wgpu::ComputePassEncoder& cp, std::uint32_t n) {
@@ -503,13 +574,13 @@ int main(int argc, char** argv) {
             astral::State sc = s;
             // the camera of the frame, not of the step
             sc.eye = sLast.eye; sc.target = sLast.target; sc.fovDeg = sLast.fovDeg;
-            fillFrame(fu, sc, sp.C, ts, step + k);
+            fillFrame(fu, sc, sp, std::max(ts - 1.0 / simRate, 0.0), ts, step + k);
             queue.WriteBuffer(frameBufs[k], 0, &fu, sizeof(fu));
         }
         const int slot = stepTimes.empty() ? 0 : static_cast<int>(stepTimes.size()) - 1;
         if (stepTimes.empty()) {
             const astral::State sp = conduct(o, static_cast<float>(std::max(t - 1.0 / simRate, 0.0)), song, score);
-            fillFrame(fu, sLast, sp.C, t, step);
+            fillFrame(fu, sLast, sp, std::max(t - 1.0 / simRate, 0.0), t, step);
             queue.WriteBuffer(frameBufs[0], 0, &fu, sizeof(fu));
         }
         wgpu::CommandEncoder enc = dev.CreateCommandEncoder();
@@ -544,6 +615,16 @@ int main(int argc, char** argv) {
             cp.DispatchWorkgroups((RC + 3) / 4, (RC + 3) / 4, (RC + 3) / 4);
             cp.End();
         }
+        if (useDensity && render && !o.noCache && approach == 4) {
+            wgpu::ComputePassDescriptor d{};
+            d.timestampWrites = timeline.mark("cache", gpu::FrameTimeline::PassKind::Compute);
+            auto cp = enc.BeginComputePass(&d);
+            cp.SetBindGroup(0, frameGroups[slot]);
+            cp.SetPipeline(cachePipe);
+            cp.SetBindGroup(1, cacheGroup);
+            cp.DispatchWorkgroups(kCacheRes / 4, kCacheRes / 4, kCacheRes / 4);
+            cp.End();
+        }
         if (render) {
             {
                 std::array<wgpu::RenderPassColorAttachment, 2> ca{};
@@ -567,6 +648,7 @@ int main(int argc, char** argv) {
                 r.End();
             }
             enc.ClearBuffer(accumBuf, 0, accumBytes);
+            { const std::uint32_t a0[4] = {12, 0, 0, 0}; queue.WriteBuffer(shardArgs, 0, a0, sizeof(a0)); }
             {
                 wgpu::ComputePassDescriptor d{};
                 d.timestampWrites = timeline.mark("flakes", gpu::FrameTimeline::PassKind::Compute);
@@ -596,6 +678,28 @@ int main(int argc, char** argv) {
             const float post[8] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f};
             queue.WriteBuffer(postBuf, 0, post, sizeof(post));
             fullPass(hdrView, combinePipe, combineGroup, false, "post");
+            if (!o.noShards) {
+                wgpu::RenderPassColorAttachment ca{};
+                ca.view = hdrView;
+                ca.loadOp = wgpu::LoadOp::Load;
+                ca.storeOp = wgpu::StoreOp::Store;
+                wgpu::RenderPassDepthStencilAttachment da{};
+                da.view = shardDepthView;
+                da.depthLoadOp = wgpu::LoadOp::Clear;
+                da.depthStoreOp = wgpu::StoreOp::Discard;
+                da.depthClearValue = 1.0f;
+                wgpu::RenderPassDescriptor rp{};
+                rp.colorAttachmentCount = 1;
+                rp.colorAttachments = &ca;
+                rp.depthStencilAttachment = &da;
+                rp.timestampWrites = timeline.mark("shards", gpu::FrameTimeline::PassKind::Render);
+                auto r = enc.BeginRenderPass(&rp);
+                r.SetPipeline(shardPipe);
+                r.SetBindGroup(0, frameGroups[slot]);
+                r.SetBindGroup(1, shardGroup);
+                r.DrawIndirect(shardArgs, 0);
+                r.End();
+            }
             fullPass(bloomViews[0], downFirst, downGroups[0], false, nullptr);
             for (int k = 1; k < kBloom; ++k) fullPass(bloomViews[k], down, downGroups[k], false, nullptr);
             for (int k = kBloom - 1, u = 0; k >= 1; --k, ++u) fullPass(bloomViews[k - 1], up, upGroups[u], true, nullptr);
@@ -611,7 +715,7 @@ int main(int argc, char** argv) {
     auto initParticles = [&](double t) {
         FrameU fu{};
         const astral::State s = conduct(o, static_cast<float>(std::max(t, 0.0)), song, score);
-        fillFrame(fu, s, s.C, t, 0);
+        fillFrame(fu, s, s, t, t, 0);
         queue.WriteBuffer(frameBufs[0], 0, &fu, sizeof(fu));
         wgpu::CommandEncoder enc = dev.CreateCommandEncoder();
         enc.ClearBuffer(gridBuf, 0, gridBytes);
@@ -647,7 +751,7 @@ int main(int argc, char** argv) {
     if (o.bench) {
         const double t0 = o.at >= 0.0 ? o.at : 8.0;
         preroll(t0);
-        Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost;
+        Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost, sCache, sShard;
         std::uint64_t lastCompleted = timeline.completedFrames();
         const std::uint32_t total = o.benchWarm + o.benchFrames;
         for (std::uint32_t f = 0; f < total; ++f) {
@@ -666,6 +770,8 @@ int main(int argc, char** argv) {
                     sSurf.add(timeline.msFor("surface"));
                     sFlk.add(timeline.msFor("flakes"));
                     sPost.add(timeline.msFor("post"));
+                    sCache.add(timeline.msFor("cache"));
+                    sShard.add(timeline.msFor("shards"));
                 }
             }
         }
@@ -674,8 +780,8 @@ int main(int argc, char** argv) {
         if (ctx.errorCount() != 0) { std::fprintf(stderr, "gpu errors: %s\n", ctx.lastError().c_str()); return 5; }
         auto j = [](const char* name, const Stat& s) { std::printf("\"%s\":{\"p50\":%.3f,\"p90\":%.3f},", name, s.pct(0.5), s.pct(0.9)); };
         std::printf("{\"test\":%d,\"approach\":\"%c\",\"n\":%u,\"grid\":%d,\"size\":\"%ux%u\",\"t\":%.2f,", o.test, o.approach, N, R, W, H, t0);
-        j("cpu_ms", sCpu); j("gpu_frame_ms", sGpu); j("sim_ms", sSim); j("density_ms", sDen); j("surface_ms", sSurf); j("flakes_ms", sFlk); j("post_ms", sPost);
-        std::printf("\"state_mb\":%.1f,\"grid_mb\":%.1f,\"accum_mb\":%.1f,\"dens_tex_mb\":%.1f,\"samples\":%zu}\n", 4 * stateBytes / 1048576.0,
+        j("cpu_ms", sCpu); j("gpu_frame_ms", sGpu); j("sim_ms", sSim); j("density_ms", sDen); j("surface_ms", sSurf); j("flakes_ms", sFlk); j("post_ms", sPost); j("cache_ms", sCache); j("shards_ms", sShard);
+        std::printf("\"state_mb\":%.1f,\"grid_mb\":%.1f,\"accum_mb\":%.1f,\"dens_tex_mb\":%.1f,\"samples\":%zu}\n", 5 * stateBytes / 1048576.0,
                     gridBytes / 1048576.0, accumBytes / 1048576.0, R * R * R * 8 / 1048576.0, sGpu.v.size());
         return 0;
     }

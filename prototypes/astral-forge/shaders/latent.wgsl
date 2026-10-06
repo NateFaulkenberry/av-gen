@@ -37,7 +37,22 @@ fn sdBlade(p: vec3f, r: vec3f) -> f32 {
 }
 // A superellipsoid-ish "faceted" version: the 6-norm turns the plate into chamfered planes.
 fn len6(v: vec3f) -> f32 { let w = v * v * v; return pow(dot(w, w), 1.0 / 6.0); }
-fn sdFacet(p: vec3f, r: vec3f) -> f32 { return (len6(p / r) - 1.0) * min(r.x, min(r.y, r.z)); }
+// Iteration 2: TRUE facets. The max over 24 planes (a jittered Fibonacci sphere of normals) of an ellipsoid's
+// support: crisp flat faces and sharp edges. The plane set turns slowly, so the geometry is precise but never still.
+fn sdFacet(p: vec3f, r: vec3f) -> f32 {
+    let q = p / r;
+    var m = -1e9;
+    let t = F.cam.w * 0.05;
+    for (var k = 0; k < 24; k++) {
+        let fk = f32(k);
+        let z = 1.0 - (2.0 * fk + 1.0) / 24.0;
+        let rr = sqrt(max(1.0 - z * z, 0.0));
+        let ph = fk * 2.39996 + t + 0.3 * sin(fk * 1.7 + t * 2.0);
+        let n = vec3f(rr * cos(ph), z, rr * sin(ph));
+        m = max(m, dot(q, n));
+    }
+    return (m - 0.93) * min(r.x, min(r.y, r.z));
+}
 fn sdCapsule(p: vec3f, a: vec3f, b: vec3f, r: f32) -> f32 {
     let pa = p - a; let ba = b - a;
     let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
@@ -68,30 +83,35 @@ fn sdOcta(p0: vec3f, s: f32) -> f32 {
 // ---- the warp: the dimensional distortion layer ------------------------------------------------
 // World -> latent. Twist about y, bend about x, and a partial sphere inversion (the "folds inward,
 // unfolds into something else" move). The per-feature folds (eye depth, mouth tunnel) live in the face.
-fn warp(pw: vec3f) -> vec3f {
+fn warpP(pw: vec3f, f0: vec4f, f1: vec4f, t: f32, breath: f32) -> vec3f {
     var q = (pw - F.entity.xyz) / F.entity.w;
-    let t = F.cam.w;
     // breath: a slow swell of the whole mass, from the low mids
-    q *= 1.0 - 0.025 * F.ent1.w;
+    q *= 1.0 - 0.025 * breath;
     // twist about y, growing with height
-    let tw = F.fold0.x * (q.y * 0.35 + 0.25 * sin(t * 0.7));
+    let tw = f0.x * (q.y * 0.35 + 0.25 * sin(t * 0.7));
     let xz = rot2(tw) * q.xz;
     q = vec3f(xz.x, q.y, xz.y);
     // bend: the upper half pitches about x
-    let bd = F.fold1.x * 0.18 * q.y;
+    let bd = f1.x * 0.18 * q.y;
     let yz = rot2(bd) * q.yz;
     q = vec3f(q.x, yz.x, yz.y);
-    // sphere inversion about a sphere of radius 3.2, blended
-    let inv = F.fold0.w;
+    // FOLD INWARD (iteration 2): a spiral implosion. The latent domain is expanded near a centre behind the eyes
+    // (so the anatomy there shrinks into a knot in world space) and twisted more toward that centre. Unlike the
+    // iteration-1 sphere inversion this is injective for inv < 0.75 (r(1 + 3 inv e^{-r^2/6.25}) is monotone),
+    // so matter carried through the warp (sim.wgsl) can follow it: the face spirals into itself instead of tearing.
+    let inv = f0.w;
     if (inv > 1e-4) {
-        let c = vec3f(0.0, 0.0, 0.6);
-        let d = q - c;
-        let r2 = max(dot(d, d), 0.05);
-        let qi = c + d * (3.2 * 3.2) / r2;
-        q = mix(q, qi, inv);
+        let c = vec3f(0.0, 0.3, 0.2);
+        var d = q - c;
+        let g = exp(-dot(d, d) / 6.25);
+        let sxy = rot2(inv * 2.6 * g) * d.xy;
+        d = vec3f(sxy.x, sxy.y, d.z);
+        q = c + d * (1.0 + 3.0 * inv * g);
     }
     return q;
 }
+fn warp(pw: vec3f) -> vec3f { return warpP(pw, F.fold0, F.fold1, F.cam.w, F.ent1.w); }
+fn warpPrev(pw: vec3f) -> vec3f { return warpP(pw, F.fp0, F.fp1, F.fp2.x, F.fp2.y); }
 
 // ---- faces ---------------------------------------------------------------------------------------
 
@@ -109,28 +129,6 @@ fn eyeCentreL() -> vec3f { return vec3f(-0.76, 0.72, 0.6); }
 fn eyeCentreR() -> vec3f { return vec3f(0.76, 0.72, 0.6); }
 fn mouthCentre() -> vec3f { return vec3f(0.0, -1.45, 0.62); }
 
-// Filaments from the plate's rim out into the field: the mask has no clean edge, it frays into matter.
-fn maskFilaments(q: vec3f) -> f32 {
-    let t = F.cam.w;
-    var d = BIG;
-    for (var k = 0; k < 13; k++) {
-        let fk = f32(k);
-        let a = fk * TAU / 13.0 + 0.3 * sin(fk * 2.3);
-        let rim = vec3f(2.05 * cos(a), 0.15 + 2.75 * sin(a), -0.45);
-        let dir = normalize(vec3f(cos(a), sin(a), -0.9 + 0.7 * sin(fk * 2.7)));
-        var lp = q - rim;
-        let along = dot(lp, dir);
-        let u = clamp(along, 0.0, 6.0);
-        // wander off the straight path, more with distance from the rim
-        let side = normalize(cross(dir, vec3f(0.0, 0.0, 1.0)) + vec3f(0.0, 0.0, 0.001));
-        let off = side * 0.35 * sin(u * 1.1 + t * 0.7 + fk) * u / 3.0 + vec3f(0.0, 0.0, 0.25 * cos(u * 0.8 + fk)) * u / 3.0;
-        let c = dir * u + off;
-        let len = 3.0 + 3.0 * u01(hashu(u32(k) * 7717u));
-        d = min(d, length(lp - c) - mix(0.05, 0.006, clamp(u / len, 0.0, 1.0)) + select(0.0, 10.0, along > len));
-    }
-    return d;
-}
-
 // The plate: a curved mask (thick shell of an ellipsoid) with no skull behind it. Its rim is torn.
 fn facePlate(q: vec3f, fp: FaceP) -> f32 {
     let c = vec3f(0.0, 0.15, -1.25);
@@ -138,7 +136,8 @@ fn facePlate(q: vec3f, fp: FaceP) -> f32 {
     let r = vec3f(1.95, 3.35, 2.0) * (1.0 + tear * smoothstep(1.4, 2.4, length(q.xy * vec2f(1.0, 0.75))));
     let dRound = abs(sdEllipsoid(q - c, r)) - 0.15;
     let dGeo = abs(sdFacet(q - c, r * vec3f(0.97, 0.97, 1.0))) - 0.15;
-    let g = smoothstep(-0.25, 0.35, q.x) * fp.asym;
+    // asym 2 (the Machine God): faceted everywhere
+    let g = select(smoothstep(-0.25, 0.35, q.x) * fp.asym, 1.0, fp.asym > 1.5);
     var d = mix(dRound, dGeo, g);
     d = smax(d, -0.55 - q.z, 0.25); // keep the front: it is a mask
     // eye sockets and the mouth slit cut through
@@ -183,7 +182,7 @@ fn faceEyes(q: vec3f, fp: FaceP) -> f32 {
     }
     let organicR = sdEllipsoid(vec3f(rot2(-0.22) * (q - eR).xy, (q - eR).z), vec3f(rR * 1.25, rR * 0.72, rR));
     let geoR = sdOcta((q - eR) * vec3f(1.0, 0.9, 1.0), rR * 1.25);
-    let g = fp.asym;
+    let g = min(fp.asym, 1.0);
     var dr = mix(organicR, geoR, g);
     let rq = q - eR;
     let fz2 = rq.z - rR * 0.86;
@@ -434,7 +433,7 @@ fn faceParamsFor(arch: i32) -> FaceP {
     if (arch == 0) { fp.asym = 0.85; }
     if (arch == 1) { fp.asym = 0.0; fp.open = 0.1; }
     if (arch == 2) { fp.asym = 0.5; fp.eyeL = 1.55; fp.eyeR = 0.55; fp.open = 1.6; fp.tunnel = max(fp.tunnel, 0.6); }
-    if (arch == 4) { fp.asym = 1.0; fp.open = 0.0; fp.inner = 0.0; }
+    if (arch == 4) { fp.asym = 2.0; fp.open = 0.0; fp.inner = 0.0; }
     return fp;
 }
 
@@ -483,7 +482,7 @@ fn archetypeD(q: vec3f, arch: i32, part: i32) -> f32 {
         if (arch == 1) { app = seraphWings(q); }
         if (arch == 2) { app = abyssTendrils(q); }
         if (arch == 4) { app = machineRings(q); }
-        if (arch == 0) { app = select(facePlate(q, fp), maskFilaments(q), F.ext.y > 0.5); } // filaments it frays into (ext.y), or a thicker plate
+        if (arch == 0) { app = facePlate(q, fp); } // the mask alone: appendage matter thickens the plate (its fraying is done by tendons)
     }
     if (part == 1) { return faceEyes(q, fp); }
     if (part == 2) { return faceMouth(q, fp); }
@@ -504,7 +503,7 @@ fn latentPart(pw: vec3f, part: i32) -> f32 {
         d = mix(d, archetypeD(q, b, part), smoothstep(0.0, 1.0, m));
     }
     // the warp is not distance-preserving: a conservative factor keeps steps and springs stable
-    let lip = 1.0 + 0.6 * abs(F.fold0.x) + 1.5 * F.fold0.w + 0.3 * abs(F.fold1.x);
+    let lip = 1.0 + 0.6 * abs(F.fold0.x) + 4.0 * F.fold0.w + 0.3 * abs(F.fold1.x);
     return d * F.entity.w / lip;
 }
 fn latent(pw: vec3f) -> f32 { return latentPart(pw, 0); }
@@ -543,4 +542,98 @@ fn engraveUV(q: vec3f, fam: i32) -> EUV {
     let s = dot(q, normalize(vec3f(0.94, 0.30, 0.17)));
     let s2 = dot(q, normalize(vec3f(-0.25, 0.95, 0.2)));
     return EUV(vec2f(s2 * 3.0 + crawl * 2.0, s), 1.0, 0.0, 1.0);
+}
+
+// ---- TENDONS: skeleton curves (iteration 2) ---------------------------------------------------------
+// The meso scale. Each tendon particle is attracted to ONE curve and streams along it. Face curves lie on the
+// mask's front surface (brows, cheek lines, nasolabial lines, the jaw arc, temples); outer tendons leave the
+// rim and wander out into the field, where the matter sprays off their ends and re-joins another curve.
+// Returns (distance, u): u is the curve parameter of the nearest point, so grad u is the streaming direction.
+
+const TENDON_CURVES: u32 = 18u;
+
+fn plateFrontZ(x: f32, y: f32) -> f32 {
+    let k = 1.0 - (x * x) / (1.95 * 1.95) - ((y - 0.15) * (y - 0.15)) / (3.35 * 3.35);
+    return -1.25 + 2.0 * sqrt(max(k, 0.0));
+}
+fn onPlate(x: f32, y: f32) -> vec3f { return vec3f(x, y, plateFrontZ(x, y) + 0.07); }
+
+fn faceCurve(id: u32, u: f32) -> vec3f {
+    let t = F.cam.w;
+    let side = select(-1.0, 1.0, (id & 1u) == 1u);
+    let PI_ = 3.14159265;
+    if (id < 2u) { // brow arc over each eye, nose bridge -> temple
+        return onPlate(side * (0.12 + 1.75 * u), 1.12 + 0.42 * sin(PI_ * u) - 0.25 * u);
+    }
+    if (id < 4u) { // cheek line, under the eye to the jaw corner
+        return onPlate(side * (0.7 + 0.85 * u), 0.2 - 2.2 * u + 0.15 * sin(PI_ * u));
+    }
+    if (id < 6u) { // nasolabial, beside the nose to past the mouth corner
+        return onPlate(side * (0.28 + 0.75 * u), 0.05 - 1.75 * u);
+    }
+    if (id == 6u) { // jaw arc under the mouth
+        return onPlate(-1.35 + 2.7 * u, -1.75 - 0.9 * sin(PI_ * u));
+    }
+    if (id == 7u) { // forehead midline, upward
+        return onPlate(0.06 * sin(u * 9.0), 1.35 + 1.75 * u);
+    }
+    if (id < 10u) { // temple to crown
+        return onPlate(side * (1.75 - 0.95 * u), 0.7 + 2.3 * u);
+    }
+    // outer tendons: they leave the rim BACKWARD (behind the mask) and curl as they go, so from the front they
+    // read as hair-fine streams receding into the field, never as whiskers sticking out to the sides
+    let k = id - 10u;
+    let h = hashu(k * 2654435761u + 77u);
+    let a = (f32(k) + 0.5) * TAU / 8.0 + 0.6 * (u01(h) - 0.5);
+    let rim = vec3f(1.8 * cos(a), 0.15 + 3.0 * sin(a), -1.1);
+    let out_ = normalize(vec3f(0.45 * cos(a), 0.45 * sin(a), -1.0));
+    let len = 4.0 + 3.5 * u01(h >> 8u);
+    let side_ = normalize(cross(out_, vec3f(0.0, 1.0, 0.0)) + vec3f(0.0, 0.0, 0.001));
+    let up_ = cross(side_, out_);
+    let s = u * len;
+    let curlA = s * (0.9 + 0.6 * u01(h >> 12u)) + t * 0.5 + f32(k);
+    let rad = 0.25 + 0.5 * s / len;
+    return rim + out_ * s + (side_ * cos(curlA) + up_ * sin(curlA)) * rad * (s / len + 0.2);
+}
+
+fn hornsCurve(id: u32, u: f32) -> vec3f {
+    let t = F.cam.w;
+    let ph = f32(id) * TAU / f32(TENDON_CURVES) + 0.2 * sin(t * 0.3);
+    let th = ph + TAU * 1.4 * u + 0.35 * (0.6 * (-2.6 + 5.2 * u)); // follows the core's twist
+    let r = 1.0 + 0.55 * sin(PI * u);
+    return vec3f(r * 1.55 * cos(th), -2.9 + 5.8 * u, r * 1.3 * sin(th));
+}
+
+fn curveAt(arch: i32, id: u32, u: f32) -> vec3f {
+    if (arch == 6) { return hornsCurve(id, u); }
+    return faceCurve(id, u);
+}
+
+// distance from q to curve `id` (a 12-segment polyline) and the parameter of the nearest point
+fn tendonDU(q: vec3f, arch: i32, id: u32) -> vec2f {
+    var best = 1e9;
+    var bu = 0.0;
+    var a = curveAt(arch, id, 0.0);
+    let N = 12;
+    for (var k = 1; k <= N; k++) {
+        let u1 = f32(k) / f32(N);
+        let b = curveAt(arch, id, u1);
+        let pa = q - a; let ba = b - a;
+        let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
+        let d = length(pa - ba * h);
+        if (d < best) { best = d; bu = (f32(k - 1) + h) / f32(N); }
+        a = b;
+    }
+    return vec2f(best, bu);
+}
+
+// The tendon's latent coordinates for a world point: chimera faces are sector-local, like archetypeD.
+fn tendonQ(q: vec3f, arch: i32) -> vec3f {
+    if (arch == 3) {
+        let ang = safeAtan2(q.x, q.z);
+        let sector = round(ang / (TAU / 3.0));
+        let lq2 = rot2(sector * TAU / 3.0) * q.xz;
+        return vec3f(lq2.x, q.y, lq2.y) - vec3f(0.0, 0.0, 1.0);
+    }
+    return q;
 }
