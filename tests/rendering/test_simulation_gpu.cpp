@@ -167,6 +167,55 @@ TEST_CASE("Injection then advection moves density downwind and matches the CPU r
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1163: a scalar grid saturates at its ceiling -- the GPU and the CPU reference agree, and nothing exceeds it
+// however hard the source injects; without one (0) the same source runs past it, as it always did.
+TEST_CASE("A scalar grid's ceiling saturates injection, and the GPU matches the CPU reference", "[simulation][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    SimHarness harness(*ctx, shaders);
+
+    scene::Scene scene;
+    addSourceAndWind(scene);
+    spatial::GridField grid = makeGrid("stain");
+    grid.injectField = "source";
+    grid.injectRate = 60.0f; // 1 per step into the source cell: far past any ceiling within a frame
+    grid.velocityField = "wind";
+    grid.advect = 1.0f;
+    grid.diffusion = 0.3f;
+    grid.ceiling = 0.6f;
+    scene.fields.grids.push_back(grid);
+
+    constexpr int kFrames = 4;
+    constexpr int kPerFrame = 6;
+    for (int f = 0; f < kFrames; ++f) {
+        harness.frame(scene, static_cast<double>((f + 1) * kPerFrame) / 60.0, static_cast<std::uint64_t>(f));
+    }
+    const std::vector<float> gpuData = harness.read(scene.fields, 0);
+    spatial::GridField reference = grid;
+    reference.reset();
+    for (int f = 0; f < kFrames; ++f) {
+        const double renderTime = static_cast<double>((f + 1) * kPerFrame) / 60.0;
+        for (int i = 0; i < kPerFrame; ++i) {
+            reference.step(1.0f / 60.0f, renderTime, &scene.fields);
+        }
+    }
+    REQUIRE(gpuData.size() == reference.data.size());
+    CHECK(maxAbsDifference(gpuData, reference.data) < 1e-3);
+    const float highest = *std::max_element(gpuData.begin(), gpuData.end());
+    CHECK(highest <= 0.6f + 1e-6f);
+    CHECK(highest > 0.55f); // it reached the ceiling: the clamp is what held it
+
+    // The control: no ceiling, and the same source runs far past 0.6.
+    spatial::GridField open = grid;
+    open.ceiling = 0.0f;
+    open.reset();
+    for (int i = 0; i < kFrames * kPerFrame; ++i) {
+        open.step(1.0f / 60.0f, 0.4, &scene.fields);
+    }
+    CHECK(*std::max_element(open.data.begin(), open.data.end()) > 1.5f);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Diffusion conserves the total mass of a grid", "[simulation][gpu]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

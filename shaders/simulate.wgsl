@@ -33,7 +33,7 @@ struct SimUniforms {
     slots: vec4<i32>,     // injection field slot, velocity field slot, mode, deposit field slot
     agents: vec4<u32>,    // ADR-1120: count, species, offset (agents), seed
     agentSense: vec4<f32>,   // sensorAngle, sensorDistance (cells), turnAngle, stepSize (cells)
-    agentDeposit: vec4<f32>, // depositAmount, repel, fixed-point scale, 0
+    agentDeposit: vec4<f32>, // depositAmount, repel, fixed-point scale, w = a scalar grid's ceiling (ADR-1163; 0 = none)
 };
 
 const SIM_MODE_SCALAR: i32 = 0;
@@ -176,7 +176,12 @@ fn cs_inject(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
     let channel = select(0u, 1u, sim.slots.z == SIM_MODE_REACTION);
-    dst[base + channel] = dst[base + channel] + amount * max(0.0, fieldScalar(slot, p));
+    var injected = dst[base + channel] + amount * max(0.0, fieldScalar(slot, p));
+    // ADR-1163: a scalar grid saturates at its ceiling (0 = unbounded).
+    if (sim.slots.z == SIM_MODE_SCALAR && sim.agentDeposit.w > 0.0) {
+        injected = min(injected, sim.agentDeposit.w);
+    }
+    dst[base + channel] = injected;
 }
 
 // Semi-Lagrangian advection: back-trace the cell centre by the velocity field and gather.

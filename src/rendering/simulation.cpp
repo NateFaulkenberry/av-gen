@@ -525,6 +525,8 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         const int velocitySlot = grid.velocityField.empty() ? -1 : scene.fields.indexOf(grid.velocityField);
         const int depositSlot = grid.depositField.empty() ? -1 : scene.fields.indexOf(grid.depositField);
         u.slots = glm::ivec4(injectSlot, velocitySlot, static_cast<int>(grid.mode), depositSlot);
+        // ADR-1163: a scalar grid's ceiling rides in agentDeposit.w, the lane agents leave unused.
+        u.agentDeposit = glm::vec4(0.0f, 0.0f, 0.0f, grid.mode == spatial::GridMode::Scalar ? grid.ceiling : 0.0f);
         if (grid.agents()) {
             u.agents = glm::uvec4(static_cast<std::uint32_t>(std::max(grid.agentCount, 0)),
                                   static_cast<std::uint32_t>(grid.species),

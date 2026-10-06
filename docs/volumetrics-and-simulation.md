@@ -188,7 +188,9 @@ order.
 `GridField::step()` (CPU reference) and the kernels of `shaders/simulate.wgsl` (GPU) both run:
 
 1. **inject** — `value += injectRate * dt * injectField(cellCentre)` (clamped at 0 for scalar and
-   reaction grids, where it lands in B; vector grids take the field's vector).
+   reaction grids, where it lands in B; vector grids take the field's vector). A scalar grid with a
+   `ceiling` > 0 (ADR-1163) is clamped to it here; advection and diffusion only average, so the grid
+   stays at or below it.
 2. **advect** — semi-Lagrangian: back-trace the cell centre by
    `advect * velocityField(centre) * dt` and gather trilinearly from the previous state
    (Stam, *Stable Fluids*).
