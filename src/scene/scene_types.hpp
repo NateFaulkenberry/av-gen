@@ -236,6 +236,23 @@ struct WireLines {
     [[nodiscard]] bool hidesSurface() const { return modeIndex() != 0 && fill < 0.5f; }
 };
 
+// ADR-1143: thin-film interference on the specular layer -- an oxide or coating `thickness`
+// nanometres thick, of refractive index `ior`, over the surface. Off at thickness 0 (the default). The
+// file block, the parameters and the shading are documented in scene/material_optics.hpp.
+struct ThinFilm {
+    float thickness = 0.0f; // nm (0 = off)
+    float ior = 2.4f;       // the film's refractive index (iron oxide is about 2.4)
+    [[nodiscard]] bool enabled() const { return thickness > 0.0f; }
+};
+
+// ADR-1143: anisotropic GGX -- the highlight stretched along a tangent (strength > 0) or across it
+// (< 0). Off at strength 0 (the default). `rotation` turns the tangent about the normal, in radians.
+struct Anisotropy {
+    float strength = 0.0f; // -1..1 (0 = off)
+    float rotation = 0.0f; // radians
+    [[nodiscard]] bool enabled() const { return strength != 0.0f; }
+};
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -262,6 +279,8 @@ struct Material {
     TextureRef occlusionTexture;         // linear, r
     ToonShading toon;                    // ADR-1071: cel lighting (off by default)
     WireLines wire;                      // ADR-1073: edges drawn as lines (off by default)
+    ThinFilm thinFilm;                   // ADR-1143: interference colour (off by default)
+    Anisotropy anisotropy;               // ADR-1143: stretched highlight (off by default)
 };
 
 // ---- geometry ------------------------------------------------------------------------------

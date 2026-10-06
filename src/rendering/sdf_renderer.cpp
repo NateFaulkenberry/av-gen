@@ -1,10 +1,11 @@
 #include "rendering/sdf_renderer.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/particle_renderer.hpp" // ADR-1142: density volumes
-#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
+#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared object slot layout)
 #include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 
 #include "core/log.hpp"
@@ -84,6 +85,7 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
         obj.toon1 = toon[1];
         obj.toon2 = toon[2];
     }
+    obj.optics = packOptics(m); // ADR-1143
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
