@@ -7,7 +7,12 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 
 | File | What |
 |---|---|
-| `examples/digital-mosh/build.py` | Source of truth: palette, layout, the tree's skeleton, SDF trees, voxel shells, fields, the contagion grid, material programs, stages, the arc and the audio routes |
+| `examples/digital-mosh/build.py` | Source of truth: palettes, layout, vantages, fields, the contagion grid, material programs, stages, the arc, the audio routes, MIDI |
+| `examples/digital-mosh/forms.py` | The olive (five SDF objects and their voxel shell) and the Tanguy object |
+| `examples/digital-mosh/land.py` | The geography (near and far terrain over one description); engine-backed height queries through `tools/gv3/ground.py` |
+| `examples/digital-mosh/palette_extract.py` | k-means in CIELAB over painting reproductions (`05-palettes.md`) |
+| `examples/digital-mosh/critic_inputs.py` | Creative Critic `intent.json` and `shots.json` for a render, from the engine's own arc trace |
+| `examples/digital-mosh/play_live.py` | Plays a track into BlackHole for live-input tests and logs its host start time |
 | `digital-mosh.scene.json` | The world (generated) |
 | `digital-mosh.json` | Feline Footwear (the primary development track) |
 | `digital-mosh-trench.json` | Trench (the contrasting track) |
@@ -19,15 +24,29 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 
 | Element | Representation | Why that representation |
 |---|---|---|
-| Plain | Procedural box, 1000 m scaled ×6 (a size parameter clamps at 1000), with material program `plain` | One draw. The program carries the stain, its blocks and its glow |
-| Haze | Volume `0.0011` with `fogSky 1` over 1.4 km, low anisotropy | The plain fades into the sky's own colour, so there is no edge and no line (S10, the owner's dead-space rule) |
-| Tree | Raymarched SDF, compiled: about 30 capsules in three limb groups, each in its own frame | `bend` per limb (wax, §8), `translate` per limb (detach, §4), `displaceNoise` with `speed` (the bark flows: it liquefies), `displaceField(rot)` (the surface recedes where it is eaten). Exact shadows (ADR-1160) |
-| Stone | SDF: three spheres, smooth union | `displaceField(rot)` too; a glossy material that picks up the magenta light |
-| Double | The same stone, parked 400 m below the plain until a preset moves it | Appears without a pop: the shadow and the haze treat it like the original |
-| Headland | SDF: a smooth union of spheres with low-frequency noise, 760 m away | The scale reference the plain needs (S1, S5), and the proof that the world is a place |
-| Blocks | Two `points` procedurals (tree 573 cubes, stone 522), a one-cell voxel shell of each object's own SDF computed in Python | The surface's own representation: they appear exactly where the surface recedes, then lift, tumble and float. One system serves as blocks, fragments and pixels |
-| Motes | Particles (disc, 40 m) | Dust in the dream light; later the infected ground's spores |
-| Fracture light | Point light, magenta, at the stone; `volumetric 1` | The contagion's colour in the light, on the plain, on the tree, in the haze, and in the stone's specular |
+| Land | Two `terrain` nodes over one geography (`land.py`). **Near**: 900 m, 30 m chunks at 24 quads (1.25 m). **Far**: 8 km, 400 m chunks; under the near land it is cut 25 m down and sits 0.8 m lower | The camera travels over the near land. The far land holds the escarpment, the mesas and the ranges. The two agree exactly at the seam (probed), because they share every layer |
+| Ground | Material program `ground` on the near land (47 ops: the stage's painting by slope, mottled, plus the infected surface); `groundFar` (8 ops) on the far land | One painting per stage reaches both lands through the ramp constants, so the seam never shows |
+| Haze | Volume 0.0006, `fogSky` 1 over 3.2 km, max distance 4 km | The land dissolves into the sky's own colour, so there is no edge and no black |
+| Olive | Five raymarched SDF objects (`trunk` with braided strands and roots, `limb0..2`), compiled, 90-94 nodes each | Each limb is in its own frame: `bend` (wax), its node position (detach), `displaceField(rot)` (eaten), `displaceNoise` with `speed` (the bark flows). Exact shadows (ADR-1160) |
+| Tanguy object | One SDF, 27 nodes: a smooth union pierced by a cylinder, a filament, a bead, a needle | Hovers 0.11 m above its shadow (S8); glossy, so it picks up the strain's light |
+| Double | The same form without `eaten`, parked under the land until a preset places it | P2 |
+| Blocks | Two `points` procedurals: the olive's shell (900 cubes of 0.16 m) and the Tanguy object's (584 cubes of 0.2 m), computed in Python from the same skeletons | The surface's own representation: they appear where the surface is eaten, then lift, tumble and float |
+| Motes | Particles (disc, 45 m) | Dust in the dream light; spores later |
+| Fracture light | Point light in the strain's colour at the Tanguy object, `volumetric 1` | The strain reaches the light, the land, the tree, the haze and the object's specular |
+
+## The camera
+
+The camera is free (mode 1). `VANTAGES` gives each stage two or three (eye, target, fov, roll) placed on the land.
+Eyes are lifted onto the engine's terrain height, and `check_moves()` probes the land along every straight move
+between them. A stage's vantages are states (`Dream`, `Dream 2`, ...), and the music moves the camera between them:
+
+- in the Dream, Uncanny and Infection, on every phrase;
+- in the Corruption, every 4 bars;
+- in the Nightmare, every 2 bars.
+
+Moves get longer early and abrupt late. Each one is `idle` (ADR-1164), so it never interrupts a stage's own morph,
+and quantised to the beat. Three LFOs (0.031, 0.0197 and 0.047 Hz) float the eye and the aim between moves, more
+deeply as the energy grows.
 
 ## Corruption as a world property
 

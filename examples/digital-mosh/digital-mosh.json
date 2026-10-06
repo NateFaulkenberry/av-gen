@@ -6601,6 +6601,11 @@
       "every": 1,
       "from": "Dream 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padDream",
+      "threshold": 0.3
      }
     ]
    },
@@ -6679,6 +6684,11 @@
       "every": 1,
       "from": "Uncanny 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padUncanny",
+      "threshold": 0.3
      }
     ]
    },
@@ -6750,6 +6760,11 @@
       "every": 1,
       "from": "Infection 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padInfection",
+      "threshold": 0.3
      }
     ]
    },
@@ -6821,6 +6836,11 @@
       "every": 4,
       "from": "Corruption 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padCorruption",
+      "threshold": 0.3
      }
     ]
    },
@@ -6892,6 +6912,11 @@
       "every": 2,
       "from": "Nightmare 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padNightmare",
+      "threshold": 0.3
      }
     ]
    },
@@ -6957,6 +6982,11 @@
       "threshold": 0.86,
       "from": "Nightmare 3",
       "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padCollapse",
+      "threshold": 0.3
      }
     ]
    },
@@ -7087,6 +7117,11 @@
       "from": "Nightmare 3",
       "hold": true,
       "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padRespite",
+      "threshold": 0.3
      }
     ]
    },
@@ -7102,6 +7137,11 @@
       "kind": "elapsed",
       "threshold": 2.0,
       "from": "Light"
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padRecovery",
+      "threshold": 0.3
      }
     ]
    }

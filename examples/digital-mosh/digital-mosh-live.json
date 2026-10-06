@@ -6600,6 +6600,11 @@
       "every": 1,
       "from": "Dream 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padDream",
+      "threshold": 0.3
      }
     ]
    },
@@ -6678,6 +6683,11 @@
       "every": 1,
       "from": "Uncanny 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padUncanny",
+      "threshold": 0.3
      }
     ]
    },
@@ -6749,6 +6759,11 @@
       "every": 1,
       "from": "Infection 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padInfection",
+      "threshold": 0.3
      }
     ]
    },
@@ -6820,6 +6835,11 @@
       "every": 4,
       "from": "Corruption 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padCorruption",
+      "threshold": 0.3
      }
     ]
    },
@@ -6891,6 +6911,11 @@
       "every": 2,
       "from": "Nightmare 3",
       "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padNightmare",
+      "threshold": 0.3
      }
     ]
    },
@@ -6956,6 +6981,11 @@
       "threshold": 0.86,
       "from": "Nightmare 3",
       "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padCollapse",
+      "threshold": 0.3
      }
     ]
    },
@@ -7086,6 +7116,11 @@
       "from": "Nightmare 3",
       "hold": true,
       "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padRespite",
+      "threshold": 0.3
      }
     ]
    },
@@ -7101,6 +7136,11 @@
       "kind": "elapsed",
       "threshold": 2.0,
       "from": "Light"
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padRecovery",
+      "threshold": 0.3
      }
     ]
    }
@@ -7112,5 +7152,79 @@
   "fps": 30,
   "output": "video",
   "path": "renders/digital-mosh.mp4"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "parameter": "macros/sensitivity",
+     "component": 0,
+     "min": 0.0,
+     "max": 1.0
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 36,
+     "signal": "padDream"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 37,
+     "signal": "padUncanny"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 38,
+     "signal": "padInfection"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 39,
+     "signal": "padCorruption"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 40,
+     "signal": "padNightmare"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 41,
+     "signal": "padCollapse"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 42,
+     "signal": "padRespite"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 43,
+     "signal": "padRecovery"
+    }
+   ]
+  }
  }
 }
