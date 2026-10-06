@@ -1,9 +1,75 @@
 # DIGITAL MOSH: Evaluation
 
-An honest evaluation against every criterion in brief §18. It is based on the final renders (1080p, both tracks), the
-live sessions and the Creative Critic. Review media: `~/Desktop/av-gen-review/38-digital-mosh/`.
+An honest evaluation against every criterion in brief §18, of the **final scene (pass 5b)**. Review media:
+`~/Desktop/av-gen-review/38-digital-mosh/final/` (the pass 5b renders) and `wip/` (every earlier pass).
+
+The scene's history:
+- passes 1-4 built the world;
+- pass 5 made the camera fly;
+- pass 6 tried the owner's art-direction correction, a mirror world of tableaux. The owner abandoned it;
+- pass 5b is pass 5 restored, plus the floating eye kept from pass 6.
+
+The tables after the pass 5b section are from pass 3 and are kept as history.
 
 Grades: **strong** (would show it), **adequate** (works, not yet memorable), **weak** (needs another pass).
+
+## Pass 5b (final)
+
+| Stage | Where (Feline Footwear) | What it is | Grade |
+|---|---|---|---|
+| Dream | 0-50 s | The flight opens on the east petal, low over sculpted dunes in a raking 12° sun. It glides past the knoll's olive, under Magritte's floating rock, over the escarpment past the giant. A 26 m eye floats over the dunes, looking at the sky | adequate to strong: the land and the light are the scene's best work. The opening seconds are still landmark-poor |
+| Uncanny | 50-81 s | de Chirico's green sky. The eye turns to watch the stone, the rock appears, the clouds stop, the shadows swing | adequate: the eye's turn is the clearest relation error yet. The 58-72 s flight still has frames with no subject |
+| Infection | 81-110 s | The camera circles the stone wide (92 m). The strain spreads in order: its light, spores, rust ahead of the ink, then the tree. The eye watches | strong: the contagion as a substance, framed every second |
+| Corruption | 110-130 s | A close circle round the spreading stain. The olive eaten from the root, the eye become a moon | strong |
+| Nightmare | 130-154 s | Blood sky, banked flight cutting along its path on the bar. The eye is a hole ringed in the strain | adequate: disorienting as intended. The cuts sometimes land on a featureless slope |
+| Collapse | 154-185 s | The camera stalls over the pan. The land breaks into 2.3 m blocks that lift and tumble, the tree into its blocks, spores everywhere. No screen-space mosh | adequate: in the world now, but busy rather than dreadful |
+| Recovery | 185-210 s | The keyframe: the dream as it was, held on the eye still watching the stone | strong as an idea, and now framed |
+
+| §18 criterion | Pass 5b verdict |
+|---|---|
+| Composition | adequate: the circles keep the stain in frame. Some flight frames are still empty sky and slope |
+| Colour | strong: painting palettes; the contagion's colour arrives only where the stain is |
+| Psychological effect | adequate to strong: the watching eye is the piece's best uncanny device |
+| Visual originality | adequate to strong: the land, the eye, the ink stain and the collapse in the world are not stock glitch |
+| Audio responsiveness | strong (see the Critic below) |
+| Temporal coherence | adequate: no shimmer. Seek equals play since ADR-1168 |
+| Deformation / material / lighting | adequate / adequate / strong |
+| Particle quality | adequate |
+| Glitch quality | adequate: image-space corruption is now an accent only |
+| Performance | adequate: see below. Every stage holds 30 fps live. 60 fps holds only at Emergency, and the Dream is at risk |
+| Live-mode stability | strong for stability (no oscillation, no audio loss); weak for rate at 60 |
+| Offline rendering quality | strong: deterministic, and a range render equals a full render (ADR-1168) |
+
+### Performance, pass 5b (1920x1080, M2 Max)
+
+| Stage | LIVE AUTO GPU p50 / p95 | Ultra GPU p50 / p95 |
+|---|---|---|
+| Dream | 13.2 / 18.9 ms | 34.3 / 66.7 ms |
+| Uncanny | 14.8 / 21.3 ms | 32.3 / 53.3 ms |
+| Infection | 22.7 / 25.4 ms | 48.1 / 68.4 ms |
+| Corruption | 22.5 / 25.6 ms | 51.3 / 55.1 ms |
+| Nightmare | 14.5 / 20.3 ms | 30.9 / 35.3 ms |
+| Collapse | 19.4 / 22.7 ms | 49.6 / 60.6 ms |
+| Decay | 27.3 / 28.4 ms | 57.1 / 59.4 ms |
+| Pixels | 25.8 / 26.9 ms | 55.9 / 69.3 ms |
+
+LIVE AUTO's level is Emergency in every stage above.
+
+`--live-profile --mode live`:
+
+| Stage | Target 60 | Target 30 |
+|---|---|---|
+| Dream | Emergency, frame p50 16.7 ms, 54 misses: at risk | High, achieved |
+| Nightmare | over budget (p95 28.8 ms) | achieved |
+| Collapse | Emergency, 16.6 ms, 27 misses: at risk | High, achieved |
+
+Pass 3, before ADR-1165, measured 22-35 ms at Emergency and 49-83 ms at Ultra. The raymarched SDF shadow cost fell to
+a few ms. The circling Infection and Corruption are the heaviest flying stages, because the stain, the blocks and the
+tree are all in frame.
+
+**Seek (ADR-1168).** A seek to 200 s costs 184 ms in total, against 67 ms without the control replay.
+
+## Pass 3 (history)
 
 ## The seven stages
 
