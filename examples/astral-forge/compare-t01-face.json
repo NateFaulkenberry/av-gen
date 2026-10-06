@@ -1,0 +1,29 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Astral Forge: compare-t01-face"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "compare-t01-face.scene.json"
+  }
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "parameters": {},
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/compare-t01-face"
+ }
+}

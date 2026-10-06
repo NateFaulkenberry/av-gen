@@ -1,0 +1,1168 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "compare-t02-metal",
+ "camera": {
+  "mode": 1,
+  "position": [
+   9.20815,
+   1.64056,
+   5.86624
+  ],
+  "target": [
+   0.0,
+   0.2,
+   0.0
+  ],
+  "fov": 32.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0,
+   0,
+   0
+  ],
+  "intensity": 0.0,
+  "bands": {
+   "phase": 5.4,
+   "rotation": 0.0,
+   "gain": 1.0,
+   "softbox": {
+    "intensity": 0.55,
+    "azimuth": 2.042,
+    "elevation": 0.5028,
+    "falloff": 2.6,
+    "skyFill": 0.08
+   },
+   "strips": [
+    {
+     "axis": [
+      -0.85332,
+      0.33035,
+      0.40339
+     ],
+     "offset": 0.0,
+     "width": 0.014,
+     "intensity": 17.0,
+     "segments": 5,
+     "warmth": 0.045,
+     "rate": 0.07
+    },
+    {
+     "axis": [
+      0.23261,
+      0.93155,
+      0.27947
+     ],
+     "offset": 0.62,
+     "width": 0.02,
+     "intensity": 9.0,
+     "segments": 0,
+     "warmth": 0.42,
+     "rate": 0.12
+    },
+    {
+     "axis": [
+      0.16676,
+      -0.83378,
+      0.5263
+     ],
+     "offset": 0.5,
+     "width": 0.012,
+     "intensity": 11.0,
+     "segments": 9,
+     "warmth": 0.325,
+     "rate": 0.17
+    },
+    {
+     "axis": [
+      0.98894,
+      0.0,
+      0.14834
+     ],
+     "offset": -0.765,
+     "width": 0.018,
+     "intensity": 28.0,
+     "segments": 0,
+     "warmth": 0.0,
+     "rate": 0.22
+    }
+   ]
+  }
+ },
+ "post": {
+  "bloomIntensity": 0.05
+ },
+ "lights": [],
+ "nodes": [
+  {
+   "name": "latent",
+   "kind": "sdf",
+   "sdf": {
+    "visible": false,
+    "tree": {
+     "root": {
+      "kind": "smoothUnion",
+      "smooth": 0.3,
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.6,
+        "children": [
+         {
+          "kind": "twist",
+          "amount": 0.35,
+          "children": [
+           {
+            "kind": "smoothDifference",
+            "smooth": 0.35,
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 1.375,
+              "height": 1.5
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.5,
+               1.2
+              ],
+              "children": [
+               {
+                "kind": "capsule",
+                "radius": 0.75,
+                "height": 0.75
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.84544,
+             0.6,
+             0.25717
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               14.73495,
+               -20.05352,
+               58.48432
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.30692307692307685,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.6,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 5.2
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.03225,
+             0.99667,
+             0.74952
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               42.94424,
+               -92.05352,
+               34.10417
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.2844515318986696,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   3.17813,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 6.356269822500632
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.86537,
+             0.49778,
+             0.20605
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               11.80605,
+               -164.05352,
+               10.96203
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.3136738107439439,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.9093,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 5.8186016461857575
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.50258,
+             0.22967,
+             -0.62217
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               -35.6477,
+               -236.05352,
+               21.03954
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.37295573959896194,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.18734,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 4.374680608979231
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.55476,
+             0.79765,
+             -0.59058
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               -33.83754,
+               -308.05352,
+               50.40993
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.3394529447034201,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.06993,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 4.139854413135817
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "polarRepeat",
+        "count": 9,
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           1.5,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "twist",
+            "amount": 0.25,
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.6,
+                 2.7,
+                 0.035
+                ]
+               },
+               {
+                "kind": "capsule",
+                "radius": 0.55,
+                "height": 2.05
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "twist",
+        "amount": 0.35,
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.5,
+           1.2
+          ],
+          "children": [
+           {
+            "kind": "intersection",
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.1,
+              "children": [
+               {
+                "kind": "capsule",
+                "radius": 0.85,
+                "height": 0.75
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.0,
+               -0.25
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 2.0,
+                 3.0,
+                 0.25
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "boundsMin": [
+     -10.0,
+     -10.0,
+     -10.0
+    ],
+    "boundsMax": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "name": "matter",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 2000000,
+    "seed": 11,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "extent": [
+     6.0,
+     6.0,
+     6.0
+    ],
+    "spawnRate": 0.0,
+    "burst": 2000000.0,
+    "lifetimeMin": 1000.0,
+    "lifetimeMax": 1000.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.3,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.4,
+    "turbulence": 0.5,
+    "turbulenceScale": 0.6,
+    "turbulenceSpeed": 0.2,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.013,
+    "colorStart": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "colorEnd": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "shape2d": "flake",
+    "flake": {
+     "metal": [
+      0.5,
+      0.51,
+      0.54
+     ],
+     "temper": 30.0,
+     "filmIor": 2.4,
+     "glint": 0.012,
+     "tumble": 0.4,
+     "free": 0.2,
+     "bound": 0.65,
+     "latentNormal": 1.0,
+     "sparkle": 0.008,
+     "sparkleGain": 0.6,
+     "fuse": 0.97
+    },
+    "latent": {
+     "sdf": "latent",
+     "coherence": 1.0,
+     "width": 0.08,
+     "strength": 1.0,
+     "flow": 0.3,
+     "release": 12.0
+    },
+    "density": {
+     "boundsMin": [
+      -10.0,
+      -10.0,
+      -10.0
+     ],
+     "boundsMax": [
+      10.0,
+      10.0,
+      10.0
+     ],
+     "resolution": 192,
+     "weight": 0.05
+    }
+   }
+  },
+  {
+   "name": "dust",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 250000,
+    "seed": 23,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "extent": [
+     22.0,
+     22.0,
+     22.0
+    ],
+    "spawnRate": 0.0,
+    "burst": 250000.0,
+    "lifetimeMin": 1000.0,
+    "lifetimeMax": 1000.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.05,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.2,
+    "turbulence": 0.15,
+    "turbulenceScale": 0.3,
+    "turbulenceSpeed": 0.1,
+    "sizeStart": 0.013,
+    "sizeEnd": 0.013,
+    "colorStart": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "colorEnd": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "shape2d": "flake",
+    "flake": {
+     "metal": [
+      0.5,
+      0.51,
+      0.54
+     ],
+     "temper": 0.0,
+     "filmIor": 2.4,
+     "glint": 0.012,
+     "tumble": 0.4,
+     "free": 0.35,
+     "bound": 0.0,
+     "latentNormal": 0.0,
+     "sparkle": 0.012,
+     "sparkleGain": 0.5,
+     "fuse": 0.0
+    }
+   }
+  },
+  {
+   "name": "entity",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "smoothUnion",
+      "smooth": 0.3,
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.6,
+        "children": [
+         {
+          "kind": "twist",
+          "amount": 0.35,
+          "children": [
+           {
+            "kind": "smoothDifference",
+            "smooth": 0.35,
+            "children": [
+             {
+              "kind": "capsule",
+              "radius": 1.375,
+              "height": 1.5
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.5,
+               1.2
+              ],
+              "children": [
+               {
+                "kind": "capsule",
+                "radius": 0.75,
+                "height": 0.75
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "union",
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.84544,
+             0.6,
+             0.25717
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               14.73495,
+               -20.05352,
+               58.48432
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.30692307692307685,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.6,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 5.2
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.03225,
+             0.99667,
+             0.74952
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               42.94424,
+               -92.05352,
+               34.10417
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.2844515318986696,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   3.17813,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 6.356269822500632
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.86537,
+             0.49778,
+             0.20605
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               11.80605,
+               -164.05352,
+               10.96203
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.3136738107439439,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.9093,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 5.8186016461857575
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             -0.50258,
+             0.22967,
+             -0.62217
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               -35.6477,
+               -236.05352,
+               21.03954
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.37295573959896194,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.18734,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 4.374680608979231
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "kind": "translate",
+            "translation": [
+             0.55476,
+             0.79765,
+             -0.59058
+            ],
+            "children": [
+             {
+              "kind": "rotate",
+              "rotation": [
+               -33.83754,
+               -308.05352,
+               50.40993
+              ],
+              "children": [
+               {
+                "kind": "bend",
+                "amount": 0.3394529447034201,
+                "children": [
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   2.06993,
+                   0.0,
+                   0.0
+                  ],
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -90.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "cone",
+                      "radius": 0.42,
+                      "height": 4.139854413135817
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "polarRepeat",
+        "count": 9,
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           1.5,
+           0.0,
+           0.0
+          ],
+          "children": [
+           {
+            "kind": "twist",
+            "amount": 0.25,
+            "children": [
+             {
+              "kind": "intersection",
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 0.6,
+                 2.7,
+                 0.035
+                ]
+               },
+               {
+                "kind": "capsule",
+                "radius": 0.55,
+                "height": 2.05
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "twist",
+        "amount": 0.35,
+        "children": [
+         {
+          "kind": "translate",
+          "translation": [
+           0.0,
+           0.5,
+           1.2
+          ],
+          "children": [
+           {
+            "kind": "intersection",
+            "children": [
+             {
+              "kind": "shell",
+              "offset": 0.1,
+              "children": [
+               {
+                "kind": "capsule",
+                "radius": 0.85,
+                "height": 0.75
+               }
+              ]
+             },
+             {
+              "kind": "translate",
+              "translation": [
+               0.0,
+               0.0,
+               -0.25
+              ],
+              "children": [
+               {
+                "kind": "box",
+                "size": [
+                 2.0,
+                 3.0,
+                 0.25
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "boundsMin": [
+     -10.0,
+     -10.0,
+     -10.0
+    ],
+    "boundsMax": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "material": {
+     "baseColor": [
+      0.36,
+      0.37,
+      0.4
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.2,
+     "metallic": 1.0,
+     "thinFilm": {
+      "thickness": 30.0,
+      "ior": 2.4
+     },
+     "anisotropy": {
+      "strength": -0.4,
+      "rotation": 0.0
+     },
+     "engraving": {
+      "depth": 0.3,
+      "crawl": 0.09,
+      "grating": 1.0,
+      "spacing": 1300.0,
+      "panels": 0.55,
+      "layers": [
+       {
+        "family": "contour",
+        "center": [
+         0.0,
+         0.2,
+         -3.0
+        ],
+        "petals": 7,
+        "frequency": 7.0,
+        "weight": 1.0,
+        "depth": 0.28,
+        "inner": 0.15,
+        "outer": 0.8
+       },
+       {
+        "family": "engine",
+        "axis": [
+         0.94,
+         0.3,
+         0.17
+        ],
+        "frequency": 9.0,
+        "weight": 0.25,
+        "depth": 0.16,
+        "inner": 0.15,
+        "outer": 0.8
+       }
+      ]
+     }
+    },
+    "maxSteps": 448,
+    "stepScale": 0.6,
+    "epsilon": 0.0006,
+    "normalEpsilon": 0.004,
+    "castShadows": false,
+    "look": {
+     "aoStrength": 0.6,
+     "aoDistance": 0.25
+    },
+    "density": {
+     "particles": "matter",
+     "iso": 1.0,
+     "sharpness": 1.0
+    }
+   }
+  }
+ ]
+}
