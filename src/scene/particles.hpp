@@ -135,6 +135,43 @@ constexpr std::uint32_t kMaxScatterAnchors = 64;
 // typically an invisible object (`visible: false`). Absent (empty `sdf`) = off, and the particle
 // pipeline does not dispatch the pass at all, so the system is byte-identical to one without it.
 // The name must resolve at load (Composition refuses the scene otherwise; ADR-704's precedent).
+// ---- ADR-1146: tendons ---------------------------------------------------------------------------
+// A latent with `tendons` binds its matter to authored skeleton curves instead of the SDF's zero set: the meso
+// scale of THE ASTRAL FORGE (prototype sim.wgsl role 6). Each particle rides one curve at a time: its curve
+// parameter is u = fract(phase + rate t), rate = speed / the curves' mean length, so the matter STREAMS along
+// the curves; the curve is chosen by a hash of (particle, generation = floor(phase + rate t)). A fresh
+// generation's binding ramps in over `ramp` of u (the matter flies in from wherever the last curve left it),
+// and crossing u = 0.97 throws it off the end with `spray` (the curve's end sprays matter into the field).
+// The curves are in the latent SDF object's local space (its transform carries them); the tree is not read.
+inline constexpr int kMaxTendonCurves = 32;
+inline constexpr int kMaxTendonPoints = 64;   // authored points per curve
+inline constexpr int kTendonSamples = 16;     // each curve resampled to this many points by arc length
+struct ParticleTendons {
+    std::vector<std::vector<glm::vec3>> curves; // 2..kMaxTendonPoints points each; empty = off
+    float speed = 0.6f;      // local units per second along a curve
+    float stiffness = 40.0f; // the spring to the moving point on the curve
+    float spray = 3.0f;      // m/s thrown off a curve's end
+    float ramp = 0.12f;      // the share of a pass over which the binding ramps in
+    [[nodiscard]] bool active() const { return !curves.empty(); }
+};
+
+// ---- ADR-1148: the collapse heat front ----------------------------------------------------------------
+// Matter a coherence drop releases (ADR-1140) is heated only where a FRONT expanding from `origin` (latent-local)
+// at `speed` (local units per second, from the moment the coherence starts to fall) passes it:
+// heat += release * inject * (0.5 + h) * exp(-((|p - o| - r) / width)^2), r = speed * since. Heat decays as
+// exp(-decay dt). A flake system shows it as sparks: a `fraction` of its plates glow heatColor(heat) * gain.
+// The particle's heat lives in its record's trail-write lane, so a heated system cannot also have trails.
+struct ParticleHeat {
+    bool enabled = false;
+    glm::vec3 origin{0.0f}; // latent-local
+    float speed = 30.0f;
+    float width = 0.9f;
+    float inject = 0.8f;
+    float decay = 3.0f;
+    float fraction = 0.045f;
+    float gain = 1.4f;
+};
+
 struct ParticleLatent {
     std::string sdf;          // the SdfObject's name; empty = off
     float coherence = 1.0f;   // 0..1, the binding level
@@ -142,7 +179,28 @@ struct ParticleLatent {
     float strength = 1.0f;    // multiplies the spring stiffness K (0 = no pull)
     float flow = 0.0f;        // tangential migration of bound matter (curl in the tangent plane)
     float release = 12.0f;    // speed (m/s per unit of unbinding) a coherence drop throws matter at
+    // ADR-1155: refresh the projection (the four SDF taps) on one step in `stagger` (1..4; 1 = every step, as it
+    // always was); in between a particle springs toward the surface point it stored in its record's `home` lane.
+    int stagger = 1;
+    ParticleTendons tendons;  // ADR-1146: bind to curves instead of the zero set
+    ParticleHeat heat;        // ADR-1148: the release front's heat
     [[nodiscard]] bool active() const { return !sdf.empty(); }
+};
+
+// ---- ADR-1147: shards -----------------------------------------------------------------------------------
+// A flake system's NEAR bound plates drawn as lit geometry, after THE ASTRAL FORGE prototype's shards.wgsl: an
+// irregular four-cornered sliver (a fan of four triangles) in the plate's plane, with micro-grooves across it
+// and a bevelled rim that catches the bands, depth-tested and resting on the surface. Candidates are every 4th
+// slot; a candidate becomes a shard when it is bound (b > 0.3), its footprint exceeds `pixels`, it rests within
+// 0.15 dist + 0.1 of the opaque surface, and its hash is under `fraction` (fewer as they grow); its flake is
+// then not drawn.
+struct ParticleShards {
+    bool enabled = false;
+    float pixels = 1.6f;    // footprint (px) above which a near plate resolves as a shard
+    float fraction = 0.25f; // share of the candidates that resolve (scaled down as footprints grow)
+    float size = 1.0f;      // shard radius as a multiple of the particle's size
+    float grooves = 40.0f;  // micro-grooves per shard radius
+    float bevel = 0.15f;    // the rim's share of the radius
 };
 
 // ---- ADR-1153: glint flakes ------------------------------------------------------------------
@@ -382,6 +440,7 @@ struct ParticleSystem {
     ParticleLatent latent;
     ParticleDensity density;
     ParticleFlake flake; // ADR-1153 (read only when shape2d is Flake)
+    ParticleShards shards; // ADR-1147 (flake systems only)
 };
 
 // The length the billboard gains along its velocity, in world units. The shader computes exactly
@@ -460,6 +519,11 @@ struct ParticleParameters {
     params::Parameter<float>* latentFlow = nullptr;
     params::Parameter<float>* latentRelease = nullptr;
     params::Parameter<float>* latentWidth = nullptr;
+    params::Parameter<float>* tendonSpeed = nullptr; // ADR-1146
+    params::Parameter<float>* heatInject = nullptr;  // ADR-1148
+    params::Parameter<float>* heatSpeed = nullptr;
+    params::Parameter<float>* shardFraction = nullptr; // ADR-1147
+    params::Parameter<float>* shardPixels = nullptr;
     params::Parameter<float>* densityWeight = nullptr;
     // ADR-1153: registered only for a flake system.
     params::Parameter<float>* flakeTemper = nullptr;

@@ -74,4 +74,30 @@ struct EngravingUv {
 };
 [[nodiscard]] EngravingUv engravingUv(const EngravingLayer& layer, glm::vec3 q, float crawlPhase);
 
+// ---- ADR-1149: per-region temper and polish --------------------------------------------------------------
+//
+//   "material": { ..., "regions": {"film": 120, "filmNoise": 60, "noiseScale": 0.9, "polish": 0.7,
+//       "points": [{"center": [-0.76, 0.72, 0.6], "sharpness": 4, "weight": 1},
+//                  {"center": [0, -1.45, 0.62], "scale": [0.8, 2, 1], "sharpness": 3, "weight": 0.6}]} }
+//
+// SDF objects only (refused by name elsewhere). Unknown keys, wrong types, more than kMaxSurfaceRegions points,
+// negative film, polish outside 0..1, a weight outside 0..1 or a sharpness <= 0 are refused by name.
+// Parameters (only when present): <prefix>material/regions/{film, filmNoise, polish}.
+[[nodiscard]] Result<SurfaceRegions> readSurfaceRegions(const nlohmann::json& j);
+[[nodiscard]] nlohmann::json surfaceRegionsToJson(const SurfaceRegions& r);
+// The weight fw at the domain point q (the shader's sdfEngrave, for tests).
+[[nodiscard]] float surfaceRegionWeight(const SurfaceRegions& r, glm::vec3 q);
+
+struct SurfaceRegionParameters {
+    params::Parameter<float>* film = nullptr;
+    params::Parameter<float>* filmNoise = nullptr;
+    params::Parameter<float>* polish = nullptr;
+};
+[[nodiscard]] SurfaceRegionParameters registerSurfaceRegionParameters(params::ParameterSet& params,
+                                                                      const std::string& prefix,
+                                                                      const std::string& group,
+                                                                      const SurfaceRegions& rest,
+                                                                      std::vector<params::IParameter*>* all);
+void applySurfaceRegionParameters(const SurfaceRegionParameters& p, SurfaceRegions& live);
+
 } // namespace avgen::scene

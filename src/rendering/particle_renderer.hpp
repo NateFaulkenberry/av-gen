@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -119,10 +120,23 @@ struct ParticleUniforms {
     glm::vec4 bandsSoft2{0.0f};
     glm::vec4 bandsRate{0.0f};
     glm::vec4 bands[8]{};
+    // ADR-1146: tendons (cs_tendon): rate (passes / s), stiffness, spray, ramp; the curves' first record, count,
+    // points per curve.
+    glm::vec4 tendon0{0.0f};
+    glm::uvec4 tendonInfo{0u};
+    // ADR-1148: the release front (cs_heat, vs_flake, fs_shard): origin (world) + seconds since it set out (< 0:
+    // none); front speed, width (world), inject, decay; spark fraction, gain, 1 = on.
+    glm::vec4 heat0{0.0f};
+    glm::vec4 heat1{0.0f};
+    glm::vec4 heat2{0.0f};
+    // ADR-1147: shards: footprint threshold (px), fraction, size, 1 = on; grooves, bevel, radians per pixel.
+    glm::vec4 shard0{0.0f};
+    glm::vec4 shard1{0.0f};
 };
 static_assert(sizeof(ParticleUniforms) == 128 + 16 * 41 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
                                               16 * scene::kMaxScatterAnchors + 16 + 3 * 64 + 3 * 16 +
-                                              4 * 16 + 12 * 16); // ADR-1153 flakes, ADR-1151 bands
+                                              4 * 16 + 12 * 16 + 7 * 16); // ADR-1153 flakes, ADR-1151 bands,
+                                                                          // ADR-1146..1148 tendons, heat, shards
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -145,6 +159,7 @@ struct ParticleFrameContext {
     // one. 0 = no limit. Spline- and scatter-anchored emitters are never culled: they have no single position.
     float cullDistance = 0.0f;
     glm::mat4 prevViewProj{1.0f};   // ADR-035, for the velocity target
+    float pixelAngle = 0.0f;        // ADR-1147: radians one pixel subtends (vertical); 0 = unknown (no shards)
     glm::vec3 cameraPosition{0.0f}; // ribbons face it; the fog coupling marches from it
     float shutterSeconds = 0.0f;    // shutterAngle / 360 * frame duration (ADR-037)
     // The volumetric atmosphere the particles sit in (scene::Environment). Density 0 = no fog
@@ -219,6 +234,7 @@ struct ParticleSnapshot {
     glm::vec3 velocity{0.0f};
     float life = 0.0f; // 0 = a dead slot
     float seed = 0.0f;
+    float trail = 0.0f;   // the trailWrites lane: trail history writes, or (ADR-1148) a heated system's heat
     glm::vec4 home{0.0f}; // the record's last lane: an anchored system's crown, or a flake's latent normal (ADR-1153)
 };
 
@@ -340,6 +356,8 @@ private:
         float latentPrevCoherence = 0.0f;
         bool latentPrevValid = false;
         bool latentWarned = false;
+        // ADR-1148: when the current release front set out (the step the coherence began to fall), or < 0.
+        double heatFrontStart = -1.0;
         // ADR-1141: the render-transient density volume (empty unless the system has a density block).
         struct Density {
             int resolution = 0;
@@ -403,6 +421,7 @@ private:
     wgpu::ComputePipeline glowReducePipeline_;
     wgpu::ComputePipeline glowTopPipeline_;
     wgpu::ComputePipeline latentPipeline_; // ADR-1140
+    wgpu::ComputePipeline latentStaggeredPipeline_; // ADR-1155
     // ADR-1141: the density passes have their own layout (particle_density.wgsl).
     wgpu::BindGroupLayout densityLayout_;
     wgpu::PipelineLayout densityPipelineLayout_;
@@ -416,12 +435,25 @@ private:
     double lastDensityMs_ = -1.0;
     bool densityThisFrame_ = false;
     std::vector<spatial::SdfNodeGpu> latentScratch_;
+    // ADR-1145: cs_latent compiled against a tree (spatial::sdfCompileWgsl spliced into particles.wgsl), by
+    // spatial::sdfCompileKey, for a latent whose SDF object has `compile` on. A null pipeline = the build
+    // failed (the force is then off for that tree, said once). Cleared by reload().
+    // ADR-1155: each variant builds both entries, cs_latent and cs_latent_staggered.
+    struct CompiledLatent {
+        wgpu::ComputePipeline plain;
+        wgpu::ComputePipeline staggered;
+    };
+    const CompiledLatent& compiledLatentPipeline(const spatial::SdfTree& tree, const spatial::FieldSet* fields);
+    std::map<std::uint64_t, CompiledLatent> compiledLatent_;
     wgpu::RenderPipeline additivePipeline_;
     wgpu::RenderPipeline alphaPipeline_;
     wgpu::RenderPipeline ribbonAdditivePipeline_;
     wgpu::RenderPipeline ribbonAlphaPipeline_;
     wgpu::RenderPipeline flakeAdditivePipeline_; // ADR-1153: vs_flake
     wgpu::RenderPipeline flakeAlphaPipeline_;
+    wgpu::ComputePipeline tendonPipeline_;   // ADR-1146
+    wgpu::ComputePipeline heatPipeline_;     // ADR-1148
+    wgpu::RenderPipeline shardPipeline_;     // ADR-1147
     std::vector<Pool> pools_;
     const scene::Scene* scene_ = nullptr;
     ParticleStats stats_;

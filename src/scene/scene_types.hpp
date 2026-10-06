@@ -287,6 +287,27 @@ struct Engraving {
     [[nodiscard]] bool enabled() const { return !layers.empty(); }
 };
 
+// ADR-1149: per-region temper and polish, after THE ASTRAL FORGE prototype's featureWeight (latent.wgsl) and its
+// use in surface.wgsl: near authored feature points (an eye, a mouth) the temper film is thicker and the metal
+// polished. fw = max_k weight_k exp(-sharpness_k |(q - center_k) scale_k|^2) at the engraving's domain point q
+// (ADR-1154); the film gains `film` nm times fw plus `filmNoise` nm times a value noise of q * noiseScale, and the
+// roughness is multiplied by 1 - polish fw. Drawn by SDF objects (the engraved pipeline variant).
+struct SurfaceRegion {
+    glm::vec3 center{0.0f};
+    glm::vec3 scale{1.0f};   // per-axis weights of the distance (an anisotropic falloff)
+    float sharpness = 4.0f;  // exp(-sharpness d^2): 4 is the prototype's eyes, 3 its mouth
+    float weight = 1.0f;     // 0..1
+};
+inline constexpr int kMaxSurfaceRegions = 4;
+struct SurfaceRegions {
+    float film = 0.0f;       // nm of film added at full weight
+    float filmNoise = 0.0f;  // nm of film varied by a value noise everywhere (the prototype's 90 tn)
+    float noiseScale = 0.9f; // that noise's frequency
+    float polish = 0.0f;     // 0..1: roughness x (1 - polish fw)
+    std::vector<SurfaceRegion> points;
+    [[nodiscard]] bool enabled() const { return !points.empty() || filmNoise > 0.0f; }
+};
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -316,6 +337,7 @@ struct Material {
     ThinFilm thinFilm;                   // ADR-1143: interference colour (off by default)
     Anisotropy anisotropy;               // ADR-1143: stretched highlight (off by default)
     Engraving engraving;                 // ADR-1152: guilloche line fields (off by default; SDF objects)
+    SurfaceRegions regions;              // ADR-1149: per-region temper and polish (off by default; SDF objects)
 };
 
 // ---- geometry ------------------------------------------------------------------------------

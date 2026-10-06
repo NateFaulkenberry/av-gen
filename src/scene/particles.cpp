@@ -133,6 +133,72 @@ Result<void> validateLatentAndDensity(const ParticleSystem& s) {
         if (!finite(l.release) || l.release < 0.0f || l.release > 1000.0f) {
             return fail("particle system '{}': latent.release must be in 0..1000, got {}", s.name, l.release);
         }
+        if (l.stagger < 1 || l.stagger > 4) { // ADR-1155
+            return fail("particle system '{}': latent.stagger must be in 1..4, got {}", s.name, l.stagger);
+        }
+        if (l.stagger > 1 && (l.tendons.active() || s.scatterAnchor.active())) {
+            return fail("particle system '{}': latent.stagger stores the projection in the record's home lane, which "
+                        "{} uses",
+                        s.name, l.tendons.active() ? "nothing (tendons do not project; drop stagger)" : "a scatter anchor");
+        }
+        const ParticleTendons& t = l.tendons; // ADR-1146
+        if (t.active()) {
+            if (t.curves.size() > static_cast<std::size_t>(kMaxTendonCurves)) {
+                return fail("particle system '{}': latent.tendons has {} curves (max {})", s.name, t.curves.size(),
+                            kMaxTendonCurves);
+            }
+            for (std::size_t c = 0; c < t.curves.size(); ++c) {
+                const auto& curve = t.curves[c];
+                if (curve.size() < 2 || curve.size() > static_cast<std::size_t>(kMaxTendonPoints)) {
+                    return fail("particle system '{}': latent.tendons.curves[{}] needs 2..{} points (got {})", s.name, c,
+                                kMaxTendonPoints, curve.size());
+                }
+                float length = 0.0f;
+                for (std::size_t k = 0; k < curve.size(); ++k) {
+                    if (!finite(curve[k].x) || !finite(curve[k].y) || !finite(curve[k].z)) {
+                        return fail("particle system '{}': latent.tendons.curves[{}] has a non-finite point", s.name, c);
+                    }
+                    length += k > 0 ? glm::length(curve[k] - curve[k - 1]) : 0.0f;
+                }
+                if (!(length > 1e-4f)) {
+                    return fail("particle system '{}': latent.tendons.curves[{}] has no length", s.name, c);
+                }
+            }
+            if (!finite(t.speed) || t.speed < 0.0f || t.speed > 1000.0f || !finite(t.stiffness) || t.stiffness < 0.0f ||
+                t.stiffness > 1.0e4f || !finite(t.spray) || t.spray < 0.0f || !finite(t.ramp) || t.ramp < 0.0f ||
+                t.ramp > 0.9f) {
+                return fail("particle system '{}': latent.tendons: speed in 0..1000, stiffness in 0..10000, spray >= 0, "
+                            "ramp in 0..0.9",
+                            s.name);
+            }
+        }
+        const ParticleHeat& h = l.heat; // ADR-1148
+        if (h.enabled) {
+            if (s.trailEnabled) {
+                return fail("particle system '{}': latent.heat keeps the heat in the trail lane; a heated system "
+                            "cannot have trails",
+                            s.name);
+            }
+            if (!finite(h.origin.x) || !finite(h.origin.y) || !finite(h.origin.z) || !finite(h.speed) ||
+                h.speed < 0.0f || !finite(h.width) || !(h.width > 0.0f) || !finite(h.inject) || h.inject < 0.0f ||
+                !finite(h.decay) || h.decay < 0.0f || !finite(h.fraction) || h.fraction < 0.0f || h.fraction > 1.0f ||
+                !finite(h.gain) || h.gain < 0.0f) {
+                return fail("particle system '{}': latent.heat: speed, inject, decay and gain >= 0, width > 0, "
+                            "fraction in 0..1",
+                            s.name);
+            }
+        }
+    }
+    if (s.shards.enabled) { // ADR-1147
+        if (s.shape2d != ParticleShape::Flake) {
+            return fail("particle system '{}': shards are near flakes; shape2d must be \"flake\"", s.name);
+        }
+        const ParticleShards& sh = s.shards;
+        if (!(sh.pixels > 0.0f) || sh.fraction < 0.0f || sh.fraction > 1.0f || !(sh.size > 0.0f) || sh.grooves < 0.0f ||
+            sh.bevel < 0.0f || sh.bevel > 0.9f || !std::isfinite(sh.pixels + sh.fraction + sh.size + sh.grooves + sh.bevel)) {
+            return fail("particle system '{}': shards: pixels and size > 0, fraction in 0..1, grooves >= 0, bevel in 0..0.9",
+                        s.name);
+        }
     }
     const ParticleDensity& d = s.density;
     if (d.enabled) {
@@ -353,6 +419,17 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
         p.latentFlow = &params.add(f(base, "latent/flow", s.latent.flow, 0.0f, 100.0f, 0.0f, 4.0f));
         p.latentRelease = &params.add(f(base, "latent/release", s.latent.release, 0.0f, 1000.0f, 0.0f, 40.0f));
         p.latentWidth = &params.add(f(base, "latent/width", s.latent.width, 0.005f, 0.5f, 0.01f, 0.3f));
+        if (s.latent.tendons.active()) { // ADR-1146
+            p.tendonSpeed = &params.add(f(base, "latent/tendons/speed", s.latent.tendons.speed, 0.0f, 1000.0f, 0.0f, 4.0f));
+        }
+        if (s.latent.heat.enabled) { // ADR-1148
+            p.heatInject = &params.add(f(base, "latent/heat/inject", s.latent.heat.inject, 0.0f, 100.0f, 0.0f, 4.0f));
+            p.heatSpeed = &params.add(f(base, "latent/heat/speed", s.latent.heat.speed, 0.0f, 1000.0f, 0.0f, 80.0f));
+        }
+    }
+    if (s.shards.enabled) { // ADR-1147
+        p.shardFraction = &params.add(f(base, "shards/fraction", s.shards.fraction, 0.0f, 1.0f, 0.0f, 1.0f));
+        p.shardPixels = &params.add(f(base, "shards/pixels", s.shards.pixels, 0.1f, 100.0f, 0.5f, 8.0f));
     }
     if (s.density.enabled) { // ADR-1141
         p.densityWeight = &params.add(f(base, "density/weight", s.density.weight, 0.0f, 1.0e4f, 0.0f, 8.0f));
@@ -437,11 +514,17 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     // ADR-1140 / ADR-1141: the block itself is structural (from rest); only its levels are live.
     s.latent = rest.latent;
     s.density = rest.density;
+    s.shards = rest.shards; // ADR-1147
     if (p.latentCoherence != nullptr) { s.latent.coherence = p.latentCoherence->value(); }
     if (p.latentStrength != nullptr) { s.latent.strength = p.latentStrength->value(); }
     if (p.latentFlow != nullptr) { s.latent.flow = p.latentFlow->value(); }
     if (p.latentRelease != nullptr) { s.latent.release = p.latentRelease->value(); }
     if (p.latentWidth != nullptr) { s.latent.width = p.latentWidth->value(); }
+    if (p.tendonSpeed != nullptr) { s.latent.tendons.speed = p.tendonSpeed->value(); }
+    if (p.heatInject != nullptr) { s.latent.heat.inject = p.heatInject->value(); }
+    if (p.heatSpeed != nullptr) { s.latent.heat.speed = p.heatSpeed->value(); }
+    if (p.shardFraction != nullptr) { s.shards.fraction = p.shardFraction->value(); }
+    if (p.shardPixels != nullptr) { s.shards.pixels = p.shardPixels->value(); }
     if (p.densityWeight != nullptr) { s.density.weight = p.densityWeight->value(); }
     s.flake = rest.flake; // ADR-1153
     if (p.flakeTemper != nullptr) { s.flake.temper = p.flakeTemper->value(); }

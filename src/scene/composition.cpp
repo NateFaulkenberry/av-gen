@@ -12475,6 +12475,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 if (m.contains("engraving")) { // ADR-1152: only the SDF raymarch cuts an engraving
                     return fail("node '{}': material 'engraving' is drawn on SDF objects only (ADR-1152)", node.name);
                 }
+                if (m.contains("regions")) { // ADR-1149: drawn by the SDF raymarch's engraved variant only
+                    return fail("node '{}': material 'regions' is drawn on SDF objects only (ADR-1149)", node.name);
+                }
                 if (m.contains("alphaMode")) {
                     // Parsed here rather than nowhere. A scene that wrote `"alphaMode":
                     // "blend"` was validated, ignored, and drawn opaque: RendererQA's
@@ -12737,10 +12740,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 if (sdfNode == nullptr || sdfNode->kind != NodeKind::Sdf) {
                     return fail("node '{}': latent.sdf '{}' names no sdf node in this scene", n.name, target);
                 }
-                if (auto fits = sdfNode->sdfRest.tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                // ADR-1145: a compiled latent object runs a compiled variant of the force (no interpreter
+                // stacks, and the ADR-1144 kinds); an interpreted one must fit the interpreter.
+                if (auto fits = sdfNode->sdfRest.tree.validate(sdfNode->sdfRest.compile
+                                                                   ? spatial::SdfEvaluator::Compiled
+                                                                   : spatial::SdfEvaluator::Interpreter);
+                    !fits) {
                     return fail("node '{}': latent.sdf '{}' cannot be evaluated by the particle simulation's "
-                                "interpreter: {}",
-                                n.name, target, fits.error().message);
+                                "{}: {}",
+                                n.name, target, sdfNode->sdfRest.compile ? "compiled force" : "interpreter",
+                                fits.error().message);
                 }
             }
             if (n.kind == NodeKind::Sdf && n.sdfRest.density.active()) {

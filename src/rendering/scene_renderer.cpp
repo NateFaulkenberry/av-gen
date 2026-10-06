@@ -3905,8 +3905,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // reads the linear depth the prepass resolves -- so the question is whether a pass was
     // ENCODED, not whether the lit pass will read it. `active()` here would have produced a shadow
     // AOV computed against a depth target nobody filled.
+    // ADR-1147: a shard rests on the opaque surface, which it finds in the linear depth.
+    const bool shardsWantDepth = std::any_of(scene.particles.begin(), scene.particles.end(), [](const scene::ParticleSystem& p) {
+        return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
+    });
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
-                                   shadowMask_->encoded() || !scene.waters.empty();
+                                   shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth;
     // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
@@ -3967,6 +3971,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
         }
         particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
+        // ADR-1147: the angle one pixel subtends (vertical), for a shard's footprint.
+        particleFrame.pixelAngle = 2.0f / (std::max(std::abs(proj[1][1]), 1e-6f) * std::max(static_cast<float>(hdr_.height()), 1.0f));
         // ADR-520: the key light, for the scattering phase function. `resolveSky` again, for the
         // reason the sky block above gives: it is pure and cheap, and one rule about which light
         // the sun is beats a second rule that can disagree with the first. A dust mote and the disc

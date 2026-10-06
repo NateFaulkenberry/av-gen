@@ -277,6 +277,26 @@ std::vector<NodeField> nodeFields(SdfNodeKind kind) {
     case SdfNodeKind::Warp: // ADR-1040: size = per-axis gain, translation = the phase
         out = {F::Amount, F::Frequency, F::Size, F::Translation, F::Axis, F::Offset, F::Rounding, F::Count};
         break;
+    // ADR-1144: the anatomical vocabulary (compiled trees; every value is live, none is structural)
+    case SdfNodeKind::Ellipsoid:
+        out = {F::Size};
+        break;
+    case SdfNodeKind::TaperedCapsule:
+    case SdfNodeKind::Octahedron:
+        out = {F::Radius};
+        break;
+    case SdfNodeKind::Facet: // offset = the support level, amount = the planes' jitter, speed = their turn rate
+        out = {F::Size, F::Offset, F::Amount, F::Speed};
+        break;
+    case SdfNodeKind::Blend: // amount = the weight, offset = where the ramp crosses the axis, smooth = its half width
+        out = {F::Amount, F::Offset, F::Smooth};
+        break;
+    case SdfNodeKind::Fray:
+        out = {F::Amount, F::Frequency, F::Speed};
+        break;
+    case SdfNodeKind::FarField:
+        out = {F::Radius, F::Offset};
+        break;
     }
     out.push_back(F::Enabled);
     return out;
@@ -460,6 +480,13 @@ Result<void> SdfObject::validate() const {
     if (look.shadowSteps < 1 || look.shadowSteps > 256) {
         return fail("sdf '{}': look shadowSteps must be in 1..256 (got {})", name, look.shadowSteps);
     }
+    if (material.regions.enabled() && renderMode != SdfRenderMode::Raymarch) { // ADR-1149
+        return fail("sdf '{}': regions are drawn by the raymarch; renderMode must be raymarch", name);
+    }
+    if (!(density.spread >= 0.0f && density.spread <= 1.0f) || !(density.spreadRadii.x > 0.0f) ||
+        !(density.spreadRadii.y > 0.0f) || !(density.spreadRadii.z > 0.0f)) { // ADR-1149
+        return fail("sdf '{}': density.spread must be in 0..1 and density.spreadRadii > 0", name);
+    }
     if (material.engraving.enabled() && renderMode != SdfRenderMode::Raymarch) { // ADR-1152
         return fail("sdf '{}': an engraving is cut by the raymarch; renderMode must be raymarch", name);
     }
@@ -536,6 +563,9 @@ json SdfObject::toJson() const {
         if (material.engraving.enabled()) {
             m["engraving"] = engravingToJson(material.engraving); // ADR-1152 (only when authored)
         }
+        if (material.regions.enabled()) {
+            m["regions"] = surfaceRegionsToJson(material.regions); // ADR-1149 (only when authored)
+        }
         j["material"] = std::move(m);
     }
     j["renderMode"] = sdfRenderModeName(renderMode);
@@ -589,6 +619,10 @@ json SdfObject::toJson() const {
     }
     if (density.active()) { // ADR-1142: written only when present
         j["density"] = json{{"particles", density.particles}, {"iso", density.iso}, {"sharpness", density.sharpness}};
+        if (density.spread != 0.0f) { // ADR-1149
+            j["density"]["spread"] = density.spread;
+            j["density"]["spreadRadii"] = vecToJson(density.spreadRadii);
+        }
     }
     return j;
 }
@@ -649,6 +683,13 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
                 return fail("material: {}", engraving.error().message);
             }
             o.material.engraving = std::move(*engraving);
+        }
+        if (m.contains("regions")) { // ADR-1149
+            auto regions = readSurfaceRegions(m.at("regions"));
+            if (!regions) {
+                return fail("material: {}", regions.error().message);
+            }
+            o.material.regions = std::move(*regions);
         }
     }
     if (j.contains("renderMode")) {
@@ -739,8 +780,8 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
             return fail("'density' must be an object {particles, iso, sharpness}");
         }
         for (const auto& [key, value] : dj.items()) {
-            if (key != "particles" && key != "iso" && key != "sharpness") {
-                return fail("'density': unknown key '{}' (expected particles, iso, sharpness)", key);
+            if (key != "particles" && key != "iso" && key != "sharpness" && key != "spread" && key != "spreadRadii") {
+                return fail("'density': unknown key '{}' (expected particles, iso, sharpness, spread, spreadRadii)", key);
             }
         }
         auto particles = readString(dj, "particles", "");
@@ -758,6 +799,13 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         }
         o.density.iso = *iso;
         o.density.sharpness = *sharpness;
+        auto spread = readFloat(dj, "spread", o.density.spread); // ADR-1149
+        auto radii = readVec3(dj, "spreadRadii", o.density.spreadRadii);
+        if (!spread || !radii) {
+            return fail("'density': spread must be a number and spreadRadii [x, y, z]");
+        }
+        o.density.spread = *spread;
+        o.density.spreadRadii = *radii;
     }
     if (auto ok = o.validate(); !ok) {
         return std::unexpected(ok.error());
@@ -791,6 +839,7 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     p.toon = registerToonParameters(params, prefix, group, rest.material.toon, &p.all); // ADR-1071
     p.optics = registerMaterialOpticsParameters(params, prefix, group, rest.material, &p.all); // ADR-1143
     p.engraving = registerEngravingParameters(params, prefix, group, rest.material.engraving, &p.all); // ADR-1152
+    p.regions = registerSurfaceRegionParameters(params, prefix, group, rest.material.regions, &p.all); // ADR-1149
     r.v3("bounds/min", "bounds/min", rest.boundsMin, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("bounds/max", "bounds/max", rest.boundsMax, -1e4f, 1e4f, -20.0f, 20.0f);
     r.i("resolution", rest.resolution, 2, 256, 8, 128);
@@ -831,6 +880,7 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     if (rest.density.active()) { // ADR-1142: the iso level and the sharpening are performance controls
         r.f("density/iso", "density/iso", rest.density.iso, 1e-4f, 1.0e4f, 0.05f, 8.0f);
         r.f("density/sharpness", "density/sharpness", rest.density.sharpness, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("density/spread", "density/spread", rest.density.spread, 0.0f, 1.0f, 0.0f, 1.0f); // ADR-1149
     }
 
     const int nodeCount = rest.tree.nodeCount();
@@ -926,6 +976,7 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     applyToonParameters(p.toon, live.material.toon); // ADR-1071
     applyMaterialOpticsParameters(p.optics, live.material); // ADR-1143
     applyEngravingParameters(p.engraving, live.material.engraving); // ADR-1152
+    applySurfaceRegionParameters(p.regions, live.material.regions); // ADR-1149
     index.copy("bounds/min", live.boundsMin);
     index.copy("bounds/max", live.boundsMax);
     index.copy("resolution", live.resolution);
@@ -960,6 +1011,7 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("look/shadow/steps", live.look.shadowSteps);
     index.copy("density/iso", live.density.iso); // ADR-1142 (absent when the object has no density source)
     index.copy("density/sharpness", live.density.sharpness);
+    index.copy("density/spread", live.density.spread); // ADR-1149
 
     char buf[128];
     int i = 0;

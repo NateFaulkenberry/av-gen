@@ -155,8 +155,9 @@ struct SdfRenderer::Impl {
     static constexpr unsigned kSurfaceDensity = 1u;
     static constexpr unsigned kSurfaceEngraved = 2u;
     static unsigned surfaceFlags(const scene::SdfObject& object) {
+        // ADR-1149: per-region temper rides the engraved variant (its header and records, its domain)
         return (object.density.active() ? kSurfaceDensity : 0u) |
-               (object.material.engraving.enabled() ? kSurfaceEngraved : 0u);
+               (object.material.engraving.enabled() || object.material.regions.enabled() ? kSurfaceEngraved : 0u);
     }
     void ensureNodeBuffer(std::uint64_t bytes);
     void rebuildGroups();
@@ -956,15 +957,23 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             // ADR-1152: an engraved object's line fields ride after its node (and surface) records: a header
             // (p0 = depth, crawl, grating, spacing; p1 = panels, layers) and one record per layer (kind = the
             // family; p0 = centre, frequency; p1 = unit axis, petals; p2 = weight, depth, inner, outer).
-            if (const scene::Engraving& eng = object.material.engraving; eng.enabled()) {
+            // ADR-1149: and the regions after the layers. ADR-1154: the header's p1.z is the tree's domain chain, the
+            // leading unary records the engraving's domain is carried through (0 = the object's local space).
+            if (const scene::Engraving& eng = object.material.engraving; eng.enabled() || object.material.regions.enabled()) {
+                const scene::SurfaceRegions& reg = object.material.regions;
                 const auto layers = std::min<std::size_t>(eng.layers.size(), scene::kMaxEngravingLayers);
+                const auto regions = std::min<std::size_t>(reg.points.size(), scene::kMaxSurfaceRegions);
                 u.surfaces.z = static_cast<std::uint32_t>(im.packScratch.size());
-                u.surfaces.w = static_cast<std::uint32_t>(1 + layers);
+                u.surfaces.w = static_cast<std::uint32_t>(1 + layers + regions);
                 spatial::SdfNodeGpu head{};
                 head.fieldSlot = -1;
                 head.p0 = glm::vec4(std::max(eng.depth, 0.0f), eng.crawl, std::max(eng.grating, 0.0f),
                                     std::max(eng.spacing, 1.0f));
-                head.p1 = glm::vec4(std::max(eng.panels, 0.0f), static_cast<float>(layers), 0.0f, 0.0f);
+                head.p1 = glm::vec4(std::max(eng.panels, 0.0f), static_cast<float>(layers),
+                                    static_cast<float>(spatial::sdfDomainChainLength(object.tree)),
+                                    static_cast<float>(regions));
+                head.p2 = glm::vec4(std::max(reg.film, 0.0f), std::max(reg.filmNoise, 0.0f),
+                                    std::max(reg.noiseScale, 1e-4f), std::clamp(reg.polish, 0.0f, 1.0f));
                 im.packScratch.push_back(head);
                 for (std::size_t k = 0; k < layers; ++k) {
                     const scene::EngravingLayer& l = eng.layers[k];
@@ -976,6 +985,14 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                     rec.p1 = glm::vec4(len > 1e-6f ? l.axis / len : glm::vec3(1.0f, 0.0f, 0.0f), std::max(l.petals, 0.0f));
                     rec.p2 = glm::vec4(std::clamp(l.weight, 0.0f, 1.0f), l.depth >= 0.0f ? l.depth : eng.depth,
                                        std::max(l.inner, 0.0f), std::max(l.outer, l.inner + 1e-4f));
+                    im.packScratch.push_back(rec);
+                }
+                for (std::size_t k = 0; k < regions; ++k) {
+                    const scene::SurfaceRegion& r = reg.points[k];
+                    spatial::SdfNodeGpu rec{};
+                    rec.fieldSlot = -1;
+                    rec.p0 = glm::vec4(r.center, std::max(r.sharpness, 1e-4f));
+                    rec.p1 = glm::vec4(r.scale, std::clamp(r.weight, 0.0f, 1.0f));
                     im.packScratch.push_back(rec);
                 }
             }
@@ -1038,6 +1055,8 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 const bool coarse = im.occupancySkipping && volume.coarseView != nullptr && volume.resolution >= 8;
                 u.density1 = glm::vec4(volume.boundsMin, static_cast<float>(volume.resolution));
                 u.density2 = glm::vec4(1.0f / extent, coarse ? 1.0f : 0.0f);
+                u.density3 = glm::vec4(std::clamp(object.density.spread, 0.0f, 1.0f),
+                                       glm::max(object.density.spreadRadii, glm::vec3(1e-4f))); // ADR-1149
                 densityView = volume.view;
                 coarseView = coarse ? volume.coarseView : im.densityPlaceholderView;
                 ++stats_.densityObjects;

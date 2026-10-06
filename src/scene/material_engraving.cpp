@@ -263,4 +263,120 @@ EngravingUv engravingUv(const EngravingLayer& layer, glm::vec3 q, float crawlPha
     return out;
 }
 
+// ---- ADR-1149: per-region temper and polish --------------------------------------------------------------
+
+#define AVGEN_TRY(EXPR)                                                                                         \
+    if (auto r_ = (EXPR); !r_) {                                                                                \
+        return std::unexpected(r_.error());                                                                     \
+    }
+
+Result<SurfaceRegions> readSurfaceRegions(const json& j) {
+    SurfaceRegions r;
+    const std::string where = "regions";
+    AVGEN_TRY(checkKeys(j, where, {"film", "filmNoise", "noiseScale", "polish", "points"}));
+    AVGEN_TRY(readNumber(j, where, "film", r.film));
+    AVGEN_TRY(readNumber(j, where, "filmNoise", r.filmNoise));
+    AVGEN_TRY(readNumber(j, where, "noiseScale", r.noiseScale));
+    AVGEN_TRY(readNumber(j, where, "polish", r.polish));
+    if (r.film < 0.0f || r.filmNoise < 0.0f || !(r.noiseScale > 0.0f) || r.polish < 0.0f || r.polish > 1.0f) {
+        return fail("{}: film and filmNoise must be >= 0, noiseScale > 0 and polish in 0..1", where);
+    }
+    if (j.contains("points")) {
+        const json& arr = j.at("points");
+        if (!arr.is_array()) {
+            return fail("{} 'points' must be an array", where);
+        }
+        if (arr.size() > static_cast<std::size_t>(kMaxSurfaceRegions)) {
+            return fail("{} has {} points; at most {} are read", where, arr.size(), kMaxSurfaceRegions);
+        }
+        for (std::size_t k = 0; k < arr.size(); ++k) {
+            const json& p = arr[k];
+            const std::string pw = where + ".points[" + std::to_string(k) + "]";
+            AVGEN_TRY(checkKeys(p, pw, {"center", "scale", "sharpness", "weight"}));
+            SurfaceRegion region;
+            AVGEN_TRY(readVec3(p, pw, "center", region.center));
+            AVGEN_TRY(readVec3(p, pw, "scale", region.scale));
+            AVGEN_TRY(readNumber(p, pw, "sharpness", region.sharpness));
+            AVGEN_TRY(readNumber(p, pw, "weight", region.weight));
+            if (!(region.sharpness > 0.0f) || region.weight < 0.0f || region.weight > 1.0f) {
+                return fail("{}: sharpness must be > 0 and weight in 0..1", pw);
+            }
+            r.points.push_back(region);
+        }
+    }
+    if (!r.enabled()) {
+        return fail("{} needs 'points' (or a filmNoise > 0): an empty block changes nothing", where);
+    }
+    return r;
+}
+
+#undef AVGEN_TRY
+
+json surfaceRegionsToJson(const SurfaceRegions& r) {
+    json j = json::object();
+    j["film"] = r.film;
+    j["filmNoise"] = r.filmNoise;
+    j["noiseScale"] = r.noiseScale;
+    j["polish"] = r.polish;
+    json points = json::array();
+    for (const SurfaceRegion& p : r.points) {
+        points.push_back(json{{"center", {p.center.x, p.center.y, p.center.z}},
+                              {"scale", {p.scale.x, p.scale.y, p.scale.z}},
+                              {"sharpness", p.sharpness},
+                              {"weight", p.weight}});
+    }
+    j["points"] = std::move(points);
+    return j;
+}
+
+float surfaceRegionWeight(const SurfaceRegions& r, glm::vec3 q) {
+    float fw = 0.0f;
+    for (const SurfaceRegion& p : r.points) {
+        const glm::vec3 d = (q - p.center) * p.scale;
+        fw = std::max(fw, p.weight * std::exp(-p.sharpness * glm::dot(d, d)));
+    }
+    return fw;
+}
+
+SurfaceRegionParameters registerSurfaceRegionParameters(params::ParameterSet& params, const std::string& prefix,
+                                                        const std::string& group, const SurfaceRegions& rest,
+                                                        std::vector<params::IParameter*>* all) {
+    SurfaceRegionParameters out;
+    if (!rest.enabled()) {
+        return out;
+    }
+    const auto add = [&](const std::string& key, float value, float lo, float hi, float softLo, float softHi) {
+        params::ParamDesc<float> d;
+        d.path = prefix + "material/regions/" + key;
+        d.label = "material/regions/" + key;
+        d.group = group;
+        d.defaultValue = value;
+        d.hardMin = lo;
+        d.hardMax = hi;
+        d.softMin = softLo;
+        d.softMax = softHi;
+        auto& p = params.add(std::move(d));
+        if (all != nullptr) {
+            all->push_back(&p);
+        }
+        return &p;
+    };
+    out.film = add("film", rest.film, 0.0f, 2000.0f, 0.0f, 400.0f);
+    out.filmNoise = add("filmNoise", rest.filmNoise, 0.0f, 2000.0f, 0.0f, 200.0f);
+    out.polish = add("polish", rest.polish, 0.0f, 1.0f, 0.0f, 1.0f);
+    return out;
+}
+
+void applySurfaceRegionParameters(const SurfaceRegionParameters& p, SurfaceRegions& live) {
+    if (p.film != nullptr) {
+        live.film = p.film->value();
+    }
+    if (p.filmNoise != nullptr) {
+        live.filmNoise = p.filmNoise->value();
+    }
+    if (p.polish != nullptr) {
+        live.polish = p.polish->value();
+    }
+}
+
 } // namespace avgen::scene

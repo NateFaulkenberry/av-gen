@@ -16,6 +16,7 @@
 #include "scene/particle_latent.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -177,11 +178,12 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         entries[3].binding = 5; // trail history, read by vs_ribbon (ADR-040)
         entries[3].visibility = wgpu::ShaderStage::Vertex;
         entries[3].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-        entries[4].binding = 13; // linear depth, read by the fog coupling in fs_particle
-        entries[4].visibility = wgpu::ShaderStage::Fragment;
+        entries[4].binding = 13; // linear depth, read by the fog coupling in fs_particle (and ADR-1147's shard test)
+        entries[4].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[4].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
         entries[4].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         entries[5] = entries[4];
+        entries[5].visibility = wgpu::ShaderStage::Fragment;
         entries[5].binding = 12; // ADR-715: the terrain's baked height, read by the same fog coupling
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-render-layout";
@@ -283,11 +285,85 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
 }
 
 Result<void> ParticleRenderer::reload() {
+    compiledLatent_.clear(); // ADR-1145: a reload changes the source every variant was spliced into
     auto module = shaders_.load("particles.wgsl");
     if (!module) {
         return std::unexpected(module.error());
     }
     return createPipelines(*module);
+}
+
+// ADR-1145: cs_latent with its four packed-interpreter calls replaced by the tree compiled to WGSL
+// (ADR-1003's sdfField over the per-node table), so an anatomy the interpreter cannot run -- the ADR-1144
+// kinds, or more than its stacks -- binds matter, at the cost of one module per tree structure. The
+// particles.wgsl text is untouched: the variant is a copy with the calls renamed and the field appended,
+// so no other system's kernel changes.
+const ParticleRenderer::CompiledLatent& ParticleRenderer::compiledLatentPipeline(const spatial::SdfTree& tree,
+                                                                                const spatial::FieldSet* fields) {
+    const std::uint64_t key = spatial::sdfCompileKey(tree);
+    if (auto it = compiledLatent_.find(key); it != compiledLatent_.end()) {
+        return it->second;
+    }
+    CompiledLatent& slot = compiledLatent_[key];
+    const auto start = std::chrono::steady_clock::now();
+    auto source = shaders_.loadSource("particles.wgsl");
+    if (!source) {
+        log::warn("particles: the compiled latent variant could not load particles.wgsl: {}", source.error().message);
+        return slot;
+    }
+    std::string text = *source;
+    constexpr std::string_view kCall = "= sdfEvaluate(0u, count, pl + k";
+    int replaced = 0;
+    for (auto at = text.find(kCall); at != std::string::npos; at = text.find(kCall, at)) {
+        text.replace(at, kCall.size(), "= sdfField(0u, count, pl + k");
+        ++replaced;
+    }
+    if (replaced != 8) { // cs_latent's four taps and cs_latent_staggered's four (ADR-1155)
+        log::warn("particles: cs_latent and cs_latent_staggered no longer have their eight sdfEvaluate taps ({}); the "
+                  "compiled latent is off",
+                  replaced);
+        return slot;
+    }
+    std::vector<spatial::SdfNodeGpu> table;
+    text += "\n" + spatial::sdfCompileWgsl(tree, table, fields);
+    auto module = shaders_.compile(text, "particles-latent-compiled");
+    if (!module) {
+        log::warn("particles: compiling the latent tree failed: {}", module.error().message);
+        return slot;
+    }
+    const auto& device = context_.device();
+    const auto build = [&](const char* entry) -> wgpu::ComputePipeline {
+        wgpu::ComputePipelineDescriptor desc{};
+        desc.label = entry;
+        desc.layout = computePipelineLayout_;
+        desc.compute.module = *module;
+        desc.compute.entryPoint = entry;
+        device.PushErrorScope(wgpu::ErrorFilter::Validation);
+        wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
+        std::string error;
+        auto future = device.PopErrorScope(
+            wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                if (type != wgpu::ErrorType::NoError) {
+                    error = gpu::Context::toString(msg);
+                }
+            });
+        context_.waitFor(future);
+        if (!error.empty() || !pipeline) {
+            log::warn("particles: the compiled latent pipeline '{}' failed: {}", entry, error);
+            return {};
+        }
+        return pipeline;
+    };
+    wgpu::ComputePipeline plain = build("cs_latent");
+    wgpu::ComputePipeline staggered = build("cs_latent_staggered");
+    if (!plain || !staggered) {
+        return slot;
+    }
+    slot.plain = plain;
+    slot.staggered = staggered;
+    log::info("particles: compiled latent variant {:016x} ({} node records) in {:.1f} ms", key, table.size(),
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    return slot;
 }
 
 Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module) {
@@ -378,6 +454,8 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!glowTop) return std::unexpected(glowTop.error());
     auto latent = makeCompute("cs_latent"); // ADR-1140
     if (!latent) return std::unexpected(latent.error());
+    auto latentStaggered = makeCompute("cs_latent_staggered"); // ADR-1155
+    if (!latentStaggered) return std::unexpected(latentStaggered.error());
     auto densityModule = shaders_.load("particle_density.wgsl"); // ADR-1141
     if (!densityModule) return std::unexpected(densityModule.error());
     auto densitySplat = makeCompute("cs_density_splat", &*densityModule, &densityPipelineLayout_);
@@ -398,6 +476,51 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!flakeAdditive) return std::unexpected(flakeAdditive.error());
     auto flakeAlpha = makeRender(false, "vs_flake");
     if (!flakeAlpha) return std::unexpected(flakeAlpha.error());
+    auto tendon = makeCompute("cs_tendon"); // ADR-1146
+    if (!tendon) return std::unexpected(tendon.error());
+    auto heat = makeCompute("cs_heat"); // ADR-1148
+    if (!heat) return std::unexpected(heat.error());
+    // ADR-1147: shards are opaque plates: no blend, depth written, the colour and velocity targets.
+    Result<wgpu::RenderPipeline> shard = [&]() -> Result<wgpu::RenderPipeline> {
+        std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+        fillSceneTargets(colorTargets, kHdrFormat, nullptr, wgpu::ColorWriteMask::None);
+        colorTargets[2].writeMask = wgpu::ColorWriteMask::All;
+        wgpu::FragmentState fragment{};
+        fragment.module = module;
+        fragment.entryPoint = "fs_shard";
+        fragment.targetCount = kSceneTargetCount;
+        fragment.targets = colorTargets.data();
+        wgpu::DepthStencilState depth{};
+        depth.format = kDepthFormat;
+        depth.depthWriteEnabled = wgpu::OptionalBool::True;
+        depth.depthCompare = wgpu::CompareFunction::Less;
+        wgpu::RenderPipelineDescriptor desc{};
+        desc.label = "particles-shards";
+        desc.layout = renderPipelineLayout_;
+        desc.vertex.module = module;
+        desc.vertex.entryPoint = "vs_shard";
+        desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+        desc.primitive.cullMode = wgpu::CullMode::None;
+        desc.depthStencil = &depth;
+        desc.multisample.count = 1;
+        desc.multisample.mask = 0xFFFFFFFFu;
+        desc.fragment = &fragment;
+        device.PushErrorScope(wgpu::ErrorFilter::Validation);
+        wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
+        std::string error;
+        auto future = device.PopErrorScope(
+            wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                if (type != wgpu::ErrorType::NoError) {
+                    error = gpu::Context::toString(msg);
+                }
+            });
+        context_.waitFor(future);
+        if (!error.empty() || !pipeline) {
+            return fail("particle shard pipeline failed: {}", error);
+        }
+        return pipeline;
+    }();
+    if (!shard) return std::unexpected(shard.error());
     emitPipeline_ = *emit;
     simulatePipeline_ = *simulate;
     scanReducePipeline_ = *reduce;
@@ -406,6 +529,7 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     glowReducePipeline_ = *glowReduce;
     glowTopPipeline_ = *glowTop;
     latentPipeline_ = *latent;
+    latentStaggeredPipeline_ = *latentStaggered;
     densitySplatPipeline_ = *densitySplat;
     densityResolvePipeline_ = *densityResolve;
     densityCoarsePipeline_ = *densityCoarse;
@@ -415,6 +539,9 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     ribbonAlphaPipeline_ = *ribbonAlpha;
     flakeAdditivePipeline_ = *flakeAdditive;
     flakeAlphaPipeline_ = *flakeAlpha;
+    tendonPipeline_ = *tendon;
+    heatPipeline_ = *heat;
+    shardPipeline_ = *shard;
     return {};
 }
 
@@ -702,6 +829,7 @@ void ParticleRenderer::resetPool(Pool& pool) {
         context_.queue().WriteBuffer(pool.history, 0, history.data(), history.size());
     }
     pool.latentPrevValid = false; // ADR-1140: a reset is not a coherence drop
+    pool.heatFrontStart = -1.0;   // ADR-1148
     pool.needsReset = false;
 }
 
@@ -1052,6 +1180,14 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         // SdfRenderer's, which holds only the visible raymarch objects and reallocates. A latent is
         // typically invisible, which is exactly the object SdfRenderer skips.
         bool latentOn = false;
+        wgpu::ComputePipeline latentCompiled; // ADR-1145: null = the interpreter's cs_latent
+        // ADR-1147: shards (a flake system's near bound plates), when the frame knows its pixel angle.
+        if (sys.shards.enabled && sys.shape2d == scene::ParticleShape::Flake && frame_.pixelAngle > 0.0f) {
+            u.shard0 = glm::vec4(std::max(sys.shards.pixels, 0.1f), std::clamp(sys.shards.fraction, 0.0f, 1.0f),
+                                 std::max(sys.shards.size, 1e-4f), 1.0f);
+            u.shard1 = glm::vec4(std::max(sys.shards.grooves, 0.0f), std::clamp(sys.shards.bevel, 0.0f, 0.9f),
+                                 frame_.pixelAngle, 0.0f);
+        }
         if (sys.latent.active()) {
             const scene::SdfObject* object = nullptr;
             for (const scene::SdfObject& candidate : scene.sdfs) {
@@ -1062,8 +1198,48 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             }
             std::optional<std::string> why;
             int count = 0;
+            latentCompiled = wgpu::ComputePipeline{};
+            const bool tendons = sys.latent.tendons.active(); // ADR-1146: the curves, not the tree
             if (object == nullptr) {
                 why = "names no sdf object in the scene";
+            } else if (tendons) {
+                latentScratch_.clear();
+                for (const auto& curve : sys.latent.tendons.curves) {
+                    // resampled by arc length to kTendonSamples points (p0.xyz = the point, latent-local)
+                    std::vector<float> acc(curve.size(), 0.0f);
+                    for (std::size_t k = 1; k < curve.size(); ++k) {
+                        acc[k] = acc[k - 1] + glm::length(curve[k] - curve[k - 1]);
+                    }
+                    const float total = std::max(acc.back(), 1e-6f);
+                    std::size_t seg = 0;
+                    for (int j = 0; j < scene::kTendonSamples; ++j) {
+                        const float at = total * static_cast<float>(j) / static_cast<float>(scene::kTendonSamples - 1);
+                        while (seg + 2 < curve.size() && acc[seg + 1] < at) {
+                            ++seg;
+                        }
+                        const float len = std::max(acc[seg + 1] - acc[seg], 1e-9f);
+                        const float f = std::clamp((at - acc[seg]) / len, 0.0f, 1.0f);
+                        spatial::SdfNodeGpu rec{};
+                        rec.fieldSlot = -1;
+                        rec.p0 = glm::vec4(curve[seg] + (curve[seg + 1] - curve[seg]) * f, at);
+                        latentScratch_.push_back(rec);
+                    }
+                }
+                count = static_cast<int>(latentScratch_.size());
+            } else if (object->compile) {
+                // ADR-1145: a compiled latent object binds through a compiled variant of cs_latent.
+                if (auto fits = object->tree.validate(spatial::SdfEvaluator::Compiled); !fits) {
+                    why = fits.error().message;
+                } else if (const CompiledLatent& built = compiledLatentPipeline(object->tree, &scene.fields); !built.plain) {
+                    why = "its compiled force did not build";
+                } else {
+                    latentCompiled = sys.latent.stagger > 1 ? built.staggered : built.plain;
+                    spatial::sdfCompileTable(object->tree, latentScratch_, &scene.fields);
+                    count = static_cast<int>(latentScratch_.size());
+                    if (count <= 0) {
+                        why = "its tree compiles to no node";
+                    }
+                }
             } else if (auto fits = object->tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
                 why = fits.error().message;
             } else {
@@ -1106,7 +1282,40 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 // the record's `home` lane (w stays 0, so the attractor reads it as "no home"); never for an
                 // anchored system, whose `home` is its crown centre.
                 const bool storeNormal = sys.shape2d == scene::ParticleShape::Flake && !anchored;
-                u.latentInfo = glm::uvec4(static_cast<std::uint32_t>(count), storeNormal ? 1u : 0u, 0u, 0u);
+                // ADR-1155: z = the stagger stride (0 = unstaggered, as before; never with tendons or anchors)
+                const std::uint32_t stagger =
+                    sys.latent.stagger > 1 && !tendons && !anchored ? static_cast<std::uint32_t>(sys.latent.stagger) : 0u;
+                u.latentInfo = glm::uvec4(static_cast<std::uint32_t>(count), storeNormal ? 1u : 0u, stagger, 0u);
+                if (tendons) { // ADR-1146
+                    const scene::ParticleTendons& t = sys.latent.tendons;
+                    float mean = 0.0f;
+                    for (const auto& curve : t.curves) {
+                        for (std::size_t k = 1; k < curve.size(); ++k) {
+                            mean += glm::length(curve[k] - curve[k - 1]);
+                        }
+                    }
+                    mean /= static_cast<float>(t.curves.size());
+                    u.tendon0 = glm::vec4(std::max(t.speed, 0.0f) / std::max(mean, 1e-4f), std::max(t.stiffness, 0.0f),
+                                          std::max(t.spray, 0.0f), std::clamp(t.ramp, 0.0f, 0.9f));
+                    u.tendonInfo = glm::uvec4(0u, static_cast<std::uint32_t>(t.curves.size()),
+                                              static_cast<std::uint32_t>(scene::kTendonSamples), 0u);
+                }
+                if (const scene::ParticleHeat& h = sys.latent.heat; h.enabled) { // ADR-1148
+                    // the front sets out on the step the coherence starts to fall, and is gone once it rises again
+                    const double now = time.renderTime;
+                    if (coherence < previous - 1e-6f && pool.heatFrontStart < 0.0) {
+                        pool.heatFrontStart = now;
+                    } else if (coherence > previous + 1e-6f) {
+                        pool.heatFrontStart = -1.0;
+                    }
+                    const float scale = std::cbrt(std::max(std::abs(glm::determinant(glm::mat3(model))), 1e-12f));
+                    const glm::vec3 origin = glm::vec3(model * glm::vec4(h.origin, 1.0f));
+                    u.heat0 = glm::vec4(origin, pool.heatFrontStart < 0.0 ? -1.0f
+                                                                          : static_cast<float>(now - pool.heatFrontStart));
+                    u.heat1 = glm::vec4(std::max(h.speed, 0.0f) * scale, std::max(h.width, 1e-4f) * scale,
+                                        std::max(h.inject, 0.0f), std::max(h.decay, 0.0f));
+                    u.heat2 = glm::vec4(std::clamp(h.fraction, 0.0f, 1.0f), std::max(h.gain, 0.0f), 1.0f, 0.0f);
+                }
                 pool.latentPrevCoherence = coherence;
                 pool.latentPrevValid = true;
                 pool.latentWarned = false;
@@ -1138,8 +1347,16 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         if (latentOn) {
             // ADR-1140: adds the spring toward the latent's projection to the velocity, which the
             // simulate dispatch then integrates. Not dispatched at all for a system without one.
-            cp.SetPipeline(latentPipeline_);
+            // ADR-1146: a latent with tendons binds to its curves (cs_tendon) instead of the zero set.
+            cp.SetPipeline(sys.latent.tendons.active()
+                               ? tendonPipeline_
+                               : (latentCompiled ? latentCompiled
+                                                 : (u.latentInfo.z > 1u ? latentStaggeredPipeline_ : latentPipeline_)));
             cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            if (sys.latent.heat.enabled) { // ADR-1148: the release front's heat, after the release it reads
+                cp.SetPipeline(heatPipeline_);
+                cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            }
         }
         cp.SetPipeline(simulatePipeline_);
         cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
@@ -1237,6 +1454,7 @@ Result<std::vector<ParticleSnapshot>> ParticleRenderer::readParticles(std::size_
         out[i].velocity = glm::vec3(rec[4], rec[5], rec[6]);
         out[i].life = rec[7];
         out[i].seed = rec[8];
+        out[i].trail = rec[10]; // ADR-1148: a heated system's heat
         out[i].home = glm::vec4(rec[12], rec[13], rec[14], rec[15]);
     }
     return out;
@@ -1313,6 +1531,12 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
         if (pool.historyPoints > 0) {
             pass.SetPipeline(additive ? ribbonAdditivePipeline_ : ribbonAlphaPipeline_);
             pass.DrawIndirect(pool.counters, kRibbonIndirectOffset);
+        }
+        if (sys.shape2d == scene::ParticleShape::Flake && sys.shards.enabled && frame_.pixelAngle > 0.0f) {
+            // ADR-1147: the near plates as opaque shards first (every 4th slot is a candidate), then the flakes.
+            pass.SetPipeline(shardPipeline_);
+            pass.Draw(12, (pool.capacity + 3) / 4);
+            pass.SetBindGroup(0, pool.renderGroup);
         }
         if (sys.shape2d == scene::ParticleShape::Flake) { // ADR-1153: its own entry point, so no other system's
             pass.SetPipeline(additive ? flakeAdditivePipeline_ : flakeAlphaPipeline_); // vertex code changes

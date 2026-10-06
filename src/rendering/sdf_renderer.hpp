@@ -91,8 +91,9 @@ struct SdfObjectUniforms {
     glm::vec4 density0;    // iso, sharpness, one density cell in local units, 1 = density mode
     glm::vec4 density1;    // the volume's world-space min corner, 0
     glm::vec4 density2;    // 1 / the volume's world-space extent, 0
+    glm::vec4 density3;    // ADR-1149: the sharpness's spread, its radii (local units)
 };
-static_assert(sizeof(SdfObjectUniforms) == 400);
+static_assert(sizeof(SdfObjectUniforms) == 416);
 
 class SdfRenderer {
 public:
