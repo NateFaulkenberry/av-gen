@@ -51,7 +51,7 @@ STONE = lin("#b6b8af")                 # Dream Caused by the Flight of a Bee: th
 PAL = {
     # Dali, Dream Caused by the Flight of a Bee + The Persistence of Memory
     # Persistence's own sky band: Cap de Creus teal over olive-gold; the Bee's ochre for the pan
-    "dream": dict(zenith=lin("#3f798d"), horizon=lin("#e4d7bf"), sun=light_of("#e4d7bf"), fog=lin("#b1c9d8"),
+    "dream": dict(zenith=lin("#3f798d"), horizon=lin("#e4d7bf"), sun=light_of("#e4d7bf"), fog=lin("#e4d7bf"),
                   land=[lin("#c6bfae"), lin("#c1ae5e"), lin("#73512a")], groundSky=lin("#9f9985")),
     # de Chirico, The Disquieting Muses + Mystery and Melancholy of a Street
     "uncanny": dict(zenith=lin("#3b6e65"), horizon=lin("#efe1ab"), sun=light_of("#e49420"), fog=lin("#f6e6be"),
@@ -150,7 +150,7 @@ def fields():
         field("lift", kind="direction", axis=[0, 1, 0], strength=1.0),
         field("tumble", kind="curlNoise", frequency=0.4, speed=0.3, seed=9, strength=1.0),
         # the liquid skin's mask: the pan's flat heart (land.py; the pan is level to +-5 cm within 25 m of its centre)
-        field("pool", position=[PAN_C[0], 0.0, PAN_C[1]], kind="box", size=[14.5, 50.0, 14.5], softness=2.5,
+        field("pool", position=[PAN_C[0], 0.0, PAN_C[1]], kind="box", size=[14.5, 50.0, 14.5], softness=6.0,
               strength=1.0),
         field("liquidKick", kind="compound", children=["kick", "pool"], combine="multiply", strength=1.0),
         field("swellNoise", kind="noise", frequency=0.09, speed=0.35, seed=17, strength=1.0),
@@ -497,11 +497,11 @@ def stage(**kw):
     return v
 
 
-COLLAPSE_COMMON = dict(wave=2.0, swell=1.4, inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
+COLLAPSE_COMMON = dict(wave=1.1, swell=0.55, inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
                        glowPlain=8.0, glowBark=6.0, gMicro=1.0, gRhythm=1.0, gMosh=1.0, gMelt=1.0, gLift=1.0)
 STAGES = {
     # Beautiful, quiet, hypnotic. Only the light, the dust and the camera move.
-    "Dream": stage(),
+    "Dream": stage(volDen=0.00038),
     # Relation errors only (Magritte, S12; de Chirico's light, D1/D2): the shadows swing against the sky's sun, the
     # Tanguy object appears twice, the long limb lifts a little against gravity, the sky turns Chirico's green.
     "Uncanny": stage(pal="uncanny", sunYaw=26.0, double=True, melt=[-0.05, 0.0, 0.0], echo=0.08, gMicro=0.3,
@@ -537,7 +537,7 @@ STAGES = {
     #   ... pixels, then colour
     "Pixels": stage(pal="nightmare", melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
                     rise=12.0, tumble=5.0, spin=6.0, kick=1.6, glowBlocks=10.0, echo=0.4, mosh=0.5, moshBlock=96.0,
-                    pixel=18.0, poster=5.0, sort=0.6, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
+                    pixel=14.0, poster=0.0, sort=0.3, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
                     **COLLAPSE_COMMON),
     #   ... and light: Tanguy's white.
     "Light": stage(pal="light", lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
@@ -547,7 +547,7 @@ STAGES = {
     "Respite": stage(pal="respite", sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
                      echo=0.05, volDen=0.0007),
     # The keyframe: the dream exactly as it was (P8). One macroblock did not refresh.
-    "Recovery": stage(dissip=9.0, keyframe=1.0, heal=1.0),
+    "Recovery": stage(dissip=9.0, keyframe=1.0, heal=1.0, volDen=0.00038),
 }
 LADDER = ["Dream", "Uncanny", "Infection", "Corruption", "Nightmare", "Collapse"]
 DEPTH_AT = {"Uncanny": 0.08, "Infection": 0.28, "Corruption": 0.48, "Nightmare": 0.66, "Collapse": 0.86}

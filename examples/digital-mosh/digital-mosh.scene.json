@@ -25,9 +25,9 @@
    0.521
   ],
   "fogColor": [
-   0.4397,
-   0.5841,
-   0.6867
+   0.7758,
+   0.6795,
+   0.521
   ],
   "shadowRange": 200.0,
   "shadowCascades": 3,
@@ -2107,7 +2107,7 @@
      50.0,
      14.5
     ],
-    "softness": 2.5,
+    "softness": 6.0,
     "strength": 1.0,
     "falloff": {
      "kind": "none"
