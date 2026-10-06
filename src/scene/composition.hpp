@@ -31,6 +31,7 @@
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
+#include "scene/reflection_bands.hpp"
 #include "scene/rebuild_deferral.hpp"
 #include "stage/staging.hpp"
 #include "scene/sdf_object.hpp"
@@ -1716,6 +1717,7 @@ private:
     params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
     params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
     params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
+    scene::ReflectionBandParameters bandParams_;         // ADR-1151 (empty unless the scene has bands)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two

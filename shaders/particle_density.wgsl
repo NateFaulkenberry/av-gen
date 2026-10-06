@@ -86,3 +86,30 @@ fn cs_density_resolve(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(wo
     let rho = sum / (64.0 * DENSITY_FIXED_SCALE) * density.boundsMax.w;
     textureStore(densityOut, c, vec4<f32>(rho, 0.0, 0.0, 1.0));
 }
+
+// ADR-1150: the coarse max-occupancy grid -- one texel per 8^3 block of the volume, holding the largest density
+// any trilinear lookup inside that block can return (the block's texels plus a one-texel apron, which is
+// what a linear sampler reads at the block's faces). A density-mode raymarch (ADR-1142) skips a block whose
+// maximum is below the level at which any surface can exist there. It is its own dispatch, after the
+// resolve, reading the resolved texture (a texture cannot be both written and read in one dispatch), with
+// its own layout: 0 DensityParams, 4 the resolved volume, 5 the coarse grid.
+@group(0) @binding(4) var densityIn: texture_3d<f32>;
+@group(0) @binding(5) var coarseOut: texture_storage_3d<rgba16float, write>;
+
+@compute @workgroup_size(4, 4, 4)
+fn cs_density_coarse(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let res = i32(density.counts.y);
+    let cr = (res + 7) / 8;
+    let c = vec3<i32>(gid);
+    if (any(c >= vec3<i32>(cr))) { return; }
+    var m = 0.0;
+    for (var z = -1; z <= 8; z = z + 1) {
+        for (var y = -1; y <= 8; y = y + 1) {
+            for (var x = -1; x <= 8; x = x + 1) {
+                let q = clamp(c * 8 + vec3<i32>(x, y, z), vec3<i32>(0), vec3<i32>(res - 1));
+                m = max(m, textureLoad(densityIn, q, 0).r);
+            }
+        }
+    }
+    textureStore(coarseOut, c, vec4<f32>(m, 0.0, 0.0, 1.0));
+}

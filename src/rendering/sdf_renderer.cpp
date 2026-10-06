@@ -125,6 +125,7 @@ struct SdfRenderer::Impl {
         // A view, not a group: the node buffer may be re-created after the items are collected, and
         // that re-creates every group, so the group is looked up when the pass is encoded.
         wgpu::TextureView densityView;
+        wgpu::TextureView coarseView; // ADR-1150: its coarse occupancy grid
     };
     struct MeshItem {
         std::size_t objectIndex;
@@ -145,14 +146,23 @@ struct SdfRenderer::Impl {
     const Pipelines* compiledPipelines(const scene::SdfObject& object, const spatial::FieldSet* fields);
     // ADR-1142: the interpreter's density-mode variant (built on first use, synchronously), or null
     // when its module failed.
-    const Pipelines* densityInterpreterPipelines();
-    // ADR-1142: `source` with the sdfSurfaceField block replaced by the density-mode field.
-    static std::string spliceDensity(const std::string& source);
+    // ADR-1142 / ADR-1152: the interpreter's variant for a set of surface flags (built on first use,
+    // synchronously), or null when it failed. Flags 0 is the default pipelines and never asked for here.
+    const Pipelines* interpreterVariantPipelines(unsigned flags);
+    // ADR-1142 / ADR-1150 / ADR-1152: `source` with the @@SDF_SURFACE@@ block replaced: the density-mode
+    // field and march (kSurfaceDensity), the engraving (kSurfaceEngraved). Empty when the markers are missing.
+    static std::string spliceSurface(const std::string& source, unsigned flags);
+    static constexpr unsigned kSurfaceDensity = 1u;
+    static constexpr unsigned kSurfaceEngraved = 2u;
+    static unsigned surfaceFlags(const scene::SdfObject& object) {
+        return (object.density.active() ? kSurfaceDensity : 0u) |
+               (object.material.engraving.enabled() ? kSurfaceEngraved : 0u);
+    }
     void ensureNodeBuffer(std::uint64_t bytes);
     void rebuildGroups();
     // ADR-1142: group 1 with `densityView` at binding 5 (the placeholder for sdfGroup itself).
-    wgpu::BindGroup makeSdfGroup(const wgpu::TextureView& densityView);
-    wgpu::BindGroup densityGroup(const wgpu::TextureView& densityView);
+    wgpu::BindGroup makeSdfGroup(const wgpu::TextureView& densityView, const wgpu::TextureView& coarseView);
+    wgpu::BindGroup densityGroup(const wgpu::TextureView& densityView, const wgpu::TextureView& coarseView);
 
     gpu::Context& context;
     gpu::ShaderLibrary& shaders;
@@ -214,10 +224,11 @@ struct SdfRenderer::Impl {
     // ADR-1003: compiled variants by spatial::sdfCompileKey, and the resolved pass source they splice.
     std::map<std::uint64_t, std::shared_ptr<Pipelines>> compiledVariants;
     bool asyncCompile = false; // ADR-1102: off by default (offline renders and tests compile before drawing)
+    bool occupancySkipping = true; // ADR-1150
     bool prewarm = true;       // ADR-1102: every compile-flagged object compiled as soon as the scene has it
     double pieceSeconds = 0.0; // the frame's render time, for the compile log
     std::string raymarchSource;
-    std::shared_ptr<Pipelines> densityInterpreter; // ADR-1142
+    std::map<unsigned, std::shared_ptr<Pipelines>> interpreterVariants; // ADR-1142 / ADR-1152, by surface flags
     std::vector<spatial::SdfNodeGpu> compileScratch;
     std::uint32_t compilesThisFrame = 0;
     double lastRaymarchMs = -1.0;
@@ -266,8 +277,8 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     {
         // Raymarch group 1: 0 = ObjectUniforms (dynamic), 1 = SdfObjectUniforms (dynamic),
         // 2 = packed nodes (read-only storage), 3 = field block, 4 = step statistics (ADR-1002),
-        // 5 + 6 = the density volume and its sampler (ADR-1142).
-        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
+        // 5 + 6 = the density volume and its sampler (ADR-1142), 7 = its coarse occupancy grid (ADR-1150).
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -297,6 +308,10 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
         entries[6].binding = 6;
         entries[6].visibility = wgpu::ShaderStage::Fragment;
         entries[6].sampler.type = wgpu::SamplerBindingType::Filtering;
+        entries[7].binding = 7; // ADR-1150: the coarse occupancy grid (textureLoad only)
+        entries[7].visibility = wgpu::ShaderStage::Fragment;
+        entries[7].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[7].texture.viewDimension = wgpu::TextureViewDimension::e3D;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "sdf-object-layout";
         desc.entryCount = entries.size();
@@ -537,7 +552,7 @@ Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule&
     raymarchDepthPipeline = built->depth;
     raymarchShadowPipeline = built->shadow;
     compiledVariants.clear(); // a reload changes the pass source every variant was spliced into
-    densityInterpreter.reset();
+    interpreterVariants.clear();
     if (auto source = shaders.loadSource("sdf_raymarch.wgsl")) {
         raymarchSource = std::move(*source);
     }
@@ -552,9 +567,9 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
         return nullptr;
     }
     // ADR-1142: a density-mode object's compiled tree is a different module (the density field spliced
-    // in as well), so it is a different variant.
-    const bool density = object.density.active();
-    const std::uint64_t key = spatial::sdfCompileKey(object.tree) ^ (density ? 0x9e3779b97f4a7c15ull : 0ull);
+    // in as well), so it is a different variant; so is an engraved one (ADR-1152).
+    const unsigned flags = surfaceFlags(object);
+    const std::uint64_t key = spatial::sdfCompileKey(object.tree) ^ (static_cast<std::uint64_t>(flags) * 0x9e3779b97f4a7c15ull);
     if (auto it = compiledVariants.find(key); it != compiledVariants.end()) {
         return it->second->failed || it->second->pending > 0 ? nullptr : it->second.get();
     }
@@ -573,8 +588,8 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     const auto start = std::chrono::steady_clock::now();
     const std::string field = spatial::sdfCompileWgsl(object.tree, compileScratch, fields);
     std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
-    if (density) {
-        source = spliceDensity(source);
+    if (flags != 0u) {
+        source = spliceSurface(source, flags);
     }
     auto module = shaders.compile(source, "sdf-raymarch-compiled");
     // ADR-1102: live, a tree the interpreter can also draw compiles on Dawn's workers and is drawn interpreted until
@@ -605,7 +620,7 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
 
 
 
-std::string SdfRenderer::Impl::spliceDensity(const std::string& source) {
+std::string SdfRenderer::Impl::spliceSurface(const std::string& source, unsigned flags) {
     constexpr std::string_view kBegin = "// @@SDF_SURFACE_BEGIN@@";
     constexpr std::string_view kEnd = "// @@SDF_SURFACE_END@@";
     const auto b = source.find(kBegin);
@@ -613,38 +628,44 @@ std::string SdfRenderer::Impl::spliceDensity(const std::string& source) {
     if (b == std::string::npos || e == std::string::npos || e < b) {
         return {};
     }
-    return source.substr(0, b) +
-           "fn sdfSurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {\n"
-           "    return sdfDensitySurfaceField(offset, count, p, t, world);\n"
-           "}\n" +
-           source.substr(e + kEnd.size());
+    const bool density = (flags & kSurfaceDensity) != 0u;
+    const bool engraved = (flags & kSurfaceEngraved) != 0u;
+    std::string block;
+    block += density ? "const kSdfDensityMode: bool = true;\n" : "const kSdfDensityMode: bool = false;\n"; // ADR-1150
+    block += engraved ? "const kSdfEngraved: bool = true;\n" : "const kSdfEngraved: bool = false;\n";      // ADR-1152
+    block += "fn sdfSurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {\n";
+    block += density ? "    return sdfDensitySurfaceField(offset, count, p, t, world);\n"
+                     : "    return sdfField(offset, count, p, t, world);\n";
+    block += "}\n";
+    return source.substr(0, b) + block + source.substr(e + kEnd.size());
 }
 
-const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::densityInterpreterPipelines() {
-    if (densityInterpreter) {
-        return densityInterpreter->failed ? nullptr : densityInterpreter.get();
+const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::interpreterVariantPipelines(unsigned flags) {
+    if (auto it = interpreterVariants.find(flags); it != interpreterVariants.end()) {
+        return it->second->failed ? nullptr : it->second.get();
     }
-    densityInterpreter = std::make_shared<Pipelines>();
-    Pipelines& slot = *densityInterpreter;
-    const std::string source = raymarchSource.empty() ? std::string() : spliceDensity(raymarchSource);
+    auto slotPtr = std::make_shared<Pipelines>();
+    interpreterVariants[flags] = slotPtr;
+    Pipelines& slot = *slotPtr;
+    const std::string source = raymarchSource.empty() ? std::string() : spliceSurface(raymarchSource, flags);
     if (source.empty()) {
         slot.failed = true;
-        log::warn("sdf: the raymarch shader has no sdfSurfaceField markers; density-mode objects are not drawn");
+        log::warn("sdf: the raymarch shader has no sdfSurfaceField markers; variant {} objects are not drawn", flags);
         return nullptr;
     }
     const auto start = std::chrono::steady_clock::now();
-    auto module = shaders.compile(source, "sdf-raymarch-density");
+    auto module = shaders.compile(source, "sdf-raymarch-variant");
     Result<Pipelines> built = module ? buildPipelines(*module) : Result<Pipelines>(std::unexpected(module.error()));
     if (!built) {
         slot.failed = true;
-        log::warn("sdf: the density-mode raymarch variant failed; density-mode objects are not drawn: {}",
-                  built.error().message);
+        log::warn("sdf: the raymarch variant {} (1 = density, 2 = engraved) failed; its objects are not drawn: {}",
+                  flags, built.error().message);
         return nullptr;
     }
     slot.lit = built->lit;
     slot.depth = built->depth;
     slot.shadow = built->shadow;
-    log::info("sdf: density-mode raymarch variant built in {:.1f} ms",
+    log::info("sdf: raymarch variant {} (1 = density, 2 = engraved) built in {:.1f} ms", flags,
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     return &slot;
 }
@@ -662,8 +683,9 @@ void SdfRenderer::Impl::ensureNodeBuffer(std::uint64_t bytes) {
     rebuildGroups();
 }
 
-wgpu::BindGroup SdfRenderer::Impl::makeSdfGroup(const wgpu::TextureView& densityView) {
-    std::array<wgpu::BindGroupEntry, 7> entries{};
+wgpu::BindGroup SdfRenderer::Impl::makeSdfGroup(const wgpu::TextureView& densityView,
+                                                const wgpu::TextureView& coarseView) {
+    std::array<wgpu::BindGroupEntry, 8> entries{};
     entries[0].binding = 0;
     entries[0].buffer = objectUniforms;
     entries[0].size = sizeof(ObjectUniforms);
@@ -683,6 +705,8 @@ wgpu::BindGroup SdfRenderer::Impl::makeSdfGroup(const wgpu::TextureView& density
     entries[5].textureView = densityView;
     entries[6].binding = 6;
     entries[6].sampler = densitySampler;
+    entries[7].binding = 7;
+    entries[7].textureView = coarseView;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "sdf-object-group";
     desc.layout = sdfLayout;
@@ -691,7 +715,8 @@ wgpu::BindGroup SdfRenderer::Impl::makeSdfGroup(const wgpu::TextureView& density
     return context.device().CreateBindGroup(&desc);
 }
 
-wgpu::BindGroup SdfRenderer::Impl::densityGroup(const wgpu::TextureView& densityView) {
+wgpu::BindGroup SdfRenderer::Impl::densityGroup(const wgpu::TextureView& densityView,
+                                                const wgpu::TextureView& coarseView) {
     auto it = densityGroups.find(densityView.Get());
     if (it != densityGroups.end()) {
         return it->second;
@@ -701,7 +726,7 @@ wgpu::BindGroup SdfRenderer::Impl::densityGroup(const wgpu::TextureView& density
     if (densityGroups.size() >= 16) {
         densityGroups.clear();
     }
-    wgpu::BindGroup group = makeSdfGroup(densityView);
+    wgpu::BindGroup group = makeSdfGroup(densityView, coarseView);
     densityGroups.emplace(densityView.Get(), group);
     return group;
 }
@@ -709,7 +734,7 @@ wgpu::BindGroup SdfRenderer::Impl::densityGroup(const wgpu::TextureView& density
 void SdfRenderer::Impl::rebuildGroups() {
     const auto& device = context.device();
     densityGroups.clear(); // they bind the node buffer this call is replacing
-    sdfGroup = makeSdfGroup(densityPlaceholderView);
+    sdfGroup = makeSdfGroup(densityPlaceholderView, densityPlaceholderView);
     if (!meshGroup) {
         if (!neutralEntityFx) {
             wgpu::BufferDescriptor bufferDesc{};
@@ -813,6 +838,8 @@ std::size_t SdfRenderer::pendingCompiles() const {
     return n;
 }
 
+void SdfRenderer::setDensityOccupancySkipping(bool on) { impl_->occupancySkipping = on; }
+
 void SdfRenderer::setAsyncCompile(bool async) { impl_->asyncCompile = async; }
 
 void SdfRenderer::setPrewarm(bool prewarm) { impl_->prewarm = prewarm; }
@@ -874,8 +901,8 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             // the density field when the object asks for it; an interpreted density-mode object takes
             // the interpreter's density variant. Every other object keeps the default pipelines.
             const Impl::Pipelines* variant = compiled;
-            if (variant == nullptr && object.density.active()) {
-                variant = im.densityInterpreterPipelines();
+            if (const unsigned flags = Impl::surfaceFlags(object); variant == nullptr && flags != 0u) {
+                variant = im.interpreterVariantPipelines(flags);
                 if (variant == nullptr) {
                     continue;
                 }
@@ -926,6 +953,32 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                     im.packScratch.push_back(rec);
                 }
             }
+            // ADR-1152: an engraved object's line fields ride after its node (and surface) records: a header
+            // (p0 = depth, crawl, grating, spacing; p1 = panels, layers) and one record per layer (kind = the
+            // family; p0 = centre, frequency; p1 = unit axis, petals; p2 = weight, depth, inner, outer).
+            if (const scene::Engraving& eng = object.material.engraving; eng.enabled()) {
+                const auto layers = std::min<std::size_t>(eng.layers.size(), scene::kMaxEngravingLayers);
+                u.surfaces.z = static_cast<std::uint32_t>(im.packScratch.size());
+                u.surfaces.w = static_cast<std::uint32_t>(1 + layers);
+                spatial::SdfNodeGpu head{};
+                head.fieldSlot = -1;
+                head.p0 = glm::vec4(std::max(eng.depth, 0.0f), eng.crawl, std::max(eng.grating, 0.0f),
+                                    std::max(eng.spacing, 1.0f));
+                head.p1 = glm::vec4(std::max(eng.panels, 0.0f), static_cast<float>(layers), 0.0f, 0.0f);
+                im.packScratch.push_back(head);
+                for (std::size_t k = 0; k < layers; ++k) {
+                    const scene::EngravingLayer& l = eng.layers[k];
+                    spatial::SdfNodeGpu rec{};
+                    rec.kind = static_cast<std::uint32_t>(l.family);
+                    rec.fieldSlot = -1;
+                    const float len = glm::length(l.axis);
+                    rec.p0 = glm::vec4(l.center, std::max(l.frequency, 1e-3f));
+                    rec.p1 = glm::vec4(len > 1e-6f ? l.axis / len : glm::vec3(1.0f, 0.0f, 0.0f), std::max(l.petals, 0.0f));
+                    rec.p2 = glm::vec4(std::clamp(l.weight, 0.0f, 1.0f), l.depth >= 0.0f ? l.depth : eng.depth,
+                                       std::max(l.inner, 0.0f), std::max(l.outer, l.inner + 1e-4f));
+                    im.packScratch.push_back(rec);
+                }
+            }
             u.worldToLocal = glm::inverse(obj.model);
             u.boundsMin = glm::vec4(object.boundsMin, 0.0f);
             u.boundsMax = glm::vec4(object.boundsMax, 0.0f);
@@ -960,6 +1013,7 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 u.wave4 = glm::vec4(ps.waveHue, ps.waveHueSpan, std::clamp(ps.waveEdgeTint, 0.0f, 1.0f), on ? 1.0f : 0.0f);
             }
             wgpu::TextureView densityView;
+            wgpu::TextureView coarseView;
             if (object.density.active()) {
                 // ADR-1142: the named system's volume, resolved by the particle renderer this frame
                 // (it runs before this update). No volume is no matter, and no matter is no surface:
@@ -980,15 +1034,18 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
                 const float scale = std::cbrt(std::max(std::abs(glm::determinant(glm::mat3(obj.model))), 1e-12f));
                 u.density0 = glm::vec4(object.density.iso, std::clamp(object.density.sharpness, 0.0f, 1.0f),
                                        cellWorld / scale, 1.0f);
-                u.density1 = glm::vec4(volume.boundsMin, 0.0f);
-                u.density2 = glm::vec4(1.0f / extent, 0.0f);
+                // ADR-1150: the volume's resolution and whether its coarse occupancy grid is bound.
+                const bool coarse = im.occupancySkipping && volume.coarseView != nullptr && volume.resolution >= 8;
+                u.density1 = glm::vec4(volume.boundsMin, static_cast<float>(volume.resolution));
+                u.density2 = glm::vec4(1.0f / extent, coarse ? 1.0f : 0.0f);
                 densityView = volume.view;
+                coarseView = coarse ? volume.coarseView : im.densityPlaceholderView;
                 ++stats_.densityObjects;
             }
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
-            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, variant, densityView});
+            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, variant, densityView, coarseView});
             ++stats_.raymarchObjects;
             stats_.packedNodes += static_cast<std::uint32_t>(count);
         } else {
@@ -1118,7 +1175,7 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
         }
         pass.SetPipeline(item.compiled != nullptr ? item.compiled->lit : im.raymarchPipeline);
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
-        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView) : im.sdfGroup, offsets.size(),
+        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView, item.coarseView) : im.sdfGroup, offsets.size(),
                           offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
         pass.Draw(6);
@@ -1152,7 +1209,7 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
             continue; // ADR-1002: opted out of this depth-only march
         }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
-        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView) : im.sdfGroup, offsets.size(),
+        pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView, item.coarseView) : im.sdfGroup, offsets.size(),
                           offsets.data());
         pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
         pass.Draw(6);

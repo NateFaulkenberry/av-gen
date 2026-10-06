@@ -164,6 +164,13 @@ struct FrameUniforms {
     // than its cube, y = the sun's intensity, z = the sky's intensity, w = the sun disc's floor
     // radius. Mirrors FrameUniforms; zero offline.
     skyLive: vec4<f32>,
+    // ADR-1151: the reflection-only light bands (reflection_bands.wgsl). All zero unless the scene
+    // authored `environment.bands`; bandsSoft2.w = 1 is the gate. Mirrors FrameUniforms; appended last.
+    bandsInfo: vec4<f32>,   // x = strips, y = phase, z = gain, w = rotation about +Y (radians)
+    bandsSoft: vec4<f32>,   // xyz = the soft box's key direction, w = its intensity
+    bandsSoft2: vec4<f32>,  // x = falloff, y = sky fill, z = 0, w = 1 when the bands are on
+    bandsRate: vec4<f32>,   // the strips' dash rates
+    bands: array<vec4<f32>, 8>, // strip k: [2k] axis xyz + offset, [2k + 1] width, intensity, segments, warmth
 };
 
 struct ObjectUniforms {

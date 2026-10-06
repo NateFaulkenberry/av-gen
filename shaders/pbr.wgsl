@@ -20,6 +20,8 @@ const kProceduralDraw: bool = false;
 // ADR-155: this draw's rung tier, or 0 (Full) for a path that has no rungs. Defined by
 // every includer of pbr_shade.wgsl, so a missing one is a compile error.
 fn proceduralRungTier() -> f32 { return 0.0; }
+// ADR-1152: no authored micro-geometry on this path (see SurfaceDetail in pbr_shade.wgsl).
+fn surfaceDetail() -> SurfaceDetail { return SurfaceDetail(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0); }
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 

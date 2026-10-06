@@ -144,8 +144,28 @@ struct Params {
     latentNormal: mat4x4<f32>,  // transpose(inverse(model)), for the release impulse's direction
     latent0: vec4<f32>,         // coherence, previous frame's coherence, width, strength
     latent1: vec4<f32>,         // flow, release, gradient epsilon (local units), 0
-    latentInfo: vec4<u32>,      // x = packed node count (the program starts at record 0), yzw = 0
+    latentInfo: vec4<u32>,      // x = packed node count (the program starts at record 0), y = 1 when
+                                // cs_latent stores the latent normal in `home` (ADR-1153), zw = 0
+    // ADR-1153: glint flakes (vs_flake only; all zero for every other system).
+    flake0: vec4<f32>,          // metal f0 rgb, 1 = a flake system
+    flake1: vec4<f32>,          // temper (nm), film ior, glint alpha, tumble (rad/s)
+    flake2: vec4<f32>,          // free brightness, bound brightness, latent-normal share, sparkle fraction
+    flake3: vec4<f32>,          // sparkle radiance, fuse, 0, 0
+    // ADR-1151: the scene's reflection-only bands (scene::ReflectionBandLanes), copied in as the wind is.
+    bandsInfo: vec4<f32>,
+    bandsSoft: vec4<f32>,
+    bandsSoft2: vec4<f32>,
+    bandsRate: vec4<f32>,
+    bands: array<vec4<f32>, 8>,
 };
+
+// ADR-1151: the band accessors reflection_bands.wgsl reads (the particle path has no frame block).
+fn bandLaneInfo() -> vec4<f32> { return params.bandsInfo; }
+fn bandLaneSoft() -> vec4<f32> { return params.bandsSoft; }
+fn bandLaneSoft2() -> vec4<f32> { return params.bandsSoft2; }
+fn bandLaneRate() -> vec4<f32> { return params.bandsRate; }
+fn bandLane(i: u32) -> vec4<f32> { return params.bands[i]; }
+#include "reflection_bands.wgsl"
 
 struct DrawArgs {
     vertexCount: u32,
@@ -612,6 +632,11 @@ fn cs_latent(@builtin(global_invocation_id) gid: vec3<u32>) {
         let sgn = select(1.0, -1.0, fract(p.seed * 29.0) < 0.2);
         p.velocity = p.velocity + release * params.latent1.y * nW * (sgn * (0.6 + 0.8 * h));
     }
+    if (params.latentInfo.y == 1u) {
+        // ADR-1153: a flake system's plates take the latent surface's normal. `home.w` stays 0, which
+        // the attractor reads as "no home" (only anchored systems set it, and they never store this).
+        p.home = vec4<f32>(nW, 0.0);
+    }
     particles[slot] = p;
 }
 
@@ -1032,6 +1057,135 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     let lit = faceLit * pulseGain(p.seed, slot);
     out.color = vec4<f32>(particleTint(t, p.seed) * lit * scatterGain(world), particleAlpha(t) * ringFade);
     out.ringMask = select(0.0, 1.0, isRing);
+    if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
+    return out;
+}
+
+// ---- ADR-1153: glint flakes ----------------------------------------------------------------
+// After THE ASTRAL FORGE prototype's flakes.wgsl. Each particle is a small metal plate: its colour is the
+// reflection-only bands (ADR-1151) seen in its normal's mirror direction, times a Fresnel term on its f0
+// (with a temper film when bound), so it is dark unless the plate sends a band toward the eye. Free plates
+// tumble; plates the latent binds turn to the latent surface's normal, so a formed patch flashes as one.
+// The quad stays camera-facing (a plate is a pixel or two): only its shading is oriented. Its own entry
+// point, so vs_particle -- every other system's vertex code -- is untouched.
+
+// The prototype's 8-wavelength thin film (air | oxide | metal), normalised so 0 nm is neutral.
+fn flakeFilm(cosI: f32, thicknessNm: f32, n: f32) -> vec3<f32> {
+    if (thicknessNm < 1.0) {
+        return vec3<f32>(1.0);
+    }
+    let sinT2 = (1.0 - cosI * cosI) / (n * n);
+    let cosT = sqrt(max(1.0 - sinT2, 0.0));
+    let r1 = (1.0 - n) / (1.0 + n);
+    let r2 = -0.62;
+    var acc = vec3<f32>(0.0);
+    var norm = vec3<f32>(0.0);
+    for (var k = 0; k < 8; k = k + 1) {
+        let lambda = 410.0 + 40.0 * f32(k);
+        let delta = 4.0 * 3.14159265 * n * thicknessNm * cosT / lambda;
+        let c = cos(delta);
+        let R = (r1 * r1 + r2 * r2 + 2.0 * r1 * r2 * c) / (1.0 + r1 * r1 * r2 * r2 + 2.0 * r1 * r2 * c);
+        let R0 = (r1 + r2) * (r1 + r2) / ((1.0 + r1 * r2) * (1.0 + r1 * r2));
+        // the CIE fit (Wyman, Sloan and Shirley 2013), as lighting.wgsl's thinFilmCmf
+        let t1 = (lambda - 442.0) * select(0.0374, 0.0624, lambda < 442.0);
+        let t2 = (lambda - 599.8) * select(0.0323, 0.0264, lambda < 599.8);
+        let t3 = (lambda - 501.1) * select(0.0382, 0.0490, lambda < 501.1);
+        let u1 = (lambda - 568.8) * select(0.0247, 0.0213, lambda < 568.8);
+        let u2 = (lambda - 530.9) * select(0.0322, 0.0613, lambda < 530.9);
+        let v1 = (lambda - 437.0) * select(0.0278, 0.0845, lambda < 437.0);
+        let v2 = (lambda - 459.0) * select(0.0725, 0.0385, lambda < 459.0);
+        let w = vec3<f32>(0.362 * exp(-0.5 * t1 * t1) + 1.056 * exp(-0.5 * t2 * t2) - 0.065 * exp(-0.5 * t3 * t3),
+                          0.821 * exp(-0.5 * u1 * u1) + 0.286 * exp(-0.5 * u2 * u2),
+                          1.217 * exp(-0.5 * v1 * v1) + 0.681 * exp(-0.5 * v2 * v2));
+        acc = acc + w * (R / R0);
+        norm = norm + w;
+    }
+    let xyz = acc / norm;
+    let rgb = vec3<f32>(3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z,
+                        -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z,
+                        0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z);
+    let white = vec3<f32>(3.2406 - 1.5372 - 0.4986, -0.9689 + 1.8758 + 0.0415, 0.0557 - 0.2040 + 1.0570);
+    return max(rgb / max(white, vec3<f32>(1e-3)), vec3<f32>(0.0));
+}
+
+fn flakeHash(x0: u32) -> u32 {
+    var x = x0;
+    x = x ^ (x >> 16u);
+    x = x * 0x7feb352du;
+    x = x ^ (x >> 15u);
+    x = x * 0x846ca68bu;
+    x = x ^ (x >> 16u);
+    return x;
+}
+
+fn flakeU01(h: u32) -> f32 {
+    return f32(h >> 8u) / 16777216.0;
+}
+
+@vertex
+fn vs_flake(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
+    let slot = aliveRead[ii];
+    let p = particlesRead[slot];
+    let t = clamp(p.age / max(p.life, 1e-4), 0.0, 1.0);
+    let size0 = particleSize(t) * p.size;
+    // A plate nearer the lens than its focus would be a large bokeh disc: its size is capped at about 1.2
+    // milliradians (the prototype's 2.5 px at 1080 lines and a 30-degree lens) and it fades by the area it
+    // lost, so a close-up stays surface rather than a snowstorm.
+    let dist0 = max(length(params.cameraPos.xyz - p.position), 1e-4);
+    let size = min(size0, 1.2e-3 * dist0);
+    let nearFade = (size / max(size0, 1e-9)) * (size / max(size0, 1e-9));
+    var corners = array<vec2<f32>, 6>(vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(-1.0, 1.0),
+                                      vec2<f32>(-1.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0));
+    let c = corners[vi];
+    // A plate resting on the surface it forms is lifted toward the eye by about a pixel's depth tolerance, as
+    // the prototype's splat accepts plates within 0.015 dist + 0.03 of the surface: half-buried billboards
+    // would z-fight the surface along its depth contours, which reads as rings of dots on every rounded form.
+    let toEye0 = params.cameraPos.xyz - p.position;
+    let lift = normalize(toEye0) * (0.01 * length(toEye0) + size);
+    let world = p.position + lift + params.cameraRight.xyz * (c.x * size) + params.cameraUp.xyz * (c.y * size);
+    // the plate: bound to the latent (the system's own binding curve) or free
+    let h = flakeHash(bitcast<u32>(p.seed) * 0x165667b1u + 0x27d4eb2fu);
+    let hz = flakeU01(h);
+    var b = 0.0;
+    if (params.latentInfo.x > 0u) {
+        let width = params.latent0.z;
+        b = latentBinding(latentTheta(p.seed, width), params.latent0.x, width);
+    }
+    let jit = vec3<f32>(flakeU01(h >> 3u), flakeU01(h >> 7u), flakeU01(h >> 11u)) - 0.5;
+    let ang = params.sim.y * params.flake1.w * (0.5 + hz) + hz * 40.0;
+    let freeN = normalize(vec3<f32>(sin(ang + jit.x * 9.0), cos(ang * 0.7 + jit.y * 7.0), sin(ang * 1.3 + jit.z * 5.0))
+                          + jit);
+    var nf = freeN;
+    let stored = p.home.xyz;
+    if (params.latentInfo.y == 1u && p.home.w < 0.5 && dot(stored, stored) > 0.25) {
+        nf = normalize(mix(freeN, normalize(stored + jit * 0.25), smoothstep(0.2, 0.8, b) * params.flake2.z));
+    }
+    let toEye = normalize(params.cameraPos.xyz - p.position);
+    if (dot(nf, toEye) < 0.0) {
+        nf = -nf;
+    }
+    let r = reflect(-toEye, nf);
+    let cosV = clamp(dot(nf, toEye), 0.0, 1.0);
+    // cold dust is bare steel; bound matter carries the temper
+    var film = flakeFilm(cosV, params.flake1.x * b * (0.8 + 0.4 * hz), params.flake1.y);
+    film = mix(vec3<f32>(dot(film, vec3<f32>(0.2126, 0.7152, 0.0722))), film, 0.6);
+    let f0 = params.flake0.xyz * film;
+    let fr = f0 + (vec3<f32>(0.95) - f0) * pow(1.0 - cosV, 5.0);
+    // as the form sharpens, bound matter fuses into the surface: its plates thin out to a residual sparkle
+    let fuse = 1.0 - params.flake3.y * smoothstep(0.6, 1.0, b);
+    var radiance = reflectionBands(r, params.flake1.z, true) * fr * (params.flake2.x + params.flake2.y * b) * fuse;
+    if (hz > 1.0 - params.flake2.w) {
+        radiance = radiance + vec3<f32>(0.85, 0.92, 1.0) * params.flake3.x * (0.3 + 0.7 * b);
+    }
+    var out: VsOut;
+    out.clip = params.viewProj * vec4<f32>(world, 1.0);
+    out.nowClip = out.clip;
+    let prevWorld = world - p.velocity * params.sim.x;
+    out.prevClip = params.prevViewProj * vec4<f32>(prevWorld, 1.0);
+    out.uv = c;
+    out.world = world;
+    out.color = vec4<f32>(radiance * nearFade, particleAlpha(t));
+    out.ringMask = 0.0;
     if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
     return out;
 }

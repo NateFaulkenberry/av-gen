@@ -460,6 +460,9 @@ Result<void> SdfObject::validate() const {
     if (look.shadowSteps < 1 || look.shadowSteps > 256) {
         return fail("sdf '{}': look shadowSteps must be in 1..256 (got {})", name, look.shadowSteps);
     }
+    if (material.engraving.enabled() && renderMode != SdfRenderMode::Raymarch) { // ADR-1152
+        return fail("sdf '{}': an engraving is cut by the raymarch; renderMode must be raymarch", name);
+    }
     if (density.active()) { // ADR-1142
         if (renderMode != SdfRenderMode::Raymarch) {
             return fail("sdf '{}': a density source draws by raymarching; renderMode must be raymarch", name);
@@ -530,6 +533,9 @@ json SdfObject::toJson() const {
             m["toon"] = toonShadingToJson(material.toon); // ADR-1071
         }
         writeMaterialOptics(material, m); // ADR-1143: thinFilm, anisotropy (only when authored)
+        if (material.engraving.enabled()) {
+            m["engraving"] = engravingToJson(material.engraving); // ADR-1152 (only when authored)
+        }
         j["material"] = std::move(m);
     }
     j["renderMode"] = sdfRenderModeName(renderMode);
@@ -636,6 +642,13 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         }
         if (auto r = readMaterialOptics(m, o.material); !r) { // ADR-1143
             return fail("material: {}", r.error().message);
+        }
+        if (m.contains("engraving")) { // ADR-1152
+            auto engraving = readEngraving(m.at("engraving"));
+            if (!engraving) {
+                return fail("material: {}", engraving.error().message);
+            }
+            o.material.engraving = std::move(*engraving);
         }
     }
     if (j.contains("renderMode")) {
@@ -777,6 +790,7 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("material/metallic", "material/metallic", rest.material.metallic, 0.0f, 1.0f, 0.0f, 1.0f);
     p.toon = registerToonParameters(params, prefix, group, rest.material.toon, &p.all); // ADR-1071
     p.optics = registerMaterialOpticsParameters(params, prefix, group, rest.material, &p.all); // ADR-1143
+    p.engraving = registerEngravingParameters(params, prefix, group, rest.material.engraving, &p.all); // ADR-1152
     r.v3("bounds/min", "bounds/min", rest.boundsMin, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("bounds/max", "bounds/max", rest.boundsMax, -1e4f, 1e4f, -20.0f, 20.0f);
     r.i("resolution", rest.resolution, 2, 256, 8, 128);
@@ -911,6 +925,7 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("material/metallic", live.material.metallic);
     applyToonParameters(p.toon, live.material.toon); // ADR-1071
     applyMaterialOpticsParameters(p.optics, live.material); // ADR-1143
+    applyEngravingParameters(p.engraving, live.material.engraving); // ADR-1152
     index.copy("bounds/min", live.boundsMin);
     index.copy("bounds/max", live.boundsMax);
     index.copy("resolution", live.resolution);

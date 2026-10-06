@@ -253,6 +253,40 @@ struct Anisotropy {
     [[nodiscard]] bool enabled() const { return strength != 0.0f; }
 };
 
+// ADR-1152: a guilloche engraving -- line fields cut into the surface, after THE ASTRAL FORGE prototype's
+// engraving (prototypes/astral-forge/shaders/latent.wgsl engraveUV, surface.wgsl grooveFamily). Each
+// layer is one family of lines in object space:
+//   Rosette: rings about `center` (u = the angle about the local z axis, v = the radius), `petals`
+//            waves per turn; cut in the annulus [inner, outer], polished inside `inner`;
+//   Contour: shells about `center` (u = the angle in xy, v = the 3-D distance), `petals` waves per turn;
+//   Engine:  engine-turned waves: lines across `axis` (v = the distance along it), one wave per line.
+// The lines are drawn in four octaves (frequency x 4 each), faded by their footprint in pixels, as
+// V-grooves that tilt the normal; the strongest groove's direction is the anisotropy tangent, and the
+// grooves diffract the reflection-only bands (ADR-1151). Drawn by SDF objects (the raymarch's engraved
+// pipeline variant); scene/material_engraving.hpp has the file block.
+enum class EngravingFamily : std::uint8_t { Rosette = 0, Contour = 1, Engine = 2 };
+struct EngravingLayer {
+    EngravingFamily family = EngravingFamily::Rosette;
+    glm::vec3 center{0.0f};             // Rosette, Contour: the pattern's centre (object space)
+    glm::vec3 axis{0.94f, 0.30f, 0.17f}; // Engine: the direction the lines advance along
+    float petals = 12.0f;               // Rosette, Contour: waves per turn
+    float frequency = 10.0f;            // lines per object-space unit (octave 0)
+    float weight = 1.0f;                // 0..1: how much of the layer is cut
+    float depth = -1.0f;                // the groove's slope; < 0 = the engraving's `depth`
+    float inner = 0.15f;                // Rosette: the polished centre's radius
+    float outer = 0.8f;                 // Rosette: the cut annulus's outer radius
+};
+inline constexpr int kMaxEngravingLayers = 6;
+struct Engraving {
+    float depth = 0.3f;     // the default groove slope (normal tilt per unit of groove)
+    float crawl = 0.0f;     // radians (rosette, contour) or line widths (engine) the pattern drifts per second
+    float grating = 0.0f;   // the grooves' diffraction of the bands (0 = none)
+    float spacing = 1600.0f; // the grating's line spacing in nm
+    float panels = 0.0f;    // > 0: contour layers are cut in noise panels of this frequency, engine layers between them
+    std::vector<EngravingLayer> layers; // empty = no engraving (the default)
+    [[nodiscard]] bool enabled() const { return !layers.empty(); }
+};
+
 // glTF metallic-roughness material. Textures multiply the factors.
 struct Material {
     glm::vec3 baseColor{0.75f, 0.2f, 0.9f};
@@ -281,6 +315,7 @@ struct Material {
     WireLines wire;                      // ADR-1073: edges drawn as lines (off by default)
     ThinFilm thinFilm;                   // ADR-1143: interference colour (off by default)
     Anisotropy anisotropy;               // ADR-1143: stretched highlight (off by default)
+    Engraving engraving;                 // ADR-1152: guilloche line fields (off by default; SDF objects)
 };
 
 // ---- geometry ------------------------------------------------------------------------------
@@ -562,6 +597,36 @@ enum class SkyBackground : std::uint8_t {
 // past anything that still reads as distance rather than as a wall.
 inline constexpr float kHorizonDensityMax = 8.0f;
 
+// ADR-1151: reflection-only light bands (scene/reflection_bands.hpp has the file block and the shading twin).
+inline constexpr int kMaxReflectionBands = 4;
+
+struct ReflectionBand {
+    glm::vec3 axis{0.0f, 1.0f, 0.0f}; // the ring's axis (normalised when packed)
+    float offset = 0.0f;              // dot(dir, axis) at the band's centre line (-1..1); 0 = a great circle
+    float width = 0.04f;              // angular half-width, as a Gaussian sigma in direction-cosine units
+    float intensity = 1.0f;           // radiance at the centre line (0 = off)
+    int segments = 0;                 // 0 = a continuous ring; n = n dashes turning with `phase`
+    float warmth = 0.5f;              // 0 cool .. 1 warm
+    float rate = 0.07f;               // dash turns per unit of phase
+};
+
+struct ReflectionSoftbox {
+    float intensity = 0.0f;  // the broad lobe's peak (0 = no soft box)
+    float azimuth = 0.8f;    // radians about +Y (0 = toward +X)
+    float elevation = 0.5f;  // radians above the horizon
+    float falloff = 2.6f;    // the lobe's sharpness: exp((dot(dir, key) - 1) * falloff)
+    float skyFill = 0.0f;    // a faint fill that rises toward +Y
+};
+
+struct ReflectionBands {
+    bool enabled = false;    // the block was authored
+    float phase = 0.0f;      // advances the dashes (a route or the timeline drives it)
+    float rotation = 0.0f;   // radians: the whole rig about world +Y
+    float gain = 1.0f;       // multiplies every band and the soft box
+    ReflectionSoftbox softbox;
+    std::vector<ReflectionBand> strips; // at most kMaxReflectionBands
+};
+
 struct Environment;
 [[nodiscard]] SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky);
 
@@ -794,6 +859,8 @@ struct Environment {
     // property of the weather rather than of any one object, and because every consumer (vegetation
     // now, particles and cloth later) has to agree about it or the world stops being one place.
     wind::WindParams wind;
+    // ADR-1151: reflection-only light bands (off unless `environment.bands` is authored).
+    ReflectionBands bands;
 };
 
 inline SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky) {

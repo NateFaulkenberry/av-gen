@@ -379,6 +379,26 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                    anisotropic);
         }
     }
+    // ADR-1151..1153: the reflection-only bands, an SDF material's engraving and flake particles are terms of the
+    // realtime shaders only.
+    if (scene.environment.bands.enabled) {
+        snap.capabilities.note("reflection bands", Support::Unsupported,
+                               "the environment's reflection-only bands (ADR-1151) are not in the tracer's "
+                               "environment: surfaces lit only by them trace dark",
+                               static_cast<int>(scene.environment.bands.strips.size()));
+    }
+    {
+        int engraved = 0;
+        for (const scene::SdfObject& sdf : scene.sdfs) {
+            engraved += sdf.visible && sdf.material.engraving.enabled() ? 1 : 0;
+        }
+        if (engraved > 0) {
+            snap.capabilities.note("engraved material", Support::Degraded,
+                                   "the guilloche engraving (ADR-1152) is a shading term of the raymarch: traced "
+                                   "as the smooth surface",
+                                   engraved);
+        }
+    }
     // ---- procedural scatter ----------------------------------------------------------------
     //
     // The realtime renderer resolves these with `scene::makeSourceMesh` on the CPU and then

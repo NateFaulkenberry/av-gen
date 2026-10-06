@@ -3380,6 +3380,9 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         if (auto optics = readMaterialOptics(j, m); !optics) { // ADR-1143
             return fail("material: {}", optics.error().message);
         }
+        if (j.contains("engraving")) { // ADR-1152: only the SDF raymarch cuts an engraving
+            return fail("material: 'engraving' is drawn on SDF objects only (ADR-1152); a procedural node cannot carry it");
+        }
         if (j.contains("alphaMode")) {
             if (!j.at("alphaMode").is_string()) {
                 return fail("material 'alphaMode' must be a string");

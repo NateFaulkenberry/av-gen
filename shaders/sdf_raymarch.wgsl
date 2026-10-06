@@ -26,6 +26,15 @@ const kProceduralDraw: bool = false;
 // ADR-155: this draw's rung tier, or 0 (Full) for a path that has no rungs. Defined by
 // every includer of pbr_shade.wgsl, so a missing one is a compile error.
 fn proceduralRungTier() -> f32 { return 0.0; }
+// ADR-1152: the engraving's record for pbr_shade.wgsl. Only the engraved variant (kSdfEngraved, set between
+// the @@SDF_SURFACE@@ markers) fills it; in every other module the branch is removed at compile time.
+var<private> sdfDetail: SurfaceDetail;
+fn surfaceDetail() -> SurfaceDetail {
+    if (kSdfEngraved) {
+        return sdfDetail;
+    }
+    return SurfaceDetail(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0);
+}
 #include "pbr_shade.wgsl"
 #include "sdf.wgsl"
 
@@ -108,6 +117,8 @@ struct SdfStepStats {
 // ADR-1142: the density volume (a 1x1x1 zero placeholder for every object not in density mode).
 @group(1) @binding(5) var sdfDensityTex: texture_3d<f32>;
 @group(1) @binding(6) var sdfDensitySampler: sampler;
+// ADR-1150: the volume's coarse max-occupancy grid (one texel per 8^3 block; the placeholder otherwise).
+@group(1) @binding(7) var sdfDensityCoarse: texture_3d<f32>;
 
 // ADR-1003: every field evaluation of this pass goes through sdfField. By default it is the packed
 // interpreter; an object with `compile` on gets a pipeline whose module replaces the block between
@@ -143,7 +154,57 @@ fn sdfDensityAt(pLocal: vec3<f32>) -> f32 {
 // in steps of about iso * cell * 1.6 through empty space. There is exactly ONE call of sdfField here:
 // a compiled field is inlined at every call site, and two would double its code at each of them.
 fn sdfDensitySurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
-    let rho = sdfDensityAt(p);
+    return sdfDensityFieldOf(offset, count, p, t, world, false);
+}
+
+// ADR-1150: the density as a cubic B-spline of the volume's texels (Sigg and Hadwiger 2005: eight linear
+// fetches at offset positions). The trilinear density's gradient is constant within a texel and jumps at its
+// faces, so a normal taken from it shows every texel as a facet -- the iteration-2 "blocky reflections". The
+// B-spline is C2, so its gradient is continuous; it is read by the normal only (the march and its bisection
+// stay on the trilinear field, which is what the depth prepass reaches too).
+fn sdfDensitySmoothAt(pLocal: vec3<f32>) -> f32 {
+    let w = (object.model * vec4<f32>(pLocal, 1.0)).xyz;
+    let uvw = (w - sdf.density1.xyz) * sdf.density2.xyz;
+    if (any(uvw < vec3<f32>(0.0)) || any(uvw > vec3<f32>(1.0))) {
+        return 0.0;
+    }
+    let res = vec3<f32>(textureDimensions(sdfDensityTex, 0));
+    let x = uvw * res - 0.5;
+    let i = floor(x);
+    let f = x - i;
+    let f2 = f * f;
+    let f3 = f2 * f;
+    let w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    let w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    let w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    let w3 = f3 / 6.0;
+    let g0 = w0 + w1;
+    let g1 = w2 + w3;
+    let h0 = (i - 0.5 + w1 / g0) / res; // texel centres at (i + 0.5) / res
+    let h1 = (i + 1.5 + w3 / g1) / res;
+    let s000 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h0.x, h0.y, h0.z), 0.0).r;
+    let s100 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h1.x, h0.y, h0.z), 0.0).r;
+    let s010 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h0.x, h1.y, h0.z), 0.0).r;
+    let s110 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h1.x, h1.y, h0.z), 0.0).r;
+    let s001 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h0.x, h0.y, h1.z), 0.0).r;
+    let s101 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h1.x, h0.y, h1.z), 0.0).r;
+    let s011 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h0.x, h1.y, h1.z), 0.0).r;
+    let s111 = textureSampleLevel(sdfDensityTex, sdfDensitySampler, vec3<f32>(h1.x, h1.y, h1.z), 0.0).r;
+    // g0 weighs the fetch at h0 and g1 = 1 - g0 the one at h1, on each axis
+    let y0 = mix(mix(s110, s010, g0.x), mix(s100, s000, g0.x), g0.y);
+    let y1 = mix(mix(s111, s011, g0.x), mix(s101, s001, g0.x), g0.y);
+    return mix(y1, y0, g0.z);
+}
+
+// The density-mode field with the density read trilinearly (`smoothDensity` false: the march) or as the
+// B-spline (true: the normal). One call of sdfField, for ADR-1142's reason.
+fn sdfDensityFieldOf(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>, smoothDensity: bool) -> f32 {
+    var rho = 0.0;
+    if (smoothDensity) {
+        rho = sdfDensitySmoothAt(p);
+    } else {
+        rho = sdfDensityAt(p);
+    }
     let iso = sdf.density0.x;
     let cell = sdf.density0.z;
     let dRho = (iso - rho) * cell * 1.6;
@@ -163,7 +224,12 @@ fn sdfDensitySurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: 
 // sdfDensitySurfaceField -- a variant rather than a branch here, because a branch changes the Metal
 // compiler's arithmetic for every other object (ADR-388 measured that kind of drift) and a variant
 // leaves their module exactly what it was.
+// ADR-1150: the block also holds `kSdfDensityMode`, which the density variant sets, so the density march
+// (sdfDensityMarch) and its normal are compiled into that variant only: in every other module the
+// constant is false and the branches on it are removed at compile time, not taken at run time.
 // @@SDF_SURFACE_BEGIN@@
+const kSdfDensityMode: bool = false;
+const kSdfEngraved: bool = false;
 fn sdfSurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
     return sdfField(offset, count, p, t, world);
 }
@@ -291,6 +357,9 @@ struct SdfMarch {
 };
 
 fn sdfMarch(roL: vec3<f32>, rdL: vec3<f32>, tStart: f32, tEnd: f32, maxSteps: u32, epsilon: f32) -> SdfMarch {
+    if (kSdfDensityMode) {
+        return sdfDensityMarch(roL, rdL, tStart, tEnd, maxSteps, epsilon); // ADR-1150
+    }
     var m: SdfMarch;
     m.t = tStart;
     m.d = 0.0;
@@ -316,6 +385,287 @@ fn sdfMarch(roL: vec3<f32>, rdL: vec3<f32>, tStart: f32, tEnd: f32, maxSteps: u3
         }
     }
     return m;
+}
+
+// ADR-1150: the march of a density-mode object (ADR-1142), after the prototype's surface.wgsl. The density
+// field is not a distance, so plain relaxed sphere tracing lands anywhere within the hit threshold of the
+// iso level, and that scatter, quantised by the steps, is the contour banding the iteration-2 renders showed
+// on every rounded form. Instead:
+//   - the ray is clipped to the volume (no matter outside it, so no surface);
+//   - a coarse block whose maximum density is below 0.3 iso is skipped to its exit: below 0.38 iso both the
+//     density term and the dilated term of the field are positive, so no surface can be inside it;
+//   - steps are the field times the step scale, clamped to [0.65, 3] cells, so no step crawls and none
+//     jumps a shell of matter;
+//   - the first step below the hit threshold is refined by 7 bisections on the field's sign, which puts
+//     the hit on the iso-surface to 1/128 of a step.
+// One function for the depth prepass and the lit pass alike, so both still reach bit-identical t.
+fn sdfDensityMarch(roL: vec3<f32>, rdL: vec3<f32>, tStart: f32, tEnd: f32, maxSteps: u32, epsilon: f32) -> SdfMarch {
+    var m: SdfMarch;
+    m.t = tStart;
+    m.d = 0.0;
+    m.steps = 0u;
+    m.hit = false;
+    m.left = true;
+    let offset = sdf.info.x;
+    let count = sdf.info.y;
+    let stepScale = sdf.march.y;
+    let time = sdf.march.w;
+    let cell = sdf.density0.z;
+    // the ray in the volume's texture coordinates: linear in the local t (the model matrix is affine)
+    let o = ((object.model * vec4<f32>(roL, 1.0)).xyz - sdf.density1.xyz) * sdf.density2.xyz;
+    let dir = (object.model * vec4<f32>(rdL, 0.0)).xyz * sdf.density2.xyz;
+    let inv = 1.0 / dir;
+    let a = -o * inv;
+    let b = (vec3<f32>(1.0) - o) * inv;
+    let vNear = max(max(min(a.x, b.x), min(a.y, b.y)), min(a.z, b.z));
+    let vFar = min(min(max(a.x, b.x), max(a.y, b.y)), max(a.z, b.z));
+    var t = max(tStart, vNear);
+    let tStop = min(tEnd, vFar);
+    if (!(t <= tStop)) {
+        m.t = t;
+        return m;
+    }
+    let useCoarse = sdf.density2.w > 0.5;
+    let blocks = sdf.density1.w / 8.0; // coarse blocks per unit of texture coordinate
+    let coarseMax = vec3<i32>(textureDimensions(sdfDensityCoarse, 0)) - vec3<i32>(1);
+    let skipBelow = 0.3 * sdf.density0.x;
+    var tPrev = t;
+    var hit = false;
+    for (var i = 0u; i < maxSteps; i = i + 1u) {
+        m.steps = i + 1u;
+        if (t > tStop) {
+            break;
+        }
+        if (useCoarse) {
+            let cc = clamp(vec3<i32>(floor((o + dir * t) * blocks)), vec3<i32>(0), coarseMax);
+            if (textureLoad(sdfDensityCoarse, cc, 0).r < skipBelow) {
+                let e0 = (vec3<f32>(cc) / blocks - o) * inv;
+                let e1 = ((vec3<f32>(cc) + vec3<f32>(1.0)) / blocks - o) * inv;
+                let tExit = min(min(max(e0.x, e1.x), max(e0.y, e1.y)), max(e0.z, e1.z));
+                tPrev = t;
+                t = max(tExit, t) + cell * 0.3;
+                continue;
+            }
+        }
+        let f = sdfSurfaceField(offset, count, roL + rdL * t, time, object.model);
+        if (f < epsilon * max(t, 1e-4)) {
+            hit = true;
+            break;
+        }
+        tPrev = t;
+        t = t + clamp(f * stepScale, cell * 0.65, cell * 3.0);
+    }
+    if (!hit) {
+        m.t = t;
+        return m;
+    }
+    var lo = tPrev;
+    var hi = t;
+    for (var k = 0; k < 7; k = k + 1) {
+        let mid = 0.5 * (lo + hi);
+        if (sdfSurfaceField(offset, count, roL + rdL * mid, time, object.model) < 0.0) {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    m.t = hi;
+    m.hit = true;
+    m.left = false;
+    return m;
+}
+
+// ADR-1150: the normal of a density-mode surface: tetrahedral differences of the field with its density read
+// as the B-spline (sdfDensitySmoothAt), so no texel shows as a facet. The tap distance is the prototype's
+// mix(0.7 cell, fine, S): unsharpened, the surface is the density's, and features finer than a cell are not
+// in it; sharpened toward the tree, the tree's own normal epsilon serves. A loop, so a compiled tree is
+// inlined once here (ADR-1003).
+fn sdfDensityNormal(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> vec3<f32> {
+    let eps = mix(0.7 * sdf.density0.z, sdf.march.z, sdf.density0.y);
+    var n = vec3<f32>(0.0);
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let k = sdfTetraTap(i);
+        n = n + k * sdfDensityFieldOf(offset, count, p + k * eps, t, world, true);
+    }
+    return sdfSafeNormalize(n);
+}
+
+// ---- ADR-1152: the guilloche engraving ----------------------------------------------------------------
+// After the prototype's engraveUV (latent.wgsl) and grooveFamily (surface.wgsl), in the object's local
+// space: each layer gives surface coordinates (u, v); per octave o (frequency x 4^o, petals x 2^o) the line
+// field is  L = f v + A sin(n u + drift f v)  -- fine lines carrying a wave ~1.5 spacings tall whose phase
+// drifts across the lines (the rose-engine braid) -- faded out where a line cycle is smaller than ~0.12-0.35
+// pixel, and cut as a V-groove that tilts the normal across the line. The records are packed after the
+// object's nodes (sdf_renderer.cpp): a header, then one per layer. The scene/material_engraving.cpp
+// `engravingUv` is the CPU twin of sdfEngraveUv.
+struct SdfEngraveUv {
+    uv: vec2<f32>,
+    petals: f32,
+    angular: bool,
+    amp: f32,
+};
+
+fn sdfEngraveAtan2(y: f32, x: f32) -> f32 {
+    return select(atan2(y, x), 0.0, abs(x) + abs(y) < 1e-12); // atan2(0, 0) is NaN on Metal
+}
+
+fn sdfEngraveUv(rec: SdfNodeGpu, q: vec3<f32>, crawl: f32) -> SdfEngraveUv {
+    var o: SdfEngraveUv;
+    let f = max(rec.p0.w, 1e-3);
+    if (rec.kind == 0u) { // rosette: rings about the centre, u = the angle about local z, v = the radius
+        let e = q - rec.p0.xyz;
+        let r = length(e.xy);
+        o.uv = vec2<f32>(sdfEngraveAtan2(e.y, e.x) + crawl, r);
+        o.petals = rec.p1.w;
+        o.angular = true;
+        o.amp = smoothstep(rec.p2.z, rec.p2.z + 6.0 / f, r);
+    } else if (rec.kind == 1u) { // contour: shells about the centre
+        let d = q - rec.p0.xyz;
+        o.uv = vec2<f32>(sdfEngraveAtan2(d.y, d.x) - crawl * 0.3, length(d) - crawl * 0.3);
+        o.petals = rec.p1.w;
+        o.angular = true;
+        o.amp = smoothstep(2.0 / f, 8.0 / f, length(d.xy));
+    } else { // engine-turned: lines across the axis, one wave per line
+        let a = rec.p1.xyz;
+        let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(a.y) > 0.9);
+        let b = normalize(up - a * dot(up, a));
+        o.uv = vec2<f32>(dot(q, b) * 3.0 + crawl * 2.0, dot(q, a));
+        o.petals = 1.0;
+        o.angular = false;
+        o.amp = 1.0;
+    }
+    return o;
+}
+
+fn sdfWrapPi(x: f32) -> f32 {
+    return x - 6.28318531 * round(x / 6.28318531);
+}
+
+struct SdfGroove {
+    n: vec3<f32>,      // the perturbed normal (local)
+    tang: vec3<f32>,   // the strongest groove's line direction (local)
+    across: vec3<f32>, // across it
+    mask: f32,         // 0..1: how much of that groove the pixel sees
+    cover: f32,        // 0..1: the strongest visibility of any octave cut here (0 = nothing engraved)
+};
+
+fn sdfGrooveLayer(rec: SdfNodeGpu, q: vec3<f32>, n0: vec3<f32>, crawl: f32, footprint: f32, weight: f32,
+                  groove: ptr<function, SdfGroove>) {
+    if (weight < 0.02) {
+        return;
+    }
+    // the gradients of u and v by forward differences (an angular u unwrapped across its branch cut)
+    let e = 2e-3;
+    let e0 = sdfEngraveUv(rec, q, crawl);
+    let ex = sdfEngraveUv(rec, q + vec3<f32>(e, 0.0, 0.0), crawl);
+    let ey = sdfEngraveUv(rec, q + vec3<f32>(0.0, e, 0.0), crawl);
+    let ez = sdfEngraveUv(rec, q + vec3<f32>(0.0, 0.0, e), crawl);
+    var du = vec3<f32>(ex.uv.x - e0.uv.x, ey.uv.x - e0.uv.x, ez.uv.x - e0.uv.x);
+    if (e0.angular) {
+        du = vec3<f32>(sdfWrapPi(du.x), sdfWrapPi(du.y), sdfWrapPi(du.z));
+    }
+    du = du / e;
+    let dv = vec3<f32>(ex.uv.y - e0.uv.y, ey.uv.y - e0.uv.y, ez.uv.y - e0.uv.y) / e;
+    let u = e0.uv.x;
+    let v = e0.uv.y;
+    let amplitude = 1.5 * e0.amp; // the wave's height, in line spacings
+    let drift = 0.35;             // its phase advance per line: the braid
+    let depth = rec.p2.y;
+    for (var o = 0; o < 4; o = o + 1) {
+        let ff = rec.p0.w * pow(4.0, f32(o));
+        let nn = e0.petals * pow(2.0, f32(o)); // petals double per octave while lines quadruple: no spokes
+        let arg = nn * u + drift * ff * v;
+        let lines = ff * v + amplitude * sin(arg);
+        var grad = ff * dv + amplitude * cos(arg) * (nn * du + drift * ff * dv);
+        grad = grad - n0 * dot(n0, grad);
+        let gl = length(grad);
+        if (gl < 1e-5) {
+            continue;
+        }
+        let vis = (1.0 - smoothstep(0.12, 0.35, gl * footprint)) * weight; // line cycles per pixel
+        if (vis < 0.01) {
+            continue;
+        }
+        (*groove).cover = max((*groove).cover, vis);
+        let across = grad / gl;
+        let x = fract(lines) - 0.5;
+        let w = 0.32;
+        let h = max(0.0, 1.0 - abs(x) / w);
+        let slope = select(0.0, -sign(x) / w, abs(x) < w);
+        (*groove).n = normalize((*groove).n - across * (slope * depth * vis / pow(1.6, f32(o))));
+        if (h * vis >= (*groove).mask) {
+            (*groove).mask = h * vis;
+            (*groove).tang = normalize(cross(n0, across));
+            (*groove).across = across;
+        }
+    }
+}
+
+// Smooth value noise for the engraved panels.
+fn sdfPanelNoise(p: vec3<f32>) -> f32 {
+    let i = vec3<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(hash01(i, 91u), hash01(i + vec3<i32>(1, 0, 0), 91u), u.x),
+                mix(hash01(i + vec3<i32>(0, 1, 0), 91u), hash01(i + vec3<i32>(1, 1, 0), 91u), u.x), u.y);
+    let b = mix(mix(hash01(i + vec3<i32>(0, 0, 1), 91u), hash01(i + vec3<i32>(1, 0, 1), 91u), u.x),
+                mix(hash01(i + vec3<i32>(0, 1, 1), 91u), hash01(i + vec3<i32>(1, 1, 1), 91u), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// The engraving at local point q with local normal n0 and a pixel `footprint` (local units). Rosettes are
+// cut in their annulus and polish their centre; contour layers are cut in the panels (everywhere without
+// panels), engine-turned layers between them, both kept off the rosettes. Fills `sdfDetail` for the shading.
+fn sdfEngrave(q: vec3<f32>, n0: vec3<f32>, footprint: f32, time: f32) -> vec3<f32> {
+    let base = sdf.info.x + sdf.surfaces.z;
+    let head = sdfNodes[base];
+    let layers = min(u32(head.p1.y + 0.5), 6u);
+    let crawl = head.p0.y * time;
+    var g: SdfGroove;
+    g.n = n0;
+    g.mask = 0.0;
+    g.cover = 0.0;
+    let ref0 = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n0.y) > 0.9);
+    g.tang = normalize(cross(n0, ref0));
+    g.across = cross(g.tang, n0);
+    var panel = 1.0;
+    if (head.p1.x > 0.0) {
+        panel = smoothstep(0.42, 0.58, sdfPanelNoise(q * head.p1.x + vec3<f32>(3.1, 0.0, 0.0)));
+    }
+    // the rosettes' cover: their annulus and the polished centre inside it
+    var cover = 0.0;
+    for (var k = 0u; k < layers; k = k + 1u) {
+        let rec = sdfNodes[base + 1u + k];
+        if (rec.kind == 0u) {
+            let d = length(q - rec.p0.xyz);
+            cover = max(cover, rec.p2.x * (1.0 - smoothstep(rec.p2.w * 0.7, rec.p2.w, d)));
+        }
+    }
+    for (var k = 0u; k < layers; k = k + 1u) {
+        let rec = sdfNodes[base + 1u + k];
+        var weight = rec.p2.x;
+        if (rec.kind == 0u) {
+            let d = length(q - rec.p0.xyz);
+            weight = weight * smoothstep(rec.p2.z * 0.85, rec.p2.z, d) * (1.0 - smoothstep(rec.p2.w * 0.7, rec.p2.w, d));
+        } else if (rec.kind == 1u) {
+            weight = weight * (1.0 - 0.8 * cover) * panel;
+        } else {
+            weight = weight * (1.0 - cover) * select(1.0, 1.0 - panel, head.p1.x > 0.0);
+        }
+        sdfGrooveLayer(rec, q, n0, crawl, footprint, weight, &g);
+    }
+    // to world space for the shading: the line direction is a tangent (the model matrix carries it), the
+    // across direction is rebuilt from it and the world normal
+    let nW = normalize((object.normalMatrix * vec4<f32>(g.n, 0.0)).xyz);
+    var tW = (object.model * vec4<f32>(g.tang, 0.0)).xyz;
+    tW = tW - nW * dot(nW, tW);
+    let tl = length(tW);
+    // where nothing is cut the line direction is no direction at all: the anisotropy keeps its reference
+    tW = select(vec3<f32>(0.0), tW / tl, tl > 1e-6 && g.cover > 0.0);
+    let aW = select(vec3<f32>(0.0), normalize(cross(tW, nW)), tl > 1e-6 && g.cover > 0.0);
+    // no grating on the rosettes: their groove direction turns too fast per pixel and aliases to confetti
+    sdfDetail = SurfaceDetail(tW, g.mask, aW, head.p0.z * g.mask * (1.0 - cover), head.p0.w);
+    return g.n;
 }
 
 // The lit pass's depth, a few ulps nearer than the prepass's for the same `t`, so a last-bit
@@ -386,9 +736,22 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     // Depth stays at the unrefined `t`, which is what the depth prepass marched to.
     let pL = roL + rdL * (t + dHit * stepScale);
     let pDepth = roL + rdL * t;
-    let nL = sdfFieldNormal(offset, count, pL, time, object.model, sdf.march.z);
+    var nL = vec3<f32>(0.0, 0.0, 1.0);
+    if (kSdfDensityMode) {
+        nL = sdfDensityNormal(offset, count, pL, time, object.model); // ADR-1150
+    } else {
+        nL = sdfFieldNormal(offset, count, pL, time, object.model, sdf.march.z);
+    }
     let worldPos = (object.model * vec4<f32>(pL, 1.0)).xyz;
-    var normal = normalize((object.normalMatrix * vec4<f32>(nL, 0.0)).xyz);
+    var nShade = nL;
+    if (kSdfEngraved) {
+        // ADR-1152: the engraving, with the hit's pixel footprint in local units (the angle one pixel
+        // subtends, times the local t).
+        let farUp = frame.invViewProj * vec4<f32>(in.ndc + vec2<f32>(0.0, 2.0 * frame.targetSize.w), 1.0, 1.0);
+        let pixelAngle = length(normalize(farUp.xyz / farUp.w - eye) - rdW);
+        nShade = sdfEngrave(pL, nL, pixelAngle * t, time);
+    }
+    var normal = normalize((object.normalMatrix * vec4<f32>(nShade, 0.0)).xyz);
     // Face the eye: an interior start (camera inside the surface) yields a back-facing gradient.
     if (dot(normal, eye - worldPos) < 0.0) {
         normal = -normal;

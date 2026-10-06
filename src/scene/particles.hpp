@@ -61,7 +61,8 @@ constexpr std::uint64_t kMaxTrailBytes = 64ull << 20;
 // Spline: emits along the scene spline named `spline` (position = S(u) + jitter within extent.x).
 enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box, Spline };
 // ADR-370: the silhouette a particle draws with.
-enum class ParticleShape : std::uint8_t { Round, Leaf };
+// ADR-1153: Flake, an oriented metal flake that is dark unless its normal reflects a band.
+enum class ParticleShape : std::uint8_t { Round, Leaf, Flake };
 enum class ParticleBlend : std::uint8_t { Additive, Alpha };
 
 // ADR-520: what a particle does when it reaches the collision height.
@@ -144,6 +145,29 @@ struct ParticleLatent {
     [[nodiscard]] bool active() const { return !sdf.empty(); }
 };
 
+// ---- ADR-1153: glint flakes ------------------------------------------------------------------
+// With `shape2d: "flake"` every particle is a small metal plate, after THE ASTRAL FORGE prototype's
+// flakes.wgsl: it reflects the scene's reflection-only bands (ADR-1151) and nothing else, so it is
+// dark unless its normal sends a band toward the eye -- at any instant most of the dust is invisible
+// and it glitters, the defence against "glowing dots". A free flake tumbles (`tumble` rad/s); a flake
+// the latent binds (ADR-1140) takes the latent surface's normal (`latentNormal` of the way), so a formed
+// patch flashes as one plate. A bound flake carries a temper film (`temper` nm, ADR-1143's tint) and is
+// brighter (`bound`) than free dust (`free`); a small fraction (`sparkle`) are hot cores that always
+// shine. The particle's colour curve is not used: its alpha curve still is. Absent = the defaults.
+struct ParticleFlake {
+    glm::vec3 metal{0.5f, 0.51f, 0.54f}; // the plates' normal-incidence reflectance (f0)
+    float temper = 0.0f;                  // bound plates' oxide film, nm (20..90 is the temper sequence)
+    float filmIor = 2.4f;
+    float glint = 0.012f;                 // the plate's reflection lobe width (GGX alpha)
+    float tumble = 0.4f;                  // free plates' tumble, radians per second
+    float free = 0.2f;                    // brightness of free dust
+    float bound = 0.85f;                  // brightness of fully bound plates (added to `free`)
+    float latentNormal = 1.0f;            // 0..1: how much bound plates take the latent normal
+    float sparkle = 0.008f;               // fraction of plates that are hot cores
+    float sparkleGain = 0.6f;             // their radiance
+    float fuse = 0.0f;                    // 0..1: how far fully bound plates fade into the surface they form
+};
+
 // ---- ADR-1141: a render-transient density volume ---------------------------------------------
 // Each frame the live particles are splatted (trilinear cloud-in-cell, u32 fixed point, atomicAdd,
 // so order-independent) into a resolution^3 grid over [boundsMin, boundsMax] (world space), blurred
@@ -160,8 +184,11 @@ struct ParticleDensity {
     int resolution = 128;
     float weight = 1.0f;
 };
-// GPU bytes one density volume costs: the u32 splat grid plus the rgba16float texture.
+// GPU bytes one density volume costs: the u32 splat grid plus the rgba16float texture, plus (ADR-1150)
+// its coarse max-occupancy grid.
 [[nodiscard]] std::uint64_t densityMemoryBytes(int resolution);
+// ADR-1150: the coarse occupancy grid's resolution, one texel per 8^3 block of the volume.
+[[nodiscard]] constexpr int densityCoarseResolution(int resolution) { return (std::max(resolution, 1) + 7) / 8; }
 
 struct ParticleSystem {
     std::string name = "particles";
@@ -354,6 +381,7 @@ struct ParticleSystem {
     // ADR-1140 / ADR-1141.
     ParticleLatent latent;
     ParticleDensity density;
+    ParticleFlake flake; // ADR-1153 (read only when shape2d is Flake)
 };
 
 // The length the billboard gains along its velocity, in world units. The shader computes exactly
@@ -433,6 +461,14 @@ struct ParticleParameters {
     params::Parameter<float>* latentRelease = nullptr;
     params::Parameter<float>* latentWidth = nullptr;
     params::Parameter<float>* densityWeight = nullptr;
+    // ADR-1153: registered only for a flake system.
+    params::Parameter<float>* flakeTemper = nullptr;
+    params::Parameter<float>* flakeGlint = nullptr;
+    params::Parameter<float>* flakeTumble = nullptr;
+    params::Parameter<float>* flakeFree = nullptr;
+    params::Parameter<float>* flakeBound = nullptr;
+    params::Parameter<float>* flakeSparkle = nullptr;
+    params::Parameter<float>* flakeFuse = nullptr;
 };
 
 // The extent a radius typed in metres means, keeping the emitter's authored proportions.

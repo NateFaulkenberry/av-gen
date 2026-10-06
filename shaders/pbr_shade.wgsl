@@ -28,6 +28,26 @@
 // ADR-230 §6. Only the ground half: the comet marching and the aurora shells belong to the sky
 // draw, and a surface fragment has no use for them.
 #include "atmosphere_ground.wgsl"
+// ADR-1151: the reflection-only bands, read from the frame block (the particle path supplies its own).
+fn bandLaneInfo() -> vec4<f32> { return frame.bandsInfo; }
+fn bandLaneSoft() -> vec4<f32> { return frame.bandsSoft; }
+fn bandLaneSoft2() -> vec4<f32> { return frame.bandsSoft2; }
+fn bandLaneRate() -> vec4<f32> { return frame.bandsRate; }
+fn bandLane(i: u32) -> vec4<f32> { return frame.bands[i]; }
+#include "reflection_bands.wgsl"
+
+// ADR-1152: what a surface's authored micro-geometry (the guilloche engraving) tells the shading beyond its
+// normal, which the caller has already perturbed. Every includer of this file defines
+// `fn surfaceDetail() -> SurfaceDetail`; all but the engraved SDF variant return the zero record, a
+// constant, so the branches on it below compile away -- the ADR-138 pattern, so a missing definition is a
+// compile error rather than a silently ignored engraving.
+struct SurfaceDetail {
+    tangent: vec3<f32>, // the line direction (unit), or 0: the anisotropy keeps ADR-1143's reference axis
+    groove: f32,        // 0..1: how much of a groove the pixel sees; widens a band's reflection across it
+    across: vec3<f32>,  // the direction across the grooves (unit, in the tangent plane)
+    grating: f32,       // the grooves' diffraction strength (0 = none)
+    spacing: f32,       // the grating's line spacing in nm (the first order's dispersion)
+};
 
 // ---- ADR-703: per-entity effect lanes (FXL) ------------------------------------------------------
 //
@@ -1022,10 +1042,14 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // the normal by `rotation`, counter-clockwise looking down the normal.
     var anisoT = vec3<f32>(0.0);
     var anisoB = vec3<f32>(0.0);
+    let detail = surfaceDetail(); // ADR-1152 (the zero record on every path but an engraved SDF)
     if (object.optics.z != 0.0) {
         var reference = normalize(object.model[1].xyz);
         if (hasNormal) {
             reference = tangentFrame[0];
+        }
+        if (dot(detail.tangent, detail.tangent) > 0.5) {
+            reference = detail.tangent; // ADR-1152: the engraving's line direction
         }
         var t0 = reference - n * dot(n, reference);
         if (dot(t0, t0) < 1e-6) {
@@ -1103,11 +1127,66 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let brdf = textureSample(brdfLut, iblSampler, vec2<f32>(nDotV, roughness)).rg;
         let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion;
         ambient = (kD * irradiance * albedo * visibility + specular) * frame.params.w;
+    } else if (frame.bandsSoft2.w > 0.5) {
+        // ADR-1151: with no environment map, a scene that authored bands is lit by them (below) and its own
+        // lights, not by the constant hemisphere a scene without either gets: a black void stays black.
+        ambient = vec3<f32>(0.0);
     } else {
         let sky = vec3<f32>(0.10, 0.12, 0.20);
         let ground = vec3<f32>(0.02, 0.015, 0.03);
         let hemi = mix(ground, sky, bentNormal.y * 0.5 + 0.5);
         ambient = (kD * albedo * hemi * visibility + kS * hemi * 0.5 * specularOcclusion) * 0.8;
+    }
+    // ADR-1151: the reflection-only bands. Specular only (a band lights no diffuse term), with the
+    // analytic split-sum scale and bias, the same specular occlusion as the IBL, and the anisotropic bend.
+    // ADR-1152: across an engraved groove the reflection is smeared (five taps across the lines, the
+    // prototype's), and the grooves diffract each band into its spectrum.
+    if (frame.bandsSoft2.w > 0.5 && tier < 2u) {
+        var rb = reflect(-v, n);
+        if (object.optics.z != 0.0) {
+            let direction = select(anisoT, anisoB, object.optics.z >= 0.0);
+            let tangentAcross = cross(direction, v);
+            let bentAniso = cross(tangentAcross, direction);
+            let bend = abs(object.optics.z) * clamp(5.0 * roughness, 0.0, 1.0);
+            rb = reflect(-v, normalize(mix(n, bentAniso, bend)));
+        }
+        var bandLight = vec3<f32>(0.0);
+        if (detail.groove > 0.0) {
+            let across = detail.groove * 0.22 + alphaR;
+            for (var j = -2; j <= 2; j = j + 1) {
+                bandLight = bandLight + reflectionBands(normalize(rb + detail.across * (f32(j) * across * 0.5)), alphaR, true);
+            }
+            bandLight = bandLight * 0.2;
+        } else {
+            bandLight = reflectionBands(rb, alphaR, true);
+        }
+        var bandSpec = bandLight * bandEnvBrdf(f0, roughness, nDotV) * specularOcclusion;
+        if (detail.grating > 0.0) {
+            // d (sin i + sin o) = m lambda, across the grooves only; orders 1..3 of each strip
+            let strips = min(u32(frame.bandsInfo.x + 0.5), 4u);
+            for (var k = 0u; k < strips; k = k + 1u) {
+                if (frame.bands[2u * k + 1u].y <= 0.0) {
+                    continue;
+                }
+                let L = reflectionBandDirection(k, rb);
+                let sv = L + v;
+                let along = dot(sv, detail.tangent);
+                let wAlong = exp(-along * along / (2.0 * 0.06 * 0.06));
+                if (wAlong < 0.01 || dot(L, n) < 0.0) {
+                    continue;
+                }
+                let u = abs(dot(sv, detail.across));
+                let bandI = reflectionBands(L, 0.0, false);
+                for (var m = 1; m <= 3; m = m + 1) {
+                    let lambda = detail.spacing * u / f32(m);
+                    let inVis = smoothstep(390.0, 430.0, lambda) * (1.0 - smoothstep(660.0, 700.0, lambda));
+                    let spectral = max(thinFilmXyzToRgb(thinFilmCmf(lambda)), vec3<f32>(0.0));
+                    bandSpec = bandSpec + spectral * (inVis * wAlong * detail.grating * 0.11 / f32(m)) * bandI
+                               * specularOcclusion;
+                }
+            }
+        }
+        ambient = ambient + bandSpec;
     }
     ambient = ambient * ao;
 

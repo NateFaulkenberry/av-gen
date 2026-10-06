@@ -140,6 +140,9 @@ public:
     // profile turn it on; offline renders and tests keep the synchronous compile so no frame draws a stand-in).
     [[nodiscard]] std::size_t pendingCompiles() const;
     void setAsyncCompile(bool async);
+    // ADR-1150: density-mode objects skip empty 8^3 blocks through the volume's coarse occupancy grid. On
+    // by default; off draws the same surface by stepping every block (tests and the cost measurement).
+    void setDensityOccupancySkipping(bool on);
     void setPrewarm(bool prewarm); // default on; off = compile at first use only (the pre-ADR-1102 behaviour)
     // Encodes the raymarch render pass onto `color`/`depth` (both loaded and stored) with the
     // frame/IBL bind groups given; one draw per Raymarch object. Call between the lit pass's

@@ -117,8 +117,12 @@ TEST_CASE("a malformed latent or density block is refused by name", "[particles]
 }
 
 TEST_CASE("the density cap is a memory budget the message states", "[particles][density]") {
-    CHECK(scene::densityMemoryBytes(128) == 128ull * 128 * 128 * 12);
-    CHECK(scene::densityMemoryBytes(scene::kMaxDensityResolution) == (192ull << 20));
+    // ADR-1150: plus the coarse occupancy grid, one rgba16float texel per 8^3 block
+    CHECK(scene::densityCoarseResolution(128) == 16);
+    CHECK(scene::densityCoarseResolution(130) == 17);
+    CHECK(scene::densityMemoryBytes(128) == 128ull * 128 * 128 * 12 + 16ull * 16 * 16 * 8);
+    CHECK(scene::densityMemoryBytes(scene::kMaxDensityResolution) == (192ull << 20) + 32ull * 32 * 32 * 8);
+    CHECK((scene::densityMemoryBytes(scene::kMaxDensityResolution) >> 20) == 192); // the refusal's MiB figure
 }
 
 // ---- ADR-1142: the SDF object's density source ----------------------------------------------------

@@ -110,7 +110,8 @@ std::uint64_t trailMemoryBytes(const ParticleSystem& s) {
 
 std::uint64_t densityMemoryBytes(int resolution) {
     const auto r = static_cast<std::uint64_t>(std::max(resolution, 0));
-    return r * r * r * (4 + 8); // u32 splat cell + rgba16float texel
+    const auto c = static_cast<std::uint64_t>(densityCoarseResolution(resolution));
+    return r * r * r * (4 + 8) + c * c * c * 8; // u32 splat cell + rgba16float texel; ADR-1150's coarse grid
 }
 
 Result<void> validateLatentAndDensity(const ParticleSystem& s) {
@@ -356,6 +357,15 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     if (s.density.enabled) { // ADR-1141
         p.densityWeight = &params.add(f(base, "density/weight", s.density.weight, 0.0f, 1.0e4f, 0.0f, 8.0f));
     }
+    if (s.shape2d == ParticleShape::Flake) { // ADR-1153
+        p.flakeTemper = &params.add(f(base, "flake/temper", s.flake.temper, 0.0f, 2000.0f, 0.0f, 120.0f));
+        p.flakeGlint = &params.add(f(base, "flake/glint", s.flake.glint, 0.001f, 1.0f, 0.002f, 0.1f));
+        p.flakeTumble = &params.add(f(base, "flake/tumble", s.flake.tumble, 0.0f, 100.0f, 0.0f, 8.0f));
+        p.flakeFree = &params.add(f(base, "flake/free", s.flake.free, 0.0f, 100.0f, 0.0f, 2.0f));
+        p.flakeBound = &params.add(f(base, "flake/bound", s.flake.bound, 0.0f, 100.0f, 0.0f, 2.0f));
+        p.flakeSparkle = &params.add(f(base, "flake/sparkle", s.flake.sparkle, 0.0f, 1.0f, 0.0f, 0.05f));
+        p.flakeFuse = &params.add(f(base, "flake/fuse", s.flake.fuse, 0.0f, 1.0f, 0.0f, 1.0f));
+    }
     {
         params::ParamDesc<bool> d;
         d.path = base + "enabled";
@@ -433,6 +443,14 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     if (p.latentRelease != nullptr) { s.latent.release = p.latentRelease->value(); }
     if (p.latentWidth != nullptr) { s.latent.width = p.latentWidth->value(); }
     if (p.densityWeight != nullptr) { s.density.weight = p.densityWeight->value(); }
+    s.flake = rest.flake; // ADR-1153
+    if (p.flakeTemper != nullptr) { s.flake.temper = p.flakeTemper->value(); }
+    if (p.flakeGlint != nullptr) { s.flake.glint = p.flakeGlint->value(); }
+    if (p.flakeTumble != nullptr) { s.flake.tumble = p.flakeTumble->value(); }
+    if (p.flakeFree != nullptr) { s.flake.free = p.flakeFree->value(); }
+    if (p.flakeBound != nullptr) { s.flake.bound = p.flakeBound->value(); }
+    if (p.flakeSparkle != nullptr) { s.flake.sparkle = p.flakeSparkle->value(); }
+    if (p.flakeFuse != nullptr) { s.flake.fuse = p.flakeFuse->value(); }
     s.enabled = p.enabled->value();
 }
 
