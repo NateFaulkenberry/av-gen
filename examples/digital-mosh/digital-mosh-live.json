@@ -576,6 +576,46 @@
    }
   },
   {
+   "source": "visual.bright",
+   "target": "material/liquid/op/34/hueShift/value",
+   "op": "add",
+   "amount": 0.331,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "procedural/liquid/deform/2/amount",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.onsetHigh",
+   "target": "material/liquid/emissionIntensity",
+   "op": "add",
+   "amount": 3.0,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 20,
+    "envelopeFallPerSecond": 6.0
+   }
+  },
+  {
    "source": "lfo.driftA.bipolar",
    "target": "camera/position",
    "op": "add",
@@ -732,6 +772,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -745,6 +800,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1012,6 +1070,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -1025,6 +1098,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1292,6 +1368,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -1305,6 +1396,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1572,6 +1666,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -1585,6 +1694,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1852,6 +1964,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -1865,6 +1992,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2132,6 +2262,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -2145,6 +2290,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2412,6 +2560,21 @@
     "material/ground/emissionIntensity": [
      2.5
     ],
+    "material/liquid/emissionIntensity": [
+     2.5
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
     "material/bark/emissionIntensity": [
      1.8
     ],
@@ -2425,6 +2588,9 @@
      3.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2692,6 +2858,21 @@
     "material/ground/emissionIntensity": [
      2.5
     ],
+    "material/liquid/emissionIntensity": [
+     2.5
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
     "material/bark/emissionIntensity": [
      1.8
     ],
@@ -2705,6 +2886,9 @@
      3.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2972,6 +3156,21 @@
     "material/ground/emissionIntensity": [
      2.5
     ],
+    "material/liquid/emissionIntensity": [
+     2.5
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
     "material/bark/emissionIntensity": [
      1.8
     ],
@@ -2985,6 +3184,9 @@
      3.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3252,6 +3454,21 @@
     "material/ground/emissionIntensity": [
      4.0
     ],
+    "material/liquid/emissionIntensity": [
+     4.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.5
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.35
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
     "material/bark/emissionIntensity": [
      3.0
     ],
@@ -3265,6 +3482,9 @@
      5.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3532,6 +3752,21 @@
     "material/ground/emissionIntensity": [
      4.0
     ],
+    "material/liquid/emissionIntensity": [
+     4.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.5
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.35
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
     "material/bark/emissionIntensity": [
      3.0
     ],
@@ -3545,6 +3780,9 @@
      5.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3812,6 +4050,21 @@
     "material/ground/emissionIntensity": [
      4.0
     ],
+    "material/liquid/emissionIntensity": [
+     4.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.5
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.35
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
     "material/bark/emissionIntensity": [
      3.0
     ],
@@ -3825,6 +4078,9 @@
      5.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4092,6 +4348,21 @@
     "material/ground/emissionIntensity": [
      6.0
     ],
+    "material/liquid/emissionIntensity": [
+     6.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     1.4
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.9
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      4.5
     ],
@@ -4105,6 +4376,9 @@
      7.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4372,6 +4646,21 @@
     "material/ground/emissionIntensity": [
      6.0
     ],
+    "material/liquid/emissionIntensity": [
+     6.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     1.4
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.9
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      4.5
     ],
@@ -4385,6 +4674,9 @@
      7.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4652,6 +4944,21 @@
     "material/ground/emissionIntensity": [
      6.0
     ],
+    "material/liquid/emissionIntensity": [
+     6.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     1.4
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.9
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      4.5
     ],
@@ -4665,6 +4972,9 @@
      7.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4932,6 +5242,21 @@
     "material/ground/emissionIntensity": [
      8.0
     ],
+    "material/liquid/emissionIntensity": [
+     8.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     2.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     1.4
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      6.0
     ],
@@ -4945,6 +5270,9 @@
      9.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5212,6 +5540,21 @@
     "material/ground/emissionIntensity": [
      8.0
     ],
+    "material/liquid/emissionIntensity": [
+     8.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     2.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     1.4
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      6.0
     ],
@@ -5225,6 +5568,9 @@
      10.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5492,6 +5838,21 @@
     "material/ground/emissionIntensity": [
      8.0
     ],
+    "material/liquid/emissionIntensity": [
+     8.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     2.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     1.4
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
     "material/bark/emissionIntensity": [
      6.0
     ],
@@ -5505,6 +5866,9 @@
      10.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5772,6 +6136,21 @@
     "material/ground/emissionIntensity": [
      8.0
     ],
+    "material/liquid/emissionIntensity": [
+     8.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     2.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     1.4
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5711,
+     0.5841,
+     0.624,
+     1
+    ],
     "material/bark/emissionIntensity": [
      6.0
     ],
@@ -5785,6 +6164,9 @@
      10.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6052,6 +6434,21 @@
     "material/ground/emissionIntensity": [
      1.0
     ],
+    "material/liquid/emissionIntensity": [
+     1.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.0802,
+     0.0931,
+     0.0908,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -6065,6 +6462,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6332,6 +6732,21 @@
     "material/ground/emissionIntensity": [
      0.0
     ],
+    "material/liquid/emissionIntensity": [
+     0.0
+    ],
+    "procedural/liquid/deform/1/amount": [
+     0.0
+    ],
+    "procedural/liquid/deform/2/amount": [
+     0.0
+    ],
+    "material/liquid/op/26/constant/constant": [
+     0.5647,
+     0.521,
+     0.4233,
+     1
+    ],
     "material/bark/emissionIntensity": [
      0.0
     ],
@@ -6345,6 +6760,9 @@
      0.0
     ],
     "material/ground/op/37/hueShift/value": [
+     0.0
+    ],
+    "material/liquid/op/34/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [

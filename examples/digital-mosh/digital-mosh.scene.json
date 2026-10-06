@@ -658,6 +658,374 @@
    "opacity": -1
   },
   {
+   "name": "liquid",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "quantize",
+     "dst": 1,
+     "srcA": 0,
+     "value": 2.2,
+     "seed": 3
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "stain"
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "stuck"
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "value": 1,
+     "constant": [
+      0.04,
+      0.9,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 4,
+     "srcA": 1,
+     "constant": [
+      3,
+      3,
+      3,
+      3
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      -1,
+      -1,
+      -1,
+      -1
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.035,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 7,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.004,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 4
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 1,
+     "value": 31.0,
+     "seed": 10
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.73,
+      0.75,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "footprint"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.054545454545454536,
+      0.20454545454545453,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2,
+     "srcC": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.5647,
+      0.521,
+      0.4233,
+      1
+     ]
+    },
+    {
+     "kind": "noise",
+     "dst": 5,
+     "srcA": 0,
+     "value": 0.035,
+     "seed": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "value": 1,
+     "constant": [
+      0.25,
+      0.75,
+      0.84,
+      1.12
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.0262,
+      0.0037,
+      0.0137,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 5,
+     "srcC": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.9132,
+      0.003,
+      0.104,
+      1
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "hueShift",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3,
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      3,
+      3,
+      3,
+      3
+     ]
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "kick"
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.25,
+      1.6
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.92,
+      0.92,
+      0.92,
+      1
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.16,
+      0.16,
+      0.16,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 4
+    }
+   ],
+   "baseColor": 6,
+   "metallic": -1,
+   "roughness": 2,
+   "emission": 7,
+   "emissionIntensity": 0.0,
+   "opacity": -1
+  },
+  {
    "name": "bark",
    "ops": [
     {
@@ -1821,6 +2189,89 @@
    }
   },
   {
+   "name": "pool",
+   "kind": "field",
+   "position": [
+    4.0,
+    0.0,
+    -8.0
+   ],
+   "field": {
+    "kind": "box",
+    "size": [
+     14.5,
+     50.0,
+     14.5
+    ],
+    "softness": 2.5,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "liquidKick",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "children": [
+     "kick",
+     "pool"
+    ],
+    "combine": "multiply",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "swellNoise",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "noise",
+    "frequency": 0.09,
+    "speed": 0.35,
+    "seed": 17,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "liquidSwell",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "children": [
+     "swellNoise",
+     "pool"
+    ],
+    "combine": "multiply",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
    "name": "land",
    "kind": "terrain",
    "position": [
@@ -2268,6 +2719,75 @@
     ],
     "roughness": 0.95,
     "metallic": 0.0
+   }
+  },
+  {
+   "name": "liquid",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    0.027000000000000003,
+    -8.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      34.0,
+      0.02,
+      34.0
+     ],
+     "subdivisions": 64
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "lod": {
+     "cull": false,
+     "count": 1
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "liquidKick",
+      "amount": 0.0,
+      "axis": [
+       0,
+       1,
+       0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "liquidSwell",
+      "amount": 0.0,
+      "axis": [
+       0,
+       1,
+       0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ],
+    "material": {
+     "program": "liquid",
+     "baseColor": [
+      0.5647,
+      0.521,
+      0.4233
+     ],
+     "roughness": 0.92,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0
+    }
    }
   },
   {

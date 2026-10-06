@@ -77,6 +77,7 @@ PAL = {
 
 # ============================================================================================ layout
 # The stage is the salt pan (land.PAN, centred at (4, -8), 110 m across). Heights are the engine's (land.py).
+PAN_C = (4.0, -8.0)                        # the pan's centre (land.PAN)
 TREE_XZ = (-6.0, 0.0)
 TANGUY_XZ = (12.0, -14.0)
 DOUBLE_XZ = (-34.0, -46.0)
@@ -146,6 +147,12 @@ def fields():
         # the fragments' release: up, and a tumble
         field("lift", kind="direction", axis=[0, 1, 0], strength=1.0),
         field("tumble", kind="curlNoise", frequency=0.4, speed=0.3, seed=9, strength=1.0),
+        # the liquid skin's mask: the pan's flat heart (land.py; the pan is level to +-5 cm within 25 m of its centre)
+        field("pool", position=[PAN_C[0], 0.0, PAN_C[1]], kind="box", size=[14.5, 50.0, 14.5], softness=2.5,
+              strength=1.0),
+        field("liquidKick", kind="compound", children=["kick", "pool"], combine="multiply", strength=1.0),
+        field("swellNoise", kind="noise", frequency=0.09, speed=0.35, seed=17, strength=1.0),
+        field("liquidSwell", kind="compound", children=["swellNoise", "pool"], combine="multiply", strength=1.0),
     ]
 
 
@@ -239,6 +246,18 @@ def land_colour_ops(world_pos_reg=0):
 def ground_program():
     # The near land: the stage's painting by slope, mottled, and the contagion's ink and front on it.
     return infected("ground", 2.2, "stain", land_colour_ops(), remap_stain=True, seed=3)
+
+
+def liquid_program():
+    # The liquid skin over the pan: the ground's own colour at zero slope (the ramp's first stop), mottled the same,
+    # infected the same -- at rest it is the ground; heaved, it is the ground turned liquid.
+    p = PAL["dream"]["land"]
+    return infected("liquid", 2.2, "stain", [
+        op("constant", 6, constant=p[0] + [1]),
+        op("noise", 5, srcA=0, value=0.035, seed=7),
+        op("remap", 5, srcA=5, value=1, constant=[0.25, 0.75, 0.84, 1.12]),
+        op("multiply", 6, srcA=6, srcB=5),
+    ], remap_stain=True, seed=3)
 
 
 def ground_far_program():
@@ -391,6 +410,20 @@ def scene():
                      "viewDistance": 7500.0, "shadowDistance": 400.0, "skirtDepth": 6.0, "groundMottle": False},
          "material": {"program": "groundFar", "baseColor": d["land"][1], "roughness": 0.95, "metallic": 0.0}},
     ]
+    # The liquid skin (brief §8 "liquid-like terrain"; terrain itself cannot deform): a subdivided 34 m square lying
+    # 4 cm above the pan, heaved by the kick's fronts and a bass swell, still at its edges (the `pool` mask).
+    nodes.append({"name": "liquid", "kind": "procedural", "position": [PAN_C[0], land.height(*PAN_C) + 0.04,
+                                                                      PAN_C[1]],
+                  "procedural": {
+                      "source": {"kind": "box", "size": [34.0, 0.02, 34.0], "subdivisions": 64},
+                      "distribution": {"kind": "single"}, "lod": {"cull": False, "count": 1},
+                      "deformers": [
+                          {"kind": "field", "field": "liquidKick", "amount": 0.0, "axis": [0, 1, 0], "space": "world",
+                           "alongNormal": False},
+                          {"kind": "field", "field": "liquidSwell", "amount": 0.0, "axis": [0, 1, 0],
+                           "space": "world", "alongNormal": False}],
+                      "material": {"program": "liquid", "baseColor": d["land"][0], "roughness": 0.92,
+                                   "metallic": 0.0, "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0}}})
     nodes.append(sdf_node("trunk", TREE_AT, OLIVE.trunk_tree(), "bark", [-2.2, -0.6, -2.2], [2.6, 4.2, 2.2],
                           BARK[1], 0.85))
     for li in range(3):
@@ -439,7 +472,7 @@ def scene():
              "volumetric": 1.0},
         ],
         "grids": [CONTAGION],
-        "materialPrograms": [ground_program(), ground_far_program(), bark_program(), stone_program(),
+        "materialPrograms": [ground_program(), ground_far_program(), liquid_program(), bark_program(), stone_program(),
                              blocks_program("treeBlocks", BARK[0], BARK[1]),
                              blocks_program("tanguyBlocks", STONE, lin("#9f9985"))],
         "nodes": nodes,
@@ -455,7 +488,7 @@ BASE = dict(pal="dream", inject=0.0, advect=0.0, dissip=0.6, climb=0.0, eat=0.0,
             echo=0.0, mosh=0.0, moshBlock=32.0, glitch=0.0, pixel=0.0, poster=0.0, sort=0.0, split=0.0,
             exposure=0.0, bloom=0.08, volDen=0.0006, sun=9.0,
             gMicro=0.15, gRhythm=0.0, gMosh=0.0, gGlitch=0.0, gMelt=0.0, gLift=0.0,
-            glowPlain=0.0, glowBark=0.0, glowBlocks=0.0, keyframe=0.0, heal=0.0)
+            glowPlain=0.0, glowBark=0.0, glowBlocks=0.0, keyframe=0.0, heal=0.0, wave=0.0, swell=0.0)
 
 
 def stage(**kw):
@@ -464,7 +497,7 @@ def stage(**kw):
     return v
 
 
-COLLAPSE_COMMON = dict(inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
+COLLAPSE_COMMON = dict(wave=2.0, swell=1.4, inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
                        glowPlain=8.0, glowBark=6.0, gMicro=1.0, gRhythm=1.0, gMosh=1.0, gMelt=1.0, gLift=1.0)
 STAGES = {
     # Beautiful, quiet, hypnotic. Only the light, the dust and the camera move.
@@ -484,14 +517,14 @@ STAGES = {
                         melt=[0.16, 0.08, -0.06], bark=0.05, barkSpeed=0.5, rise=0.35, tumble=0.25, spin=0.4,
                         kick=0.25, fracture=1900.0, double=True, glowPlain=4.0, glowBark=3.0, glowBlocks=5.0,
                         echo=0.18, mosh=0.0, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.12, gMelt=0.5,
-                        gLift=0.3, motes=160.0, volDen=0.0011),
+                        gLift=0.3, motes=160.0, volDen=0.0011, wave=0.5, swell=0.35),
     # The Elephants' blood sky over Tanguy's night land: the tree is blocks, its limbs float free.
     "Nightmare": stage(pal="nightmare", inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
                        melt=[0.26, 0.18, -0.14], lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8,
                        tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=6.0,
                        glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.03, moshBlock=24.0, exposure=-0.7,
                        gMicro=1.0, gRhythm=1.0, gMosh=0.85, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0,
-                       volDen=0.0014),
+                       volDen=0.0014, wave=1.4, swell=0.9),
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
     # geometry...
     "Collapse": stage(pal="nightmare", melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
@@ -540,11 +573,14 @@ def stage_values(name, v):
         "sdf/tanguy/node/eaten/amount": [v["eatStone"]],
         "lights/fracture/intensity": [v["fracture"]], "lights/sun/azimuth": [sun_azimuth(v["sunYaw"])],
         "lights/sun/color": pal["sun"], "lights/sun/intensity": [v["sun"]],
-        "material/ground/emissionIntensity": [v["glowPlain"]], "material/bark/emissionIntensity": [v["glowBark"]],
+        "material/ground/emissionIntensity": [v["glowPlain"]], "material/liquid/emissionIntensity": [v["glowPlain"]],
+        "procedural/liquid/deform/1/amount": [v["wave"]], "procedural/liquid/deform/2/amount": [v["swell"]],
+        f"material/liquid/op/{program_op(liquid_program, 'constant', 3)}/constant/constant": pal["land"][0] + [1], "material/bark/emissionIntensity": [v["glowBark"]],
         "material/skin/emissionIntensity": [v["glowBark"]],
         "material/treeBlocks/emissionIntensity": [v["glowBlocks"]],
         "material/tanguyBlocks/emissionIntensity": [v["glowBlocks"]],
         f"material/ground/op/{hue_op}/hueShift/value": [0.0],
+        f"material/liquid/op/{program_op(liquid_program, 'hueShift')}/hueShift/value": [0.0],
         "nodes/double/position": DOUBLE_AT if v["double"] else HIDDEN,
         "particles/motes/spawnRate": [v["motes"]],
         "temporal/echo/strength": [v["echo"]], "temporal/mosh/amount": [v["mosh"]],
@@ -745,6 +781,11 @@ def routes():
     r.append(gated("visual.bright", f"material/ground/op/{hue_op}/hueShift/value", STRAIN_TO_CHARTREUSE, "gRhythm",
                    {"attackMs": 3000, "decayMs": 3000}))
     r.append(gated("visual.bright", "grid/contagion/advect", 1.5, "gRhythm", {"attackMs": 2000, "decayMs": 2000}))
+    r.append(gated("visual.bright", f"material/liquid/op/{program_op(liquid_program, 'hueShift')}/hueShift/value",
+                   STRAIN_TO_CHARTREUSE, "gRhythm", {"attackMs": 3000, "decayMs": 3000}))
+    r.append(gated("audio.bassLevel", "procedural/liquid/deform/2/amount", 0.6, "gMelt",
+                   {"attackMs": 250, "decayMs": 900}))
+    r.append(gated("audio.onsetHigh", "material/liquid/emissionIntensity", 3.0, "gRhythm", PEAK(20, 6.0)))
     # ---- the camera floats between its moves: slow incommensurate drifts, deeper as the music grows (not shake)
     for src, comp, amt in (("driftA", 0, 1.6), ("driftB", 2, 1.6), ("driftC", 1, 0.3)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": amt,
