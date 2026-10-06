@@ -14,7 +14,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -155,4 +157,20 @@ TEST_CASE("A project without scene states does not pay for the control replay", 
     e.seekSeconds(4.0);
     e.seekSeconds(2.0);
     CHECK(e.stats().controlReplays == 0);
+}
+
+// ADR-1168's cost: a seek late in a real song. `AVGEN_BENCH_PROJECT` names the project (DIGITAL MOSH by default).
+TEST_CASE("the cost of a seek that replays the control layer", "[.bench][seek][states][adr1168]") {
+    const char* env = std::getenv("AVGEN_BENCH_PROJECT");
+    const std::filesystem::path project = env != nullptr ? env : "examples/digital-mosh/digital-mosh.json";
+    app::Engine e(app::EngineMode::Offline);
+    REQUIRE(e.loadProject(project).has_value());
+    for (const double t : {30.0, 100.0, 200.0}) {
+        const auto start = std::chrono::steady_clock::now();
+        e.seekSeconds(t);
+        const double withReplay =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        WARN(project.filename().string() << ": seek to " << t << " s: " << withReplay << " ms (control replays "
+                                         << e.stats().controlReplays << ")");
+    }
 }

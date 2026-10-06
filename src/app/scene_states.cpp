@@ -123,6 +123,7 @@ void StateMachine::beginTransition(const SceneState& state, params::ParameterSet
         return;
     }
     from_ = params::capturePreset(params, "state-from");
+    blendFor_.clear(); // ADR-1168: a new transition resolves its blend afresh
     pending_ = state.name;
     progress_ = 0.0f;
     startSeconds_ = seconds;
@@ -285,7 +286,37 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
             progress_ = std::max(0.0f, t);
             const float eased = easeTransition(state->transition.easing, progress_, state->transition.bezierC0,
                                                state->transition.bezierC1);
-            params::applyPresetBlend(params, from_, *preset, eased);
+            // ADR-1168: only what the target preset names is blended, from the values captured when the transition
+            // began. The general blend also re-applied every captured parameter the target does not name (its
+            // value at the start, every frame) and rebuilt the union of both presets' paths per frame: ~3,900
+            // parameters a frame on DIGITAL MOSH, 0.7 ms, which a seek's control replay pays thousands of times.
+            if (blendFor_ != pending_ || blendSet_ != &params || blendParams_ != params.size()) {
+                blend_.clear();
+                for (const auto& [path, target] : preset->values) {
+                    params::IParameter* param = params.find(path);
+                    if (param == nullptr) {
+                        continue;
+                    }
+                    const auto start = from_.values.find(path);
+                    BlendItem item;
+                    item.param = param;
+                    const std::size_t count = std::min(param->componentCount(), target.size());
+                    for (std::size_t i = 0; i < count; ++i) {
+                        item.from.push_back(start != from_.values.end() && i < start->second.size() ? start->second[i]
+                                                                                                    : target[i]);
+                        item.to.push_back(target[i]);
+                    }
+                    blend_.push_back(std::move(item));
+                }
+                blendFor_ = pending_;
+                blendSet_ = &params;
+                blendParams_ = params.size();
+            }
+            for (const BlendItem& item : blend_) {
+                for (std::size_t i = 0; i < item.to.size(); ++i) {
+                    item.param->setBaseComponent(i, item.from[i] + (item.to[i] - item.from[i]) * eased);
+                }
+            }
         }
     }
 }

@@ -127,6 +127,17 @@ private:
     std::string current_;
     std::string pending_;
     params::Preset from_;
+    // ADR-1168: the running transition's blend, resolved once: each named parameter, its start and target values.
+    // Rebuilt when the transition or the parameter set's size changes (a reload re-registers everything).
+    struct BlendItem {
+        params::IParameter* param = nullptr;
+        std::vector<float> from;
+        std::vector<float> to;
+    };
+    std::vector<BlendItem> blend_;
+    std::string blendFor_;
+    std::size_t blendParams_ = 0;
+    const params::ParameterSet* blendSet_ = nullptr;
     double startSeconds_ = 0.0;
     double enteredSeconds_ = 0.0; // ADR-1164: when `current_` was last committed (Elapsed triggers)
     double waitUntil_ = -1.0;    // quantised start (< 0 = none)

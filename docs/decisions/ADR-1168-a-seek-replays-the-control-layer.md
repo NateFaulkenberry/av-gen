@@ -41,8 +41,26 @@ Scenes, entities and the timeline are placed by the existing seek (ADR-700/870),
   (`[adr1168]`). It runs at three instants across several state changes, and checks a bounded integral of a macro set
   by a state's preset, an integral and a follower of an interpret source, the state index and the fov, landing and
   one frame on.
-- Cost: proportional to the target time. DIGITAL MOSH's control layer is a few microseconds a step, so about
-  6,000 steps for a seek 200 s in, well under a second. A project without scene states does not run it (tested).
+- **Cost**, measured on DIGITAL MOSH (`[.bench][adr1168]`, M2 Max), as total seek time:
+
+  | Seek to | Without the replay | With it, first version | With it, now |
+  |---|---|---|---|
+  | 30 s | 20 ms | 883 ms | 28 ms |
+  | 100 s | 47 ms | 2,911 ms | 90 ms |
+  | 200 s | 67 ms | 4,328 ms | 184 ms |
+
+  The replay's own share at 200 s is 48 ms. The rest of the extra time is outside it, and was not traced.
+
+  The first version's cost was the state machine's transition blend. Every frame of a transition it captured
+  and re-applied all ~4,000 parameters, through a set of path strings, at 0.7 ms a frame. That is also what the play
+  pays. Two changes fixed it:
+  - **The blend.** A transition now blends only what its target preset names, from the start values captured when
+    it began, with the parameters resolved once per transition. A parameter the target does not name keeps whatever
+    its base is.
+  - **The resets.** The replay resets only the finals it can move: route targets, macros and source settings.
+
+  The cost is under the 100 ms budget, so no checkpoints were added. A project without scene states does not run the
+  replay (tested).
 - **Live input is not replayed.** It cannot be: the music it heard is gone. A live seek resets the control layer, as
   before.
 - The signal replay inside it no longer advances the pure-in-time routes itself (they would integrate twice).

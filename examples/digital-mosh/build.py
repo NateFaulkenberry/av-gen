@@ -368,15 +368,19 @@ FLY = {
     # disorienting: wide, leaning hard, the path cut forward and back on the bar
     "Nightmare": [fly(0.0, 22, 58, 20, 7.0), fly(10.0, 26, 60, 22, -6.0, 0.04), fly(-2.0, 18, 62, 24, 11.0, -0.025)],
     "Respite": [fly(10.0, 48, 38, 6)],
-    "Recovery": [fly(0.0, 36, 40, 8)],
+    "Recovery": [fly(0.0, 36, 40, 8)],   # (unused: the Recovery holds on the eye still watching the stone)
 }
 # metres per second along the path, as the macro `flight` (x 20): the energy adds up to 4 m/s on top
 FLIGHT_SPEED = {"Dream": 6.0, "Uncanny": 7.0, "Infection": 8.0, "Corruption": 10.0, "Nightmare": 15.0,
                 "Respite": 4.0, "Recovery": 5.0, "Collapse": 2.0, "Decay": 1.0, "Pixels": 0.5, "Light": 0.5}
 FLIGHT_LENGTH = flight.length()
+FLIGHT_START = 0.3    # pass 5b: the flight opens on the east petal, where the eye floats over the dunes
 
 # The Collapse stalls the flight: the camera holds over the pan while the world decomposes (camera mode 1).
 VANTAGES = {
+    # the untrustworthy keyframe: the dream as it was -- except the eye, which still watches the stone
+    "Recovery": [([TANGUY_AT[0] - 16.0, land.height(TANGUY_AT[0] - 16.0, TANGUY_AT[2] - 12.0) + 4.0,
+                   TANGUY_AT[2] - 12.0], [EYE_AT[0] - 18.0, EYE_AT[1] - 6.0, EYE_AT[2] - 4.0], 42, 0)],
     "Collapse": [(eye(22, 24.0, 30), [2, 0.0, -10], 50, 0)],
     "Decay": [(eye(36, 32.0, 40), [2, 0.0, -10], 52, 0)],
     "Pixels": [(eye(18, 44.0, 52), [0, 0.0, -10], 54, 0)],
@@ -769,12 +773,12 @@ def presets():
                 vals.update({"camera/mode": [1], "camera/position": [PAN_C[0], land.height(*PAN_C) + h, PAN_C[1]],
                              "camera/target": [TANGUY_AT[0], TANGUY_AT[1] - 1.0, TANGUY_AT[2]], "camera/fov": [fov],
                              "camera/roll": [0.0]})
-            elif name in FLY and name not in ("Corruption", "Infection"):
+            elif name in FLY and name not in ("Corruption", "Infection", "Recovery"):
                 f = FLY[name][k]
                 vals.update({"camera/mode": [2], "camera/splineOffset": [0.0, f["lift"], 0.0],
                              "camera/lookAhead": [f["look"]], "camera/fov": [f["fov"]],
                              "camera/splineBank": [f["bank"]], "camera/roll": [f["roll"]],
-                             "camera/splineT": [f["jump"]]})
+                             "camera/splineT": [FLIGHT_START + f["jump"]]})
             else:
                 e, t, fov, roll = VANTAGES[name][k]
                 vals.update({"camera/mode": [1], "camera/position": e, "camera/target": t, "camera/fov": [fov],
