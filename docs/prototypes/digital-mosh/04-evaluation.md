@@ -67,6 +67,23 @@ Pass 3, before ADR-1165, measured 22-35 ms at Emergency and 49-83 ms at Ultra. T
 a few ms. The circling Infection and Corruption are the heaviest flying stages, because the stain, the blocks and the
 tree are all in frame.
 
+**Creative Critic (final 1080p renders, preview mode).**
+- Feline Footwear: overall 0.946. Pass 3 scored 0.913 and pass 1 0.899.
+  - Visual energy tracks the music at Spearman 0.61.
+  - The remaining findings are clipped highlights in the Light stratum, camera wobble from the flight's banking and
+    drift, and the Collapse not being the most energetic section.
+- Trench: overall 0.95.
+
+**Suites (final, under the GPU lock, one after the other).**
+- `avgen_tests`: exit 0; 4,140 test cases, 4,120 passed, 19 skipped, 1 failed as expected.
+- `avgen_render_tests`: exit 0.
+
+**Known limitation: a range render's contagion.** The camera, the stage and every macro now land where a full render
+puts them (ADR-1168). The contagion grid does not. Its seek runs the grid's backlog on the GPU with the parameters
+the grid has when the seek lands (inject strength, advection, dissipation), not the values the stages gave it over
+time. So a `--range 120:122` render shows the stain larger than the full render does at 121 s. Full renders are
+exact. Fixing it would mean recording the grid's per-step inputs over the control replay; that is not done.
+
 **Seek (ADR-1168).** A seek to 200 s costs 184 ms in total, against 67 ms without the control replay.
 
 ## Pass 3 (history)
