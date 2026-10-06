@@ -26,12 +26,16 @@ the scene's stages comes from the extraction below, or from a single named opera
 
 ## The mapping: one painting per stage, by role
 
+*Pass 4: the owner's note that stage changes read as whole-frame tints. Infection and Corruption no longer swap the
+frame's palette. Ernst's colours arrive only where the contagion is. Tanguy's grey-blue (`#b8c9c6`, `#9ab3bc`,
+`#79898d`) was Infection's land through pass 3; it is not used now. The extraction below is unchanged.*
+
 | Stage | Source | Sky (zenith / horizon) | Land (flat / slope / cliff) | Light | Haze | Accent |
 |---|---|---|---|---|---|---|
 | **Dream** | Dalí, *Dream Caused by the Flight of a Bee*; Dalí, *The Persistence of Memory* | `#94acbe` / `#e4d7bf` (Bee) | `#e4d7bf` salt pan (Bee); `#b1b081` olive-gold, `#8c6f36` ochre (Persistence); `#574625` cliff (Persistence) | warm cream `#e4d7bf` (Bee) | `#e4d7bf` (Bee's horizon; pass 3: its sky blue `#b1c9d8` washed the land grey) | Cap de Creus teal `#3f798d` in the shadows' sky light (Persistence) |
 | **Uncanny** | de Chirico, *The Disquieting Muses*; *Mystery and Melancholy of a Street* | `#3b6e65` green-teal / `#efe1ab` (Muses) | unchanged: the land is still the Dream's | Chirico's late orange `#e49420` (Muses) | `#f6e6be` cream (Street) | green-black shadow `#223b37` (Street) |
-| **Infection** | Tanguy, *Indefinite Divisibility* | `#84add1` / `#d7e2da` | the ochre drains toward Tanguy's grey-blue: `#b8c9c6`, `#9ab3bc`, `#79898d` | cool white `#d7e2da` | `#b8c9c6` | the strain (below) |
-| **Corruption** | Ernst, *Europe After the Rain II* | `#c7d2ce` pale (Ernst's sky) toward dusk | Ernst's rot: rust `#975736`, `#732e26`, ink `#2d0c1f` | `#b47222` | `#5f4c46` | the strain at full chroma |
+| **Infection** | de Chirico's sky continues (pass 4); the Dream's land | as the Uncanny | the Dream's, **except where the contagion is** | as the Uncanny | as the Uncanny | the strain (below) |
+| **Corruption** | as Infection; Ernst, *Europe After the Rain II*, arrives with the stain | as the Uncanny | the Dream's, turned to Ernst's rust `#975736` a few metres ahead of the ink `#2d0c1f` | as the Uncanny | as the Uncanny | the strain at full chroma |
 | **Nightmare** | Dalí, *The Elephants* (sky); Tanguy, *Slowly Toward the North* (land) | blood red `#8f2b30` / `#b35a43` (Elephants) | `#36444e`, `#1d2c35` (North) | `#c27f54` (Elephants) | `#563529` (Elephants) | |
 | **Collapse** | Tanguy, *Multiplication of the Arcs* | `#373943` / `#aaaeb6` | the debris greys `#555962`, `#747a84`, `#9098a3` | | `#9098a3` | it burns out to `#ebeeec`, its own white |
 | **Respite** | Magritte, *The Empire of Light* | day `#94c0d9` / `#e1e4d9` | **night**: `#25292a`, `#323637` | | `#505655` | a temporary recovery as Magritte's paradox: a day sky over a land still in night |

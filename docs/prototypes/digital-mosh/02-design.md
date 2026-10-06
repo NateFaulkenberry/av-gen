@@ -14,7 +14,18 @@ for one block that did not refresh.
 ## The world (brief §3, §14)
 
 *Revised in art pass 1, after the owner asked for real landscape, a camera that travels, more craft and
-painting-derived colour.*
+painting-derived colour. Revised again in art pass 4, after the owner's notes: the land read as flat, the camera sat
+too low, the light was flat, and stage changes read as screen tints.*
+
+**Pass 4: the land as sculpture.** The land in pass 1 was a flat pan with ranges far off: the features existed, but
+they sat at the edge of the world. Now:
+
+- **Ground:** wind-warped dune fields and crested dunes cover the ground around the stage.
+- **The knoll:** the olive stands on a knoll on the bank of a deep dry riverbed. The riverbed spills into a small salt
+  pan, and the Tanguy object hovers over the pan.
+- **Middle ground:** an eroded escarpment wall stands 200 m behind the pan, and two mesas and a butte at 130-160 m.
+  They are close enough that their height and shadows read.
+- **Distance:** the far ranges stay 3 km out, in the haze.
 
 A sparse set of deliberate elements stands on a sculpted desert (`land.py`). Each one is chosen for what it lets
 the corruption say.
@@ -24,7 +35,7 @@ the corruption say.
 | **The land**: two terrain nodes over one geography. A salt pan for the stage; a dry riverbed meandering into it as a leading line; long low swells and dunes; a Cap de Creus escarpment and two flat-topped mesas at the edge; ranges 3 km out, dissolving into the haze | Dalí's beach and Cap de Creus (S1); Tanguy's infinite plain (S10) | Real foreground, middle ground and distance for a travelling camera, and composed negative space made of land and sky | The ground's colour (ink), its tiling (macroblock cells), the palette of the whole land per stage |
 | **The olive**: a trunk of three braided strands, a root flare gripping the ground, and three limbs with three levels of branching, built as five SDF objects | The dead olive of *The Persistence of Memory* (S1, S2), made our own | The protagonist of brief §4's chain | It bends (limbs `bend`), softens (the bark flows), is eaten from the root up (blocks), and its limbs detach and float (node positions) |
 | **The Tanguy object**: a smooth mass pierced by a hole, a slender filament rising to a balanced bead, and a needle pointing down that stops a hand's width above its shadow | Tanguy's biomorphs (S11); the hovering of *Dream Caused by the Flight of a Bee* (S8) | Patient zero: the first block goes bad here | It doubles (P2), quantises into blocks, and is the contagion's source |
-| **The long shadows**: an 11° sun, so every shadow runs about five times its caster's height toward the viewer | de Chirico (D2), Dalí (S3) | Free, enormous, and the first thing to lie | They swing against the sun (Uncanny) |
+| **The long shadows**: a raking 12° sun from the side (pass 4; it was behind the stage), so every shadow runs about five times its caster's height across the frame and the dunes model, lit face against shadowed face | de Chirico (D2), Dalí (S3) | Free, enormous, and the first thing to lie | They swing against the sun (Uncanny) |
 
 Negative space is land and sky. The far land ends 4 km out, inside the haze (`fogSky` over 3.2 km), so no frame
 shows an edge.
@@ -37,13 +48,16 @@ Every stage's sky, land, light and haze is extracted from one painting:
 |---|---|
 | Dream | *Persistence* and the *Bee* |
 | Uncanny | de Chirico |
-| Infection | Tanguy's *Indefinite Divisibility* |
-| Corruption | Ernst's *Europe After the Rain II* |
+| Infection | de Chirico's sky continues; the land stays the Dream's until the contagion reaches it (pass 4) |
+| Corruption | as Infection; Ernst's *Europe After the Rain II* arrives only where the stain is: its rust ahead of its ink |
 | Nightmare | *The Elephants* over Tanguy's *Slowly Toward the North* |
 | Collapse | Tanguy's *Multiplication of the Arcs* |
 | Respite | Magritte's *The Empire of Light* |
 
-The contagion is Ernst's rot at full chroma, so it reads as one painting infecting another.
+The contagion is Ernst's rot at full chroma, so it reads as one painting infecting another. In pass 1 each stage
+swapped the whole frame's palette, and the owner read it, rightly, as screen tints. Since pass 4 only the systemic
+stages change the palette everywhere: the Nightmare, the Collapse, and Magritte's Respite. Before them, the painting
+stays intact except where the contagion has reached it.
 
 ### The travelling camera
 
@@ -52,11 +66,11 @@ vantages on the land, and the music's phrases (later, its bars) move the camera 
 
 | Stage | Move | What the vantages show |
 |---|---|---|
-| Dream | 16 s glides | The classic frame, low along the riverbed, the shadow line leading to the viewer |
-| Uncanny | 12 s | A reveal from behind, the double against the mesas, a slow crane up |
+| Dream | 16 s glides | Pass 4: it opens behind a dune crest (only sand and sky), rises over it to the whole stage from 30 m, then descends into the riverbed toward the tree on its knoll |
+| Uncanny | 12 s | The tree on the sky from the north, the double across the dunes from 24 m, low along the riverbed |
 | Infection | 9 s | Toward the first bad block, then a wide reveal of the spread |
 | Corruption | 5 s every 4 bars | Low and close, under the drooping limbs |
-| Nightmare | 1.2 s jumps every 2 bars | Beside the trunk, a sudden height, ankle level; the horizon rolls |
+| Nightmare | 1.2 s jumps every 2 bars | Over the knoll toward the stained pan, a sudden 30 m height, ankle level; the horizon rolls |
 
 Between moves, slow LFOs float the eye and the aim, more deeply as the energy grows. `build.py` checks every eye,
 and every straight move between eyes, against the engine's terrain heights. A move is marked `idle` (ADR-1164) so
@@ -64,10 +78,9 @@ it never interrupts a stage's own transition.
 
 ## Corruption is a substance, not a filter (brief §6)
 
-There is one world property, **contagion**: a Gray-Scott reaction-diffusion grid lying on the plain (ADR-032
-grids, ADR-1119 per-step inputs, so it scrubs exactly). It is injected at the Stone, so it grows outward as a
-living front. The pattern is coral, maze and spots: Ernst's decalcomania (S14), produced by a process rather
-than drawn. Everything that is corrupted samples this one field, so corruption is spatially coherent: the
+There is one world property, **contagion**: a scalar grid lying on the land (designed as Gray-Scott, built as an
+advected, diffused scalar with a ceiling because Gray-Scott was too slow for a song; `03-implementation.md`). It is
+injected at the Stone, so it grows outward as a living front. Everything that is corrupted samples this one field, so corruption is spatially coherent: the
 tree is infected where the stain reaches it, from the root up. The domains:
 
 | Domain | How it is built | Read from |
@@ -90,8 +103,18 @@ The palette is the temperature of the dream:
   chroma (research, Part 4), so the corruption colour is the medium's own failure colour, not a choice of
   "neon".
 
-A corruption event introduces a colour that propagates through every channel the renderer has. The **magenta
-fracture** (the stone's first bad block):
+A corruption event introduces a colour that propagates through every channel the renderer has. As built (pass 4) it
+reaches them in this order:
+
+1. its light: the fracture light's reach grows from 12 to 28 to 50 m;
+2. its spores: strain-coloured particles drifting out from the stone;
+3. the haze that light passes through;
+4. the ground: Ernst's rust a few metres ahead of the ink cells;
+5. the tree.
+
+Everything it has not reached keeps the painting.
+
+The design, as first written, was this **magenta fracture** (the stone's first bad block):
 
 1. **Fracture.** The stone's blocks emit magenta (its material program, masked by quantisation).
 2. **Magenta light.** A point light at the stone, its intensity driven by the corruption, falls on the plain

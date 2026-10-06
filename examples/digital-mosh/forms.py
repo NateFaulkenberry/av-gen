@@ -313,3 +313,35 @@ def tanguy_blocks(cell):
     pts = voxel_shell(tanguy_distance, [-1.6, -1.7, -1.4], [1.6, 3.1, 1.4], cell)
     s = cell * 0.94
     return [[round(x, 4), round(y, 4), round(z, 4), 0, 0, 0, 1, s, s, s] for (x, y, z) in pts]
+
+
+# ============================================================================================ pass 5: the landmarks
+def flower_tree():
+    """The impossible flower (brief §3): a stem far too tall and too thin to stand, leaning a little, and a bloom of
+    seven petals around a seed head, all of it stone-smooth. It stands near the Tanguy object, so it is the first
+    neighbour the contagion reaches (`eaten`, the stone's program)."""
+    stem_top = [0.35, 6.6, 0.1]
+    stem = sdf("smoothUnion", [capsule_between([0, -0.2, 0], [0.12, 3.4, 0.03], 0.075),
+                               capsule_between([0.12, 3.4, 0.03], stem_top, 0.06)], smooth=0.2)
+    petals = []
+    for k in range(7):
+        a = 2 * math.pi * k / 7
+        tip = add(stem_top, [1.45 * math.cos(a), 0.55, 1.45 * math.sin(a)])
+        petals.append(capsule_between(add(stem_top, [0.25 * math.cos(a), 0.05, 0.25 * math.sin(a)]), tip, 0.2))
+    bloom = sdf("smoothUnion", petals + [sdf("translate", [sdf("sphere", radius=0.42)], translation=stem_top)],
+                smooth=0.18)
+    form = sdf("smoothUnion", [stem, bloom], smooth=0.15)
+    return {"root": sdf("displaceField", [form], amount=0.0, reference="rot", name="eaten")}
+
+
+def rock_tree():
+    """Magritte's Castle in the Pyrenees: a boulder floating over the riverbed, a small square keep on its crown."""
+    lobes = [([0.0, 0.0, 0.0], 3.1), ([1.9, 0.6, 0.4], 2.2), ([-1.7, 0.4, -0.6], 2.3), ([0.4, -1.6, 0.3], 2.0),
+             ([0.2, 1.3, -1.2], 1.9)]
+    body = sdf("smoothUnion", [sdf("translate", [sdf("sphere", radius=r)], translation=c) for c, r in lobes],
+               smooth=0.9)
+    keep = sdf("translate", [sdf("box", size=[0.55, 1.0, 0.55])], translation=[0.3, 3.9, -0.2])
+    tower = sdf("translate", [sdf("cylinder", radius=0.32, height=2.6)], translation=[-0.6, 4.2, 0.4])
+    form = sdf("smoothUnion", [sdf("displaceNoise", [body], amount=0.32, frequency=0.9, seed=5),
+                               sdf("union", [keep, tower])], smooth=0.25)
+    return {"root": form}

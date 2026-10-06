@@ -194,7 +194,8 @@ lights and the camera describe the intended contract with the spline API.
 - **Camera** (`camera/mode = spline`): the camera sits at `sampleByDistance(splineT * length)`
   (or `sample(splineT)`), looks at the position a look-ahead distance further along
   (`sampleByDistance(d + lookAhead)`), and uses the sample normal rotated by an extra roll as up.
-  `camera/splineT` is a normal parameter, so the timeline and audio can drive the ride.
+  `camera/splineT` is a normal parameter, so the timeline and audio can drive the ride. `camera/splineBank`
+  (ADR-1166) leans the camera into the path's turns: degrees of roll per radian its heading turns over the look-ahead.
 
 All of these consume the same table, so the frame convention above (x = binormal, y = normal,
 z = tangent) is the one to match on the GPU (`shaders/spline.wgsl`).

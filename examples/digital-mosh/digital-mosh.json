@@ -26,7 +26,9 @@
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.08,
   "camera/exposure/mode": 0,
-  "camera/mode": 1,
+  "camera/mode": 2,
+  "camera/lookAhead": 36.0,
+  "camera/splineBank": 8.0,
   "temporal/echo/enabled": true,
   "temporal/echo/frames": 8.0,
   "temporal/echo/decay": 0.7,
@@ -552,7 +554,7 @@
   },
   {
    "source": "visual.bright",
-   "target": "material/ground/op/37/hueShift/value",
+   "target": "material/ground/op/42/hueShift/value",
    "op": "add",
    "amount": 0.331,
    "depthSource": "macro.gRhythm",
@@ -575,6 +577,53 @@
     "attackMs": 2000,
     "decayMs": 2000
    }
+  },
+  {
+   "source": "macro.flight",
+   "target": "camera/splineT",
+   "op": "add",
+   "amount": 0.012658353930040818,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "camera/splineT",
+   "op": "add",
+   "amount": 0.0025316707860081637,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "macro.drift",
+   "target": "procedural/clouds/effector/1/strength",
+   "op": "add",
+   "amount": 6.0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/splineOffset",
+   "op": "add",
+   "amount": 2.4,
+   "component": 0,
+   "depthSource": "macro.energy",
+   "depthMin": 0.5,
+   "depthMax": 1.0
+  },
+  {
+   "source": "lfo.driftC.bipolar",
+   "target": "camera/splineOffset",
+   "op": "add",
+   "amount": 1.2,
+   "component": 1,
+   "depthSource": "macro.energy",
+   "depthMin": 0.5,
+   "depthMax": 1.0
   },
   {
    "source": "lfo.driftA.bipolar",
@@ -666,6 +715,18 @@
   {
    "name": "heal",
    "label": "HEAL",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "flight",
+   "label": "FLIGHT",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "drift",
+   "label": "DRIFT",
    "default": 0.0,
    "targets": []
   },
@@ -765,7 +826,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -776,14 +837,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -876,19 +957,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -996,21 +1077,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     -2,
-     12.357,
-     54
+    "macros/flight": [
+     0.3
     ],
-    "camera/target": [
-     -6,
-     12.0,
-     20
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     36
     ],
     "camera/fov": [
-     34
+     40
+    ],
+    "camera/splineBank": [
+     8
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -1066,7 +1157,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1077,14 +1168,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -1177,19 +1288,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1297,21 +1408,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     26,
-     37.239,
-     70
+    "macros/flight": [
+     0.3
     ],
-    "camera/target": [
-     -14,
-     3.0,
-     -2
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     9.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     44
     ],
     "camera/fov": [
-     36
+     44
+    ],
+    "camera/splineBank": [
+     7
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -1367,7 +1488,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1378,14 +1499,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -1478,19 +1619,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1598,21 +1739,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     -57,
-     10.817,
-     24
+    "macros/flight": [
+     0.3
     ],
-    "camera/target": [
-     -34.0,
-     9.818,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     -2.5,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30
     ],
     "camera/fov": [
-     34
+     38
+    ],
+    "camera/splineBank": [
+     9
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -1668,7 +1819,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1679,14 +1830,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -1779,19 +1950,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1899,21 +2070,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     -26,
-     6.319,
-     -34
+    "macros/flight": [
+     0.35
     ],
-    "camera/target": [
-     -34.0,
-     10.818,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     34
     ],
     "camera/fov": [
-     36
+     38
+    ],
+    "camera/splineBank": [
+     10
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -1969,7 +2150,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1980,14 +2161,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -2080,19 +2281,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -2200,21 +2401,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     64,
-     24.618,
-     -40
+    "macros/flight": [
+     0.35
     ],
-    "camera/target": [
-     -20,
-     4.0,
-     -20
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     14.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     46
     ],
     "camera/fov": [
-     34
+     46
+    ],
+    "camera/splineBank": [
+     8
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -2270,7 +2481,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2281,14 +2492,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -2381,19 +2612,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -2501,21 +2732,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     -46,
-     2.062,
-     -14
+    "macros/flight": [
+     0.35
     ],
-    "camera/target": [
-     -34.0,
-     10.318,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     -2.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     28
     ],
     "camera/fov": [
-     40
+     36
+    ],
+    "camera/splineBank": [
+     12
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -2571,7 +2812,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2582,14 +2823,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      70.0
@@ -2682,19 +2943,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -2802,21 +3063,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     30,
-     3.707,
-     6
+    "macros/flight": [
+     0.4
     ],
-    "camera/target": [
-     12.0,
-     2.034,
-     -14.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30
     ],
     "camera/fov": [
-     36
+     42
+    ],
+    "camera/splineBank": [
+     10
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -2872,7 +3143,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2883,14 +3154,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      70.0
@@ -2983,19 +3274,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -3103,21 +3394,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     -10,
-     3.977,
-     4
+    "macros/flight": [
+     0.4
     ],
-    "camera/target": [
-     12.0,
-     2.534,
-     -14.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     6.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     38
     ],
     "camera/fov": [
-     40
+     46
+    ],
+    "camera/splineBank": [
+     9
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -3173,7 +3474,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3184,14 +3485,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      70.0
@@ -3284,19 +3605,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -3404,21 +3725,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     44,
-     23.836,
-     34
+    "macros/flight": [
+     0.4
     ],
-    "camera/target": [
-     -8,
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
      0.0,
-     -6
+     -2.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     26
     ],
     "camera/fov": [
-     36
+     40
+    ],
+    "camera/splineBank": [
+     12
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -3474,7 +3805,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3485,14 +3816,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.9
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      160.0
@@ -3585,19 +3936,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -3705,21 +4056,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.25
     ],
-    "camera/position": [
-     -28,
-     7.709,
-     22
+    "macros/flight": [
+     0.5
     ],
-    "camera/target": [
-     -34.0,
-     11.018,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     -1.5,
+     0.0
+    ],
+    "camera/lookAhead": [
+     26
     ],
     "camera/fov": [
      46
     ],
+    "camera/splineBank": [
+     14
+    ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -3775,7 +4136,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3786,14 +4147,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.9
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      160.0
@@ -3886,19 +4267,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -4006,21 +4387,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.25
     ],
-    "camera/position": [
-     -50,
-     7.549,
-     24
+    "macros/flight": [
+     0.5
     ],
-    "camera/target": [
-     -34.0,
-     11.318,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     4.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30
     ],
     "camera/fov": [
-     40
+     50
+    ],
+    "camera/splineBank": [
+     15
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -4076,7 +4467,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4087,14 +4478,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.9
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      160.0
@@ -4187,19 +4598,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -4307,21 +4718,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.25
     ],
-    "camera/position": [
-     -22,
-     8.598,
-     18
+    "macros/flight": [
+     0.5
     ],
-    "camera/target": [
-     4.0,
-     1.0,
-     -8.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     9.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     36
     ],
     "camera/fov": [
-     44
+     52
+    ],
+    "camera/splineBank": [
+     13
     ],
     "camera/roll": [
-     0
+     4.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -4377,7 +4798,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4388,14 +4809,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     2.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      420.0
@@ -4488,19 +4929,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -4608,21 +5049,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.6
     ],
-    "camera/position": [
-     -18.0,
-     12.718,
-     26.0
+    "macros/flight": [
+     0.75
     ],
-    "camera/target": [
-     6.0,
-     2.034,
-     -10.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     22
     ],
     "camera/fov": [
-     54
+     58
+    ],
+    "camera/splineBank": [
+     20
     ],
     "camera/roll": [
-     7
+     7.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -4678,7 +5129,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4689,14 +5140,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     2.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      420.0
@@ -4789,19 +5260,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -4909,21 +5380,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.6
     ],
-    "camera/position": [
-     -8,
-     34.705,
-     34
+    "macros/flight": [
+     0.75
     ],
-    "camera/target": [
-     -18,
-     2.0,
-     0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     10.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     26
     ],
     "camera/fov": [
-     52
+     60
+    ],
+    "camera/splineBank": [
+     22
     ],
     "camera/roll": [
-     -5
+     -6.0
+    ],
+    "camera/splineT": [
+     0.04
     ]
    }
   },
@@ -4979,7 +5460,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4990,14 +5471,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     2.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      420.0
@@ -5090,19 +5591,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -5210,21 +5711,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.6
     ],
-    "camera/position": [
-     -18,
-     2.638,
+    "macros/flight": [
+     0.75
+    ],
+    "camera/mode": [
      2
     ],
-    "camera/target": [
-     12.0,
-     2.8339999999999996,
-     -14.0
+    "camera/splineOffset": [
+     0.0,
+     -2.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     18
     ],
     "camera/fov": [
-     60
+     62
+    ],
+    "camera/splineBank": [
+     24
     ],
     "camera/roll": [
-     11
+     11.0
+    ],
+    "camera/splineT": [
+     -0.025
     ]
    }
   },
@@ -5280,7 +5791,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      9.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5291,14 +5802,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     1.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     1.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.6
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.3
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.18
     ],
     "particles/motes/spawnRate": [
      900.0
@@ -5391,19 +5922,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -5511,18 +6042,24 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      1.2
     ],
+    "macros/flight": [
+     0.1
+    ],
+    "camera/mode": [
+     1
+    ],
     "camera/position": [
-     12,
-     10.942,
-     34
+     22,
+     25.825,
+     30
     ],
     "camera/target": [
-     -12,
-     3.0,
-     -4
+     2,
+     0.0,
+     -10
     ],
     "camera/fov": [
-     48
+     50
     ],
     "camera/roll": [
      0
@@ -5581,7 +6118,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5592,14 +6129,34 @@
     "material/ground/op/2/quantize/value": [
      0.8800000000000001
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.25
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.2,
      0.8,
      0.7,
      1.25
+    ],
+    "macros/drift": [
+     1.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     1.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     3.5
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     1.6
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.96
     ],
     "particles/motes/spawnRate": [
      2600.0
@@ -5692,19 +6249,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -5812,18 +6369,24 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      1.6
     ],
+    "macros/flight": [
+     0.05
+    ],
+    "camera/mode": [
+     1
+    ],
     "camera/position": [
-     30,
-     20.446,
-     44
+     36,
+     32.41,
+     40
     ],
     "camera/target": [
-     -10,
-     2.0,
-     -6
+     2,
+     0.0,
+     -10
     ],
     "camera/fov": [
-     50
+     52
     ],
     "camera/roll": [
      0
@@ -5882,7 +6445,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5893,14 +6456,34 @@
     "material/ground/op/2/quantize/value": [
      0.264
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.9
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.2,
      0.8,
      0.45,
      1.45
+    ],
+    "macros/drift": [
+     1.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     1.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     7.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     3.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     1.7999999999999998
     ],
     "particles/motes/spawnRate": [
      2600.0
@@ -5993,19 +6576,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -6113,18 +6696,24 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      1.6
     ],
+    "macros/flight": [
+     0.025
+    ],
+    "camera/mode": [
+     1
+    ],
     "camera/position": [
-     14,
-     37.492,
-     62
+     18,
+     51.35,
+     52
     ],
     "camera/target": [
-     -8,
+     0,
      0.0,
-     -8
+     -10
     ],
     "camera/fov": [
-     52
+     54
     ],
     "camera/roll": [
      0
@@ -6183,7 +6772,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6194,14 +6783,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     1.0
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     1.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     9.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     4.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     2.4
     ],
     "particles/motes/spawnRate": [
      2600.0
@@ -6294,19 +6903,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5711,
      0.5841,
      0.624,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.402,
      0.4233,
      0.4678,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.2789,
      0.314,
      0.3663,
@@ -6414,18 +7023,24 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
+    "macros/flight": [
+     0.025
+    ],
+    "camera/mode": [
+     1
+    ],
     "camera/position": [
-     14,
-     37.492,
-     62
+     18,
+     51.35,
+     52
     ],
     "camera/target": [
-     -8,
+     0,
      0.0,
-     -8
+     -10
     ],
     "camera/fov": [
-     52
+     54
     ],
     "camera/roll": [
      0
@@ -6484,7 +7099,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6495,14 +7110,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.2
+    ],
+    "nodes/rock/position": [
+     -100.0,
+     28.62,
+     76.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -6595,19 +7230,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.0802,
      0.0931,
      0.0908,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.0319,
      0.0369,
      0.0382,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.0185,
      0.0222,
      0.0232,
@@ -6715,21 +7350,31 @@
     "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
-    "camera/position": [
-     26,
-     3.436,
-     18
+    "macros/flight": [
+     0.2
     ],
-    "camera/target": [
-     -34.0,
-     9.818,
-     12.0
+    "camera/mode": [
+     2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     10.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     48
     ],
     "camera/fov": [
-     34
+     38
+    ],
+    "camera/splineBank": [
+     6
     ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   },
@@ -6785,7 +7430,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/37/hueShift/value": [
+    "material/ground/op/42/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6796,14 +7441,34 @@
     "material/ground/op/2/quantize/value": [
      2.2
     ],
-    "material/ground/op/27/noise/value": [
+    "material/ground/op/24/noise/value": [
      0.035
     ],
-    "material/ground/op/28/remap/constant": [
+    "material/ground/op/25/remap/constant": [
      0.25,
      0.75,
      0.84,
      1.12
+    ],
+    "macros/drift": [
+     0.5
+    ],
+    "nodes/rock/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "field/collapse/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/landBlocks/effector/5/strength": [
+     0.0
     ],
     "particles/motes/spawnRate": [
      40.0
@@ -6896,19 +7561,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/26/ramp/constant": [
+    "material/ground/op/23/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/26/ramp/constant2": [
+    "material/ground/op/23/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/26/ramp/constant3": [
+    "material/ground/op/23/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -7019,21 +7684,31 @@
     "field/stuck/strength": [
      1.0
     ],
-    "camera/position": [
-     26,
-     37.239,
-     70
+    "macros/flight": [
+     0.25
     ],
-    "camera/target": [
-     -14,
-     3.0,
-     -2
+    "camera/mode": [
+     2
     ],
-    "camera/fov": [
+    "camera/splineOffset": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "camera/lookAhead": [
      36
     ],
+    "camera/fov": [
+     40
+    ],
+    "camera/splineBank": [
+     8
+    ],
     "camera/roll": [
-     0
+     0.0
+    ],
+    "camera/splineT": [
+     0.0
     ]
    }
   }

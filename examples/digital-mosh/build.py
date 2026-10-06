@@ -19,6 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import flight  # noqa: E402
 import forms  # noqa: E402
 import land  # noqa: E402
 from forms import add, mul, norm  # noqa: E402
@@ -96,6 +97,11 @@ OLIVE = forms.Olive(seed=7)
 TREE_AT = on_ground(TREE_XZ, -0.05)
 TANGUY_AT = on_ground(TANGUY_XZ, TANGUY_HOVER)
 DOUBLE_AT = on_ground(DOUBLE_XZ, TANGUY_HOVER)
+# Pass 5's landmarks: sparse, each with a beat of its own (02-design.md, "The landmarks")
+FLOWER_AT = on_ground((-4.0, -22.0), -0.1)          # near the stone: the first neighbour the contagion reaches
+ROCK_AT = on_ground((-100.0, 76.0), 22.0)           # over the riverbed; the flight passes beneath it
+GIANT_SCALE = 7.0
+GIANT_AT = on_ground((10.0, -160.0), TANGUY_HOVER * GIANT_SCALE)  # the object again, at the escarpment's foot
 # the macroblock that does not refresh (Recovery): on the long limb, two thirds of the way out
 _b0, _d0, _s0 = OLIVE.limbs[0]
 STUCK_AT = add(TREE_AT, forms.lerp(_s0[1][0], _s0[1][1], 0.6))
@@ -150,6 +156,9 @@ def fields():
         # the fragments' release: up, and a tumble
         field("lift", kind="direction", axis=[0, 1, 0], strength=1.0),
         field("tumble", kind="curlNoise", frequency=0.4, speed=0.3, seed=9, strength=1.0),
+        # the collapse's gate on the land's own blocks (0 until the Collapse), and the wind the clouds drift on
+        field("collapse", kind="constant", strength=0.0),
+        field("wind", kind="direction", axis=[1, 0, 0.25], strength=1.0),
     ]
 
 
@@ -172,15 +181,15 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("input", 0, input="worldPosition"),
         op("quantize", 1, srcA=0, value=cells_per_m, seed=seed),
         op("field", 2, field=fieldname),
+    ] + ([] if fieldname == "stain" else [   # the stuck macroblock is on a limb: the land never reads it
         op("field", 3, field="stuck"),
         op("add", 2, srcA=2, srcB=3),
-    ]
+    ])
     if remap_stain:
         ops.append(op("remap", 2, srcA=2, value=1, constant=[0.04, 0.9, 0.0, 1.0]))
     ops += [
         op("swizzle", 4, srcA=1, constant=[3, 3, 3, 3]),
-        op("constant", 5, constant=[-1, -1, -1, -1]),
-        op("multiply", 4, srcA=4, srcB=5),
+        op("remap", 4, srcA=4, value=1, constant=[0.0, 1.0, 0.0, -1.0]),  # -cell random
         op("add", 4, srcA=2, srcB=4),                                     # d = contagion - cell random
         op("smoothstep", 7, srcA=4, constant=[0.0, 0.035, 0, 0]),
         op("remap", 7, srcA=7, value=1, constant=[0.0, 1.0, 1.0, 0.0]),
@@ -206,15 +215,10 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("constant", 3, constant=[0, 0, 0, 0]),
         op("hueShift", 5, srcA=5, srcB=3, value=0.0),                     # timbre turns the strain (routed)
         op("multiply", 7, srcA=7, srcB=5),
-        op("input", 3, input="audio"),
-        op("swizzle", 3, srcA=3, constant=[3, 3, 3, 3]),                  # treble
-        op("field", 2, field="kick"),
-        op("add", 3, srcA=3, srcB=2),
-        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.25, 1.6]),
+        op("field", 3, field="kick"),                                     # the kick's front (the treble: a route)
+        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.4, 1.6]),
         op("multiply", 7, srcA=7, srcB=3),
-        op("constant", 2, constant=[0.92, 0.92, 0.92, 1]),
-        op("constant", 3, constant=[0.16, 0.16, 0.16, 1]),
-        op("mixBy", 2, srcA=2, srcB=3, srcC=4),                           # ink is glossy: it reflects the sky
+        op("remap", 2, srcA=4, value=1, constant=[0.0, 1.0, 0.92, 0.16]),  # ink is glossy: it reflects the sky
     ]
     prog = {"name": name, "ops": ops, "baseColor": 6, "metallic": -1, "roughness": 2, "emission": 7,
             "emissionIntensity": 0.0, "opacity": -1}
@@ -228,6 +232,19 @@ def land_colour_ops(world_pos_reg=0, contagion=False):
     mottled at the scale of dunes. With `contagion` (the near land, inside infected(), where r2 still holds the stain):
     the colour itself is reached first -- the painting's earth turns to Ernst's rust a few metres ahead of the ink."""
     p = PAL["dream"]["land"]
+    # The sand's surface (pass 5): wind ripples -- noise stretched along the crests, faded with the pixel footprint so
+    # it can never shimmer (microDetail) -- and the dunes' own form: convex crests bleached, hollows darker.
+    texture = ([
+        op("constant", 3, constant=[1.0, 1.0, 0.15, 0.0]),
+        op("multiply", 5, srcA=0, srcB=3),
+        op("microDetail", 5, srcA=5, value=1.7, seed=11),
+        op("remap", 5, srcA=5, value=1, constant=[0.3, 0.7, 0.88, 1.08]),
+        op("multiply", 6, srcA=6, srcB=5),
+    ] if contagion else []) + [
+        op("input", 5, input="convexity"),
+        op("remap", 5, srcA=5, value=1, constant=[0.0, 1.0, 0.86, 1.1]),
+        op("multiply", 6, srcA=6, srcB=5),
+    ]
     reach = [
         op("smoothstep", 5, srcA=2, constant=[0.0, 0.3, 0, 0]),
         op("constant", 3, constant=RUST + [1]),
@@ -241,7 +258,7 @@ def land_colour_ops(world_pos_reg=0, contagion=False):
         op("noise", 5, srcA=world_pos_reg, value=0.035, seed=7),
         op("remap", 5, srcA=5, value=1, constant=[0.25, 0.75, 0.84, 1.12]),
         op("multiply", 6, srcA=6, srcB=5),
-    ] + reach
+    ] + texture + reach
 
 
 def mottle_remap_op():
@@ -312,35 +329,38 @@ def eye(x, above, z):
 
 TX, TY, TZ = TREE_AT                      # the olive on its knoll
 SX, SY, SZ = TANGUY_AT                    # the Tanguy object over the pan
+
+# Pass 5: the camera flies (flight.py: one closed path of three petals, each returning over the pan). Its speed is
+# integrated from the stage's own pace plus the music's energy, so it never stops between moves; a stage's variants,
+# moved between on its phrases or bars as before, change how it flies -- its altitude over the path (`lift`), how far
+# ahead it looks (`look`), its lens (`fov`), its lean into turns (`bank`), an extra roll (`roll`) -- and, in the
+# Nightmare only, `jump`: the path itself is cut forward or back, so the camera swoops to somewhere else.
+def fly(lift=0.0, look=32.0, fov=40.0, bank=8.0, roll=0.0, jump=0.0):
+    return dict(lift=lift, look=look, fov=fov, bank=bank, roll=roll, jump=jump)
+
+
+FLY = {
+    # slow, floating: a long low glide, then up into the air, then down to the dune crests
+    "Dream": [fly(0.0, 36, 40, 8), fly(9.0, 44, 44, 7), fly(-2.5, 30, 38, 9)],
+    "Uncanny": [fly(1.0, 34, 38, 10), fly(14.0, 46, 46, 8), fly(-2.0, 28, 36, 12)],
+    "Infection": [fly(0.0, 30, 42, 10), fly(6.0, 38, 46, 9), fly(-2.0, 26, 40, 12)],
+    "Corruption": [fly(-1.5, 26, 46, 14), fly(4.0, 30, 50, 15), fly(9.0, 36, 52, 13, 4.0)],
+    # disorienting: wide, leaning hard, the path cut forward and back on the bar
+    "Nightmare": [fly(0.0, 22, 58, 20, 7.0), fly(10.0, 26, 60, 22, -6.0, 0.04), fly(-2.0, 18, 62, 24, 11.0, -0.025)],
+    "Respite": [fly(10.0, 48, 38, 6)],
+    "Recovery": [fly(0.0, 36, 40, 8)],
+}
+# metres per second along the path, as the macro `flight` (x 20): the energy adds up to 4 m/s on top
+FLIGHT_SPEED = {"Dream": 6.0, "Uncanny": 7.0, "Infection": 8.0, "Corruption": 10.0, "Nightmare": 15.0,
+                "Respite": 4.0, "Recovery": 5.0, "Collapse": 2.0, "Decay": 1.0, "Pixels": 0.5, "Light": 0.5}
+FLIGHT_LENGTH = flight.length()
+
+# The Collapse stalls the flight: the camera holds over the pan while the world decomposes (camera mode 1).
 VANTAGES = {
-    # The reveal: behind a dune crest, nothing but sand and sky; then up over it, the whole stage from the air; then
-    # down into the riverbed, travelling toward the tree on its bank.
-    "Dream": [(eye(-2, 4.0, 54), [-6, 12.0, 20], 34, 0),
-              (eye(26, 30.0, 70), [-14, 3.0, -2], 36, 0),
-              (eye(-57, 5.0, 24), [TX, TY + 3.0, TZ], 34, 0)],
-    # less predictable: from the north the tree on the sky in de Chirico's light, the double across the pan from the air,
-    # low along the riverbed
-    "Uncanny": [(eye(-26, 2.0, -34), [TX, TY + 4.0, TZ], 36, 0),
-                (eye(64, 24.0, -40), [-20, 4.0, -20], 34, 0),
-                (eye(-46, 1.4, -14), [TX, TY + 3.5, TZ], 40, 0)],
-    # toward the first bad block; between the stone and the tree; a high wide view of the spread across the pan
-    "Infection": [(eye(30, 2.2, 6), [SX, SY, SZ], 36, 0),
-                  (eye(-10, 3.0, 4), [SX, SY + 0.5, SZ], 40, 0),
-                  (eye(44, 26.0, 34), [-8, 0.0, -6], 36, 0)],
-    # under the drooping limbs on the knoll; from the riverbed below it; down from the knoll over the stained pan
-    "Corruption": [(eye(-28, 2.4, 22), [TX, TY + 4.2, TZ], 46, 0),
-                   (eye(-50, 1.6, 24), [TX, TY + 4.5, TZ], 40, 0),
-                   (eye(-22, 5.0, 18), [SX - 8, 1.0, SZ + 6], 44, 0)],
-    # impossible: inside the tree, a sudden height, the ground at ankle height (P5: the horizon tilts, not shakes)
-    "Nightmare": [(eye(TX + 16, 9.0, TZ + 14), [SX - 6, SY, SZ + 4], 54, 7),
-                  (eye(-8, 30.0, 34), [-18, 2.0, 0], 52, -5),
-                  (eye(-18, 1.1, 2), [SX, SY + 0.8, SZ], 60, 11)],
-    "Collapse": [(eye(12, 8.0, 34), [-12, 3.0, -4], 48, 0)],
-    "Decay": [(eye(30, 18.0, 44), [-10, 2.0, -6], 50, 0)],
-    "Pixels": [(eye(14, 30.0, 62), [-8, 0.0, -8], 52, 0)],
-    "Light": [(eye(14, 30.0, 62), [-8, 0.0, -8], 52, 0)],
-    "Respite": [(eye(26, 2.0, 18), [TX, TY + 3.0, TZ], 34, 0)],
-    "Recovery": [(eye(26, 30.0, 70), [-14, 3.0, -2], 36, 0)],
+    "Collapse": [(eye(22, 24.0, 30), [2, 0.0, -10], 50, 0)],
+    "Decay": [(eye(36, 32.0, 40), [2, 0.0, -10], 52, 0)],
+    "Pixels": [(eye(18, 44.0, 52), [0, 0.0, -10], 54, 0)],
+    "Light": [(eye(18, 44.0, 52), [0, 0.0, -10], 54, 0)],
 }
 # how a stage moves between its own vantages: (trigger kind, every, seconds, easing)
 MOVES = {"Dream": ("phrase", 1, 16.0, "smooth"), "Uncanny": ("phrase", 1, 12.0, "smooth"),
@@ -404,6 +424,57 @@ def blocks_node(name, at, pts, program, roughness):
                      "emissiveIntensity": 1.0, "program": program}}}
 
 
+def land_blocks():
+    """The land's own blocks (pass 5, the Collapse in the world): cubes 2.3 m on a 2.4 m lattice over the pan and its
+    banks, sunk to the land's surface, scale 0 until the Collapse opens them where the stain is."""
+    pts = []
+    xs = [PAN_C[0] - 38.4 + 2.4 * i for i in range(33)]
+    zs = [PAN_C[1] - 38.4 + 2.4 * j for j in range(33)]
+    hs = land.heights([(x, z) for z in zs for x in xs])
+    for k, (z, x) in enumerate([(z, x) for z in zs for x in xs]):
+        pts.append([round(x, 3), round(hs[k] - 1.05, 3), round(z, 3), 0, 0, 0, 1, 2.3, 2.3, 2.3])
+    return {"name": "landBlocks", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+        "source": {"kind": "box", "size": [1.0, 1.0, 1.0], "subdivisions": 1},
+        "variation": {"seed": 5},
+        "distribution": {"kind": "points", "points": pts},
+        "effectors": [
+            {"field": "collapse", "op": "scale", "blend": "multiply", "strength": 1.0, "scaleAxis": [1, 1, 1]},
+            {"field": "stain", "op": "scale", "blend": "multiply", "strength": 1.0, "scaleAxis": [1, 1, 1]},
+            {"field": "lift", "op": "positionOffset", "blend": "add", "strength": 0.0},
+            {"field": "tumble", "op": "positionOffset", "blend": "add", "strength": 0.0},
+            {"field": "tumble", "op": "rotation", "blend": "add", "strength": 0.0},
+        ],
+        "lod": {"cull": True, "count": 1},
+        "material": {"baseColor": RUST, "roughness": 0.85, "metallic": 0.0, "emissiveColor": [1, 1, 1],
+                     "emissiveIntensity": 1.0, "program": "landBlocks"}}}
+
+
+# Magritte's clouds (pass 5): sculpted, solid-looking cumulus far out over the land, lit by the same raking sun.
+CLOUDS = [(-1100, 300, -1500, 1.0), (-250, 380, -2000, 1.4), (800, 330, -1700, 1.15), (1700, 280, -500, 1.0),
+          (1400, 360, 1100, 1.3), (-500, 320, 1800, 1.1), (-1800, 340, 400, 1.2)]
+
+
+def clouds():
+    """Magritte's clouds: each a heap of overlapping rounded masses on a flat, hazed base -- big at the base and
+    climbing smaller -- far enough out (1.5-2.5 km) that the haze softens them into the sky's own colour."""
+    import random
+    rnd = random.Random(1953)
+    pts = []
+    for cx, cy, cz, k in CLOUDS:
+        for _ in range(26):
+            u = rnd.random()
+            r = (70 - 42 * u) * k * rnd.uniform(0.8, 1.2)
+            ox, oz = rnd.gauss(0, 120 * k * (1.1 - 0.6 * u)), rnd.gauss(0, 60 * k)
+            oy = u * 110 * k
+            pts.append([cx + ox, cy + oy, cz + oz, 0, 0, 0, 1, r * 1.2, r * 0.8, r])
+    return {"name": "clouds", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+        "source": {"kind": "sphere", "radius": 1.0, "segments": 24},
+        "distribution": {"kind": "points", "points": [[round(v, 2) for v in p] for p in pts]},
+        "effectors": [{"field": "wind", "op": "positionOffset", "blend": "add", "strength": 0.0}],
+        "castsShadow": False, "lod": {"cull": True, "count": 1},
+        "material": {"baseColor": lin("#e9e7e0"), "roughness": 1.0, "metallic": 0.0}}}
+
+
 def scene():
     d = PAL["dream"]
     sky = {"enabled": True, "background": True, "useKeyLight": False, "sunDirection": mul(SUN_DIR, -1.0),
@@ -432,6 +503,20 @@ def scene():
     double = forms.tanguy_tree()
     double["root"] = double["root"]["children"][0]   # no contagion on the double: it is a memory, not the thing
     nodes.append(sdf_node("double", HIDDEN, double, "", [-1.6, -1.75, -1.4], [1.6, 3.1, 1.4], STONE, 0.3, steps=96))
+    # the landmarks: the flower carries the contagion (the stone's program), the rock floats, the giant is the object
+    # again at a size nothing nearby lets you judge
+    nodes.append(sdf_node("flower", FLOWER_AT, forms.flower_tree(), "skin", [-1.9, -0.4, -1.8], [2.3, 7.8, 2.0],
+                          STONE, 0.3, steps=96))
+    nodes.append(sdf_node("rock", HIDDEN, forms.rock_tree(), "", [-4.6, -4.0, -4.0], [4.6, 5.8, 4.0],
+                          lin("#8a7f72"), 0.9, steps=96))
+    giant = forms.tanguy_tree()
+    giant["root"] = giant["root"]["children"][0]
+    g = sdf_node("giant", GIANT_AT, giant, "", [-1.6, -1.75, -1.4], [1.6, 3.1, 1.4], STONE, 0.3, steps=96)
+    g["scale"] = [GIANT_SCALE] * 3
+    nodes.append(g)
+    nodes.append(land_blocks())
+    nodes.append(clouds())
+    nodes.append(flight.spline_node())
     nodes += [
         blocks_node("treeBlocks", TREE_AT, OLIVE.blocks(TREE_CELL), "treeBlocks", 0.75),
         blocks_node("tanguyBlocks", TANGUY_AT, forms.tanguy_blocks(TANGUY_CELL), "tanguyBlocks", 0.4),
@@ -452,11 +537,11 @@ def scene():
             "lifetimeMin": 7.0, "lifetimeMax": 14.0, "colorStart": STRAIN + [0.95], "colorEnd": INK + [0.0],
             "emissive": 4.0, "blend": "additive", "softness": 0.5}},
     ]
-    e0, t0, fov0, _r = VANTAGES["Dream"][0]
+    f0 = FLY["Dream"][0]
     return {
         "format": "avgen-scene", "version": 1, "name": "DIGITAL MOSH",
         "_note": "Generated by build.py; edit that, not this file.",
-        "camera": {"mode": 1, "position": e0, "target": t0, "fov": fov0},
+        "camera": {"mode": 2, "spline": "flight", "fov": f0["fov"]},
         "environment": {
             "intensity": 0.12, "background": d["horizon"], "fogColor": d["fog"],
             "shadowRange": 200.0, "shadowCascades": 3,
@@ -479,7 +564,8 @@ def scene():
         "grids": [CONTAGION],
         "materialPrograms": [ground_program(), ground_far_program(), bark_program(), stone_program(),
                              blocks_program("treeBlocks", BARK[0], BARK[1]),
-                             blocks_program("tanguyBlocks", STONE, lin("#9f9985"))],
+                             blocks_program("tanguyBlocks", STONE, lin("#9f9985")),
+                             blocks_program("landBlocks", RUST, INK)],
         "nodes": nodes,
     }
 
@@ -489,7 +575,7 @@ def scene():
 # (restraint early, brief §16). Each stage breaks ONE more law than the last (research S2).
 BASE = dict(pal="dream", landPal="dream", inject=0.0, advect=0.0, dissip=0.6, climb=0.0, eat=0.0, eatStone=0.0,
             melt=[0.0, 0.0, 0.0], lift=[0.0, 0.0, 0.0], bark=0.016, barkSpeed=0.0,
-            rise=0.0, tumble=0.0, spin=0.0, kick=0.0, sunYaw=0.0, fracture=0.0, double=False, motes=40.0, spores=0.0, fracRange=10.0, skyI=0.6, cells=1.0, mottle=0.035, mottleRange=[0.25, 0.75, 0.84, 1.12],
+            rise=0.0, tumble=0.0, spin=0.0, kick=0.0, sunYaw=0.0, fracture=0.0, double=False, motes=40.0, spores=0.0, fracRange=10.0, skyI=0.6, drift=0.5, rock=False, collapseGate=0.0, landRise=0.0, landTumble=0.0, cells=1.0, mottle=0.035, mottleRange=[0.25, 0.75, 0.84, 1.12],
             echo=0.0, mosh=0.0, moshBlock=32.0, glitch=0.0, pixel=0.0, poster=0.0, sort=0.0, split=0.0,
             exposure=0.0, bloom=0.08, volDen=0.0006, sun=11.0,
             gMicro=0.15, gRhythm=0.0, gMosh=0.0, gGlitch=0.0, gMelt=0.0, gLift=0.0,
@@ -502,30 +588,30 @@ def stage(**kw):
     return v
 
 
-COLLAPSE_COMMON = dict(spores=400.0, fracRange=60.0, inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
+COLLAPSE_COMMON = dict(spores=400.0, fracRange=60.0, rock=True, drift=1.0, collapseGate=1.0, inject=5.0, advect=4.0, climb=12.0, eat=1.0, eatStone=1.0, fracture=5000.0, double=True,
                        glowPlain=8.0, glowBark=6.0, gMicro=1.0, gRhythm=1.0, gMosh=1.0, gMelt=1.0, gLift=1.0)
 STAGES = {
     # Beautiful, quiet, hypnotic. Only the light, the dust and the camera move.
     "Dream": stage(volDen=0.00038),
     # Relation errors only (Magritte, S12; de Chirico's light, D1/D2): the shadows swing against the sky's sun, the
     # Tanguy object appears twice, the long limb lifts a little against gravity, the sky turns Chirico's green.
-    "Uncanny": stage(pal="uncanny", sunYaw=26.0, double=True, melt=[-0.05, 0.0, 0.0], echo=0.08, gMicro=0.3,
+    "Uncanny": stage(pal="uncanny", drift=0.0, rock=True, sunYaw=26.0, double=True, melt=[-0.05, 0.0, 0.0], echo=0.08, gMicro=0.3,
                      gRhythm=0.1, volDen=0.0007),
     # The first block goes bad: the strain at the Tanguy object. It spreads in order (brief §7): its light, then its
     # spores, then the haze it lights, then the ground (rust a few metres ahead of the ink), then the tree. Everything
     # it has not reached keeps the painting.
-    "Infection": stage(pal="uncanny", inject=1.4, advect=0.9, dissip=0.02, climb=1.6, eat=0.18, eatStone=0.35,
+    "Infection": stage(pal="uncanny", rock=True, inject=1.4, advect=0.9, dissip=0.02, climb=1.6, eat=0.18, eatStone=0.35,
                        melt=[0.06, 0.0, 0.0], fracture=700.0, double=True, sunYaw=8.0, glowPlain=2.5, glowBark=1.8,
                        glowBlocks=3.0, echo=0.1, gMicro=0.5, gRhythm=0.35, gMosh=0.15, gMelt=0.2, motes=70.0, spores=30.0, fracRange=12.0,
                        exposure=-0.1, volDen=0.0008),
     # Ernst's rot: the tree eaten from the root up, its bark flowing like wax, limbs drooping, the first blocks lifting.
-    "Corruption": stage(pal="uncanny", inject=2.4, advect=2.0, dissip=0.0, climb=4.6, eat=0.32, eatStone=0.5,
+    "Corruption": stage(pal="uncanny", rock=True, drift=0.9, inject=2.4, advect=2.0, dissip=0.0, climb=4.6, eat=0.32, eatStone=0.5,
                         melt=[0.16, 0.08, -0.06], bark=0.05, barkSpeed=0.5, rise=0.35, tumble=0.25, spin=0.4,
                         kick=0.25, fracture=1900.0, double=True, glowPlain=4.0, glowBark=3.0, glowBlocks=5.0,
                         echo=0.18, mosh=0.0, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.12, gMelt=0.5,
                         gLift=0.3, motes=160.0, spores=140.0, fracRange=28.0, volDen=0.0011),
     # The Elephants' blood sky over Tanguy's night land: the tree is blocks, its limbs float free.
-    "Nightmare": stage(pal="nightmare", landPal="nightmare", inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
+    "Nightmare": stage(pal="nightmare", landPal="nightmare", rock=True, drift=2.0, inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
                        melt=[0.26, 0.18, -0.14], lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8,
                        tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=3.0,
                        glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.03, moshBlock=24.0, exposure=-0.7,
@@ -533,24 +619,24 @@ STAGES = {
                        volDen=0.0014),
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
     # geometry...
-    "Collapse": stage(pal="nightmare", landPal="nightmare", melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
+    "Collapse": stage(pal="nightmare", landPal="nightmare", landRise=0.6, landTumble=0.3, melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
                       rise=5.0, tumble=2.5, spin=3.0, kick=1.2, glowBlocks=9.0, echo=0.35, mosh=0.25, moshBlock=48.0,
                       exposure=-0.6, gGlitch=0.8, motes=900.0, volDen=0.0016, **COLLAPSE_COMMON),
     #   ... fragments become particles and temporal fragments
-    "Decay": stage(pal="nightmare", landPal="nightmare", melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0], bark=0.12, barkSpeed=1.5, rise=9.0,
+    "Decay": stage(pal="nightmare", landPal="nightmare", landRise=3.5, landTumble=1.6, melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0], bark=0.12, barkSpeed=1.5, rise=9.0,
                    tumble=4.0, spin=5.0, kick=1.6, glowBlocks=10.0, echo=0.5, mosh=0.45, moshBlock=64.0, cells=0.4, mottle=0.25, mottleRange=[0.2, 0.8, 0.7, 1.25],
                    exposure=-0.5, gGlitch=1.0, motes=2600.0, volDen=0.0018, **COLLAPSE_COMMON),
     #   ... pixels, then colour
-    "Pixels": stage(pal="nightmare", landPal="nightmare", melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
+    "Pixels": stage(pal="nightmare", landPal="nightmare", landRise=7.0, landTumble=3.0, melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
                     rise=12.0, tumble=5.0, spin=6.0, kick=1.6, glowBlocks=10.0, echo=0.4, mosh=0.3, moshBlock=96.0,
                     cells=0.12, mottle=0.9, mottleRange=[0.2, 0.8, 0.45, 1.45], pixel=4.0, poster=0.0, sort=0.15, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
                     **COLLAPSE_COMMON),
     #   ... and light: Tanguy's white.
-    "Light": stage(pal="light", landPal="light", skyI=1.0, lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
+    "Light": stage(pal="light", landPal="light", skyI=1.0, landRise=9.0, landTumble=4.0, lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
                    mosh=0.3, pixel=40.0, poster=3.0, exposure=2.6, bloom=1.0, gGlitch=1.0, motes=2600.0,
                    volDen=0.002, **COLLAPSE_COMMON),
     # A breakdown's respite: Magritte's Empire of Light -- a day sky over a land still in night; the stain stays.
-    "Respite": stage(pal="respite", landPal="respite", skyI=1.0, sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
+    "Respite": stage(pal="respite", landPal="respite", skyI=1.0, drift=0.2, rock=True, sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
                      echo=0.05, volDen=0.0007),
     # The keyframe: the dream exactly as it was (P8). One macroblock did not refresh.
     "Recovery": stage(dissip=9.0, keyframe=1.0, heal=1.0, volDen=0.00038),
@@ -562,7 +648,8 @@ ENTRY = {"Dream": (8, "smooth"), "Uncanny": (12, "smooth"), "Infection": (6, "sm
 
 
 def variant_names(st):
-    return [st] + [f"{st} {k + 1}" for k in range(1, len(VANTAGES[st]))]
+    n = len(FLY[st]) if st in FLY else len(VANTAGES[st])
+    return [st] + [f"{st} {k + 1}" for k in range(1, n)]
 
 
 def sun_azimuth(yaw_deg):
@@ -589,6 +676,11 @@ def stage_values(name, v):
         f"material/ground/op/{program_op(ground_program, 'quantize')}/quantize/value": [2.2 * v["cells"]],
         f"material/ground/op/{program_op(ground_program, 'noise')}/noise/value": [v["mottle"]],
         f"material/ground/op/{mottle_remap_op()}/remap/constant": v["mottleRange"],
+        "macros/drift": [v["drift"]], "nodes/rock/position": ROCK_AT if v["rock"] else HIDDEN,
+        "field/collapse/strength": [v["collapseGate"]],
+        "procedural/landBlocks/effector/3/strength": [v["landRise"]],
+        "procedural/landBlocks/effector/4/strength": [v["landTumble"]],
+        "procedural/landBlocks/effector/5/strength": [v["landTumble"] * 0.6],
         "particles/motes/spawnRate": [v["motes"]], "particles/spores/spawnRate": [v["spores"]],
         "temporal/echo/strength": [v["echo"]], "temporal/mosh/amount": [v["mosh"]],
         "temporal/mosh/block": [v["moshBlock"]], "post/glitch/amount": [v["glitch"]],
@@ -633,9 +725,18 @@ def presets():
     for name, v in STAGES.items():
         base = stage_values(name, v)
         for k, vname in enumerate(variant_names(name)):
-            e, t, fov, roll = VANTAGES[name][k]
             vals = dict(base)
-            vals.update({"camera/position": e, "camera/target": t, "camera/fov": [fov], "camera/roll": [roll]})
+            vals["macros/flight"] = [FLIGHT_SPEED[name] / 20.0]
+            if name in FLY:
+                f = FLY[name][k]
+                vals.update({"camera/mode": [2], "camera/splineOffset": [0.0, f["lift"], 0.0],
+                             "camera/lookAhead": [f["look"]], "camera/fov": [f["fov"]],
+                             "camera/splineBank": [f["bank"]], "camera/roll": [f["roll"]],
+                             "camera/splineT": [f["jump"]]})
+            else:
+                e, t, fov, roll = VANTAGES[name][k]
+                vals.update({"camera/mode": [1], "camera/position": e, "camera/target": t, "camera/fov": [fov],
+                             "camera/roll": [roll]})
             out.append({"name": vname.lower(), "values": vals})
     return out
 
@@ -721,7 +822,7 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 
 def macros():
     m = [{"name": n, "label": n.upper(), "default": 0.0, "targets": []}
-         for n in ("energy", "baseline", "dose", "keyframe", "heal")]
+         for n in ("energy", "baseline", "dose", "keyframe", "heal", "flight", "drift")]
     m.append({"name": "sensitivity", "label": "SENSITIVITY", "default": 0.25, "targets": []})
     m += [{"name": g, "label": g.upper(), "default": BASE[g], "targets": []} for g in GATES]
     return m
@@ -791,7 +892,20 @@ def routes():
     r.append(gated("visual.bright", f"material/ground/op/{hue_op}/hueShift/value", STRAIN_TO_CHARTREUSE, "gRhythm",
                    {"attackMs": 3000, "decayMs": 3000}))
     r.append(gated("visual.bright", "grid/contagion/advect", 1.5, "gRhythm", {"attackMs": 2000, "decayMs": 2000}))
-    # ---- the camera floats between its moves: slow incommensurate drifts, deeper as the music grows (not shake)
+    # ---- the flight (pass 5): the path position integrates the stage's pace and the music's energy -- never a stop
+    integ = {"integrate": True}
+    r.append({"source": "macro.flight", "target": "camera/splineT", "op": "add", "amount": 20.0 / FLIGHT_LENGTH,
+              "chain": dict(integ)})
+    r.append({"source": "macro.energy", "target": "camera/splineT", "op": "add", "amount": 4.0 / FLIGHT_LENGTH,
+              "chain": dict(integ)})
+    # the clouds drift on the wind (metres): a stage that stops the drift stops a cloud
+    r.append({"source": "macro.drift", "target": "procedural/clouds/effector/1/strength", "op": "add",
+              "amount": 6.0, "chain": dict(integ)})
+    # the flying camera floats a little off its path, more as the music grows
+    for src, comp, amt in (("driftA", 0, 2.4), ("driftC", 1, 1.2)):
+        r.append({"source": f"lfo.{src}.bipolar", "target": "camera/splineOffset", "op": "add", "amount": amt,
+                  "component": comp, "depthSource": "macro.energy", "depthMin": 0.5, "depthMax": 1.0})
+    # ---- the held camera floats between its moves: slow incommensurate drifts, deeper as the music grows
     for src, comp, amt in (("driftA", 0, 1.6), ("driftB", 2, 1.6), ("driftC", 1, 0.3)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": amt,
                   "component": comp, "depthSource": "macro.energy", "depthMin": 0.6, "depthMax": 1.0})
@@ -809,7 +923,7 @@ POST = {
     "post/bloom/enabled": True, "post/bloom/threshold": 1.4, "post/bloom/emissionWeight": 0.7,
     "post/tonemap/chroma-retention": 0.55, "post/output/vignette": 0.24,
     "post/grade/contrast": 1.1, "post/grade/saturation": 1.08,
-    "camera/exposure/mode": 0, "camera/mode": 1,
+    "camera/exposure/mode": 0, "camera/mode": 2, "camera/lookAhead": 36.0, "camera/splineBank": 8.0,
     "temporal/echo/enabled": True, "temporal/echo/frames": 8.0, "temporal/echo/decay": 0.7,
     "temporal/mosh/enabled": True, "temporal/mosh/frames": 16.0, "temporal/mosh/smear": 22.0,
     "temporal/mosh/rate": 10.0,
