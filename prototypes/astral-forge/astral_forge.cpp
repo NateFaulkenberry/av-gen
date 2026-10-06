@@ -199,6 +199,7 @@ struct Options {
     bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
     bool noShards = false; // iteration 2: near flakes stay splats
     float shardPx = 12.0f;
+    std::string perfCsv;   // bench: per-frame GPU frame time CSV (t, ms)
     bool noHalf = false;   // iteration 3: full-resolution march (no half-resolution pre-pass)
     float cacheFrame = 0.4f;  // fine cache box half-size, as a fraction of the camera-target distance
     float minStep = 0.65f; // surface march minimum step, in density cells (iteration 1: 0.3)
@@ -214,6 +215,7 @@ astral::State conductRaw(const Options& o, float t, const astral::SongAnalysis& 
     case 4: return astral::test04(t);
     case 5: return astral::test05(t);
     case 7: return astral::test07(t);
+    case 8: return astral::test08(t, song, score);
     default: return astral::test06(t, o.songStart, song, score);
     }
 }
@@ -263,6 +265,7 @@ int main(int argc, char** argv) {
         else if (a == "--no-advect") o.noAdvect = true;
         else if (a == "--no-cache") o.noCache = true;
         else if (a == "--no-half") o.noHalf = true;
+        else if (a == "--perf-csv") o.perfCsv = next();
         else if (a == "--arch") o.archOverride = std::stoi(next());
         else if (a == "--no-shards") o.noShards = true;
         else if (a == "--min-step") o.minStep = std::stof(next());
@@ -290,7 +293,7 @@ int main(int argc, char** argv) {
                  song.snareT.size(), song.analyseSeconds);
     if (o.debug == 8) {
         // the conductor as CSV at 60 Hz (CPU only): what the music did to the entity's state
-        const double d = o.to > 0.0 ? o.to : testDuration(o.test);
+        const double d = o.to > 0.0 ? o.to : (o.test == 8 ? song.duration : testDuration(o.test));
         std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera\n");
         for (double t = o.from; t <= d + 1e-9; t += 1.0 / 60.0) {
             const astral::State s = conduct(o, static_cast<float>(t), song, score);
@@ -530,7 +533,7 @@ int main(int argc, char** argv) {
 
     // ---- per-frame state ----
     const double simRate = 60.0;
-    const double dur = testDuration(o.test);
+    const double dur = o.test == 8 ? song.duration : testDuration(o.test);
     if (o.to < 0.0) o.to = dur;
     auto fillFrame = [&](FrameU& f, const astral::State& s, const astral::State& sPrev, double tPrev, double t, std::uint64_t step) {
         const float Cprev = sPrev.C;
@@ -555,7 +558,7 @@ int main(int argc, char** argv) {
         setBands(f, s);
         f.rig = glm::vec4(s.rigPhase, s.sweep, s.sweepStrength, s.flicker);
         astral::AudioAtT a{};
-        if (o.test == 6) a = astral::sampleSong(song, o.songStart + t);
+        if (o.test == 6 || o.test == 8) a = astral::sampleSong(song, (o.test == 8 ? 0.0 : o.songStart) + t);
         f.audio0 = a.env0;
         f.audio1 = glm::vec4(a.env1.x, a.rms, a.kickEnv, a.snareEnv);
         const float flakeSize = 0.013f;
@@ -809,6 +812,8 @@ int main(int argc, char** argv) {
         Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost, sCache, sShard, sMarch;
         std::uint64_t lastCompleted = timeline.completedFrames();
         const std::uint32_t total = o.benchWarm + o.benchFrames;
+        std::FILE* csv = o.perfCsv.empty() ? nullptr : std::fopen(o.perfCsv.c_str(), "w");
+        if (csv) std::fprintf(csv, "t,gpu_ms,surface_ms,sim_ms\n");
         for (std::uint32_t f = 0; f < total; ++f) {
             const double t = t0 + (f + 1) / simRate;
             const auto c0 = Clock::now();
@@ -820,6 +825,7 @@ int main(int argc, char** argv) {
                 if (timeline.completedFrames() != lastCompleted) {
                     lastCompleted = timeline.completedFrames();
                     sGpu.add(timeline.frameMs());
+                    if (csv) std::fprintf(csv, "%.4f,%.3f,%.3f,%.3f\n", t, timeline.frameMs(), timeline.msFor("surface"), timeline.msFor("sim"));
                     sSim.add(timeline.msFor("sim"));
                     sDen.add(timeline.msFor("density"));
                     sSurf.add(timeline.msFor("surface"));
@@ -832,6 +838,7 @@ int main(int argc, char** argv) {
             }
         }
         ctx.waitForQueue();
+        if (csv) std::fclose(csv);
         if (!o.png.empty()) savePng(o.png);
         if (ctx.errorCount() != 0) { std::fprintf(stderr, "gpu errors: %s\n", ctx.lastError().c_str()); return 5; }
         auto j = [](const char* name, const Stat& s) { std::printf("\"%s\":{\"p50\":%.3f,\"p90\":%.3f},", name, s.pct(0.5), s.pct(0.9)); };
