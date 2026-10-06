@@ -646,6 +646,23 @@
    "depthMax": 1.0
   },
   {
+   "source": "visual.lift",
+   "target": "nodes/double/scale",
+   "op": "add",
+   "amount": 0.9,
+   "depthSource": "macro.gMicro",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 6000,
+    "offset": -0.55,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
+   }
+  },
+  {
    "source": "lfo.driftB.bipolar",
    "target": "camera/target",
    "op": "add",

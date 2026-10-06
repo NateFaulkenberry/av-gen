@@ -790,6 +790,11 @@ def routes():
     for src, comp, amt in (("driftA", 0, 1.6), ("driftB", 2, 1.6), ("driftC", 1, 0.3)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": amt,
                   "component": comp, "depthSource": "macro.energy", "depthMin": 0.6, "depthMax": 1.0})
+    # the Uncanny's "a distant object briefly changes scale" (brief §5): the double swells for a phrase on the
+    # music's own swells, with nothing else moving -- gated by the micro gate, so the Dream never does it
+    r.append(gated("visual.lift", "nodes/double/scale", 0.9, "gMicro", {"attackMs": 4000, "decayMs": 6000,
+                                                                          "offset": -0.55, "clampEnabled": True,
+                                                                          "clampMin": 0.0, "clampMax": 1.0}))
     r.append({"source": "lfo.driftB.bipolar", "target": "camera/target", "op": "add", "amount": 0.6, "component": 0})
     r.append({"source": "lfo.driftA.bipolar", "target": "camera/target", "op": "add", "amount": 0.25, "component": 1})
     return r
