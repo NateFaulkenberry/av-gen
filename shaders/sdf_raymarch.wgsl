@@ -14,7 +14,8 @@
 //
 // Bind groups: 0 frame (common.wgsl); 1 = {0 ObjectUniforms (dynamic offset: model = local ->
 // world, normalMatrix, the material lanes shadePbr reads), 1 SdfObjectUniforms (dynamic offset),
-// 2 array<SdfNodeGpu> (read-only storage, every object's records concatenated), 3 FieldBlock};
+// 2 array<SdfNodeGpu> (read-only storage, every object's records concatenated), 3 FieldBlock,
+// 4 step statistics, 5 + 6 the ADR-1142 density volume and its linear sampler};
 // 2 material, 3 IBL (declared by pbr_shade.wgsl). Mirrors rendering/sdf_renderer.hpp.
 #include "common.wgsl"
 // ADR-138: whether this module's draws are the procedural scatter, which is the share tier
@@ -52,6 +53,11 @@ struct SdfObjectUniforms {
     wave2: vec4<f32>,
     wave3: vec4<f32>,
     wave4: vec4<f32>,
+    // ADR-1142: "density iso (+) SDF". density0.w = 1 draws the iso-surface of a particle system's
+    // density volume (ADR-1141) sharpened toward this object's tree; 0 is the object as it always was.
+    density0: vec4<f32>,    // iso, sharpness, one density cell in local units, 1 = density mode
+    density1: vec4<f32>,    // the volume's world-space min corner, 0
+    density2: vec4<f32>,    // 1 / the volume's world-space extent, 0
 };
 
 // ADR-1055: the world wave at a world point -- the band's colour, how much of the band is here, and how
@@ -99,6 +105,9 @@ struct SdfStepStats {
 @group(1) @binding(2) var<storage, read> sdfNodes: array<SdfNodeGpu>;
 @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
 @group(1) @binding(4) var<storage, read_write> sdfStepStats: SdfStepStats;
+// ADR-1142: the density volume (a 1x1x1 zero placeholder for every object not in density mode).
+@group(1) @binding(5) var sdfDensityTex: texture_3d<f32>;
+@group(1) @binding(6) var sdfDensitySampler: sampler;
 
 // ADR-1003: every field evaluation of this pass goes through sdfField. By default it is the packed
 // interpreter; an object with `compile` on gets a pipeline whose module replaces the block between
@@ -114,19 +123,65 @@ fn sdfSurface(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>)
 }
 // @@SDF_FIELD_END@@
 
+// ADR-1142: the density at a tree-local point (0 outside the volume, so the clamped edge texels do
+// not smear into streaks out to the march's bounds).
+fn sdfDensityAt(pLocal: vec3<f32>) -> f32 {
+    let w = (object.model * vec4<f32>(pLocal, 1.0)).xyz;
+    let uvw = (w - sdf.density1.xyz) * sdf.density2.xyz;
+    if (any(uvw < vec3<f32>(0.0)) || any(uvw > vec3<f32>(1.0))) {
+        return 0.0;
+    }
+    return textureSampleLevel(sdfDensityTex, sdfDensitySampler, uvw, 0.0).r;
+}
+
+// ADR-1142: the field of an object in density mode (after the prototype's approach E):
+//     dRho = (iso - rho) * cell * 1.6
+//     f    = sharpness > 0 && rho > 0.12 iso ? mix(dRho, max(sdf, (0.38 iso - rho) * cell * 3), sharpness) : dRho
+// so with no matter there is no surface whatever the tree says, and the tree is evaluated only where
+// matter already is. dRho is not a distance (it is a density difference scaled to about one cell per
+// unit), so a density-mode object wants a step scale below 1 and a step budget that covers its bounds
+// in steps of about iso * cell * 1.6 through empty space. There is exactly ONE call of sdfField here:
+// a compiled field is inlined at every call site, and two would double its code at each of them.
+fn sdfDensitySurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    let rho = sdfDensityAt(p);
+    let iso = sdf.density0.x;
+    let cell = sdf.density0.z;
+    let dRho = (iso - rho) * cell * 1.6;
+    if (!(sdf.density0.y > 0.0 && rho > 0.12 * iso)) {
+        return dRho;
+    }
+    let tree = sdfField(offset, count, p, t, world);
+    let dilated = (0.38 * iso - rho) * cell * 3.0;
+    return mix(dRho, max(tree, dilated), sdf.density0.y);
+}
+
+// The field every march, normal, occlusion and shadow of this pass reads: ONE function for the depth
+// prepass and the lit pass alike, so the two still reach bit-identical `t` (ADR-1002's speckle), and
+// OUTSIDE the sdfField markers, so a compiled tree (ADR-1003) replaces sdfField under it and keeps it.
+// By default it is sdfField and nothing else. An object in density mode (ADR-1142) is drawn by a
+// pipeline variant whose module replaces the block between these two markers with a call of
+// sdfDensitySurfaceField -- a variant rather than a branch here, because a branch changes the Metal
+// compiler's arithmetic for every other object (ADR-388 measured that kind of drift) and a variant
+// leaves their module exactly what it was.
+// @@SDF_SURFACE_BEGIN@@
+fn sdfSurfaceField(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>) -> f32 {
+    return sdfField(offset, count, p, t, world);
+}
+// @@SDF_SURFACE_END@@
+
 fn sdfTetraTap(i: u32) -> vec3<f32> {
     var k = array<vec3<f32>, 4>(vec3<f32>(1.0, -1.0, -1.0), vec3<f32>(-1.0, -1.0, 1.0), vec3<f32>(-1.0, 1.0, -1.0),
                                 vec3<f32>(1.0, 1.0, 1.0));
     return k[i];
 }
 
-// Tetrahedron-difference normal over sdfField (sdf.wgsl's sdfNormal, for either field).
+// Tetrahedron-difference normal over sdfSurfaceField (sdf.wgsl's sdfNormal, for either field).
 fn sdfFieldNormal(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x4<f32>, eps: f32) -> vec3<f32> {
     // A loop, not four calls: a compiled field is inlined at every call site (ADR-1003).
     var n = vec3<f32>(0.0);
     for (var i = 0u; i < 4u; i = i + 1u) {
         let k = sdfTetraTap(i);
-        n = n + k * sdfField(offset, count, p + k * eps, t, world);
+        n = n + k * sdfSurfaceField(offset, count, p + k * eps, t, world);
     }
     return sdfSafeNormalize(n);
 }
@@ -144,7 +199,7 @@ fn sdfOcclusion(offset: u32, count: u32, p: vec3<f32>, n: vec3<f32>, t: f32, wor
     var weight = 1.0;
     for (var i = 0; i < 5; i = i + 1) {
         let h = reach * (0.05 + f32(i) * 0.25);
-        let d = sdfField(offset, count, p + n * h, t, world);
+        let d = sdfSurfaceField(offset, count, p + n * h, t, world);
         occ = occ + max(h - d, 0.0) * weight;
         weight = weight * 0.8;
     }
@@ -169,7 +224,7 @@ fn sdfSoftShadow(offset: u32, count: u32, p: vec3<f32>, dir: vec3<f32>, t: f32, 
     var res = 1.0;
     var s = eps * 8.0;
     for (var i = 0u; i < steps; i = i + 1u) {
-        let h = sdfField(offset, count, p + dir * s, t, world);
+        let h = sdfSurfaceField(offset, count, p + dir * s, t, world);
         if (h < eps) {
             return 0.0;
         }
@@ -248,7 +303,7 @@ fn sdfMarch(roL: vec3<f32>, rdL: vec3<f32>, tStart: f32, tEnd: f32, maxSteps: u3
     let time = sdf.march.w;
     for (var i = 0u; i < maxSteps; i = i + 1u) {
         m.steps = i + 1u;
-        let d = sdfField(offset, count, roL + rdL * m.t, time, object.model);
+        let d = sdfSurfaceField(offset, count, roL + rdL * m.t, time, object.model);
         if (d < epsilon * max(m.t, 1e-4)) {
             m.hit = true;
             m.d = d;

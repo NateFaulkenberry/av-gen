@@ -40,6 +40,7 @@ class ShaderLibrary;
 namespace avgen::rendering {
 
 class FieldUniforms;
+class ParticleRenderer;
 
 struct SdfStats {
     std::uint32_t objects = 0;          // visible SDF objects drawn this frame (both modes)
@@ -48,6 +49,7 @@ struct SdfStats {
     std::uint32_t packedNodes = 0;      // packed records uploaded this frame (raymarch objects)
     std::uint32_t meshTriangles = 0;    // triangles of the drawn meshed objects
     std::uint32_t meshUploads = 0;      // mesh buffers (re)uploaded this frame
+    std::uint32_t densityObjects = 0;   // ADR-1142: raymarch objects drawn in density mode this frame
     double raymarchMs = -1.0;           // GPU time of the last measured raymarch pass (-1 = none / unavailable)
     double cpuUpdateMs = 0.0;           // packing + upload time this frame
     // ADR-1002: march step statistics of the lit raymarch pass, sampled on every 4th pixel in x and y
@@ -85,8 +87,12 @@ struct SdfObjectUniforms {
     glm::vec4 wave2;
     glm::vec4 wave3;
     glm::vec4 wave4;
+    // ADR-1142: density iso (+) SDF. density0.w = 1 is density mode; all zero is the object as it was.
+    glm::vec4 density0;    // iso, sharpness, one density cell in local units, 1 = density mode
+    glm::vec4 density1;    // the volume's world-space min corner, 0
+    glm::vec4 density2;    // 1 / the volume's world-space extent, 0
 };
-static_assert(sizeof(SdfObjectUniforms) == 352);
+static_assert(sizeof(SdfObjectUniforms) == 400);
 
 class SdfRenderer {
 public:
@@ -114,8 +120,10 @@ public:
     // objects, uploads changed meshes of Mesh objects, writes the per-object uniforms.
     // `viewProj` and the target size compute the screen rect each raymarch draw covers.
     // `fields` resolves DisplaceField names to slots (null: those displacements are 0).
+    // `particles` resolves an ADR-1142 density source to its system's volume (ADR-1141); null, or a
+    // system that has no resolved volume, draws that object as no matter at all, i.e. nothing.
     void update(const scene::Scene& scene, const FrameTime& time, const glm::mat4& viewProj,
-                const FieldUniforms* fields = nullptr);
+                const FieldUniforms* fields = nullptr, const ParticleRenderer* particles = nullptr);
     // Inside the lit pass (frame and IBL groups already set): draws the Mesh-mode objects with
     // the entity PBR pipeline; sets its own group 1 and the material group via `materialBindGroup`.
     // `depthOnlyPipeline` (optional) replaces the lit pipelines, for the depth prepass and the

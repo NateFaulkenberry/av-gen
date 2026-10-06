@@ -460,6 +460,17 @@ Result<void> SdfObject::validate() const {
     if (look.shadowSteps < 1 || look.shadowSteps > 256) {
         return fail("sdf '{}': look shadowSteps must be in 1..256 (got {})", name, look.shadowSteps);
     }
+    if (density.active()) { // ADR-1142
+        if (renderMode != SdfRenderMode::Raymarch) {
+            return fail("sdf '{}': a density source draws by raymarching; renderMode must be raymarch", name);
+        }
+        if (!(density.iso > 0.0f) || !std::isfinite(density.iso)) {
+            return fail("sdf '{}': density.iso must be > 0 (got {})", name, density.iso);
+        }
+        if (!(density.sharpness >= 0.0f && density.sharpness <= 1.0f)) {
+            return fail("sdf '{}': density.sharpness must be in 0..1 (got {})", name, density.sharpness);
+        }
+    }
     return {};
 }
 
@@ -568,6 +579,9 @@ json SdfObject::toJson() const {
         j["look"]["staticCell"] = look.staticCell;
         j["look"]["staticRate"] = look.staticRate;
         j["look"]["staticRoll"] = look.staticRoll;
+    }
+    if (density.active()) { // ADR-1142: written only when present
+        j["density"] = json{{"particles", density.particles}, {"iso", density.iso}, {"sharpness", density.sharpness}};
     }
     return j;
 }
@@ -702,6 +716,32 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         if (!steps) return std::unexpected(steps.error());
         o.look.shadowSteps = *steps;
     }
+    if (j.contains("density")) { // ADR-1142
+        const json& dj = j.at("density");
+        if (!dj.is_object()) {
+            return fail("'density' must be an object {particles, iso, sharpness}");
+        }
+        for (const auto& [key, value] : dj.items()) {
+            if (key != "particles" && key != "iso" && key != "sharpness") {
+                return fail("'density': unknown key '{}' (expected particles, iso, sharpness)", key);
+            }
+        }
+        auto particles = readString(dj, "particles", "");
+        if (!particles) {
+            return fail("'density.particles': {}", particles.error().message);
+        }
+        if (particles->empty()) {
+            return fail("'density' needs 'particles', the particle system whose density volume this object draws");
+        }
+        o.density.particles = *particles;
+        auto iso = readFloat(dj, "iso", o.density.iso);
+        auto sharpness = readFloat(dj, "sharpness", o.density.sharpness);
+        if (!iso || !sharpness) {
+            return fail("'density': iso and sharpness must be numbers");
+        }
+        o.density.iso = *iso;
+        o.density.sharpness = *sharpness;
+    }
     if (auto ok = o.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -769,6 +809,10 @@ SdfParameters registerSdfParameters(params::ParameterSet& params, const SdfObjec
     r.f("look/shadow/softness", "look/shadow/softness", rest.look.shadowSoftness, 0.1f, 256.0f, 1.0f, 64.0f);
     r.v3("look/shadow/direction", "look/shadow/direction", rest.look.shadowDirection, -1.0f, 1.0f, -1.0f, 1.0f);
     r.i("look/shadow/steps", rest.look.shadowSteps, 1, 256, 8, 96);
+    if (rest.density.active()) { // ADR-1142: the iso level and the sharpening are performance controls
+        r.f("density/iso", "density/iso", rest.density.iso, 1e-4f, 1.0e4f, 0.05f, 8.0f);
+        r.f("density/sharpness", "density/sharpness", rest.density.sharpness, 0.0f, 1.0f, 0.0f, 1.0f);
+    }
 
     const int nodeCount = rest.tree.nodeCount();
     p.nodeAmount.assign(static_cast<std::size_t>(nodeCount), nullptr);
@@ -893,6 +937,8 @@ bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject
     index.copy("look/shadow/softness", live.look.shadowSoftness);
     index.copy("look/shadow/direction", live.look.shadowDirection);
     index.copy("look/shadow/steps", live.look.shadowSteps);
+    index.copy("density/iso", live.density.iso); // ADR-1142 (absent when the object has no density source)
+    index.copy("density/sharpness", live.density.sharpness);
 
     char buf[128];
     int i = 0;

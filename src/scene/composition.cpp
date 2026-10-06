@@ -625,6 +625,8 @@ void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
     ps.spline = prefixed(prefix, ps.spline);
     // The terrain's scatter objects are named with the same prefix (scatterObjectName below).
     ps.scatterAnchor.terrain = prefixed(prefix, ps.scatterAnchor.terrain);
+    // ADR-1140: the latent names an SDF node of the same scene file, which is flattened under the same prefix.
+    ps.latent.sdf = prefixed(prefix, ps.latent.sdf);
 }
 void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
     node.reference = prefixed(prefix, node.reference);
@@ -635,6 +637,7 @@ void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
 void prefixFieldReferences(SdfObject& so, const std::string& prefix) {
     prefixSdfReferences(so.tree.root, prefix);
     so.material.program = prefixed(prefix, so.material.program);
+    so.density.particles = prefixed(prefix, so.density.particles); // ADR-1142: a particles node of the same file
 }
 void prefixFieldReferences(MaterialProgram& mp, const std::string& prefix) {
     for (auto& op : mp.ops) {
@@ -12679,6 +12682,36 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                           parentName);
             }
             comp->findNode(child)->parent = parentName;
+        }
+        // ADR-1140 / ADR-1142: cross-object references are refused at load, by name, rather than
+        // left to draw nothing (ADR-704: a binding that silently answers 0 is the defect). Both
+        // name a node of THIS file; nesting prefixes them together when the scene is flattened.
+        for (const auto& nodePtr : comp->nodes_) {
+            const CompositionNode& n = *nodePtr;
+            if (n.kind == NodeKind::Particles && n.particleRest.latent.active()) {
+                const std::string& target = n.particleRest.latent.sdf;
+                const CompositionNode* sdfNode = comp->findNode(target);
+                if (sdfNode == nullptr || sdfNode->kind != NodeKind::Sdf) {
+                    return fail("node '{}': latent.sdf '{}' names no sdf node in this scene", n.name, target);
+                }
+                if (auto fits = sdfNode->sdfRest.tree.validate(spatial::SdfEvaluator::Interpreter); !fits) {
+                    return fail("node '{}': latent.sdf '{}' cannot be evaluated by the particle simulation's "
+                                "interpreter: {}",
+                                n.name, target, fits.error().message);
+                }
+            }
+            if (n.kind == NodeKind::Sdf && n.sdfRest.density.active()) {
+                const std::string& target = n.sdfRest.density.particles;
+                const CompositionNode* pNode = comp->findNode(target);
+                if (pNode == nullptr || pNode->kind != NodeKind::Particles) {
+                    return fail("node '{}': density.particles '{}' names no particles node in this scene", n.name,
+                                target);
+                }
+                if (!pNode->particleRest.density.enabled) {
+                    return fail("node '{}': density.particles '{}' has no density volume (give it a 'density' block)",
+                                n.name, target);
+                }
+            }
         }
     }
     return comp;
