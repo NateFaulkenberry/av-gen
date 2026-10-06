@@ -450,8 +450,8 @@ def land_blocks():
 
 
 # Magritte's clouds (pass 5): sculpted, solid-looking cumulus far out over the land, lit by the same raking sun.
-CLOUDS = [(-1100, 300, -1500, 1.0), (-250, 380, -2000, 1.4), (800, 330, -1700, 1.15), (1700, 280, -500, 1.0),
-          (1400, 360, 1100, 1.3), (-500, 320, 1800, 1.1), (-1800, 340, 400, 1.2)]
+CLOUDS = [(-1500, 420, -2100, 1.4), (-350, 520, -2800, 1.9), (1100, 460, -2400, 1.6), (2400, 400, -700, 1.4),
+          (2000, 500, 1500, 1.8), (-700, 440, 2500, 1.5), (-2500, 470, 550, 1.7)]
 
 
 def clouds():
@@ -620,16 +620,16 @@ STAGES = {
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
     # geometry...
     "Collapse": stage(pal="nightmare", landPal="nightmare", landRise=0.6, landTumble=0.3, melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
-                      rise=5.0, tumble=2.5, spin=3.0, kick=1.2, glowBlocks=9.0, echo=0.35, mosh=0.25, moshBlock=48.0,
+                      rise=5.0, tumble=2.5, spin=3.0, kick=1.2, glowBlocks=9.0, echo=0.35, mosh=0.12, moshBlock=48.0,
                       exposure=-0.6, gGlitch=0.8, motes=900.0, volDen=0.0016, **COLLAPSE_COMMON),
     #   ... fragments become particles and temporal fragments
     "Decay": stage(pal="nightmare", landPal="nightmare", landRise=3.5, landTumble=1.6, melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0], bark=0.12, barkSpeed=1.5, rise=9.0,
-                   tumble=4.0, spin=5.0, kick=1.6, glowBlocks=10.0, echo=0.5, mosh=0.45, moshBlock=64.0, cells=0.4, mottle=0.25, mottleRange=[0.2, 0.8, 0.7, 1.25],
+                   tumble=4.0, spin=5.0, kick=1.6, glowBlocks=10.0, echo=0.5, mosh=0.2, moshBlock=64.0, cells=0.4, mottle=0.25, mottleRange=[0.2, 0.8, 0.7, 1.25],
                    exposure=-0.5, gGlitch=1.0, motes=2600.0, volDen=0.0018, **COLLAPSE_COMMON),
     #   ... pixels, then colour
     "Pixels": stage(pal="nightmare", landPal="nightmare", landRise=7.0, landTumble=3.0, melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
-                    rise=12.0, tumble=5.0, spin=6.0, kick=1.6, glowBlocks=10.0, echo=0.4, mosh=0.3, moshBlock=96.0,
-                    cells=0.12, mottle=0.9, mottleRange=[0.2, 0.8, 0.45, 1.45], pixel=4.0, poster=0.0, sort=0.15, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
+                    rise=12.0, tumble=5.0, spin=6.0, kick=1.6, glowBlocks=10.0, echo=0.4, mosh=0.15, moshBlock=96.0,
+                    cells=0.12, mottle=0.9, mottleRange=[0.2, 0.8, 0.45, 1.45], pixel=0.0, poster=0.0, sort=0.15, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
                     **COLLAPSE_COMMON),
     #   ... and light: Tanguy's white.
     "Light": stage(pal="light", landPal="light", skyI=1.0, landRise=9.0, landTumble=4.0, lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,

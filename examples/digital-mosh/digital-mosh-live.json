@@ -5840,7 +5840,7 @@
      0.35
     ],
     "temporal/mosh/amount": [
-     0.25
+     0.12
     ],
     "temporal/mosh/block": [
      48.0
@@ -6167,7 +6167,7 @@
      0.5
     ],
     "temporal/mosh/amount": [
-     0.45
+     0.2
     ],
     "temporal/mosh/block": [
      64.0
@@ -6494,7 +6494,7 @@
      0.4
     ],
     "temporal/mosh/amount": [
-     0.3
+     0.15
     ],
     "temporal/mosh/block": [
      96.0
@@ -6503,7 +6503,7 @@
      0.0
     ],
     "post/display/pixelate": [
-     4.0
+     0.0
     ],
     "post/display/posterize": [
      0.0
