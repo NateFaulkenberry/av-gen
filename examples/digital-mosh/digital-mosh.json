@@ -38,7 +38,10 @@
   "temporal/mosh/rate": 10.0,
   "sources/driftA/rate": 0.031,
   "sources/driftB/rate": 0.0197,
-  "sources/driftC/rate": 0.047
+  "sources/driftC/rate": 0.047,
+  "sources/circleA/rate": 0.021,
+  "sources/circleB/rate": 0.021,
+  "sources/circleB/phase": 0.25
  },
  "sources": [
   {
@@ -162,6 +165,20 @@
   {
    "kind": "lfo",
    "name": "driftC",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "circleA",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "circleB",
    "settings": {
     "shape": "sine"
    }
@@ -626,6 +643,26 @@
    "depthMax": 1.0
   },
   {
+   "source": "lfo.circleA.bipolar",
+   "target": "camera/position",
+   "op": "add",
+   "amount": 46.0,
+   "component": 0,
+   "depthSource": "macro.circle",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "lfo.circleB.bipolar",
+   "target": "camera/position",
+   "op": "add",
+   "amount": 46.0,
+   "component": 2,
+   "depthSource": "macro.circle",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
    "source": "lfo.driftA.bipolar",
    "target": "camera/position",
    "op": "add",
@@ -727,6 +764,12 @@
   {
    "name": "drift",
    "label": "DRIFT",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "circle",
+   "label": "CIRCLE",
    "default": 0.0,
    "targets": []
   },
@@ -846,6 +889,26 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     -58.0,
+     -150.0,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
@@ -1079,6 +1142,9 @@
     ],
     "macros/flight": [
      0.3
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -1177,6 +1243,26 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     -58.0,
+     -150.0,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
@@ -1410,6 +1496,9 @@
     ],
     "macros/flight": [
      0.3
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -1508,6 +1597,26 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     -58.0,
+     -150.0,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
@@ -1742,6 +1851,9 @@
     "macros/flight": [
      0.3
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      2
     ],
@@ -1839,13 +1951,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -2072,6 +2204,9 @@
     ],
     "macros/flight": [
      0.35
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -2170,13 +2305,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -2403,6 +2558,9 @@
     ],
     "macros/flight": [
      0.35
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -2501,13 +2659,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -2735,6 +2913,9 @@
     "macros/flight": [
      0.35
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      2
     ],
@@ -2832,13 +3013,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -3065,6 +3266,9 @@
     ],
     "macros/flight": [
      0.4
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -3163,13 +3367,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -3397,19 +3621,22 @@
     "macros/flight": [
      0.4
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      2
     ],
     "camera/splineOffset": [
      0.0,
-     6.0,
+     3.0,
      0.0
     ],
     "camera/lookAhead": [
-     38
+     32
     ],
     "camera/fov": [
-     46
+     44
     ],
     "camera/splineBank": [
      9
@@ -3494,13 +3721,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.5
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -3727,6 +3974,9 @@
     ],
     "macros/flight": [
      0.4
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -3825,13 +4075,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.9
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -4059,27 +4329,26 @@
     "macros/flight": [
      0.5
     ],
+    "macros/circle": [
+     1.0
+    ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
-     -1.5,
-     0.0
+    "camera/position": [
+     4.0,
+     12.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     26
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     46
-    ],
-    "camera/splineBank": [
-     14
+     44
     ],
     "camera/roll": [
-     0.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -4156,13 +4425,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.9
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -4390,27 +4679,26 @@
     "macros/flight": [
      0.5
     ],
+    "macros/circle": [
+     1.0
+    ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
+    "camera/position": [
      4.0,
-     0.0
+     21.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     30
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     50
-    ],
-    "camera/splineBank": [
-     15
+     48
     ],
     "camera/roll": [
-     0.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -4487,13 +4775,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.9
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -4721,27 +5029,26 @@
     "macros/flight": [
      0.5
     ],
+    "macros/circle": [
+     1.0
+    ],
     "camera/mode": [
-     2
+     1
     ],
-    "camera/splineOffset": [
-     0.0,
-     9.0,
-     0.0
+    "camera/position": [
+     4.0,
+     8.0,
+     -8.0
     ],
-    "camera/lookAhead": [
-     36
+    "camera/target": [
+     12.0,
+     1.0339999999999998,
+     -14.0
     ],
     "camera/fov": [
-     52
-    ],
-    "camera/splineBank": [
-     13
+     50
     ],
     "camera/roll": [
-     4.0
-    ],
-    "camera/splineT": [
      0.0
     ]
    }
@@ -4818,13 +5125,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      2.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -5051,6 +5378,9 @@
     ],
     "macros/flight": [
      0.75
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -5149,13 +5479,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      2.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -5382,6 +5732,9 @@
     ],
     "macros/flight": [
      0.75
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
@@ -5480,13 +5833,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      2.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -5714,6 +6087,9 @@
     "macros/flight": [
      0.75
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      2
     ],
@@ -5811,13 +6187,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      1.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      1.0
@@ -5841,7 +6237,7 @@
      0.35
     ],
     "temporal/mosh/amount": [
-     0.12
+     0.0
     ],
     "temporal/mosh/block": [
      48.0
@@ -5911,7 +6307,7 @@
      1.0
     ],
     "macros/gMosh": [
-     1.0
+     0.0
     ],
     "macros/gGlitch": [
      0.8
@@ -6045,6 +6441,9 @@
     "macros/flight": [
      0.1
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      1
     ],
@@ -6138,13 +6537,33 @@
      0.7,
      1.25
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      1.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      1.0
@@ -6168,7 +6587,7 @@
      0.5
     ],
     "temporal/mosh/amount": [
-     0.2
+     0.0
     ],
     "temporal/mosh/block": [
      64.0
@@ -6238,7 +6657,7 @@
      1.0
     ],
     "macros/gMosh": [
-     1.0
+     0.0
     ],
     "macros/gGlitch": [
      1.0
@@ -6372,6 +6791,9 @@
     "macros/flight": [
      0.05
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      1
     ],
@@ -6465,13 +6887,33 @@
      0.45,
      1.45
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      1.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      1.0
@@ -6495,7 +6937,7 @@
      0.4
     ],
     "temporal/mosh/amount": [
-     0.15
+     0.0
     ],
     "temporal/mosh/block": [
      96.0
@@ -6565,7 +7007,7 @@
      1.0
     ],
     "macros/gMosh": [
-     1.0
+     0.0
     ],
     "macros/gGlitch": [
      1.0
@@ -6698,6 +7140,9 @@
     ],
     "macros/flight": [
      0.025
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      1
@@ -6792,13 +7237,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "material/eye/emissionIntensity": [
+     6.0
+    ],
     "macros/drift": [
      1.0
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      1.0
@@ -6822,7 +7287,7 @@
      0.6
     ],
     "temporal/mosh/amount": [
-     0.3
+     0.0
     ],
     "temporal/mosh/block": [
      32.0
@@ -6831,10 +7296,10 @@
      0.0
     ],
     "post/display/pixelate": [
-     40.0
+     0.0
     ],
     "post/display/posterize": [
-     3.0
+     0.0
     ],
     "post/sort/amount": [
      0.0
@@ -6892,7 +7357,7 @@
      1.0
     ],
     "macros/gMosh": [
-     1.0
+     0.0
     ],
     "macros/gGlitch": [
      1.0
@@ -7026,6 +7491,9 @@
     "macros/flight": [
      0.025
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      1
     ],
@@ -7119,13 +7587,33 @@
      0.84,
      1.12
     ],
+    "nodes/eye/rotation": [
+     -58.0,
+     -150.0,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
+    ],
     "macros/drift": [
      0.2
     ],
     "nodes/rock/position": [
-     -100.0,
-     28.62,
-     76.0
+     -122.98,
+     18.5,
+     77.57
     ],
     "field/collapse/strength": [
      0.0
@@ -7353,6 +7841,9 @@
     "macros/flight": [
      0.2
     ],
+    "macros/circle": [
+     0.0
+    ],
     "camera/mode": [
      2
     ],
@@ -7449,6 +7940,26 @@
      0.75,
      0.84,
      1.12
+    ],
+    "nodes/eye/rotation": [
+     15.54,
+     -116.57,
+     0.0
+    ],
+    "material/eye/op/24/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/op/31/constant/constant": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "material/eye/emissionIntensity": [
+     0.0
     ],
     "macros/drift": [
      0.5
@@ -7686,6 +8197,9 @@
     ],
     "macros/flight": [
      0.25
+    ],
+    "macros/circle": [
+     0.0
     ],
     "camera/mode": [
      2
