@@ -139,4 +139,17 @@ The T07 residual is unresolved: it persists even on the full path, and is probab
   - Per-frame uploads are at most +86-104 KB, with no visible effect on the submission CPU.
   - No change was made. Raw data is in the scratchpad `bench/`, and the method is in the agent's notes.
 - **Merge:** `origin/main` (a470a241) is already contained.
-- **Suites and the large-file check:** see the final report.
+- **Suites at `12e38c88`**, run one after the other under `tools/gpu-lock.sh`, after a reconfigure and a full
+  build, with each binary's exit code captured in the same shell:
+
+  | Suite | Exit code | Cases | Assertions |
+  |---|---|---|---|
+  | `avgen_tests` | **0** | 4162: 4142 passed, 19 skipped, **1 failed as expected** (the one `[!shouldfail]`) | 10,334,092 |
+  | `avgen_render_tests` | **0** | 619: 618 passed, 1 skipped | 643,495 |
+
+- **Large-file check** (`git diff origin/main..HEAD`):
+  - 0 files under `assets/`.
+  - No file over 1 MB.
+  - No video or audio.
+  - The only images are 11 documentation figures in `docs/prototypes/astral-forge/img/` (1.7 MB total, the
+    largest about 0.3 MB), the same practice as `docs/research/gpu-world/`.
