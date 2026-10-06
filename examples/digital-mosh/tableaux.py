@@ -155,8 +155,7 @@ def eye_program():
         op("multiply", 4, srcA=4, srcB=5),
         # the sclera: wax-cream, its veins dusty rose
         op("voronoiEdge", 5, srcA=0, value=0.16, seed=5),
-        op("smoothstep", 5, srcA=5, constant=[0.0, 0.012, 0, 0]),
-        op("remap", 5, srcA=5, value=1, constant=[0.0, 1.0, 0.55, 1.0]),       # faint veins
+        op("smoothstep", 5, srcA=5, constant=[0.0, 0.035, 0, 0]),
         op("constant", 6, constant=ROSE + [1]),
         op("constant", 7, constant=CREAM + [1]),
         op("mixBy", 6, srcA=6, srcB=7, srcC=5),
@@ -201,9 +200,8 @@ def night_program():
 # ============================================================================================ the nodes
 def sdf_node(name, at, tree, colour, lo, hi, roughness=0.6, program="", steps=128, scale=None, rotation=None,
              cast=True):
-    # no material emission: a program that writes emission (the night through the door) sets its own intensity
     material = {"baseColor": colour, "roughness": roughness, "metallic": 0.0, "emissiveColor": [1, 1, 1],
-                "emissiveIntensity": 1.0 if program == "night" else 0.0}
+                "emissiveIntensity": 1.0}
     if program:
         material["program"] = program
     n = {"name": name, "kind": "sdf", "position": at, "sdf": {
@@ -218,55 +216,12 @@ def sdf_node(name, at, tree, colour, lo, hi, roughness=0.6, program="", steps=12
     return n
 
 
-def veil():
-    """The mirror's own surface: a near-transparent, glossy, dark film at y = 0. Without it the reflected world is as
-    bright as the real one and there is no horizon; with it everything below reads as a reflection in still water,
-    and the sun leaves its glint."""
-    return {"name": "veil", "kind": "procedural", "position": [0, 0, 0], "scale": [40, 1, 40], "procedural": {
-        "source": {"kind": "box", "size": [500, 0.01, 500], "subdivisions": 1}, "distribution": {"kind": "single"},
-        "castsShadow": False, "lod": {"cull": False, "count": 1},
-        "material": {"baseColor": lin("#1c3036"), "roughness": 0.04, "metallic": 0.0, "alphaMode": "blend",
-                     "opacity": 0.34}}}
-
-
-REFLECT = [0.5, 0.58, 0.64]   # what still water does to what it reflects: darker, a little cooler
-
-
-def solid_program(name, colour, below=REFLECT):
-    """A plain surface whose reflection (local y < 0: every tableau node stands on the mirror) is darker and cooler,
-    as a reflection in still water is."""
-    return {"name": name, "ops": [
-        op("input", 0, input="localPosition"),
-        op("swizzle", 1, srcA=0, constant=[1, 1, 1, 1]),
-        op("smoothstep", 1, srcA=1, constant=[0.05, -0.05, 0, 0]),
-        op("constant", 2, constant=colour + [1]),
-        op("constant", 3, constant=[colour[i] * below[i] for i in range(3)] + [1]),
-        op("mixBy", 2, srcA=2, srcB=3, srcC=1),
-    ], "baseColor": 2, "metallic": -1, "roughness": -1, "emission": -1, "emissionIntensity": 0.0, "opacity": -1}
-
-
-def programs(bark):
-    b = dict(bark)
-    reg = b["baseColor"]
-    b["ops"] = list(b["ops"]) + [
-        op("input", 0, input="localPosition"),
-        op("swizzle", 1, srcA=0, constant=[1, 1, 1, 1]),
-        op("smoothstep", 1, srcA=1, constant=[0.05, -0.05, 0, 0]),
-        op("constant", 3, constant=[1, 1, 1, 1]),
-        op("constant", 4, constant=REFLECT + [1]),
-        op("mixBy", 3, srcA=3, srcB=4, srcC=1),
-        op("multiply", reg, srcA=reg, srcB=3),
-    ]
-    return [eye_program(), night_program(), b, solid_program("earth", EARTH[1]), solid_program("chalk", CHALK),
-            solid_program("stone", lin("#b6b8af")), solid_program("porcelain", PORCELAIN)]
-
-
 def nodes(olive):
     out = []
     out.append(sdf_node("eye", EYE_AT, eye_tree(), CREAM, [-EYE_R - 1] * 3, [EYE_R + 1] * 3, 0.2, program="eye"))
     sx, sy, sz = SLAB_HALF
     out.append(sdf_node("slab", SLAB_AT, slab_tree(olive), EARTH[1],
-                        [-sx - 12, -SLAB_Y - sy - 12, -sz - 12], [sx + 12, SLAB_Y + sy + 12, sz + 12], 0.95, program="earth"))
+                        [-sx - 12, -SLAB_Y - sy - 12, -sz - 12], [sx + 12, SLAB_Y + sy + 12, sz + 12], 0.95))
     # the olive, hung from the underside -- trunk and three limbs, each its own object (ADR-1160 shadows), scaled 3
     k = 3.2
     under = SLAB_Y - sy + 0.6
@@ -287,19 +242,19 @@ def nodes(olive):
     kt = 2.6
     out.append(sdf_node("hangTanguy", SLAB_AT, hanging(hz["root"]["children"][0], [-34.0, under - 5.2, 18.0], kt),
                         lin("#b6b8af"), [-40 / kt, -under / kt, 12 / kt], [-28 / kt, under / kt, 24 / kt], 0.3,
-                        program="stone", scale=kt))
+                        scale=kt))
     out.append(sdf_node("door", DOOR_AT, door_frame_tree(), CHALK, [-5.6, -19.6, -1.2], [5.6, 19.6, 1.2], 0.7,
-                        program="chalk", rotation=[0, DOOR_YAW, 0]))
+                        rotation=[0, DOOR_YAW, 0]))
     out.append(sdf_node("doorNight", DOOR_AT, door_panel_tree(), NIGHT[1], [-3.8, -17.3, -0.2], [3.8, 17.3, 0.2],
                         0.9, program="night", rotation=[0, DOOR_YAW, 0], cast=False))
     ex, ey, ew = stair_extent()
     out.append(sdf_node("stair", STAIR_AT, stair_tree(), CHALK, [-1, -ey - 2, -ew - 1], [ex + 1, ey + 2, ew + 1], 0.8,
-                        program="chalk", rotation=[0, STAIR_YAW, 0]))
+                        rotation=[0, STAIR_YAW, 0]))
     out.append(sdf_node("colossus", FLOWER_AT, flower_tree(), PORCELAIN, [-1.9, -7.8, -1.8], [2.3, 7.8, 2.0], 0.25,
-                        program="porcelain", scale=FLOWER_SCALE))
+                        scale=FLOWER_SCALE))
     for i, (at, s, sink) in enumerate(TANGUY_FORMS):
         out.append(sdf_node(f"form{i}", at, tanguy_mirrored(sink), lin("#b6b8af"), [-1.7, -3.2, -1.5],
-                            [1.7, 3.2, 1.5], 0.35, program="stone", scale=s))
+                            [1.7, 3.2, 1.5], 0.35, scale=s))
     return out
 
 
