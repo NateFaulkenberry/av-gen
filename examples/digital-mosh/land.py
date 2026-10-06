@@ -25,23 +25,56 @@ FAR_SIZE = 8000.0
 
 LAYERS = [
     # long low swells: the land breathes over hundreds of metres
-    {"frequency": 0.0022, "amplitude": 16.0, "ridged": 0.0, "warp": 90.0},
-    # dunes: softly crested, wind-drawn
-    {"frequency": 0.011, "amplitude": 4.0, "ridged": 0.25, "warp": 26.0},
+    {"frequency": 0.0022, "amplitude": 26.0, "ridged": 0.0, "warp": 320.0},
+    # dune fields: the swells broken into long rises a few hundred metres apart
+    {"frequency": 0.0055, "amplitude": 16.0, "ridged": 0.35, "warp": 170.0},
+    # dunes: crested, wind-drawn, tall enough to throw a shadow across the next one in a low sun
+    {"frequency": 0.013, "amplitude": 24.0, "ridged": 0.35, "warp": 60.0},
     # ripples
-    {"frequency": 0.05, "amplitude": 0.45, "ridged": 0.0, "warp": 4.0},
+    {"frequency": 0.05, "amplitude": 0.5, "ridged": 0.0, "warp": 4.0},
     {"frequency": 0.21, "amplitude": 0.07, "ridged": 0.0, "warp": 0.0},
 ]
 
-# The stage: a salt pan, level and glassy, the tree and the Tanguy object on it.
-PAN = {"name": "pan", "kind": "flat", "path": [[4.0, 0.0, -8.0]], "width": 110.0, "falloff": 0.7,
-       "flatten": 0.96, "roughness": 0.06, "smoothing": 0}
-# The dry riverbed: enters the pan from the front left -- a line the camera can follow in.
+# The stage: a small salt pan, level and glassy, the Tanguy object hovering on it (Tanguy's objects stand on a floor).
+PAN = {"name": "pan", "kind": "flat", "path": [[4.0, 0.0, -8.0]], "width": 60.0, "falloff": 0.5,
+       "flatten": 1.0, "roughness": 0.06, "smoothing": 0}
+# The olive stands on a knoll on the riverbed's bank, above the pan (the owner: on a feature, not on the flat).
+KNOLL_XZ = (-34.0, 12.0)
+KNOLL = {"name": "knoll", "kind": "ridge", "path": [[KNOLL_XZ[0], 0.0, KNOLL_XZ[1]]], "width": 26.0,
+         "amplitude": 6.5, "falloff": 1.3, "roughness": 0.4}
+# The dry riverbed: comes in from the front left, cuts past the knoll's foot and spills into the pan -- a deep
+# leading line the camera can travel along.
 RIVERBED = {"name": "riverbed", "kind": "valley",
-            "path": [[-420.0, 0.0, 260.0], [-250.0, 0.0, 170.0], [-150.0, 0.0, 150.0], [-80.0, 0.0, 70.0],
-                     [-30.0, 0.0, 42.0], [10.0, 0.0, 30.0], [40.0, 0.0, 6.0]],
-            "width": 10.0, "amplitude": 1.6, "falloff": 1.3, "roughness": 0.25, "smoothing": 3}
-NEAR_FEATURES = [PAN, RIVERBED]
+            "path": [[-420.0, 0.0, 260.0], [-250.0, 0.0, 170.0], [-150.0, 0.0, 120.0], [-84.0, 0.0, 62.0],
+                     [-62.0, 0.0, 34.0], [-52.0, 0.0, 10.0], [-38.0, 0.0, -10.0], [-20.0, 0.0, -20.0]],
+            "width": 9.0, "amplitude": 4.2, "falloff": 1.1, "roughness": 0.2, "smoothing": 3}
+# The middle ground: Cap de Creus brought close -- an eroded escarpment wall 200 m behind the pan, and mesas and a
+# butte at 130-160 m, where the camera sees their height and their shadows.
+ESCARPMENT = [
+    {"name": "escarp", "kind": "ridge",
+     "path": [[-340.0, 0.0, -110.0], [-190.0, 0.0, -170.0], [-40.0, 0.0, -195.0], [120.0, 0.0, -205.0],
+              [300.0, 0.0, -150.0]],
+     "width": 70.0, "amplitude": 34.0, "falloff": 2.0, "roughness": 0.7, "smoothing": 3},
+    {"name": "escarpTop", "kind": "flat",
+     "path": [[-340.0, 30.0, -125.0], [-190.0, 30.0, -185.0], [-40.0, 30.0, -210.0], [120.0, 30.0, -220.0],
+              [300.0, 30.0, -165.0]],
+     "width": 46.0, "falloff": 3.0, "flatten": 0.85, "roughness": 0.3},
+]
+MESAS = [
+    {"name": "mesaE", "kind": "ridge", "path": [[140.0, 0.0, -50.0], [168.0, 0.0, -20.0]], "width": 34.0,
+     "amplitude": 24.0, "falloff": 3.2, "roughness": 0.6},
+    {"name": "mesaEtop", "kind": "flat", "path": [[140.0, 21.0, -50.0], [168.0, 21.0, -20.0]], "width": 28.0,
+     "falloff": 3.0, "flatten": 1.0, "roughness": 0.15},
+    {"name": "butteW", "kind": "ridge", "path": [[-130.0, 0.0, -58.0]], "width": 22.0, "amplitude": 17.0,
+     "falloff": 3.2, "roughness": 0.6},
+    {"name": "butteWtop", "kind": "flat", "path": [[-130.0, 15.0, -58.0]], "width": 16.0, "falloff": 3.0,
+     "flatten": 1.0, "roughness": 0.15},
+    {"name": "mesaS", "kind": "ridge", "path": [[110.0, 0.0, 95.0], [150.0, 0.0, 120.0]], "width": 30.0,
+     "amplitude": 13.0, "falloff": 3.2, "roughness": 0.6},
+    {"name": "mesaStop", "kind": "flat", "path": [[110.0, 11.0, 95.0], [150.0, 11.0, 120.0]], "width": 24.0,
+     "falloff": 3.0, "flatten": 1.0, "roughness": 0.15},
+]
+NEAR_FEATURES = [PAN, KNOLL, RIVERBED] + ESCARPMENT + MESAS
 
 FAR_ONLY = [
     # the escarpment (Cap de Creus): a long eroded wall to the north-west
@@ -73,7 +106,7 @@ FAR_ONLY = [
 
 def world(far=False):
     w = {"name": "dream-far" if far else "dream", "seed": 20261005, "size": [FAR_SIZE if far else NEAR_SIZE] * 2,
-         "baseHeight": 0.0, "erosion": 0.2, "seaLevel": -1000.0, "layers": copy.deepcopy(LAYERS),
+         "baseHeight": 11.0, "erosion": 0.2, "seaLevel": -1000.0, "layers": copy.deepcopy(LAYERS),
          "features": copy.deepcopy(NEAR_FEATURES if not far else NEAR_FEATURES + FAR_ONLY), "biomes": []}
     # NB: both lands must share every layer, or they would disagree at the near land's edge; the ranges get their
     # roughness from their features' `roughness` (which multiplies the base noise inside them) instead.

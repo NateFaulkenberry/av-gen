@@ -9,6 +9,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/sdf_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "spatial/sdf.hpp"
@@ -1699,5 +1700,89 @@ TEST_CASE("A raymarched SDF casts the shadow a mesh casts, from any camera, cast
         CHECK(ns > nm * 3 / 4);
         CHECK(ns < nm * 5 / 4);
         CHECK(glm::length(cs - cm) < 4.0f);
+    }
+}
+
+// ADR-1165: a raymarched caster marched at half or a quarter of the shadow map's resolution and composited in throws the
+// shadow the full-resolution march throws -- the same area, in the same place -- and the low-resolution side is really
+// what drew it (the stats name the low layer's size; at scale 1 there is none).
+TEST_CASE("A raymarched SDF's shadow marched at a fraction of the map is the full-resolution shadow", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const glm::vec3 casterAt(-4.0f, 3.0f, -2.0f);
+    constexpr float kRadius = 1.2f;
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, -0.45f, 0.3f));
+    const glm::vec3 shadowAt = casterAt + lightDir * (casterAt.y / -lightDir.y);
+    const auto sceneWith = [&](bool caster) {
+        scene::Scene s = baseScene();
+        s.lights.clear();
+        const scene::MeshId ground = s.addMesh(scene::makePlane(30.0f, 8));
+        auto& g = s.addEntity("ground", ground);
+        g.material.baseColor = glm::vec3(0.8f);
+        g.material.roughness = 0.9f;
+        scene::PunctualLight key;
+        key.name = "key";
+        key.type = scene::PunctualLight::Type::Directional;
+        key.direction = lightDir;
+        key.intensity = 4.0f;
+        key.castsShadow = true;
+        key.contactShadow = false;
+        s.addLight(key);
+        s.camera.position = glm::vec3(6.0f, 5.0f, 7.0f);
+        s.camera.target = shadowAt;
+        if (caster) {
+            scene::SdfObject o;
+            o.name = "caster";
+            o.tree = treeOf(sphere(kRadius));
+            o.transform.position = casterAt;
+            o.boundsMin = glm::vec3(-kRadius - 0.1f);
+            o.boundsMax = glm::vec3(kRadius + 0.1f);
+            s.sdfs.push_back(o);
+        }
+        return s;
+    };
+    const auto renderAt = [&](std::uint32_t scale, bool caster, std::uint32_t& marched) {
+        rendering::QualitySettings held = rendering::QualitySettings::forTier(rendering::QualityTier::High);
+        held.sdfShadowScale = scale;
+        renderer.setQualitySettings(held);
+        auto img = renderWith(renderer, sceneWith(caster), 0.0, 192, 192);
+        marched = renderer.stats().sdf.shadowMarchResolution;
+        return img;
+    };
+    std::uint32_t marched = 0;
+    const auto none = renderAt(1, false, marched);
+    const auto darkened = [&](const gpu::Image8& img, glm::vec2& centroid) {
+        long n = 0;
+        glm::dvec2 sum(0.0);
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                if (int(none.pixel(x, y)[1]) - int(img.pixel(x, y)[1]) > 12) {
+                    ++n;
+                    sum += glm::dvec2(x, y);
+                }
+            }
+        }
+        centroid = n > 0 ? glm::vec2(sum / double(n)) : glm::vec2(-1.0f);
+        return n;
+    };
+    const auto full = renderAt(1, true, marched);
+    CHECK(marched == 0); // scale 1: the march goes straight into the map, as before
+    glm::vec2 cf{};
+    const long nf = darkened(full, cf);
+    REQUIRE(nf > 200);
+    for (const std::uint32_t scale : {2u, 4u}) {
+        const auto low = renderAt(scale, true, marched);
+        CHECK(ctx->errorCount() == 0);
+        CHECK(marched >= rendering::SdfRenderer::kMinLowResShadow); // the low side drew it
+        glm::vec2 cl{};
+        const long nl = darkened(low, cl);
+        INFO("scale " << scale << " (low layer " << marched << " texels): darkens " << nl << " px around (" << cl.x << ", "
+                      << cl.y << "); full resolution " << nf << " px around (" << cf.x << ", " << cf.y << ")");
+        CHECK(nl > nf * 9 / 10);
+        CHECK(nl < nf * 11 / 10);
+        CHECK(glm::length(cl - cf) < 1.5f);
     }
 }

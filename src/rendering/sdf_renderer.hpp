@@ -45,6 +45,7 @@ struct SdfStats {
     std::uint32_t objects = 0;          // visible SDF objects drawn this frame (both modes)
     std::uint32_t raymarchObjects = 0;  // drawn by the raymarch pass
     std::uint32_t shadowOnlyObjects = 0; // ADR-1160: off the camera's screen, marched into the shadow maps only
+    std::uint32_t shadowMarchResolution = 0; // ADR-1165: the low layer's size in texels (0 = marched at the map's own)
     std::uint32_t meshObjects = 0;      // drawn as meshes
     std::uint32_t packedNodes = 0;      // packed records uploaded this frame (raymarch objects)
     std::uint32_t meshTriangles = 0;    // triangles of the drawn meshed objects
@@ -171,11 +172,27 @@ public:
     // `maxSteps` in the shader, so a cheap object never gets an expensive shadow.
     void setSdfShadowSteps(std::uint32_t steps) { sdfShadowSteps_ = steps; }
 
+    // ADR-1165: the raymarched casters' shadow resolution, as a divisor of the shadow map's (1 = full, 2 = half,
+    // 4 = quarter; `QualitySettings::sdfShadowScale`). Above 1 the casters of each view are marched into a
+    // low-resolution depth layer (`lowResShadowLayer`, drawn with `drawRaymarchDepth(..., true)` by the caller) and
+    // `drawShadowComposite` copies it into the view's full-resolution layer. The low layer is never smaller than
+    // `kMinLowResShadow` texels, so a 1024 atlas at a quarter still marches 512.
+    void setSdfShadowScale(std::uint32_t scale) { sdfShadowScale_ = scale; }
+    static constexpr std::uint32_t kMinLowResShadow = 512;
+    // This frame's low-resolution side, after update(): true when it is in use (a scale above 1, an atlas larger than
+    // the minimum, and at least one raymarched caster). Allocates or resizes the layers. False = draw as before.
+    [[nodiscard]] bool prepareLowResShadows(const scene::Scene& scene, std::uint32_t views,
+                                            std::uint32_t atlasResolution);
+    [[nodiscard]] const wgpu::TextureView& lowResShadowLayer(std::uint32_t view) const;
+    // Inside the view's full-resolution shadow pass: the composite (one triangle). Binds its own pipeline and group 0.
+    void drawShadowComposite(wgpu::RenderPassEncoder& pass, std::uint32_t view);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     SdfStats stats_;
     std::uint32_t sdfShadowSteps_ = 24; // the QualitySettings default
+    std::uint32_t sdfShadowScale_ = 1;  // ADR-1165
 };
 
 } // namespace avgen::rendering

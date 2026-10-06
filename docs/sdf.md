@@ -263,6 +263,9 @@ the struct default when missing; `fromJson` validates the result, so a bad `rend
   depth, but prepass readers (GTAO, the screen-space shadow mask, contact shadows) no longer see it.
   The shadow march is the light's (ADR-1160): each shadow view projects its own quad, rays start on the
   view's near plane, and a caster off the camera's screen still casts (a shadow-only item).
+  On the live tiers the march runs at a fraction of the map's resolution and is composited in (ADR-1165,
+  `QualitySettings::sdfShadowScale`: offline 1, live 2, Low/Emergency 4, never under 512 texels): a caster costs the
+  texels it covers times its steps times its nodes, per shadow view.
 - `maxSteps`, `epsilon` (hit threshold, scaled by distance so it is screen-space constant),
   `stepScale` (relaxation; displaced or twisted trees need < 1) and `normalEpsilon` are raymarch
   only. `resolution` is mesh only.

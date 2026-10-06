@@ -207,6 +207,18 @@ struct SdfRenderer::Impl {
     std::size_t cacheFrames = 120;
     bool initialised = false;
     bool warnedLimit = false;
+    // ADR-1165: the low-resolution shadow side. One Depth24Plus array (a layer per shadow view), a 2D view of each
+    // layer (the attachment, and the composite's texture), and a composite bind group per layer.
+    wgpu::Texture lowShadow;
+    std::uint32_t lowShadowSize = 0;
+    std::uint32_t lowShadowLayers = 0;
+    std::vector<wgpu::TextureView> lowShadowViews;
+    std::vector<wgpu::BindGroup> lowShadowGroups;
+    wgpu::BindGroupLayout compositeLayout;
+    wgpu::RenderPipeline compositePipeline;
+    wgpu::Buffer compositeUniforms;
+    std::uint32_t compositeFullSize = 0;
+    Result<void> createCompositePipeline();
 };
 
 SdfRenderer::SdfRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -315,8 +327,153 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     if (auto r = im.createRaymarchPipeline(*raymarch); !r) {
         return r;
     }
+    if (auto r = im.createCompositePipeline(); !r) {
+        return r;
+    }
     im.initialised = true;
     return {};
+}
+
+// ADR-1165: the low-resolution shadow composite (sdf_shadow_composite.wgsl).
+Result<void> SdfRenderer::Impl::createCompositePipeline() {
+    const auto& device = context.device();
+    auto module = shaders.load("sdf_shadow_composite.wgsl");
+    if (!module) {
+        return std::unexpected(module.error());
+    }
+    if (!compositeLayout) {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Fragment;
+        entries[0].texture.sampleType = wgpu::TextureSampleType::Depth;
+        entries[0].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Fragment;
+        entries[1].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[1].buffer.minBindingSize = 16;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "sdf-shadow-composite-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        compositeLayout = device.CreateBindGroupLayout(&desc);
+        wgpu::BufferDescriptor ub{};
+        ub.label = "sdf-shadow-composite-uniforms";
+        ub.size = 16;
+        ub.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        compositeUniforms = device.CreateBuffer(&ub);
+    }
+    wgpu::PipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.label = "sdf-shadow-composite";
+    layoutDesc.bindGroupLayoutCount = 1;
+    layoutDesc.bindGroupLayouts = &compositeLayout;
+    const wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+    wgpu::FragmentState fragment{};
+    fragment.module = *module;
+    fragment.entryPoint = "fs_composite";
+    fragment.targetCount = 0;
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less; // the shadow passes' own test (the depth-only pipelines)
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "sdf-shadow-composite";
+    desc.layout = layout;
+    desc.vertex.module = *module;
+    desc.vertex.entryPoint = "vs_composite";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.fragment = &fragment;
+    context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
+    compositePipeline = gpu::createRenderPipeline(device, &desc);
+    std::string error;
+    auto future = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
+                                       [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                                           if (type != wgpu::ErrorType::NoError) {
+                                               error = gpu::Context::toString(msg);
+                                           }
+                                       });
+    context.waitFor(future);
+    if (!error.empty() || !compositePipeline) {
+        return fail("pipeline 'sdf-shadow-composite' creation failed: {}", error);
+    }
+    return {};
+}
+
+bool SdfRenderer::prepareLowResShadows(const scene::Scene& scene, std::uint32_t views, std::uint32_t atlasResolution) {
+    Impl& im = *impl_;
+    stats_.shadowMarchResolution = 0;
+    const std::uint32_t scale = std::clamp(sdfShadowScale_, 1u, 8u);
+    if (!im.initialised || !im.compositePipeline || scale <= 1 || views == 0 ||
+        atlasResolution <= kMinLowResShadow) {
+        return false;
+    }
+    bool anyCaster = false;
+    for (const auto& item : im.raymarchItems) {
+        anyCaster = anyCaster || (item.objectIndex < scene.sdfs.size() && scene.sdfs[item.objectIndex].castShadows);
+    }
+    if (!anyCaster) {
+        return false;
+    }
+    const std::uint32_t size = std::max(kMinLowResShadow, atlasResolution / scale);
+    if (size >= atlasResolution) {
+        return false;
+    }
+    const auto& device = im.context.device();
+    if (!im.lowShadow || im.lowShadowSize != size || im.lowShadowLayers < views) {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "sdf-shadow-low";
+        desc.size = {size, size, views};
+        desc.format = im.depthFormat; // the shadow atlas's format (ShadowRenderer::kFormat): the shadow pipelines serve both
+        desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        im.lowShadow = device.CreateTexture(&desc);
+        im.lowShadowSize = size;
+        im.lowShadowLayers = views;
+        im.lowShadowViews.clear();
+        im.lowShadowGroups.clear();
+        for (std::uint32_t v = 0; v < views; ++v) {
+            wgpu::TextureViewDescriptor vd{};
+            vd.dimension = wgpu::TextureViewDimension::e2D;
+            vd.baseArrayLayer = v;
+            vd.arrayLayerCount = 1;
+            vd.aspect = wgpu::TextureAspect::DepthOnly;
+            im.lowShadowViews.push_back(im.lowShadow.CreateView(&vd));
+            std::array<wgpu::BindGroupEntry, 2> entries{};
+            entries[0].binding = 0;
+            entries[0].textureView = im.lowShadowViews.back();
+            entries[1].binding = 1;
+            entries[1].buffer = im.compositeUniforms;
+            entries[1].size = 16;
+            wgpu::BindGroupDescriptor gd{};
+            gd.label = "sdf-shadow-composite";
+            gd.layout = im.compositeLayout;
+            gd.entryCount = entries.size();
+            gd.entries = entries.data();
+            im.lowShadowGroups.push_back(device.CreateBindGroup(&gd));
+        }
+    }
+    if (im.compositeFullSize != atlasResolution) {
+        const std::array<float, 4> full{static_cast<float>(atlasResolution), static_cast<float>(atlasResolution), 0.0f,
+                                        0.0f};
+        im.context.queue().WriteBuffer(im.compositeUniforms, 0, full.data(), sizeof(full));
+        im.compositeFullSize = atlasResolution;
+    }
+    stats_.shadowMarchResolution = size;
+    return true;
+}
+
+const wgpu::TextureView& SdfRenderer::lowResShadowLayer(std::uint32_t view) const {
+    return impl_->lowShadowViews.at(view);
+}
+
+void SdfRenderer::drawShadowComposite(wgpu::RenderPassEncoder& pass, std::uint32_t view) {
+    Impl& im = *impl_;
+    if (view >= im.lowShadowGroups.size()) {
+        return;
+    }
+    pass.SetPipeline(im.compositePipeline);
+    pass.SetBindGroup(0, im.lowShadowGroups[view]);
+    pass.Draw(3);
 }
 
 void SdfRenderer::setMeshPipelines(const wgpu::RenderPipeline& cull, const wgpu::RenderPipeline& noCull) {
@@ -330,7 +487,10 @@ Result<void> SdfRenderer::reload() {
     if (!raymarch) {
         return std::unexpected(raymarch.error());
     }
-    return im.createRaymarchPipeline(*raymarch);
+    if (auto r = im.createRaymarchPipeline(*raymarch); !r) {
+        return r;
+    }
+    return im.createCompositePipeline();
 }
 
 Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelineDescriptor& desc, const char* label) {

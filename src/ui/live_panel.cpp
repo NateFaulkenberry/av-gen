@@ -352,6 +352,10 @@ void ControlPanel::drawLive(app::Engine& engine) {
                             static_cast<double>(s.volumeStepScale) * 100.0);
                 ImGui::Text("Shadows %u cascades, %u px maps, %s; small casters under %.0f px skipped", s.cascadeCount,
                             s.shadowResolution, s.softShadows ? "soft" : "plain", static_cast<double>(s.shadowCasterMinPixels));
+                // ADR-1165
+                ImGui::Text("Raymarched SDF shadows at %s of the map", s.sdfShadowScale <= 1   ? "the resolution"
+                                                                       : s.sdfShadowScale == 2 ? "half"
+                                                                                               : "a quarter");
                 ImGui::Text("Motion blur %s, depth of field %s, effect taps %.0f%%", s.motionBlur ? "on" : "off",
                             s.depthOfField ? "on" : "off", static_cast<double>(s.postEffectQuality) * 100.0);
                 ImGui::Text("Detail: LOD bias %.2f, draw distance %.0f%%", static_cast<double>(s.lodBias),

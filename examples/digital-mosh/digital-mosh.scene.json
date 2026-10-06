@@ -6,19 +6,19 @@
  "camera": {
   "mode": 1,
   "position": [
-   2,
-   1.172,
-   26
+   -2,
+   12.357,
+   54
   ],
   "target": [
-   -2,
-   3.4,
-   -4
+   -6,
+   12.0,
+   20
   ],
-  "fov": 30
+  "fov": 34
  },
  "environment": {
-  "intensity": 0.22,
+  "intensity": 0.12,
   "background": [
    0.7758,
    0.6795,
@@ -46,9 +46,9 @@
    "background": true,
    "useKeyLight": false,
    "sunDirection": [
-    -0.42194543383240274,
-    0.20092639706304893,
-    -0.8840761470774153
+    -0.8918325397005952,
+    0.21800350970458993,
+    -0.39637001764470897
    ],
    "zenithColor": [
     0.0497,
@@ -84,9 +84,9 @@
    "type": "directional",
    "role": "key",
    "direction": [
-    0.42194543383240274,
-    -0.20092639706304893,
-    0.8840761470774153
+    0.8918325397005952,
+    -0.21800350970458993,
+    0.39637001764470897
    ],
    "color": [
     1.0,
@@ -96,7 +96,8 @@
    "intensity": 9.0,
    "castsShadow": true,
    "shadowStrength": 1.0,
-   "softness": 0.35
+   "softness": 0.35,
+   "shadowBias": 0.006
   },
   {
    "name": "fracture",
@@ -104,7 +105,7 @@
    "type": "point",
    "position": [
     12.0,
-    2.1390000000000002,
+    2.534,
     -14.0
    ],
    "color": [
@@ -132,12 +133,12 @@
    ],
    "boundsMin": [
     -60,
-    -6,
+    -40,
     -68
    ],
    "boundsMax": [
     68,
-    6,
+    40,
     60
    ],
    "injectField": "infect",
@@ -389,7 +390,7 @@
     {
      "kind": "noise",
      "dst": 5,
-     "srcA": 0,
+     "srcA": 1,
      "value": 0.035,
      "seed": 7
     },
@@ -410,6 +411,34 @@
      "dst": 6,
      "srcA": 6,
      "srcB": 5
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      0.3,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.3095,
+      0.0953,
+      0.0369,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 3,
+     "srcC": 5
     },
     {
      "kind": "constant",
@@ -630,350 +659,6 @@
    "metallic": -1,
    "roughness": -1,
    "emission": -1,
-   "emissionIntensity": 0.0,
-   "opacity": -1
-  },
-  {
-   "name": "liquid",
-   "ops": [
-    {
-     "kind": "input",
-     "dst": 0,
-     "input": "worldPosition"
-    },
-    {
-     "kind": "quantize",
-     "dst": 1,
-     "srcA": 0,
-     "value": 2.2,
-     "seed": 3
-    },
-    {
-     "kind": "field",
-     "dst": 2,
-     "field": "stain"
-    },
-    {
-     "kind": "field",
-     "dst": 3,
-     "field": "stuck"
-    },
-    {
-     "kind": "add",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
-     "kind": "remap",
-     "dst": 2,
-     "srcA": 2,
-     "value": 1,
-     "constant": [
-      0.04,
-      0.9,
-      0.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "swizzle",
-     "dst": 4,
-     "srcA": 1,
-     "constant": [
-      3,
-      3,
-      3,
-      3
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      -1,
-      -1,
-      -1,
-      -1
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 7,
-     "srcA": 4,
-     "constant": [
-      0.0,
-      0.035,
-      0,
-      0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 7,
-     "srcA": 7,
-     "value": 1,
-     "constant": [
-      0.0,
-      1.0,
-      1.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 4,
-     "srcA": 4,
-     "constant": [
-      0.0,
-      0.004,
-      0,
-      0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "depth"
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      2.5,
-      8.0,
-      0,
-      0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 3
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "footprint"
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      0.054545454545454536,
-      0.20454545454545453,
-      0,
-      0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 2,
-     "srcC": 3
-    },
-    {
-     "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
-     "value": 1,
-     "constant": [
-      0.0,
-      1.0,
-      1.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 6,
-     "constant": [
-      0.5647,
-      0.521,
-      0.4233,
-      1
-     ]
-    },
-    {
-     "kind": "noise",
-     "dst": 5,
-     "srcA": 0,
-     "value": 0.035,
-     "seed": 7
-    },
-    {
-     "kind": "remap",
-     "dst": 5,
-     "srcA": 5,
-     "value": 1,
-     "constant": [
-      0.25,
-      0.75,
-      0.84,
-      1.12
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 5
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0262,
-      0.0037,
-      0.0137,
-      1
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 5,
-     "srcC": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.9132,
-      0.003,
-      0.104,
-      1
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0,
-      0,
-      0,
-      0
-     ]
-    },
-    {
-     "kind": "hueShift",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 3,
-     "value": 0.0
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 5
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "audio"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      3,
-      3,
-      3,
-      3
-     ]
-    },
-    {
-     "kind": "field",
-     "dst": 2,
-     "field": "kick"
-    },
-    {
-     "kind": "add",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 2
-    },
-    {
-     "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
-     "value": 0,
-     "constant": [
-      0.0,
-      1.0,
-      0.25,
-      1.6
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.92,
-      0.92,
-      0.92,
-      1
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.16,
-      0.16,
-      0.16,
-      1
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3,
-     "srcC": 4
-    }
-   ],
-   "baseColor": 6,
-   "metallic": -1,
-   "roughness": 2,
-   "emission": 7,
    "emissionIntensity": 0.0,
    "opacity": -1
   },
@@ -1891,7 +1576,7 @@
    "kind": "field",
    "position": [
     12.0,
-    1.639,
+    2.034,
     -14.0
    ],
    "field": {
@@ -1928,7 +1613,7 @@
    "kind": "field",
    "position": [
     12.0,
-    1.639,
+    2.034,
     -14.0
    ],
    "field": {
@@ -2008,9 +1693,9 @@
    "name": "stuck",
    "kind": "field",
    "position": [
-    -2.7200792895420376,
-    3.581718881302763,
-    0.3568657069883394
+    -30.72007928954204,
+    10.479718881302762,
+    12.356865706988339
    ],
    "field": {
     "kind": "box",
@@ -2031,7 +1716,7 @@
    "kind": "field",
    "position": [
     12.0,
-    1.639,
+    2.034,
     -14.0
    ],
    "field": {
@@ -2093,89 +1778,6 @@
    }
   },
   {
-   "name": "pool",
-   "kind": "field",
-   "position": [
-    4.0,
-    0.0,
-    -8.0
-   ],
-   "field": {
-    "kind": "box",
-    "size": [
-     9.0,
-     50.0,
-     9.0
-    ],
-    "softness": 7.0,
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "liquidKick",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "compound",
-    "children": [
-     "kick",
-     "pool"
-    ],
-    "combine": "multiply",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "swellNoise",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "noise",
-    "frequency": 0.09,
-    "speed": 0.35,
-    "seed": 17,
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "liquidSwell",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "compound",
-    "children": [
-     "swellNoise",
-     "pool"
-    ],
-    "combine": "multiply",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
    "name": "land",
    "kind": "terrain",
    "position": [
@@ -2190,25 +1792,31 @@
      900.0,
      900.0
     ],
-    "baseHeight": 0.0,
+    "baseHeight": 11.0,
     "erosion": 0.2,
     "seaLevel": -1000.0,
     "layers": [
      {
       "frequency": 0.0022,
-      "amplitude": 16.0,
+      "amplitude": 26.0,
       "ridged": 0.0,
-      "warp": 90.0
+      "warp": 320.0
      },
      {
-      "frequency": 0.011,
-      "amplitude": 4.0,
-      "ridged": 0.25,
-      "warp": 26.0
+      "frequency": 0.0055,
+      "amplitude": 16.0,
+      "ridged": 0.35,
+      "warp": 170.0
+     },
+     {
+      "frequency": 0.013,
+      "amplitude": 24.0,
+      "ridged": 0.35,
+      "warp": 60.0
      },
      {
       "frequency": 0.05,
-      "amplitude": 0.45,
+      "amplitude": 0.5,
       "ridged": 0.0,
       "warp": 4.0
      },
@@ -2230,11 +1838,26 @@
         -8.0
        ]
       ],
-      "width": 110.0,
-      "falloff": 0.7,
-      "flatten": 0.96,
+      "width": 60.0,
+      "falloff": 0.5,
+      "flatten": 1.0,
       "roughness": 0.06,
       "smoothing": 0
+     },
+     {
+      "name": "knoll",
+      "kind": "ridge",
+      "path": [
+       [
+        -34.0,
+        0.0,
+        12.0
+       ]
+      ],
+      "width": 26.0,
+      "amplitude": 6.5,
+      "falloff": 1.3,
+      "roughness": 0.4
      },
      {
       "name": "riverbed",
@@ -2253,34 +1876,220 @@
        [
         -150.0,
         0.0,
-        150.0
+        120.0
        ],
        [
-        -80.0,
+        -84.0,
         0.0,
-        70.0
+        62.0
        ],
        [
-        -30.0,
+        -62.0,
         0.0,
-        42.0
+        34.0
        ],
        [
-        10.0,
+        -52.0,
         0.0,
-        30.0
+        10.0
        ],
        [
-        40.0,
+        -38.0,
         0.0,
-        6.0
+        -10.0
+       ],
+       [
+        -20.0,
+        0.0,
+        -20.0
        ]
       ],
-      "width": 10.0,
-      "amplitude": 1.6,
-      "falloff": 1.3,
-      "roughness": 0.25,
+      "width": 9.0,
+      "amplitude": 4.2,
+      "falloff": 1.1,
+      "roughness": 0.2,
       "smoothing": 3
+     },
+     {
+      "name": "escarp",
+      "kind": "ridge",
+      "path": [
+       [
+        -340.0,
+        0.0,
+        -110.0
+       ],
+       [
+        -190.0,
+        0.0,
+        -170.0
+       ],
+       [
+        -40.0,
+        0.0,
+        -195.0
+       ],
+       [
+        120.0,
+        0.0,
+        -205.0
+       ],
+       [
+        300.0,
+        0.0,
+        -150.0
+       ]
+      ],
+      "width": 70.0,
+      "amplitude": 34.0,
+      "falloff": 2.0,
+      "roughness": 0.7,
+      "smoothing": 3
+     },
+     {
+      "name": "escarpTop",
+      "kind": "flat",
+      "path": [
+       [
+        -340.0,
+        30.0,
+        -125.0
+       ],
+       [
+        -190.0,
+        30.0,
+        -185.0
+       ],
+       [
+        -40.0,
+        30.0,
+        -210.0
+       ],
+       [
+        120.0,
+        30.0,
+        -220.0
+       ],
+       [
+        300.0,
+        30.0,
+        -165.0
+       ]
+      ],
+      "width": 46.0,
+      "falloff": 3.0,
+      "flatten": 0.85,
+      "roughness": 0.3
+     },
+     {
+      "name": "mesaE",
+      "kind": "ridge",
+      "path": [
+       [
+        140.0,
+        0.0,
+        -50.0
+       ],
+       [
+        168.0,
+        0.0,
+        -20.0
+       ]
+      ],
+      "width": 34.0,
+      "amplitude": 24.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "mesaEtop",
+      "kind": "flat",
+      "path": [
+       [
+        140.0,
+        21.0,
+        -50.0
+       ],
+       [
+        168.0,
+        21.0,
+        -20.0
+       ]
+      ],
+      "width": 28.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
+     },
+     {
+      "name": "butteW",
+      "kind": "ridge",
+      "path": [
+       [
+        -130.0,
+        0.0,
+        -58.0
+       ]
+      ],
+      "width": 22.0,
+      "amplitude": 17.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "butteWtop",
+      "kind": "flat",
+      "path": [
+       [
+        -130.0,
+        15.0,
+        -58.0
+       ]
+      ],
+      "width": 16.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
+     },
+     {
+      "name": "mesaS",
+      "kind": "ridge",
+      "path": [
+       [
+        110.0,
+        0.0,
+        95.0
+       ],
+       [
+        150.0,
+        0.0,
+        120.0
+       ]
+      ],
+      "width": 30.0,
+      "amplitude": 13.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "mesaStop",
+      "kind": "flat",
+      "path": [
+       [
+        110.0,
+        11.0,
+        95.0
+       ],
+       [
+        150.0,
+        11.0,
+        120.0
+       ]
+      ],
+      "width": 24.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
      }
     ],
     "biomes": []
@@ -2289,7 +2098,7 @@
     "chunkSize": 30.0,
     "resolution": 24,
     "lodLevels": 4,
-    "lodDistance": 60.0,
+    "lodDistance": 110.0,
     "viewDistance": 1300.0,
     "shadowDistance": 200.0,
     "skirtDepth": 2.0,
@@ -2321,25 +2130,31 @@
      8000.0,
      8000.0
     ],
-    "baseHeight": 0.0,
+    "baseHeight": 11.0,
     "erosion": 0.2,
     "seaLevel": -1000.0,
     "layers": [
      {
       "frequency": 0.0022,
-      "amplitude": 16.0,
+      "amplitude": 26.0,
       "ridged": 0.0,
-      "warp": 90.0
+      "warp": 320.0
      },
      {
-      "frequency": 0.011,
-      "amplitude": 4.0,
-      "ridged": 0.25,
-      "warp": 26.0
+      "frequency": 0.0055,
+      "amplitude": 16.0,
+      "ridged": 0.35,
+      "warp": 170.0
+     },
+     {
+      "frequency": 0.013,
+      "amplitude": 24.0,
+      "ridged": 0.35,
+      "warp": 60.0
      },
      {
       "frequency": 0.05,
-      "amplitude": 0.45,
+      "amplitude": 0.5,
       "ridged": 0.0,
       "warp": 4.0
      },
@@ -2361,11 +2176,26 @@
         -8.0
        ]
       ],
-      "width": 110.0,
-      "falloff": 0.7,
-      "flatten": 0.96,
+      "width": 60.0,
+      "falloff": 0.5,
+      "flatten": 1.0,
       "roughness": 0.06,
       "smoothing": 0
+     },
+     {
+      "name": "knoll",
+      "kind": "ridge",
+      "path": [
+       [
+        -34.0,
+        0.0,
+        12.0
+       ]
+      ],
+      "width": 26.0,
+      "amplitude": 6.5,
+      "falloff": 1.3,
+      "roughness": 0.4
      },
      {
       "name": "riverbed",
@@ -2384,34 +2214,220 @@
        [
         -150.0,
         0.0,
-        150.0
+        120.0
        ],
        [
-        -80.0,
+        -84.0,
         0.0,
-        70.0
+        62.0
        ],
        [
-        -30.0,
+        -62.0,
         0.0,
-        42.0
+        34.0
        ],
        [
-        10.0,
+        -52.0,
         0.0,
-        30.0
+        10.0
        ],
        [
-        40.0,
+        -38.0,
         0.0,
-        6.0
+        -10.0
+       ],
+       [
+        -20.0,
+        0.0,
+        -20.0
        ]
       ],
-      "width": 10.0,
-      "amplitude": 1.6,
-      "falloff": 1.3,
-      "roughness": 0.25,
+      "width": 9.0,
+      "amplitude": 4.2,
+      "falloff": 1.1,
+      "roughness": 0.2,
       "smoothing": 3
+     },
+     {
+      "name": "escarp",
+      "kind": "ridge",
+      "path": [
+       [
+        -340.0,
+        0.0,
+        -110.0
+       ],
+       [
+        -190.0,
+        0.0,
+        -170.0
+       ],
+       [
+        -40.0,
+        0.0,
+        -195.0
+       ],
+       [
+        120.0,
+        0.0,
+        -205.0
+       ],
+       [
+        300.0,
+        0.0,
+        -150.0
+       ]
+      ],
+      "width": 70.0,
+      "amplitude": 34.0,
+      "falloff": 2.0,
+      "roughness": 0.7,
+      "smoothing": 3
+     },
+     {
+      "name": "escarpTop",
+      "kind": "flat",
+      "path": [
+       [
+        -340.0,
+        30.0,
+        -125.0
+       ],
+       [
+        -190.0,
+        30.0,
+        -185.0
+       ],
+       [
+        -40.0,
+        30.0,
+        -210.0
+       ],
+       [
+        120.0,
+        30.0,
+        -220.0
+       ],
+       [
+        300.0,
+        30.0,
+        -165.0
+       ]
+      ],
+      "width": 46.0,
+      "falloff": 3.0,
+      "flatten": 0.85,
+      "roughness": 0.3
+     },
+     {
+      "name": "mesaE",
+      "kind": "ridge",
+      "path": [
+       [
+        140.0,
+        0.0,
+        -50.0
+       ],
+       [
+        168.0,
+        0.0,
+        -20.0
+       ]
+      ],
+      "width": 34.0,
+      "amplitude": 24.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "mesaEtop",
+      "kind": "flat",
+      "path": [
+       [
+        140.0,
+        21.0,
+        -50.0
+       ],
+       [
+        168.0,
+        21.0,
+        -20.0
+       ]
+      ],
+      "width": 28.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
+     },
+     {
+      "name": "butteW",
+      "kind": "ridge",
+      "path": [
+       [
+        -130.0,
+        0.0,
+        -58.0
+       ]
+      ],
+      "width": 22.0,
+      "amplitude": 17.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "butteWtop",
+      "kind": "flat",
+      "path": [
+       [
+        -130.0,
+        15.0,
+        -58.0
+       ]
+      ],
+      "width": 16.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
+     },
+     {
+      "name": "mesaS",
+      "kind": "ridge",
+      "path": [
+       [
+        110.0,
+        0.0,
+        95.0
+       ],
+       [
+        150.0,
+        0.0,
+        120.0
+       ]
+      ],
+      "width": 30.0,
+      "amplitude": 13.0,
+      "falloff": 3.2,
+      "roughness": 0.6
+     },
+     {
+      "name": "mesaStop",
+      "kind": "flat",
+      "path": [
+       [
+        110.0,
+        11.0,
+        95.0
+       ],
+       [
+        150.0,
+        11.0,
+        120.0
+       ]
+      ],
+      "width": 24.0,
+      "falloff": 3.0,
+      "flatten": 1.0,
+      "roughness": 0.15
      },
      {
       "name": "escarpment",
@@ -2626,81 +2642,12 @@
    }
   },
   {
-   "name": "liquid",
-   "kind": "procedural",
-   "position": [
-    4.0,
-    -30.0,
-    -8.0
-   ],
-   "procedural": {
-    "source": {
-     "kind": "box",
-     "size": [
-      34.0,
-      0.02,
-      34.0
-     ],
-     "subdivisions": 64
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "lod": {
-     "cull": false,
-     "count": 1
-    },
-    "deformers": [
-     {
-      "kind": "field",
-      "field": "liquidKick",
-      "amount": 0.0,
-      "axis": [
-       0,
-       1,
-       0
-      ],
-      "space": "world",
-      "alongNormal": false
-     },
-     {
-      "kind": "field",
-      "field": "liquidSwell",
-      "amount": 0.0,
-      "axis": [
-       0,
-       1,
-       0
-      ],
-      "space": "world",
-      "alongNormal": false
-     }
-    ],
-    "material": {
-     "program": "liquid",
-     "baseColor": [
-      0.5647,
-      0.521,
-      0.4233
-     ],
-     "roughness": 0.92,
-     "metallic": 0.0,
-     "emissiveColor": [
-      1,
-      1,
-      1
-     ],
-     "emissiveIntensity": 1.0
-    }
-   }
-  },
-  {
    "name": "trunk",
    "kind": "sdf",
    "position": [
-    -6.0,
-    -0.08,
-    0.0
+    -34.0,
+    6.818,
+    12.0
    ],
    "sdf": {
     "tree": {
@@ -3516,9 +3463,9 @@
    "name": "limb0",
    "kind": "sdf",
    "position": [
-    -5.231176656942079,
-    3.1234305960746704,
-    0.19220583576448022
+    -33.23117665694208,
+    10.02143059607467,
+    12.19220583576448
    ],
    "sdf": {
     "tree": {
@@ -4308,9 +4255,9 @@
    "name": "limb1",
    "kind": "sdf",
    "position": [
-    -5.231176656942079,
-    3.1234305960746704,
-    0.19220583576448022
+    -33.23117665694208,
+    10.02143059607467,
+    12.19220583576448
    ],
    "sdf": {
     "tree": {
@@ -5100,9 +5047,9 @@
    "name": "limb2",
    "kind": "sdf",
    "position": [
-    -5.231176656942079,
-    3.1234305960746704,
-    0.19220583576448022
+    -33.23117665694208,
+    10.02143059607467,
+    12.19220583576448
    ],
    "sdf": {
     "tree": {
@@ -5893,7 +5840,7 @@
    "kind": "sdf",
    "position": [
     12.0,
-    1.639,
+    2.034,
     -14.0
    ],
    "sdf": {
@@ -6389,9 +6336,9 @@
    "name": "treeBlocks",
    "kind": "procedural",
    "position": [
-    -6.0,
-    -0.08,
-    0.0
+    -34.0,
+    6.818,
+    12.0
    ],
    "procedural": {
     "source": {
@@ -17280,7 +17227,7 @@
    "kind": "procedural",
    "position": [
     12.0,
-    1.639,
+    2.034,
     -14.0
    ],
    "procedural": {
@@ -24428,6 +24375,63 @@
     "emissive": 2.0,
     "blend": "additive",
     "softness": 0.6
+   }
+  },
+  {
+   "name": "spores",
+   "kind": "particles",
+   "particles": {
+    "capacity": 12000,
+    "seed": 9,
+    "shape": "sphere",
+    "position": [
+     12.0,
+     2.4339999999999997,
+     -14.0
+    ],
+    "extent": [
+     1.2,
+     1.2,
+     1.2
+    ],
+    "direction": [
+     0,
+     1,
+     0
+    ],
+    "spread": 1.0,
+    "spawnRate": 0,
+    "speedMin": 0.2,
+    "speedMax": 1.1,
+    "gravity": [
+     0,
+     0.05,
+     0
+    ],
+    "drag": 0.15,
+    "turbulence": 0.6,
+    "turbulenceScale": 0.08,
+    "turbulenceSpeed": 0.2,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.015,
+    "sizeVariance": 0.5,
+    "lifetimeMin": 7.0,
+    "lifetimeMax": 14.0,
+    "colorStart": [
+     0.9132,
+     0.003,
+     0.104,
+     0.95
+    ],
+    "colorEnd": [
+     0.0262,
+     0.0037,
+     0.0137,
+     0.0
+    ],
+    "emissive": 4.0,
+    "blend": "additive",
+    "softness": 0.5
    }
   }
  ]
