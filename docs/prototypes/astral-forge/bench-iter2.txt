@@ -1,0 +1,24 @@
+2M T1 t= 10.8 frame  13.4/ 15.9 sim  7.73 dens 1.70 surf  1.97 cache 0.20 flk 1.51 shards 0.00 post 0.20
+2M T2 t=  6.0 frame  20.3/ 22.2 sim  3.67 dens 1.64 surf 12.12 cache 0.33 flk 1.57 shards 0.00 post 0.20
+2M T3 t=  8.5 frame  23.3/ 28.3 sim  6.16 dens 1.57 surf 11.93 cache 0.59 flk 2.69 shards 0.00 post 0.20
+2M T3 t= 10.0 frame  23.1/ 28.2 sim  6.23 dens 1.57 surf 11.99 cache 0.33 flk 2.36 shards 0.00 post 0.20
+2M T4 t=  7.0 frame  21.6/ 24.2 sim  6.88 dens 1.51 surf  9.31 cache 0.26 flk 2.95 shards 0.00 post 0.20
+2M T5 t=  1.0 frame  23.9/ 42.9 sim  6.36 dens 1.57 surf 13.57 cache 0.52 flk 1.44 shards 0.00 post 0.20
+2M T5 t=  7.5 frame  14.7/ 22.5 sim  6.55 dens 1.57 surf  4.59 cache 0.13 flk 1.57 shards 0.00 post 0.13
+2M T5 t= 15.0 frame  38.9/ 42.4 sim  6.36 dens 1.57 surf 28.51 cache 1.64 flk 0.20 shards 0.07 post 0.20
+2M T6 t= 24.0 frame  17.2/ 23.2 sim  5.05 dens 1.57 surf  3.54 cache 0.66 flk 2.10 shards 0.00 post 0.20
+2M T7 t=  6.0 frame  11.6/ 22.5 sim  5.05 dens 1.57 surf  2.69 cache 0.26 flk 2.03 shards 0.00 post 0.20
+2M T7 t= 14.0 frame  22.9/ 23.5 sim  5.11 dens 1.51 surf 13.76 cache 0.33 flk 1.51 shards 0.00 post 0.20
+1.75M T1 t= 10.8 frame  11.9/ 13.8 sim  6.75 dens 1.51 surf  1.97 cache 0.20 flk 1.25 shards 0.00 post 0.20
+1.75M T2 t=  6.0 frame  19.1/ 21.0 sim  3.15 dens 1.51 surf 11.93 cache 0.33 flk 1.31 shards 0.00 post 0.20
+1.75M T3 t=  8.5 frame  21.8/ 26.2 sim  5.37 dens 1.51 surf 11.86 cache 0.59 flk 2.29 shards 0.00 post 0.20
+1.75M T4 t=  7.0 frame  19.5/ 22.5 sim  6.03 dens 1.44 surf  9.11 cache 0.26 flk 2.49 shards 0.00 post 0.20
+1.75M T5 t=  1.0 frame  22.5/ 40.4 sim  5.57 dens 1.51 surf 13.50 cache 0.46 flk 1.25 shards 0.00 post 0.20
+1.75M T5 t= 15.0 frame  35.3/ 35.6 sim  5.57 dens 1.51 surf 26.21 cache 1.64 flk 0.20 shards 0.07 post 0.20
+1.75M T6 t= 24.0 frame  15.5/ 22.5 sim  4.46 dens 1.51 surf  3.47 cache 0.66 flk 1.77 shards 0.00 post 0.20
+1.75M T7 t= 14.0 frame  22.0/ 22.5 sim  4.52 dens 1.44 surf 13.76 cache 0.33 flk 1.38 shards 0.00 post 0.20
+iter1 T2 t=  6.0 frame  22.2/ 24.8 sim  3.60 dens 1.57 surf 14.62 cache -1.00 flk 1.51 shards -1.00 post 0.20
+iter1 T3 t=  8.5 frame  30.6/ 32.1 sim  5.64 dens 1.57 surf 20.71 cache -1.00 flk 2.29 shards -1.00 post 0.20
+iter1 T4 t=  7.0 frame  24.5/ 27.1 sim  6.42 dens 1.51 surf 13.57 cache -1.00 flk 2.82 shards -1.00 post 0.20
+iter1 T5 t=  1.0 frame  26.6/ 48.8 sim  6.36 dens 1.51 surf 16.91 cache -1.00 flk 1.44 shards -1.00 post 0.20
+FBDONE

@@ -12,6 +12,7 @@ violently dissolves. This is research plus a prototype plus art, not a finished 
 | [03-parameter-state-model.md](03-parameter-state-model.md) | §3, §12, §20.4 | coherence semantics, the conductor's state, audio → state, time and seek, live/MIDI contract |
 | [04-architecture.md](04-architecture.md) | §15-16, §20.2 | approaches A-E implemented and benchmarked; E (hybrid) chosen; the production path |
 | [05-tests-and-assessment.md](05-tests-and-assessment.md) | §18-20 | the six tests with verdicts, performance, what worked, what looked generic, the next iteration |
+| [06-iteration-2.md](06-iteration-2.md) | the approved next iteration | warp advection, tendons, shards, the latent cache (and its lesson), conductor vocabulary, the Machine God and Chimera (TEST 07), and the production path: ADR-1140..1143 in the engine |
 
 **In one paragraph.**
 
@@ -25,6 +26,8 @@ violently dissolves. This is research plus a prototype plus art, not a finished 
 - **Collapse** is a release with momentum and forge heat.
 - A **conductor** (a pure function of t) drives it all from a scripted curve, or from the song's sections,
   16-beat phrases, kicks and snares.
+
+**Iteration 2** (2026-10-05/06) moved the core into the production engine as four ADRs (1140-1143); see `06-iteration-2.md`.
 
 **The test song is Trench**, at `assets/audio/trench.wav` (gitignored, never committed). *Fireballs* is the
 only secondary check. TEST 01-05 are scripted and silent.
