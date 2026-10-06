@@ -31,7 +31,6 @@ struct SkyRuntime {
     float sunGlowWidth = 0.18f;
     float intensity = 1.0f;
     glm::vec3 sunDirection{0.0f, 1.0f, 0.0f}; // unit, pointing *towards* the sun
-    float mirror = 0.0f;                        // ADR-1167
     [[nodiscard]] std::uint64_t hash() const; // changes exactly when a rebuild is needed
 };
 
@@ -69,9 +68,6 @@ struct SkyRuntime {
 //          scaled by (sunAngularRadius / r)^2 so widening the disc conserves its energy
 //   glow = exp(-theta / max(sunGlowWidth, 1e-3)) * 0.02   (the aureole around the disc)
 //   out  = (base + sunColor * sunIntensity * (disc + glow) * band) * intensity
-//   ADR-1167, with mirror m > 0: below the horizon the sky above it is reflected in, sun included --
-//   out += m * (1 - band) * (sky(dir') + sun(dir') - ground) * intensity, dir' = (dir.x, -dir.y, dir.z),
-//   where sky() and sun() are the terms above without the band. At m = 0 nothing changes.
 // `minRadius` is how wide one texel of the target is in radians; it keeps the disc from falling
 // between texels in the coarse mips (the analytic stand-in for downsampling the cube).
 [[nodiscard]] glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadius = 0.0f);

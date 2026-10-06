@@ -411,7 +411,7 @@ Result<void> EnvironmentProcessor::recordSky(SkyJob& job, const scene::SkyRuntim
     sky4.skyHorizon = glm::vec4(sky.horizonColor, sky.sunAngularRadius);
     sky4.skyGround = glm::vec4(sky.groundColor, sky.sunGlowWidth);
     sky4.skySun = glm::vec4(sky.sunColor * sky.sunIntensity, sky.intensity);
-    sky4.skySunDir = glm::vec4(sky.sunDirection, sky.mirror); // w: ADR-1167
+    sky4.skySunDir = glm::vec4(sky.sunDirection, 0.0f);
 
     job = SkyJob{};
     job.sky = sky;

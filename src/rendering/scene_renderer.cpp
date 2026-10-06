@@ -3074,7 +3074,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.skyZenithColor = glm::vec4(resolved.zenithColor, resolved.hazeWidth);
         frame.skyHorizonColor = glm::vec4(resolved.horizonColor, resolved.sunAngularRadius);
         frame.skyGroundColor = glm::vec4(resolved.groundColor, resolved.sunGlowWidth);
-        frame.skyMirror = glm::vec4(resolved.mirror, 0.0f, 0.0f, 0.0f); // ADR-1167
         // The flag only means anything when a map is the IBL: with the procedural sky already the
         // IBL there is nothing to decouple, and the existing cube path is the better one because
         // it is what the lighting was built from.

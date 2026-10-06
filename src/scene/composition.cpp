@@ -81,7 +81,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "vortex"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
-    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity", "mirror"};
+    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
 
 // Every key a `"lights"` entry may carry. Named after the `PunctualLight` field it sets, except
 // where `LightRig`'s file format already had a name for the same quantity -- `color`, `temperature`,
@@ -4642,8 +4642,6 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
             floatDesc(prefix_ + "env/sky/sunGlow", sky.sunGlowWidth, 0.001f, 3.0f, 0.02f, 1.0f));
         skyIntensity_ = &params.add(
             floatDesc(prefix_ + "env/sky/intensity", sky.intensity, 0.0f, 20.0f, 0.0f, 4.0f));
-        // ADR-1167: below the horizon, the sky above it reflected (a world with no ground: a still sea)
-        skyMirror_ = &params.add(floatDesc(prefix_ + "env/sky/mirror", sky.mirror, 0.0f, 1.0f, 0.0f, 1.0f));
     }
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
@@ -5918,7 +5916,6 @@ void Composition::detach() {
     skySunColor_ = nullptr;
     skyHaze_ = nullptr;
     skySunIntensity_ = nullptr;
-    skyMirror_ = nullptr;
     skySunSize_ = nullptr;
     skySunGlow_ = nullptr;
     skyIntensity_ = nullptr;
@@ -9170,7 +9167,6 @@ void Composition::applyParameters() {
         sky.sunColor = c(skySunColor_, sky.sunColor);
         sky.hazeWidth = f(skyHaze_, sky.hazeWidth);
         sky.sunIntensity = f(skySunIntensity_, sky.sunIntensity);
-        sky.mirror = f(skyMirror_, sky.mirror); // ADR-1167
         sky.sunAngularRadius = f(skySunSize_, sky.sunAngularRadius);
         sky.sunGlowWidth = f(skySunGlow_, sky.sunGlowWidth);
         sky.intensity = f(skyIntensity_, sky.intensity);
@@ -10108,7 +10104,6 @@ nlohmann::json Composition::toJson() const {
         sky.sunColor = c(skySunColor_, sky.sunColor);
         sky.hazeWidth = f(skyHaze_, sky.hazeWidth);
         sky.sunIntensity = f(skySunIntensity_, sky.sunIntensity);
-        sky.mirror = f(skyMirror_, sky.mirror); // ADR-1167
         sky.sunAngularRadius = f(skySunSize_, sky.sunAngularRadius);
         sky.sunGlowWidth = f(skySunGlow_, sky.sunGlowWidth);
         sky.intensity = f(skyIntensity_, sky.intensity);
@@ -10132,7 +10127,6 @@ nlohmann::json Composition::toJson() const {
         if (sky.sunAngularRadius != def.sunAngularRadius) sj["sunSize"] = sky.sunAngularRadius;
         if (sky.sunGlowWidth != def.sunGlowWidth) sj["sunGlow"] = sky.sunGlowWidth;
         if (sky.intensity != def.intensity) sj["intensity"] = sky.intensity;
-        if (sky.mirror != def.mirror) sj["mirror"] = sky.mirror; // ADR-1167
         if (!sj.empty()) {
             environment["sky"] = std::move(sj);
         }
@@ -11395,8 +11389,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       SkyFloat{"sunIntensity", &sky.sunIntensity},
                                       SkyFloat{"sunSize", &sky.sunAngularRadius},
                                       SkyFloat{"sunGlow", &sky.sunGlowWidth},
-                                      SkyFloat{"intensity", &sky.intensity},
-                                      SkyFloat{"mirror", &sky.mirror}}) { // ADR-1167
+                                      SkyFloat{"intensity", &sky.intensity}}) {
                 auto value = readFloat(sj, sf.key, *sf.target);
                 if (!value) {
                     return std::unexpected(value.error());

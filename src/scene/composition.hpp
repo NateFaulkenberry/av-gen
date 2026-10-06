@@ -2431,7 +2431,6 @@ private:
     params::Parameter<glm::vec3>* skySunColor_ = nullptr;
     params::Parameter<float>* skyHaze_ = nullptr;
     params::Parameter<float>* skySunIntensity_ = nullptr;
-    params::Parameter<float>* skyMirror_ = nullptr; // ADR-1167
     params::Parameter<float>* skySunSize_ = nullptr;
     params::Parameter<float>* skySunGlow_ = nullptr;
     params::Parameter<float>* skyIntensity_ = nullptr;

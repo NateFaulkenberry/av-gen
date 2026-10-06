@@ -69,9 +69,6 @@ std::uint64_t SkyRuntime::hash() const {
     h.f32(sunGlowWidth);
     h.f32(intensity);
     h.v3(sunDirection);
-    if (mirror != 0.0f) {
-        h.f32(mirror); // ADR-1167: only when used, so every existing sky keeps its hash
-    }
     return h.value();
 }
 
@@ -105,7 +102,7 @@ bool skyWithinRebuildTolerance(const SkyRuntime& built, const SkyRuntime& curren
            scalarWithin(built.sunIntensity, current.sunIntensity) &&
            scalarWithin(built.sunAngularRadius, current.sunAngularRadius) &&
            scalarWithin(built.sunGlowWidth, current.sunGlowWidth) &&
-           scalarWithin(built.intensity, current.intensity) && scalarWithin(built.mirror, current.mirror) &&
+           scalarWithin(built.intensity, current.intensity) &&
            glm::length(built.sunDirection - current.sunDirection) <= kSkySunChordTolerance;
 }
 
@@ -133,7 +130,6 @@ SkyRuntime resolveSky(const SkySettings& settings, const std::vector<PunctualLig
     sky.hazeWidth = std::max(settings.hazeWidth, 1e-3f);
     sky.sunIntensity = std::max(settings.sunIntensity, 0.0f);
     sky.sunAngularRadius = std::clamp(settings.sunAngularRadius, 1e-3f, 1.5f);
-    sky.mirror = std::clamp(settings.mirror, 0.0f, 1.0f); // ADR-1167
     sky.sunGlowWidth = std::max(settings.sunGlowWidth, 1e-3f);
     sky.intensity = std::max(settings.intensity, 0.0f);
     sky.sunColor = glm::max(settings.sunColor, glm::vec3(0.0f));
@@ -154,20 +150,6 @@ SkyRuntime resolveSky(const SkySettings& settings, const std::vector<PunctualLig
     return sky;
 }
 
-namespace {
-// The sky above the horizon along `d` (d.y >= 0 assumed), gradient and sun, without the horizon band.
-glm::vec3 skyAbove(const SkyRuntime& sky, const glm::vec3& d, float minRadius) {
-    const float haze = std::exp(-saturate1(d.y) / std::max(sky.hazeWidth, 1e-3f));
-    const glm::vec3 gradient = sky.zenithColor * (1.0f - haze) + sky.horizonColor * haze;
-    const float theta = std::acos(std::clamp(glm::dot(d, sky.sunDirection), -1.0f, 1.0f));
-    const float radius = std::max(sky.sunAngularRadius, std::max(minRadius, 0.0f));
-    const float energy = (sky.sunAngularRadius / radius) * (sky.sunAngularRadius / radius);
-    const float disc = (1.0f - smoothstep1(radius * 0.85f, radius * 1.15f, theta)) * energy;
-    const float glow = std::exp(-theta / std::max(sky.sunGlowWidth, 1e-3f)) * kSunAureole;
-    return gradient + sky.sunColor * sky.sunIntensity * (disc + glow);
-}
-} // namespace
-
 glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadius) {
     const glm::vec3 d = safeNormalize(dir, glm::vec3(0.0f, 1.0f, 0.0f));
     const float h = saturate1(d.y);
@@ -183,11 +165,6 @@ glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadi
     const float disc = (1.0f - smoothstep1(radius * 0.85f, radius * 1.15f, theta)) * energy;
     const float glow = std::exp(-theta / std::max(sky.sunGlowWidth, 1e-3f)) * kSunAureole;
     const glm::vec3 sun = sky.sunColor * sky.sunIntensity * (disc + glow) * band;
-    if (sky.mirror > 0.0f) { // ADR-1167
-        const glm::vec3 reflected = skyAbove(sky, glm::vec3(d.x, -d.y, d.z), minRadius);
-        return (base + sun + std::min(sky.mirror, 1.0f) * (1.0f - band) * (reflected - sky.groundColor)) *
-               sky.intensity;
-    }
     return (base + sun) * sky.intensity;
 }
 
