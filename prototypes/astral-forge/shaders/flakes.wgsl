@@ -153,7 +153,11 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     // proof that the surface is made of matter
     let shardW = max(fuse, 0.3);
     // a quarter of the near bound matter resolves as plates; the rest keeps fading as dust
-    if (F.it2.y > 0.5 && rpx0 > F.it2.z && b > 0.3 && hz < 0.25) { // only matter that belongs to the entity: near free dust would be confetti
+    // only debris RESTING ON the surface (a thin shell around the ray depth) becomes a plate, and fewer as they
+    // grow: matter between the lens and the surface stays dust, or a close-up inside the field is a blizzard
+    let onSurface = abs(dist - sd) < 0.15 * dist + 0.1 && sd < 1e8;
+    let keep = hz < 0.25 * min(1.0, (F.it2.z * 2.0 / rpx0) * (F.it2.z * 2.0 / rpx0));
+    if (F.it2.y > 0.5 && rpx0 > F.it2.z && b > 0.3 && onSurface && keep) { // only matter that belongs to the entity: near free dust would be confetti
         let idx = atomicAdd(&shardArgs.instanceCount, 1u);
         if (idx < SHARD_MAX) {
             shards[idx] = Shard(vec4f(p, rw), vec4f(nf, heat), vec4f(b, hz, f32(role), shardW * smoothstep(F.it2.z, F.it2.z + 1.0, rpx0) * (1.0 - smoothstep(60.0, 80.0, rpx0))));

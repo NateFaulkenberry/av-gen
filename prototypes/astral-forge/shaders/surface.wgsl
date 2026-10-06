@@ -13,7 +13,8 @@
 @group(1) @binding(0) var densTex: texture_3d<f32>;
 @group(1) @binding(1) var densSamp: sampler;
 @group(1) @binding(2) var coarseTex: texture_3d<f32>;
-@group(1) @binding(3) var latentCache: texture_3d<f32>; // iteration 2
+@group(1) @binding(3) var latentCache: texture_3d<f32>; // iteration 2: level 0, framed on the shot
+@group(1) @binding(4) var latentCacheCoarse: texture_3d<f32>; // level 1, the whole density box
 
 struct VOut { @builtin(position) clip: vec4f, @location(0) uv: vec2f, };
 @vertex fn vs_full(@builtin(vertex_index) vi: u32) -> VOut {
@@ -50,7 +51,16 @@ fn fieldAtMode(p: vec3f, exact: bool) -> f32 {
         if (exact || F.it2.x < 0.5) {
             L = latent(p);
         } else {
-            L = textureSampleLevel(latentCache, densSamp, (p - F.grid0.xyz) / boxExtent(), 0.0).r;
+            // the cache is a BOUND, not the field: its 128^3 texels (~0.16 units) cannot hold features smaller than
+            // ~0.3 (the inner face, the teeth), so within two texels of the surface the exact latent takes over
+            let uvw = (p - F.cbox.xyz) / F.cbox.w;
+            if (all(uvw >= vec3f(0.0)) && all(uvw <= vec3f(1.0))) {
+                L = textureSampleLevel(latentCache, densSamp, uvw, 0.0).r;
+                if (L < 0.75 * F.cbox.w / 128.0) { L = latent(p); }
+            } else {
+                L = textureSampleLevel(latentCacheCoarse, densSamp, (p - F.grid0.xyz) / boxExtent(), 0.0).r;
+                if (L < 0.75 * boxExtent() / 128.0) { L = latent(p); }
+            }
         }
         let dil = (T * 0.38 - s) * cell * 3.0;
         return mix(dRho, max(L, dil), S);

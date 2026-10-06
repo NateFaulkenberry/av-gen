@@ -64,7 +64,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox;
 };
 
 std::string readFile(const std::string& path) {
@@ -199,6 +199,7 @@ struct Options {
     bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
     bool noShards = false; // iteration 2: near flakes stay splats
     float shardPx = 12.0f;
+    float cacheFrame = 0.4f;  // fine cache box half-size, as a fraction of the camera-target distance
     float minStep = 0.65f; // surface march minimum step, in density cells (iteration 1: 0.3)
     int archOverride = -1; // substitute an archetype into a scripted test (art direction)  // footprint (px) above which a flake becomes a shard
     double songStart = -1.0; // TEST 06: where the excerpt starts in the song (default per track)
@@ -263,6 +264,7 @@ int main(int argc, char** argv) {
         else if (a == "--arch") o.archOverride = std::stoi(next());
         else if (a == "--no-shards") o.noShards = true;
         else if (a == "--min-step") o.minStep = std::stof(next());
+        else if (a == "--cache-frame") o.cacheFrame = std::stof(next());
         else if (a == "--shard-px") o.shardPx = std::stof(next());
         else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = true; o.minStep = 0.3f; }
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &o.width, &o.height); }
@@ -350,6 +352,8 @@ int main(int argc, char** argv) {
     constexpr int kCacheRes = 128; // must match CACHE_RES in latent_cache.wgsl
     wgpu::Texture cacheTex = makeTex({kCacheRes, kCacheRes, kCacheRes}, hdrFmt,
                                      wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
+    wgpu::Texture cacheTexCoarse = makeTex({kCacheRes, kCacheRes, kCacheRes}, hdrFmt,
+                                           wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
     wgpu::Texture shardDepth = makeTex({W, H, 1}, wgpu::TextureFormat::Depth32Float, wgpu::TextureUsage::RenderAttachment);
     wgpu::Texture surfColor = makeTex({W, H, 1}, hdrFmt, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
     wgpu::Texture surfDepth = makeTex({W, H, 1}, wgpu::TextureFormat::R32Float, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
@@ -365,6 +369,7 @@ int main(int argc, char** argv) {
     }
     wgpu::TextureView densView = densTex.CreateView(), coarseView = coarseTex.CreateView();
     wgpu::TextureView cacheView = cacheTex.CreateView(), shardDepthView = shardDepth.CreateView();
+    wgpu::TextureView cacheViewCoarse = cacheTexCoarse.CreateView();
     wgpu::TextureView surfColorView = surfColor.CreateView(), surfDepthView = surfDepth.CreateView();
     wgpu::TextureView hdrView = hdr.CreateView(), ldrView = ldr.CreateView();
     wgpu::SamplerDescriptor sd{};
@@ -405,15 +410,15 @@ int main(int argc, char** argv) {
     auto coarseLayout = makeLayout(ctx, {B::Tex3D, B::StoreTex3D_R32F}, CS);
     auto coarsePipe = makeCompute(ctx, coarseMod, "cs_coarse", makePL(ctx, {frameLayout, coarseLayout}));
     auto coarseGroup = makeGroup(ctx, coarseLayout, {tex(densView), tex(coarseView)});
-    auto cacheLayout = makeLayout(ctx, {B::Tex3DUnfilt, B::StoreTex3D_RGBA16F}, CS);
+    auto cacheLayout = makeLayout(ctx, {B::Tex3DUnfilt, B::StoreTex3D_RGBA16F, B::StoreTex3D_RGBA16F}, CS);
     auto cachePipe = makeCompute(ctx, cacheMod, "cs_latent_cache", makePL(ctx, {frameLayout, cacheLayout}));
-    auto cacheGroup = makeGroup(ctx, cacheLayout, {tex(coarseView), tex(cacheView)});
+    auto cacheGroup = makeGroup(ctx, cacheLayout, {tex(coarseView), tex(cacheView), tex(cacheViewCoarse)});
 
     auto flakeLayout = makeLayout(ctx, {B::ReadOnly, B::ReadOnly, B::ReadOnly, B::Storage, B::Tex2DUnfilt, B::Storage, B::Storage}, CS);
     auto flakePipe = makeCompute(ctx, flakeMod, "cs_flakes", makePL(ctx, {frameLayout, flakeLayout}));
     auto flakeGroup = makeGroup(ctx, flakeLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(accumBuf, accumBytes), tex(surfDepthView), buf(shardBuf, shardBytes), buf(shardArgs, 16)});
 
-    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt, B::Tex3D}, wgpu::ShaderStage::Fragment);
+    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt, B::Tex3D, B::Tex3D}, wgpu::ShaderStage::Fragment);
     wgpu::RenderPipeline surfPipe;
     {
         std::array<wgpu::ColorTargetState, 2> cts{};
@@ -431,7 +436,7 @@ int main(int argc, char** argv) {
         rpd.fragment = &fst;
         surfPipe = dev.CreateRenderPipeline(&rpd);
     }
-    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView)});
+    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView), tex(cacheViewCoarse)});
     // the shard pass: instanced fans, depth-tested among themselves, culled against the surface's ray depth
     auto shardLayout = makeLayout(ctx, {B::ReadOnly, B::Tex2DUnfilt}, wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
     wgpu::RenderPipeline shardPipe;
@@ -542,6 +547,13 @@ int main(int argc, char** argv) {
         f.fp1 = sPrev.fold1;
         f.fp2 = glm::vec4(static_cast<float>(tPrev), sPrev.breath, s.warpAdvect, 0.0f);
         f.ext = glm::vec4(s.sharpSpread, s.tendonWeight, s.metaRadius, s.metaFace);
+        {   // the cache box is framed on the shot: centred on the camera target, sized to the view distance, so its
+            // 128 texels resolve detail at screen scale (LOD by framing), clamped to the density box
+            const float half = std::clamp(o.cacheFrame * glm::length(s.eye - s.target), 0.5f, o.gridSize * 0.5f);
+            const glm::vec3 lo = s.centre - glm::vec3(o.gridSize * 0.5f);
+            const glm::vec3 c = glm::clamp(s.target, lo + half, lo + glm::vec3(o.gridSize) - half);
+            f.cbox = glm::vec4(c - half, 2.0f * half);
+        }
         f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, o.minStep);
         f.fp2.w = s.tendonFlow;
     };

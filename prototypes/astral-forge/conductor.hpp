@@ -368,7 +368,9 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     s.flow = 0.4f + 1.8f * a.env0.z;
     s.tendonFlow = 0.6f + 1.4f * a.env0.z;
     s.shimmer = std::clamp(0.2f + 0.9f * a.env0.w + 0.4f * a.hatEnv, 0.0f, 1.2f);
-    s.flicker = 0.25f * a.hatEnv;
+    // iteration 2: no global flicker. Brightening every light band on the hats made the WHOLE frame pulse with the
+    // audio (Critic: 71% of regions brightening together); the hats now only shimmer the flakes (s.shimmer above)
+    s.flicker = 0.0f;
     const float secEnergy = song.sections.empty() ? 0.5f : song.sections[static_cast<std::size_t>(sec) % song.sections.size()].energy;
     s.temper = std::clamp(0.15f + 0.9f * (a.centroid - 0.35f) + 0.25f * secEnergy + 0.25f * s.C, 0.05f, 0.95f);
     s.blast = 14.0f + 10.0f * a.lastKickS;
