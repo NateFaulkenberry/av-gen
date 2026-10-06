@@ -183,7 +183,7 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),         # m: the cell has failed
         op("multiply", 7, srcA=7, srcB=4),                                # the growth front
         op("noise", 3, srcA=1, value=31.0, seed=seed + 7),
-        op("smoothstep", 3, srcA=3, constant=[0.66, 0.68, 0, 0]),
+        op("smoothstep", 3, srcA=3, constant=[0.73, 0.75, 0, 0]),
         op("multiply", 3, srcA=3, srcB=4),                                # stuck pixels among the failed
         op("constant", 5, constant=[0.5, 0.5, 0.5, 0.5]),
         op("multiply", 3, srcA=3, srcB=5),
@@ -372,7 +372,7 @@ def scene():
     d = PAL["dream"]
     sky = {"enabled": True, "background": True, "useKeyLight": False, "sunDirection": mul(SUN_DIR, -1.0),
            "zenithColor": d["zenith"], "horizonColor": d["horizon"], "groundColor": d["groundSky"],
-           "sunColor": d["sun"], "haze": 0.32, "sunIntensity": 1.0, "sunSize": 0.02, "sunGlow": 0.3,
+           "sunColor": d["sun"], "haze": 0.16, "sunIntensity": 1.0, "sunSize": 0.02, "sunGlow": 0.3,
            "intensity": 1.0}
     nodes = fields() + [
         {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(False),
@@ -476,7 +476,7 @@ STAGES = {
     "Corruption": stage(pal="corruption", inject=2.4, advect=2.0, dissip=0.0, climb=4.6, eat=0.32, eatStone=0.5,
                         melt=[0.16, 0.08, -0.06], bark=0.05, barkSpeed=0.5, rise=0.35, tumble=0.25, spin=0.4,
                         kick=0.25, fracture=1900.0, double=True, glowPlain=4.0, glowBark=3.0, glowBlocks=5.0,
-                        echo=0.18, mosh=0.0, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.25, gMelt=0.5,
+                        echo=0.18, mosh=0.0, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.12, gMelt=0.5,
                         gLift=0.3, motes=160.0, volDen=0.0011),
     # The Elephants' blood sky over Tanguy's night land: the tree is blocks, its limbs float free.
     "Nightmare": stage(pal="nightmare", inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
@@ -491,7 +491,7 @@ STAGES = {
                       rise=5.0, tumble=2.5, spin=3.0, kick=1.2, glowBlocks=9.0, echo=0.35, mosh=0.25, moshBlock=48.0,
                       exposure=-0.6, gGlitch=0.8, motes=900.0, volDen=0.0016, **COLLAPSE_COMMON),
     #   ... fragments become particles and temporal fragments
-    "Decay": stage(pal="collapse", melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0], bark=0.12, barkSpeed=1.5, rise=9.0,
+    "Decay": stage(pal="nightmare", melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0], bark=0.12, barkSpeed=1.5, rise=9.0,
                    tumble=4.0, spin=5.0, kick=1.6, glowBlocks=10.0, echo=0.5, mosh=0.6, moshBlock=64.0,
                    exposure=-0.5, gGlitch=1.0, motes=2600.0, volDen=0.0018, **COLLAPSE_COMMON),
     #   ... pixels, then colour
@@ -712,7 +712,7 @@ def routes():
     for blocks in ("treeBlocks", "tanguyBlocks"):
         r.append(gated("audio.onsetLow", f"procedural/{blocks}/effector/5/strength", 0.6, "gRhythm", PEAK(40, 4.0)))
     r.append(gated("audio.onsetMid", "field/infect/strength", 4.0, "gRhythm", PEAK(60, 3.0)))
-    r.append(gated("audio.onsetMid", "temporal/mosh/amount", 0.14, "gMosh", PEAK(70, 5.0)))
+    r.append(gated("audio.onsetMid", "temporal/mosh/amount", 0.10, "gMosh", PEAK(60, 6.0)))
     r.append(gated("audio.onsetMid", "post/glitch/tear", 0.35, "gGlitch", PEAK(50, 6.0)))
     r.append(gated("audio.onsetLow", "post/split/amount", 6.0, "gGlitch", PEAK(15, 12.0)))
     # ---- LAYER 3, musical: bass is mass and gravity -- the limbs sag and lift, the bark flows, the haze breathes

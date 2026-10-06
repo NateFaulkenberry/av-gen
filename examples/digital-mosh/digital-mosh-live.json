@@ -365,14 +365,14 @@
    "source": "audio.onsetMid",
    "target": "temporal/mosh/amount",
    "op": "add",
-   "amount": 0.14,
+   "amount": 0.1,
    "depthSource": "macro.gMosh",
    "depthMin": 0.0,
    "depthMax": 1.0,
    "chain": {
     "envelope": "peakhold",
-    "envelopeHoldMs": 70,
-    "envelopeFallPerSecond": 5.0
+    "envelopeHoldMs": 60,
+    "envelopeFallPerSecond": 6.0
    }
   },
   {
@@ -3346,7 +3346,7 @@
      0.65
     ],
     "macros/gMosh": [
-     0.25
+     0.12
     ],
     "macros/gGlitch": [
      0.0
@@ -3626,7 +3626,7 @@
      0.65
     ],
     "macros/gMosh": [
-     0.25
+     0.12
     ],
     "macros/gGlitch": [
      0.0
@@ -3906,7 +3906,7 @@
      0.65
     ],
     "macros/gMosh": [
-     0.25
+     0.12
     ],
     "macros/gGlitch": [
      0.0
@@ -5202,9 +5202,9 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
-     0.9717,
      1.0,
-     0.9811
+     0.3933,
+     0.1644
     ],
     "lights/sun/intensity": [
      9.0
@@ -5269,29 +5269,29 @@
      0.0018
     ],
     "scene/fogColor": [
-     0.2789,
-     0.314,
-     0.3663
+     0.0931,
+     0.0356,
+     0.0222
     ],
     "env/sky/zenithColor": [
-     0.0382,
-     0.0409,
-     0.0561
+     0.2747,
+     0.0242,
+     0.0296
     ],
     "env/sky/horizonColor": [
-     0.402,
-     0.4233,
-     0.4678
+     0.4508,
+     0.1022,
+     0.0561
     ],
     "env/sky/groundColor": [
-     0.0091,
-     0.0116,
-     0.0194
+     0.0123,
+     0.0252,
+     0.0356
     ],
     "env/sky/sunColor": [
-     0.9717,
      1.0,
-     0.9811
+     0.3933,
+     0.1644
     ],
     "macros/keyframe": [
      0.0
@@ -5318,39 +5318,39 @@
      1.0
     ],
     "material/ground/op/24/ramp/constant": [
-     0.1746,
-     0.1946,
-     0.2307,
+     0.0782,
+     0.1413,
+     0.1981,
      1
     ],
     "material/ground/op/24/ramp/constant2": [
-     0.0908,
-     0.0999,
-     0.1221,
+     0.0369,
+     0.0578,
+     0.0762,
      1
     ],
     "material/ground/op/24/ramp/constant3": [
-     0.0382,
-     0.0409,
-     0.0561,
+     0.0123,
+     0.0252,
+     0.0356,
      1
     ],
     "material/groundFar/op/5/ramp/constant": [
-     0.1746,
-     0.1946,
-     0.2307,
+     0.0782,
+     0.1413,
+     0.1981,
      1
     ],
     "material/groundFar/op/5/ramp/constant2": [
-     0.0908,
-     0.0999,
-     0.1221,
+     0.0369,
+     0.0578,
+     0.0762,
      1
     ],
     "material/groundFar/op/5/ramp/constant3": [
-     0.0382,
-     0.0409,
-     0.0561,
+     0.0123,
+     0.0252,
+     0.0356,
      1
     ],
     "sdf/trunk/node/eaten/amount": [

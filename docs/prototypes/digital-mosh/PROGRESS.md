@@ -15,7 +15,10 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 | ADR-1161: bounded integrate; ADR-1162: material quantize op | done | 6866444c |
 | ADR-1163: scalar grid ceiling; the scene's path-guard test | done | 383500e6 |
 | ADR-1164: hold and elapsed state triggers; the arc, stages, audio mapping | done | ee3ac206 |
-| Art pass 1 | in progress | |
+| WIP for the owner (first build) | done | `~/Desktop/av-gen-review/38-digital-mosh/wip/` |
+| Art pass 1, part: ink stain, matter blocks, sky fix | done | b07c5a60 |
+| Art pass 1: terrain, olive and Tanguy forms, painting palettes, travelling camera; ADR-1164 `idle` | done | 12a71635 |
+| Art pass 1: palette and restraint fixes from the full-song review | in progress | |
 
 ## How to work on it
 
@@ -35,6 +38,13 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 - **GPU.** Every render and every GPU test goes through `tools/gpu-lock.sh`. Other agents (gpuprod, astral-forge)
   share the lock and run long suites, so expect to queue.
 
+## The owner's feedback so far (2026-10-05)
+
+- The first build was crude; the camera must travel through the world (the brief's §13), not orbit or sit still.
+- Real landscape, from AV Gen's terrain system: not a flat plane.
+- Palettes taken from actual Surrealist paintings, sampled from reproductions (`05-palettes.md`).
+- Earlier scenes: no visible edge of the world and no unrendered black; no vortex or spinning-tower centrepiece.
+
 ## Engine facts learned here (each one cost time)
 
 1. Raymarched SDF shadows were marched from the camera's eye (ADR-1160). Fixed.
@@ -50,3 +60,9 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 8. State triggers fired only on crossings, and `bar every N` counts global bars (ADR-1164 adds `hold` and
    `elapsed`).
 9. The default transition is 2 s, and `current()` is the committed state, not the pending one.
+10. A periodic trigger interrupts a running transition. Mark it `idle` (ADR-1164), or a ladder never lands.
+11. Terrain cannot be deformed at runtime: its geography is not parameters, and the chunks are built once. Liquid
+    land has to come from other systems.
+12. A `world` block falls back to Glowmere's layers, features and biomes for any key it omits. Set them all.
+13. Offline render speed: the full song at 1280x720 renders at about 10.5 fps (offline tier), so a song takes
+    about 10 minutes.
