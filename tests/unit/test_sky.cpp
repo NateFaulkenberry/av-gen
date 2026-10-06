@@ -245,3 +245,40 @@ TEST_CASE("resolveSky clamps the values a build would divide by", "[sky]") {
     const glm::vec3 c = skyRadiance(sky, {0.0f, 1.0f, 0.0f});
     CHECK(std::isfinite(c.r));
 }
+
+// ADR-1167: with a mirror, the sky below the horizon is the sky above it reflected, sun included; without one it is
+// the ground colour exactly as before, and the hash of a sky that does not use the mirror is unchanged.
+TEST_CASE("sky mirror reflects the sky above the horizon below it", "[sky][adr1167]") {
+    SkySettings settings;
+    settings.useKeyLight = false;
+    settings.sunDirection = glm::normalize(glm::vec3(0.4f, 0.25f, -0.8f));
+    settings.intensity = 1.0f;
+    const SkyRuntime plain = resolveSky(settings, {});
+    settings.mirror = 1.0f;
+    const SkyRuntime mirrored = resolveSky(settings, {});
+    SkySettings unset = settings;
+    unset.mirror = 0.0f;
+    CHECK(resolveSky(unset, {}).hash() == plain.hash()); // an unused mirror does not enter the hash
+    CHECK(mirrored.hash() != plain.hash());
+
+    for (const glm::vec3 up : {glm::vec3(0.3f, 0.6f, 0.2f), glm::vec3(-0.7f, 0.2f, 0.4f), glm::vec3(0.0f, 0.95f, 0.1f)}) {
+        const glm::vec3 down(up.x, -up.y, up.z);
+        const glm::vec3 above = skyRadiance(mirrored, up);
+        const glm::vec3 below = skyRadiance(mirrored, down);
+        INFO("up " << up.x << "," << up.y << "," << up.z);
+        CHECK_THAT(d(below.r), WithinAbs(d(above.r), 1e-4));
+        CHECK_THAT(d(below.g), WithinAbs(d(above.g), 1e-4));
+        CHECK_THAT(d(below.b), WithinAbs(d(above.b), 1e-4));
+        // without the mirror, below the horizon is the ground colour
+        const glm::vec3 ground = skyRadiance(plain, down);
+        CHECK_THAT(d(ground.r), WithinAbs(d(plain.groundColor.r), 1e-6));
+    }
+    // the sun's reflection is below the horizon, as bright as the sun
+    const glm::vec3 sunDown(mirrored.sunDirection.x, -mirrored.sunDirection.y, mirrored.sunDirection.z);
+    CHECK(luminance(skyRadiance(mirrored, sunDown)) > 0.9f * luminance(skyRadiance(mirrored, mirrored.sunDirection)));
+    CHECK(luminance(skyRadiance(plain, sunDown)) < 0.5f * luminance(skyRadiance(plain, plain.sunDirection)));
+    // well above the horizon the mirror changes nothing
+    const glm::vec3 high(0.1f, 0.9f, 0.2f);
+    CHECK_THAT(d(skyRadiance(mirrored, high).g), WithinAbs(d(skyRadiance(plain, high).g), 1e-6));
+    CHECK_FALSE(skyWithinRebuildTolerance(plain, mirrored)); // turning the mirror on rebuilds the cube
+}

@@ -526,6 +526,10 @@ struct SkySettings {
     bool showBackground = false;     // draw the sky behind the scene instead of the background colour
     bool useKeyLight = true;         // take the sun direction from the scene's key light
     glm::vec3 sunDirection{0.35f, 0.75f, 0.55f}; // fallback direction *towards* the sun
+    // ADR-1167: how much of the sky below the horizon is the sky above it, reflected (0 = the ground colour, as
+    // before; 1 = a perfect mirror, its sun included). A world with no ground -- a still sea to every horizon --
+    // looks down into its own sky.
+    float mirror = 0.0f;
 };
 
 // ADR-345. Which background the scene pass should draw, as a function of the environment alone.

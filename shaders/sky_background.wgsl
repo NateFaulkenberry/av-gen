@@ -35,6 +35,19 @@ fn skyRadianceFrame(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
 
 // ADR-1070: the same sky with the sun's intensity applied, as the cube applies it, for the live
 // background of a procedural-sky IBL (the ADR-345 caller above has never applied it).
+// ADR-1167: the sky above the horizon along d (gradient and sun, no band), for the mirror below it.
+fn skyAboveFrame(d: vec3<f32>, minRadius: f32, sunScale: f32) -> vec3<f32> {
+    let haze = exp(-saturate(d.y) / max(frame.skyZenithColor.w, 1e-3));
+    let gradient = mix(frame.skyZenithColor.rgb, frame.skyHorizonColor.rgb, haze);
+    let theta = acos(clamp(dot(d, frame.skySun.xyz), -1.0, 1.0));
+    let sunRadius = max(frame.skyHorizonColor.w, 1e-3);
+    let radius = max(sunRadius, max(minRadius, 0.0));
+    let energy = (sunRadius / radius) * (sunRadius / radius);
+    let disc = (1.0 - skySmoothstepF(radius * 0.85, radius * 1.15, theta)) * energy;
+    let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02;
+    return gradient + frame.skySunRadiance.rgb * sunScale * (disc + glow);
+}
+
 fn skyRadianceFrameScaled(dir: vec3<f32>, minRadius: f32, sunScale: f32) -> vec3<f32> {
     let d = normalize(dir);
     let hazeWidth = max(frame.skyZenithColor.w, 1e-3);
@@ -51,7 +64,12 @@ fn skyRadianceFrameScaled(dir: vec3<f32>, minRadius: f32, sunScale: f32) -> vec3
     let disc = (1.0 - skySmoothstepF(radius * 0.85, radius * 1.15, theta)) * energy;
     let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
     let sun = frame.skySunRadiance.rgb * sunScale * (disc + glow) * band;
-    return base + sun;
+    var mirrored = vec3<f32>(0.0);
+    if (frame.skyMirror.x > 0.0) { // ADR-1167: below the horizon, the sky above it
+        mirrored = min(frame.skyMirror.x, 1.0) * (1.0 - band) *
+                   (skyAboveFrame(vec3<f32>(d.x, -d.y, d.z), minRadius, sunScale) - frame.skyGroundColor.rgb);
+    }
+    return base + sun + mirrored;
 }
 
 // The parameterisation shaders/environment.wgsl builds the cube with. One definition, so the sky

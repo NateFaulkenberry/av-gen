@@ -18,7 +18,7 @@ struct EnvUniforms {
     skyHorizon: vec4<f32>,  // rgb, w = sunAngularRadius
     skyGround: vec4<f32>,   // rgb, w = sunGlowWidth
     skySun: vec4<f32>,      // rgb = sun colour * sun intensity, w = overall intensity
-    skySunDir: vec4<f32>,   // xyz = unit direction *towards* the sun
+    skySunDir: vec4<f32>,   // xyz = unit direction *towards* the sun, w = ADR-1167's mirror (0 = none)
 };
 
 @group(0) @binding(0) var<uniform> env: EnvUniforms;
@@ -117,6 +117,19 @@ fn skySmoothstep(e0: f32, e1: f32, x: f32) -> f32 {
     return t * t * (3.0 - 2.0 * t);
 }
 
+// ADR-1167: the sky above the horizon along d (gradient and sun, no band), for the mirror below it.
+fn skyAboveEnv(d: vec3<f32>, minRadius: f32) -> vec3<f32> {
+    let haze = exp(-saturate(d.y) / max(env.skyZenith.w, 1e-3));
+    let gradient = mix(env.skyZenith.rgb, env.skyHorizon.rgb, haze);
+    let theta = acos(clamp(dot(d, env.skySunDir.xyz), -1.0, 1.0));
+    let sunRadius = max(env.skyHorizon.w, 1e-3);
+    let radius = max(sunRadius, max(minRadius, 0.0));
+    let energy = (sunRadius / radius) * (sunRadius / radius);
+    let disc = (1.0 - skySmoothstep(radius * 0.85, radius * 1.15, theta)) * energy;
+    let glow = exp(-theta / max(env.skyGround.w, 1e-3)) * 0.02;
+    return gradient + env.skySun.rgb * (disc + glow);
+}
+
 fn skyRadiance(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
     let d = normalize(dir);
     let hazeWidth = max(env.skyZenith.w, 1e-3);
@@ -133,7 +146,12 @@ fn skyRadiance(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
     let disc = (1.0 - skySmoothstep(radius * 0.85, radius * 1.15, theta)) * energy;
     let glow = exp(-theta / max(env.skyGround.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
     let sun = env.skySun.rgb * (disc + glow) * band;
-    return (base + sun) * env.skySun.w;
+    var mirrored = vec3<f32>(0.0);
+    if (env.skySunDir.w > 0.0) { // ADR-1167: below the horizon, the sky above it
+        mirrored = min(env.skySunDir.w, 1.0) * (1.0 - band) *
+                   (skyAboveEnv(vec3<f32>(d.x, -d.y, d.z), minRadius) - env.skyGround.rgb);
+    }
+    return (base + sun + mirrored) * env.skySun.w;
 }
 
 @fragment

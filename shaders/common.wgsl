@@ -164,6 +164,8 @@ struct FrameUniforms {
     // than its cube, y = the sun's intensity, z = the sky's intensity, w = the sun disc's floor
     // radius. Mirrors FrameUniforms; zero offline.
     skyLive: vec4<f32>,
+    // ADR-1167: x = the sky's mirror below the horizon (0 = none). Mirrors FrameUniforms, appended last.
+    skyMirror: vec4<f32>,
 };
 
 struct ObjectUniforms {
