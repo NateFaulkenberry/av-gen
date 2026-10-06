@@ -653,8 +653,7 @@ fn cs_latent(@builtin(global_invocation_id) gid: vec3<u32>) {
 
 // ---- ADR-1155: the staggered projection -----------------------------------------------------------
 // cs_latent with the prototype's stagger: a particle refreshes its projection (the four SDF taps) on one step in
-// `stride` (latentInfo.z; by 64-slot block, so a SIMD group takes one branch), on any step it is released, and
-// when it has none stored; in between it springs toward the stored surface point. The point rides the record's
+// `stride` (latentInfo.z; by 64-slot block); in between it springs toward the stored surface point. The point rides the record's
 // `home` lane (xyz, world), and the latent normal octahedral-packed into 2 x 11 bits in `home.w` as
 // -(1 + bits): always < 0.5, so the attractor (which reads home.w > 0.5 as an anchored home) never sees it, and
 // > -0.5 marks "nothing stored yet". A separate entry, so cs_latent -- every unstaggered latent -- is untouched.
@@ -680,9 +679,16 @@ fn latentOctDecode(w: f32) -> vec3<f32> {
     return normalize(n);
 }
 
+// Two entries, so the heavy one runs on a third of the matter: `cs_latent_project` (the SDF taps, the only code
+// that inlines the tree) runs over just the 64-slot blocks whose turn it is this step and stores their surface
+// points; `cs_latent_spring` (no SDF code at all, so a tree's register pressure never throttles it) springs every
+// bound particle toward its stored point. A particle with nothing stored yet waits for its block's turn (at most
+// stride - 1 steps); a released one is thrown along its stored normal.
 @compute @workgroup_size(64)
-fn cs_latent_staggered(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let slot = gid.x;
+fn cs_latent_project(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let stride = max(params.latentInfo.z, 1u);
+    let phase = (stride - (u32(params.sim.z) % stride)) % stride; // (block + frame) % stride == 0
+    let slot = ((gid.x >> 6u) * stride + phase) * 64u + (gid.x & 63u);
     if (slot >= params.counts.y) { return; }
     var p = particles[slot];
     if (p.life <= 0.0 || p.stage > 0.5) { return; }
@@ -691,31 +697,41 @@ fn cs_latent_staggered(@builtin(global_invocation_id) gid: vec3<u32>) {
     let b = latentBinding(theta, params.latent0.x, width);
     let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
     if (b <= 0.0 && release <= 0.0) { return; }
-    let dt = params.sim.x;
     let t = params.sim.y;
     let count = params.latentInfo.x;
-    let stride = max(params.latentInfo.z, 1u);
-    var goal = p.home.xyz;
-    var nW = vec3<f32>(0.0, 1.0, 0.0);
-    if (((slot >> 6u) + u32(params.sim.z)) % stride == 0u || release > 0.0 || p.home.w > -0.5) {
-        let pl = (params.latentInverse * vec4<f32>(p.position, 1.0)).xyz;
-        let e = params.latent1.z;
-        let k0 = vec3<f32>(1.0, -1.0, -1.0);
-        let k1 = vec3<f32>(-1.0, -1.0, 1.0);
-        let k2 = vec3<f32>(-1.0, 1.0, -1.0);
-        let k3 = vec3<f32>(1.0, 1.0, 1.0);
-        let d0 = sdfEvaluate(0u, count, pl + k0 * e, t, params.latentModel);
-        let d1 = sdfEvaluate(0u, count, pl + k1 * e, t, params.latentModel);
-        let d2 = sdfEvaluate(0u, count, pl + k2 * e, t, params.latentModel);
-        let d3 = sdfEvaluate(0u, count, pl + k3 * e, t, params.latentModel);
-        let nL = sdfSafeNormalize(k0 * d0 + k1 * d1 + k2 * d2 + k3 * d3);
-        let d = 0.25 * (d0 + d1 + d2 + d3);
-        goal = (params.latentModel * vec4<f32>(pl - nL * d, 1.0)).xyz;
-        nW = sdfSafeNormalize((params.latentNormal * vec4<f32>(nL, 0.0)).xyz);
-        p.home = vec4<f32>(goal, latentOctEncode(nW));
-    } else {
-        nW = latentOctDecode(p.home.w);
-    }
+    let pl = (params.latentInverse * vec4<f32>(p.position, 1.0)).xyz;
+    let e = params.latent1.z;
+    let k0 = vec3<f32>(1.0, -1.0, -1.0);
+    let k1 = vec3<f32>(-1.0, -1.0, 1.0);
+    let k2 = vec3<f32>(-1.0, 1.0, -1.0);
+    let k3 = vec3<f32>(1.0, 1.0, 1.0);
+    let d0 = sdfEvaluate(0u, count, pl + k0 * e, t, params.latentModel);
+    let d1 = sdfEvaluate(0u, count, pl + k1 * e, t, params.latentModel);
+    let d2 = sdfEvaluate(0u, count, pl + k2 * e, t, params.latentModel);
+    let d3 = sdfEvaluate(0u, count, pl + k3 * e, t, params.latentModel);
+    let nL = sdfSafeNormalize(k0 * d0 + k1 * d1 + k2 * d2 + k3 * d3);
+    let d = 0.25 * (d0 + d1 + d2 + d3);
+    let goal = (params.latentModel * vec4<f32>(pl - nL * d, 1.0)).xyz;
+    let nW = sdfSafeNormalize((params.latentNormal * vec4<f32>(nL, 0.0)).xyz);
+    p.home = vec4<f32>(goal, latentOctEncode(nW));
+    particles[slot] = p;
+}
+
+@compute @workgroup_size(64)
+fn cs_latent_spring(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    if (p.life <= 0.0 || p.stage > 0.5 || p.home.w > -0.5) { return; } // dead, a ring, or nothing stored yet
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let b = latentBinding(theta, params.latent0.x, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
+    if (b <= 0.0 && release <= 0.0) { return; }
+    let dt = params.sim.x;
+    let t = params.sim.y;
+    let goal = p.home.xyz;
+    let nW = latentOctDecode(p.home.w);
     let C = params.latent0.x;
     var K = params.latent0.w * (18.0 + 70.0 * C * C);
     if (dt > 0.0) {

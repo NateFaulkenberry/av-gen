@@ -356,6 +356,7 @@ private:
         float latentPrevCoherence = 0.0f;
         bool latentPrevValid = false;
         bool latentWarned = false;
+        std::uint32_t latentModeLogged = 0; // the force's mode last said in the log (1 + mode), 0 = never
         // ADR-1148: when the current release front set out (the step the coherence began to fall), or < 0.
         double heatFrontStart = -1.0;
         // ADR-1141: the render-transient density volume (empty unless the system has a density block).
@@ -421,7 +422,8 @@ private:
     wgpu::ComputePipeline glowReducePipeline_;
     wgpu::ComputePipeline glowTopPipeline_;
     wgpu::ComputePipeline latentPipeline_; // ADR-1140
-    wgpu::ComputePipeline latentStaggeredPipeline_; // ADR-1155
+    wgpu::ComputePipeline latentProjectPipeline_; // ADR-1155
+    wgpu::ComputePipeline latentSpringPipeline_;  // ADR-1155
     // ADR-1141: the density passes have their own layout (particle_density.wgsl).
     wgpu::BindGroupLayout densityLayout_;
     wgpu::PipelineLayout densityPipelineLayout_;
@@ -438,10 +440,11 @@ private:
     // ADR-1145: cs_latent compiled against a tree (spatial::sdfCompileWgsl spliced into particles.wgsl), by
     // spatial::sdfCompileKey, for a latent whose SDF object has `compile` on. A null pipeline = the build
     // failed (the force is then off for that tree, said once). Cleared by reload().
-    // ADR-1155: each variant builds both entries, cs_latent and cs_latent_staggered.
+    // ADR-1155: each variant builds both tree-reading entries, cs_latent and cs_latent_project (the staggered
+    // spring, cs_latent_spring, reads no tree and is the base module's).
     struct CompiledLatent {
         wgpu::ComputePipeline plain;
-        wgpu::ComputePipeline staggered;
+        wgpu::ComputePipeline project;
     };
     const CompiledLatent& compiledLatentPipeline(const spatial::SdfTree& tree, const spatial::FieldSet* fields);
     std::map<std::uint64_t, CompiledLatent> compiledLatent_;

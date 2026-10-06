@@ -1744,7 +1744,7 @@
      1
     ],
     "emissive": 1.0,
-    "blend": "additive",
+    "blend": "alpha",
     "shape2d": "flake",
     "flake": {
      "metal": [
@@ -1936,7 +1936,7 @@
      1
     ],
     "emissive": 1.0,
-    "blend": "additive",
+    "blend": "alpha",
     "shape2d": "flake",
     "flake": {
      "metal": [

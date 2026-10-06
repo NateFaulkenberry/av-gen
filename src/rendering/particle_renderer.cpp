@@ -318,8 +318,8 @@ const ParticleRenderer::CompiledLatent& ParticleRenderer::compiledLatentPipeline
         text.replace(at, kCall.size(), "= sdfField(0u, count, pl + k");
         ++replaced;
     }
-    if (replaced != 8) { // cs_latent's four taps and cs_latent_staggered's four (ADR-1155)
-        log::warn("particles: cs_latent and cs_latent_staggered no longer have their eight sdfEvaluate taps ({}); the "
+    if (replaced != 8) { // cs_latent's four taps and cs_latent_project's four (ADR-1155)
+        log::warn("particles: cs_latent and cs_latent_project no longer have their eight sdfEvaluate taps ({}); the "
                   "compiled latent is off",
                   replaced);
         return slot;
@@ -355,12 +355,12 @@ const ParticleRenderer::CompiledLatent& ParticleRenderer::compiledLatentPipeline
         return pipeline;
     };
     wgpu::ComputePipeline plain = build("cs_latent");
-    wgpu::ComputePipeline staggered = build("cs_latent_staggered");
-    if (!plain || !staggered) {
+    wgpu::ComputePipeline project = build("cs_latent_project");
+    if (!plain || !project) {
         return slot;
     }
     slot.plain = plain;
-    slot.staggered = staggered;
+    slot.project = project;
     log::info("particles: compiled latent variant {:016x} ({} node records) in {:.1f} ms", key, table.size(),
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     return slot;
@@ -454,8 +454,10 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!glowTop) return std::unexpected(glowTop.error());
     auto latent = makeCompute("cs_latent"); // ADR-1140
     if (!latent) return std::unexpected(latent.error());
-    auto latentStaggered = makeCompute("cs_latent_staggered"); // ADR-1155
-    if (!latentStaggered) return std::unexpected(latentStaggered.error());
+    auto latentProject = makeCompute("cs_latent_project"); // ADR-1155
+    if (!latentProject) return std::unexpected(latentProject.error());
+    auto latentSpring = makeCompute("cs_latent_spring");
+    if (!latentSpring) return std::unexpected(latentSpring.error());
     auto densityModule = shaders_.load("particle_density.wgsl"); // ADR-1141
     if (!densityModule) return std::unexpected(densityModule.error());
     auto densitySplat = makeCompute("cs_density_splat", &*densityModule, &densityPipelineLayout_);
@@ -529,7 +531,8 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     glowReducePipeline_ = *glowReduce;
     glowTopPipeline_ = *glowTop;
     latentPipeline_ = *latent;
-    latentStaggeredPipeline_ = *latentStaggered;
+    latentProjectPipeline_ = *latentProject;
+    latentSpringPipeline_ = *latentSpring;
     densitySplatPipeline_ = *densitySplat;
     densityResolvePipeline_ = *densityResolve;
     densityCoarsePipeline_ = *densityCoarse;
@@ -1233,7 +1236,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 } else if (const CompiledLatent& built = compiledLatentPipeline(object->tree, &scene.fields); !built.plain) {
                     why = "its compiled force did not build";
                 } else {
-                    latentCompiled = sys.latent.stagger > 1 ? built.staggered : built.plain;
+                    latentCompiled = sys.latent.stagger > 1 ? built.project : built.plain;
                     spatial::sdfCompileTable(object->tree, latentScratch_, &scene.fields);
                     count = static_cast<int>(latentScratch_.size());
                     if (count <= 0) {
@@ -1319,6 +1322,14 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 pool.latentPrevCoherence = coherence;
                 pool.latentPrevValid = true;
                 pool.latentWarned = false;
+                // Say once (and again on a change) which force this system runs: the evidence a cost reads.
+                const std::uint32_t mode = 1u + (tendons ? 3u : (latentCompiled ? 1u : 0u)) + (stagger > 1u ? 4u : 0u);
+                if (pool.latentModeLogged != mode) {
+                    log::info("particles '{}': latent force {}{} ({} records)", sys.name,
+                              tendons ? "cs_tendon" : (latentCompiled ? "compiled" : "interpreted"),
+                              stagger > 1u ? fmt::format(", staggered {}", stagger) : std::string(), count);
+                    pool.latentModeLogged = mode;
+                }
                 latentOn = true;
                 if (!warming_) {
                     ++stats_.latentSystems;
@@ -1348,11 +1359,21 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             // ADR-1140: adds the spring toward the latent's projection to the velocity, which the
             // simulate dispatch then integrates. Not dispatched at all for a system without one.
             // ADR-1146: a latent with tendons binds to its curves (cs_tendon) instead of the zero set.
-            cp.SetPipeline(sys.latent.tendons.active()
-                               ? tendonPipeline_
-                               : (latentCompiled ? latentCompiled
-                                                 : (u.latentInfo.z > 1u ? latentStaggeredPipeline_ : latentPipeline_)));
-            cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            if (sys.latent.tendons.active()) {
+                cp.SetPipeline(tendonPipeline_);
+                cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            } else if (u.latentInfo.z > 1u) {
+                // ADR-1155: project this step's third (its blocks only), then spring everything to what is stored.
+                const std::uint32_t blocks = (pool.capacity + 63u) / 64u;
+                const std::uint32_t turn = (blocks + u.latentInfo.z - 1u) / u.latentInfo.z;
+                cp.SetPipeline(latentCompiled ? latentCompiled : latentProjectPipeline_);
+                cp.DispatchWorkgroups(std::max(turn * 64u / kWorkgroup, 1u));
+                cp.SetPipeline(latentSpringPipeline_);
+                cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            } else {
+                cp.SetPipeline(latentCompiled ? latentCompiled : latentPipeline_);
+                cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+            }
             if (sys.latent.heat.enabled) { // ADR-1148: the release front's heat, after the release it reads
                 cp.SetPipeline(heatPipeline_);
                 cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
