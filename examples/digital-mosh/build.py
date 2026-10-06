@@ -78,6 +78,8 @@ PAL = {
 # ============================================================================================ layout
 # The stage is the salt pan (land.PAN, centred at (4, -8), 110 m across). Heights are the engine's (land.py).
 PAN_C = (4.0, -8.0)                        # the pan's centre (land.PAN)
+LIQUID_AT = [PAN_C[0], -0.075, PAN_C[1]]   # under the pan's lowest point inside the square (-0.064 m)
+LIQUID_HIDDEN = [PAN_C[0], -30.0, PAN_C[1]]
 TREE_XZ = (-6.0, 0.0)
 TANGUY_XZ = (12.0, -14.0)
 DOUBLE_XZ = (-34.0, -46.0)
@@ -411,9 +413,9 @@ def scene():
          "material": {"program": "groundFar", "baseColor": d["land"][1], "roughness": 0.95, "metallic": 0.0}},
     ]
     # The liquid skin (brief §8 "liquid-like terrain"; terrain itself cannot deform): a subdivided 34 m square lying
-    # 4 cm above the pan, heaved by the kick's fronts and a bass swell, still at its edges (the `pool` mask).
-    nodes.append({"name": "liquid", "kind": "procedural", "position": [PAN_C[0], land.height(*PAN_C) + 0.04,
-                                                                      PAN_C[1]],
+    # just UNDER the pan, so at rest the land covers it and only the crests the kick's fronts and the bass swell lift
+    # rise out of the ground (its edges stay under: no line). Parked far below in the stages where land is solid.
+    nodes.append({"name": "liquid", "kind": "procedural", "position": LIQUID_HIDDEN,
                   "procedural": {
                       "source": {"kind": "box", "size": [34.0, 0.02, 34.0], "subdivisions": 64},
                       "distribution": {"kind": "single"}, "lod": {"cull": False, "count": 1},
@@ -521,7 +523,7 @@ STAGES = {
     # The Elephants' blood sky over Tanguy's night land: the tree is blocks, its limbs float free.
     "Nightmare": stage(pal="nightmare", inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
                        melt=[0.26, 0.18, -0.14], lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8,
-                       tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=6.0,
+                       tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=3.0,
                        glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.03, moshBlock=24.0, exposure=-0.7,
                        gMicro=1.0, gRhythm=1.0, gMosh=0.85, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0,
                        volDen=0.0014, wave=1.4, swell=0.9),
@@ -575,6 +577,7 @@ def stage_values(name, v):
         "lights/sun/color": pal["sun"], "lights/sun/intensity": [v["sun"]],
         "material/ground/emissionIntensity": [v["glowPlain"]], "material/liquid/emissionIntensity": [v["glowPlain"]],
         "procedural/liquid/deform/1/amount": [v["wave"]], "procedural/liquid/deform/2/amount": [v["swell"]],
+        "nodes/liquid/position": LIQUID_AT if v["wave"] > 0 else LIQUID_HIDDEN,
         f"material/liquid/op/{program_op(liquid_program, 'constant', 3)}/constant/constant": pal["land"][0] + [1], "material/bark/emissionIntensity": [v["glowBark"]],
         "material/skin/emissionIntensity": [v["glowBark"]],
         "material/treeBlocks/emissionIntensity": [v["glowBlocks"]],
