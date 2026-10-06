@@ -479,24 +479,6 @@
       "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure, and a big friendly fish circling over the lane swims the melody. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
       "name": "Sonic Abstract - 8-Bit Ocean",
       "project": "sonic-abstract/bit-ocean.json"
-    },
-    {
-      "category": "Flagship",
-      "description": "The flagship LIVE scene: a continuous flight through an endless world that hears. A 420k-agent organism draws the floor and the roof in light (colour is frequency), a forest grows where it walked, sea whips and colossal horns pass by, and kick fronts race out from the traveller. Seven stages of the journey follow the music's energy. Plays Feline Footwear (assets/audio/feline-footwear.wav, not in the repo); see docs/research/gpu-world-productionization.md, Phase 4.",
-      "name": "PHONOTAXIS",
-      "project": "phonotaxis/phonotaxis.json"
-    },
-    {
-      "category": "Flagship",
-      "description": "PHONOTAXIS as an instrument: live audio input and MIDI (knobs CC 1 and 21-28, pads 36-50). Opening it turns live input on; pick the devices in the Live panel. The vocabulary is in docs/research/gpu-world-productionization.md, Phase 4.",
-      "name": "PHONOTAXIS LIVE",
-      "project": "phonotaxis/phonotaxis-live.json"
-    },
-    {
-      "category": "Flagship",
-      "description": "PHONOTAXIS on a darker track (night-shift.wav), trimmed with the SENSITIVITY knob: the same world finds the song's own arc.",
-      "name": "PHONOTAXIS - Night Shift",
-      "project": "phonotaxis/phonotaxis-night-shift.json"
     }
   ]
 }

@@ -2,8 +2,9 @@
 
 - Status: Accepted (gpu/productionization, the flagship LIVE scene)
 - Builds on ADR-032 (simulated grids), ADR-1119 (per-step inputs, GPU checkpoints), ADR-1120 (agents grids).
-- Found by: PHONOTAXIS (`examples/phonotaxis/`), whose MIDI vocabulary needs the organism's behaviour (how far
+- Found by: PHONOTAXIS (formerly `examples/phonotaxis/`), whose MIDI vocabulary needs the organism's behaviour (how far
   it looks, how sharply it turns, how fast its trails fade) under a performer's hands.
+- PHONOTAXIS was dropped by the owner on 2026-10-05 and its scene deleted; this capability stays.
 
 ## Problem
 

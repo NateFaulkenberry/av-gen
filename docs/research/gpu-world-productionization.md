@@ -6,6 +6,14 @@ engine agent (brief Phases 0-3). Phase 4, the flagship LIVE scene and its art, b
 agent, and the handoff to it is at the end of this file. Machine: Apple M2 Max (38-core GPU, 64 GB),
 macOS 26, Dawn/WebGPU on Metal. Every GPU run goes through `tools/gpu-lock.sh`.
 
+> **Status: PHONOTAXIS (Phase 4, the flagship LIVE scene) was dropped by the owner on 2026-10-05.** The scene
+> (`examples/phonotaxis/`: its build script, projects, performer, replay and recorded performance) and its
+> `examples/index.json` entries were deleted before the merge to main. Every PHONOTAXIS section below is kept as
+> history only; the files it names no longer exist. What the scene produced and stays on main: ADR-1122 (a
+> grid's behaviour is parameters), ADR-1123 (orbit camera pivot), ADR-1124 (scene states read the bus after the
+> sources), `tools/frame_coverage.py` (the dead-space check), and the engine findings recorded below (the
+> compound-field typing defect and the "Found and recorded" list). Phases 0-3 are unaffected.
+
 Read with: `docs/research/gpu-world-architecture-spike.md` (the spike, final decision GREEN, narrowly
 scoped), `docs/development/gpu-sim-seek-investigation.md`, ADR-1114 and ADR-1115.
 
@@ -17,9 +25,11 @@ scoped), `docs/development/gpu-sim-seek-investigation.md`, ADR-1114 and ADR-1115
 | 1. CPU/GPU bridge research | done (primary sources plus measurements on this machine) | §Phase 1 |
 | 2. Architecture decision | done: three additive extensions, no container | §Phase 2 |
 | 3. Production hardening | done: ADR-1116 to ADR-1121, three regression scenes, benchmarks | §Phase 3, §Regression benchmarks |
-| 4. Flagship LIVE scene | **PAUSED by the owner 2026-10-05** ("I'm not sure I want to use that one"). PHONOTAXIS was redesigned as a flight and passes the dead-space check; no final measurements or deliverables for the flight. ADR-1122 to ADR-1124 and the Critic's LIVE mode are done | §PHONOTAXIS: where it stands (below), §Phase 4 |
+| 4. Flagship LIVE scene | **DROPPED by the owner 2026-10-05** (scene deleted; history below). Earlier: **PAUSED by the owner 2026-10-05** ("I'm not sure I want to use that one"). PHONOTAXIS was redesigned as a flight and passes the dead-space check; no final measurements or deliverables for the flight. ADR-1122 to ADR-1124 and the Critic's LIVE mode are done | §PHONOTAXIS: where it stood (below), §Phase 4 |
 
-### PHONOTAXIS: where it stands (paused 2026-10-05)
+### PHONOTAXIS: where it stood (paused, then dropped by the owner on 2026-10-05)
+
+*History: the scene was dropped by the owner on 2026-10-05 and `examples/phonotaxis/` was deleted.*
 
 **How the design got here.** The owner redirected the design three times:
 
@@ -137,7 +147,8 @@ It is history: where it differs from this section, this section is right.
   and Color if all are colour, on both the CPU and the GPU. It needs an ADR, because existing programs
   that read such compounds would change.
 
-Resume points, if anything has to be picked up cold:
+Resume points, if anything has to be picked up cold (the PHONOTAXIS points are history: the scene was dropped
+by the owner on 2026-10-05 and its files deleted):
 
 - PHONOTAXIS is generated: edit `examples/phonotaxis/build.py`, then run `python3 examples/phonotaxis/build.py`.
   Never edit the JSON it writes. `perform.py` is the scripted performer (audio into BlackHole, MIDI from a
@@ -934,7 +945,10 @@ Not merged, not pushed.
 
 ---
 
-## Phase 4: PHONOTAXIS (the flagship LIVE scene)
+## Phase 4: PHONOTAXIS (the flagship LIVE scene) -- dropped by the owner on 2026-10-05
+
+*History only: the scene was dropped by the owner on 2026-10-05 and `examples/phonotaxis/` was deleted. ADR-1122,
+ADR-1123, ADR-1124 and `tools/frame_coverage.py` stay.*
 
 The art agent's run, 2026-10-05: brief Phase 4, from the handoff above.
 
