@@ -9,6 +9,7 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 |---|---|
 | `examples/digital-mosh/build.py` | Source of truth: palettes, layout, vantages, fields, the contagion grid, material programs, stages, the arc, the audio routes, MIDI |
 | `examples/digital-mosh/forms.py` | The olive (five SDF objects and their voxel shell) and the Tanguy object |
+| `examples/digital-mosh/flight.py` | The flight: three petals of control points (x, metres above the land, z), the closed Catmull-Rom spline node, and a clearance check against the engine's land heights |
 | `examples/digital-mosh/land.py` | The geography (near and far terrain over one description); engine-backed height queries through `tools/gv3/ground.py` |
 | `examples/digital-mosh/palette_extract.py` | k-means in CIELAB over painting reproductions (`05-palettes.md`) |
 | `examples/digital-mosh/critic_inputs.py` | Creative Critic `intent.json` and `shots.json` for a render, from the engine's own arc trace |
@@ -31,6 +32,9 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 | Tanguy object | One SDF, 27 nodes: a smooth union pierced by a cylinder, a filament, a bead, a needle | Hovers 0.11 m above its shadow (S8); glossy, so it picks up the strain's light |
 | Double | The same form without `eaten`, parked under the land until a preset places it | P2 |
 | Blocks | Two `points` procedurals: the olive's shell (900 cubes of 0.16 m) and the Tanguy object's (584 cubes of 0.2 m), computed in Python from the same skeletons | The surface's own representation: they appear where the surface is eaten, then lift, tumble and float |
+| Flower, rock, giant | SDF objects (`forms.flower_tree`, `forms.rock_tree`, and the Tanguy form at node scale 7) | The landmarks (02-design.md): the flower uses the stone's infected program; the rock is parked under the land in the Dream |
+| Clouds | One `points` procedural of 182 flattened spheres in 7 heaps, 1.5-2.8 km out, 400-600 m up; no shadows; a `wind` direction field moves them by an integrated route | Magritte's sculpted clouds at the cost of one instanced draw |
+| Land blocks | A `points` procedural of 1,089 cubes of 2.3 m on a 2.4 m lattice over the pan and its banks, sunk to the land's surface; scale = the `collapse` field (0 until the Collapse) x the stain; lift and tumble staged | The Collapse in the world: the land itself breaks into blocks with depth and parallax |
 | Motes | Particles (disc, 45 m) | Dust in the dream light; spores later |
 | Fracture light | Point light in the strain's colour at the Tanguy object, `volumetric 1` | The strain reaches the light, the land, the tree, the haze and the object's specular |
 
@@ -38,7 +42,24 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 painted stage, and 1.0 for Magritte's Respite and the Light, so shadowed faces read dark against lit ones in
 greyscale. The key carries a `shadowBias` of 0.006, which keeps a grazing sun on 1.25 m quads from producing acne.
 
-## The camera
+## The camera (pass 5: the flight)
+
+The camera is the spline camera (mode 2) on `flight` (`flight.py`). Two routes integrate into `camera/splineT`:
+- `macro.flight`, the stage's pace (metres per second ÷ 20), with amount 20 / path length;
+- `macro.energy`, with amount 4 / path length.
+
+A stage variant's preset sets the following, and the variants move on phrases and bars exactly as the vantages did:
+- `camera/splineOffset` (altitude);
+- `camera/lookAhead`;
+- `camera/fov`;
+- `camera/splineBank` (ADR-1166);
+- `camera/roll`;
+- in the Nightmare, a `camera/splineT` base offset (a cut along the path).
+
+The Collapse strata set `camera/mode` 1 and a held vantage over the pan. Two LFOs float the camera off its path,
+deeper with the energy.
+
+## The camera (passes 1 to 4)
 
 The camera is free (mode 1). `VANTAGES` gives each stage two or three (eye, target, fov, roll) placed on the land.
 Eyes are lifted onto the engine's terrain height, and `check_moves()` probes the land along every straight move

@@ -59,7 +59,55 @@ swapped the whole frame's palette, and the owner read it, rightly, as screen tin
 stages change the palette everywhere: the Nightmare, the Collapse, and Magritte's Respite. Before them, the painting
 stays intact except where the contagion has reached it.
 
-### The travelling camera
+### The flight (pass 5)
+
+The owner asked for a soaring camera in place of vantages. Since pass 5 the camera flies one closed path over the
+land (`flight.py`, camera mode 2), made of three petals. Each petal leaves the salt pan and returns over it, so the
+stone and its contagion come back into view about every half minute, whatever the song's tempo:
+
+- **West:** down onto the riverbed and upstream along it, under the floating rock, then back over the knoll, gliding
+  past the tree.
+- **East:** low over the dune crests past the east mesa, round through the southern dunes, then home over a crest.
+- **North:** climbing over the escarpment's wall to the land and mesas beyond, past the giant at its foot.
+
+The flight never stops:
+
+- **Speed:** the camera's position along the path integrates the stage's pace and the music's energy (about 6 m/s in
+  the Dream, 15 in the Nightmare, up to 4 m/s more on the energy).
+- **Phrases and bars:** these still drive the camera, as before. They now change how it flies: its altitude over
+  the path, how far ahead it looks, its lens, and its lean into turns (ADR-1166).
+- **The Nightmare** also cuts the path itself forward and back on the bar, so the camera swoops somewhere else.
+- **The Collapse** stalls the flight: the camera holds over the pan while the world comes apart, and Recovery
+  resumes it.
+
+### The landmarks (pass 5)
+
+One tree and one stone were beautiful but not yet uncanny, and a flight needs things to pass. Three more were
+added, each with a beat of its own:
+
+| Landmark | Reference | Role |
+|---|---|---|
+| **An impossible flower**: a stem far too tall and thin to stand, and a stone bloom of seven petals, beside the stone | the brief's "impossible flower"; Dalí's stems | The first neighbour the contagion reaches: it carries the stone's infected surface |
+| **A floating rock** with a small keep on its crown, over the riverbed | Magritte, *The Castle of the Pyrenees* | The Uncanny's first violation: absent in the Dream, there from the Uncanny on. The flight passes beneath it |
+| **The giant**: the Tanguy object again, seven times its size, hovering at the escarpment's foot | Tanguy; P2 (the double) | Something whose scale cannot be judged from anything near it |
+
+### The sky (pass 5)
+
+Magritte's clouds are sculpted, solid-looking heaps far out over the land, lit by the same raking sun. They sit
+1.5-2.8 km out, so the haze takes them into the sky's own colour, and they cost no volumetrics.
+
+They drift on a wind, and the Uncanny stops the drift: a cloud that stops is the sky's first relation error. Their
+colour follows the stage's light, so the Nightmare's blood light reaches them as well. Dalí's horizon band is the
+sky's own gradient, and Tanguy's fog, where ground and sky merge, is the haze.
+
+### The surface (pass 5)
+
+The sand carries wind ripples and its own form:
+- The ripples are noise stretched along the crests, faded with the pixel's footprint so they cannot shimmer.
+- Convex crests are bleached and hollows darker.
+- The near land is meshed at 1 m out to 180 m, so crest lines seen from the air do not step.
+
+### The travelling camera (passes 1 to 4)
 
 The camera moves through the world. It never sits locked off and never shakes. Each stage has two or three
 vantages on the land, and the music's phrases (later, its bars) move the camera between them:
