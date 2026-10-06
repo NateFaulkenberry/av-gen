@@ -7,10 +7,13 @@
 #include "assets/asset_registry.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "pathtrace/snapshot.hpp"
 #include "rendering/optics_pack.hpp"
 #include "scene/composition.hpp"
 #include "scene/material_optics.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/procedural.hpp"
+#include "scene/scene.hpp"
 #include "scene/sdf_object.hpp"
 #include "support/temp_dir.hpp"
 
@@ -332,4 +335,44 @@ TEST_CASE("A terrain or orb node's material carries thin film and anisotropy int
     REQUIRE_FALSE(bad.has_value());
     CHECK(bad.error().message.find("power") != std::string::npos);
     CHECK(bad.error().message.find("ball") != std::string::npos);
+}
+
+TEST_CASE("The CPU path tracer says it traces thin film and anisotropy as the bare material",
+          "[material_optics][adr1143][pathtrace]") {
+    scene::Scene s;
+    const auto mesh = s.addMesh(scene::makeIcosphere(1.0f, 2));
+    auto& filmed = s.addEntity("filmed", mesh);
+    filmed.material.thinFilm.thickness = 55.0f;
+    auto& brushed = s.addEntity("brushed", mesh);
+    brushed.material.anisotropy.strength = 0.8f;
+    auto& both = s.addEntity("both", mesh);
+    both.material.thinFilm.thickness = 300.0f;
+    both.material.anisotropy.strength = -0.5f;
+    s.addEntity("plain", mesh);
+
+    const auto find = [](const pathtrace::Snapshot& snap, const std::string& feature) -> const pathtrace::Capability* {
+        for (const pathtrace::Capability& c : snap.capabilities.entries) {
+            if (c.feature == feature) {
+                return &c;
+            }
+        }
+        return nullptr;
+    };
+    const pathtrace::Snapshot snap = pathtrace::buildSnapshot(s);
+    const pathtrace::Capability* film = find(snap, "thin-film material");
+    const pathtrace::Capability* aniso = find(snap, "anisotropic material");
+    REQUIRE(film != nullptr);
+    REQUIRE(aniso != nullptr);
+    CHECK(film->support == pathtrace::Support::Degraded);
+    CHECK(film->count == 2);
+    CHECK(aniso->support == pathtrace::Support::Degraded);
+    CHECK(aniso->count == 2);
+    CHECK(snap.capabilities.anyDegraded());
+
+    // A scene that uses neither says nothing about either.
+    scene::Scene plain;
+    plain.addEntity("plain", plain.addMesh(scene::makeIcosphere(1.0f, 2)));
+    const pathtrace::Snapshot clean = pathtrace::buildSnapshot(plain);
+    CHECK(find(clean, "thin-film material") == nullptr);
+    CHECK(find(clean, "anisotropic material") == nullptr);
 }
