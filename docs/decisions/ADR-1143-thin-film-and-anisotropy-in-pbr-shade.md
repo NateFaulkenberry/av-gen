@@ -15,7 +15,8 @@
   - the shading: `thinFilmTint`, `anisotropicGgxDV` and `specularLobeDV` in `shaders/lighting.wgsl`; the f0
     tint, the tangent and the IBL bent reflection in `shadeSurface` (`shaders/pbr_shade.wgsl`);
   - the path tracer's capability notes in `src/pathtrace/snapshot.cpp`.
-- **Tests:** `tests/unit/test_material_optics.cpp` (`[material_optics][adr1143]`),
+- **Tests:** `tests/unit/test_material_optics.cpp` (`[material_optics][adr1143]`, including the path
+  tracer's capability notes),
   `tests/rendering/test_material_optics_gpu.cpp` (`[gpu][material_optics][adr1143]`), the amended
   ADR-128 guard in `tests/unit/test_renderer_layout_guards.cpp`.
 - **Example:** `examples/astral-forge/tempered-metal.scene.json`.
@@ -168,9 +169,15 @@ a cheap approximation that elongates the environment's reflection along the righ
   golden and image tests pass unchanged.
 - A pinned build and its own commit's shaders stay consistent; a new binary with old shaders (or the reverse)
   disagrees about `ObjectUniforms`' size, as with ADR-1071.
-- Cost: measured in the final report of this change (shading pass with every sphere filmed and anisotropic
-  vs neither); the film is 16 iterations of a few exponentials per fragment, once, and the anisotropic lobe
-  replaces the isotropic one per light.
+- Cost, measured (M2 Max, 1920x1080, headless, 300 frames, the twelve SDF spheres of
+  `examples/astral-forge/tempered-metal.scene.json`, which cover roughly a quarter of the frame and are
+  lit by four lights): the `sdf` pass median (raymarch and shading together) was 4.92 / 4.39 ms with
+  neither term on any sphere and 5.05 / 4.98 ms with a 55 nm film and anisotropy 0.8 on every sphere, in
+  two interleaved pairs. The effect (+0.13 and +0.59 ms) is the same size as the run-to-run spread of the
+  plain arm (0.53 ms), so the honest statement is "under about 0.6 ms for a quarter of a 1080p frame,
+  not resolved below that". The film is 16 iterations of a few exponentials once per fragment; the
+  anisotropic lobe replaces the isotropic one per light. A material with neither pays two uniform
+  branches.
 
 ## Rejected alternatives
 
