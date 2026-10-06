@@ -18,20 +18,20 @@
   "fov": 30
  },
  "environment": {
-  "intensity": 0.3,
+  "intensity": 0.22,
   "background": [
-   0.96,
-   0.78,
-   0.6
+   1.0,
+   0.8,
+   0.58
   ],
   "fogColor": [
-   0.96,
-   0.78,
-   0.6
+   1.0,
+   0.8,
+   0.58
   ],
   "shadowRange": 160.0,
   "shadowCascades": 3,
-  "volumeDensity": 0.0011,
+  "volumeDensity": 0.0008,
   "volumeScattering": 0.9,
   "volumeAbsorption": 0.12,
   "volumeAnisotropy": 0.25,
@@ -51,29 +51,29 @@
     -0.8840761470774153
    ],
    "zenithColor": [
-    0.22,
-    0.38,
-    0.66
+    0.1,
+    0.24,
+    0.58
    ],
    "horizonColor": [
-    0.96,
-    0.78,
-    0.6
+    1.0,
+    0.8,
+    0.58
    ],
    "groundColor": [
     0.5,
-    0.4,
-    0.3
+    0.38,
+    0.26
    ],
    "sunColor": [
     1.0,
     0.8,
     0.58
    ],
-   "haze": 0.55,
+   "haze": 0.32,
    "sunIntensity": 1.0,
-   "sunSize": 0.5,
-   "sunGlow": 0.15,
+   "sunSize": 0.02,
+   "sunGlow": 0.3,
    "intensity": 1.0
   }
  },
@@ -93,7 +93,7 @@
     0.8,
     0.58
    ],
-   "intensity": 7.0,
+   "intensity": 9.0,
    "castsShadow": true,
    "shadowStrength": 1.0,
    "softness": 0.35
@@ -234,6 +234,29 @@
     },
     {
      "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.03,
+      0.1,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 7,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
@@ -242,6 +265,58 @@
       0,
       0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 4
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 1,
+     "value": 31.0,
+     "seed": 10
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.66,
+      0.68,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
     },
     {
      "kind": "noise",
@@ -255,21 +330,21 @@
      "dst": 6,
      "srcA": 6,
      "constant": [
-      0.36,
-      0.25,
-      0.14,
+      0.4,
+      0.24,
+      0.1,
       1
      ],
      "constant2": [
-      0.56,
-      0.41,
-      0.24,
+      0.62,
+      0.4,
+      0.18,
       1
      ],
      "constant3": [
-      0.7,
-      0.56,
-      0.38,
+      0.78,
+      0.58,
+      0.34,
       1
      ]
     },
@@ -277,9 +352,9 @@
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.3,
-      0.01,
-      0.16,
+      0.03,
+      0.004,
+      0.02,
       1
      ]
     },
@@ -291,47 +366,8 @@
      "srcC": 4
     },
     {
-     "kind": "input",
-     "dst": 2,
-     "input": "audio"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 2,
-     "srcA": 2,
-     "constant": [
-      3,
-      3,
-      3,
-      3
-     ]
-    },
-    {
-     "kind": "field",
-     "dst": 3,
-     "field": "kick"
-    },
-    {
-     "kind": "add",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
-     "kind": "remap",
-     "dst": 2,
-     "srcA": 2,
-     "value": 0,
-     "constant": [
-      0.0,
-      1.0,
-      0.0,
-      1.6
-     ]
-    },
-    {
      "kind": "constant",
-     "dst": 7,
+     "dst": 5,
      "constant": [
       1.0,
       0.08,
@@ -341,7 +377,7 @@
     },
     {
      "kind": "constant",
-     "dst": 5,
+     "dst": 3,
      "constant": [
       0,
       0,
@@ -351,30 +387,100 @@
     },
     {
      "kind": "hueShift",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 5,
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3,
      "value": 0.0
     },
     {
      "kind": "multiply",
      "dst": 7,
      "srcA": 7,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      3,
+      3,
+      3,
+      3
+     ]
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "kick"
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
      "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.45,
+      2.2
+     ]
     },
     {
      "kind": "multiply",
      "dst": 7,
      "srcA": 7,
-     "srcB": 4
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.92,
+      0.92,
+      0.92,
+      1
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.16,
+      0.16,
+      0.16,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 4
     }
    ],
    "baseColor": 6,
    "metallic": -1,
-   "roughness": -1,
+   "roughness": 2,
    "emission": 7,
    "emissionIntensity": 0.0,
-   "opacity": -1
+   "opacity": -1,
+   "gate": {
+    "near": 0.0,
+    "far": 150.0
+   }
   },
   {
    "name": "bark",
@@ -442,6 +548,29 @@
     },
     {
      "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.03,
+      0.1,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 7,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
@@ -450,6 +579,58 @@
       0,
       0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 4
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 1,
+     "value": 31.0,
+     "seed": 18
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.66,
+      0.68,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
     },
     {
      "kind": "noise",
@@ -485,9 +666,9 @@
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.3,
-      0.01,
-      0.16,
+      0.03,
+      0.004,
+      0.02,
       1
      ]
     },
@@ -500,7 +681,7 @@
     },
     {
      "kind": "constant",
-     "dst": 7,
+     "dst": 5,
      "constant": [
       1.0,
       0.08,
@@ -509,15 +690,104 @@
      ]
     },
     {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "hueShift",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3,
+     "value": 0.0
+    },
+    {
      "kind": "multiply",
      "dst": 7,
      "srcA": 7,
-     "srcB": 4
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      3,
+      3,
+      3,
+      3
+     ]
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "kick"
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.45,
+      2.2
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.92,
+      0.92,
+      0.92,
+      1
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.16,
+      0.16,
+      0.16,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 4
     }
    ],
    "baseColor": 6,
    "metallic": -1,
-   "roughness": -1,
+   "roughness": 2,
    "emission": 7,
    "emissionIntensity": 0.0,
    "opacity": -1
@@ -588,6 +858,29 @@
     },
     {
      "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.03,
+      0.1,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 7,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
@@ -598,12 +891,64 @@
      ]
     },
     {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 4
+    },
+    {
+     "kind": "noise",
+     "dst": 3,
+     "srcA": 1,
+     "value": 31.0,
+     "seed": 20
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.66,
+      0.68,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.78,
-      0.73,
-      0.67,
+      0.8,
+      0.75,
+      0.69,
       1
      ]
     },
@@ -611,9 +956,9 @@
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.3,
-      0.01,
-      0.16,
+      0.03,
+      0.004,
+      0.02,
       1
      ]
     },
@@ -626,7 +971,7 @@
     },
     {
      "kind": "constant",
-     "dst": 7,
+     "dst": 5,
      "constant": [
       1.0,
       0.08,
@@ -635,21 +980,110 @@
      ]
     },
     {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "hueShift",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3,
+     "value": 0.0
+    },
+    {
      "kind": "multiply",
      "dst": 7,
      "srcA": 7,
-     "srcB": 4
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      3,
+      3,
+      3,
+      3
+     ]
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "kick"
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.45,
+      2.2
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.92,
+      0.92,
+      0.92,
+      1
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.16,
+      0.16,
+      0.16,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 4
     }
    ],
    "baseColor": 6,
    "metallic": -1,
-   "roughness": -1,
+   "roughness": 2,
    "emission": 7,
    "emissionIntensity": 0.0,
    "opacity": -1
   },
   {
-   "name": "blocks",
+   "name": "treeBlocks",
    "ops": [
     {
      "kind": "input",
@@ -661,10 +1095,10 @@
      "dst": 1,
      "srcA": 0,
      "constant": [
-      0,
-      0,
-      0,
-      0
+      1,
+      1,
+      1,
+      1
      ]
     },
     {
@@ -672,18 +1106,50 @@
      "dst": 2,
      "srcA": 1,
      "constant": [
-      0.3,
-      0.01,
-      0.16,
+      0.07,
+      0.05,
+      0.045,
       1
      ],
      "constant2": [
-      0.55,
-      0.05,
-      0.32,
+      0.16,
+      0.115,
+      0.09,
       1
      ],
      "constant3": [
+      0.07,
+      0.05,
+      0.045,
+      1
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.83,
+      0.84,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
       1.0,
       0.08,
       0.62,
@@ -691,27 +1157,178 @@
      ]
     },
     {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 3
+    },
+    {
      "kind": "field",
-     "dst": 3,
+     "dst": 5,
      "field": "kick"
     },
     {
      "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
+     "dst": 5,
+     "srcA": 5,
      "value": 0,
      "constant": [
       0.0,
       1.0,
-      0.25,
-      2.5
+      0.6,
+      3.0
      ]
     },
     {
      "kind": "multiply",
      "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.03,
+      0.004,
+      0.02,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
      "srcA": 2,
+     "srcB": 6,
+     "srcC": 3
+    }
+   ],
+   "baseColor": 2,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 0.0,
+   "opacity": -1
+  },
+  {
+   "name": "stoneBlocks",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "instanceRandom"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      1,
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      0.8,
+      0.75,
+      0.69,
+      1
+     ],
+     "constant2": [
+      0.66,
+      0.61,
+      0.56,
+      1
+     ],
+     "constant3": [
+      0.8,
+      0.75,
+      0.69,
+      1
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 0,
+     "constant": [
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.83,
+      0.84,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      1.0,
+      0.08,
+      0.62,
+      1
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
      "srcB": 3
+    },
+    {
+     "kind": "field",
+     "dst": 5,
+     "field": "kick"
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "value": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.6,
+      3.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.03,
+      0.004,
+      0.02,
+      1
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6,
+     "srcC": 3
     }
    ],
    "baseColor": 2,
@@ -768,8 +1385,8 @@
    ],
    "field": {
     "kind": "curlNoise",
-    "frequency": 0.06,
-    "speed": 0.05,
+    "frequency": 0.11,
+    "speed": 0.04,
     "seed": 5,
     "strength": 1.0,
     "falloff": {
@@ -787,7 +1404,7 @@
    ],
    "field": {
     "kind": "radialVector",
-    "strength": 0.6,
+    "strength": 0.22,
     "falloff": {
      "kind": "none"
     }
@@ -1004,9 +1621,9 @@
     },
     "material": {
      "baseColor": [
-      0.56,
-      0.41,
-      0.24
+      0.62,
+      0.4,
+      0.18
      ],
      "roughness": 0.95,
      "metallic": 0.0,
@@ -8995,11 +9612,11 @@
     },
     "material": {
      "baseColor": [
-      0.3,
-      0.01,
-      0.16
+      0.03,
+      0.004,
+      0.02
      ],
-     "roughness": 0.35,
+     "roughness": 0.75,
      "metallic": 0.0,
      "emissiveColor": [
       1,
@@ -9007,7 +9624,7 @@
       1
      ],
      "emissiveIntensity": 1.0,
-     "program": "blocks"
+     "program": "treeBlocks"
     }
    }
   },
@@ -15349,11 +15966,11 @@
     },
     "material": {
      "baseColor": [
-      0.3,
-      0.01,
-      0.16
+      0.03,
+      0.004,
+      0.02
      ],
-     "roughness": 0.35,
+     "roughness": 0.4,
      "metallic": 0.0,
      "emissiveColor": [
       1,
@@ -15361,7 +15978,7 @@
       1
      ],
      "emissiveIntensity": 1.0,
-     "program": "blocks"
+     "program": "stoneBlocks"
     }
    }
   },

@@ -28,9 +28,9 @@ STUCK_AT = [-3.2, 3.9, 0.35]         # the macroblock that does not refresh (Rec
 # ============================================================================================ palette
 # Linear RGB. Dream: Dali's Catalan afternoon -- cream, ochre, Cap de Creus blue, peach horizon (brief §7).
 DREAM = {
-    "zenith": [0.22, 0.38, 0.66], "horizon": [0.96, 0.78, 0.60], "groundSky": [0.50, 0.40, 0.30],
-    "sun": [1.0, 0.80, 0.58], "ochreDark": [0.36, 0.25, 0.14], "ochre": [0.56, 0.41, 0.24],
-    "ochreLight": [0.70, 0.56, 0.38], "barkDark": [0.07, 0.05, 0.045], "bark": [0.16, 0.115, 0.09],
+    "zenith": [0.10, 0.24, 0.58], "horizon": [1.0, 0.80, 0.58], "groundSky": [0.50, 0.38, 0.26],
+    "sun": [1.0, 0.80, 0.58], "ochreDark": [0.40, 0.24, 0.10], "ochre": [0.62, 0.40, 0.18],
+    "ochreLight": [0.78, 0.58, 0.34], "barkDark": [0.07, 0.05, 0.045], "bark": [0.16, 0.115, 0.09],
     "barkLight": [0.28, 0.22, 0.17], "stone": [0.78, 0.73, 0.67],
 }
 # The corruption colours are the decoder's own failure colours (research Part 4): overflowing chroma is magenta,
@@ -300,8 +300,8 @@ def fields():
         # the contagion's source: the stone (the first block that went bad)
         field("infect", position=STONE_AT, kind="sphere", radius=1.6, softness=2.5, strength=0.0),
         # how it creeps: outward from the stone, along curl noise (ink in water; Ernst's decalcomania)
-        field("creep", kind="curlNoise", frequency=0.06, speed=0.05, seed=5, strength=1.0),
-        field("outward", position=STONE_AT, kind="radialVector", strength=0.6),
+        field("creep", kind="curlNoise", frequency=0.11, speed=0.04, seed=5, strength=1.0),
+        field("outward", position=STONE_AT, kind="radialVector", strength=0.22),
         field("flow", kind="compound", children=["creep", "outward"], combine="add", strength=1.0),
         # infection climbs: 1 below the plane, which rises as the dose grows
         field("climb", position=[0, 0.0, 0], kind="plane", axis=[0, 1, 0], softness=1.2, invert=True, strength=1.0),
@@ -331,92 +331,103 @@ CONTAGION = {
 
 
 # ============================================================================================ material programs
-def plain_program():
-    # The plain: Dali's ochre, mottled at the scale of dunes, and the contagion as square cells that fail one at a
-    # time as the stain passes their own random (ADR-1162) -- a stain with a macroblock edge.
-    return {"name": "plain", "ops": [
+INK = [0.030, 0.004, 0.020]       # the stain: near-black magenta ink, glossy -- ink on paper (Ernst), not pink paint
+STONE_PALE = [0.80, 0.75, 0.69]
+
+
+def infected(name, cells_per_m, field, base_ops, remap_stain=False, seed=3, gate_far=0.0):
+    """An infected surface (ADR-1162): every cell of a square lattice fails when the contagion passes the cell's own
+    random. A failed cell is ink (dark, glossy); the cells that failed most recently -- the growth front -- glow, and
+    a few failed cells glow forever (stuck pixels). The glow is the strain's colour, turned by timbre (hueShift,
+    routed), flaring with the treble and the kick's front. `base_ops` write the healthy colour into r6 (may use r5)."""
+    ops = [
         op("input", 0, input="worldPosition"),
-        op("quantize", 1, srcA=0, value=2.2, seed=3),                      # 0.45 m macroblocks; w = cell random
-        op("field", 2, field="stain"),
+        op("quantize", 1, srcA=0, value=cells_per_m, seed=seed),       # w = the cell's random
+        op("field", 2, field=field),
         op("field", 3, field="stuck"),
         op("add", 2, srcA=2, srcB=3),
-        op("remap", 2, srcA=2, value=1, constant=[0.04, 0.9, 0.0, 1.0]),   # stain -> 0..1
+    ]
+    if remap_stain:
+        ops.append(op("remap", 2, srcA=2, value=1, constant=[0.04, 0.9, 0.0, 1.0]))
+    ops += [
         op("swizzle", 4, srcA=1, constant=[3, 3, 3, 3]),
         op("constant", 5, constant=[-1, -1, -1, -1]),
         op("multiply", 4, srcA=4, srcB=5),
-        op("add", 4, srcA=2, srcB=4),                                      # stain - cell random
-        op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),          # the cell has failed: 0 or 1
-        # the ground: dune-scale mottle between three ochres
+        op("add", 4, srcA=2, srcB=4),                                     # d = contagion - cell random
+        op("smoothstep", 7, srcA=4, constant=[0.03, 0.10, 0, 0]),
+        op("remap", 7, srcA=7, value=1, constant=[0.0, 1.0, 1.0, 0.0]),   # 1 just past the threshold
+        op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),         # m: the cell has failed
+        op("multiply", 7, srcA=7, srcB=4),                                # the growth front
+        op("noise", 3, srcA=1, value=31.0, seed=seed + 7),                # per cell (sampled at its centre)
+        op("smoothstep", 3, srcA=3, constant=[0.66, 0.68, 0, 0]),
+        op("multiply", 3, srcA=3, srcB=4),                                # stuck pixels among the failed
+        op("constant", 5, constant=[0.5, 0.5, 0.5, 0.5]),
+        op("multiply", 3, srcA=3, srcB=5),
+        op("add", 7, srcA=7, srcB=3),                                     # the glow mask
+    ]
+    ops += base_ops                                                       # healthy colour -> r6
+    ops += [
+        op("constant", 5, constant=INK + [1]),
+        op("mixBy", 6, srcA=6, srcB=5, srcC=4),                           # base colour
+        op("constant", 5, constant=MAGENTA + [1]),
+        op("constant", 3, constant=[0, 0, 0, 0]),
+        op("hueShift", 5, srcA=5, srcB=3, value=0.0),                     # timbre turns the strain (routed)
+        op("multiply", 7, srcA=7, srcB=5),
+        op("input", 3, input="audio"),
+        op("swizzle", 3, srcA=3, constant=[3, 3, 3, 3]),                  # treble
+        op("field", 2, field="kick"),
+        op("add", 3, srcA=3, srcB=2),
+        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.45, 2.2]),
+        op("multiply", 7, srcA=7, srcB=3),                                # emission
+        op("constant", 2, constant=[0.92, 0.92, 0.92, 1]),
+        op("constant", 3, constant=[0.16, 0.16, 0.16, 1]),
+        op("mixBy", 2, srcA=2, srcB=3, srcC=4),                           # ink is glossy: it reflects the sky
+    ]
+    prog = {"name": name, "ops": ops, "baseColor": 6, "metallic": -1, "roughness": 2, "emission": 7,
+            "emissionIntensity": 0.0, "opacity": -1}
+    if gate_far > 0:
+        prog["gate"] = {"near": 0.0, "far": gate_far}
+    return prog
+
+
+def plain_program():
+    # Dali's ochre, mottled at the scale of dunes; the contagion's ink and front on it. Past 150 m the program does
+    # not run (the gate): the contagion grid ends at 64 m and the haze owns the distance.
+    return infected("plain", 2.2, "stain", [
         op("noise", 6, srcA=0, value=0.045, seed=7),
         op("ramp", 6, srcA=6, constant=DREAM["ochreDark"] + [1], constant2=DREAM["ochre"] + [1],
            constant3=DREAM["ochreLight"] + [1]),
-        op("constant", 5, constant=MAGENTA_DARK + [1]),
-        op("mixBy", 6, srcA=6, srcB=5, srcC=4),
-        # the failed cells glow, with the treble and the kick's front
-        op("input", 2, input="audio"),
-        op("swizzle", 2, srcA=2, constant=[3, 3, 3, 3]),
-        op("field", 3, field="kick"),
-        op("add", 2, srcA=2, srcB=3),
-        op("remap", 2, srcA=2, value=0, constant=[0.0, 1.0, 0.0, 1.6]),
-        op("constant", 7, constant=MAGENTA + [1]),
-        op("constant", 5, constant=[0, 0, 0, 0]),
-        op("hueShift", 7, srcA=7, srcB=5, value=0.0),                     # timbre turns the strain (routed)
-        op("multiply", 7, srcA=7, srcB=2),
-        op("multiply", 7, srcA=7, srcB=4),
-    ], "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.0, "opacity": -1}
+    ], remap_stain=True, seed=3, gate_far=150.0)
 
 
 def bark_program():
-    return {"name": "bark", "ops": [
-        op("input", 0, input="worldPosition"),
-        op("quantize", 1, srcA=0, value=6.0, seed=11),                     # 0.17 m blocks on the bark
-        op("field", 2, field="rot"),
-        op("field", 3, field="stuck"),
-        op("add", 2, srcA=2, srcB=3),
-        op("swizzle", 4, srcA=1, constant=[3, 3, 3, 3]),
-        op("constant", 5, constant=[-1, -1, -1, -1]),
-        op("multiply", 4, srcA=4, srcB=5),
-        op("add", 4, srcA=2, srcB=4),
-        op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),
+    return infected("bark", 6.0, "rot", [
         op("noise", 6, srcA=0, value=2.3, seed=5),
         op("ramp", 6, srcA=6, constant=DREAM["barkDark"] + [1], constant2=DREAM["bark"] + [1],
            constant3=DREAM["barkLight"] + [1]),
-        op("constant", 5, constant=MAGENTA_DARK + [1]),
-        op("mixBy", 6, srcA=6, srcB=5, srcC=4),
-        op("constant", 7, constant=MAGENTA + [1]),
-        op("multiply", 7, srcA=7, srcB=4),
-    ], "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.0, "opacity": -1}
+    ], seed=11)
 
 
 def stone_program():
-    return {"name": "skin", "ops": [
-        op("input", 0, input="worldPosition"),
-        op("quantize", 1, srcA=0, value=5.0, seed=13),
-        op("field", 2, field="rot"),
-        op("field", 3, field="stuck"),
-        op("add", 2, srcA=2, srcB=3),
-        op("swizzle", 4, srcA=1, constant=[3, 3, 3, 3]),
-        op("constant", 5, constant=[-1, -1, -1, -1]),
-        op("multiply", 4, srcA=4, srcB=5),
-        op("add", 4, srcA=2, srcB=4),
-        op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),
-        op("constant", 6, constant=DREAM["stone"] + [1]),
-        op("constant", 5, constant=MAGENTA_DARK + [1]),
-        op("mixBy", 6, srcA=6, srcB=5, srcC=4),
-        op("constant", 7, constant=MAGENTA + [1]),
-        op("multiply", 7, srcA=7, srcB=4),
-    ], "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 7, "emissionIntensity": 0.0, "opacity": -1}
+    return infected("skin", 5.0, "rot", [op("constant", 6, constant=STONE_PALE + [1])], seed=13)
 
 
-def blocks_program():
-    # The blocks are corrupted matter: the stain's colour, each block its own value, flaring with its band.
-    return {"name": "blocks", "ops": [
+def blocks_program(name, colour_a, colour_b):
+    # The blocks are the object's own matter, cut on the codec's grid: most keep the object's colour; one in six is
+    # a stuck block, lit in the strain's colour and flaring with the kick's front.
+    return {"name": name, "ops": [
         op("input", 0, input="instanceRandom"),
-        op("swizzle", 1, srcA=0, constant=[0, 0, 0, 0]),
-        op("ramp", 2, srcA=1, constant=MAGENTA_DARK + [1], constant2=[0.55, 0.05, 0.32, 1], constant3=MAGENTA + [1]),
-        op("field", 3, field="kick"),
-        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.25, 2.5]),
-        op("multiply", 4, srcA=2, srcB=3),
+        op("swizzle", 1, srcA=0, constant=[1, 1, 1, 1]),
+        op("ramp", 2, srcA=1, constant=colour_a + [1], constant2=colour_b + [1], constant3=colour_a + [1]),
+        op("swizzle", 3, srcA=0, constant=[0, 0, 0, 0]),
+        op("smoothstep", 3, srcA=3, constant=[0.83, 0.84, 0, 0]),       # one in six
+        op("constant", 4, constant=MAGENTA + [1]),
+        op("multiply", 4, srcA=4, srcB=3),
+        op("field", 5, field="kick"),
+        op("remap", 5, srcA=5, value=0, constant=[0.0, 1.0, 0.6, 3.0]),
+        op("multiply", 4, srcA=4, srcB=5),
+        op("constant", 6, constant=INK + [1]),
+        op("mixBy", 2, srcA=2, srcB=6, srcC=3),                          # a lit block is ink outside its glow
     ], "baseColor": 2, "metallic": -1, "roughness": -1, "emission": 4, "emissionIntensity": 0.0, "opacity": -1}
 
 
@@ -427,7 +438,7 @@ SUN_DIR = norm([0.42, -0.2, 0.88])   # the direction the light travels: low (~11
 def scene():
     sky = {"enabled": True, "background": True, "useKeyLight": False, "sunDirection": mul(SUN_DIR, -1.0),
            "zenithColor": DREAM["zenith"], "horizonColor": DREAM["horizon"], "groundColor": DREAM["groundSky"],
-           "sunColor": DREAM["sun"], "haze": 0.55, "sunIntensity": 1.0, "sunSize": 0.5, "sunGlow": 0.15,
+           "sunColor": DREAM["sun"], "haze": 0.32, "sunIntensity": 1.0, "sunSize": 0.02, "sunGlow": 0.3,
            "intensity": 1.0}
     tree_pts = tree_blocks()
     stone_pts = stone_blocks()
@@ -467,8 +478,8 @@ def scene():
             "renderMode": "raymarch", "boundsMin": [-170, -10, -110], "boundsMax": [250, 60, 120],
             "compile": True, "maxSteps": 96, "stepScale": 0.75, "maxDistance": 2000.0,
             "castShadows": False, "depthPrepass": True}},
-        blocks_node("treeBlocks", TREE_AT, tree_pts, TREE_CELL),
-        blocks_node("stoneBlocks", STONE_AT, stone_pts, STONE_CELL),
+        blocks_node("treeBlocks", TREE_AT, tree_pts, TREE_CELL, "treeBlocks", 0.75),
+        blocks_node("stoneBlocks", STONE_AT, stone_pts, STONE_CELL, "stoneBlocks", 0.4),
         {"name": "motes", "kind": "particles", "particles": {
             # dust in the dream light; later the infected ground's spores (emit mask = the stain)
             "capacity": 20000, "seed": 4, "shape": "disc", "position": [2, 0.2, -6], "extent": [40, 0, 40],
@@ -483,29 +494,31 @@ def scene():
         "_note": "Generated by build.py; edit that, not this file.",
         "camera": {"mode": 1, "position": [0.0, 1.4, 24.0], "target": [0.0, 3.6, 0.0], "fov": 30},
         "environment": {
-            "intensity": 0.3, "background": DREAM["horizon"], "fogColor": DREAM["horizon"],
+            "intensity": 0.22, "background": DREAM["horizon"], "fogColor": DREAM["horizon"],
             "shadowRange": 160.0, "shadowCascades": 3,
             # aerial perspective: a thin, low medium that takes the sky's colour with distance, so the plain never
             # ends -- it dissolves into the sky (Tanguy). No edge, no line, no black (the owner's dead-space rule).
-            "volumeDensity": 0.0011, "volumeScattering": 0.9, "volumeAbsorption": 0.12, "volumeAnisotropy": 0.25,
+            "volumeDensity": 0.0008, "volumeScattering": 0.9, "volumeAbsorption": 0.12, "volumeAnisotropy": 0.25,
             "volumeSteps": 24, "volumeMaxDistance": 3000.0, "fogHeight": 0.0, "fogHeightFalloff": 0.02,
             "fogSky": 1.0, "fogSkyDistance": 1400.0,
             "sky": sky,
         },
         "lights": [
             {"name": "sun", "id": "sun", "type": "directional", "role": "key", "direction": SUN_DIR,
-             "color": DREAM["sun"], "intensity": 7.0, "castsShadow": True, "shadowStrength": 1.0, "softness": 0.35},
+             "color": DREAM["sun"], "intensity": 9.0, "castsShadow": True, "shadowStrength": 1.0, "softness": 0.35},
             # the first fracture's light: magenta, at the stone, off until the infection
             {"name": "fracture", "id": "fracture", "type": "point", "position": add(STONE_AT, [0, 0.5, 0]),
              "color": MAGENTA, "intensity": 0.0, "range": 30.0, "radius": 0.6, "castsShadow": False, "volumetric": 1.0},
         ],
         "grids": [CONTAGION],
-        "materialPrograms": [plain_program(), bark_program(), stone_program(), blocks_program()],
+        "materialPrograms": [plain_program(), bark_program(), stone_program(),
+                             blocks_program("treeBlocks", DREAM["barkDark"], DREAM["bark"]),
+                             blocks_program("stoneBlocks", STONE_PALE, [0.66, 0.61, 0.56])],
         "nodes": nodes,
     }
 
 
-def blocks_node(name, at, pts, cell):
+def blocks_node(name, at, pts, cell, program, roughness):
     return {"name": name, "kind": "procedural", "position": at, "procedural": {
         "source": {"kind": "box", "size": [1.0, 1.0, 1.0], "subdivisions": 1},
         "variation": {"seed": 3},
@@ -520,8 +533,8 @@ def blocks_node(name, at, pts, cell):
             {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 0.0, "axis": [0, 1, 0]},
         ],
         "lod": {"cull": True, "count": 1},
-        "material": {"baseColor": MAGENTA_DARK, "roughness": 0.35, "metallic": 0.0, "emissiveColor": [1, 1, 1],
-                     "emissiveIntensity": 1.0, "program": "blocks"}}}
+        "material": {"baseColor": INK, "roughness": roughness, "metallic": 0.0, "emissiveColor": [1, 1, 1],
+                     "emissiveIntensity": 1.0, "program": program}}}
 
 
 # ============================================================================================ the performance
@@ -561,6 +574,7 @@ BASE = dict(dist=24.0, height=1.4, fov=30.0, pivot=[0.0, 3.6, 0.0], orbit=0.010,
             echo=0.0, mosh=0.0, moshBlock=32.0, glitch=0.0, pixel=0.0, poster=0.0, sort=0.0, split=0.0,
             exposure=0.0, bloom=0.08, volDen=0.0011, fogTint=DREAM["horizon"],
             gMicro=0.15, gRhythm=0.0, gMosh=0.0, gGlitch=0.0, gMelt=0.0, gLift=0.0,
+            zenith=DREAM["zenith"], horizon=DREAM["horizon"],
             glowPlain=0.0, glowBark=0.0, glowBlocks=0.0, keyframe=0.0, heal=0.0, stainHue=0.0, grade=0.0)
 
 
@@ -578,53 +592,56 @@ STAGES = {
     # the light cools toward turquoise. Nothing is broken; everything is slightly wrong.
     "Uncanny": stage(dist=19.0, fov=38.0, pivot=[0.5, 3.4, -1.0], orbit=0.012, sunYaw=26.0, double=True,
                      melt=[-0.05, 0.0, 0.0], sunColor=[0.86, 0.9, 0.86], echo=0.08, gMicro=0.3, gRhythm=0.1,
-                     grade=0.35, volDen=0.0013),
+                     grade=0.35, volDen=0.0010, zenith=[0.06, 0.24, 0.50], horizon=[0.86, 0.84, 0.66]),
     # The first block goes bad: the magenta fracture at the stone. Its light, its stain on the plain, the first blocks;
     # the stain creeps toward the tree and starts to climb it. The long limb begins to soften.
     "Infection": stage(dist=17.0, height=1.8, fov=36.0, pivot=[3.0, 3.0, -5.0], orbit=0.016, inject=1.4, advect=0.9,
                        dissip=0.02, climb=1.6, eatTree=0.18, eatStone=0.35, melt=[0.06, 0.0, 0.0], fracture=700.0,
                        double=True, sunYaw=8.0, glowPlain=2.5, glowBark=1.8, glowBlocks=3.0, echo=0.1, mosh=0.0,
-                       gMicro=0.5, gRhythm=0.35, gMosh=0.15, gMelt=0.2, motes=70.0, volDen=0.0014, grade=0.2),
+                       gMicro=0.5, gRhythm=0.35, gMosh=0.15, gMelt=0.2, motes=70.0, volDen=0.0011, grade=0.2,
+                       zenith=[0.07, 0.17, 0.42], horizon=[0.92, 0.72, 0.58], exposure=-0.15),
     # The rules are going: the stain owns the ground near the stone, the tree is eaten from the root up and its bark
     # flows like wax (liquefies), the limbs droop under an imaginary gravity, the first blocks lift and tumble.
     "Corruption": stage(dist=13.0, height=1.1, fov=42.0, pivot=[-1.0, 3.2, -2.0], orbit=-0.03, inject=2.4,
                         advect=2.0, dissip=0.0, climb=4.6, eatTree=0.32, eatStone=0.5, melt=[0.16, 0.08, -0.06],
                         bark=0.05, barkSpeed=0.5, rise=0.35, tumble=0.25, spin=0.4, kick=0.25, fracture=1900.0,
                         double=True, glowPlain=4.0, glowBark=3.0, glowBlocks=5.0, echo=0.18, mosh=0.04,
-                        moshBlock=32.0, exposure=0.05, gMicro=0.75, gRhythm=0.65, gMosh=0.45, gMelt=0.5, gLift=0.3,
-                        motes=160.0, volDen=0.0018, fogTint=[0.9, 0.62, 0.72], grade=0.0, stainHue=0.0),
+                        moshBlock=32.0, exposure=-0.45, gMicro=0.75, gRhythm=0.65, gMosh=0.45, gMelt=0.5, gLift=0.3,
+                        motes=160.0, volDen=0.0014, fogTint=[0.62, 0.56, 0.64], grade=0.0, stainHue=0.0,
+                        zenith=[0.035, 0.07, 0.20], horizon=[0.62, 0.42, 0.40], sunColor=[1.0, 0.68, 0.50]),
     # Systemic: the tree is blocks, its limbs float free of the trunk, the camera stands inside the tree and the
     # horizon tilts (P5: the ground plane is lost, not shaken). Mosh and tears on the drums.
     "Nightmare": stage(dist=8.0, height=2.8, fov=54.0, pivot=[-5.0, 3.8, 0.5], orbit=0.07, roll=7.0, inject=3.5,
                        advect=3.4, dissip=0.0, climb=9.5, eatTree=0.55, eatStone=0.7, melt=[0.26, 0.18, -0.14],
                        lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8, tumble=1.1, spin=1.5, kick=0.6,
                        sunYaw=-34.0, sunColor=[1.0, 0.62, 0.46], fracture=3200.0, double=True, glowPlain=6.0,
-                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.1, moshBlock=24.0, glitch=0.0, exposure=0.1,
+                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.1, moshBlock=24.0, glitch=0.0, exposure=-0.9,
                        gMicro=1.0, gRhythm=1.0, gMosh=0.85, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0,
-                       volDen=0.0026, fogTint=[0.85, 0.42, 0.62]),
+                       volDen=0.0018, fogTint=[0.42, 0.36, 0.50], zenith=[0.012, 0.010, 0.04],
+                       horizon=[0.40, 0.20, 0.28]),
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
-    "Collapse": stage(dist=40.0, height=46.0, fov=58.0, pivot=[2.0, 0.0, -6.0], orbit=0.05, inject=5.0, advect=4.0,
+    "Collapse": stage(dist=26.0, height=3.0, fov=48.0, pivot=[1.0, 4.0, -5.0], orbit=0.05, inject=5.0, advect=4.0,
                       dissip=0.0, climb=12.0, eatTree=1.0, eatStone=1.0, melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5],
                       bark=0.12, barkSpeed=1.5, rise=5.0, tumble=2.5, spin=3.0, kick=1.2, fracture=5000.0,
                       double=True, glowPlain=8.0, glowBark=6.0, glowBlocks=9.0, echo=0.35, mosh=0.25, moshBlock=48.0,
-                      exposure=0.15, gMicro=1.0, gRhythm=1.0, gMosh=1.0, gGlitch=0.8, gMelt=1.0, gLift=1.0,
-                      motes=900.0, volDen=0.0030, fogTint=[0.8, 0.3, 0.6]),
+                      exposure=-0.8, gMicro=1.0, gRhythm=1.0, gMosh=1.0, gGlitch=0.8, gMelt=1.0, gLift=1.0,
+                      motes=900.0, volDen=0.0030, fogTint=[0.40, 0.34, 0.48], zenith=[0.01, 0.008, 0.03], horizon=[0.34, 0.16, 0.24]),
     #   ... fragments become particles and temporal fragments (the mosh holds old frames over new)
-    "Decay": stage(dist=40.0, height=60.0, fov=60.0, pivot=[2.0, 0.0, -6.0], orbit=0.05, inject=5.0, advect=4.0,
+    "Decay": stage(dist=34.0, height=9.0, fov=50.0, pivot=[1.0, 4.0, -5.0], orbit=0.05, inject=5.0, advect=4.0,
                    dissip=0.0, climb=12.0, eatTree=1.0, eatStone=1.0, melt=[0.4, 0.3, -0.3], lift=[5.0, 3.5, 4.0],
                    bark=0.12, barkSpeed=1.5, rise=9.0, tumble=4.0, spin=5.0, kick=1.6, fracture=5000.0, double=True,
-                   glowPlain=8.0, glowBark=6.0, glowBlocks=10.0, echo=0.5, mosh=0.6, moshBlock=64.0, exposure=0.2,
+                   glowPlain=8.0, glowBark=6.0, glowBlocks=10.0, echo=0.5, mosh=0.6, moshBlock=64.0, exposure=-0.7,
                    gMicro=1.0, gRhythm=1.0, gMosh=1.0, gGlitch=1.0, gMelt=1.0, gLift=1.0, motes=2600.0,
-                   volDen=0.0034, fogTint=[0.8, 0.3, 0.6]),
+                   volDen=0.0034, fogTint=[0.40, 0.34, 0.48], zenith=[0.01, 0.008, 0.03], horizon=[0.34, 0.16, 0.24]),
     #   ... pixels, then colour (posterised to a few levels, sorted)
-    "Pixels": stage(dist=40.0, height=60.0, fov=60.0, pivot=[2.0, 0.0, -6.0], orbit=0.05, inject=5.0, advect=4.0,
+    "Pixels": stage(dist=40.0, height=14.0, fov=52.0, pivot=[1.0, 4.0, -5.0], orbit=0.05, inject=5.0, advect=4.0,
                     dissip=0.0, climb=12.0, eatTree=1.0, eatStone=1.0, melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0],
                     bark=0.12, barkSpeed=1.5, rise=12.0, tumble=5.0, spin=6.0, kick=1.6, fracture=5000.0,
                     double=True, glowPlain=8.0, glowBark=6.0, glowBlocks=10.0, echo=0.4, mosh=0.5, moshBlock=96.0,
-                    pixel=18.0, poster=5.0, sort=0.6, exposure=0.4, gMicro=1.0, gRhythm=1.0, gMosh=1.0,
-                    gGlitch=1.0, gMelt=1.0, gLift=1.0, motes=2600.0, volDen=0.0034, fogTint=[0.8, 0.3, 0.6]),
+                    pixel=18.0, poster=5.0, sort=0.6, exposure=-0.4, gMicro=1.0, gRhythm=1.0, gMosh=1.0,
+                    gGlitch=1.0, gMelt=1.0, gLift=1.0, motes=2600.0, volDen=0.0034, fogTint=[0.40, 0.34, 0.48], zenith=[0.01, 0.008, 0.03], horizon=[0.34, 0.16, 0.24]),
     #   ... and light: everything burns out to white.
-    "Light": stage(dist=40.0, height=60.0, fov=60.0, pivot=[2.0, 0.0, -6.0], orbit=0.05, inject=5.0, advect=4.0,
+    "Light": stage(dist=40.0, height=14.0, fov=52.0, pivot=[1.0, 4.0, -5.0], orbit=0.05, inject=5.0, advect=4.0,
                    dissip=0.0, climb=12.0, eatTree=1.0, eatStone=1.0, lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0,
                    spin=6.0, fracture=5000.0, double=True, glowPlain=8.0, glowBark=6.0, glowBlocks=10.0, echo=0.6,
                    mosh=0.3, pixel=40.0, poster=3.0, exposure=4.5, bloom=1.5, gMicro=1.0, gRhythm=1.0, gMosh=1.0,
@@ -669,7 +686,8 @@ def presets():
             "lights/sun/color": v["sunColor"],
             "material/plain/emissionIntensity": [v["glowPlain"]], "material/bark/emissionIntensity": [v["glowBark"]],
             "material/skin/emissionIntensity": [v["glowBark"]],
-            "material/blocks/emissionIntensity": [v["glowBlocks"]],
+            "material/treeBlocks/emissionIntensity": [v["glowBlocks"]],
+            "material/stoneBlocks/emissionIntensity": [v["glowBlocks"]],
             f"material/plain/op/{hue_op}/hueShift/value": [v["stainHue"]],
             "nodes/double/position": DOUBLE_AT if v["double"] else HIDDEN,
             "particles/motes/spawnRate": [v["motes"]],
@@ -679,6 +697,7 @@ def presets():
             "post/sort/amount": [v["sort"]], "post/split/amount": [v["split"]],
             "camera/exposure/compensation": [v["exposure"]], "post/bloom/intensity": [v["bloom"]],
             "scene/volumeDensity": [v["volDen"]], "scene/fogColor": v["fogTint"],
+            "env/sky/zenithColor": v["zenith"], "env/sky/horizonColor": v["horizon"],
             "post/grade/temperature": [-0.12 * v["grade"]], "post/grade/tint": [-0.08 * v["grade"]],
             "macros/gMicro": [v["gMicro"]], "macros/gRhythm": [v["gRhythm"]], "macros/gMosh": [v["gMosh"]],
             "macros/gGlitch": [v["gGlitch"]], "macros/gMelt": [v["gMelt"]], "macros/gLift": [v["gLift"]],
@@ -815,7 +834,8 @@ def routes():
     # ---- LAYER 1, micro (ms): high frequencies are fine detail -- dust glints, the infected cells shimmer
     r.append(gated("audio.treble", "particles/motes/spawnRate", 260.0, "gMicro", {"attackMs": 40, "decayMs": 600}))
     r.append(gated("audio.onsetHigh", "material/plain/emissionIntensity", 3.0, "gRhythm", PEAK(20, 6.0)))
-    r.append(gated("audio.onsetHigh", "material/blocks/emissionIntensity", 4.0, "gRhythm", PEAK(20, 6.0)))
+    for blocks in ("treeBlocks", "stoneBlocks"):
+        r.append(gated("audio.onsetHigh", f"material/{blocks}/emissionIntensity", 4.0, "gRhythm", PEAK(20, 6.0)))
     r.append(gated("audio.trebleLevel", "post/glitch/amount", 0.05, "gGlitch", {"attackMs": 30, "decayMs": 300}))
     # ---- LAYER 2, rhythmic (beat): the kick fractures, the snare spreads
     r.append(gated("audio.onsetLow", "lights/fracture/intensity", 2500.0, "gRhythm", PEAK(30, 5.0)))
@@ -834,7 +854,7 @@ def routes():
     r.append(gated("audio.bassLevel", "sdf/tree/node/bark/amount", 0.04, "gMelt", {"attackMs": 200, "decayMs": 900}))
     r.append(gated("macro.energy", "scene/volumeDensity", 0.0012, "gRhythm", {"attackMs": 2000, "decayMs": 4000}))
     # timbre turns the strain: bright music -> chartreuse (a zeroed chroma), dark -> magenta (overflowing chroma)
-    r.append(gated("visual.bright", f"material/plain/op/{hue_op}/hueShift/value", 0.32, "gRhythm",
+    r.append(gated("visual.bright", f"material/plain/op/{hue_op}/hueShift/value", 0.44, "gRhythm",
                    {"attackMs": 3000, "decayMs": 3000}))
     r.append(gated("visual.bright", "grid/contagion/advect", 1.5, "gRhythm", {"attackMs": 2000, "decayMs": 2000}))
     # ---- the camera: a slow, incommensurate drift (dolly and crane) and a slow turn of the double toward the viewer
