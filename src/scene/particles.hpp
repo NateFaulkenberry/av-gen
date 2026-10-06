@@ -121,6 +121,48 @@ struct ScatterAnchor {
 // The most anchors one system can use at once: the size of the table in the particle uniforms.
 constexpr std::uint32_t kMaxScatterAnchors = 64;
 
+// ---- ADR-1140: a latent SDF force ------------------------------------------------------------
+// Particles are pulled onto the zero set of a named SDF object (`Scene::sdfs`, matched by its
+// flattened name), each one gated by its own binding threshold against `coherence`:
+//     theta = mix(width, 1 - width, fract(seed * 61))     (so coherence 1 binds every particle
+//     b     = smoothstep(theta - width, theta + width, coherence)   and coherence 0 binds none)
+//     accel += b * (K * (proj - p) - 2 * 0.55 * sqrt(K) * v),   K = strength * (18 + 70 * coherence^2)
+// where proj = p - d * grad(d) is the SDF's projection (tetrahedral differences, 4 evaluations of the
+// packed program in the object's local space). A coherence DROP between two frames releases the
+// matter it unbinds with an impulse of `release` along the surface normal; `flow` adds the system's
+// curl noise projected into the tangent plane. The SDF object is never drawn by this: a latent is
+// typically an invisible object (`visible: false`). Absent (empty `sdf`) = off, and the particle
+// pipeline does not dispatch the pass at all, so the system is byte-identical to one without it.
+// The name must resolve at load (Composition refuses the scene otherwise; ADR-704's precedent).
+struct ParticleLatent {
+    std::string sdf;          // the SdfObject's name; empty = off
+    float coherence = 1.0f;   // 0..1, the binding level
+    float width = 0.08f;      // the binding curve's half width (0.005..0.5)
+    float strength = 1.0f;    // multiplies the spring stiffness K (0 = no pull)
+    float flow = 0.0f;        // tangential migration of bound matter (curl in the tangent plane)
+    float release = 12.0f;    // speed (m/s per unit of unbinding) a coherence drop throws matter at
+    [[nodiscard]] bool active() const { return !sdf.empty(); }
+};
+
+// ---- ADR-1141: a render-transient density volume ---------------------------------------------
+// Each frame the live particles are splatted (trilinear cloud-in-cell, u32 fixed point, atomicAdd,
+// so order-independent) into a resolution^3 grid over [boundsMin, boundsMax] (world space), blurred
+// 3x3x3 (binomial) and resolved into an rgba16float 3-D texture whose r channel is
+// weight * (blurred particles per cell). Owned by the particle renderer, never a Simulation grid:
+// it is a picture of this frame's particles, not state. Off unless `enabled`.
+constexpr int kMaxDensityResolution = 256; // 256^3: 64 MiB of u32 grid + 128 MiB of rgba16float
+constexpr int kMinDensityResolution = 4;
+constexpr std::uint32_t kDensityFixedScale = 1024; // u32 fixed point: 1/1024 of a particle
+struct ParticleDensity {
+    bool enabled = false;
+    glm::vec3 boundsMin{-1.0f};
+    glm::vec3 boundsMax{1.0f};
+    int resolution = 128;
+    float weight = 1.0f;
+};
+// GPU bytes one density volume costs: the u32 splat grid plus the rgba16float texture.
+[[nodiscard]] std::uint64_t densityMemoryBytes(int resolution);
+
 struct ParticleSystem {
     std::string name = "particles";
     bool enabled = true;
@@ -309,6 +351,9 @@ struct ParticleSystem {
     // the dust around them; the coupling is one-directional (the volume never affects the sim).
     float fogCoupling = 1.0f;
     float volumeGlow = 0.0f;
+    // ADR-1140 / ADR-1141.
+    ParticleLatent latent;
+    ParticleDensity density;
 };
 
 // The length the billboard gains along its velocity, in world units. The shader computes exactly
@@ -324,6 +369,10 @@ struct ParticleSystem {
 // Rejects systems the renderer cannot honour: an out-of-range trail length or stride, a curve
 // with too many or unsorted keys, and above all a trail buffer over kMaxTrailBytes.
 [[nodiscard]] Result<void> validateParticleSystem(const ParticleSystem& s);
+// ADR-1140 / ADR-1141: the latent and density blocks' own ranges (the reader refuses a file that
+// breaks them). Cross-object references -- the latent's SDF, a density consumer's system -- are the
+// Composition's to check, because only it knows what else the scene holds.
+[[nodiscard]] Result<void> validateLatentAndDensity(const ParticleSystem& s);
 
 // Registers "particles/<name>/<field>" parameters for the modulatable fields and returns
 // handles; applyParticleParameters() copies their finals back into the system each frame.
@@ -376,6 +425,14 @@ struct ParticleParameters {
     params::Parameter<float>* scatterStrength = nullptr;
     params::Parameter<float>* scatterAnisotropy = nullptr;
     params::Parameter<bool>* enabled = nullptr;
+    // ADR-1140: registered only when the system has a latent block (latent/coherence, strength,
+    // flow, release, width); ADR-1141: density/weight only when it has a density volume.
+    params::Parameter<float>* latentCoherence = nullptr;
+    params::Parameter<float>* latentStrength = nullptr;
+    params::Parameter<float>* latentFlow = nullptr;
+    params::Parameter<float>* latentRelease = nullptr;
+    params::Parameter<float>* latentWidth = nullptr;
+    params::Parameter<float>* densityWeight = nullptr;
 };
 
 // The extent a radius typed in metres means, keeping the emitter's authored proportions.

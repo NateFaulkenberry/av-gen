@@ -4,8 +4,10 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -226,6 +228,17 @@ json particlesToJson(const ParticleSystem& s) {
     }
     if (s.volumeGlow != 0.0f) {
         j["volumeGlow"] = s.volumeGlow;
+    }
+    if (s.latent.active()) { // ADR-1140: written only when present, so a file without it stays as it was
+        j["latent"] = json{{"sdf", s.latent.sdf},           {"coherence", s.latent.coherence},
+                           {"width", s.latent.width},       {"strength", s.latent.strength},
+                           {"flow", s.latent.flow},         {"release", s.latent.release}};
+    }
+    if (s.density.enabled) { // ADR-1141
+        j["density"] = json{{"boundsMin", vecToJson(s.density.boundsMin)},
+                            {"boundsMax", vecToJson(s.density.boundsMax)},
+                            {"resolution", s.density.resolution},
+                            {"weight", s.density.weight}};
     }
     auto scalarCurve = [](const ParticleCurve& c) {
         json keys = json::array();
@@ -491,6 +504,66 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
                 s.colorCurve.keys.push_back(ColorKey{*t, *c});
             }
         }
+    }
+    if (j.contains("latent")) { // ADR-1140
+        const json& l = j.at("latent");
+        if (!l.is_object()) {
+            return fail("'latent' must be an object {sdf, coherence, width, strength, flow, release}");
+        }
+        for (const auto& [key, value] : l.items()) {
+            static constexpr const char* kKeys[] = {"sdf", "coherence", "width", "strength", "flow", "release"};
+            if (std::find_if(std::begin(kKeys), std::end(kKeys), [&](const char* k) { return key == k; }) ==
+                std::end(kKeys)) {
+                return fail("'latent': unknown key '{}' (expected sdf, coherence, width, strength, flow, release)", key);
+            }
+        }
+        auto sdf = readString(l, "sdf", "");
+        if (!sdf) {
+            return fail("'latent.sdf': {}", sdf.error().message);
+        }
+        if (sdf->empty()) {
+            return fail("'latent' needs 'sdf', the name of the SDF object whose zero set binds the particles");
+        }
+        s.latent.sdf = *sdf;
+        for (const auto& [key, target] : {std::pair<const char*, float*>{"coherence", &s.latent.coherence},
+                                          std::pair<const char*, float*>{"width", &s.latent.width},
+                                          std::pair<const char*, float*>{"strength", &s.latent.strength},
+                                          std::pair<const char*, float*>{"flow", &s.latent.flow},
+                                          std::pair<const char*, float*>{"release", &s.latent.release}}) {
+            auto v = readFloat(l, key, *target);
+            if (!v) {
+                return fail("'latent.{}': {}", key, v.error().message);
+            }
+            *target = *v;
+        }
+    }
+    if (j.contains("density")) { // ADR-1141
+        const json& d = j.at("density");
+        if (!d.is_object()) {
+            return fail("'density' must be an object {boundsMin, boundsMax, resolution, weight}");
+        }
+        if (!d.contains("boundsMin") || !d.contains("boundsMax")) {
+            return fail("'density' needs 'boundsMin' and 'boundsMax' (world space)");
+        }
+        s.density.enabled = true;
+        auto lo = readVec<3>(d, "boundsMin", s.density.boundsMin);
+        auto hi = readVec<3>(d, "boundsMax", s.density.boundsMax);
+        auto weight = readFloat(d, "weight", s.density.weight);
+        if (!lo || !hi || !weight) {
+            return fail("'density': boundsMin and boundsMax must be [x, y, z] and weight a number");
+        }
+        s.density.boundsMin = *lo;
+        s.density.boundsMax = *hi;
+        s.density.weight = *weight;
+        if (d.contains("resolution")) {
+            if (!d.at("resolution").is_number_integer()) {
+                return fail("'density.resolution' must be an integer");
+            }
+            s.density.resolution = d.at("resolution").get<int>();
+        }
+    }
+    if (auto r = validateLatentAndDensity(s); !r) {
+        return std::unexpected(r.error());
     }
     if (auto r = validateParticleSystem(s); !r) {
         return std::unexpected(r.error());

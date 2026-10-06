@@ -62,27 +62,12 @@
 #include "wind_field.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
+// ADR-1140: the packed SDF interpreter, for the latent force (cs_latent). sdf_program.wgsl, not
+// sdf.wgsl: that one includes fields.wgsl a second time.
+#include "sdf_program.wgsl"
 
-struct Particle {
-    position: vec3<f32>,
-    age: f32,
-    velocity: vec3<f32>,
-    life: f32,       // 0 = dead
-    seed: f32,
-    size: f32,
-    trailWrites: f32, // history samples written since birth (ADR-040); 0 at emit
-    // ADR-520: which life the particle is living. 0 = the primary one, 1 = the splash ring it
-    // became when it hit the ground. This was `pad`, so the struct's size and layout are
-    // unchanged and every existing pool is bit-identical: a system with no collision response
-    // writes 0 here exactly where it used to write 0 there.
-    stage: f32,
-    // Scatter-anchored clusters (scene::ScatterAnchor): the crown centre this particle was born
-    // round, w = 1. It is kept per particle rather than looked up in the table each step because
-    // the table follows the camera: a tree that leaves it must not drag its swarm across the valley
-    // to whichever tree took its slot. All zero for every other system, and then the attractor
-    // below is `params.attractor`, exactly as it always was.
-    home: vec4<f32>,
-};
+// The pool record, shared with particle_density.wgsl (ADR-1141), which reads the same buffer.
+#include "particle_record.wgsl"
 
 struct Params {
     viewProj: mat4x4<f32>,
@@ -151,6 +136,15 @@ struct Params {
     // ADR-717: x = fogPooling (0 without a terrain), yzw = 0. Appended last, mirroring
     // ParticleUniforms; its static_assert counts it.
     fogPool: vec4<f32>,
+    // ADR-1140: the latent SDF force (cs_latent; never read by any other entry point). Appended
+    // last, mirroring ParticleUniforms. All zero when the system has no latent, and then the pass is
+    // not dispatched at all.
+    latentModel: mat4x4<f32>,   // the SDF object's local -> world
+    latentInverse: mat4x4<f32>, // world -> local
+    latentNormal: mat4x4<f32>,  // transpose(inverse(model)), for the release impulse's direction
+    latent0: vec4<f32>,         // coherence, previous frame's coherence, width, strength
+    latent1: vec4<f32>,         // flow, release, gradient epsilon (local units), 0
+    latentInfo: vec4<u32>,      // x = packed node count (the program starts at record 0), yzw = 0
 };
 
 struct DrawArgs {
@@ -188,6 +182,9 @@ struct Counters {
 @group(0) @binding(7) var<storage, read_write> scratch: array<u32>;
 @group(0) @binding(8) var<uniform> fieldBlock: FieldBlock;
 @group(0) @binding(9) var<storage, read> splineTable: SplineTable;
+// ADR-1140: the latent SDF's packed program (sdf_program.wgsl's interpreter reads it by this name).
+// The tenth storage buffer of the compute stage: the adapter allows ten, so this was the last slot.
+@group(0) @binding(10) var<storage, read> sdfNodes: array<SdfNodeGpu>;
 // Read-only views for the render stage (same bindings, used only by the vertex stages).
 @group(0) @binding(1) var<storage, read> particlesRead: array<Particle>;
 @group(0) @binding(4) var<storage, read> aliveRead: array<u32>;
@@ -550,6 +547,72 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     particles[slot] = p;
     scratch[slot] = 1u;
+}
+
+// ---- ADR-1140: the latent SDF force ------------------------------------------------------------
+// Dispatched between cs_emit and cs_simulate, only for a system with a latent. It adds the spring
+// toward the SDF's projection (and the release impulse) to the velocity; cs_simulate then integrates
+// as it always has. scene/particle_latent.cpp is the CPU reference: same formulas, same order.
+
+fn latentTheta(seed: f32, width: f32) -> f32 {
+    return mix(width, 1.0 - width, fract(seed * 61.0));
+}
+
+fn latentBinding(theta: f32, coherence: f32, width: f32) -> f32 {
+    return smoothstep(theta - width, theta + width, coherence);
+}
+
+@compute @workgroup_size(64)
+fn cs_latent(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    // Dead slots, and splash rings (ADR-520: a ring lies on the ground and must not be pulled off it).
+    if (p.life <= 0.0 || p.stage > 0.5) { return; }
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let b = latentBinding(theta, params.latent0.x, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
+    if (b <= 0.0 && release <= 0.0) { return; }
+    let dt = params.sim.x;
+    let t = params.sim.y;
+    let count = params.latentInfo.x;
+    let pl = (params.latentInverse * vec4<f32>(p.position, 1.0)).xyz;
+    let e = params.latent1.z;
+    // Tetrahedral differences: four evaluations give the distance (their mean) and the direction.
+    let k0 = vec3<f32>(1.0, -1.0, -1.0);
+    let k1 = vec3<f32>(-1.0, -1.0, 1.0);
+    let k2 = vec3<f32>(-1.0, 1.0, -1.0);
+    let k3 = vec3<f32>(1.0, 1.0, 1.0);
+    let d0 = sdfEvaluate(0u, count, pl + k0 * e, t, params.latentModel);
+    let d1 = sdfEvaluate(0u, count, pl + k1 * e, t, params.latentModel);
+    let d2 = sdfEvaluate(0u, count, pl + k2 * e, t, params.latentModel);
+    let d3 = sdfEvaluate(0u, count, pl + k3 * e, t, params.latentModel);
+    let nL = sdfSafeNormalize(k0 * d0 + k1 * d1 + k2 * d2 + k3 * d3);
+    let d = 0.25 * (d0 + d1 + d2 + d3);
+    let goal = (params.latentModel * vec4<f32>(pl - nL * d, 1.0)).xyz;
+    let nW = sdfSafeNormalize((params.latentNormal * vec4<f32>(nL, 0.0)).xyz);
+    let C = params.latent0.x;
+    var K = params.latent0.w * (18.0 + 70.0 * C * C);
+    if (dt > 0.0) {
+        K = min(K, 0.8 / (dt * dt));
+    }
+    let c = 2.0 * 0.55 * sqrt(K);
+    var acc = b * (K * (goal - p.position) - c * p.velocity);
+    if (params.latent1.x > 0.0) {
+        // Bound matter migrates over the surface: the system's own curl noise, in the tangent plane.
+        var cf = turbCurl(p.position * params.turb.x + vec3<f32>(0.0, 0.0, t * params.turb.y));
+        cf = cf - nW * dot(cf, nW);
+        acc = acc + b * params.latent1.x * cf;
+    }
+    p.velocity = p.velocity + acc * dt;
+    if (release > 0.0) {
+        // The collapse: matter a coherence drop lets go is thrown along the normal (a fifth inward).
+        let h = fract(p.seed * 173.0);
+        let sgn = select(1.0, -1.0, fract(p.seed * 29.0) < 0.2);
+        p.velocity = p.velocity + release * params.latent1.y * nW * (sgn * (0.6 + 0.8 * h));
+    }
+    particles[slot] = p;
 }
 
 // ---- stable stream compaction -------------------------------------------------------------------
