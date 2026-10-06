@@ -188,6 +188,13 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("constant", 5, constant=[0.5, 0.5, 0.5, 0.5]),
         op("multiply", 3, srcA=3, srcB=5),
         op("add", 7, srcA=7, srcB=3),                                     # the glow mask
+        # far away a cell is smaller than a pixel or two: it would shimmer as the camera moves (the Critic's
+        # temporal_shimmer). There the cells give way to the smooth stain, and their glow fades out.
+        op("input", 3, input="footprint"),
+        op("smoothstep", 3, srcA=3, constant=[0.12 / cells_per_m, 0.45 / cells_per_m, 0, 0]),
+        op("mixBy", 4, srcA=4, srcB=2, srcC=3),
+        op("remap", 3, srcA=3, value=1, constant=[0.0, 1.0, 1.0, 0.0]),
+        op("multiply", 7, srcA=7, srcB=3),
     ]
     ops += base_ops
     ops += [
@@ -286,19 +293,19 @@ def eye(x, above, z):
 VANTAGES = {
     # floating, observational: the classic frame; low along the riverbed; the shadow line leading to the viewer
     "Dream": [(eye(2, 1.5, 26), [-2, 3.4, -4], 30, 0), (eye(-44, 2.4, 30), [-2, 3.2, -6], 32, 0),
-              (eye(30, 2.6, 22), [-5, 3.0, -4], 28, 0)],
+              (eye(96, 12.0, 118), [-4, 2.5, -2], 14, 0)],   # a tiny strange object alone in a vast land (§14)
     # less predictable: from behind (the double revealed against the mesas), a slow crane up, the low ground
-    "Uncanny": [(eye(16, 1.2, 30), [-4, 3.0, -8], 38, 0), (eye(-26, 1.8, -34), [8, 2.6, -8], 34, 0),
-                (eye(6, 9.0, 42), [0, 1.0, -6], 36, 0)],
+    "Uncanny": [(eye(16, 1.2, 30), [-4, 3.0, -8], 38, 0), (eye(-26, 2.6, -34), [8, 2.6, -8], 34, 0),
+                (eye(-62, 1.6, 56), [-6, 4.0, 0], 30, 0)],     # from the riverbed, low, the tree on the sky
     # toward the first bad block; the stain at the tree's roots; a wide reveal of the spread across the pan
     "Infection": [(eye(26, 1.8, 6), [12, 1.6, -14], 36, 0), (eye(0, 2.4, 12), [-6, 2.2, 0], 40, 0),
                   (eye(44, 6.0, -38), [0, 1.0, 0], 34, 0)],
     # lower, closer, under the drooping limbs
-    "Corruption": [(eye(-2, 1.0, 9), [-6, 4.2, 0], 46, 0), (eye(18, 1.3, -6), [-6, 3.0, 0], 42, 0),
+    "Corruption": [(eye(-2, 1.0, 9), [-6, 4.2, 0], 46, 0), (eye(-6, 1.6, -22), [-6, 4.5, 0], 40, 0),
                    (eye(-20, 3.6, 12), [4, 1.2, -10], 44, 0)],
     # impossible: inside the tree, a sudden height, the ground at ankle height (P5: the horizon tilts, not shakes)
     "Nightmare": [(eye(-4.2, 2.9, 1.9), [12, 2.6, -14], 58, 7), (eye(8, 15.0, 18), [-6, 1.5, 0], 52, -5),
-                  (eye(-14, 0.5, -4), [12, 2.4, -14], 60, 11)],
+                  (eye(-14, 1.1, -4), [12, 2.4, -14], 60, 11)],
     "Collapse": [(eye(10, 6.0, 30), [0, 3.0, -6], 48, 0)],
     "Decay": [(eye(26, 14.0, 40), [0, 2.0, -6], 50, 0)],
     "Pixels": [(eye(10, 26.0, 58), [0, 0.0, -10], 52, 0)],
@@ -495,7 +502,7 @@ STAGES = {
                    tumble=4.0, spin=5.0, kick=1.6, glowBlocks=10.0, echo=0.5, mosh=0.6, moshBlock=64.0,
                    exposure=-0.5, gGlitch=1.0, motes=2600.0, volDen=0.0018, **COLLAPSE_COMMON),
     #   ... pixels, then colour
-    "Pixels": stage(pal="collapse", melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
+    "Pixels": stage(pal="nightmare", melt=[0.4, 0.3, -0.3], lift=[6.0, 4.5, 5.0], bark=0.12, barkSpeed=1.5,
                     rise=12.0, tumble=5.0, spin=6.0, kick=1.6, glowBlocks=10.0, echo=0.4, mosh=0.5, moshBlock=96.0,
                     pixel=18.0, poster=5.0, sort=0.6, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
                     **COLLAPSE_COMMON),
@@ -587,6 +594,10 @@ def presets():
     return out
 
 
+PADS = {"Dream": 36, "Uncanny": 37, "Infection": 38, "Corruption": 39, "Nightmare": 40, "Collapse": 41,
+        "Respite": 42, "Recovery": 43}
+
+
 def states():
     def held(signal, threshold, frm, falling=False):
         t = {"kind": "signal", "signal": signal, "threshold": threshold, "from": frm, "hold": True}
@@ -617,8 +628,12 @@ def states():
                 # idle (ADR-1164): a camera move never interrupts a stage's own transition
                 trig.append({"kind": kind, "every": every, "from": variants[vi - 1], "idle": True})
             seconds, easing = entry if vi == 0 else MOVES[name][2:4]
-            S.append({"name": vname, "preset": vname.lower(), "transition": {"seconds": seconds, "easing": easing},
-                      "triggers": trig})
+            if vi == 0 and name in PADS:
+                trig.append({"kind": "signal", "signal": f"control.pad{name}", "threshold": 0.3})
+            transition = {"seconds": seconds, "easing": easing}
+            if vi > 0:
+                transition["quantize"] = "beat"   # a camera move starts on the beat
+            S.append({"name": vname, "preset": vname.lower(), "transition": transition, "triggers": trig})
     S.append({"name": "Decay", "preset": "decay", "transition": {"seconds": 3, "easing": "easeIn", "quantize": "bar"},
               "triggers": [after(6.0, "Collapse")]})
     S.append({"name": "Pixels", "preset": "pixels",
@@ -627,10 +642,11 @@ def states():
               "triggers": [after(4.0, "Pixels")]})
     S.append({"name": "Respite", "preset": "respite", "transition": {"seconds": 1.5, "easing": "smooth"},
               "triggers": [held("visual.lift", 0.28, f, falling=True)
-                           for st in ("Infection", "Corruption", "Nightmare") for f in variant_names(st)]})
+                           for st in ("Infection", "Corruption", "Nightmare") for f in variant_names(st)]
+              + [{"kind": "signal", "signal": "control.padRespite", "threshold": 0.3}]})
     # the keyframe: an instant cut from white to the calm dream (brief §15)
     S.append({"name": "Recovery", "preset": "recovery", "transition": {"seconds": 0.0, "easing": "linear"},
-              "triggers": [after(3.5, "Light")]})
+              "triggers": [after(2.0, "Light"), {"kind": "signal", "signal": "control.padRecovery", "threshold": 0.3}]})
     return {"initial": "Dream", "states": S}
 
 
@@ -732,7 +748,7 @@ def routes():
     # ---- the camera floats between its moves: slow incommensurate drifts, deeper as the music grows (not shake)
     for src, comp, amt in (("driftA", 0, 1.6), ("driftB", 2, 1.6), ("driftC", 1, 0.3)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/position", "op": "add", "amount": amt,
-                  "component": comp, "depthSource": "macro.energy", "depthMin": 0.6, "depthMax": 1.4})
+                  "component": comp, "depthSource": "macro.energy", "depthMin": 0.6, "depthMax": 1.0})
     r.append({"source": "lfo.driftB.bipolar", "target": "camera/target", "op": "add", "amount": 0.6, "component": 0})
     r.append({"source": "lfo.driftA.bipolar", "target": "camera/target", "op": "add", "amount": 0.25, "component": 1})
     return r
@@ -772,6 +788,13 @@ def project(name, audio, live=False, sensitivity=None):
         p["parameters"]["macros/sensitivity"] = sensitivity
     if live:
         p["sonic"] = {"live": True}
+        # the instrument: SENSITIVITY trims the arc to the input (CC 1); pads force
+        # a stage (the arc carries on from there) -- General MIDI drum notes 36..43
+        bindings = [{"source": "*", "channel": -1, "kind": "cc", "number": 1, "parameter": "macros/sensitivity",
+                     "component": 0, "min": 0.0, "max": 1.0}]
+        bindings += [{"source": "*", "channel": -1, "kind": "noteEvent", "number": n, "signal": f"pad{st}"}
+                     for st, n in PADS.items()]
+        p["control"] = {"midi": {"enabled": True, "filter": "*", "bindings": bindings}}
     return p
 
 

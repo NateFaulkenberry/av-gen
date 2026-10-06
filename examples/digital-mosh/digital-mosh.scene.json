@@ -320,6 +320,47 @@
     },
     {
      "kind": "input",
+     "dst": 3,
+     "input": "footprint"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.054545454545454536,
+      0.20454545454545453,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2,
+     "srcC": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
      "dst": 6,
      "input": "uv"
     },
@@ -767,6 +808,47 @@
      "srcB": 3
     },
     {
+     "kind": "input",
+     "dst": 3,
+     "input": "footprint"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.02,
+      0.075,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2,
+     "srcC": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
      "kind": "noise",
      "dst": 6,
      "srcA": 0,
@@ -1072,6 +1154,47 @@
     },
     {
      "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "footprint"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.024,
+      0.09,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2,
+     "srcC": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "value": 1,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
      "dst": 7,
      "srcA": 7,
      "srcB": 3

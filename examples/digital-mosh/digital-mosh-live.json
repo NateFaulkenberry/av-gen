@@ -551,7 +551,7 @@
   },
   {
    "source": "visual.bright",
-   "target": "material/ground/op/32/hueShift/value",
+   "target": "material/ground/op/37/hueShift/value",
    "op": "add",
    "amount": 0.331,
    "depthSource": "macro.gRhythm",
@@ -583,7 +583,7 @@
    "component": 0,
    "depthSource": "macro.energy",
    "depthMin": 0.6,
-   "depthMax": 1.4
+   "depthMax": 1.0
   },
   {
    "source": "lfo.driftB.bipolar",
@@ -593,7 +593,7 @@
    "component": 2,
    "depthSource": "macro.energy",
    "depthMin": 0.6,
-   "depthMax": 1.4
+   "depthMax": 1.0
   },
   {
    "source": "lfo.driftC.bipolar",
@@ -603,7 +603,7 @@
    "component": 1,
    "depthSource": "macro.energy",
    "depthMin": 0.6,
-   "depthMax": 1.4
+   "depthMax": 1.0
   },
   {
    "source": "lfo.driftB.bipolar",
@@ -744,7 +744,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -837,19 +837,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1024,7 +1024,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1117,19 +1117,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1304,7 +1304,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1397,19 +1397,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1518,17 +1518,17 @@
      0.0
     ],
     "camera/position": [
-     30,
-     2.178,
-     22
+     96,
+     7.983,
+     118
     ],
     "camera/target": [
-     -5,
-     3.0,
-     -4
+     -4,
+     2.5,
+     -2
     ],
     "camera/fov": [
-     28
+     14
     ],
     "camera/roll": [
      0
@@ -1584,7 +1584,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1677,19 +1677,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -1864,7 +1864,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -1957,19 +1957,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -2079,7 +2079,7 @@
     ],
     "camera/position": [
      -26,
-     1.528,
+     2.328,
      -34
     ],
     "camera/target": [
@@ -2144,7 +2144,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2237,19 +2237,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -2358,17 +2358,17 @@
      0.0
     ],
     "camera/position": [
-     6,
-     8.415,
-     42
+     -62,
+     -1.406,
+     56
     ],
     "camera/target": [
-     0,
-     1.0,
-     -6
+     -6,
+     4.0,
+     0
     ],
     "camera/fov": [
-     36
+     30
     ],
     "camera/roll": [
      0
@@ -2424,7 +2424,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2517,19 +2517,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.6795,
      0.7605,
      0.7011,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3231,
      0.4508,
      0.5029,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1912,
      0.2502,
      0.2664,
@@ -2704,7 +2704,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2797,19 +2797,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.6795,
      0.7605,
      0.7011,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3231,
      0.4508,
      0.5029,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1912,
      0.2502,
      0.2664,
@@ -2984,7 +2984,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3077,19 +3077,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.6795,
      0.7605,
      0.7011,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3231,
      0.4508,
      0.5029,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1912,
      0.2502,
      0.2664,
@@ -3264,7 +3264,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3357,19 +3357,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.3763,
      0.2502,
      0.1651,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3095,
      0.0953,
      0.0369,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0273,
      0.0194,
@@ -3544,7 +3544,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3637,19 +3637,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.3763,
      0.2502,
      0.1651,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3095,
      0.0953,
      0.0369,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0273,
      0.0194,
@@ -3758,17 +3758,17 @@
      0.25
     ],
     "camera/position": [
-     18,
-     1.266,
-     -6
+     -6,
+     1.56,
+     -22
     ],
     "camera/target": [
      -6,
-     3.0,
+     4.5,
      0
     ],
     "camera/fov": [
-     42
+     40
     ],
     "camera/roll": [
      0
@@ -3824,7 +3824,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -3917,19 +3917,19 @@
     "macros/gLift": [
      0.3
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.3763,
      0.2502,
      0.1651,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.3095,
      0.0953,
      0.0369,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0273,
      0.0194,
@@ -4104,7 +4104,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4197,19 +4197,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -4384,7 +4384,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4477,19 +4477,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -4664,7 +4664,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -4757,19 +4757,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -4879,7 +4879,7 @@
     ],
     "camera/position": [
      -14,
-     0.449,
+     1.049,
      -4
     ],
     "camera/target": [
@@ -4944,7 +4944,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      9.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5037,19 +5037,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -5224,7 +5224,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5317,19 +5317,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0782,
      0.1413,
      0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0369,
      0.0578,
      0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0123,
      0.0252,
      0.0356,
@@ -5482,9 +5482,9 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
-     0.9717,
      1.0,
-     0.9811
+     0.3933,
+     0.1644
     ],
     "lights/sun/intensity": [
      9.0
@@ -5504,7 +5504,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5549,29 +5549,29 @@
      0.0018
     ],
     "scene/fogColor": [
-     0.2789,
-     0.314,
-     0.3663
+     0.0931,
+     0.0356,
+     0.0222
     ],
     "env/sky/zenithColor": [
-     0.0382,
-     0.0409,
-     0.0561
+     0.2747,
+     0.0242,
+     0.0296
     ],
     "env/sky/horizonColor": [
-     0.402,
-     0.4233,
-     0.4678
+     0.4508,
+     0.1022,
+     0.0561
     ],
     "env/sky/groundColor": [
-     0.0091,
-     0.0116,
-     0.0194
+     0.0123,
+     0.0252,
+     0.0356
     ],
     "env/sky/sunColor": [
-     0.9717,
      1.0,
-     0.9811
+     0.3933,
+     0.1644
     ],
     "macros/keyframe": [
      0.0
@@ -5597,40 +5597,40 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
-     0.1746,
-     0.1946,
-     0.2307,
+    "material/ground/op/29/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
-     0.0908,
-     0.0999,
-     0.1221,
+    "material/ground/op/29/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
-     0.0382,
-     0.0409,
-     0.0561,
+    "material/ground/op/29/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
      1
     ],
     "material/groundFar/op/5/ramp/constant": [
-     0.1746,
-     0.1946,
-     0.2307,
+     0.0782,
+     0.1413,
+     0.1981,
      1
     ],
     "material/groundFar/op/5/ramp/constant2": [
-     0.0908,
-     0.0999,
-     0.1221,
+     0.0369,
+     0.0578,
+     0.0762,
      1
     ],
     "material/groundFar/op/5/ramp/constant3": [
-     0.0382,
-     0.0409,
-     0.0561,
+     0.0123,
+     0.0252,
+     0.0356,
      1
     ],
     "sdf/trunk/node/eaten/amount": [
@@ -5784,7 +5784,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -5877,19 +5877,19 @@
     "macros/gLift": [
      1.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5711,
      0.5841,
      0.624,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.402,
      0.4233,
      0.4678,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.2789,
      0.314,
      0.3663,
@@ -6064,7 +6064,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6157,19 +6157,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.0802,
      0.0931,
      0.0908,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.0319,
      0.0369,
      0.0382,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.0185,
      0.0222,
      0.0232,
@@ -6344,7 +6344,7 @@
     "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/ground/op/32/hueShift/value": [
+    "material/ground/op/37/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -6437,19 +6437,19 @@
     "macros/gLift": [
      0.0
     ],
-    "material/ground/op/24/ramp/constant": [
+    "material/ground/op/29/ramp/constant": [
      0.5647,
      0.521,
      0.4233,
      1
     ],
-    "material/ground/op/24/ramp/constant2": [
+    "material/ground/op/29/ramp/constant2": [
      0.5333,
      0.4233,
      0.1119,
      1
     ],
-    "material/ground/op/24/ramp/constant3": [
+    "material/ground/op/29/ramp/constant3": [
      0.1714,
      0.0823,
      0.0232,
@@ -6608,7 +6608,8 @@
     "preset": "dream 2",
     "transition": {
      "seconds": 16.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6624,7 +6625,8 @@
     "preset": "dream 3",
     "transition": {
      "seconds": 16.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6684,7 +6686,8 @@
     "preset": "uncanny 2",
     "transition": {
      "seconds": 12.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6700,7 +6703,8 @@
     "preset": "uncanny 3",
     "transition": {
      "seconds": 12.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6753,7 +6757,8 @@
     "preset": "infection 2",
     "transition": {
      "seconds": 9.0,
-     "easing": "easeInOut"
+     "easing": "easeInOut",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6769,7 +6774,8 @@
     "preset": "infection 3",
     "transition": {
      "seconds": 9.0,
-     "easing": "easeInOut"
+     "easing": "easeInOut",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6822,7 +6828,8 @@
     "preset": "corruption 2",
     "transition": {
      "seconds": 5.0,
-     "easing": "easeInOut"
+     "easing": "easeInOut",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6838,7 +6845,8 @@
     "preset": "corruption 3",
     "transition": {
      "seconds": 5.0,
-     "easing": "easeInOut"
+     "easing": "easeInOut",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6891,7 +6899,8 @@
     "preset": "nightmare 2",
     "transition": {
      "seconds": 1.2,
-     "easing": "easeIn"
+     "easing": "easeIn",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -6907,7 +6916,8 @@
     "preset": "nightmare 3",
     "transition": {
      "seconds": 1.2,
-     "easing": "easeIn"
+     "easing": "easeIn",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -7089,7 +7099,7 @@
     "triggers": [
      {
       "kind": "elapsed",
-      "threshold": 3.5,
+      "threshold": 2.0,
       "from": "Light"
      }
     ]
