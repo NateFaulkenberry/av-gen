@@ -33,7 +33,11 @@ could not be said.
 - **`"kind": "elapsed"`**: it fires when the committed state has lasted `threshold` seconds. It never fires
   mid-transition. The machine records when the state was committed. Use `from` for a state's own length; a
   target with `quantize: "bar"` lands on the bar.
-- **Reach:** JSON (`hold`, and `elapsed` in the kind list), round-trip, and the World panel's state list. That
+- **`"idle": true`** on any trigger: it fires only while no transition is running or waiting for its beat. Without
+  it, a periodic trigger (DIGITAL MOSH's camera moves on every phrase) interrupted the ladder's 12-second morph every
+  phrase, the held rung restarted it, and the two restarted each other: the measured arc never left its first
+  vantage. Marked idle, the move waits for the morph to land.
+- **Reach:** JSON (`hold`, `idle`, and `elapsed` in the kind list), round-trip, and the World panel's state list. That
   list now also shows the comparison (`>=` or `<`), "(while)" for a hold, "after N s" and the `from` state.
 
 ## Consequences
@@ -44,6 +48,9 @@ could not be said.
   - with it, the machine reaches the top;
   - an elapsed trigger leaves the top after 2 s and not before;
   - `hold` and `elapsed` round-trip.
+
+  `An idle trigger waits for the running transition to land`: a held trigger toward B and a periodic pull toward
+  C, both from A. Without `idle` they restart each other and nothing lands; with it, B lands.
 - DIGITAL MOSH's arc uses `hold` for every rung, and `elapsed` for the collapse strata (6 s, 5 s, 4 s, then the cut
   3.5 s later) and for the keyframe's hold (20 s).
 - **Seek:** unchanged. The state machine is not replayed on seek (a seek replays signals, ADR-870, not states),

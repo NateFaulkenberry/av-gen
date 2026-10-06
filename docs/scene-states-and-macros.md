@@ -65,7 +65,8 @@ A state names a preset and how to get there.
 - `"hold": true` on a `signal`/`macro` trigger (ADR-1164) fires every frame the condition holds rather than on the
   crossing: a `from` ladder then cannot strand when the signal jumps past two rungs or moves during a transition.
   `"kind": "elapsed"` fires once the committed state has lasted `threshold` seconds (with `from`: that state's own
-  length; a `quantize: "bar"` target lands on the bar).
+  length; a `quantize: "bar"` target lands on the bar). `"idle": true` on any trigger: it fires only while no
+  transition is running, so a periodic trigger never interrupts a morph another trigger started.
 - The machine updates after the signal sources (ADR-1124), so a one-frame event such as a MIDI pad
   bound as `noteEvent` (`control.<channel>`) fires a `signal` trigger in the frame it arrives.
 - OSC: `/avgen/state/go <name> [instant]` or `/avgen/state/<name>`.

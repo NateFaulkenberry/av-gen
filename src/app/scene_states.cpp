@@ -253,6 +253,9 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
                 break;
             }
             lastSignal_[mySlot] = value;
+            if (t.idle && (!pending_.empty() || !pendingQuantized_.empty())) {
+                fired = false; // ADR-1164: an idle trigger waits for the running transition to land
+            }
             if (fired && fromOk && fire.empty() && target != current_ && target != pending_) {
                 fire = target;
             }
@@ -307,6 +310,7 @@ nlohmann::json StateMachine::toJson() const {
             tj["threshold"] = t.threshold;
             if (t.falling) tj["falling"] = true;
             if (t.hold) tj["hold"] = true; // ADR-1164
+            if (t.idle) tj["idle"] = true;
             tj["every"] = t.every;
             if (!t.fromState.empty()) tj["from"] = t.fromState;
             if (!t.target.empty()) tj["target"] = t.target;
@@ -373,6 +377,7 @@ Result<void> StateMachine::fromJson(const nlohmann::json& j) {
                     if (tj.contains("threshold") && tj["threshold"].is_number()) t.threshold = tj["threshold"].get<float>();
                     if (tj.contains("falling") && tj["falling"].is_boolean()) t.falling = tj["falling"].get<bool>();
                     if (tj.contains("hold") && tj["hold"].is_boolean()) t.hold = tj["hold"].get<bool>(); // ADR-1164
+                    if (tj.contains("idle") && tj["idle"].is_boolean()) t.idle = tj["idle"].get<bool>();
                     if (tj.contains("every") && tj["every"].is_number_integer()) t.every = std::max(1, tj["every"].get<int>());
                     if (tj.contains("from") && tj["from"].is_string()) t.fromState = tj["from"].get<std::string>();
                     if (tj.contains("target") && tj["target"].is_string()) t.target = tj["target"].get<std::string>();

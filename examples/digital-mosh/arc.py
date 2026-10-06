@@ -24,10 +24,8 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PROBE = ["macro.energy", "macro.baseline", "macro.dose", "macro.keyframe", "state.index", "audio.energy",
+PROBE = ["state.progress", "macro.energy", "macro.baseline", "macro.dose", "macro.keyframe", "state.index", "audio.energy",
          "audio.trebleLevel"]
-STAGES = ["Dream", "Uncanny", "Infection", "Corruption", "Nightmare", "Collapse", "Decay", "Pixels", "Light",
-          "Respite", "Recovery"]
 
 
 def main() -> int:
@@ -39,6 +37,7 @@ def main() -> int:
     a = ap.parse_args()
     src = Path(a.project).resolve()
     p = json.loads(src.read_text())
+    STAGES = [st["name"] for st in p["states"]["states"]]  # state.index is this order
     # absolute asset paths, so the copy can live anywhere
     for key in ("scene", "audio"):
         if key in p.get("assets", {}):
@@ -47,7 +46,9 @@ def main() -> int:
         print("this project has no audio file (a LIVE project?): trace the file projects instead")
         return 2
     p.setdefault("sonic", {})
-    gains = {"state.index": 0.1}
+    gains = {"state.index": 0.1}  # up to 10 states per unit; the probe clamps at 1, so cap the index
+    if len(p["states"]["states"]) > 10:
+        gains = {"state.index": 0.02}
     p["sources"].append({"kind": "interpret", "name": "probe", "settings": {"mappings": [
         {"name": k.replace(".", "_"), "combine": "mean", "inputs": [{"signal": k, "weight": 1.0}], "bias": 0.0,
          "gain": gains.get(k, 1.0), "curve": 1.0} for k in PROBE]}})
@@ -62,15 +63,18 @@ def main() -> int:
             return r.returncode
         rows = list(csv.DictReader(out.open()))
         t = [float(row["time"]) for row in rows]
-        idx = [int(round(float(row["visual.state_index"]) * 10)) for row in rows]
+        scale = 0.02 if len(STAGES) > 10 else 0.1
+        idx = [int(round(float(row["visual.state_index"]) / scale)) for row in rows]
+        # a stage's vantages ("Dream 2") are one stage for the timeline
+        names = [STAGES[k].split(" ")[0] if 0 <= k < len(STAGES) else str(k) for k in idx]
         spans = []
-        for ti, k in zip(t, idx):
+        for ti, k in zip(t, names):
             if not spans or spans[-1][0] != k:
                 spans.append([k, ti, ti])
             spans[-1][2] = ti
         print(src.name + ":")
         for k, a0, a1 in spans:
-            print(f"  {STAGES[k] if 0 <= k < len(STAGES) else k:<11} {a0:6.1f} - {a1:6.1f} s")
+            print(f"  {k:<11} {a0:6.1f} - {a1:6.1f} s")
         if a.plot:
             import matplotlib
             matplotlib.use("Agg")

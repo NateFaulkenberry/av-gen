@@ -70,6 +70,9 @@ struct StateTrigger {
     // on the crossing. With `from`, a ladder cannot stick: a state whose exit is already exceeded when it is entered
     // (after a jump, or a transition that masked the signal) still leaves.
     bool hold = false;
+    // ADR-1164: fire only while the machine is idle -- no transition running or waiting for its beat. A periodic
+    // trigger (a camera move on every phrase) then never interrupts a morph another trigger started.
+    bool idle = false;
     int every = 1;               // Beat / Bar
     std::string fromState;       // only when the current state has this name ("" = any)
     std::string target;          // state to go to ("" = the owning state)

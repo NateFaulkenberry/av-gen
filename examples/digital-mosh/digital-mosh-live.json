@@ -19,10 +19,11 @@
   "post/bloom/threshold": 1.4,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.55,
-  "post/output/vignette": 0.22,
+  "post/output/vignette": 0.24,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.08,
   "camera/exposure/mode": 0,
-  "camera/mode": 0,
-  "camera/orbitPivotWeight": 1.0,
+  "camera/mode": 1,
   "temporal/echo/enabled": true,
   "temporal/echo/frames": 8.0,
   "temporal/echo/decay": 0.7,
@@ -30,9 +31,9 @@
   "temporal/mosh/frames": 16.0,
   "temporal/mosh/smear": 22.0,
   "temporal/mosh/rate": 10.0,
-  "sources/driftA/rate": 0.017,
-  "sources/driftB/rate": 0.0113,
-  "sources/turn/rate": 0.006
+  "sources/driftA/rate": 0.031,
+  "sources/driftB/rate": 0.0197,
+  "sources/driftC/rate": 0.047
  },
  "sources": [
   {
@@ -155,7 +156,7 @@
   },
   {
    "kind": "lfo",
-   "name": "turn",
+   "name": "driftC",
    "settings": {
     "shape": "sine"
    }
@@ -251,7 +252,7 @@
   },
   {
    "source": "audio.onsetHigh",
-   "target": "material/plain/emissionIntensity",
+   "target": "material/ground/emissionIntensity",
    "op": "add",
    "amount": 3.0,
    "depthSource": "macro.gRhythm",
@@ -279,7 +280,7 @@
   },
   {
    "source": "audio.onsetHigh",
-   "target": "material/stoneBlocks/emissionIntensity",
+   "target": "material/tanguyBlocks/emissionIntensity",
    "op": "add",
    "amount": 4.0,
    "depthSource": "macro.gRhythm",
@@ -334,7 +335,7 @@
   },
   {
    "source": "audio.onsetLow",
-   "target": "procedural/stoneBlocks/effector/5/strength",
+   "target": "procedural/tanguyBlocks/effector/5/strength",
    "op": "add",
    "amount": 0.6,
    "depthSource": "macro.gRhythm",
@@ -404,7 +405,7 @@
   },
   {
    "source": "audio.bassLevel",
-   "target": "sdf/tree/node/melt0/amount",
+   "target": "sdf/limb0/node/melt/amount",
    "op": "add",
    "amount": 0.1,
    "depthSource": "macro.gMelt",
@@ -417,7 +418,7 @@
   },
   {
    "source": "audio.bass",
-   "target": "sdf/tree/node/limb0/translation",
+   "target": "nodes/limb0/position",
    "op": "add",
    "amount": 0.6,
    "depthSource": "macro.gLift",
@@ -431,7 +432,7 @@
   },
   {
    "source": "audio.bassLevel",
-   "target": "sdf/tree/node/melt1/amount",
+   "target": "sdf/limb1/node/melt/amount",
    "op": "add",
    "amount": 0.1,
    "depthSource": "macro.gMelt",
@@ -444,7 +445,7 @@
   },
   {
    "source": "audio.bass",
-   "target": "sdf/tree/node/limb1/translation",
+   "target": "nodes/limb1/position",
    "op": "add",
    "amount": 0.6,
    "depthSource": "macro.gLift",
@@ -458,7 +459,7 @@
   },
   {
    "source": "audio.bassLevel",
-   "target": "sdf/tree/node/melt2/amount",
+   "target": "sdf/limb2/node/melt/amount",
    "op": "add",
    "amount": -0.08,
    "depthSource": "macro.gMelt",
@@ -471,7 +472,7 @@
   },
   {
    "source": "audio.bass",
-   "target": "sdf/tree/node/limb2/translation",
+   "target": "nodes/limb2/position",
    "op": "add",
    "amount": 0.6,
    "depthSource": "macro.gLift",
@@ -485,7 +486,46 @@
   },
   {
    "source": "audio.bassLevel",
-   "target": "sdf/tree/node/bark/amount",
+   "target": "sdf/trunk/node/bark/amount",
+   "op": "add",
+   "amount": 0.04,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/limb0/node/bark/amount",
+   "op": "add",
+   "amount": 0.04,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/limb1/node/bark/amount",
+   "op": "add",
+   "amount": 0.04,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/limb2/node/bark/amount",
    "op": "add",
    "amount": 0.04,
    "depthSource": "macro.gMelt",
@@ -500,7 +540,7 @@
    "source": "macro.energy",
    "target": "scene/volumeDensity",
    "op": "add",
-   "amount": 0.0012,
+   "amount": 0.0006,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -511,9 +551,9 @@
   },
   {
    "source": "visual.bright",
-   "target": "material/plain/op/27/hueShift/value",
+   "target": "material/ground/op/32/hueShift/value",
    "op": "add",
-   "amount": 0.44,
+   "amount": 0.331,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -537,15 +577,47 @@
   },
   {
    "source": "lfo.driftA.bipolar",
-   "target": "camera/height",
+   "target": "camera/position",
    "op": "add",
-   "amount": 0.3
+   "amount": 1.6,
+   "component": 0,
+   "depthSource": "macro.energy",
+   "depthMin": 0.6,
+   "depthMax": 1.4
   },
   {
    "source": "lfo.driftB.bipolar",
-   "target": "camera/distance",
+   "target": "camera/position",
    "op": "add",
-   "amount": 1.6
+   "amount": 1.6,
+   "component": 2,
+   "depthSource": "macro.energy",
+   "depthMin": 0.6,
+   "depthMax": 1.4
+  },
+  {
+   "source": "lfo.driftC.bipolar",
+   "target": "camera/position",
+   "op": "add",
+   "amount": 0.3,
+   "component": 1,
+   "depthSource": "macro.energy",
+   "depthMin": 0.6,
+   "depthMax": 1.4
+  },
+  {
+   "source": "lfo.driftB.bipolar",
+   "target": "camera/target",
+   "op": "add",
+   "amount": 0.6,
+   "component": 0
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/target",
+   "op": "add",
+   "amount": 0.25,
+   "component": 1
   }
  ],
  "worldMacros": [
@@ -626,26 +698,6 @@
   {
    "name": "dream",
    "values": {
-    "camera/distance": [
-     24.0
-    ],
-    "camera/height": [
-     1.4
-    ],
-    "camera/fov": [
-     30.0
-    ],
-    "camera/orbitPivot": [
-     0.0,
-     3.6,
-     0.0
-    ],
-    "camera/orbitSpeed": [
-     0.01
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      0.0
     ],
@@ -660,16 +712,7 @@
      0.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
+    "sdf/tanguy/node/eaten/amount": [
      0.0
     ],
     "lights/fracture/intensity": [
@@ -680,10 +723,13 @@
     ],
     "lights/sun/color": [
      1.0,
-     0.8,
-     0.58
+     0.8759,
+     0.6716
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      0.0
     ],
     "material/bark/emissionIntensity": [
@@ -695,10 +741,10 @@
     "material/treeBlocks/emissionIntensity": [
      0.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -740,28 +786,38 @@
      0.08
     ],
     "scene/volumeDensity": [
-     0.0011
+     0.0006
     ],
     "scene/fogColor": [
-     1.0,
-     0.8,
-     0.58
+     0.4397,
+     0.5841,
+     0.6867
     ],
     "env/sky/zenithColor": [
-     0.1,
-     0.24,
-     0.58
+     0.0497,
+     0.1912,
+     0.2664
     ],
     "env/sky/horizonColor": [
+     0.7758,
+     0.6795,
+     0.521
+    ],
+    "env/sky/groundColor": [
+     0.3467,
+     0.3185,
+     0.2346
+    ],
+    "env/sky/sunColor": [
      1.0,
-     0.8,
-     0.58
+     0.8759,
+     0.6716
     ],
-    "post/grade/temperature": [
-     -0.0
+    "macros/keyframe": [
+     0.0
     ],
-    "post/grade/tint": [
-     -0.0
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      0.15
@@ -781,35 +837,101 @@
     "macros/gLift": [
      0.0
     ],
-    "macros/keyframe": [
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
      0.0
     ],
-    "macros/heal": [
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/melt0/amount": [
+    "sdf/limb0/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/limb0/node/bark/amount": [
+     0.016
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb0/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
-    ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb1/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.0
@@ -823,43 +945,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
+    ],
+    "camera/position": [
+     2,
+     1.172,
+     26
+    ],
+    "camera/target": [
+     -2,
+     3.4,
+     -4
+    ],
+    "camera/fov": [
+     30
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
-   "name": "uncanny",
+   "name": "dream 2",
    "values": {
-    "camera/distance": [
-     19.0
-    ],
-    "camera/height": [
-     1.4
-    ],
-    "camera/fov": [
-     38.0
-    ],
-    "camera/orbitPivot": [
-     0.5,
-     3.4,
-     -1.0
-    ],
-    "camera/orbitSpeed": [
-     0.012
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      0.0
     ],
@@ -874,30 +992,24 @@
      0.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
+    "sdf/tanguy/node/eaten/amount": [
      0.0
     ],
     "lights/fracture/intensity": [
      0.0
     ],
     "lights/sun/azimuth": [
-     -128.48612957246576
+     -154.48612957246576
     ],
     "lights/sun/color": [
-     0.86,
-     0.9,
-     0.86
+     1.0,
+     0.8759,
+     0.6716
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      0.0
     ],
     "material/bark/emissionIntensity": [
@@ -909,15 +1021,575 @@
     "material/treeBlocks/emissionIntensity": [
      0.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.0
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0006
+    ],
+    "scene/fogColor": [
+     0.4397,
+     0.5841,
+     0.6867
+    ],
+    "env/sky/zenithColor": [
+     0.0497,
+     0.1912,
+     0.2664
+    ],
+    "env/sky/horizonColor": [
+     0.7758,
+     0.6795,
+     0.521
+    ],
+    "env/sky/groundColor": [
+     0.3467,
+     0.3185,
+     0.2346
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.8759,
+     0.6716
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.15
+    ],
+    "macros/gRhythm": [
+     0.0
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     -44,
+     1.377,
+     30
+    ],
+    "camera/target": [
+     -2,
+     3.2,
+     -6
+    ],
+    "camera/fov": [
+     32
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "dream 3",
+   "values": {
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8759,
+     0.6716
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.0
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0006
+    ],
+    "scene/fogColor": [
+     0.4397,
+     0.5841,
+     0.6867
+    ],
+    "env/sky/zenithColor": [
+     0.0497,
+     0.1912,
+     0.2664
+    ],
+    "env/sky/horizonColor": [
+     0.7758,
+     0.6795,
+     0.521
+    ],
+    "env/sky/groundColor": [
+     0.3467,
+     0.3185,
+     0.2346
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.8759,
+     0.6716
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.15
+    ],
+    "macros/gRhythm": [
+     0.0
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     30,
+     2.178,
+     22
+    ],
+    "camera/target": [
+     -5,
+     3.0,
+     -4
+    ],
+    "camera/fov": [
+     28
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "uncanny",
+   "values": {
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -128.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -954,28 +1626,38 @@
      0.08
     ],
     "scene/volumeDensity": [
-     0.001
+     0.0007
     ],
     "scene/fogColor": [
-     1.0,
-     0.8,
-     0.58
+     0.9216,
+     0.7913,
+     0.5149
     ],
     "env/sky/zenithColor": [
-     0.06,
-     0.24,
-     0.5
+     0.0437,
+     0.1559,
+     0.1301
     ],
     "env/sky/horizonColor": [
-     0.86,
-     0.84,
-     0.66
+     0.8632,
+     0.7529,
+     0.4072
     ],
-    "post/grade/temperature": [
-     -0.041999999999999996
+    "env/sky/groundColor": [
+     0.016,
+     0.0437,
+     0.0382
     ],
-    "post/grade/tint": [
-     -0.027999999999999997
+    "env/sky/sunColor": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      0.3
@@ -995,35 +1677,101 @@
     "macros/gLift": [
      0.0
     ],
-    "macros/keyframe": [
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
      0.0
     ],
-    "macros/heal": [
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/melt0/amount": [
+    "sdf/limb0/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
      -0.05
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.0
@@ -1037,43 +1785,599 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
+    ],
+    "camera/position": [
+     16,
+     0.696,
+     30
+    ],
+    "camera/target": [
+     -4,
+     3.0,
+     -8
+    ],
+    "camera/fov": [
+     38
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "uncanny 2",
+   "values": {
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -128.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.08
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0007
+    ],
+    "scene/fogColor": [
+     0.9216,
+     0.7913,
+     0.5149
+    ],
+    "env/sky/zenithColor": [
+     0.0437,
+     0.1559,
+     0.1301
+    ],
+    "env/sky/horizonColor": [
+     0.8632,
+     0.7529,
+     0.4072
+    ],
+    "env/sky/groundColor": [
+     0.016,
+     0.0437,
+     0.0382
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.3
+    ],
+    "macros/gRhythm": [
+     0.1
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     -0.05
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     -26,
+     1.528,
+     -34
+    ],
+    "camera/target": [
+     8,
+     2.6,
+     -8
+    ],
+    "camera/fov": [
+     34
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "uncanny 3",
+   "values": {
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -128.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     0.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.08
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0007
+    ],
+    "scene/fogColor": [
+     0.9216,
+     0.7913,
+     0.5149
+    ],
+    "env/sky/zenithColor": [
+     0.0437,
+     0.1559,
+     0.1301
+    ],
+    "env/sky/horizonColor": [
+     0.8632,
+     0.7529,
+     0.4072
+    ],
+    "env/sky/groundColor": [
+     0.016,
+     0.0437,
+     0.0382
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3817,
+     0.0186
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.3
+    ],
+    "macros/gRhythm": [
+     0.1
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     -0.05
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     6,
+     8.415,
+     42
+    ],
+    "camera/target": [
+     0,
+     1.0,
+     -6
+    ],
+    "camera/fov": [
+     36
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "infection",
    "values": {
-    "camera/distance": [
-     17.0
-    ],
-    "camera/height": [
-     1.8
-    ],
-    "camera/fov": [
-     36.0
-    ],
-    "camera/orbitPivot": [
-     3.0,
-     3.0,
-     -5.0
-    ],
-    "camera/orbitSpeed": [
-     0.016
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      1.4
     ],
@@ -1088,17 +2392,8 @@
      1.6,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.18
-    ],
-    "sdf/stone/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      0.35
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
-     0.0
     ],
     "lights/fracture/intensity": [
      700.0
@@ -1107,11 +2402,14 @@
      -146.48612957246576
     ],
     "lights/sun/color": [
+     0.8935,
      1.0,
-     0.8,
-     0.58
+     0.9219
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      2.5
     ],
     "material/bark/emissionIntensity": [
@@ -1123,15 +2421,15 @@
     "material/treeBlocks/emissionIntensity": [
      3.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      3.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -1162,34 +2460,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.15
+     -0.1
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.0011
+     0.0008
     ],
     "scene/fogColor": [
-     1.0,
-     0.8,
-     0.58
+     0.4793,
+     0.5841,
+     0.5647
     ],
     "env/sky/zenithColor": [
-     0.07,
-     0.17,
-     0.42
+     0.2307,
+     0.4179,
+     0.6376
     ],
     "env/sky/horizonColor": [
-     0.92,
-     0.72,
-     0.58
+     0.6795,
+     0.7605,
+     0.7011
     ],
-    "post/grade/temperature": [
-     -0.024
+    "env/sky/groundColor": [
+     0.0802,
+     0.0931,
+     0.0908
     ],
-    "post/grade/tint": [
-     -0.016
+    "env/sky/sunColor": [
+     0.8935,
+     1.0,
+     0.9219
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      0.5
@@ -1209,35 +2517,101 @@
     "macros/gLift": [
      0.0
     ],
-    "macros/keyframe": [
+    "material/ground/op/24/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "macros/heal": [
+    "sdf/limb0/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/melt0/amount": [
+    "sdf/limb1/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.06
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.0
@@ -1251,43 +2625,599 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
+    ],
+    "camera/position": [
+     26,
+     1.682,
+     6
+    ],
+    "camera/target": [
+     12,
+     1.6,
+     -14
+    ],
+    "camera/fov": [
+     36
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "infection 2",
+   "values": {
+    "field/infect/strength": [
+     1.4
+    ],
+    "grid/contagion/advect": [
+     0.9
+    ],
+    "grid/contagion/dissipation": [
+     0.02
+    ],
+    "field/climb/position": [
+     0.0,
+     1.6,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.35
+    ],
+    "lights/fracture/intensity": [
+     700.0
+    ],
+    "lights/sun/azimuth": [
+     -146.48612957246576
+    ],
+    "lights/sun/color": [
+     0.8935,
+     1.0,
+     0.9219
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     2.5
+    ],
+    "material/bark/emissionIntensity": [
+     1.8
+    ],
+    "material/skin/emissionIntensity": [
+     1.8
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     3.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     3.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     70.0
+    ],
+    "temporal/echo/strength": [
+     0.1
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.1
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0008
+    ],
+    "scene/fogColor": [
+     0.4793,
+     0.5841,
+     0.5647
+    ],
+    "env/sky/zenithColor": [
+     0.2307,
+     0.4179,
+     0.6376
+    ],
+    "env/sky/horizonColor": [
+     0.6795,
+     0.7605,
+     0.7011
+    ],
+    "env/sky/groundColor": [
+     0.0802,
+     0.0931,
+     0.0908
+    ],
+    "env/sky/sunColor": [
+     0.8935,
+     1.0,
+     0.9219
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.5
+    ],
+    "macros/gRhythm": [
+     0.35
+    ],
+    "macros/gMosh": [
+     0.15
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.2
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.06
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     0,
+     2.337,
+     12
+    ],
+    "camera/target": [
+     -6,
+     2.2,
+     0
+    ],
+    "camera/fov": [
+     40
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "infection 3",
+   "values": {
+    "field/infect/strength": [
+     1.4
+    ],
+    "grid/contagion/advect": [
+     0.9
+    ],
+    "grid/contagion/dissipation": [
+     0.02
+    ],
+    "field/climb/position": [
+     0.0,
+     1.6,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.35
+    ],
+    "lights/fracture/intensity": [
+     700.0
+    ],
+    "lights/sun/azimuth": [
+     -146.48612957246576
+    ],
+    "lights/sun/color": [
+     0.8935,
+     1.0,
+     0.9219
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     2.5
+    ],
+    "material/bark/emissionIntensity": [
+     1.8
+    ],
+    "material/skin/emissionIntensity": [
+     1.8
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     3.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     3.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     70.0
+    ],
+    "temporal/echo/strength": [
+     0.1
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.1
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0008
+    ],
+    "scene/fogColor": [
+     0.4793,
+     0.5841,
+     0.5647
+    ],
+    "env/sky/zenithColor": [
+     0.2307,
+     0.4179,
+     0.6376
+    ],
+    "env/sky/horizonColor": [
+     0.6795,
+     0.7605,
+     0.7011
+    ],
+    "env/sky/groundColor": [
+     0.0802,
+     0.0931,
+     0.0908
+    ],
+    "env/sky/sunColor": [
+     0.8935,
+     1.0,
+     0.9219
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.5
+    ],
+    "macros/gRhythm": [
+     0.35
+    ],
+    "macros/gMosh": [
+     0.15
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.2
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.6795,
+     0.7605,
+     0.7011,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3231,
+     0.4508,
+     0.5029,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1912,
+     0.2502,
+     0.2664,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.06
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.0
+    ],
+    "camera/position": [
+     44,
+     5.478,
+     -38
+    ],
+    "camera/target": [
+     0,
+     1.0,
+     0
+    ],
+    "camera/fov": [
+     34
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "corruption",
    "values": {
-    "camera/distance": [
-     13.0
-    ],
-    "camera/height": [
-     1.1
-    ],
-    "camera/fov": [
-     42.0
-    ],
-    "camera/orbitPivot": [
-     -1.0,
-     3.2,
-     -2.0
-    ],
-    "camera/orbitSpeed": [
-     -0.03
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      2.4
     ],
@@ -1302,16 +3232,7 @@
      4.6,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.32
-    ],
-    "sdf/stone/node/eaten/amount": [
-     0.5
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.05
-    ],
-    "sdf/tree/node/bark/speed": [
+    "sdf/tanguy/node/eaten/amount": [
      0.5
     ],
     "lights/fracture/intensity": [
@@ -1322,10 +3243,13 @@
     ],
     "lights/sun/color": [
      1.0,
-     0.68,
-     0.5
+     0.3688,
+     0.0351
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      4.0
     ],
     "material/bark/emissionIntensity": [
@@ -1337,15 +3261,15 @@
     "material/treeBlocks/emissionIntensity": [
      5.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      5.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -1376,34 +3300,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.45
+     -0.4
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.0014
+     0.0011
     ],
     "scene/fogColor": [
-     0.62,
-     0.56,
-     0.64
+     0.1144,
+     0.0723,
+     0.0612
     ],
     "env/sky/zenithColor": [
-     0.035,
-     0.07,
-     0.2
+     0.0782,
+     0.0103,
+     0.0168
     ],
     "env/sky/horizonColor": [
-     0.62,
-     0.42,
-     0.4
+     0.5711,
+     0.6445,
+     0.6172
     ],
-    "post/grade/temperature": [
-     -0.0
+    "env/sky/groundColor": [
+     0.0262,
+     0.0037,
+     0.0137
     ],
-    "post/grade/tint": [
-     -0.0
+    "env/sky/sunColor": [
+     1.0,
+     0.3688,
+     0.0351
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      0.75
@@ -1423,35 +3357,101 @@
     "macros/gLift": [
      0.3
     ],
-    "macros/keyframe": [
-     0.0
+    "material/ground/op/24/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
     ],
-    "macros/heal": [
-     0.0
+    "material/ground/op/24/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.05
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.16
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.08
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      -0.06
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.35
@@ -1465,43 +3465,599 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.25
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.35
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.25
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.4
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.25
+    ],
+    "camera/position": [
+     -2,
+     0.95,
+     9
+    ],
+    "camera/target": [
+     -6,
+     4.2,
+     0
+    ],
+    "camera/fov": [
+     46
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "corruption 2",
+   "values": {
+    "field/infect/strength": [
+     2.4
+    ],
+    "grid/contagion/advect": [
+     2.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     4.6,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.5
+    ],
+    "lights/fracture/intensity": [
+     1900.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3688,
+     0.0351
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     4.0
+    ],
+    "material/bark/emissionIntensity": [
+     3.0
+    ],
+    "material/skin/emissionIntensity": [
+     3.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     5.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     5.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     160.0
+    ],
+    "temporal/echo/strength": [
+     0.18
+    ],
+    "temporal/mosh/amount": [
+     0.04
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.4
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0011
+    ],
+    "scene/fogColor": [
+     0.1144,
+     0.0723,
+     0.0612
+    ],
+    "env/sky/zenithColor": [
+     0.0782,
+     0.0103,
+     0.0168
+    ],
+    "env/sky/horizonColor": [
+     0.5711,
+     0.6445,
+     0.6172
+    ],
+    "env/sky/groundColor": [
+     0.0262,
+     0.0037,
+     0.0137
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3688,
+     0.0351
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.75
+    ],
+    "macros/gRhythm": [
+     0.65
+    ],
+    "macros/gMosh": [
+     0.45
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.5
+    ],
+    "macros/gLift": [
+     0.3
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.05
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.16
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.08
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     -0.06
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.25
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.25
+    ],
+    "camera/position": [
+     18,
+     1.266,
+     -6
+    ],
+    "camera/target": [
+     -6,
+     3.0,
+     0
+    ],
+    "camera/fov": [
+     42
+    ],
+    "camera/roll": [
+     0
+    ]
+   }
+  },
+  {
+   "name": "corruption 3",
+   "values": {
+    "field/infect/strength": [
+     2.4
+    ],
+    "grid/contagion/advect": [
+     2.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     4.6,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.5
+    ],
+    "lights/fracture/intensity": [
+     1900.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3688,
+     0.0351
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     4.0
+    ],
+    "material/bark/emissionIntensity": [
+     3.0
+    ],
+    "material/skin/emissionIntensity": [
+     3.0
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     5.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     5.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     160.0
+    ],
+    "temporal/echo/strength": [
+     0.18
+    ],
+    "temporal/mosh/amount": [
+     0.04
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.4
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0011
+    ],
+    "scene/fogColor": [
+     0.1144,
+     0.0723,
+     0.0612
+    ],
+    "env/sky/zenithColor": [
+     0.0782,
+     0.0103,
+     0.0168
+    ],
+    "env/sky/horizonColor": [
+     0.5711,
+     0.6445,
+     0.6172
+    ],
+    "env/sky/groundColor": [
+     0.0262,
+     0.0037,
+     0.0137
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3688,
+     0.0351
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     0.75
+    ],
+    "macros/gRhythm": [
+     0.65
+    ],
+    "macros/gMosh": [
+     0.45
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.5
+    ],
+    "macros/gLift": [
+     0.3
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.3763,
+     0.2502,
+     0.1651,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.3095,
+     0.0953,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.1714,
+     0.0273,
+     0.0194,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.05
+    ],
+    "sdf/trunk/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.05
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.5
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.16
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.08
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     -0.06
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.25
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.25
+    ],
+    "camera/position": [
+     -20,
+     3.438,
+     12
+    ],
+    "camera/target": [
+     4,
+     1.2,
+     -10
+    ],
+    "camera/fov": [
+     44
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "nightmare",
    "values": {
-    "camera/distance": [
-     8.0
-    ],
-    "camera/height": [
-     2.8
-    ],
-    "camera/fov": [
-     54.0
-    ],
-    "camera/orbitPivot": [
-     -5.0,
-     3.8,
-     0.5
-    ],
-    "camera/orbitSpeed": [
-     0.07
-    ],
-    "camera/roll": [
-     7.0
-    ],
     "field/infect/strength": [
      3.5
     ],
@@ -1516,17 +4072,8 @@
      9.5,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.55
-    ],
-    "sdf/stone/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      0.7
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.09
-    ],
-    "sdf/tree/node/bark/speed": [
-     1.0
     ],
     "lights/fracture/intensity": [
      3200.0
@@ -1536,10 +4083,13 @@
     ],
     "lights/sun/color": [
      1.0,
-     0.62,
-     0.46
+     0.3933,
+     0.1644
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      6.0
     ],
     "material/bark/emissionIntensity": [
@@ -1551,15 +4101,15 @@
     "material/treeBlocks/emissionIntensity": [
      7.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      7.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -1590,34 +4140,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.9
+     -0.7
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.0018
+     0.0014
     ],
     "scene/fogColor": [
-     0.42,
-     0.36,
-     0.5
+     0.0931,
+     0.0356,
+     0.0222
     ],
     "env/sky/zenithColor": [
-     0.012,
-     0.01,
-     0.04
+     0.2747,
+     0.0242,
+     0.0296
     ],
     "env/sky/horizonColor": [
-     0.4,
-     0.2,
-     0.28
+     0.4508,
+     0.1022,
+     0.0561
     ],
-    "post/grade/temperature": [
-     -0.0
+    "env/sky/groundColor": [
+     0.0123,
+     0.0252,
+     0.0356
     ],
-    "post/grade/tint": [
-     -0.0
+    "env/sky/sunColor": [
+     1.0,
+     0.3933,
+     0.1644
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      1.0
@@ -1637,35 +4197,101 @@
     "macros/gLift": [
      1.0
     ],
-    "macros/keyframe": [
-     0.0
+    "material/ground/op/24/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
     ],
-    "macros/heal": [
-     0.0
+    "material/ground/op/24/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.09
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.26
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.20157213265935717,
-     4.158996078115403,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -5.036176656942079,
+     4.42343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.18
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.11157213265935716,
-     3.5589960781154035,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -5.126176656942079,
+     3.8234305960746706,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      -0.14
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.15657213265935715,
-     3.8589960781154033,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -5.081176656942079,
+     4.12343059607467,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      1.8
@@ -1679,43 +4305,599 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.6
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      1.8
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      1.1
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      1.5
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.6
+    ],
+    "camera/position": [
+     -4.2,
+     2.87,
+     1.9
+    ],
+    "camera/target": [
+     12,
+     2.6,
+     -14
+    ],
+    "camera/fov": [
+     58
+    ],
+    "camera/roll": [
+     7
+    ]
+   }
+  },
+  {
+   "name": "nightmare 2",
+   "values": {
+    "field/infect/strength": [
+     3.5
+    ],
+    "grid/contagion/advect": [
+     3.4
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     9.5,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.7
+    ],
+    "lights/fracture/intensity": [
+     3200.0
+    ],
+    "lights/sun/azimuth": [
+     -188.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3933,
+     0.1644
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     6.0
+    ],
+    "material/bark/emissionIntensity": [
+     4.5
+    ],
+    "material/skin/emissionIntensity": [
+     4.5
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     7.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     7.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     420.0
+    ],
+    "temporal/echo/strength": [
+     0.3
+    ],
+    "temporal/mosh/amount": [
+     0.1
+    ],
+    "temporal/mosh/block": [
+     24.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.7
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0014
+    ],
+    "scene/fogColor": [
+     0.0931,
+     0.0356,
+     0.0222
+    ],
+    "env/sky/zenithColor": [
+     0.2747,
+     0.0242,
+     0.0296
+    ],
+    "env/sky/horizonColor": [
+     0.4508,
+     0.1022,
+     0.0561
+    ],
+    "env/sky/groundColor": [
+     0.0123,
+     0.0252,
+     0.0356
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3933,
+     0.1644
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     0.85
+    ],
+    "macros/gGlitch": [
+     0.6
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.09
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.26
+    ],
+    "nodes/limb0/position": [
+     -5.036176656942079,
+     4.42343059607467,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.18
+    ],
+    "nodes/limb1/position": [
+     -5.126176656942079,
+     3.8234305960746706,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     -0.14
+    ],
+    "nodes/limb2/position": [
+     -5.081176656942079,
+     4.12343059607467,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.6
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.6
+    ],
+    "camera/position": [
+     8,
+     14.889,
+     18
+    ],
+    "camera/target": [
+     -6,
+     1.5,
+     0
+    ],
+    "camera/fov": [
+     52
+    ],
+    "camera/roll": [
+     -5
+    ]
+   }
+  },
+  {
+   "name": "nightmare 3",
+   "values": {
+    "field/infect/strength": [
+     3.5
+    ],
+    "grid/contagion/advect": [
+     3.4
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     9.5,
+     0.0
+    ],
+    "sdf/tanguy/node/eaten/amount": [
+     0.7
+    ],
+    "lights/fracture/intensity": [
+     3200.0
+    ],
+    "lights/sun/azimuth": [
+     -188.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.3933,
+     0.1644
+    ],
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
+     6.0
+    ],
+    "material/bark/emissionIntensity": [
+     4.5
+    ],
+    "material/skin/emissionIntensity": [
+     4.5
+    ],
+    "material/treeBlocks/emissionIntensity": [
+     7.0
+    ],
+    "material/tanguyBlocks/emissionIntensity": [
+     7.0
+    ],
+    "material/ground/op/32/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.018,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     420.0
+    ],
+    "temporal/echo/strength": [
+     0.3
+    ],
+    "temporal/mosh/amount": [
+     0.1
+    ],
+    "temporal/mosh/block": [
+     24.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     -0.7
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0014
+    ],
+    "scene/fogColor": [
+     0.0931,
+     0.0356,
+     0.0222
+    ],
+    "env/sky/zenithColor": [
+     0.2747,
+     0.0242,
+     0.0296
+    ],
+    "env/sky/horizonColor": [
+     0.4508,
+     0.1022,
+     0.0561
+    ],
+    "env/sky/groundColor": [
+     0.0123,
+     0.0252,
+     0.0356
+    ],
+    "env/sky/sunColor": [
+     1.0,
+     0.3933,
+     0.1644
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     0.85
+    ],
+    "macros/gGlitch": [
+     0.6
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.0782,
+     0.1413,
+     0.1981,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0369,
+     0.0578,
+     0.0762,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0123,
+     0.0252,
+     0.0356,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.09
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.09
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.26
+    ],
+    "nodes/limb0/position": [
+     -5.036176656942079,
+     4.42343059607467,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.18
+    ],
+    "nodes/limb1/position": [
+     -5.126176656942079,
+     3.8234305960746706,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     -0.14
+    ],
+    "nodes/limb2/position": [
+     -5.081176656942079,
+     4.12343059607467,
+     0.19220583576448022
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.6
+    ],
+    "procedural/tanguyBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/tanguyBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/tanguyBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/tanguyBlocks/effector/5/strength": [
+     0.6
+    ],
+    "camera/position": [
+     -14,
+     0.449,
+     -4
+    ],
+    "camera/target": [
+     12,
+     2.4,
+     -14
+    ],
+    "camera/fov": [
+     60
+    ],
+    "camera/roll": [
+     11
     ]
    }
   },
   {
    "name": "collapse",
    "values": {
-    "camera/distance": [
-     26.0
-    ],
-    "camera/height": [
-     3.0
-    ],
-    "camera/fov": [
-     48.0
-    ],
-    "camera/orbitPivot": [
-     1.0,
-     4.0,
-     -5.0
-    ],
-    "camera/orbitSpeed": [
-     0.05
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      5.0
     ],
@@ -1723,24 +4905,15 @@
      4.0
     ],
     "grid/contagion/dissipation": [
-     0.0
+     0.6
     ],
     "field/climb/position": [
      0.0,
      12.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      1.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     1.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.12
-    ],
-    "sdf/tree/node/bark/speed": [
-     1.5
     ],
     "lights/fracture/intensity": [
      5000.0
@@ -1749,11 +4922,14 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
+     0.9717,
      1.0,
-     0.8,
-     0.58
+     0.9811
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      8.0
     ],
     "material/bark/emissionIntensity": [
@@ -1765,15 +4941,15 @@
     "material/treeBlocks/emissionIntensity": [
      9.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      9.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -1804,34 +4980,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.8
+     -0.6
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.003
+     0.0016
     ],
     "scene/fogColor": [
-     0.4,
-     0.34,
-     0.48
+     0.2789,
+     0.314,
+     0.3663
     ],
     "env/sky/zenithColor": [
-     0.01,
-     0.008,
-     0.03
+     0.0382,
+     0.0409,
+     0.0561
     ],
     "env/sky/horizonColor": [
-     0.34,
-     0.16,
-     0.24
+     0.402,
+     0.4233,
+     0.4678
     ],
-    "post/grade/temperature": [
-     -0.0
+    "env/sky/groundColor": [
+     0.0091,
+     0.0116,
+     0.0194
     ],
-    "post/grade/tint": [
-     -0.0
+    "env/sky/sunColor": [
+     0.9717,
+     1.0,
+     0.9811
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      1.0
@@ -1851,35 +5037,101 @@
     "macros/gLift": [
      1.0
     ],
-    "macros/keyframe": [
-     0.0
+    "material/ground/op/24/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
     ],
-    "macros/heal": [
-     0.0
+    "material/ground/op/24/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.12
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.4
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.45657213265935714,
-     5.858996078115403,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -4.781176656942079,
+     6.12343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.3
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.3065721326593571,
-     4.858996078115403,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -4.931176656942079,
+     5.12343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      -0.3
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.3815721326593572,
-     5.358996078115403,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -4.856176656942079,
+     5.62343059607467,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      5.0
@@ -1893,43 +5145,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      1.2
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      5.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      2.5
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      3.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      1.2
+    ],
+    "camera/position": [
+     10,
+     5.372,
+     30
+    ],
+    "camera/target": [
+     0,
+     3.0,
+     -6
+    ],
+    "camera/fov": [
+     48
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "decay",
    "values": {
-    "camera/distance": [
-     34.0
-    ],
-    "camera/height": [
-     9.0
-    ],
-    "camera/fov": [
-     50.0
-    ],
-    "camera/orbitPivot": [
-     1.0,
-     4.0,
-     -5.0
-    ],
-    "camera/orbitSpeed": [
-     0.05
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      5.0
     ],
@@ -1937,24 +5185,15 @@
      4.0
     ],
     "grid/contagion/dissipation": [
-     0.0
+     0.6
     ],
     "field/climb/position": [
      0.0,
      12.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      1.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     1.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.12
-    ],
-    "sdf/tree/node/bark/speed": [
-     1.5
     ],
     "lights/fracture/intensity": [
      5000.0
@@ -1963,11 +5202,14 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
+     0.9717,
      1.0,
-     0.8,
-     0.58
+     0.9811
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      8.0
     ],
     "material/bark/emissionIntensity": [
@@ -1979,15 +5221,15 @@
     "material/treeBlocks/emissionIntensity": [
      10.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -2018,34 +5260,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.7
+     -0.5
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.0034
+     0.0018
     ],
     "scene/fogColor": [
-     0.4,
-     0.34,
-     0.48
+     0.2789,
+     0.314,
+     0.3663
     ],
     "env/sky/zenithColor": [
-     0.01,
-     0.008,
-     0.03
+     0.0382,
+     0.0409,
+     0.0561
     ],
     "env/sky/horizonColor": [
-     0.34,
-     0.16,
-     0.24
+     0.402,
+     0.4233,
+     0.4678
     ],
-    "post/grade/temperature": [
-     -0.0
+    "env/sky/groundColor": [
+     0.0091,
+     0.0116,
+     0.0194
     ],
-    "post/grade/tint": [
-     -0.0
+    "env/sky/sunColor": [
+     0.9717,
+     1.0,
+     0.9811
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      1.0
@@ -2065,35 +5317,101 @@
     "macros/gLift": [
      1.0
     ],
-    "macros/keyframe": [
-     0.0
+    "material/ground/op/24/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
     ],
-    "macros/heal": [
-     0.0
+    "material/ground/op/24/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.12
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.4
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.7565721326593572,
-     7.858996078115403,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -4.481176656942079,
+     8.12343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.3
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.5315721326593572,
-     6.358996078115403,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -4.706176656942079,
+     6.62343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      -0.3
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.6065721326593572,
-     6.858996078115403,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -4.631176656942079,
+     7.12343059607467,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      9.0
@@ -2107,43 +5425,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      1.6
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      9.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      4.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      5.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      1.6
+    ],
+    "camera/position": [
+     26,
+     13.32,
+     40
+    ],
+    "camera/target": [
+     0,
+     2.0,
+     -6
+    ],
+    "camera/fov": [
+     50
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "pixels",
    "values": {
-    "camera/distance": [
-     40.0
-    ],
-    "camera/height": [
-     14.0
-    ],
-    "camera/fov": [
-     52.0
-    ],
-    "camera/orbitPivot": [
-     1.0,
-     4.0,
-     -5.0
-    ],
-    "camera/orbitSpeed": [
-     0.05
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      5.0
     ],
@@ -2151,24 +5465,15 @@
      4.0
     ],
     "grid/contagion/dissipation": [
-     0.0
+     0.6
     ],
     "field/climb/position": [
      0.0,
      12.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      1.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     1.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.12
-    ],
-    "sdf/tree/node/bark/speed": [
-     1.5
     ],
     "lights/fracture/intensity": [
      5000.0
@@ -2177,11 +5482,14 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
+     0.9717,
      1.0,
-     0.8,
-     0.58
+     0.9811
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      8.0
     ],
     "material/bark/emissionIntensity": [
@@ -2193,15 +5501,15 @@
     "material/treeBlocks/emissionIntensity": [
      10.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -2232,34 +5540,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     -0.4
+     -0.3
     ],
     "post/bloom/intensity": [
      0.08
     ],
     "scene/volumeDensity": [
-     0.0034
+     0.0018
     ],
     "scene/fogColor": [
-     0.4,
-     0.34,
-     0.48
+     0.2789,
+     0.314,
+     0.3663
     ],
     "env/sky/zenithColor": [
-     0.01,
-     0.008,
-     0.03
+     0.0382,
+     0.0409,
+     0.0561
     ],
     "env/sky/horizonColor": [
-     0.34,
-     0.16,
-     0.24
+     0.402,
+     0.4233,
+     0.4678
     ],
-    "post/grade/temperature": [
-     -0.0
+    "env/sky/groundColor": [
+     0.0091,
+     0.0116,
+     0.0194
     ],
-    "post/grade/tint": [
-     -0.0
+    "env/sky/sunColor": [
+     0.9717,
+     1.0,
+     0.9811
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      1.0
@@ -2279,35 +5597,101 @@
     "macros/gLift": [
      1.0
     ],
-    "macros/keyframe": [
-     0.0
+    "material/ground/op/24/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
     ],
-    "macros/heal": [
-     0.0
+    "material/ground/op/24/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.1746,
+     0.1946,
+     0.2307,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0908,
+     0.0999,
+     0.1221,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0382,
+     0.0409,
+     0.0561,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.12
+    ],
+    "sdf/trunk/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb0/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb1/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.12
+    ],
+    "sdf/limb2/node/bark/speed": [
+     1.5
+    ],
+    "sdf/limb0/node/melt/amount": [
      0.4
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.9065721326593571,
-     8.858996078115403,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -4.331176656942079,
+     9.12343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.3
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.6815721326593571,
-     7.358996078115403,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -4.556176656942079,
+     7.62343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb2/node/melt/amount": [
      -0.3
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.7565721326593572,
-     7.858996078115403,
-     0.1501435118199082
+    "nodes/limb2/position": [
+     -4.481176656942079,
+     8.12343059607467,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      12.0
@@ -2321,43 +5705,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      1.6
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      12.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      5.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      6.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      1.6
+    ],
+    "camera/position": [
+     10,
+     24.751,
+     58
+    ],
+    "camera/target": [
+     0,
+     0.0,
+     -10
+    ],
+    "camera/fov": [
+     52
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "light",
    "values": {
-    "camera/distance": [
-     40.0
-    ],
-    "camera/height": [
-     14.0
-    ],
-    "camera/fov": [
-     52.0
-    ],
-    "camera/orbitPivot": [
-     1.0,
-     4.0,
-     -5.0
-    ],
-    "camera/orbitSpeed": [
-     0.05
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      5.0
     ],
@@ -2365,24 +5745,15 @@
      4.0
     ],
     "grid/contagion/dissipation": [
-     0.0
+     0.6
     ],
     "field/climb/position": [
      0.0,
      12.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
+    "sdf/tanguy/node/eaten/amount": [
      1.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     1.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
-     0.0
     ],
     "lights/fracture/intensity": [
      5000.0
@@ -2391,11 +5762,14 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
+     0.9717,
      1.0,
-     0.8,
-     0.58
+     0.9811
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      8.0
     ],
     "material/bark/emissionIntensity": [
@@ -2407,15 +5781,15 @@
     "material/treeBlocks/emissionIntensity": [
      10.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      10.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -2446,34 +5820,44 @@
      0.0
     ],
     "camera/exposure/compensation": [
-     4.5
+     4.0
     ],
     "post/bloom/intensity": [
      1.5
     ],
     "scene/volumeDensity": [
-     0.004
+     0.002
     ],
     "scene/fogColor": [
-     1.0,
-     1.0,
-     1.0
+     0.8308,
+     0.855,
+     0.8388
     ],
     "env/sky/zenithColor": [
-     0.1,
-     0.24,
-     0.58
+     0.8308,
+     0.855,
+     0.8388
     ],
     "env/sky/horizonColor": [
+     0.8308,
+     0.855,
+     0.8388
+    ],
+    "env/sky/groundColor": [
+     0.5711,
+     0.5841,
+     0.624
+    ],
+    "env/sky/sunColor": [
+     0.9717,
      1.0,
-     0.8,
-     0.58
+     0.9811
     ],
-    "post/grade/temperature": [
-     -0.0
+    "macros/keyframe": [
+     0.0
     ],
-    "post/grade/tint": [
-     -0.0
+    "macros/heal": [
+     0.0
     ],
     "macros/gMicro": [
      1.0
@@ -2488,40 +5872,106 @@
      1.0
     ],
     "macros/gMelt": [
-     0.0
+     1.0
     ],
     "macros/gLift": [
+     1.0
+    ],
+    "material/ground/op/24/ramp/constant": [
+     0.5711,
+     0.5841,
+     0.624,
+     1
+    ],
+    "material/ground/op/24/ramp/constant2": [
+     0.402,
+     0.4233,
+     0.4678,
+     1
+    ],
+    "material/ground/op/24/ramp/constant3": [
+     0.2789,
+     0.314,
+     0.3663,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5711,
+     0.5841,
+     0.624,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.402,
+     0.4233,
+     0.4678,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2789,
+     0.314,
+     0.3663,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/trunk/node/bark/amount": [
+     0.016
+    ],
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "macros/keyframe": [
+    "sdf/limb0/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
      0.0
     ],
-    "macros/heal": [
+    "sdf/limb1/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/melt0/amount": [
+    "sdf/limb2/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.9065721326593571,
-     8.858996078115403,
-     0.1501435118199082
-    ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/limb0/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.6815721326593571,
-     7.358996078115403,
-     0.1501435118199082
+    "nodes/limb0/position": [
+     -4.331176656942079,
+     9.12343059607467,
+     0.19220583576448022
     ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb1/node/melt/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.7565721326593572,
-     7.858996078115403,
-     0.1501435118199082
+    "nodes/limb1/position": [
+     -4.556176656942079,
+     7.62343059607467,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -4.481176656942079,
+     8.12343059607467,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      12.0
@@ -2535,43 +5985,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      12.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      5.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      6.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
+    ],
+    "camera/position": [
+     10,
+     24.751,
+     58
+    ],
+    "camera/target": [
+     0,
+     0.0,
+     -10
+    ],
+    "camera/fov": [
+     52
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "respite",
    "values": {
-    "camera/distance": [
-     22.0
-    ],
-    "camera/height": [
-     1.5
-    ],
-    "camera/fov": [
-     32.0
-    ],
-    "camera/orbitPivot": [
-     1.0,
-     3.5,
-     -1.0
-    ],
-    "camera/orbitSpeed": [
-     0.008
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      0.0
     ],
@@ -2586,16 +6032,7 @@
      0.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
+    "sdf/tanguy/node/eaten/amount": [
      0.0
     ],
     "lights/fracture/intensity": [
@@ -2605,11 +6042,14 @@
      -154.48612957246576
     ],
     "lights/sun/color": [
+     0.9705,
      1.0,
-     0.8,
-     0.58
+     0.8944
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     1.2
+    ],
+    "material/ground/emissionIntensity": [
      1.0
     ],
     "material/bark/emissionIntensity": [
@@ -2621,15 +6061,15 @@
     "material/treeBlocks/emissionIntensity": [
      0.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
      -34.0,
-     1.15,
+     1.018,
      -46.0
     ],
     "particles/motes/spawnRate": [
@@ -2666,28 +6106,38 @@
      0.08
     ],
     "scene/volumeDensity": [
-     0.0012
+     0.0007
     ],
     "scene/fogColor": [
-     1.0,
-     0.8,
-     0.58
+     0.0802,
+     0.0931,
+     0.0908
     ],
     "env/sky/zenithColor": [
-     0.1,
-     0.24,
-     0.58
+     0.2961,
+     0.5271,
+     0.6939
     ],
     "env/sky/horizonColor": [
+     0.7529,
+     0.7758,
+     0.6939
+    ],
+    "env/sky/groundColor": [
+     0.0185,
+     0.0222,
+     0.0232
+    ],
+    "env/sky/sunColor": [
+     0.9705,
      1.0,
-     0.8,
-     0.58
+     0.8944
     ],
-    "post/grade/temperature": [
-     -0.0
+    "macros/keyframe": [
+     1.0
     ],
-    "post/grade/tint": [
-     -0.0
+    "macros/heal": [
+     0.45
     ],
     "macros/gMicro": [
      0.3
@@ -2707,35 +6157,101 @@
     "macros/gLift": [
      0.0
     ],
-    "macros/keyframe": [
-     1.0
+    "material/ground/op/24/ramp/constant": [
+     0.0802,
+     0.0931,
+     0.0908,
+     1
     ],
-    "macros/heal": [
-     0.45
+    "material/ground/op/24/ramp/constant2": [
+     0.0319,
+     0.0369,
+     0.0382,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.0185,
+     0.0222,
+     0.0232,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.0802,
+     0.0931,
+     0.0908,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.0319,
+     0.0369,
+     0.0382,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.0185,
+     0.0222,
+     0.0232,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/trunk/node/bark/amount": [
+     0.016
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
-    ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb0/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.0
@@ -2749,43 +6265,39 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
+    ],
+    "camera/position": [
+     16,
+     1.044,
+     28
+    ],
+    "camera/target": [
+     -2,
+     3.0,
+     -6
+    ],
+    "camera/fov": [
+     32
+    ],
+    "camera/roll": [
+     0
     ]
    }
   },
   {
    "name": "recovery",
    "values": {
-    "camera/distance": [
-     24.0
-    ],
-    "camera/height": [
-     1.4
-    ],
-    "camera/fov": [
-     30.0
-    ],
-    "camera/orbitPivot": [
-     0.0,
-     3.6,
-     0.0
-    ],
-    "camera/orbitSpeed": [
-     0.01
-    ],
-    "camera/roll": [
-     0.0
-    ],
     "field/infect/strength": [
      0.0
     ],
@@ -2800,16 +6312,7 @@
      0.0,
      0.0
     ],
-    "sdf/tree/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/stone/node/eaten/amount": [
-     0.0
-    ],
-    "sdf/tree/node/bark/amount": [
-     0.016
-    ],
-    "sdf/tree/node/bark/speed": [
+    "sdf/tanguy/node/eaten/amount": [
      0.0
     ],
     "lights/fracture/intensity": [
@@ -2820,10 +6323,13 @@
     ],
     "lights/sun/color": [
      1.0,
-     0.8,
-     0.58
+     0.8759,
+     0.6716
     ],
-    "material/plain/emissionIntensity": [
+    "lights/sun/intensity": [
+     9.0
+    ],
+    "material/ground/emissionIntensity": [
      0.0
     ],
     "material/bark/emissionIntensity": [
@@ -2835,10 +6341,10 @@
     "material/treeBlocks/emissionIntensity": [
      0.0
     ],
-    "material/stoneBlocks/emissionIntensity": [
+    "material/tanguyBlocks/emissionIntensity": [
      0.0
     ],
-    "material/plain/op/27/hueShift/value": [
+    "material/ground/op/32/hueShift/value": [
      0.0
     ],
     "nodes/double/position": [
@@ -2880,28 +6386,38 @@
      0.08
     ],
     "scene/volumeDensity": [
-     0.0011
+     0.0006
     ],
     "scene/fogColor": [
-     1.0,
-     0.8,
-     0.58
+     0.4397,
+     0.5841,
+     0.6867
     ],
     "env/sky/zenithColor": [
-     0.1,
-     0.24,
-     0.58
+     0.0497,
+     0.1912,
+     0.2664
     ],
     "env/sky/horizonColor": [
+     0.7758,
+     0.6795,
+     0.521
+    ],
+    "env/sky/groundColor": [
+     0.3467,
+     0.3185,
+     0.2346
+    ],
+    "env/sky/sunColor": [
      1.0,
-     0.8,
-     0.58
+     0.8759,
+     0.6716
     ],
-    "post/grade/temperature": [
-     -0.0
+    "macros/keyframe": [
+     1.0
     ],
-    "post/grade/tint": [
-     -0.0
+    "macros/heal": [
+     1.0
     ],
     "macros/gMicro": [
      0.15
@@ -2921,35 +6437,101 @@
     "macros/gLift": [
      0.0
     ],
-    "macros/keyframe": [
-     1.0
+    "material/ground/op/24/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
     ],
-    "macros/heal": [
-     1.0
+    "material/ground/op/24/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
     ],
-    "sdf/tree/node/melt0/amount": [
+    "material/ground/op/24/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant": [
+     0.5333,
+     0.4233,
+     0.1119,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant2": [
+     0.4397,
+     0.4342,
+     0.2195,
+     1
+    ],
+    "material/groundFar/op/5/ramp/constant3": [
+     0.2623,
+     0.159,
+     0.0369,
+     1
+    ],
+    "sdf/trunk/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb0/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/trunk/node/bark/amount": [
+     0.016
     ],
-    "sdf/tree/node/melt1/amount": [
+    "sdf/trunk/node/bark/speed": [
      0.0
     ],
-    "sdf/tree/node/limb1/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
-    ],
-    "sdf/tree/node/melt2/amount": [
+    "sdf/limb0/node/eaten/amount": [
      0.0
     ],
-    "sdf/tree/node/limb2/translation": [
-     0.0065721326593571605,
-     2.8589960781154033,
-     0.1501435118199082
+    "sdf/limb0/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb0/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb1/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb1/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb1/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb2/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/limb2/node/bark/amount": [
+     0.016
+    ],
+    "sdf/limb2/node/bark/speed": [
+     0.0
+    ],
+    "sdf/limb0/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb0/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb1/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb1/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
+    ],
+    "sdf/limb2/node/melt/amount": [
+     0.0
+    ],
+    "nodes/limb2/position": [
+     -5.231176656942079,
+     3.1234305960746704,
+     0.19220583576448022
     ],
     "procedural/treeBlocks/effector/2/strength": [
      0.0
@@ -2963,20 +6545,36 @@
     "procedural/treeBlocks/effector/5/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/2/strength": [
+    "procedural/tanguyBlocks/effector/2/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/3/strength": [
+    "procedural/tanguyBlocks/effector/3/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/4/strength": [
+    "procedural/tanguyBlocks/effector/4/strength": [
      0.0
     ],
-    "procedural/stoneBlocks/effector/5/strength": [
+    "procedural/tanguyBlocks/effector/5/strength": [
      0.0
     ],
     "field/stuck/strength": [
      1.0
+    ],
+    "camera/position": [
+     2,
+     1.172,
+     26
+    ],
+    "camera/target": [
+     -2,
+     3.4,
+     -4
+    ],
+    "camera/fov": [
+     30
+    ],
+    "camera/roll": [
+     0
     ]
    }
   }
@@ -2996,6 +6594,44 @@
       "kind": "elapsed",
       "threshold": 20.0,
       "from": "Recovery"
+     },
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Dream 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Dream 2",
+    "preset": "dream 2",
+    "transition": {
+     "seconds": 16.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Dream",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Dream 3",
+    "preset": "dream 3",
+    "transition": {
+     "seconds": 16.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Dream 2",
+      "idle": true
      }
     ]
    },
@@ -3016,10 +6652,62 @@
      },
      {
       "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.08,
+      "from": "Dream 2",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.08,
+      "from": "Dream 3",
+      "hold": true
+     },
+     {
+      "kind": "signal",
       "signal": "visual.lift",
       "threshold": 0.55,
       "from": "Respite",
       "hold": true
+     },
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Uncanny 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Uncanny 2",
+    "preset": "uncanny 2",
+    "transition": {
+     "seconds": 12.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Uncanny",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Uncanny 3",
+    "preset": "uncanny 3",
+    "transition": {
+     "seconds": 12.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Uncanny 2",
+      "idle": true
      }
     ]
    },
@@ -3037,6 +6725,58 @@
       "threshold": 0.28,
       "from": "Uncanny",
       "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.28,
+      "from": "Uncanny 2",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.28,
+      "from": "Uncanny 3",
+      "hold": true
+     },
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Infection 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Infection 2",
+    "preset": "infection 2",
+    "transition": {
+     "seconds": 9.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Infection",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Infection 3",
+    "preset": "infection 3",
+    "transition": {
+     "seconds": 9.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Infection 2",
+      "idle": true
      }
     ]
    },
@@ -3054,6 +6794,58 @@
       "threshold": 0.48,
       "from": "Infection",
       "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.48,
+      "from": "Infection 2",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.48,
+      "from": "Infection 3",
+      "hold": true
+     },
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Corruption 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Corruption 2",
+    "preset": "corruption 2",
+    "transition": {
+     "seconds": 5.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Corruption",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Corruption 3",
+    "preset": "corruption 3",
+    "transition": {
+     "seconds": 5.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 4,
+      "from": "Corruption 2",
+      "idle": true
      }
     ]
    },
@@ -3071,6 +6863,58 @@
       "threshold": 0.66,
       "from": "Corruption",
       "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.66,
+      "from": "Corruption 2",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.66,
+      "from": "Corruption 3",
+      "hold": true
+     },
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Nightmare 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Nightmare 2",
+    "preset": "nightmare 2",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Nightmare",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Nightmare 3",
+    "preset": "nightmare 3",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "bar",
+      "every": 2,
+      "from": "Nightmare 2",
+      "idle": true
      }
     ]
    },
@@ -3087,6 +6931,20 @@
       "signal": "visual.depth",
       "threshold": 0.86,
       "from": "Nightmare",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.86,
+      "from": "Nightmare 2",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.86,
+      "from": "Nightmare 3",
       "hold": true
      }
     ]
@@ -3159,6 +7017,22 @@
       "kind": "signal",
       "signal": "visual.lift",
       "threshold": 0.28,
+      "from": "Infection 2",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Infection 3",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
       "from": "Corruption",
       "hold": true,
       "falling": true
@@ -3167,7 +7041,39 @@
       "kind": "signal",
       "signal": "visual.lift",
       "threshold": 0.28,
+      "from": "Corruption 2",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Corruption 3",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
       "from": "Nightmare",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Nightmare 2",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Nightmare 3",
       "hold": true,
       "falling": true
      }

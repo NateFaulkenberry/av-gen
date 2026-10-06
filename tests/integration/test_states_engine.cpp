@@ -350,3 +350,56 @@ TEST_CASE("Hold triggers leave a state whose exit is already exceeded; elapsed t
         CHECK(back.states[0].triggers[0].kind == app::TriggerKind::Elapsed);
     }
 }
+
+// ADR-1164: an idle trigger never interrupts a running transition. A beat trigger (every beat) toward another state
+// would otherwise restart the morph on every beat; marked idle, it waits until the morph lands.
+TEST_CASE("An idle trigger waits for the running transition to land", "[integration][states][adr1164]") {
+    for (const bool idle : {false, true}) {
+        app::Engine engine(app::EngineMode::Offline);
+        control::ControlMap map;
+        map.oscEnabled = false;
+        map.midiEnabled = false;
+        engine.control().setMap(map);
+        FixedStepClock clock(60.0);
+        engine.update(engine.tick(clock));
+        auto* scale = engine.params().find("orb/scale");
+        REQUIRE(scale != nullptr);
+        for (const auto& [preset, value] : {std::pair{"a", 1.0f}, {"b", 2.0f}, {"c", 3.0f}}) {
+            scale->setBaseComponent(0, value);
+            engine.storePreset(preset);
+        }
+        app::SceneState a{"A", "a", {}, {}};
+        app::SceneState b{"B", "b", {}, {}};
+        app::SceneState c{"C", "c", {}, {}};
+        b.transition.seconds = 1.0;
+        c.transition.seconds = 1.0;
+        app::StateTrigger toB;  // a control signal held high: B, from A
+        toB.kind = app::TriggerKind::Signal;
+        toB.signal = "control.go";
+        toB.threshold = 0.5f;
+        toB.fromState = "A";
+        toB.hold = true;
+        b.triggers.push_back(toB);
+        app::StateTrigger toC;  // a periodic pull toward C, from A (fires on a control pulse every 0.25 s below)
+        toC.kind = app::TriggerKind::Signal;
+        toC.signal = "control.tick";
+        toC.threshold = 0.5f;
+        toC.fromState = "A";
+        toC.idle = idle;
+        c.triggers.push_back(toC);
+        engine.states().states = {a, b, c};
+        engine.states().initial = "A";
+        engine.states().reset(engine.params(), engine.presets());
+        engine.controlSource().set("go", 1.0f);
+        for (int i = 0; i < 150; ++i) { // 2.5 s; a tick every 15 frames
+            engine.controlSource().set("tick", (i % 15) == 7 ? 1.0f : 0.0f);
+            engine.update(engine.tick(clock));
+        }
+        INFO("idle " << idle << ": current " << engine.states().current());
+        if (idle) {
+            CHECK(engine.states().current() == "B"); // the ticks waited; B's one-second morph landed
+        } else {
+            CHECK(engine.states().current() == "A"); // B and C kept restarting each other: nothing ever landed
+        }
+    }
+}
