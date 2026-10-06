@@ -261,3 +261,92 @@ TEST_CASE("A MIDI pad bound as noteEvent changes the scene state", "[integration
     }
     CHECK(engine.states().current() == "Awakening");
 }
+
+// ADR-1164: a hold trigger fires while its condition holds, so a ladder state entered with its exit already exceeded
+// still leaves (a crossing trigger waits for a crossing that never comes); an elapsed trigger leaves a state after
+// it has lasted its threshold in seconds.
+TEST_CASE("Hold triggers leave a state whose exit is already exceeded; elapsed triggers time a state",
+          "[integration][states][adr1164]") {
+    for (const bool hold : {false, true}) {
+        app::Engine engine(app::EngineMode::Offline);
+        control::ControlMap map;
+        map.oscEnabled = false;
+        map.midiEnabled = false;
+        engine.control().setMap(map);
+        FixedStepClock clock(60.0);
+        engine.update(engine.tick(clock));
+        auto* scale = engine.params().find("orb/scale");
+        REQUIRE(scale != nullptr);
+        for (const auto& [preset, value] : {std::pair{"low", 1.0f}, {"mid", 2.0f}, {"high", 3.0f}}) {
+            scale->setBaseComponent(0, value);
+            engine.storePreset(preset);
+        }
+        app::SceneState low{"Low", "low", {}, {}};
+        app::SceneState mid{"Mid", "mid", {}, {}};
+        app::SceneState high{"High", "high", {}, {}};
+        // Low -> Mid when depth reaches 0.3; Mid -> High when it reaches 0.6 (both from their predecessor).
+        app::StateTrigger toMid;
+        toMid.kind = app::TriggerKind::Signal;
+        toMid.signal = "control.depth";
+        toMid.threshold = 0.3f;
+        toMid.fromState = "Low";
+        toMid.hold = hold;
+        mid.triggers.push_back(toMid);
+        app::StateTrigger toHigh = toMid;
+        toHigh.threshold = 0.6f;
+        toHigh.fromState = "Mid";
+        high.triggers.push_back(toHigh);
+        // High -> Low after two seconds in High.
+        app::StateTrigger timed;
+        timed.kind = app::TriggerKind::Elapsed;
+        timed.threshold = 2.0f;
+        timed.fromState = "High";
+        low.triggers.push_back(timed);
+        for (app::SceneState* st : {&low, &mid, &high}) {
+            st->transition.seconds = 0.1; // short and committed quickly: current() names the committed state
+        }
+        engine.states().states = {low, mid, high};
+        engine.states().initial = "Low";
+        engine.states().reset(engine.params(), engine.presets());
+
+        // depth jumps straight to 0.9: both thresholds are crossed in ONE frame, while the machine is in Low.
+        engine.controlSource().set("depth", 0.9f);
+        for (int i = 0; i < 60; ++i) { // one second: room for two 0.1 s transitions
+            engine.update(engine.tick(clock));
+        }
+        if (!hold) {
+            // The crossing fired Low -> Mid; Mid's exit was crossed while in Low, so it never fires: stuck in Mid.
+            CHECK(engine.states().current() == "Mid");
+            continue;
+        }
+        // Held, it goes on to High...
+        CHECK(engine.states().current() == "High");
+        // ...and the elapsed trigger takes it back to Low after two seconds there, not before.
+        for (int i = 0; i < 40; ++i) { // High was entered ~0.25 s in: now ~1.4 s there
+            engine.update(engine.tick(clock));
+        }
+        CHECK(engine.states().current() == "High");
+        for (int i = 0; i < 45; ++i) { // past 2 s in High
+            engine.update(engine.tick(clock));
+        }
+        // Low's own hold trigger sends it straight on to Mid (depth is still 0.9): a level, by design. The elapsed
+        // trigger left High; what follows is the ladder again.
+        CHECK(engine.states().current() != "High");
+        const auto& j = engine.states().toJson();
+        bool sawHold = false;
+        bool sawElapsed = false;
+        for (const auto& s : j["states"]) {
+            for (const auto& t : s["triggers"]) {
+                sawHold = sawHold || t.value("hold", false);
+                sawElapsed = sawElapsed || t.value("kind", std::string()) == "elapsed";
+            }
+        }
+        CHECK(sawHold);
+        CHECK(sawElapsed);
+        app::StateMachine back;
+        REQUIRE(back.fromJson(j).has_value());
+        REQUIRE(back.states.size() == 3);
+        CHECK(back.states[1].triggers[0].hold);
+        CHECK(back.states[0].triggers[0].kind == app::TriggerKind::Elapsed);
+    }
+}

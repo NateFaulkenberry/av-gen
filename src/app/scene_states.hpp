@@ -54,6 +54,9 @@ enum class TriggerKind : std::uint8_t {
     Phrase,   // every `every`-th musical phrase (ADR-041)
     Section,  // every `every`-th section
     Cue,      // reserved: cues address states through their preset
+    // ADR-1164, appended: the current (committed) state has lasted `threshold` seconds. With `from`, a state's own
+    // length; with a bar-quantised target transition, it lands on the bar.
+    Elapsed,
 };
 [[nodiscard]] const char* triggerKindName(TriggerKind kind);
 [[nodiscard]] std::optional<TriggerKind> triggerKindFromName(std::string_view name);
@@ -63,6 +66,10 @@ struct StateTrigger {
     std::string signal;          // Signal / Macro (knob name)
     float threshold = 0.5f;
     bool falling = false;        // Signal/Macro: fire on the falling crossing instead
+    // ADR-1164: Signal/Macro fire every frame the condition HOLDS (value >= threshold, or < when `falling`), not only
+    // on the crossing. With `from`, a ladder cannot stick: a state whose exit is already exceeded when it is entered
+    // (after a jump, or a transition that masked the signal) still leaves.
+    bool hold = false;
     int every = 1;               // Beat / Bar
     std::string fromState;       // only when the current state has this name ("" = any)
     std::string target;          // state to go to ("" = the owning state)
@@ -118,6 +125,7 @@ private:
     std::string pending_;
     params::Preset from_;
     double startSeconds_ = 0.0;
+    double enteredSeconds_ = 0.0; // ADR-1164: when `current_` was last committed (Elapsed triggers)
     double waitUntil_ = -1.0;    // quantised start (< 0 = none)
     float progress_ = 1.0f;
     // trigger edge state

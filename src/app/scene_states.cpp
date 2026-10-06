@@ -55,12 +55,14 @@ const char* triggerKindName(TriggerKind k) {
     case TriggerKind::Phrase: return "phrase";
     case TriggerKind::Section: return "section";
     case TriggerKind::Cue: return "cue";
+    case TriggerKind::Elapsed: return "elapsed";
     }
     return "manual";
 }
 std::optional<TriggerKind> triggerKindFromName(std::string_view n) {
     for (auto k : {TriggerKind::Manual, TriggerKind::Beat, TriggerKind::Bar, TriggerKind::Onset, TriggerKind::Signal,
-                   TriggerKind::Macro, TriggerKind::Phrase, TriggerKind::Section, TriggerKind::Cue}) {
+                   TriggerKind::Macro, TriggerKind::Phrase, TriggerKind::Section, TriggerKind::Cue,
+                   TriggerKind::Elapsed}) {
         if (n == triggerKindName(k)) return k;
     }
     return std::nullopt;
@@ -114,6 +116,7 @@ void StateMachine::beginTransition(const SceneState& state, params::ParameterSet
     if (instant || state.transition.seconds <= 0.0) {
         params::applyPreset(params, *preset);
         current_ = state.name;
+        enteredSeconds_ = seconds;
         pending_.clear();
         progress_ = 1.0f;
         waitUntil_ = -1.0;
@@ -234,11 +237,20 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
                 if (auto id = bus.find(name)) {
                     value = bus.value(*id);
                     const float last = lastSignal_[mySlot];
-                    fired = t.falling ? (last >= t.threshold && value < t.threshold)
-                                      : (last < t.threshold && value >= t.threshold);
+                    if (t.hold) { // ADR-1164: while the condition holds
+                        fired = t.falling ? value < t.threshold : value >= t.threshold;
+                    } else {
+                        fired = t.falling ? (last >= t.threshold && value < t.threshold)
+                                          : (last < t.threshold && value >= t.threshold);
+                    }
                 }
                 break;
             }
+            case TriggerKind::Elapsed:
+                // ADR-1164: the committed state has lasted `threshold` seconds (never mid-transition).
+                fired = pending_.empty() && pendingQuantized_.empty() && !current_.empty() &&
+                        seconds - enteredSeconds_ >= static_cast<double>(t.threshold);
+                break;
             }
             lastSignal_[mySlot] = value;
             if (fired && fromOk && fire.empty() && target != current_ && target != pending_) {
@@ -263,6 +275,7 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
         if (t >= 1.0f) {
             params::applyPreset(params, *preset);
             current_ = pending_;
+            enteredSeconds_ = seconds;
             pending_.clear();
             progress_ = 1.0f;
         } else {
@@ -293,6 +306,7 @@ nlohmann::json StateMachine::toJson() const {
             if (!t.signal.empty()) tj["signal"] = t.signal;
             tj["threshold"] = t.threshold;
             if (t.falling) tj["falling"] = true;
+            if (t.hold) tj["hold"] = true; // ADR-1164
             tj["every"] = t.every;
             if (!t.fromState.empty()) tj["from"] = t.fromState;
             if (!t.target.empty()) tj["target"] = t.target;
@@ -358,6 +372,7 @@ Result<void> StateMachine::fromJson(const nlohmann::json& j) {
                     if (tj.contains("signal") && tj["signal"].is_string()) t.signal = tj["signal"].get<std::string>();
                     if (tj.contains("threshold") && tj["threshold"].is_number()) t.threshold = tj["threshold"].get<float>();
                     if (tj.contains("falling") && tj["falling"].is_boolean()) t.falling = tj["falling"].get<bool>();
+                    if (tj.contains("hold") && tj["hold"].is_boolean()) t.hold = tj["hold"].get<bool>(); // ADR-1164
                     if (tj.contains("every") && tj["every"].is_number_integer()) t.every = std::max(1, tj["every"].get<int>());
                     if (tj.contains("from") && tj["from"].is_string()) t.fromState = tj["from"].get<std::string>();
                     if (tj.contains("target") && tj["target"].is_string()) t.target = tj["target"].get<std::string>();

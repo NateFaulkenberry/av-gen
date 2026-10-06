@@ -1087,7 +1087,16 @@ void WorldPanel::drawStates(app::Engine& engine) {
                 ImGui::TextUnformatted(app::triggerKindName(trig.kind));
                 if (!trig.signal.empty()) {
                     ImGui::SameLine();
-                    ImGui::TextDisabled("%s >= %.2f", trig.signal.c_str(), static_cast<double>(trig.threshold));
+                    ImGui::TextDisabled("%s %s %.2f%s", trig.signal.c_str(), trig.falling ? "<" : ">=",
+                                        static_cast<double>(trig.threshold), trig.hold ? " (while)" : "");
+                }
+                if (trig.kind == app::TriggerKind::Elapsed) { // ADR-1164
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("after %.1f s", static_cast<double>(trig.threshold));
+                }
+                if (!trig.fromState.empty()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("from %s", trig.fromState.c_str());
                 }
                 if (trig.kind == app::TriggerKind::Beat || trig.kind == app::TriggerKind::Bar) {
                     ImGui::SameLine();

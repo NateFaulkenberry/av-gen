@@ -11,16 +11,158 @@
   }
  },
  "live": {
-  "qualityStrategy": "balanced",
+  "qualityStrategy": "effects_first",
   "targetFps": 60
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.08,
-  "post/bloom/threshold": 1.2,
-  "post/tonemap/chroma-retention": 0.5,
-  "post/output/vignette": 0.25,
-  "camera/exposure/mode": 0
+  "post/bloom/threshold": 1.4,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.55,
+  "post/output/vignette": 0.22,
+  "camera/exposure/mode": 0,
+  "camera/mode": 0,
+  "camera/orbitPivotWeight": 1.0,
+  "temporal/echo/enabled": true,
+  "temporal/echo/frames": 8.0,
+  "temporal/echo/decay": 0.7,
+  "temporal/mosh/enabled": true,
+  "temporal/mosh/frames": 16.0,
+  "temporal/mosh/smear": 22.0,
+  "temporal/mosh/rate": 10.0,
+  "sources/driftA/rate": 0.017,
+  "sources/driftB/rate": 0.0113,
+  "sources/turn/rate": 0.006
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "listen",
+   "settings": {
+    "mappings": [
+     {
+      "name": "drive",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "audio.energy",
+        "weight": 1.0
+       },
+       {
+        "signal": "audio.trebleLevel",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.95,
+      "gain": 3.0,
+      "curve": 1.0
+     },
+     {
+      "name": "bright",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "sonic.brightness.slow",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.25,
+      "gain": 2.0,
+      "curve": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "arc",
+   "settings": {
+    "mappings": [
+     {
+      "name": "lift",
+      "combine": "sum",
+      "inputs": [
+       {
+        "signal": "macro.energy",
+        "weight": 1.0
+       },
+       {
+        "signal": "macro.baseline",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -2.5,
+      "gain": 3.0,
+      "curve": 1.0
+     },
+     {
+      "name": "pace",
+      "combine": "sum",
+      "inputs": [
+       {
+        "signal": "macro.energy",
+        "weight": 0.3
+       },
+       {
+        "signal": "visual.lift",
+        "weight": 0.8
+       },
+       {
+        "signal": "macro.heal",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": -1.05,
+      "gain": 1.0,
+      "curve": 1.0
+     },
+     {
+      "name": "depth",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "macro.dose",
+        "weight": 1.0
+       },
+       {
+        "signal": "macro.keyframe",
+        "weight": 1.0,
+        "invert": true
+       }
+      ],
+      "bias": 0.0,
+      "gain": 1.0,
+      "curve": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftA",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftB",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "turn",
+   "settings": {
+    "shape": "sine"
+   }
+  }
+ ],
+ "sonic": {
+  "live": true
  },
  "routes": [
   {
@@ -46,16 +188,2856 @@
    "target": "root/impulse",
    "op": "add",
    "amount": 0.0
+  },
+  {
+   "source": "visual.drive",
+   "target": "macros/energy",
+   "op": "add",
+   "amount": 1.0,
+   "depthSource": "macro.sensitivity",
+   "depthMin": 0.0,
+   "depthMax": 4.0,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "visual.drive",
+   "target": "macros/baseline",
+   "op": "add",
+   "amount": 1.0,
+   "depthSource": "macro.sensitivity",
+   "depthMin": 0.0,
+   "depthMax": 4.0,
+   "chain": {
+    "attackMs": 30000,
+    "decayMs": 30000
+   }
+  },
+  {
+   "source": "visual.pace",
+   "target": "macros/dose",
+   "op": "add",
+   "amount": 1.0,
+   "chain": {
+    "curve": "power",
+    "curveAmount": 0.25,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": -0.05,
+    "remapOutMax": 0.0105,
+    "integrate": true,
+    "integrateMin": 0.0,
+    "integrateMax": 1.0
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "particles/motes/spawnRate",
+   "op": "add",
+   "amount": 260.0,
+   "depthSource": "macro.gMicro",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "audio.onsetHigh",
+   "target": "material/plain/emissionIntensity",
+   "op": "add",
+   "amount": 3.0,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 20,
+    "envelopeFallPerSecond": 6.0
+   }
+  },
+  {
+   "source": "audio.onsetHigh",
+   "target": "material/blocks/emissionIntensity",
+   "op": "add",
+   "amount": 4.0,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 20,
+    "envelopeFallPerSecond": 6.0
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "post/glitch/amount",
+   "op": "add",
+   "amount": 0.05,
+   "depthSource": "macro.gGlitch",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "audio.onsetLow",
+   "target": "lights/fracture/intensity",
+   "op": "add",
+   "amount": 2500.0,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 30,
+    "envelopeFallPerSecond": 5.0
+   }
+  },
+  {
+   "source": "audio.onsetLow",
+   "target": "procedural/treeBlocks/effector/5/strength",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 40,
+    "envelopeFallPerSecond": 4.0
+   }
+  },
+  {
+   "source": "audio.onsetLow",
+   "target": "procedural/stoneBlocks/effector/5/strength",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 40,
+    "envelopeFallPerSecond": 4.0
+   }
+  },
+  {
+   "source": "audio.onsetMid",
+   "target": "field/infect/strength",
+   "op": "add",
+   "amount": 4.0,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 60,
+    "envelopeFallPerSecond": 3.0
+   }
+  },
+  {
+   "source": "audio.onsetMid",
+   "target": "temporal/mosh/amount",
+   "op": "add",
+   "amount": 0.28,
+   "depthSource": "macro.gMosh",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 90,
+    "envelopeFallPerSecond": 3.5
+   }
+  },
+  {
+   "source": "audio.onsetMid",
+   "target": "post/glitch/tear",
+   "op": "add",
+   "amount": 0.35,
+   "depthSource": "macro.gGlitch",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 50,
+    "envelopeFallPerSecond": 6.0
+   }
+  },
+  {
+   "source": "audio.onsetLow",
+   "target": "post/split/amount",
+   "op": "add",
+   "amount": 6.0,
+   "depthSource": "macro.gGlitch",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 15,
+    "envelopeFallPerSecond": 12.0
+   }
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/tree/node/melt0/amount",
+   "op": "add",
+   "amount": 0.1,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/tree/node/limb0/translation",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gLift",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   },
+   "component": 1
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/tree/node/melt1/amount",
+   "op": "add",
+   "amount": 0.1,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/tree/node/limb1/translation",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gLift",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   },
+   "component": 1
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/tree/node/melt2/amount",
+   "op": "add",
+   "amount": -0.08,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "sdf/tree/node/limb2/translation",
+   "op": "add",
+   "amount": 0.6,
+   "depthSource": "macro.gLift",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   },
+   "component": 1
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "sdf/tree/node/bark/amount",
+   "op": "add",
+   "amount": 0.04,
+   "depthSource": "macro.gMelt",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "scene/volumeDensity",
+   "op": "add",
+   "amount": 0.0012,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "visual.bright",
+   "target": "material/plain/op/23/hueShift/value",
+   "op": "add",
+   "amount": 0.32,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "visual.bright",
+   "target": "grid/contagion/advect",
+   "op": "add",
+   "amount": 1.5,
+   "depthSource": "macro.gRhythm",
+   "depthMin": 0.0,
+   "depthMax": 1.0,
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/height",
+   "op": "add",
+   "amount": 0.3
+  },
+  {
+   "source": "lfo.driftB.bipolar",
+   "target": "camera/distance",
+   "op": "add",
+   "amount": 1.6
   }
  ],
+ "worldMacros": [
+  {
+   "name": "energy",
+   "label": "ENERGY",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "baseline",
+   "label": "BASELINE",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "dose",
+   "label": "DOSE",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "keyframe",
+   "label": "KEYFRAME",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "heal",
+   "label": "HEAL",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "sensitivity",
+   "label": "SENSITIVITY",
+   "default": 0.25,
+   "targets": []
+  },
+  {
+   "name": "gMicro",
+   "label": "GMICRO",
+   "default": 0.15,
+   "targets": []
+  },
+  {
+   "name": "gRhythm",
+   "label": "GRHYTHM",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "gMosh",
+   "label": "GMOSH",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "gGlitch",
+   "label": "GGLITCH",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "gMelt",
+   "label": "GMELT",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "gLift",
+   "label": "GLIFT",
+   "default": 0.0,
+   "targets": []
+  }
+ ],
+ "presets": [
+  {
+   "name": "dream",
+   "values": {
+    "camera/distance": [
+     24.0
+    ],
+    "camera/height": [
+     1.4
+    ],
+    "camera/fov": [
+     30.0
+    ],
+    "camera/orbitPivot": [
+     0.0,
+     3.6,
+     0.0
+    ],
+    "camera/orbitSpeed": [
+     0.01
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/blocks/emissionIntensity": [
+     0.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.0
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0011
+    ],
+    "scene/fogColor": [
+     0.96,
+     0.78,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     0.15
+    ],
+    "macros/gRhythm": [
+     0.0
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "uncanny",
+   "values": {
+    "camera/distance": [
+     19.0
+    ],
+    "camera/height": [
+     1.4
+    ],
+    "camera/fov": [
+     38.0
+    ],
+    "camera/orbitPivot": [
+     0.5,
+     3.4,
+     -1.0
+    ],
+    "camera/orbitSpeed": [
+     0.012
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.6
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -128.48612957246576
+    ],
+    "lights/sun/color": [
+     0.86,
+     0.9,
+     0.86
+    ],
+    "material/plain/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/blocks/emissionIntensity": [
+     0.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.08
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0013
+    ],
+    "scene/fogColor": [
+     0.96,
+     0.78,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.041999999999999996
+    ],
+    "post/grade/tint": [
+     -0.027999999999999997
+    ],
+    "macros/gMicro": [
+     0.3
+    ],
+    "macros/gRhythm": [
+     0.1
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     -0.05
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "infection",
+   "values": {
+    "camera/distance": [
+     17.0
+    ],
+    "camera/height": [
+     1.8
+    ],
+    "camera/fov": [
+     36.0
+    ],
+    "camera/orbitPivot": [
+     3.0,
+     3.0,
+     -5.0
+    ],
+    "camera/orbitSpeed": [
+     0.016
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     1.4
+    ],
+    "grid/contagion/advect": [
+     0.9
+    ],
+    "grid/contagion/dissipation": [
+     0.02
+    ],
+    "field/climb/position": [
+     0.0,
+     1.6,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.18
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.35
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     700.0
+    ],
+    "lights/sun/azimuth": [
+     -146.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     2.5
+    ],
+    "material/bark/emissionIntensity": [
+     1.8
+    ],
+    "material/skin/emissionIntensity": [
+     1.8
+    ],
+    "material/blocks/emissionIntensity": [
+     3.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     70.0
+    ],
+    "temporal/echo/strength": [
+     0.1
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0014
+    ],
+    "scene/fogColor": [
+     0.96,
+     0.78,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.024
+    ],
+    "post/grade/tint": [
+     -0.016
+    ],
+    "macros/gMicro": [
+     0.5
+    ],
+    "macros/gRhythm": [
+     0.35
+    ],
+    "macros/gMosh": [
+     0.15
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.2
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.06
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "corruption",
+   "values": {
+    "camera/distance": [
+     13.0
+    ],
+    "camera/height": [
+     1.1
+    ],
+    "camera/fov": [
+     42.0
+    ],
+    "camera/orbitPivot": [
+     -1.0,
+     3.2,
+     -2.0
+    ],
+    "camera/orbitSpeed": [
+     -0.03
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     2.4
+    ],
+    "grid/contagion/advect": [
+     2.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     4.6,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.32
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.5
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.05
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.5
+    ],
+    "lights/fracture/intensity": [
+     1900.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     4.0
+    ],
+    "material/bark/emissionIntensity": [
+     3.0
+    ],
+    "material/skin/emissionIntensity": [
+     3.0
+    ],
+    "material/blocks/emissionIntensity": [
+     5.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     160.0
+    ],
+    "temporal/echo/strength": [
+     0.18
+    ],
+    "temporal/mosh/amount": [
+     0.04
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.05
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0018
+    ],
+    "scene/fogColor": [
+     0.9,
+     0.62,
+     0.72
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     0.75
+    ],
+    "macros/gRhythm": [
+     0.65
+    ],
+    "macros/gMosh": [
+     0.45
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.5
+    ],
+    "macros/gLift": [
+     0.3
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.16
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.08
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     -0.06
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.25
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.35
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.25
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.4
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.25
+    ]
+   }
+  },
+  {
+   "name": "nightmare",
+   "values": {
+    "camera/distance": [
+     8.0
+    ],
+    "camera/height": [
+     2.8
+    ],
+    "camera/fov": [
+     54.0
+    ],
+    "camera/orbitPivot": [
+     -5.0,
+     3.8,
+     0.5
+    ],
+    "camera/orbitSpeed": [
+     0.07
+    ],
+    "camera/roll": [
+     7.0
+    ],
+    "field/infect/strength": [
+     3.5
+    ],
+    "grid/contagion/advect": [
+     3.4
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     9.5,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.55
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.7
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.09
+    ],
+    "sdf/tree/node/bark/speed": [
+     1.0
+    ],
+    "lights/fracture/intensity": [
+     3200.0
+    ],
+    "lights/sun/azimuth": [
+     -188.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.62,
+     0.46
+    ],
+    "material/plain/emissionIntensity": [
+     6.0
+    ],
+    "material/bark/emissionIntensity": [
+     4.5
+    ],
+    "material/skin/emissionIntensity": [
+     4.5
+    ],
+    "material/blocks/emissionIntensity": [
+     7.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     420.0
+    ],
+    "temporal/echo/strength": [
+     0.3
+    ],
+    "temporal/mosh/amount": [
+     0.1
+    ],
+    "temporal/mosh/block": [
+     24.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.1
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0026
+    ],
+    "scene/fogColor": [
+     0.85,
+     0.42,
+     0.62
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     0.85
+    ],
+    "macros/gGlitch": [
+     0.6
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.26
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.20157213265935717,
+     4.158996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.18
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.11157213265935716,
+     3.5589960781154035,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     -0.14
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.15657213265935715,
+     3.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.6
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     1.8
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     1.1
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     1.5
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.6
+    ]
+   }
+  },
+  {
+   "name": "collapse",
+   "values": {
+    "camera/distance": [
+     40.0
+    ],
+    "camera/height": [
+     46.0
+    ],
+    "camera/fov": [
+     58.0
+    ],
+    "camera/orbitPivot": [
+     2.0,
+     0.0,
+     -6.0
+    ],
+    "camera/orbitSpeed": [
+     0.05
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     5.0
+    ],
+    "grid/contagion/advect": [
+     4.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     12.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.12
+    ],
+    "sdf/tree/node/bark/speed": [
+     1.5
+    ],
+    "lights/fracture/intensity": [
+     5000.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     8.0
+    ],
+    "material/bark/emissionIntensity": [
+     6.0
+    ],
+    "material/skin/emissionIntensity": [
+     6.0
+    ],
+    "material/blocks/emissionIntensity": [
+     9.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     900.0
+    ],
+    "temporal/echo/strength": [
+     0.35
+    ],
+    "temporal/mosh/amount": [
+     0.25
+    ],
+    "temporal/mosh/block": [
+     48.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.15
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.003
+    ],
+    "scene/fogColor": [
+     0.8,
+     0.3,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     1.0
+    ],
+    "macros/gGlitch": [
+     0.8
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.4
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.45657213265935714,
+     5.858996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.3
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.3065721326593571,
+     4.858996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     -0.3
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.3815721326593572,
+     5.358996078115403,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     5.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     2.5
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     3.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     1.2
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     5.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     2.5
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     3.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     1.2
+    ]
+   }
+  },
+  {
+   "name": "decay",
+   "values": {
+    "camera/distance": [
+     40.0
+    ],
+    "camera/height": [
+     60.0
+    ],
+    "camera/fov": [
+     60.0
+    ],
+    "camera/orbitPivot": [
+     2.0,
+     0.0,
+     -6.0
+    ],
+    "camera/orbitSpeed": [
+     0.05
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     5.0
+    ],
+    "grid/contagion/advect": [
+     4.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     12.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.12
+    ],
+    "sdf/tree/node/bark/speed": [
+     1.5
+    ],
+    "lights/fracture/intensity": [
+     5000.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     8.0
+    ],
+    "material/bark/emissionIntensity": [
+     6.0
+    ],
+    "material/skin/emissionIntensity": [
+     6.0
+    ],
+    "material/blocks/emissionIntensity": [
+     10.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     2600.0
+    ],
+    "temporal/echo/strength": [
+     0.5
+    ],
+    "temporal/mosh/amount": [
+     0.6
+    ],
+    "temporal/mosh/block": [
+     64.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.2
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0034
+    ],
+    "scene/fogColor": [
+     0.8,
+     0.3,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     1.0
+    ],
+    "macros/gGlitch": [
+     1.0
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.4
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.7565721326593572,
+     7.858996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.3
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.5315721326593572,
+     6.358996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     -0.3
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.6065721326593572,
+     6.858996078115403,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     9.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     4.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     5.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     1.6
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     9.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     4.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     5.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     1.6
+    ]
+   }
+  },
+  {
+   "name": "pixels",
+   "values": {
+    "camera/distance": [
+     40.0
+    ],
+    "camera/height": [
+     60.0
+    ],
+    "camera/fov": [
+     60.0
+    ],
+    "camera/orbitPivot": [
+     2.0,
+     0.0,
+     -6.0
+    ],
+    "camera/orbitSpeed": [
+     0.05
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     5.0
+    ],
+    "grid/contagion/advect": [
+     4.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     12.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.12
+    ],
+    "sdf/tree/node/bark/speed": [
+     1.5
+    ],
+    "lights/fracture/intensity": [
+     5000.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     8.0
+    ],
+    "material/bark/emissionIntensity": [
+     6.0
+    ],
+    "material/skin/emissionIntensity": [
+     6.0
+    ],
+    "material/blocks/emissionIntensity": [
+     10.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     2600.0
+    ],
+    "temporal/echo/strength": [
+     0.4
+    ],
+    "temporal/mosh/amount": [
+     0.5
+    ],
+    "temporal/mosh/block": [
+     96.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     18.0
+    ],
+    "post/display/posterize": [
+     5.0
+    ],
+    "post/sort/amount": [
+     0.6
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.4
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0034
+    ],
+    "scene/fogColor": [
+     0.8,
+     0.3,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     1.0
+    ],
+    "macros/gGlitch": [
+     1.0
+    ],
+    "macros/gMelt": [
+     1.0
+    ],
+    "macros/gLift": [
+     1.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.4
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.9065721326593571,
+     8.858996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.3
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.6815721326593571,
+     7.358996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     -0.3
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.7565721326593572,
+     7.858996078115403,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     12.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     5.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     6.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     1.6
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     12.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     5.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     6.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     1.6
+    ]
+   }
+  },
+  {
+   "name": "light",
+   "values": {
+    "camera/distance": [
+     40.0
+    ],
+    "camera/height": [
+     60.0
+    ],
+    "camera/fov": [
+     60.0
+    ],
+    "camera/orbitPivot": [
+     2.0,
+     0.0,
+     -6.0
+    ],
+    "camera/orbitSpeed": [
+     0.05
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     5.0
+    ],
+    "grid/contagion/advect": [
+     4.0
+    ],
+    "grid/contagion/dissipation": [
+     0.0
+    ],
+    "field/climb/position": [
+     0.0,
+     12.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     1.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     5000.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     8.0
+    ],
+    "material/bark/emissionIntensity": [
+     6.0
+    ],
+    "material/skin/emissionIntensity": [
+     6.0
+    ],
+    "material/blocks/emissionIntensity": [
+     10.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     2600.0
+    ],
+    "temporal/echo/strength": [
+     0.6
+    ],
+    "temporal/mosh/amount": [
+     0.3
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     40.0
+    ],
+    "post/display/posterize": [
+     3.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     4.5
+    ],
+    "post/bloom/intensity": [
+     1.5
+    ],
+    "scene/volumeDensity": [
+     0.004
+    ],
+    "scene/fogColor": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     1.0
+    ],
+    "macros/gRhythm": [
+     1.0
+    ],
+    "macros/gMosh": [
+     1.0
+    ],
+    "macros/gGlitch": [
+     1.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     0.0
+    ],
+    "macros/heal": [
+     0.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.9065721326593571,
+     8.858996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.6815721326593571,
+     7.358996078115403,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.7565721326593572,
+     7.858996078115403,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     12.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     5.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     6.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     12.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     5.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     6.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "respite",
+   "values": {
+    "camera/distance": [
+     22.0
+    ],
+    "camera/height": [
+     1.5
+    ],
+    "camera/fov": [
+     32.0
+    ],
+    "camera/orbitPivot": [
+     1.0,
+     3.5,
+     -1.0
+    ],
+    "camera/orbitSpeed": [
+     0.008
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     0.25
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     1.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/blocks/emissionIntensity": [
+     0.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     -34.0,
+     1.15,
+     -46.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.05
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0012
+    ],
+    "scene/fogColor": [
+     0.96,
+     0.78,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     0.3
+    ],
+    "macros/gRhythm": [
+     0.0
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     1.0
+    ],
+    "macros/heal": [
+     0.45
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "recovery",
+   "values": {
+    "camera/distance": [
+     24.0
+    ],
+    "camera/height": [
+     1.4
+    ],
+    "camera/fov": [
+     30.0
+    ],
+    "camera/orbitPivot": [
+     0.0,
+     3.6,
+     0.0
+    ],
+    "camera/orbitSpeed": [
+     0.01
+    ],
+    "camera/roll": [
+     0.0
+    ],
+    "field/infect/strength": [
+     0.0
+    ],
+    "grid/contagion/advect": [
+     0.0
+    ],
+    "grid/contagion/dissipation": [
+     9.0
+    ],
+    "field/climb/position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "sdf/tree/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/stone/node/eaten/amount": [
+     0.0
+    ],
+    "sdf/tree/node/bark/amount": [
+     0.016
+    ],
+    "sdf/tree/node/bark/speed": [
+     0.0
+    ],
+    "lights/fracture/intensity": [
+     0.0
+    ],
+    "lights/sun/azimuth": [
+     -154.48612957246576
+    ],
+    "lights/sun/color": [
+     1.0,
+     0.8,
+     0.58
+    ],
+    "material/plain/emissionIntensity": [
+     0.0
+    ],
+    "material/bark/emissionIntensity": [
+     0.0
+    ],
+    "material/skin/emissionIntensity": [
+     0.0
+    ],
+    "material/blocks/emissionIntensity": [
+     0.0
+    ],
+    "material/plain/op/23/hueShift/value": [
+     0.0
+    ],
+    "nodes/double/position": [
+     0.0,
+     -400.0,
+     0.0
+    ],
+    "particles/motes/spawnRate": [
+     40.0
+    ],
+    "temporal/echo/strength": [
+     0.0
+    ],
+    "temporal/mosh/amount": [
+     0.0
+    ],
+    "temporal/mosh/block": [
+     32.0
+    ],
+    "post/glitch/amount": [
+     0.0
+    ],
+    "post/display/pixelate": [
+     0.0
+    ],
+    "post/display/posterize": [
+     0.0
+    ],
+    "post/sort/amount": [
+     0.0
+    ],
+    "post/split/amount": [
+     0.0
+    ],
+    "camera/exposure/compensation": [
+     0.0
+    ],
+    "post/bloom/intensity": [
+     0.08
+    ],
+    "scene/volumeDensity": [
+     0.0011
+    ],
+    "scene/fogColor": [
+     0.96,
+     0.78,
+     0.6
+    ],
+    "post/grade/temperature": [
+     -0.0
+    ],
+    "post/grade/tint": [
+     -0.0
+    ],
+    "macros/gMicro": [
+     0.15
+    ],
+    "macros/gRhythm": [
+     0.0
+    ],
+    "macros/gMosh": [
+     0.0
+    ],
+    "macros/gGlitch": [
+     0.0
+    ],
+    "macros/gMelt": [
+     0.0
+    ],
+    "macros/gLift": [
+     0.0
+    ],
+    "macros/keyframe": [
+     1.0
+    ],
+    "macros/heal": [
+     1.0
+    ],
+    "sdf/tree/node/melt0/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb0/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt1/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb1/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "sdf/tree/node/melt2/amount": [
+     0.0
+    ],
+    "sdf/tree/node/limb2/translation": [
+     0.0065721326593571605,
+     2.8589960781154033,
+     0.1501435118199082
+    ],
+    "procedural/treeBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/treeBlocks/effector/5/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/2/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/3/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/4/strength": [
+     0.0
+    ],
+    "procedural/stoneBlocks/effector/5/strength": [
+     0.0
+    ],
+    "field/stuck/strength": [
+     1.0
+    ]
+   }
+  }
+ ],
+ "states": {
+  "initial": "Dream",
+  "states": [
+   {
+    "name": "Dream",
+    "preset": "dream",
+    "transition": {
+     "seconds": 8,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 20.0,
+      "from": "Recovery"
+     }
+    ]
+   },
+   {
+    "name": "Uncanny",
+    "preset": "uncanny",
+    "transition": {
+     "seconds": 12,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.08,
+      "from": "Dream",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.55,
+      "from": "Respite",
+      "hold": true
+     }
+    ]
+   },
+   {
+    "name": "Infection",
+    "preset": "infection",
+    "transition": {
+     "seconds": 6,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.28,
+      "from": "Uncanny",
+      "hold": true
+     }
+    ]
+   },
+   {
+    "name": "Corruption",
+    "preset": "corruption",
+    "transition": {
+     "seconds": 3,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.48,
+      "from": "Infection",
+      "hold": true
+     }
+    ]
+   },
+   {
+    "name": "Nightmare",
+    "preset": "nightmare",
+    "transition": {
+     "seconds": 2,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.66,
+      "from": "Corruption",
+      "hold": true
+     }
+    ]
+   },
+   {
+    "name": "Collapse",
+    "preset": "collapse",
+    "transition": {
+     "seconds": 4,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.depth",
+      "threshold": 0.86,
+      "from": "Nightmare",
+      "hold": true
+     }
+    ]
+   },
+   {
+    "name": "Decay",
+    "preset": "decay",
+    "transition": {
+     "seconds": 3,
+     "easing": "easeIn",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 6.0,
+      "from": "Collapse"
+     }
+    ]
+   },
+   {
+    "name": "Pixels",
+    "preset": "pixels",
+    "transition": {
+     "seconds": 2,
+     "easing": "easeIn",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 5.0,
+      "from": "Decay"
+     }
+    ]
+   },
+   {
+    "name": "Light",
+    "preset": "light",
+    "transition": {
+     "seconds": 3,
+     "easing": "easeIn",
+     "quantize": "bar"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 4.0,
+      "from": "Pixels"
+     }
+    ]
+   },
+   {
+    "name": "Respite",
+    "preset": "respite",
+    "transition": {
+     "seconds": 1.5,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Infection",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Corruption",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "visual.lift",
+      "threshold": 0.28,
+      "from": "Nightmare",
+      "hold": true,
+      "falling": true
+     }
+    ]
+   },
+   {
+    "name": "Recovery",
+    "preset": "recovery",
+    "transition": {
+     "seconds": 0.0,
+     "easing": "linear"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 3.5,
+      "from": "Light"
+     }
+    ]
+   }
+  ]
+ },
  "render": {
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "output": "video",
   "path": "renders/digital-mosh.mp4"
- },
- "sonic": {
-  "live": true
  }
 }
