@@ -332,7 +332,7 @@ VANTAGES = {
                    (eye(-50, 1.6, 24), [TX, TY + 4.5, TZ], 40, 0),
                    (eye(-22, 5.0, 18), [SX - 8, 1.0, SZ + 6], 44, 0)],
     # impossible: inside the tree, a sudden height, the ground at ankle height (P5: the horizon tilts, not shakes)
-    "Nightmare": [(eye(TX + 1.8, 2.9, TZ + 1.9), [SX, SY + 1.0, SZ], 58, 7),
+    "Nightmare": [(eye(TX + 16, 9.0, TZ + 14), [SX - 6, SY, SZ + 4], 54, 7),
                   (eye(-8, 30.0, 34), [-18, 2.0, 0], 52, -5),
                   (eye(-18, 1.1, 2), [SX, SY + 0.8, SZ], 60, 11)],
     "Collapse": [(eye(12, 8.0, 34), [-12, 3.0, -4], 48, 0)],
@@ -489,7 +489,7 @@ def scene():
 # (restraint early, brief §16). Each stage breaks ONE more law than the last (research S2).
 BASE = dict(pal="dream", landPal="dream", inject=0.0, advect=0.0, dissip=0.6, climb=0.0, eat=0.0, eatStone=0.0,
             melt=[0.0, 0.0, 0.0], lift=[0.0, 0.0, 0.0], bark=0.016, barkSpeed=0.0,
-            rise=0.0, tumble=0.0, spin=0.0, kick=0.0, sunYaw=0.0, fracture=0.0, double=False, motes=40.0, spores=0.0, fracRange=10.0, cells=1.0, mottle=0.035, mottleRange=[0.25, 0.75, 0.84, 1.12],
+            rise=0.0, tumble=0.0, spin=0.0, kick=0.0, sunYaw=0.0, fracture=0.0, double=False, motes=40.0, spores=0.0, fracRange=10.0, skyI=0.6, cells=1.0, mottle=0.035, mottleRange=[0.25, 0.75, 0.84, 1.12],
             echo=0.0, mosh=0.0, moshBlock=32.0, glitch=0.0, pixel=0.0, poster=0.0, sort=0.0, split=0.0,
             exposure=0.0, bloom=0.08, volDen=0.0006, sun=11.0,
             gMicro=0.15, gRhythm=0.0, gMosh=0.0, gGlitch=0.0, gMelt=0.0, gLift=0.0,
@@ -546,11 +546,11 @@ STAGES = {
                     cells=0.12, mottle=0.9, mottleRange=[0.2, 0.8, 0.45, 1.45], pixel=4.0, poster=0.0, sort=0.15, exposure=-0.3, gGlitch=1.0, motes=2600.0, volDen=0.0018,
                     **COLLAPSE_COMMON),
     #   ... and light: Tanguy's white.
-    "Light": stage(pal="light", landPal="light", lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
+    "Light": stage(pal="light", landPal="light", skyI=1.0, lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
                    mosh=0.3, pixel=40.0, poster=3.0, exposure=2.6, bloom=1.0, gGlitch=1.0, motes=2600.0,
                    volDen=0.002, **COLLAPSE_COMMON),
     # A breakdown's respite: Magritte's Empire of Light -- a day sky over a land still in night; the stain stays.
-    "Respite": stage(pal="respite", landPal="respite", sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
+    "Respite": stage(pal="respite", landPal="respite", skyI=1.0, sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
                      echo=0.05, volDen=0.0007),
     # The keyframe: the dream exactly as it was (P8). One macroblock did not refresh.
     "Recovery": stage(dissip=9.0, keyframe=1.0, heal=1.0, volDen=0.00038),
@@ -596,6 +596,7 @@ def stage_values(name, v):
         "post/sort/amount": [v["sort"]], "post/split/amount": [v["split"]],
         "camera/exposure/compensation": [v["exposure"]], "post/bloom/intensity": [v["bloom"]],
         "scene/volumeDensity": [v["volDen"]], "scene/fogColor": pal["fog"],
+        "env/sky/intensity": [v["skyI"]],  # the sky's fill: lower, so shadowed faces read dark against lit ones
         "env/sky/zenithColor": pal["zenith"], "env/sky/horizonColor": pal["horizon"],
         "env/sky/groundColor": pal["groundSky"], "env/sky/sunColor": pal["sun"],
         "macros/keyframe": [v["keyframe"]], "macros/heal": [v["heal"]],

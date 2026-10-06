@@ -58,13 +58,13 @@ ESCARPMENT = [
     {"name": "escarpTop", "kind": "flat",
      "path": [[-340.0, 30.0, -125.0], [-190.0, 30.0, -185.0], [-40.0, 30.0, -210.0], [120.0, 30.0, -220.0],
               [300.0, 30.0, -165.0]],
-     "width": 46.0, "falloff": 3.0, "flatten": 0.85, "roughness": 0.3},
+     "width": 46.0, "falloff": 1.2, "flatten": 0.8, "roughness": 0.3},
 ]
 MESAS = [
     {"name": "mesaE", "kind": "ridge", "path": [[140.0, 0.0, -50.0], [168.0, 0.0, -20.0]], "width": 34.0,
      "amplitude": 24.0, "falloff": 3.2, "roughness": 0.6},
     {"name": "mesaEtop", "kind": "flat", "path": [[140.0, 21.0, -50.0], [168.0, 21.0, -20.0]], "width": 28.0,
-     "falloff": 3.0, "flatten": 1.0, "roughness": 0.15},
+     "falloff": 1.2, "flatten": 0.9, "roughness": 0.15},
     {"name": "butteW", "kind": "ridge", "path": [[-130.0, 0.0, -58.0]], "width": 22.0, "amplitude": 17.0,
      "falloff": 3.2, "roughness": 0.6},
     {"name": "butteWtop", "kind": "flat", "path": [[-130.0, 15.0, -58.0]], "width": 16.0, "falloff": 3.0,
@@ -72,7 +72,7 @@ MESAS = [
     {"name": "mesaS", "kind": "ridge", "path": [[110.0, 0.0, 95.0], [150.0, 0.0, 120.0]], "width": 30.0,
      "amplitude": 13.0, "falloff": 3.2, "roughness": 0.6},
     {"name": "mesaStop", "kind": "flat", "path": [[110.0, 11.0, 95.0], [150.0, 11.0, 120.0]], "width": 24.0,
-     "falloff": 3.0, "flatten": 1.0, "roughness": 0.15},
+     "falloff": 1.2, "flatten": 0.9, "roughness": 0.15},
 ]
 NEAR_FEATURES = [PAN, KNOLL, RIVERBED] + ESCARPMENT + MESAS
 

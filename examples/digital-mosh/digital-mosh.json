@@ -829,6 +829,9 @@
      0.6795,
      0.521
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0497,
      0.1912,
@@ -1126,6 +1129,9 @@
      0.7758,
      0.6795,
      0.521
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0497,
@@ -1425,6 +1431,9 @@
      0.6795,
      0.521
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0497,
      0.1912,
@@ -1722,6 +1731,9 @@
      0.9216,
      0.7913,
      0.5149
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0437,
@@ -2021,6 +2033,9 @@
      0.7913,
      0.5149
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0437,
      0.1559,
@@ -2318,6 +2333,9 @@
      0.9216,
      0.7913,
      0.5149
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0437,
@@ -2617,6 +2635,9 @@
      0.7913,
      0.5149
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0437,
      0.1559,
@@ -2914,6 +2935,9 @@
      0.9216,
      0.7913,
      0.5149
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0437,
@@ -3213,6 +3237,9 @@
      0.7913,
      0.5149
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0437,
      0.1559,
@@ -3510,6 +3537,9 @@
      0.9216,
      0.7913,
      0.5149
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0437,
@@ -3809,6 +3839,9 @@
      0.7913,
      0.5149
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.0437,
      0.1559,
@@ -4106,6 +4139,9 @@
      0.9216,
      0.7913,
      0.5149
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0437,
@@ -4405,6 +4441,9 @@
      0.0356,
      0.0222
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.2747,
      0.0242,
@@ -4570,17 +4609,17 @@
      0.6
     ],
     "camera/position": [
-     -32.2,
-     9.475,
-     13.9
+     -18.0,
+     12.718,
+     26.0
     ],
     "camera/target": [
-     12.0,
-     3.034,
-     -14.0
+     6.0,
+     2.034,
+     -10.0
     ],
     "camera/fov": [
-     58
+     54
     ],
     "camera/roll": [
      7
@@ -4702,6 +4741,9 @@
      0.0931,
      0.0356,
      0.0222
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.2747,
@@ -5001,6 +5043,9 @@
      0.0356,
      0.0222
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.2747,
      0.0242,
@@ -5298,6 +5343,9 @@
      0.0931,
      0.0356,
      0.0222
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.2747,
@@ -5597,6 +5645,9 @@
      0.0356,
      0.0222
     ],
+    "env/sky/intensity": [
+     0.6
+    ],
     "env/sky/zenithColor": [
      0.2747,
      0.0242,
@@ -5894,6 +5945,9 @@
      0.0931,
      0.0356,
      0.0222
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.2747,
@@ -6193,6 +6247,9 @@
      0.855,
      0.8388
     ],
+    "env/sky/intensity": [
+     1.0
+    ],
     "env/sky/zenithColor": [
      0.8308,
      0.855,
@@ -6491,6 +6548,9 @@
      0.0931,
      0.0908
     ],
+    "env/sky/intensity": [
+     1.0
+    ],
     "env/sky/zenithColor": [
      0.2961,
      0.5271,
@@ -6788,6 +6848,9 @@
      0.7758,
      0.6795,
      0.521
+    ],
+    "env/sky/intensity": [
+     0.6
     ],
     "env/sky/zenithColor": [
      0.0497,
