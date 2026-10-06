@@ -87,6 +87,15 @@ HIDDEN = [0.0, -400.0, 0.0]                # parked under the land (its shadow c
 TANGUY_HOVER = 1.55 + 0.11                 # its needle's tip (local y -1.55) a hand's width above its shadow
 
 
+def liquid_at(v):
+    """The skin's rest height for a stage. The swell's noise is positive, so the skin sinks by the swell's mean lift
+    (half its amount, plus half the bass route's typical 0.3): only crests above the mean break the land, never the
+    whole masked square. Parked far below where the land is solid."""
+    if v["wave"] <= 0:
+        return LIQUID_HIDDEN
+    return [LIQUID_AT[0], round(LIQUID_AT[1] - 0.5 * (v["swell"] + 0.3), 3), LIQUID_AT[2]]
+
+
 def on_ground(xz, lift=0.0):
     return [xz[0], round(land.height(*xz) + lift, 3), xz[1]]
 
@@ -542,7 +551,7 @@ STAGES = {
                     **COLLAPSE_COMMON),
     #   ... and light: Tanguy's white.
     "Light": stage(pal="light", lift=[6.0, 4.5, 5.0], rise=12.0, tumble=5.0, spin=6.0, glowBlocks=10.0, echo=0.6,
-                   mosh=0.3, pixel=40.0, poster=3.0, exposure=4.0, bloom=1.5, gGlitch=1.0, motes=2600.0,
+                   mosh=0.3, pixel=40.0, poster=3.0, exposure=2.6, bloom=1.0, gGlitch=1.0, motes=2600.0,
                    volDen=0.002, **COLLAPSE_COMMON),
     # A breakdown's respite: Magritte's Empire of Light -- a day sky over a land still in night; the stain stays.
     "Respite": stage(pal="respite", sun=1.2, dissip=0.25, double=True, keyframe=1.0, heal=0.45, glowPlain=1.0, gMicro=0.3,
@@ -576,7 +585,7 @@ def stage_values(name, v):
         "lights/sun/color": pal["sun"], "lights/sun/intensity": [v["sun"]],
         "material/ground/emissionIntensity": [v["glowPlain"]], "material/liquid/emissionIntensity": [v["glowPlain"]],
         "procedural/liquid/deform/1/amount": [v["wave"]], "procedural/liquid/deform/2/amount": [v["swell"]],
-        "nodes/liquid/position": LIQUID_AT if v["wave"] > 0 else LIQUID_HIDDEN,
+        "nodes/liquid/position": liquid_at(v),
         f"material/liquid/op/{program_op(liquid_program, 'constant', 3)}/constant/constant": pal["land"][0] + [1], "material/bark/emissionIntensity": [v["glowBark"]],
         "material/skin/emissionIntensity": [v["glowBark"]],
         "material/treeBlocks/emissionIntensity": [v["glowBlocks"]],

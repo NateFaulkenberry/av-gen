@@ -18,7 +18,11 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 | WIP for the owner (first build) | done | `~/Desktop/av-gen-review/38-digital-mosh/wip/` |
 | Art pass 1, part: ink stain, matter blocks, sky fix | done | b07c5a60 |
 | Art pass 1: terrain, olive and Tanguy forms, painting palettes, travelling camera; ADR-1164 `idle` | done | 12a71635 |
-| Art pass 1: palette and restraint fixes from the full-song review | in progress | |
+| Art pass 1b/1c: palette and restraint fixes from the full-song review | done | 73ec201d, ee61637f |
+| Art pass 2: Critic fixes (shimmer, wobble, beat moves, varied vantages), liquid skin, double scale, MIDI | done | 95c6b672..49cf8d28 |
+| Performance: per-stage offline profile (auto, Ultra), SDF-shadow A/B, live-mode profile, two live sessions | done | `04-evaluation.md` |
+| Art pass 3: warm Dream haze, simpler Pixels stratum, liquid mask inside its skin and sunk by its mean swell, Light not clipped | done | 3957ec05..(final) |
+| Final renders (1080p, both tracks), Critic, evaluation, full suites | done | `04-evaluation.md` |
 
 ## How to work on it
 
@@ -66,3 +70,9 @@ Evaluation: `04-evaluation.md`. Review media: `~/Desktop/av-gen-review/38-digita
 12. A `world` block falls back to Glowmere's layers, features and biomes for any key it omits. Set them all.
 13. Offline render speed: the full song at 1280x720 renders at about 10.5 fps (offline tier), so a song takes
     about 10 minutes.
+14. `--live-capture` re-renders every second frame at its own size: a captured live session's frame rate is not
+    evidence. Profile live with `--live-profile --mode live`, or run uncaptured.
+15. Python's `time.monotonic_ns` has a per-process origin on macOS; AV Gen's live clocks are `CLOCK_UPTIME_RAW`.
+16. Raymarched SDF shadows are the scene's largest cost (each caster is marched per shadow texel per cascade), and
+    the shadow atlas does not shrink with LIVE AUTO's render scale.
+17. A `box` field's `size` is a HALF extent, and `softness` extends past it.

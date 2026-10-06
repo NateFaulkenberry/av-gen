@@ -170,7 +170,7 @@ One scene and one artistic system. The fidelity levers:
 The live project adds a `live` block (`effects_first` priority, so the ladder drops resolution after the
 effects that carry no meaning). Heroes (tree, stone) are never degraded.
 
-## Engine additions (ADR-1160 to ADR-1162)
+## Engine additions (ADR-1160 to ADR-1164)
 
 Each one is small, tested, and reachable from scene JSON, the CLI and the editor:
 
@@ -180,6 +180,11 @@ Each one is small, tested, and reachable from scene JSON, the CLI and the editor
 - **ADR-1161:** an integrating route can be bounded (`integrateMin` / `integrateMax`), which gives the dose.
 - **ADR-1162:** a material-program `quantize` op: cell centres and a per-cell random, for squares and macroblock
   masks.
+- **ADR-1163:** a scalar grid can saturate (`ceiling`): injection stops at a level, so the contagion spreads rather than
+  piling up at the source.
+- **ADR-1164:** state triggers can `hold` (fire while a condition holds), be `elapsed` (fire after a state has lasted N
+  seconds) and be `idle` (wait for the running transition to land). These give the hold ladder, the timed collapse
+  strata and camera moves that never interrupt a stage's own morph.
 
 **Considered and not built:**
 
