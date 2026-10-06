@@ -30,6 +30,7 @@ struct Frame {
     ext: vec4f,      // sharpness spread (1 = only the anatomy's centre sharpens, 0 = everywhere), tendon density weight, meta-field radius, meta-face strength
     it2: vec4f,      // iteration 2: latent cache on, shards on, shard threshold (px), -
     cbox: vec4f,     // iteration 2: the latent cache's box (origin xyz, edge length), framed on the shot
+    it3: vec4f,      // iteration 3: half-resolution march on, seconds since the last collapse (-1 none), -, -
 };
 
 @group(0) @binding(0) var<uniform> F: Frame;

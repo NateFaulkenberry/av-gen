@@ -155,7 +155,7 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
         }
         if (release > 0.0) {
             v += release * F.ent3.x * (gdn * (0.4 + 0.8 * u01(hi >> 3u)) + cflow * 0.25 + jitter3(hi) * 0.6);
-            heat += release * F.ent3.y * (0.5 + u01(hi >> 7u)) * 0.6;
+            heat += release * F.ent3.y * (0.5 + u01(hi >> 7u)) * 0.6 * releaseFront(p);
         }
     } else if (role != 5 && approach != 1) {
         // The latent pulls bound matter onto the anatomy (a relaxed Witkin-Heckbert constraint). The projection
@@ -219,7 +219,9 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
             let jitter = vec3f(u01(hi), u01(hi >> 5u), u01(hi >> 11u)) - 0.5;
             let sgn = select(1.0, -1.0, u01(hi >> 17u) < 0.2);
             v += release * F.ent3.x * (nrm * sgn * (0.6 + 0.8 * u01(hi >> 3u)) + cflow * 0.2 + jitter * 0.6);
-            heat += release * F.ent3.y * (0.5 + u01(hi >> 7u));
+            // iteration 3: heat only on the RELEASE FRONT, a shell expanding from the mouth at ~30 units/s through the
+            // collapse; matter released away from it flies cold (the whole-cloud orange frame is gone)
+            heat += release * F.ent3.y * (0.5 + u01(hi >> 7u)) * releaseFront(p);
         }
         // a few bound flakes escape and are re-absorbed: the form is always being generated
         if (u01(hashu(hi + u32(t * 3.0))) < F.misc.y * dt) { v += (nrm + jitter3(hi)) * 3.0; b *= 0.2; }
@@ -275,6 +277,15 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     P[i] = vec4f(p, theta);
     V[i] = vec4f(v, heat);
     A[i] = vec4f(nrm, b);
+}
+
+fn releaseFront(p: vec3f) -> f32 {
+    let since = F.it3.y;
+    if (since < 0.0) { return 1.0; } // no authored collapse time: legacy behaviour
+    let o = F.entity.xyz + vec3f(0.0, -1.45, 0.62) * F.entity.w;
+    let r = 30.0 * since * F.entity.w;
+    let x = (length(p - o) - r) / (0.9 * F.entity.w);
+    return exp(-x * x);
 }
 
 fn jitter3(h: u32) -> vec3f { return vec3f(u01(h >> 2u), u01(h >> 9u), u01(h >> 13u)) - 0.5; }

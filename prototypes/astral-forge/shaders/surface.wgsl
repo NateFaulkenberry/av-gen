@@ -15,6 +15,7 @@
 @group(1) @binding(2) var coarseTex: texture_3d<f32>;
 @group(1) @binding(3) var latentCache: texture_3d<f32>; // iteration 2: level 0, framed on the shot
 @group(1) @binding(4) var latentCacheCoarse: texture_3d<f32>; // level 1, the whole density box
+@group(1) @binding(5) var halfTex: texture_2d<f32>; // iteration 3: the half-resolution march
 
 struct VOut { @builtin(position) clip: vec4f, @location(0) uv: vec2f, };
 @vertex fn vs_full(@builtin(vertex_index) vi: u32) -> VOut {
@@ -33,7 +34,11 @@ fn density(p: vec3f) -> vec2f {
 
 // The reconstructed field (positive outside). `exact` selects the analytic latent; otherwise the cached volume
 // is used when it is enabled (iteration 2): the march steps on the cache, the bisection and normal are exact.
-fn fieldAtMode(p: vec3f, exact: bool) -> f32 {
+fn fieldAtMode(p: vec3f, exact: bool) -> f32 { return fieldAtM(p, select(0, 1, exact)); }
+// mode 0: cached with an exact band near the surface; 1: exact; 2: cache only (iteration 3: the refine march after
+// the half-resolution march has already found the hit with the exact band)
+fn fieldAtM(p: vec3f, mode: i32) -> f32 {
+    let exact = mode == 1;
     let approach = i32(F.sim.w);
     if (approach == 3) { return latent(p); }
     let s = density(p).r;
@@ -56,10 +61,10 @@ fn fieldAtMode(p: vec3f, exact: bool) -> f32 {
             let uvw = (p - F.cbox.xyz) / F.cbox.w;
             if (all(uvw >= vec3f(0.0)) && all(uvw <= vec3f(1.0))) {
                 L = textureSampleLevel(latentCache, densSamp, uvw, 0.0).r;
-                if (L < 0.75 * F.cbox.w / 128.0) { L = latent(p); }
+                if (mode == 0 && L < 0.75 * F.cbox.w / 128.0) { L = latent(p); }
             } else {
                 L = textureSampleLevel(latentCacheCoarse, densSamp, (p - F.grid0.xyz) / boxExtent(), 0.0).r;
-                if (L < 0.75 * boxExtent() / 128.0) { L = latent(p); }
+                if (mode == 0 && L < 0.75 * boxExtent() / 128.0) { L = latent(p); }
             }
         }
         let dil = (T * 0.38 - s) * cell * 3.0;
@@ -274,44 +279,27 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
 
 struct FOut { @location(0) color: vec4f, @location(1) depth: vec4f, };
 
-@fragment fn fs_surface(i: VOut) -> FOut {
-    let ndc = vec2f(i.uv.x * 2.0 - 1.0, 1.0 - i.uv.y * 2.0);
-    let a = F.invViewProj * vec4f(ndc, 0.0, 1.0);
-    let b = F.invViewProj * vec4f(ndc, 1.0, 1.0);
-    let ro = F.cam.xyz;
-    let rd = normalize(b.xyz / b.w - a.xyz / a.w);
-    var o: FOut;
-    o.color = vec4f(0.0, 0.0, 0.0, 1.0);
-    o.depth = vec4f(1e9, 0.0, 0.0, 0.0);
+// ---- the march, factored (iteration 3) ----------------------------------------------------------
+struct MR { hit: bool, t: f32, tPrev: f32, haze: f32, hazeHeat: f32, };
+
+fn marchRay(ro: vec3f, rd: vec3f, tStart: f32, tEnd: f32, maxIt: i32, skip: bool, fmode: i32) -> MR {
     let approach = i32(F.sim.w);
-    if (approach == 0) { return o; } // A: particles only
-
     let bmin = F.grid0.xyz;
-    let bmax = F.grid0.xyz + vec3f(boxExtent());
     let inv = 1.0 / rd;
-    let t0v = (bmin - ro) * inv; let t1v = (bmax - ro) * inv;
-    let tn = max(max(min(t0v.x, t1v.x), min(t0v.y, t1v.y)), min(t0v.z, t1v.z));
-    let tf = min(min(max(t0v.x, t1v.x), max(t0v.y, t1v.y)), max(t0v.z, t1v.z));
-    if (tf <= max(tn, 0.0)) { return o; }
-
     let cell = F.grid0.w;
     let T = F.grid1.z;
     let coarseSize = cell * 8.0;
-    let px = vec2u(i.clip.xy);
-    let jit = u01(hashu(px.x * 1973u + px.y * 9277u + u32(F.sim.y) * 26699u));
-    var t = max(tn, 0.02) + jit * cell * 0.5;
+    var r: MR;
+    r.hit = false; r.haze = 0.0; r.hazeHeat = 0.0;
+    var t = tStart;
     var tPrev = t;
-    var hit = false;
-    var haze = 0.0;
-    var hazeHeat = 0.0;
-    for (var it = 0; it < 360; it++) {
-        if (t > tf) { break; }
+    for (var it = 0; it < maxIt; it++) {
+        if (t > tEnd) { break; }
         let p = ro + rd * t;
-        if (approach != 3) {
+        if (skip && approach != 3) {
             let cc = vec3i(floor((p - bmin) / coarseSize));
             let m = textureLoad(coarseTex, cc, 0).r;
             if (m < T * 0.3) {
-                // skip to the exit of this coarse cell
                 let cmin = bmin + vec3f(cc) * coarseSize;
                 let e0 = (cmin - ro) * inv; let e1 = (cmin + vec3f(coarseSize) - ro) * inv;
                 let tx = min(min(max(e0.x, e1.x), max(e0.y, e1.y)), max(e0.z, e1.z));
@@ -320,48 +308,146 @@ struct FOut { @location(0) color: vec4f, @location(1) depth: vec4f, };
                 continue;
             }
         }
-        let f = fieldAtMode(p, false);
+        let f = fieldAtM(p, fmode);
         if (approach >= 2) {
             let s = density(p).rg;
-            haze += min(s.r, T) * cell;
-            hazeHeat += s.r * s.g * cell;
+            r.haze += min(s.r, T) * cell;
+            r.hazeHeat += s.r * s.g * cell;
         }
-        if (f < 0.0015 * t + 0.002) { hit = true; break; }
+        if (f < 0.0015 * t + 0.002) { r.hit = true; break; }
         tPrev = t;
         if (approach == 3) { t += max(f * 0.75, 0.002 * t); }
-        else { t += clamp(f * 0.8, cell * F.it2.w, cell * 3.0); } // it2.w: minimum step in cells (iteration 2: 0.65, refined by bisection)
+        else { t += clamp(f * 0.8, cell * F.it2.w, cell * 3.0); } // it2.w: minimum step in cells
+    }
+    r.t = t; r.tPrev = tPrev;
+    return r;
+}
+
+struct Ray { ro: vec3f, rd: vec3f, tn: f32, tf: f32, ok: bool, };
+fn rayAt(uv: vec2f) -> Ray {
+    let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let a = F.invViewProj * vec4f(ndc, 0.0, 1.0);
+    let b = F.invViewProj * vec4f(ndc, 1.0, 1.0);
+    var r: Ray;
+    r.ro = F.cam.xyz;
+    r.rd = normalize(b.xyz / b.w - a.xyz / a.w);
+    let bmin = F.grid0.xyz;
+    let bmax = F.grid0.xyz + vec3f(boxExtent());
+    let inv = 1.0 / r.rd;
+    let t0v = (bmin - r.ro) * inv; let t1v = (bmax - r.ro) * inv;
+    r.tn = max(max(min(t0v.x, t1v.x), min(t0v.y, t1v.y)), min(t0v.z, t1v.z));
+    r.tf = min(min(max(t0v.x, t1v.x), max(t0v.y, t1v.y)), max(t0v.z, t1v.z));
+    r.ok = r.tf > max(r.tn, 0.0) && i32(F.sim.w) != 0;
+    return r;
+}
+
+// Bisection, normal and shading of a hit.
+fn shadeHit(ro: vec3f, rd: vec3f, tPrev0: f32, t0: f32, cacheNormal: bool) -> vec4f {
+    let approach = i32(F.sim.w);
+    let cell = F.grid0.w;
+    var lo = tPrev0; var hi = t0;
+    // the first five halvings on the cached field, the last two on the exact latent (iteration 2)
+    for (var k = 0; k < 7; k++) {
+        let mid = 0.5 * (lo + hi);
+        if (fieldAtM(ro + rd * mid, select(select(0, 2, cacheNormal), 1, k >= 5)) < 0.0) { hi = mid; } else { lo = mid; }
+    }
+    let t = hi;
+    let p = ro + rd * t;
+    let S = select(0.0, F.ent0.z, approach == 4);
+    let e = select(mix(cell * 0.7, 0.01 * F.entity.w, S), 0.004 * F.entity.w, approach == 3);
+    // iteration 3: when the framed cache's texels are as fine as the normal's epsilon, take the normal from the cache
+    let texel = F.cbox.w / 128.0;
+    let uvw = (p - F.cbox.xyz) / F.cbox.w;
+    let inFine = all(uvw >= vec3f(0.02)) && all(uvw <= vec3f(0.98));
+    var nm = 1;
+    var en = e;
+    // (measured: rgba16f cache values are too coarse for a 0.01-unit difference -- mottled MICRO normals; disabled)
+    if (false && cacheNormal && inFine && texel < 2.5 * e && F.it2.x > 0.5 && approach == 4) { nm = 2; en = max(e, texel); }
+    let f0 = fieldAtM(p, nm);
+    let gN = vec3f(fieldAtM(p + vec3f(en, 0.0, 0.0), nm), fieldAtM(p + vec3f(0.0, en, 0.0), nm), fieldAtM(p + vec3f(0.0, 0.0, en), nm)) - f0 * select(0.0, 1.0, nm == 2 || cacheNormal); // a cache-bisected point is not exactly on the zero set: subtract f(p)
+    var n = vec3f(0.0, 0.0, 1.0);
+    if (length(gN) > 1e-9) { n = gN / length(gN); } else { n = normalAt(p, e); } // select() would evaluate both
+    var col = vec3f(0.0);
+    if (i32(F.flags.x) == 1) {
+        col = vec3f(0.5 + 0.5 * dot(n, normalize(vec3f(0.4, 0.7, 0.6))));
+    } else if (i32(F.flags.x) != 3) {
+        col = shadeSurface(p, n, rd, t);
+    }
+    return vec4f(col, t);
+}
+
+fn hazeOver(col: vec3f, haze: f32, hazeHeat: f32) -> vec3f {
+    let hz = 1.0 - exp(-haze * F.look.z);
+    // iteration 3: no heat in the haze (it tinted the whole cloud orange on a collapse); heat lives on the release front
+    let hazeLight = vec3f(0.035, 0.038, 0.045) * (1.0 + 2.0 * F.audio0.w);
+    return col * (1.0 - hz * 0.6) + hazeLight * hz;
+}
+
+fn jitterAt(px: vec2u) -> f32 { return u01(hashu(px.x * 1973u + px.y * 9277u + u32(F.sim.y) * 26699u)); }
+
+// Iteration 3, pass 1: the march at HALF resolution. Writes (hit t | -1, tPrev, haze, hazeHeat).
+@fragment fn fs_march_half(i: VOut) -> @location(0) vec4f {
+    let r = rayAt(i.uv);
+    if (!r.ok) { return vec4f(-1.0, 0.0, 0.0, 0.0); }
+    let cell = F.grid0.w;
+    let m = marchRay(r.ro, r.rd, max(r.tn, 0.02) + jitterAt(vec2u(i.clip.xy)) * cell * 0.5, r.tf, 360, true, 0);
+    return vec4f(select(-1.0, m.t, m.hit), m.tPrev, m.haze, m.hazeHeat);
+}
+
+// Pass 2 (full resolution). With the half-resolution march on, each pixel reads the 3x3 half-res neighbourhood:
+// no hit anywhere -> haze only; hits everywhere at similar depth -> a short refinement march from just in front
+// of the nearest hit, then exact bisection and full shading; a silhouette (mixed) -> the full march.
+@fragment fn fs_surface(i: VOut) -> FOut {
+    var o: FOut;
+    o.color = vec4f(0.0, 0.0, 0.0, 1.0);
+    o.depth = vec4f(1e9, 0.0, 0.0, 0.0);
+    let r = rayAt(i.uv);
+    let cell = F.grid0.w;
+    let px = vec2u(i.clip.xy);
+    var hit = false;
+    var interior = false;
+    var tH = 0.0; var tP = 0.0; var haze = 0.0; var hazeHeat = 0.0;
+    if (F.it3.x > 0.5) {
+        let hd = vec2i(textureDimensions(halfTex));
+        let hc = vec2i(px / 2u);
+        let c0 = textureLoad(halfTex, clamp(hc, vec2i(0), hd - 1), 0);
+        haze = c0.z; hazeHeat = c0.w;
+        var nHit = 0; var nAll = 0; var tMin = 1e9; var tMax = -1e9;
+        for (var y = -1; y <= 1; y++) {
+            for (var x = -1; x <= 1; x++) {
+                let v = textureLoad(halfTex, clamp(hc + vec2i(x, y), vec2i(0), hd - 1), 0);
+                nAll++;
+                if (v.x > 0.0) { nHit++; tMin = min(tMin, v.x); tMax = max(tMax, v.x); }
+            }
+        }
+        if (!r.ok || nHit == 0) {
+            o.color = vec4f(hazeOver(vec3f(0.0), haze, hazeHeat), 1.0);
+            return o;
+        }
+        // interior, at a distance: refine from the half-res hit. Within ~25 density cells of the lens (MICRO) the
+        // full-resolution exact path is kept: there a cell is a large part of the view and the cache-only refine
+        // visibly mottled the finest engraving (measured: mean |d| 11 vs <3 elsewhere)
+        // the Chimera's sector choice makes its latent DIScontinuous: a refine started from a neighbour's depth can land on
+        // a different sector's surface (measured: mean |d| 8 even with an exact refine), so it always takes the full march
+        let continuous = i32(F.ent1.x) != 3 && i32(F.ent1.y) != 3;
+        if (continuous && nHit == nAll && tMax - tMin < 1.5 * cell && tMin > 25.0 * cell) {
+            let m = marchRay(r.ro, r.rd, max(tMin - 1.5 * cell, r.tn), min(tMax + 2.0 * cell, r.tf), 24, false, 2);
+            hit = m.hit; tH = m.t; tP = m.tPrev; interior = true;
+        } else {
+            let m = marchRay(r.ro, r.rd, max(r.tn, 0.02) + jitterAt(px) * cell * 0.5, r.tf, 360, true, 0);
+            hit = m.hit; tH = m.t; tP = m.tPrev;
+        }
+    } else {
+        if (!r.ok) { return o; }
+        let m = marchRay(r.ro, r.rd, max(r.tn, 0.02) + jitterAt(px) * cell * 0.5, r.tf, 360, true, 0);
+        hit = m.hit; tH = m.t; tP = m.tPrev; haze = m.haze; hazeHeat = m.hazeHeat;
     }
     var col = vec3f(0.0);
     if (hit) {
-        // refine by bisection
-        var lo = tPrev; var hi = t;
-        // the first five halvings on the cached field, the last two on the exact latent (iteration 2)
-        for (var k = 0; k < 7; k++) {
-            let mid = 0.5 * (lo + hi);
-            if (fieldAtMode(ro + rd * mid, k >= 5) < 0.0) { hi = mid; } else { lo = mid; }
-        }
-        t = hi;
-        let p = ro + rd * t;
-        let S = select(0.0, F.ent0.z, approach == 4);
-        let e = select(mix(cell * 0.7, 0.01 * F.entity.w, S), 0.004 * F.entity.w, approach == 3);
-        // the bisected point lies on the zero set (to 1/128 of a step), so a forward difference needs 3 exact evaluations
-        let f0 = 0.0;
-        let gN = vec3f(fieldAt(p + vec3f(e, 0.0, 0.0)) - f0, fieldAt(p + vec3f(0.0, e, 0.0)) - f0, fieldAt(p + vec3f(0.0, 0.0, e)) - f0);
-        var n = vec3f(0.0, 0.0, 1.0);
-        if (length(gN) > 1e-9) { n = gN / length(gN); } else { n = normalAt(p, e); } // select() would evaluate both
-        if (i32(F.flags.x) == 3) {
-            col = vec3f(0.0);
-        } else if (i32(F.flags.x) == 1) {
-            col = vec3f(0.5 + 0.5 * dot(n, normalize(vec3f(0.4, 0.7, 0.6))));
-        } else {
-            col = shadeSurface(p, n, rd, t);
-        }
-        o.depth = vec4f(t, 0.0, 0.0, 0.0);
+        let sh = shadeHit(r.ro, r.rd, tP, tH, interior);
+        col = sh.rgb;
+        o.depth = vec4f(sh.w, 0.0, 0.0, 0.0);
     }
-    // haze: the field's low density, lit faintly by the bands and by heat
-    let hz = 1.0 - exp(-haze * F.look.z);
-    let hazeLight = vec3f(0.035, 0.038, 0.045) * (1.0 + 2.0 * F.audio0.w) + heatColor(0.6) * min(hazeHeat * F.look.z, 1.0) * 0.02;
-    col = col * (1.0 - hz * 0.6) + hazeLight * hz;
-    o.color = vec4f(col, 1.0);
+    o.color = vec4f(hazeOver(col, haze, hazeHeat), 1.0);
     return o;
 }

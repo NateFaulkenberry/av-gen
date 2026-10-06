@@ -309,36 +309,30 @@ fn chimeraHorns(q: vec3f) -> f32 {
 }
 
 // Machine god: counter-rotating toothed gyro rings and a fan of radial plates behind.
+// Iteration 3: the Machine God's gyro rings (a sci-fi device) are gone. Its appendages are now its own face, PEELING:
+// three nested masks, each a thin shell offset outward from the faceted plate, cut by a rotating angular window, so
+// they lift off the face like lamellae or the layers of an onion and turn against each other. The god is made of
+// copies of its own face (the brief's "skin of smaller faces", in depth rather than tiling). It opens with the breath.
 fn machineRings(q: vec3f) -> f32 {
     let t = F.cam.w;
+    let open = 0.55 + 0.35 * sin(t * 0.45) + 0.25 * F.ent1.w;
     var d = BIG;
+    let fp = faceParamsFor(4);
     for (var k = 0; k < 3; k++) {
         let fk = f32(k);
-        var lp = q - vec3f(0.0, 0.2, -0.6);
-        let a1 = t * (0.13 + 0.07 * fk) * select(1.0, -1.0, k == 1) + fk * 1.1;
-        let yz = rot2(0.9 * fk + 0.25 * sin(t * 0.2)) * lp.yz;
-        lp = vec3f(lp.x, yz.x, yz.y);
-        let xy = rot2(a1) * lp.xy;
-        lp = vec3f(xy.x, xy.y, lp.z);
-        let R = 3.6 + 0.65 * fk;
-        var ring = sdTorusZ(lp, R, 0.09);
-        // teeth by polar repetition
-        let n = 36.0 + 12.0 * fk;
-        let ang = safeAtan2(lp.y, lp.x);
-        let cell = round(ang / (TAU / n)) * (TAU / n);
-        let tp = vec3f(rot2(-cell) * lp.xy, lp.z) - vec3f(R + 0.16, 0.0, 0.0);
-        let tooth = max(max(abs(tp.x) - 0.12, abs(tp.y) - 0.035), abs(tp.z) - 0.07);
-        ring = min(ring, tooth);
-        d = min(d, ring);
+        // each layer turns about the face axis, alternating direction
+        var lp = q;
+        let rxy = rot2((0.18 + 0.1 * fk) * open * select(1.0, -1.0, k == 1) + 0.05 * sin(t * 0.3 + fk)) * lp.xy;
+        lp = vec3f(rxy.x, rxy.y, lp.z);
+        let off = (0.32 + 0.42 * fk) * open;
+        // a shell of the face plate, scaled up so it nests outside it
+        let sc = 1.0 + 0.12 * (fk + 1.0) * open;
+        let shell = abs(facePlate((lp - vec3f(0.0, 0.0, off)) / sc, fp) * sc) - 0.035;
+        // the angular window: a rotating gap, so each layer is a crescent that peels away
+        let ang = safeAtan2(lp.y - 0.15, lp.x) + t * (0.12 + 0.05 * fk) * select(1.0, -1.0, k == 1) + fk * 2.1;
+        let win = -cos(ang) - (0.25 - 0.15 * fk);
+        d = min(d, smax(shell, win * 1.2, 0.08));
     }
-    // radial blade fan behind
-    var bp = q - vec3f(0.0, 0.3, -2.4);
-    let n = 14.0;
-    let ang = safeAtan2(bp.y, bp.x) + 0.05 * t;
-    let cell = round(ang / (TAU / n)) * (TAU / n);
-    let r2 = rot2(-cell + 0.05 * t) * bp.xy;
-    let bl = sdBlade(vec3f(r2.x - 4.3, r2.y, bp.z), vec3f(2.2, 0.16, 0.04));
-    d = min(d, bl);
     return d;
 }
 

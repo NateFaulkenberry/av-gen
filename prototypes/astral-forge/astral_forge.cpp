@@ -64,7 +64,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox, it3;
 };
 
 std::string readFile(const std::string& path) {
@@ -199,6 +199,7 @@ struct Options {
     bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
     bool noShards = false; // iteration 2: near flakes stay splats
     float shardPx = 12.0f;
+    bool noHalf = false;   // iteration 3: full-resolution march (no half-resolution pre-pass)
     float cacheFrame = 0.4f;  // fine cache box half-size, as a fraction of the camera-target distance
     float minStep = 0.65f; // surface march minimum step, in density cells (iteration 1: 0.3)
     int archOverride = -1; // substitute an archetype into a scripted test (art direction)  // footprint (px) above which a flake becomes a shard
@@ -261,12 +262,13 @@ int main(int argc, char** argv) {
         else if (a == "--debug") o.debug = std::stoi(next());
         else if (a == "--no-advect") o.noAdvect = true;
         else if (a == "--no-cache") o.noCache = true;
+        else if (a == "--no-half") o.noHalf = true;
         else if (a == "--arch") o.archOverride = std::stoi(next());
         else if (a == "--no-shards") o.noShards = true;
         else if (a == "--min-step") o.minStep = std::stof(next());
         else if (a == "--cache-frame") o.cacheFrame = std::stof(next());
         else if (a == "--shard-px") o.shardPx = std::stof(next());
-        else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = true; o.minStep = 0.3f; }
+        else if (a == "--iter1") { o.noAdvect = o.noCache = o.noShards = o.noHalf = true; o.minStep = 0.3f; }
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &o.width, &o.height); }
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
@@ -355,6 +357,9 @@ int main(int argc, char** argv) {
     wgpu::Texture cacheTexCoarse = makeTex({kCacheRes, kCacheRes, kCacheRes}, hdrFmt,
                                            wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding, wgpu::TextureDimension::e3D);
     wgpu::Texture shardDepth = makeTex({W, H, 1}, wgpu::TextureFormat::Depth32Float, wgpu::TextureUsage::RenderAttachment);
+    const std::uint32_t HW = (W + 1) / 2, HH = (H + 1) / 2;
+    wgpu::Texture halfTex = makeTex({HW, HH, 1}, wgpu::TextureFormat::RGBA32Float, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
+    wgpu::Texture dummy2D = makeTex({1, 1, 1}, wgpu::TextureFormat::RGBA32Float, wgpu::TextureUsage::TextureBinding);
     wgpu::Texture surfColor = makeTex({W, H, 1}, hdrFmt, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
     wgpu::Texture surfDepth = makeTex({W, H, 1}, wgpu::TextureFormat::R32Float, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
     wgpu::Texture hdr = makeTex({W, H, 1}, hdrFmt, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding);
@@ -371,6 +376,7 @@ int main(int argc, char** argv) {
     wgpu::TextureView cacheView = cacheTex.CreateView(), shardDepthView = shardDepth.CreateView();
     wgpu::TextureView cacheViewCoarse = cacheTexCoarse.CreateView();
     wgpu::TextureView surfColorView = surfColor.CreateView(), surfDepthView = surfDepth.CreateView();
+    wgpu::TextureView halfView = halfTex.CreateView(), dummy2DView = dummy2D.CreateView();
     wgpu::TextureView hdrView = hdr.CreateView(), ldrView = ldr.CreateView();
     wgpu::SamplerDescriptor sd{};
     sd.minFilter = wgpu::FilterMode::Linear;
@@ -418,7 +424,7 @@ int main(int argc, char** argv) {
     auto flakePipe = makeCompute(ctx, flakeMod, "cs_flakes", makePL(ctx, {frameLayout, flakeLayout}));
     auto flakeGroup = makeGroup(ctx, flakeLayout, {buf(Pb, stateBytes), buf(Vb, stateBytes), buf(Ab, stateBytes), buf(accumBuf, accumBytes), tex(surfDepthView), buf(shardBuf, shardBytes), buf(shardArgs, 16)});
 
-    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt, B::Tex3D, B::Tex3D}, wgpu::ShaderStage::Fragment);
+    auto surfLayout = makeLayout(ctx, {B::Tex3D, B::Sampler, B::Tex3DUnfilt, B::Tex3D, B::Tex3D, B::Tex2DUnfilt}, wgpu::ShaderStage::Fragment);
     wgpu::RenderPipeline surfPipe;
     {
         std::array<wgpu::ColorTargetState, 2> cts{};
@@ -436,7 +442,24 @@ int main(int argc, char** argv) {
         rpd.fragment = &fst;
         surfPipe = dev.CreateRenderPipeline(&rpd);
     }
-    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView), tex(cacheViewCoarse)});
+    wgpu::RenderPipeline halfPipe; // iteration 3: the half-resolution march
+    {
+        wgpu::ColorTargetState cts{};
+        cts.format = wgpu::TextureFormat::RGBA32Float;
+        wgpu::FragmentState fst{};
+        fst.module = surfMod;
+        fst.entryPoint = "fs_march_half";
+        fst.targetCount = 1;
+        fst.targets = &cts;
+        wgpu::RenderPipelineDescriptor rpd{};
+        rpd.layout = makePL(ctx, {frameLayout, surfLayout});
+        rpd.vertex.module = surfMod;
+        rpd.vertex.entryPoint = "vs_full";
+        rpd.fragment = &fst;
+        halfPipe = dev.CreateRenderPipeline(&rpd);
+    }
+    auto surfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView), tex(cacheViewCoarse), tex(halfView)});
+    auto halfGroup = makeGroup(ctx, surfLayout, {tex(densView), smp(sampler), tex(coarseView), tex(cacheView), tex(cacheViewCoarse), tex(dummy2DView)});
     // the shard pass: instanced fans, depth-tested among themselves, culled against the surface's ray depth
     auto shardLayout = makeLayout(ctx, {B::ReadOnly, B::Tex2DUnfilt}, wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
     wgpu::RenderPipeline shardPipe;
@@ -554,6 +577,7 @@ int main(int argc, char** argv) {
             const glm::vec3 c = glm::clamp(s.target, lo + half, lo + glm::vec3(o.gridSize) - half);
             f.cbox = glm::vec4(c - half, 2.0f * half);
         }
+        f.it3 = glm::vec4(o.noHalf ? 0.0f : 1.0f, s.collapseAt > -1e8f ? static_cast<float>(t) - s.collapseAt : -1.0f, 0.0f, 0.0f);
         f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, o.minStep);
         f.fp2.w = s.tendonFlow;
     };
@@ -640,6 +664,23 @@ int main(int argc, char** argv) {
             cp.End();
         }
         if (render) {
+            if (!o.noHalf) {
+                wgpu::RenderPassColorAttachment ca{};
+                ca.view = halfView;
+                ca.loadOp = wgpu::LoadOp::Clear;
+                ca.storeOp = wgpu::StoreOp::Store;
+                ca.clearValue = {-1, 0, 0, 0};
+                wgpu::RenderPassDescriptor rp{};
+                rp.colorAttachmentCount = 1;
+                rp.colorAttachments = &ca;
+                rp.timestampWrites = timeline.mark("march", gpu::FrameTimeline::PassKind::Render);
+                auto r = enc.BeginRenderPass(&rp);
+                r.SetPipeline(halfPipe);
+                r.SetBindGroup(0, frameGroups[slot]);
+                r.SetBindGroup(1, halfGroup);
+                r.Draw(3);
+                r.End();
+            }
             {
                 std::array<wgpu::RenderPassColorAttachment, 2> ca{};
                 ca[0].view = surfColorView;
@@ -765,7 +806,7 @@ int main(int argc, char** argv) {
     if (o.bench) {
         const double t0 = o.at >= 0.0 ? o.at : 8.0;
         preroll(t0);
-        Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost, sCache, sShard;
+        Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost, sCache, sShard, sMarch;
         std::uint64_t lastCompleted = timeline.completedFrames();
         const std::uint32_t total = o.benchWarm + o.benchFrames;
         for (std::uint32_t f = 0; f < total; ++f) {
@@ -786,6 +827,7 @@ int main(int argc, char** argv) {
                     sPost.add(timeline.msFor("post"));
                     sCache.add(timeline.msFor("cache"));
                     sShard.add(timeline.msFor("shards"));
+                    sMarch.add(timeline.msFor("march"));
                 }
             }
         }
@@ -794,7 +836,7 @@ int main(int argc, char** argv) {
         if (ctx.errorCount() != 0) { std::fprintf(stderr, "gpu errors: %s\n", ctx.lastError().c_str()); return 5; }
         auto j = [](const char* name, const Stat& s) { std::printf("\"%s\":{\"p50\":%.3f,\"p90\":%.3f},", name, s.pct(0.5), s.pct(0.9)); };
         std::printf("{\"test\":%d,\"approach\":\"%c\",\"n\":%u,\"grid\":%d,\"size\":\"%ux%u\",\"t\":%.2f,", o.test, o.approach, N, R, W, H, t0);
-        j("cpu_ms", sCpu); j("gpu_frame_ms", sGpu); j("sim_ms", sSim); j("density_ms", sDen); j("surface_ms", sSurf); j("flakes_ms", sFlk); j("post_ms", sPost); j("cache_ms", sCache); j("shards_ms", sShard);
+        j("cpu_ms", sCpu); j("gpu_frame_ms", sGpu); j("sim_ms", sSim); j("density_ms", sDen); j("surface_ms", sSurf); j("flakes_ms", sFlk); j("post_ms", sPost); j("cache_ms", sCache); j("shards_ms", sShard); j("march_ms", sMarch);
         std::printf("\"state_mb\":%.1f,\"grid_mb\":%.1f,\"accum_mb\":%.1f,\"dens_tex_mb\":%.1f,\"samples\":%zu}\n", 5 * stateBytes / 1048576.0,
                     gridBytes / 1048576.0, accumBytes / 1048576.0, R * R * R * 8 / 1048576.0, sGpu.v.size());
         return 0;

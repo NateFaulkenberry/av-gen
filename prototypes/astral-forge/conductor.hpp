@@ -32,6 +32,7 @@ struct State {
     float warpAdvect = 1.0f;   // 1: bound matter is carried through the warp (iteration 2); 0: re-attracted only (iteration 1)
     float sharpSpread = 0.6f;  // 1: only the anatomy's centre becomes precise; 0: everywhere (material studies)
     float bloom = 0.035f;
+    float collapseAt = -1e9f; // iteration 3: time of the last collapse (heat lives on its release front)
     float metaRadius = 22.0f;  // how far the unbound dust field extends
     float metaFace = 0.0f;     // the dust condenses into a giant ghost mask (0..1)
     float tendonWeight = 0.22f; // density weight of tendon matter: low, so tendons read as streams of flakes, thickening only where dense
@@ -86,6 +87,7 @@ inline State test01(float t) {
     s.blast = 16.0f;
     s.heatInject = 0.8f;
     s.strobe = 0.35f * pulse(t, 11.55f, 0.06f);
+    if (t >= 11.5f) s.collapseAt = 11.5f;
     s.breath = 0.5f * std::sin(t * 1.3f);
     s.rigPhase = t * 0.35f;
     s.fovDeg = 26.0f;
@@ -160,6 +162,7 @@ inline State test04(float t) {
     s.shimmer = 0.45f;
     s.blast = 18.0f;
     s.strobe = 0.6f * pulse(t, 12.45f, 0.08f);
+    if (t >= 12.4f) s.collapseAt = 12.4f;
     s.rigPhase = t * 0.4f;
     s.warmth = 0.6f;
     s.sharpSpread = 0.0f; // every small face must be precise, not only the centre
@@ -235,6 +238,7 @@ inline State test07(float t) {
     s.shimmer = 0.45f;
     s.blast = 18.0f;
     s.strobe = 0.6f * pulse(t, 8.25f, 0.045f);
+    if (t >= 8.2f) s.collapseAt = 8.2f;
     s.rigPhase = t * 0.4f;
     s.sharpSpread = 0.3f;
     // one continuous orbit: 400 degrees over the test, a slow dolly in, a low-to-level pass
@@ -355,6 +359,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         if (since < 0.09f) C = cPrevEnd + (0.08f - cPrevEnd) * sstep(0.0f, 0.09f, since);
         // iteration 2: the strobe decays within ~0.15 s (the Critic read 0.4 s holds as overexposure)
         s.strobe = 0.6f * pulse(since, 0.0f, 0.045f);
+        s.collapseAt = static_cast<float>(ph.start - songT0);
     }
     if (!withhold) C += 0.10f * (a.env0.z - 0.5f);
     s.C = std::clamp(C, 0.0f, 1.0f);
@@ -395,7 +400,11 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     // CAMERA VOCABULARY (iteration 2). A behaviour per phrase from its family, never the same twice in a row,
     // and the side alternates. Build phrases: OBSERVER, PROFILE, LOW. Held phrases: DESCENT, ORBIT, MICRO.
     // Withheld sections: HOVER on the eyes. A new section REVEALs; a kick-opened phrase begins in COLLISION.
-    auto camAt = [&](double tc, glm::vec3& eye, glm::vec3& tgt, std::string& lab) {
+    // ITERATION 3: OFF-CENTRE FRAMING AND SCALE CUTS. The subject sits on a third (side by phrase, upper third for
+    // LOW), and phrases contain hard cuts between scales: a held phrase cuts at its midpoint (to an extreme close-up
+    // on one eye, or to a wide shot from MICRO); a build phrase cuts for its last four beats to a close-up on the
+    // eyes. Smoothing never crosses a cut (shot ids), so a cut is a cut.
+    auto camAt = [&](double tc, glm::vec3& eye, glm::vec3& tgt, std::string& lab) -> int {
         std::size_t k = 0;
         while (k + 1 < sc.phrases.size() && tc >= sc.phrases[k + 1].start) ++k;
         const Phrase& p = sc.phrases.empty() ? Phrase{0, 1e9, 0, 0, false} : sc.phrases[k];
@@ -408,37 +417,60 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const int choice = (p.index * 7 + std::max(p.section, 0) * 5) % 3;
         glm::vec3 focus{0.0f, 0.2f, 0.0f};
         float d = 20.0f, el = 6.0f, az = 0.0f;
+        float thirdX = ((p.index * 3 + 1) % 2 == 0) ? 1.0f : -1.0f, thirdY = 0.0f;
+        int seg = 0;
         tgt = {0.0f, -0.1f, 0.0f};
+        const glm::vec3 eyeL{-0.76f, 0.72f, 0.6f}, eyeR{0.76f, 0.72f, 0.6f};
         if (wh) {
             const glm::vec3 eyes{0.0f, 0.72f, 0.6f};
             d = 8.5f - 2.0f * v; el = 3.0f; az = side * (12.0f - 10.0f * v); focus = eyes; tgt = eyes; lab = "HOVER";
+            thirdX *= 0.6f;
         } else if (build) {
             if (choice == 0) { d = 30.0f - 13.0f * v; el = 6.0f; az = side * (20.0f - 8.0f * v); lab = "OBSERVER"; }
             else if (choice == 1) { d = 19.0f - 5.0f * v; el = 0.0f; az = side * (78.0f - 18.0f * v); lab = "PROFILE"; }
-            else { d = 22.0f - 7.0f * v; el = -28.0f + 20.0f * v; az = side * (25.0f - 10.0f * v); lab = "LOW"; }
+            else { d = 22.0f - 7.0f * v; el = -28.0f + 20.0f * v; az = side * (25.0f - 10.0f * v); lab = "LOW"; thirdY = 1.0f; }
+            if (v >= 0.75f && !p.kickOpens) { // cut: the eyes, close, for the last four beats
+                seg = 1; focus = tgt = glm::mix(eyeL, eyeR, 0.5f + 0.5f * side); d = 5.5f; el = 2.0f; az = side * 10.0f;
+                thirdX = -thirdX; thirdY = 0.0f; lab += "+CUT:EYES";
+            }
         } else {
             if (choice == 0) { d = 15.0f - 4.0f * v; el = 32.0f - 26.0f * v; az = side * 18.0f; lab = "DESCENT"; }
             else if (choice == 1) { d = 13.0f; el = 10.0f; az = side * (-55.0f + 110.0f * v); lab = "ORBIT"; }
             else {
-                const glm::vec3 eye{side * 0.76f, 0.72f, 0.6f};
-                d = 7.5f - 1.8f * v; el = 4.0f; az = side * 14.0f; focus = eye; tgt = eye; lab = "MICRO";
+                const glm::vec3 e = side > 0.0f ? eyeR : eyeL;
+                d = 7.5f - 1.8f * v; el = 4.0f; az = side * 14.0f; focus = e; tgt = e; lab = "MICRO";
+            }
+            if (v >= 0.5f) { // cut at the phrase's midpoint
+                seg = 1;
+                if (choice == 2) { focus = {0.0f, 0.2f, 0.0f}; tgt = {0.0f, -0.1f, 0.0f}; d = 34.0f; el = 12.0f; az = -side * 30.0f; lab += "+CUT:WIDE"; }
+                else { const glm::vec3 e = side > 0.0f ? eyeL : eyeR; focus = tgt = e; d = 3.6f + 0.6f * (v - 0.5f); el = -3.0f; az = -side * 8.0f; lab += "+CUT:ECU"; }
+                thirdX = -thirdX;
             }
         }
         const float since = static_cast<float>(tc - p.start);
         if (first && since < 4.5f && !wh) { d += 24.0f * std::sin(glm::pi<float>() * since / 4.5f); el += 6.0f; lab = "REVEAL"; }
-        if (p.kickOpens && since < 1.4f) { d -= 5.0f * (1.0f - since / 1.4f); lab = "COLLISION"; }
+        if (p.kickOpens && since < 1.4f) { d -= 5.0f * (1.0f - since / 1.4f); lab = "COLLISION"; thirdX = 0.0f; thirdY = 0.0f; }
         eye = orbit(d, az, el, focus);
+        // place the subject on a third: aim past it, sideways (30 degree vertical FOV at 16:9)
+        const glm::vec3 fwd = glm::normalize(tgt - eye);
+        const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)));
+        const glm::vec3 upv = glm::cross(right, fwd);
+        const float dist = glm::length(tgt - eye);
+        tgt += right * (thirdX * 0.157f * dist) - upv * (thirdY * 0.088f * dist);
+        return p.index * 4 + seg;
     };
     glm::vec3 eyeAcc{0.0f}, tgtAcc{0.0f};
     float wsum = 0.0f;
+    int shot0 = -1;
     for (int k = 0; k < 16; ++k) {
         const double tc = t - 0.9 * k / 15.0;
         glm::vec3 e, g;
         std::string lab;
-        camAt(tc, e, g, lab);
+        const int shot = camAt(tc, e, g, lab);
+        if (k == 0) { s.label = lab; shot0 = shot; }
+        if (shot != shot0) break; // never smooth across a cut
         const float w = 1.0f - k / 16.0f;
         eyeAcc += e * w; tgtAcc += g * w; wsum += w;
-        if (k == 0) s.label = lab;
     }
     s.eye = eyeAcc / wsum;
     s.target = tgtAcc / wsum;
