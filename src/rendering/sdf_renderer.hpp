@@ -160,7 +160,7 @@ public:
     [[nodiscard]] const SdfStats& stats() const { return stats_; }
 
     static constexpr std::uint32_t kMaxObjects = 256;   // 256-byte uniform slots
-    static constexpr std::uint32_t kObjectStride = 512;
+    static constexpr std::uint32_t kObjectStride = 768; // ADR-1143: holds the 528-byte ObjectUniforms
     static_assert(kObjectStride % 256 == 0);
     static_assert(sizeof(SdfObjectUniforms) <= kObjectStride);
 

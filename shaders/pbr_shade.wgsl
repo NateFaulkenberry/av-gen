@@ -1001,9 +1001,44 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     let nDotV = max(dot(n, v), 1e-4);
 
     let albedo = baseColor.rgb;
-    let f0 = mix(vec3<f32>(0.04), albedo, metallic);
+    var f0 = mix(vec3<f32>(0.04), albedo, metallic);
+    // ADR-1143: thin-film interference as a tint on f0, so it reaches every light's Fresnel (punctual,
+    // representative-point and the LTC area lights' f0 term) and the IBL split sum's kS below. The gate
+    // is the draw's uniform: a material with no film never enters.
+    if (object.optics.x > 0.0) {
+        let substrate = dot(f0, vec3<f32>(0.2126, 0.7152, 0.0722));
+        f0 = clamp(f0 * thinFilmTint(nDotV, object.optics.x, object.optics.y, substrate, metallic),
+                   vec3<f32>(0.0), vec3<f32>(1.0));
+    }
     let diffuseColor = albedo * (1.0 - metallic);
     let alphaR = roughness * roughness;
+
+    // ADR-1143: the anisotropy tangent. A mesh whose material has a normal map has a tangent frame (the
+    // one the map is decoded in, from its UVs) and the lobe follows its U direction. Nothing else in the
+    // engine carries a tangent -- SDF surfaces, procedural geometry and a mesh with no normal map -- so
+    // the reference is the object's local +Y axis (the model matrix's second column; its +X where +Y is
+    // along the normal), projected into the tangent plane. On a sphere that is the meridians: a turned
+    // or brushed finish whose highlight runs pole to pole. Either way the tangent is then turned about
+    // the normal by `rotation`, counter-clockwise looking down the normal.
+    var anisoT = vec3<f32>(0.0);
+    var anisoB = vec3<f32>(0.0);
+    if (object.optics.z != 0.0) {
+        var reference = normalize(object.model[1].xyz);
+        if (hasNormal) {
+            reference = tangentFrame[0];
+        }
+        var t0 = reference - n * dot(n, reference);
+        if (dot(t0, t0) < 1e-6) {
+            let fallback = normalize(object.model[0].xyz);
+            t0 = fallback - n * dot(n, fallback);
+        }
+        t0 = normalize(t0);
+        let b0 = cross(n, t0);
+        let c = cos(object.optics.w);
+        let sn = sin(object.optics.w);
+        anisoT = t0 * c + b0 * sn;
+        anisoB = cross(n, anisoT);
+    }
 
     // ---- direct lighting (ADR-033): clustered, area-aware, shadowed ----
     var ctx: ShadeContext;
@@ -1026,6 +1061,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ctx.maskable = alphaMode < 1.5; // ADR-087: blended surfaces are not in the depth prepass
     ctx.tier = tier;
     ctx.localLightBudget = tierLocalLights;
+    ctx.anisotropy = object.optics.z; // ADR-1143 (0 = the isotropic lobe)
+    ctx.anisoT = anisoT;
+    ctx.anisoB = anisoB;
     let lit = directLighting(ctx);
     let direct = lit.diffuse + lit.specular;
 
@@ -1047,7 +1085,18 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     let kS = fresnelSchlickRoughness(nDotV, f0, roughness);
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - metallic);
     if (frame.envParams.w > 0.5 && tier < 2u) {
-        let r = reflect(-v, n);
+        var r = reflect(-v, n);
+        // ADR-1143: the split sum's prefiltered map and LUT are isotropic. An anisotropic lobe is
+        // approximated by bending the normal the reflection is taken about towards the plane that
+        // contains the stretch direction (the bent-normal trick of McAuley's 2015 Far Cry 4 talk, as
+        // Filament does), scaled down on very smooth surfaces where the stretch is sub-pixel.
+        if (object.optics.z != 0.0) {
+            let direction = select(anisoT, anisoB, object.optics.z >= 0.0);
+            let tangentAcross = cross(direction, v);
+            let bentAniso = cross(tangentAcross, direction);
+            let bend = abs(object.optics.z) * clamp(5.0 * roughness, 0.0, 1.0);
+            r = reflect(-v, normalize(mix(n, bentAniso, bend)));
+        }
         let irradiance = textureSample(irradianceMap, iblSampler, envRotate(bentNormal)).rgb;
         let maxMip = frame.envParams.y;
         let prefiltered = textureSampleLevel(prefilteredMap, iblSampler, envRotate(r), roughness * maxMip).rgb;

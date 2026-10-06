@@ -449,14 +449,20 @@ struct ObjectUniforms {
     // keeps the default is the draw it was before this existed.
     glm::vec4 emission{1.0f, 0.0f, 0.0f, 0.0f};
     // ADR-1071: the material's cel lighting, the last three padding vec4s (the struct now fills its
-    // 512-byte slot; the next lane anyone needs grows kObjectStride). toon0.x is the gate: 0 (every
+    // 512-byte slot; ADR-1143's `optics` below grew kObjectStride to 768). toon0.x is the gate: 0 (every
     // material that does not ask for it) and the lit shader never enters the toon branch. Packed by
     // rendering/toon_pack.hpp; read by `shadeSurface` in pbr_shade.wgsl and `evaluateLight`.
     glm::vec4 toon0{0.0f}; // x = lit bands (0 = off), y = edge softness, z = terminator, w = highlight strength
     glm::vec4 toon1{0.0f}; // rgb = shadow tone (shadowColor x ambient), w = rim width
     glm::vec4 toon2{0.0f}; // rgb = rim colour x intensity, w = highlight size
+    // ADR-1143: the material's thin film and anisotropy, packed by rendering/optics_pack.hpp. The first
+    // lane past ADR-1071's 512 bytes, so kObjectStride grew from 512 to 768 (the next dynamic-offset
+    // multiple); 15 vec4s of room remain in the slot. x == 0 and z == 0 are the shader's two gates, so
+    // every material that does not ask shades exactly as before.
+    glm::vec4 optics{0.0f}; // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
+                            // (-1..1, 0 = off), w = anisotropy rotation (radians)
 };
-static_assert(sizeof(ObjectUniforms) == 512);
+static_assert(sizeof(ObjectUniforms) == 528);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -474,6 +480,7 @@ static_assert(offsetof(ObjectUniforms, fxB) == 432);
 static_assert(offsetof(ObjectUniforms, emission) == 448);
 static_assert(offsetof(ObjectUniforms, toon0) == 464);
 static_assert(offsetof(ObjectUniforms, toon2) == 496);
+static_assert(offsetof(ObjectUniforms, optics) == 512);
 
 struct TonemapUniforms {
     float exposure;
@@ -838,7 +845,8 @@ public:
     // `ensureObjectCapacity` raises it before the entity loop runs, and `objectCapacity()` reports
     // what the frame actually has. The one number that is still a limit is the byte budget below.
     static constexpr std::uint32_t kInitialObjects = 256;
-    static constexpr std::uint32_t kObjectStride = 512; // dynamic-offset alignment (256) x 2
+    // ADR-1143: 768 (dynamic-offset alignment 256 x 3) since ObjectUniforms passed 512 bytes.
+    static constexpr std::uint32_t kObjectStride = 768;
     // The ceiling is a memory budget, not a slot count: 64 MiB of object uniforms. It exists so a
     // scene that asks for a preposterous number of entities fails loudly at a documented number
     // instead of asking the driver for a gigabyte. 131,072 slots is ~470x Glowmere's 278 entities,

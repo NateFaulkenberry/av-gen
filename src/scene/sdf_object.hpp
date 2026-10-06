@@ -10,6 +10,7 @@
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/material_optics.hpp"
 #include "scene/toon_shading.hpp"
 #include "spatial/sdf.hpp"
 
@@ -122,6 +123,7 @@ struct SdfParameters {
     std::string prefix;
     std::vector<params::IParameter*> all;
     ToonParameters toon; // ADR-1071: toon/* (the material's cel lighting)
+    MaterialOpticsParameters optics; // ADR-1143: material/thinFilm/*, material/anisotropy/*
     params::Parameter<bool>* visible = nullptr;
     params::Parameter<glm::vec3>* position = nullptr;
     params::Parameter<glm::vec3>* rotation = nullptr;

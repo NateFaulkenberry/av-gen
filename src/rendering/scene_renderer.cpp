@@ -1,5 +1,6 @@
 #include "rendering/scene_renderer.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
 #include "core/phase2_probe.hpp" // TEMPORARY: ui-responsiveness phase 2
 
@@ -3571,6 +3572,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.toon1 = toon[1];
             obj.toon2 = toon[2];
         }
+        obj.optics = packOptics(m); // ADR-1143
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();

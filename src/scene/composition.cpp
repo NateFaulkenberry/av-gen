@@ -18,6 +18,7 @@
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/asset_parts.hpp"
+#include "scene/material_optics.hpp"
 #include "scene/mesh_metrics.hpp"
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
@@ -10668,6 +10669,7 @@ nlohmann::json Composition::toJson() const {
             if (!m.program.empty()) {
                 mat["program"] = m.program;
             }
+            writeMaterialOptics(m, mat); // ADR-1143: thinFilm, anisotropy (only when authored)
             n["material"] = std::move(mat);
         }
         nodes.push_back(std::move(n));
@@ -12428,6 +12430,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         return fail("node '{}': material 'program' must be a string", node.name);
                     }
                     mat.program = m.at("program").get<std::string>();
+                }
+                if (auto optics = readMaterialOptics(m, mat); !optics) { // ADR-1143
+                    return fail("node '{}': material: {}", node.name, optics.error().message);
                 }
                 if (m.contains("alphaMode")) {
                     // Parsed here rather than nowhere. A scene that wrote `"alphaMode":
