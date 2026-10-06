@@ -2103,11 +2103,11 @@
    "field": {
     "kind": "box",
     "size": [
-     14.5,
+     9.0,
      50.0,
-     14.5
+     9.0
     ],
-    "softness": 6.0,
+    "softness": 7.0,
     "strength": 1.0,
     "falloff": {
      "kind": "none"

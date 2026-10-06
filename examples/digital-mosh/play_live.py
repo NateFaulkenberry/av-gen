@@ -2,8 +2,9 @@
 """DIGITAL MOSH: play a track into the live input, for testing the LIVE project with real music.
 
 Plays an audio file into an output device that AV Gen captures as its live input (BlackHole on this machine), after a
-lead-in, and records the host time (time.monotonic_ns: mach_absolute_time in ns, the clock AV Gen's --live-capture
-and --sonic-live-log use) at which the music started, so a capture can be joined to the music afterwards.
+lead-in, and records the host time at which the music started (CLOCK_UPTIME_RAW in ns: mach_absolute_time, the clock
+AV Gen's --live-capture and --sonic-live-log use; Python's time.monotonic_ns has a process-relative origin on macOS
+and cannot be joined), so a capture can be joined to the music afterwards.
 
 Needs: sounddevice, soundfile, numpy.
 
@@ -41,7 +42,7 @@ def main() -> None:
     device = next(i for i, d in enumerate(sd.query_devices())
                   if a.device.lower() in d["name"].lower() and d["max_output_channels"] >= 2)
     time.sleep(a.lead_in)
-    host_ns = time.monotonic_ns()
+    host_ns = time.clock_gettime_ns(time.CLOCK_UPTIME_RAW)
     sd.play(clip[:, :2], rate, device=device, blocking=True)
     json.dump({"audio": a.audio, "start": a.start, "seconds": a.seconds, "hostStartNs": host_ns, "rate": rate},
               open(a.out, "w"), indent=1)

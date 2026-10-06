@@ -149,8 +149,9 @@ def fields():
         # the fragments' release: up, and a tumble
         field("lift", kind="direction", axis=[0, 1, 0], strength=1.0),
         field("tumble", kind="curlNoise", frequency=0.4, speed=0.3, seed=9, strength=1.0),
-        # the liquid skin's mask: the pan's flat heart (land.py; the pan is level to +-5 cm within 25 m of its centre)
-        field("pool", position=[PAN_C[0], 0.0, PAN_C[1]], kind="box", size=[14.5, 50.0, 14.5], softness=6.0,
+        # the liquid skin's mask: the pan's flat heart (land.py; the pan is level to +-5 cm within 25 m of its centre).
+        # `size` is a HALF extent: 1 inside 9 m, 0 at 16 m -- inside the skin's own 17 m, so its edge never lifts
+        field("pool", position=[PAN_C[0], 0.0, PAN_C[1]], kind="box", size=[9.0, 50.0, 9.0], softness=7.0,
               strength=1.0),
         field("liquidKick", kind="compound", children=["kick", "pool"], combine="multiply", strength=1.0),
         field("swellNoise", kind="noise", frequency=0.09, speed=0.35, seed=17, strength=1.0),
