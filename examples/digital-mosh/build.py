@@ -170,8 +170,8 @@ CONTAGION = {
 # ============================================================================================ material programs
 def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, gate_far=0.0):
     """An infected surface (ADR-1162): every cell of a square lattice fails when the contagion passes the cell's own
-    random. A failed cell is ink (dark, glossy); the cells that failed most recently -- the growth front -- glow, and
-    a few failed cells glow forever (stuck pixels). The glow is the strain, turned by timbre (hueShift, routed),
+    random. A failed cell is ink (dark, glossy); the cells that failed most recently -- the growth front -- glow,
+    though not under the lens. The glow is the strain, turned by timbre (hueShift, routed),
     flaring with the treble and the kick's front. `base_ops` write the healthy colour into r6 (may use r5)."""
     ops = [
         op("input", 0, input="worldPosition"),
@@ -190,13 +190,11 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("smoothstep", 7, srcA=4, constant=[0.0, 0.035, 0, 0]),
         op("remap", 7, srcA=7, value=1, constant=[0.0, 1.0, 1.0, 0.0]),
         op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),         # m: the cell has failed
-        op("multiply", 7, srcA=7, srcB=4),                                # the growth front
-        op("noise", 3, srcA=1, value=31.0, seed=seed + 7),
-        op("smoothstep", 3, srcA=3, constant=[0.73, 0.75, 0, 0]),
-        op("multiply", 3, srcA=3, srcB=4),                                # stuck pixels among the failed
-        op("constant", 5, constant=[0.5, 0.5, 0.5, 0.5]),
-        op("multiply", 3, srcA=3, srcB=5),
-        op("add", 7, srcA=7, srcB=3),                                     # the glow mask
+        op("multiply", 7, srcA=7, srcB=4),                                # the growth front: the glow mask
+        # under the lens the glow would be a floor of lit tiles (a game, not a fracture): it lives at a distance
+        op("input", 3, input="depth"),
+        op("smoothstep", 3, srcA=3, constant=[2.5, 8.0, 0, 0]),
+        op("multiply", 7, srcA=7, srcB=3),
         # far away a cell is smaller than a pixel or two: it would shimmer as the camera moves (the Critic's
         # temporal_shimmer). There the cells give way to the smooth stain, and their glow fades out.
         op("input", 3, input="footprint"),

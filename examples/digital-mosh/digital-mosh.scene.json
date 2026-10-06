@@ -273,47 +273,23 @@
      "srcB": 4
     },
     {
-     "kind": "noise",
+     "kind": "input",
      "dst": 3,
-     "srcA": 1,
-     "value": 31.0,
-     "seed": 10
+     "input": "depth"
     },
     {
      "kind": "smoothstep",
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.73,
-      0.75,
+      2.5,
+      8.0,
       0,
       0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      0.5
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
      "dst": 7,
      "srcA": 7,
      "srcB": 3
@@ -774,47 +750,23 @@
      "srcB": 4
     },
     {
-     "kind": "noise",
+     "kind": "input",
      "dst": 3,
-     "srcA": 1,
-     "value": 31.0,
-     "seed": 10
+     "input": "depth"
     },
     {
      "kind": "smoothstep",
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.73,
-      0.75,
+      2.5,
+      8.0,
       0,
       0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      0.5
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
      "dst": 7,
      "srcA": 7,
      "srcB": 3
@@ -1130,47 +1082,23 @@
      "srcB": 4
     },
     {
-     "kind": "noise",
+     "kind": "input",
      "dst": 3,
-     "srcA": 1,
-     "value": 31.0,
-     "seed": 18
+     "input": "depth"
     },
     {
      "kind": "smoothstep",
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.73,
-      0.75,
+      2.5,
+      8.0,
       0,
       0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      0.5
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
      "dst": 7,
      "srcA": 7,
      "srcB": 3
@@ -1481,47 +1409,23 @@
      "srcB": 4
     },
     {
-     "kind": "noise",
+     "kind": "input",
      "dst": 3,
-     "srcA": 1,
-     "value": 31.0,
-     "seed": 20
+     "input": "depth"
     },
     {
      "kind": "smoothstep",
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.73,
-      0.75,
+      2.5,
+      8.0,
       0,
       0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      0.5
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
      "dst": 7,
      "srcA": 7,
      "srcB": 3
