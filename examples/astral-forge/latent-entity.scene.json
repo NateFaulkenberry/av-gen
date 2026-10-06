@@ -1,436 +1,444 @@
 {
- "format": "avgen-scene",
- "version": 1,
- "name": "latent-entity",
- "camera": {
-  "mode": 1,
-  "position": [
-   0.0,
-   0.25,
-   7.2
-  ],
-  "target": [
-   0.0,
-   0.0,
-   0.0
-  ],
-  "fov": 34.0,
-  "orbitSpeed": 0.0
- },
- "environment": {
-  "background": [
-   0,
-   0,
-   0
-  ],
-  "intensity": 0.0
- },
- "post": {
-  "bloomIntensity": 0.05
- },
- "lights": [
-  {
-   "id": "strip-top",
-   "name": "strip-top",
-   "type": "tube",
-   "position": [
-    0,
-    6,
-    7
-   ],
-   "direction": [
-    0,
-    -0.6,
-    -0.8
-   ],
-   "up": [
-    0,
-    0.8,
-    -0.6
-   ],
-   "width": 22.0,
-   "radius": 0.12,
-   "color": [
-    1,
-    0.97,
-    0.92
-   ],
-   "intensity": 70.0,
-   "castsShadow": false,
-   "contactShadow": false
-  },
-  {
-   "id": "strip-left",
-   "name": "strip-left",
-   "type": "tube",
-   "position": [
-    -9,
-    0,
-    6
-   ],
-   "direction": [
-    0.8,
-    0,
-    -0.6
-   ],
-   "up": [
-    0,
-    1,
-    0
-   ],
-   "width": 14.0,
-   "radius": 0.08,
-   "color": [
-    0.85,
-    0.9,
-    1
-   ],
-   "intensity": 45.0,
-   "castsShadow": false,
-   "contactShadow": false
-  },
-  {
-   "id": "strip-low",
-   "name": "strip-low",
-   "type": "tube",
-   "position": [
-    0,
-    -6,
-    6
-   ],
-   "direction": [
-    0,
-    0.7,
-    -0.7
-   ],
-   "up": [
-    0,
-    0.7,
-    0.7
-   ],
-   "width": 22.0,
-   "radius": 0.06,
-   "color": [
-    1,
-    0.9,
-    0.8
-   ],
-   "intensity": 25.0,
-   "castsShadow": false,
-   "contactShadow": false
-  },
-  {
-   "id": "key",
-   "name": "key",
-   "type": "directional",
-   "direction": [
-    -0.35,
-    -0.45,
-    -0.82
-   ],
-   "color": [
-    1,
-    0.96,
-    0.9
-   ],
-   "intensity": 2.5,
-   "castsShadow": false,
-   "contactShadow": false
-  }
- ],
- "nodes": [
-  {
-   "name": "mask",
-   "kind": "sdf",
-   "sdf": {
-    "visible": false,
-    "tree": {
-     "root": {
-      "kind": "smoothUnion",
-      "smooth": 0.18,
-      "children": [
-       {
-        "kind": "roundedBox",
-        "size": [
-         1.05,
-         1.45,
-         0.22
-        ],
-        "rounding": 0.2,
-        "name": "plate"
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         -0.5,
-         0.38,
-         0.2
-        ],
-        "children": [
-         {
-          "kind": "sphere",
-          "radius": 0.36
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         0.5,
-         0.38,
-         0.2
-        ],
-        "children": [
-         {
-          "kind": "sphere",
-          "radius": 0.36
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         0.0,
-         -0.62,
-         0.18
-        ],
-        "children": [
-         {
-          "kind": "rotate",
-          "rotation": [
-           0.0,
-           0.0,
-           90.0
-          ],
-          "children": [
-           {
-            "kind": "capsule",
-            "radius": 0.12,
-            "height": 0.38
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    },
-    "boundsMin": [
-     -2.4,
-     -2.4,
-     -2.4
-    ],
-    "boundsMax": [
-     2.4,
-     2.4,
-     2.4
-    ],
-    "material": {
-     "baseColor": [
-      0.56,
-      0.56,
-      0.58
-     ],
-     "emissiveColor": [
-      0,
-      0,
-      0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.24,
-     "metallic": 1.0
-    }
-   }
-  },
-  {
-   "name": "matter",
-   "kind": "particles",
-   "particles": {
-    "enabled": true,
-    "capacity": 400000,
-    "seed": 11,
-    "shape": "sphere",
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "latent-entity",
+  "camera": {
+    "mode": 1,
     "position": [
-     0.0,
-     0.0,
-     0.0
+      0.0,
+      0.25,
+      7.2
     ],
-    "extent": [
-     2.6,
-     2.6,
-     2.6
+    "target": [
+      0.0,
+      0.0,
+      0.0
     ],
-    "spawnRate": 0.0,
-    "burst": 400000.0,
-    "lifetimeMin": 1000.0,
-    "lifetimeMax": 1000.0,
-    "spread": 1.0,
-    "speedMin": 0.0,
-    "speedMax": 0.3,
-    "gravity": [
-     0,
-     0,
-     0
-    ],
-    "drag": 0.4,
-    "turbulence": 0.5,
-    "turbulenceScale": 0.6,
-    "turbulenceSpeed": 0.2,
-    "sizeStart": 0.007,
-    "sizeEnd": 0.007,
-    "colorStart": [
-     1.0,
-     0.82,
-     0.6,
-     0.55
-    ],
-    "colorEnd": [
-     1.0,
-     0.82,
-     0.6,
-     0.55
-    ],
-    "emissive": 1.4,
-    "blend": "additive",
-    "latent": {
-     "sdf": "mask",
-     "coherence": 0.72,
-     "width": 0.08,
-     "strength": 1.0,
-     "flow": 0.4,
-     "release": 12.0
-    },
-    "density": {
-     "boundsMin": [
-      -2.4,
-      -2.4,
-      -2.4
-     ],
-     "boundsMax": [
-      2.4,
-      2.4,
-      2.4
-     ],
-     "resolution": 192,
-     "weight": 1.0
-    }
-   }
+    "fov": 34.0,
+    "orbitSpeed": 0.0
   },
-  {
-   "name": "entity",
-   "kind": "sdf",
-   "sdf": {
-    "tree": {
-     "root": {
-      "kind": "smoothUnion",
-      "smooth": 0.18,
-      "children": [
-       {
-        "kind": "roundedBox",
-        "size": [
-         1.05,
-         1.45,
-         0.22
-        ],
-        "rounding": 0.2,
-        "name": "plate"
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         -0.5,
-         0.38,
-         0.2
-        ],
-        "children": [
-         {
-          "kind": "sphere",
-          "radius": 0.36
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         0.5,
-         0.38,
-         0.2
-        ],
-        "children": [
-         {
-          "kind": "sphere",
-          "radius": 0.36
-         }
-        ]
-       },
-       {
-        "kind": "translate",
-        "translation": [
-         0.0,
-         -0.62,
-         0.18
-        ],
-        "children": [
-         {
-          "kind": "rotate",
-          "rotation": [
-           0.0,
-           0.0,
-           90.0
-          ],
-          "children": [
-           {
-            "kind": "capsule",
-            "radius": 0.12,
-            "height": 0.38
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    },
-    "boundsMin": [
-     -2.4,
-     -2.4,
-     -2.4
-    ],
-    "boundsMax": [
-     2.4,
-     2.4,
-     2.4
-    ],
-    "material": {
-     "baseColor": [
-      0.56,
-      0.56,
-      0.58
-     ],
-     "emissiveColor": [
+  "environment": {
+    "background": [
       0,
       0,
       0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.24,
-     "metallic": 1.0
+    ],
+    "intensity": 0.0
+  },
+  "post": {
+    "bloomIntensity": 0.05
+  },
+  "lights": [
+    {
+      "id": "strip-top",
+      "name": "strip-top",
+      "type": "tube",
+      "position": [
+        0,
+        6,
+        7
+      ],
+      "direction": [
+        0,
+        -0.6,
+        -0.8
+      ],
+      "up": [
+        0,
+        0.8,
+        -0.6
+      ],
+      "width": 22.0,
+      "radius": 0.12,
+      "color": [
+        1,
+        0.97,
+        0.92
+      ],
+      "intensity": 70.0,
+      "castsShadow": false,
+      "contactShadow": false
     },
-    "maxSteps": 448,
-    "stepScale": 0.6,
-    "epsilon": 0.0008,
-    "normalEpsilon": 0.004,
-    "castShadows": false,
-    "look": {
-     "aoStrength": 0.6,
-     "aoDistance": 0.25
+    {
+      "id": "strip-left",
+      "name": "strip-left",
+      "type": "tube",
+      "position": [
+        -9,
+        0,
+        6
+      ],
+      "direction": [
+        0.8,
+        0,
+        -0.6
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "width": 14.0,
+      "radius": 0.08,
+      "color": [
+        0.85,
+        0.9,
+        1
+      ],
+      "intensity": 45.0,
+      "castsShadow": false,
+      "contactShadow": false
     },
-    "density": {
-     "particles": "matter",
-     "iso": 1.5,
-     "sharpness": 0.85
+    {
+      "id": "strip-low",
+      "name": "strip-low",
+      "type": "tube",
+      "position": [
+        0,
+        -6,
+        6
+      ],
+      "direction": [
+        0,
+        0.7,
+        -0.7
+      ],
+      "up": [
+        0,
+        0.7,
+        0.7
+      ],
+      "width": 22.0,
+      "radius": 0.06,
+      "color": [
+        1,
+        0.9,
+        0.8
+      ],
+      "intensity": 25.0,
+      "castsShadow": false,
+      "contactShadow": false
+    },
+    {
+      "id": "key",
+      "name": "key",
+      "type": "directional",
+      "direction": [
+        -0.35,
+        -0.45,
+        -0.82
+      ],
+      "color": [
+        1,
+        0.96,
+        0.9
+      ],
+      "intensity": 2.5,
+      "castsShadow": false,
+      "contactShadow": false
     }
-   }
-  }
- ]
+  ],
+  "nodes": [
+    {
+      "name": "mask",
+      "kind": "sdf",
+      "sdf": {
+        "visible": false,
+        "tree": {
+          "root": {
+            "kind": "smoothUnion",
+            "smooth": 0.18,
+            "children": [
+              {
+                "kind": "roundedBox",
+                "size": [
+                  1.05,
+                  1.45,
+                  0.22
+                ],
+                "rounding": 0.2,
+                "name": "plate"
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  -0.5,
+                  0.38,
+                  0.2
+                ],
+                "children": [
+                  {
+                    "kind": "sphere",
+                    "radius": 0.36
+                  }
+                ]
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  0.5,
+                  0.38,
+                  0.2
+                ],
+                "children": [
+                  {
+                    "kind": "sphere",
+                    "radius": 0.36
+                  }
+                ]
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  0.0,
+                  -0.62,
+                  0.18
+                ],
+                "children": [
+                  {
+                    "kind": "rotate",
+                    "rotation": [
+                      0.0,
+                      0.0,
+                      90.0
+                    ],
+                    "children": [
+                      {
+                        "kind": "capsule",
+                        "radius": 0.12,
+                        "height": 0.38
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "boundsMin": [
+          -2.4,
+          -2.4,
+          -2.4
+        ],
+        "boundsMax": [
+          2.4,
+          2.4,
+          2.4
+        ],
+        "material": {
+          "baseColor": [
+            0.56,
+            0.56,
+            0.58
+          ],
+          "emissiveColor": [
+            0,
+            0,
+            0
+          ],
+          "emissiveIntensity": 0.0,
+          "roughness": 0.24,
+          "metallic": 1.0
+        }
+      }
+    },
+    {
+      "name": "matter",
+      "kind": "particles",
+      "particles": {
+        "enabled": true,
+        "capacity": 400000,
+        "seed": 11,
+        "shape": "sphere",
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          2.6,
+          2.6,
+          2.6
+        ],
+        "spawnRate": 0.0,
+        "burst": 400000.0,
+        "lifetimeMin": 1000.0,
+        "lifetimeMax": 1000.0,
+        "spread": 1.0,
+        "speedMin": 0.0,
+        "speedMax": 0.3,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.4,
+        "turbulence": 0.5,
+        "turbulenceScale": 0.6,
+        "turbulenceSpeed": 0.2,
+        "sizeStart": 0.007,
+        "sizeEnd": 0.007,
+        "colorStart": [
+          1.0,
+          0.82,
+          0.6,
+          0.55
+        ],
+        "colorEnd": [
+          1.0,
+          0.82,
+          0.6,
+          0.55
+        ],
+        "emissive": 1.4,
+        "blend": "additive",
+        "latent": {
+          "sdf": "mask",
+          "coherence": 0.72,
+          "width": 0.08,
+          "strength": 1.0,
+          "flow": 0.4,
+          "release": 12.0
+        },
+        "density": {
+          "boundsMin": [
+            -2.4,
+            -2.4,
+            -2.4
+          ],
+          "boundsMax": [
+            2.4,
+            2.4,
+            2.4
+          ],
+          "resolution": 192,
+          "weight": 1.0
+        }
+      }
+    },
+    {
+      "name": "entity",
+      "kind": "sdf",
+      "sdf": {
+        "tree": {
+          "root": {
+            "kind": "smoothUnion",
+            "smooth": 0.18,
+            "children": [
+              {
+                "kind": "roundedBox",
+                "size": [
+                  1.05,
+                  1.45,
+                  0.22
+                ],
+                "rounding": 0.2,
+                "name": "plate"
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  -0.5,
+                  0.38,
+                  0.2
+                ],
+                "children": [
+                  {
+                    "kind": "sphere",
+                    "radius": 0.36
+                  }
+                ]
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  0.5,
+                  0.38,
+                  0.2
+                ],
+                "children": [
+                  {
+                    "kind": "sphere",
+                    "radius": 0.36
+                  }
+                ]
+              },
+              {
+                "kind": "translate",
+                "translation": [
+                  0.0,
+                  -0.62,
+                  0.18
+                ],
+                "children": [
+                  {
+                    "kind": "rotate",
+                    "rotation": [
+                      0.0,
+                      0.0,
+                      90.0
+                    ],
+                    "children": [
+                      {
+                        "kind": "capsule",
+                        "radius": 0.12,
+                        "height": 0.38
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "boundsMin": [
+          -2.4,
+          -2.4,
+          -2.4
+        ],
+        "boundsMax": [
+          2.4,
+          2.4,
+          2.4
+        ],
+        "material": {
+          "baseColor": [
+            0.56,
+            0.56,
+            0.58
+          ],
+          "emissiveColor": [
+            0,
+            0,
+            0
+          ],
+          "emissiveIntensity": 0.0,
+          "roughness": 0.24,
+          "metallic": 1.0,
+          "thinFilm": {
+            "thickness": 58.0,
+            "ior": 2.4
+          },
+          "anisotropy": {
+            "strength": 0.6,
+            "rotation": 0.0
+          }
+        },
+        "maxSteps": 448,
+        "stepScale": 0.6,
+        "epsilon": 0.0008,
+        "normalEpsilon": 0.004,
+        "castShadows": false,
+        "look": {
+          "aoStrength": 0.6,
+          "aoDistance": 0.25
+        },
+        "density": {
+          "particles": "matter",
+          "iso": 1.5,
+          "sharpness": 0.85
+        }
+      }
+    }
+  ]
 }
