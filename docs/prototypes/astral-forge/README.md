@@ -12,6 +12,7 @@ violently dissolves. This is research plus a prototype plus art, not a finished 
 | [03-parameter-state-model.md](03-parameter-state-model.md) | §3, §12, §20.4 | coherence semantics, the conductor's state, audio → state, time and seek, live/MIDI contract |
 | [04-architecture.md](04-architecture.md) | §15-16, §20.2 | approaches A-E implemented and benchmarked; E (hybrid) chosen; the production path |
 | [05-tests-and-assessment.md](05-tests-and-assessment.md) | §18-20 | the six tests with verdicts, performance, what worked, what looked generic, the next iteration |
+| [07-iteration-3.md](07-iteration-3.md) | iteration 3 | the production look (ADR-1150..1153) vs the prototype, off-centre framing, the peeling Machine God, release-front heat, the half-resolution march, the stride benchmark |
 | [06-iteration-2.md](06-iteration-2.md) | the approved next iteration | warp advection, tendons, shards, the latent cache (and its lesson), conductor vocabulary, the Machine God and Chimera (TEST 07), and the production path: ADR-1140..1143 in the engine |
 
 **In one paragraph.**
