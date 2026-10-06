@@ -32,6 +32,7 @@ scene source is `examples/digital-mosh/build.py`; the generated files beside it 
 | Double | The same form without `eaten`, parked under the land until a preset places it | P2 |
 | Blocks | Two `points` procedurals: the olive's shell (900 cubes of 0.16 m) and the Tanguy object's (584 cubes of 0.2 m), computed in Python from the same skeletons | The surface's own representation: they appear where the surface is eaten, then lift, tumble and float |
 | Motes | Particles (disc, 45 m) | Dust in the dream light; spores later |
+| Liquid skin | A `procedural` box 34 x 0.02 x 34 m, 64 subdivisions, lying 1 cm under the pan's flat heart; two world-space field deformers: `liquidKick` (the kick's onset front x the `pool` mask) and `liquidSwell` (slow noise x `pool`, amount on the bass) | Terrain cannot deform (fact 11), so the brief's liquid land (§8) is a skin the land covers at rest: only crests rise out of the ground. The `pool` box's 6 m soft edge keeps the skin's own edge under the land. Parked 30 m down in the stages where land is solid |
 | Fracture light | Point light in the strain's colour at the Tanguy object, `volumetric 1` | The strain reaches the light, the land, the tree, the haze and the object's specular |
 
 ## The camera
@@ -110,3 +111,27 @@ Why this shape:
 | | | **Recovery** (its outro, ~198) | 200-208 |
 
 Both songs collapse at their own climax and recover in their own outro, and nothing names either song.
+
+## Live: the instrument
+
+`digital-mosh-live.json` is the same scene and arc on live input (`sonic.live`) at LIVE AUTO. A performer has two
+controls, bound in `control.midi`:
+
+- **SENSITIVITY** (CC 1 → `macros/sensitivity`) scales the drive's depth (0 to 4). It trims the arc to the input level, the
+  way a gain knob trims a channel: a quiet room never leaves the Dream at 0.25 and corrupts quickly at 1.
+- **Stage pads** (General MIDI drum notes 36 to 43) force a stage: Dream, Uncanny, Infection, Corruption, Nightmare,
+  Collapse, Respite, Recovery. They are ordinary signal triggers on the states (`control.pad<Stage>`). The arc then
+  continues from the forced stage, because the dose is still the music's own.
+
+`play_live.py` plays a track into BlackHole and records the host time it started, so a capture
+(`--live-capture`) and a sonic log (`--sonic-live-log`) can be joined to the music afterwards.
+
+## The art passes
+
+| Pass | What changed | Why (what the review saw) |
+|---|---|---|
+| Build 1 | Flat plain, primitive tree, static camera, all corruption systems wired | Proved the systems; the owner found it crude and static |
+| 1 | Terrain (dunes, pan, riverbed, mesas, ranges), the braided olive and the Tanguy object as SDF, painting palettes, the travelling camera, ADR-1164 `idle` | The owner: travel, landscape, real palettes |
+| 1b/1c | The Bee's land band; a narrow growth front; mosh restraint; the collapse keeps the nightmare's colour; the zenith reaches the frame | Pass 1's full-song review: too much glitch too early, collapse went grey |
+| 2 | Footprint-faded cells (no shimmer), moves on the beat, a shorter white, varied vantages (a tiny tree in a vast land), less drift; the liquid skin; the double's scale on lifts; MIDI; the front's glow faded under the lens | The Critic on pass 1 (shimmer, wobble, repeated compositions, cuts off the beat, clipped white) and the review of pass 2 (a floor of lit tiles under the camera, the skin's edge line) |
+| 3 | The Dream's haze warm and thin (the Bee's horizon colour at 0.38 of the density) instead of a grey-blue wash; the liquid heaves gently with a 6 m tapered mask (it had risen as a dark plateau with an edge); the Pixels stratum without posterize and with less sort | Pass 2's contact sheet: a grey Dream, a slab in the collapse, a garish poster-red frame at the Pixels stratum |
