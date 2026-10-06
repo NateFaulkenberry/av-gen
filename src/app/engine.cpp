@@ -169,6 +169,8 @@ public:
         in.duration = duration_;
         in.playing = playing_;
         const bool pulse = engine_.advanceClock(state_, bus_, time, fresh, in);
+        lastPulse_ = pulse;
+        lastBpm_ = in.bpm;
         lastBuilt_ = now;
         if (replaysRoutes_) {
             advanceRoutes(time, in.bpm, pulse);
@@ -249,6 +251,12 @@ public:
     }
 
     [[nodiscard]] const SignalClock& state() const { return state_; }
+    // ADR-1168: the control replay applies every route itself; its signal replay must not also advance the
+    // pure-in-time ones (they would integrate twice).
+    void withoutRoutes() { replaysRoutes_ = false; }
+    // ADR-1168: the last built step's beat pulse and tempo, for a control replay's source context.
+    [[nodiscard]] bool lastPulse() const { return lastPulse_; }
+    [[nodiscard]] double lastBpm() const { return lastBpm_; }
 
     // ADR-901: whether this seek replays any of the project's routes (tests and the log ask).
     [[nodiscard]] bool replaysRoutes() const { return replaysRoutes_; }
@@ -381,6 +389,8 @@ private:
     bool started_ = false;
     bool exact_ = true;
     double lastBuilt_ = -1.0;
+    bool lastPulse_ = false; // ADR-1168
+    double lastBpm_ = 120.0;
     // ADR-901
     std::vector<std::uint8_t> samplable_;
     signals::SignalBus sampling_;
@@ -4560,6 +4570,11 @@ void Engine::seekSeconds(double seconds) {
             replaySignals_->runTo(seconds);
         }
     }
+    // ADR-1168: a project with scene states replays its control layer -- the sources, the state machine and every
+    // route -- from zero to the target, on the play's own frame grid, so the seek lands where a play does.
+    if (seekReplaysSignals() && !states_.states.empty()) {
+        replayControl(seconds);
+    }
     // ADR-912: nothing to scan for a keyed cut across a jump; the renderer drops its history for the
     // jump itself.
     cutScanFrom_ = std::numeric_limits<double>::quiet_NaN();
@@ -4582,6 +4597,69 @@ void Engine::seekSeconds(double seconds) {
     // T3 for the interaction log: the authoritative state has changed. Everything above this line
     // is what a scrub costs, and the log's `input->ack` minus this is where it went.
     core::interactions().markModel();
+}
+
+// ADR-1168: the control layer, replayed. What a play from zero does to the sources, the scene states and the routes
+// in every frame before `target`, on the play's grid (the render rate: frame k at k / fps, the first with dt 0), with
+// the bus each of those frames saw rebuilt by a fresh signal replay. Scenes, entities and the timeline are not part
+// of it -- the seek above has placed them -- so this is the control state only: the state machine's state, its
+// transition and timers, every route's chain (integrals, followers, envelopes) and every source's own history (an
+// interpret mapping's follower). A target off the grid lands on the frame before it.
+void Engine::replayControl(double target) {
+    const double fps = renderSettings().fps > 0.0 ? renderSettings().fps : 60.0;
+    ReplaySignals replay(*this);
+    replay.begin(isPlaying(), durationSeconds());
+    replay.withoutRoutes();
+    replay.reset();
+    modulator_.resetState();
+    sources_.reset();
+    states_.reset(params_, presets_);
+    signals::SignalBus scratch = bus_;
+    const auto frames = static_cast<std::uint64_t>(std::floor(std::max(target, 0.0) * fps + 1e-6));
+    // Through the frame at the target itself: the landing update that follows a seek runs at dt 0 (a render's first
+    // tick after its seek), so it re-derives the outputs without stepping any integral, timer or transition again.
+    for (std::uint64_t k = 0; k <= frames; ++k) {
+        const double now = static_cast<double>(k) / fps;
+        const double dt = k == 0 ? 0.0 : 1.0 / fps;
+        replay.build(now, dt);
+        scratch.clearEvents();
+        const signals::SignalBus& built = replay.bus();
+        for (std::size_t i = 0; i < built.size() && i < scratch.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            if (built.event(id)) {
+                scratch.setEvent(id, true, built.value(id));
+            } else {
+                scratch.set(id, built.value(id));
+            }
+        }
+        const SignalClock& clock = replay.state();
+        signals::SourceContext ctx;
+        ctx.time = FrameTime{now, dt, k};
+        ctx.audioPosition = now;
+        ctx.audioDuration = durationSeconds();
+        ctx.playing = isPlaying();
+        ctx.beatPhase = static_cast<float>(clock.beatPhase);
+        ctx.musicalBeats = clock.haveClockBeats ? meter().beats(clock.clockBeats) : 0.0;
+        ctx.tempoBpm = static_cast<float>(replay.lastBpm());
+        ctx.beatEvent = replay.lastPulse();
+        sources_.update(scratch, ctx);
+        BeatInfo beat;
+        beat.beatPulse = scratch.event(timeSignals_.beatPulse);
+        beat.barPhase = scratch.value(timeSignals_.barPhase);
+        beat.phrasePulse = scratch.event(timeSignals_.phrasePulse);
+        beat.sectionPhase = scratch.value(timeSignals_.sectionPhase);
+        beat.onset = scratch.event(audioSignals_.onset);
+        beat.onsetStrength = scratch.value(audioSignals_.onsetStrength);
+        const double bpm = ctx.tempoBpm > 1.0f ? static_cast<double>(ctx.tempoBpm) : 120.0;
+        beat.beatSeconds = 60.0 / bpm;
+        beat.barSeconds = beat.beatSeconds * static_cast<double>(meter().beatsPerBar);
+        states_.update(now, dt, scratch, beat, params_, presets_);
+        scratch.set(stateProgressSignal_, states_.progress());
+        scratch.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
+        params_.resetFinals();
+        modulator_.applyRoutes(scratch, params_, dt);
+    }
+    ++stats_.controlReplays;
 }
 
 // ---- the interactive seek -------------------------------------------------------------------
