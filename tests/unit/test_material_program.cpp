@@ -1818,3 +1818,49 @@ TEST_CASE("The Glowmere projects leave both tissue programs their own emission",
         CHECK(warmBest > 0.5 * coolBest);
     }
 }
+
+// ADR-1162: quantize snaps a value to the centre of its square cell, in the value's own units, and gives every cell
+// one uniform random -- the same cell, the same random; a neighbouring cell, an unrelated one.
+TEST_CASE("quantize gives the cell centre and a per-cell random", "[material][adr1162]") {
+    REQUIRE(materialOpKindFromName("quantize").has_value());
+    CHECK(std::string(materialOpKindName(MaterialOpKind::Quantize)) == "quantize");
+    MaterialOp q = makeOp(MaterialOpKind::Quantize, 1, 0);
+    q.value = 2.0f; // two cells per unit: 0.5 m squares
+    q.seed = 5;
+    const glm::vec4 a = evalOp({constantOp(0, {0.30f, -0.70f, 1.26f, 9.0f})}, q);
+    checkVec4(glm::vec4(glm::vec3(a), 0.0f), {0.25f, -0.75f, 1.25f, 0.0f}, 1e-6f);
+    CHECK(a.w >= 0.0f);
+    CHECK(a.w < 1.0f);
+    // Anywhere in the same cell: the same centre and the same random.
+    const glm::vec4 b = evalOp({constantOp(0, {0.49f, -0.51f, 1.01f, 0.0f})}, q);
+    checkVec4(b, a, 0.0f);
+    // The next cell over: the next centre, another random.
+    const glm::vec4 c = evalOp({constantOp(0, {0.51f, -0.51f, 1.01f, 0.0f})}, q);
+    CHECK(c.x == 0.75f);
+    CHECK(c.w != a.w);
+    // The constant shifts the lattice (a phase); the centre stays in the input's units.
+    MaterialOp shifted = q;
+    shifted.constant = {0.5f, 0.0f, 0.0f, 0.0f}; // half a cell
+    const glm::vec4 s = evalOp({constantOp(0, {0.30f, -0.70f, 1.26f, 0.0f})}, shifted);
+    CHECK_THAT(d(s.x), WithinAbs(0.5, 1e-6));
+    // A non-positive frequency passes the value through.
+    MaterialOp off = q;
+    off.value = 0.0f;
+    checkVec4(evalOp({constantOp(0, {0.3f, 0.4f, 0.5f, 0.6f})}, off), {0.3f, 0.4f, 0.5f, 0.6f}, 0.0f);
+    // The randoms are uniform enough to threshold against a mask: over 4,096 cells the mean is near 0.5 and the
+    // share below 0.25 near a quarter.
+    double sum = 0.0;
+    int below = 0;
+    for (int i = 0; i < 64; ++i) {
+        for (int j = 0; j < 64; ++j) {
+            const float r = evalOp({constantOp(0, {static_cast<float>(i) * 0.5f + 0.1f, 0.0f,
+                                                   static_cast<float>(j) * 0.5f + 0.1f, 0.0f})},
+                                   q)
+                                .w;
+            sum += r;
+            below += r < 0.25f ? 1 : 0;
+        }
+    }
+    CHECK_THAT(sum / 4096.0, WithinAbs(0.5, 0.03));
+    CHECK_THAT(below / 4096.0, WithinAbs(0.25, 0.03));
+}

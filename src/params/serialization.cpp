@@ -5,6 +5,7 @@
 #include "core/log.hpp"
 
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <string_view>
@@ -243,6 +244,13 @@ json chainToJson(const ProcessorChain& chain) {
     if (chain.integrate) {
         j["integrate"] = true;
     }
+    // ADR-1161: the bounds, only when finite (JSON has no infinity; absent = unbounded).
+    if (std::isfinite(chain.integrateMin)) {
+        j["integrateMin"] = static_cast<double>(chain.integrateMin);
+    }
+    if (std::isfinite(chain.integrateMax)) {
+        j["integrateMax"] = static_cast<double>(chain.integrateMax);
+    }
     return j;
 }
 
@@ -251,7 +259,7 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 23> results{
+    std::array<Result<void>, 25> results{
         readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
@@ -275,11 +283,17 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         readFloat(j, "springHz", chain.springHz),           // ADR-1041; absent = off
         readFloat(j, "springDamping", chain.springDamping), // ADR-1041; absent = critical
         readBool(j, "integrate", chain.integrate),          // ADR-1041; absent = off
+        readFloat(j, "integrateMin", chain.integrateMin),   // ADR-1161; absent = unbounded
+        readFloat(j, "integrateMax", chain.integrateMax),   // ADR-1161; absent = unbounded
     };
     for (const auto& r : results) {
         if (!r) {
             return fail("processor chain: {}", r.error().message);
         }
+    }
+    if (!(chain.integrateMin <= chain.integrateMax)) {
+        return fail("processor chain: 'integrateMin' ({:g}) must not exceed 'integrateMax' ({:g})", chain.integrateMin,
+                    chain.integrateMax);
     }
     if (chain.delayMs < 0.0f) {
         return fail("processor chain: 'delayMs' must be >= 0, got {:g}", chain.delayMs);

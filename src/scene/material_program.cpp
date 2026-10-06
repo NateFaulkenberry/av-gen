@@ -117,6 +117,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::MicroDetail, "microDetail"},
     {MaterialOpKind::Swizzle, "swizzle"},
     {MaterialOpKind::VoronoiEdge, "voronoiEdge"},
+    {MaterialOpKind::Quantize, "quantize"}, // ADR-1162
 };
 
 struct InputName {
@@ -665,6 +666,16 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         const glm::vec3 w = worleyF1F2(glm::vec3(a) * f + glm::vec3(k), op.seed);
         return {w.y - w.x, w.x, w.z, w.y};
     }
+    case MaterialOpKind::Quantize: {
+        // ADR-1162: the cell centre in a's own units and a per-cell uniform random.
+        if (!(f > 0.0f)) {
+            return a;
+        }
+        const glm::vec3 cell = glm::floor(glm::vec3(a) * f + glm::vec3(k));
+        const glm::vec3 centre = (cell + glm::vec3(0.5f) - glm::vec3(k)) / f;
+        return {centre, noise::hash01(static_cast<std::int32_t>(cell.x), static_cast<std::int32_t>(cell.y),
+                                      static_cast<std::int32_t>(cell.z), op.seed)};
+    }
     }
     return glm::vec4(0.0f);
 }
@@ -807,6 +818,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::MicroDetail:
     case MaterialOpKind::Swizzle:
     case MaterialOpKind::VoronoiEdge:
+    case MaterialOpKind::Quantize:
         return {true, false, false};
     case MaterialOpKind::Multiply:
     case MaterialOpKind::Add:

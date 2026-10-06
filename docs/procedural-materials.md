@@ -137,6 +137,7 @@ the fragment's normal and view direction.
 | `anisotropy` | a, N, V | An anisotropic lobe's effective roughness for the current view. `α = a.x²`, `αT = α(1+f)`, `αB = α(1-f)` with `f` clamped to ±0.95; `t` is `k.xyz` projected onto the tangent plane, `c` the cosine between `t` and the view's tangent projection; `vec4(sqrt(sqrt(αT²c² + αB²(1-c²))))`. A direction with no tangent component passes `a.x` through unchanged |
 | `roughnessFilter` | a | Specular anti-aliasing (Kaplanyan et al. 2016): `α = a.x²`, `κ = min(2·max(f,0)·normalVariance, 0.18)`, `vec4(sqrt(min(α + κ, 1)))`. Put it last, on whatever register feeds `roughness` |
 | `microDetail` | a | `fade = saturate(1 - footprint·|f|·2)`; `vec4(0.5 + (fbm3(p, seed) - 0.5) · fade)`. Noise that fades to its own mean as one pixel grows to cover a period, so micro detail can never alias or shimmer |
+| `quantize` | a | ADR-1162: `c = floor(a.xyz * f + k.xyz)`; `vec4((c + 0.5 - k.xyz) / f, hash01(c, seed))` — the centre of a's square cell in a's own units, and a uniform random per cell. `f <= 0` passes `a` through. Squares and macroblock masks: noise at the centre is constant per cell; `step(out.w, mask)` fails cells one at a time |
 
 Notes for the shader transliteration:
 

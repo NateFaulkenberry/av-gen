@@ -149,14 +149,25 @@ One scene and one artistic system. The fidelity levers:
 The live project adds a `live` block (`effects_first` priority, so the ladder drops resolution after the
 effects that carry no meaning). Heroes (tree, stone) are never degraded.
 
-## Engine additions (ADR-1160 to ADR-1164)
+## Engine additions (ADR-1160 to ADR-1162)
 
-Each one is small, tested, and reachable from scene JSON, the CLI (`avgen --render`, `--live-profile`) and the
-editor (they are parameters):
+Each one is small, tested, and reachable from scene JSON, the CLI and the editor:
 
-- **ADR-1160:** a raymarched SDF casts its shadow from the light's view. A defect fix: SDF shadows were
-  marched from the camera; the scene's first frame had no tree shadow.
+- **ADR-1160:** a raymarched SDF casts its shadow from the light's view. A defect fix: SDF shadows were marched
+  from the camera's eye, over the camera's rect, and dropped when the caster was off screen. The scene's first
+  frame had no tree shadow.
 - **ADR-1161:** an integrating route can be bounded (`integrateMin` / `integrateMax`), which gives the dose.
-- **ADR-1162:** an SDF `quantize` node: aligned blocks, per-cell probability, an optional field mask.
-- **ADR-1163:** a material-program `quantize` op: floor to cell centres, so programs can build blocks.
-- **ADR-1164:** an SDF `flow` node: a domain warp by a vector field (melting, sagging, liquid).
+- **ADR-1162:** a material-program `quantize` op: cell centres and a per-cell random, for squares and macroblock
+  masks.
+
+**Considered and not built:**
+
+- **An SDF `quantize` node.** A correct distance bound for "this cell is blocks, its neighbour is not" needs the
+  neighbours' distances, which the stack interpreter cannot give without seven evaluations per sample. The
+  cheaper bounds draw phantom walls on the cell faces.
+- **An SDF `flow` warp.**
+
+The blocks are real instances instead. Python voxelises the tree's and the stone's own skeletons into a shell of
+cubes (a `points` distribution); field effectors reveal, displace, tumble and float them; and the SDF surface
+recedes beneath them through `displaceField`. One system serves as the blocks, the fragments and the pixels.
+Melting is `bend` on each limb, rooted at its base, plus displacement.

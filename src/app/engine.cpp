@@ -319,6 +319,8 @@ private:
                 (c.remapEnabled ? 1ull << 25u : 0u) | (c.integrate ? 1ull << 26u : 0u));
             mix(bits(c.springHz)); // ADR-1041
             mix(bits(c.springDamping));
+            mix(bits(c.integrateMin)); // ADR-1161
+            mix(bits(c.integrateMax));
         }
         routesKey_ = h;
         if (replaysRoutes_) {

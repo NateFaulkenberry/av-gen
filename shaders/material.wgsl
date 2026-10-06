@@ -97,6 +97,7 @@ const MAT_OP_ROUGHNESS_FILTER: u32 = 28u;
 const MAT_OP_MICRO_DETAIL: u32 = 29u;
 const MAT_OP_SWIZZLE: u32 = 30u;
 const MAT_OP_VORONOI_EDGE: u32 = 31u; // ADR-1069
+const MAT_OP_QUANTIZE: u32 = 32u;     // ADR-1162
 
 fn matPick(v: vec4<f32>, index: f32) -> f32 {
     return v[clamp(i32(index), 0, 3)];
@@ -660,6 +661,14 @@ fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields:
         // ADR-1069: F2 - F1 is 0 on the boundary between two cells -- polygons, not blobs.
         let w = worleyF1F2(a.xyz * f + k.xyz, matOpSeed(pi, oi));
         return vec4<f32>(w.y - w.x, w.x, w.z, w.y);
+    }
+    if (kind == MAT_OP_QUANTIZE) {
+        // ADR-1162: the centre of a's square cell, in a's own units, and a uniform random per cell.
+        if (!(f > 0.0)) {
+            return a;
+        }
+        let cell = floor(a.xyz * f + k.xyz);
+        return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
     }
     return vec4<f32>(0.0);
 }
