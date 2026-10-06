@@ -2205,9 +2205,9 @@
    },
    "terrain": {
     "chunkSize": 30.0,
-    "resolution": 24,
+    "resolution": 30,
     "lodLevels": 4,
-    "lodDistance": 110.0,
+    "lodDistance": 180.0,
     "viewDistance": 1300.0,
     "shadowDistance": 200.0,
     "skirtDepth": 2.0,

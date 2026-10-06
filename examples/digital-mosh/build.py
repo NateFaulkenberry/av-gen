@@ -483,7 +483,7 @@ def scene():
            "intensity": 1.0}
     nodes = fields() + [
         {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(False),
-         "terrain": {"chunkSize": 30.0, "resolution": 24, "lodLevels": 4, "lodDistance": 110.0,
+         "terrain": {"chunkSize": 30.0, "resolution": 30, "lodLevels": 4, "lodDistance": 180.0,
                      "viewDistance": 1300.0, "shadowDistance": 200.0, "skirtDepth": 2.0, "groundMottle": False},
          "material": {"program": "ground", "baseColor": d["land"][1], "roughness": 0.92, "metallic": 0.0}},
         {"name": "far", "kind": "terrain", "position": [0, -0.8, 0], "world": land.world(True),
