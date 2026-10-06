@@ -6140,6 +6140,18 @@ void Engine::update(const FrameTime& time) {
     updateTimeSignals(time, newFrame); // and music.*, unconditionally (ADR-073)
     updateTimelineClock(time);
     applyCues();
+    probeStage(probe2::frame().updSignalsMs); // TEMPORARY: phase 2
+    stats_.allocsSignals = allocsNow() - allocMark;
+    allocMark = allocsNow();
+    if (input_ && inputGain_ != nullptr) {
+        input_->setGain(inputGain_->value());
+    }
+    sources_.update(bus_, sourceContext_);
+    // ADR-1124: the scene states read the bus AFTER the sources, so a one-frame event a source publishes this
+    // frame -- a MIDI noteEvent pad, a control pulse, an envelope's trigger -- reaches a state trigger before the
+    // end-of-frame clearEvents() erases it. Before, the states ran ahead of the sources and saw only values that
+    // persisted across frames: a pad bound as noteEvent could never change a state. Still before resetFinals, so
+    // a transition's preset morph lands on the bases the routes then modulate, as it always did.
     {
         BeatInfo beat;
         beat.beatPulse = bus_.event(timeSignals_.beatPulse);
@@ -6155,13 +6167,6 @@ void Engine::update(const FrameTime& time) {
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
     }
-    probeStage(probe2::frame().updSignalsMs); // TEMPORARY: phase 2
-    stats_.allocsSignals = allocsNow() - allocMark;
-    allocMark = allocsNow();
-    if (input_ && inputGain_ != nullptr) {
-        input_->setGain(inputGain_->value());
-    }
-    sources_.update(bus_, sourceContext_);
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     // Spatial reactivity, between automation and the routes (ADR-097). After timeline_.apply so a

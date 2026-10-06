@@ -62,6 +62,8 @@ A state names a preset and how to get there.
   when they cross an integer boundary.
 - The machine publishes `state.progress` (0..1 during a transition) and `state.index`, so the
   world can react to its own transitions.
+- The machine updates after the signal sources (ADR-1124), so a one-frame event such as a MIDI pad
+  bound as `noteEvent` (`control.<channel>`) fires a `signal` trigger in the frame it arrives.
 - OSC: `/avgen/state/go <name> [instant]` or `/avgen/state/<name>`.
 
 ## 3. Authoring layers

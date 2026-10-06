@@ -229,3 +229,35 @@ TEST_CASE("A director installs artistic knobs and a look changes only the look",
     CHECK(engine.applyLookByName("nope").applied == 0);
     fs::remove_all(dir);
 }
+
+// ADR-1124: a one-frame event -- a MIDI pad bound as noteEvent -- reaches a state trigger. The states ran ahead of
+// the sources, which publish the pad's pulse, and the bus cleared the pulse at the end of the frame, so a pad could
+// never change a state (only a value held across frames could, which the test above uses).
+TEST_CASE("A MIDI pad bound as noteEvent changes the scene state", "[integration][states][midi]") {
+    app::Engine engine(app::EngineMode::Live);
+    engine.setLiveControl(false); // no device: the injected bytes are the controller
+    control::ControlMap map;
+    map.oscEnabled = false;
+    map.midiEnabled = true;
+    control::MidiBinding pad;
+    pad.kind = control::MidiBindKind::NoteEvent;
+    pad.number = 41;
+    pad.channel = -1;
+    pad.target.signal = "go";
+    map.midi.push_back(pad);
+    engine.control().setMap(map);
+    FixedStepClock clock(60.0);
+    engine.update(engine.tick(clock));
+    makeStates(engine);
+    engine.update(engine.tick(clock));
+    CHECK(engine.states().current() == "Dormant");
+    // A pad hit and its release in the same breath, as a drum pad sends them.
+    engine.control().injectMidi(std::array<std::uint8_t, 6>{0x90, 41, 110, 0x80, 41, 0});
+    engine.update(engine.tick(clock));
+    engine.update(engine.tick(clock));
+    CHECK(engine.states().pending() == "Awakening");
+    for (int i = 0; i < 80; ++i) {
+        engine.update(engine.tick(clock));
+    }
+    CHECK(engine.states().current() == "Awakening");
+}
