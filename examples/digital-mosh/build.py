@@ -52,10 +52,10 @@ PAL = {
     # Dali, Dream Caused by the Flight of a Bee + The Persistence of Memory
     # Persistence's own sky band: Cap de Creus teal over olive-gold; the Bee's ochre for the pan
     "dream": dict(zenith=lin("#3f798d"), horizon=lin("#e4d7bf"), sun=light_of("#e4d7bf"), fog=lin("#b1c9d8"),
-                  land=[lin("#c1ae5e"), lin("#b1b081"), lin("#8c6f36")], groundSky=lin("#9f9985")),
+                  land=[lin("#c6bfae"), lin("#c1ae5e"), lin("#73512a")], groundSky=lin("#9f9985")),
     # de Chirico, The Disquieting Muses + Mystery and Melancholy of a Street
     "uncanny": dict(zenith=lin("#3b6e65"), horizon=lin("#efe1ab"), sun=light_of("#e49420"), fog=lin("#f6e6be"),
-                    land=[lin("#c1ae5e"), lin("#b1b081"), lin("#8c6f36")], groundSky=lin("#223b37")),
+                    land=[lin("#c6bfae"), lin("#c1ae5e"), lin("#73512a")], groundSky=lin("#223b37")),
     # Tanguy, Indefinite Divisibility: the ochre drains to grey-blue infinity
     "infection": dict(zenith=lin("#84add1"), horizon=lin("#d7e2da"), sun=light_of("#d7e2da"), fog=lin("#b8c9c6"),
                       land=[lin("#d7e2da"), lin("#9ab3bc"), lin("#79898d")], groundSky=lin("#505655")),
@@ -178,7 +178,7 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("constant", 5, constant=[-1, -1, -1, -1]),
         op("multiply", 4, srcA=4, srcB=5),
         op("add", 4, srcA=2, srcB=4),                                     # d = contagion - cell random
-        op("smoothstep", 7, srcA=4, constant=[0.03, 0.10, 0, 0]),
+        op("smoothstep", 7, srcA=4, constant=[0.0, 0.035, 0, 0]),
         op("remap", 7, srcA=7, value=1, constant=[0.0, 1.0, 1.0, 0.0]),
         op("smoothstep", 4, srcA=4, constant=[0.0, 0.004, 0, 0]),         # m: the cell has failed
         op("multiply", 7, srcA=7, srcB=4),                                # the growth front
@@ -201,7 +201,7 @@ def infected(name, cells_per_m, fieldname, base_ops, remap_stain=False, seed=3, 
         op("swizzle", 3, srcA=3, constant=[3, 3, 3, 3]),                  # treble
         op("field", 2, field="kick"),
         op("add", 3, srcA=3, srcB=2),
-        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.45, 2.2]),
+        op("remap", 3, srcA=3, value=0, constant=[0.0, 1.0, 0.25, 1.6]),
         op("multiply", 7, srcA=7, srcB=3),
         op("constant", 2, constant=[0.92, 0.92, 0.92, 1]),
         op("constant", 3, constant=[0.16, 0.16, 0.16, 1]),
@@ -476,18 +476,18 @@ STAGES = {
     "Corruption": stage(pal="corruption", inject=2.4, advect=2.0, dissip=0.0, climb=4.6, eat=0.32, eatStone=0.5,
                         melt=[0.16, 0.08, -0.06], bark=0.05, barkSpeed=0.5, rise=0.35, tumble=0.25, spin=0.4,
                         kick=0.25, fracture=1900.0, double=True, glowPlain=4.0, glowBark=3.0, glowBlocks=5.0,
-                        echo=0.18, mosh=0.04, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.45, gMelt=0.5,
+                        echo=0.18, mosh=0.0, exposure=-0.4, gMicro=0.75, gRhythm=0.65, gMosh=0.25, gMelt=0.5,
                         gLift=0.3, motes=160.0, volDen=0.0011),
     # The Elephants' blood sky over Tanguy's night land: the tree is blocks, its limbs float free.
     "Nightmare": stage(pal="nightmare", inject=3.5, advect=3.4, dissip=0.0, climb=9.5, eat=0.55, eatStone=0.7,
                        melt=[0.26, 0.18, -0.14], lift=[1.3, 0.7, 1.0], bark=0.09, barkSpeed=1.0, rise=1.8,
                        tumble=1.1, spin=1.5, kick=0.6, sunYaw=-34.0, fracture=3200.0, double=True, glowPlain=6.0,
-                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.1, moshBlock=24.0, exposure=-0.7,
+                       glowBark=4.5, glowBlocks=7.0, echo=0.3, mosh=0.03, moshBlock=24.0, exposure=-0.7,
                        gMicro=1.0, gRhythm=1.0, gMosh=0.85, gGlitch=0.6, gMelt=1.0, gLift=1.0, motes=420.0,
                        volDen=0.0014),
     # The collapse, through the representations the renderer built the world from (G10, brief §15), on the bar grid:
     # geometry...
-    "Collapse": stage(pal="collapse", melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
+    "Collapse": stage(pal="nightmare", melt=[0.4, 0.3, -0.3], lift=[3.0, 2.0, 2.5], bark=0.12, barkSpeed=1.5,
                       rise=5.0, tumble=2.5, spin=3.0, kick=1.2, glowBlocks=9.0, echo=0.35, mosh=0.25, moshBlock=48.0,
                       exposure=-0.6, gGlitch=0.8, motes=900.0, volDen=0.0016, **COLLAPSE_COMMON),
     #   ... fragments become particles and temporal fragments
@@ -712,7 +712,7 @@ def routes():
     for blocks in ("treeBlocks", "tanguyBlocks"):
         r.append(gated("audio.onsetLow", f"procedural/{blocks}/effector/5/strength", 0.6, "gRhythm", PEAK(40, 4.0)))
     r.append(gated("audio.onsetMid", "field/infect/strength", 4.0, "gRhythm", PEAK(60, 3.0)))
-    r.append(gated("audio.onsetMid", "temporal/mosh/amount", 0.28, "gMosh", PEAK(90, 3.5)))
+    r.append(gated("audio.onsetMid", "temporal/mosh/amount", 0.14, "gMosh", PEAK(70, 5.0)))
     r.append(gated("audio.onsetMid", "post/glitch/tear", 0.35, "gGlitch", PEAK(50, 6.0)))
     r.append(gated("audio.onsetLow", "post/split/amount", 6.0, "gGlitch", PEAK(15, 12.0)))
     # ---- LAYER 3, musical: bass is mass and gravity -- the limbs sag and lift, the bark flows, the haze breathes

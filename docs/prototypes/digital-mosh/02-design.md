@@ -13,20 +13,54 @@ for one block that did not refresh.
 
 ## The world (brief §3, §14)
 
-There are a small number of deliberate elements on an infinite plain. Each is chosen for what it lets the
-corruption say.
+*Revised in art pass 1, after the owner asked for real landscape, a camera that travels, more craft and
+painting-derived colour.*
+
+A sparse set of deliberate elements stands on a sculpted desert (`land.py`). Each one is chosen for what it lets
+the corruption say.
 
 | Element | Reference | Role | What corrupts in it |
 |---|---|---|---|
-| **The Plain**: pale ochre, flat, no horizon line. It dissolves into the sky through aerial haze | Tanguy (S10), Dalí's beach (S1) | The baseline of normality, and the canvas of the contagion | Colour (the stain), tiling (blocks), height (liquid swells), the horizon (it steps) |
-| **The Tree**: one bare, gnarled, dead-olive tree | *Persistence of Memory* (S1, S2) | The protagonist of brief §4's chain | Bends, stretches, liquefies, its limbs detach and float, fragments, pixels, another object |
-| **The Stone**: a smooth, singular pebble of indeterminate size, hovering a hand's width above its shadow | Tanguy (S11), *Dream Caused by the Flight of a Bee* (S8) | The patient zero: the first block goes bad here | Doubles (P2), quantises into blocks, is the infection's source |
-| **The Long Shadows**: an 11° sun, so every shadow runs 5× its caster's height toward the viewer | de Chirico (D2), Dalí (S3) | Free, enormous, and the first thing to lie | They turn against the sun (Uncanny), point the wrong way, and a shadow stays after its caster has gone |
-| **Far Headland**: a low, hazed rock mass on the horizon | Cap de Creus (S1) | The scale reference, and proof that the world is a place | Spatial corruption: it appears twice, or nearer |
-| **Still clouds**: two or three smooth, elongated forms | Magritte | A slow drift that can stop (Uncanny) | Freezing, and repetition |
+| **The land**: two terrain nodes over one geography. A salt pan for the stage; a dry riverbed meandering into it as a leading line; long low swells and dunes; a Cap de Creus escarpment and two flat-topped mesas at the edge; ranges 3 km out, dissolving into the haze | Dalí's beach and Cap de Creus (S1); Tanguy's infinite plain (S10) | Real foreground, middle ground and distance for a travelling camera, and composed negative space made of land and sky | The ground's colour (ink), its tiling (macroblock cells), the palette of the whole land per stage |
+| **The olive**: a trunk of three braided strands, a root flare gripping the ground, and three limbs with three levels of branching, built as five SDF objects | The dead olive of *The Persistence of Memory* (S1, S2), made our own | The protagonist of brief §4's chain | It bends (limbs `bend`), softens (the bark flows), is eaten from the root up (blocks), and its limbs detach and float (node positions) |
+| **The Tanguy object**: a smooth mass pierced by a hole, a slender filament rising to a balanced bead, and a needle pointing down that stops a hand's width above its shadow | Tanguy's biomorphs (S11); the hovering of *Dream Caused by the Flight of a Bee* (S8) | Patient zero: the first block goes bad here | It doubles (P2), quantises into blocks, and is the contagion's source |
+| **The long shadows**: an 11° sun, so every shadow runs about five times its caster's height toward the viewer | de Chirico (D2), Dalí (S3) | Free, enormous, and the first thing to lie | They swing against the sun (Uncanny) |
 
-Negative space is the plain and the sky, 70-80% of every early frame (S6). The horizon sits in the lower third.
-The world never shows an edge: the plain fades into the sky's colour (the owner's dead-space rule).
+Negative space is land and sky. The far land ends 4 km out, inside the haze (`fogSky` over 3.2 km), so no frame
+shows an edge.
+
+### Colour (`05-palettes.md`)
+
+Every stage's sky, land, light and haze is extracted from one painting:
+
+| Stage | Painting |
+|---|---|
+| Dream | *Persistence* and the *Bee* |
+| Uncanny | de Chirico |
+| Infection | Tanguy's *Indefinite Divisibility* |
+| Corruption | Ernst's *Europe After the Rain II* |
+| Nightmare | *The Elephants* over Tanguy's *Slowly Toward the North* |
+| Collapse | Tanguy's *Multiplication of the Arcs* |
+| Respite | Magritte's *The Empire of Light* |
+
+The contagion is Ernst's rot at full chroma, so it reads as one painting infecting another.
+
+### The travelling camera
+
+The camera moves through the world. It never sits locked off and never shakes. Each stage has two or three
+vantages on the land, and the music's phrases (later, its bars) move the camera between them:
+
+| Stage | Move | What the vantages show |
+|---|---|---|
+| Dream | 16 s glides | The classic frame, low along the riverbed, the shadow line leading to the viewer |
+| Uncanny | 12 s | A reveal from behind, the double against the mesas, a slow crane up |
+| Infection | 9 s | Toward the first bad block, then a wide reveal of the spread |
+| Corruption | 5 s every 4 bars | Low and close, under the drooping limbs |
+| Nightmare | 1.2 s jumps every 2 bars | Beside the trunk, a sudden height, ankle level; the horizon rolls |
+
+Between moves, slow LFOs float the eye and the aim, more deeply as the energy grows. `build.py` checks every eye,
+and every straight move between eyes, against the engine's terrain heights. A move is marked `idle` (ADR-1164) so
+it never interrupts a stage's own transition.
 
 ## Corruption is a substance, not a filter (brief §6)
 
@@ -38,7 +72,7 @@ tree is infected where the stain reaches it, from the root up. The domains:
 
 | Domain | How it is built | Read from |
 |---|---|---|
-| **Geometry** | SDF **quantise** (ADR-1162): the surface becomes aligned blocks, cell by cell, with a per-cell probability of `amount × contagion(cell)`, which is the codec's failing macroblocks (G3). SDF **flow** (ADR-1164): a vector-field domain warp that sags, drips and liquefies a shape while its light and shadow stay correct (§8). Fragments: cubes placed along the tree's skeleton, which detach, float and tumble through field effectors | contagion grid, `melt` and `lift` fields, bass |
+| **Geometry** | Voxel shells: cubes on the forms' own surfaces that appear where the contagion has eaten the smooth SDF surface (`displaceField`), then lift, tumble and float through field effectors; limbs that bend like wax and detach; bark that flows | contagion grid, `melt` and `lift` fields, bass |
 | **Temporal** | The temporal ring: mosh (blocks replaced by older blocks, G1/G2), echo, slit-scan. Freezes: a cloud stops; the camera's orbit stops while the music continues (G11) | corruption × percussion |
 | **Spatial** | The Stone's double appears where it should not be (P2). The Headland duplicates nearer. A dolly-zoom (FOV against distance) breaks perspective (D1). The horizon steps (the plain's far half offset) | states, macros |
 | **Material** | The bark takes the stone's surface and the stone takes the bark's (S14, collage). The material colour migrates along the contagion. Specular goes wrong | material programs reading the contagion field |
@@ -117,20 +151,7 @@ Dream --depth>0.12--> Uncanny --0.28--> Infection --0.45--> Corruption --0.65-->
 
 ## Camera (brief §13)
 
-An orbit around a per-state pivot (ADR-1123), with two incommensurate LFO drifts. Transitions are preset
-morphs, so they are moves, not cuts. Instability is spatial, never shake:
-
-- **Dream:** eye height (1.4 m), a long lens (30°), the horizon in the lower third, orbit about 0.01 rad/s.
-- **Uncanny:** the same framing, but the field of view and the distance trade against each other: a slow
-  dolly-zoom, so the space breathes in a way no physical camera does (D1, P5).
-- **Infection:** nearer the tree, slightly faster, with a parallax reveal of the stone's double.
-- **Corruption:** lower and closer, the orbit reversing on state changes.
-- **Nightmare:**
-  - the pivot inside the tree, so the camera passes through corrupted geometry;
-  - a slow roll that tilts the horizon (loss of ground plane, P5);
-  - short transitions (impossible moves).
-- **Collapse:** an abrupt rise to 200 m looking down: a scale change, so the plain becomes a canvas.
-- **Recovery:** exactly the Dream framing (P8).
+See "The travelling camera" above. It replaced the first build's orbit, which the owner found static.
 
 ## Quality tiers (brief §11)
 
