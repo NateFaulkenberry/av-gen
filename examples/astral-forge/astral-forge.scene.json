@@ -39,7 +39,10 @@
     "preroll": 6.0,
     "controls": {
       "zoom": 1.1,
-      "legibility": 0.3,
+      "legibility": 0.55,
+      "light": 0.25,
+      "dust": 1.0,
+      "folds": 0.35,
       "cameraStyle": 0
     }
   }

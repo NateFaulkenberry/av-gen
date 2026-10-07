@@ -92,7 +92,8 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     var heat = v4.w;
     // v2: about half the drifter dust is ABSORBED into a formed face (pal4.w = absorption, from coherence): it binds
     // as plate matter, so the face thickens and the background thins; a collapse throws it back out
-    let absorbed = F.pal0.w > 0.0 && roleOf(i) == 5 && u01(hashu(i * 0x51ed27u + 3u)) < 0.8;
+    // (lg0.y: production turns the absorption on without the palette, ADR-1221)
+    let absorbed = (F.pal0.w > 0.0 || F.lg0.y > 0.5) && roleOf(i) == 5 && u01(hashu(i * 0x51ed27u + 3u)) < 0.8;
     let role = select(roleOf(i), 3, absorbed);
     let hi = hashu(i * 0x27d4eb2fu + 0x165667b1u);
 

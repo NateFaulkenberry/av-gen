@@ -72,7 +72,7 @@ Result<AstralForge> astralFromJson(const json& j) {
             return fail("astral.controls must be an object");
         }
         if (auto ok = refuseUnknown(c, {"summon", "hold", "intensity", "palette", "light", "atmosphere", "godRays",
-                                        "legibility", "zoom", "exposure", "god", "intro", "ending", "cameraStyle"},
+                                        "legibility", "zoom", "exposure", "god", "intro", "ending", "cameraStyle", "dust", "folds"},
                                     "astral.controls");
             !ok) {
             return std::unexpected(ok.error());
@@ -90,6 +90,8 @@ Result<AstralForge> astralFromJson(const json& j) {
         k.exposure = c.value("exposure", k.exposure);
         k.god = c.value("god", k.god);
         k.camera = c.value("cameraStyle", k.camera);
+        k.dust = c.value("dust", k.dust);
+        k.folds = c.value("folds", k.folds);
         k.intro = c.value("intro", k.intro);
         k.ending = c.value("ending", k.ending);
         if (k.god < -1 || k.god > 6) {
@@ -114,7 +116,7 @@ json astralToJson(const AstralForge& a) {
                  {{"summon", k.summon}, {"hold", k.hold}, {"intensity", k.intensity}, {"palette", k.palette},
                   {"light", k.light}, {"atmosphere", k.atmosphere}, {"godRays", k.godRays},
                   {"legibility", k.legibility}, {"zoom", k.zoom}, {"exposure", k.exposure}, {"god", k.god},
-                  {"intro", k.intro}, {"ending", k.ending}, {"cameraStyle", k.camera}}}};
+                  {"intro", k.intro}, {"ending", k.ending}, {"cameraStyle", k.camera}, {"dust", k.dust}, {"folds", k.folds}}}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------
@@ -192,6 +194,8 @@ AstralParameters registerAstralParameters(params::ParameterSet& params, const As
     r.f("atmosphere", "void glow", k.atmosphere, 0.0f, 1.0f);
     r.f("godRays", "god rays", k.godRays, 0.0f, 1.0f);
     r.f("legibility", "face legibility at a formed peak", k.legibility, 0.0f, 1.0f);
+    r.f("dust", "dust absorbed into a formed face", k.dust, 0.0f, 1.0f);
+    r.f("folds", "the held face's dimensional folds", k.folds, 0.0f, 1.0f);
     r.f("zoom", "camera zoom (distance divisor)", k.zoom, 0.25f, 4.0f);
     r.i("cameraStyle", "camera style (0 iteration 2's vocabulary, 1 v2's shot sizes)", k.camera, 0, 1);
     r.f("exposure", "exposure (multiplier)", k.exposure, 0.0f, 4.0f);
@@ -211,6 +215,8 @@ float applyAstralParameters(const AstralParameters& p, const AstralForge& rest, 
     k.atmosphere = fval(p, "atmosphere", k.atmosphere);
     k.godRays = fval(p, "godRays", k.godRays);
     k.legibility = fval(p, "legibility", k.legibility);
+    k.dust = fval(p, "dust", k.dust);
+    k.folds = fval(p, "folds", k.folds);
     k.zoom = fval(p, "zoom", k.zoom);
     k.camera = ival(p, "cameraStyle", k.camera);
     k.exposure = fval(p, "exposure", k.exposure);

@@ -512,7 +512,7 @@ void AstralRenderer::fillFrame(FrameU& f, const scene::AstralForge& a, const ast
         f.pal3 = glm::vec4(mx(pa.zoneA, pb.zoneA), s.keyLight);
         f.pal4 = glm::vec4(mx(pa.zoneB, pb.zoneB), s.absorb);
         f.atm0 = glm::vec4(glm::mix(pa.fog, pb.fog, m), s.atmosphere);
-        f.lg0 = glm::vec4(s.legible, 0.0f, 0.0f, 0.0f);
+        f.lg0 = glm::vec4(s.legible, s.absorbOn, 0.0f, 0.0f);
     }
     const TierLevers lv = leversFor(tier_);
     f.it3 = glm::vec4(lv.fullMarch ? 0.0f : 1.0f, s.collapseAt > -1e8f ? static_cast<float>(t) - s.collapseAt : -1.0f, 0.0f, 0.0f);

@@ -38,6 +38,7 @@ struct State {
     float rimLight = 0.0f, eyeGlow = 0.0f, keyLight = 0.0f, absorb = 0.0f;
     float atmosphere = 0.0f, godRays = 0.0f;
     float legible = 0.0f; // v2: face legibility at a formed peak (quiet engraving, dark sockets, frontal key)
+    float absorbOn = 0.0f; // ADR-1221: loose dust is absorbed into a formed face without the palette (production)
     float metaRadius = 22.0f;  // how far the unbound dust field extends
     float metaFace = 0.0f;     // the dust condenses into a giant ghost mask (0..1)
     float tendonWeight = 0.22f; // density weight of tendon matter: low, so tendons read as streams of flakes, thickening only where dense
@@ -535,12 +536,12 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
             // the build pushes in as the face forms and arrives at a portrait for the hold (v2: peak by 60%)
             const float push = sstep(0.0f, 0.65f, v);
             if (choice == 0) { d = 26.0f - 12.0f * push; el = 6.0f; az = side * (20.0f - 8.0f * v); lab = "OBSERVER"; }
-            else if (choice == 1) { d = 19.0f - 5.0f * push; el = 0.0f; az = side * (70.0f - 30.0f * push); lab = "PROFILE"; }
+            else if (choice == 1) { d = 19.0f - 5.0f * push; el = 0.0f; az = side * (70.0f - 52.0f * push); lab = "PROFILE"; } // turns to face the lens as it forms
             else { d = 22.0f - 8.0f * push; el = -24.0f + 18.0f * push; az = side * (25.0f - 10.0f * v); lab = "LOW"; }
         } else {
             const bool micro = choice == 2 && (p.index % 8) == 7;
             if (choice == 0) { d = 15.0f - 3.0f * v; el = 28.0f - 22.0f * v; az = side * 18.0f; lab = "DESCENT"; }
-            else if (choice == 1) { d = 13.5f; el = 10.0f; az = side * (-50.0f + 100.0f * v); lab = "ORBIT"; }
+            else if (choice == 1) { d = 13.5f; el = 10.0f; az = side * (-28.0f + 56.0f * v); lab = "ORBIT"; } // a frontal arc
             else if (micro) {
                 const glm::vec3 eyeP{side * 0.76f, 0.72f, 0.6f};
                 d = 7.5f - 1.8f * v; el = 4.0f; az = side * 14.0f; focus = eyeP; tgt = eyeP; lab = "MICRO";
@@ -607,6 +608,8 @@ struct Controls {
     float atmosphere = 0.0f;  // 0..1: the tinted void glow (v2)
     float godRays = 0.0f;     // 0..1: shafts from the off-screen source (v2)
     float legibility = 1.0f;  // 0..1: the formed face reads by form (quiet engraving, dark sockets)
+    float dust = 1.0f;        // 0..1: loose dust absorbed into a formed face (the void clears at a peak)
+    float folds = 1.0f;       // 0..1: the held face's dimensional folds (twist, eye depth, tunnel, inversion, bend)
     float zoom = 1.0f;        // camera distance divisor (1.2 = 20% closer)
     float exposure = 1.0f;    // multiplier on the conductor's exposure
     int god = -1;             // -1: the score chooses; 0..6 an archetype (Arch)
@@ -628,7 +631,12 @@ inline void applyControls(State& s, const Controls& c) {
         s.flash = s.C < 0.85f ? s.flash : 0.0f;
     }
     s.legible = sstep(0.82f, 0.95f, s.C) * std::clamp(c.legibility, 0.0f, 1.0f);
-    s.absorb = sstep(0.7f, 0.95f, s.C) * (c.palette > 0.0f ? 1.0f : 0.0f);
+    const float dustAbsorb = std::max(c.palette > 0.0f ? 1.0f : 0.0f, std::clamp(c.dust, 0.0f, 1.0f));
+    s.absorb = sstep(0.7f, 0.95f, s.C) * dustAbsorb;
+    s.absorbOn = dustAbsorb > 0.0f ? 1.0f : 0.0f;
+    const float fk = std::clamp(c.folds, 0.0f, 1.0f); // the choir's sync and merge (fold1.zw) are not folds
+    s.fold0 *= fk;
+    s.fold1.x *= fk;
     const float k = std::clamp(c.intensity, 0.0f, 2.0f);
     s.flow *= k;
     s.tendonFlow *= k;
