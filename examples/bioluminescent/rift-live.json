@@ -19,14 +19,16 @@
   "post/bloom/threshold": 0.9,
   "post/bloom/intensity": 0.32,
   "post/bloom/emissionWeight": 0.75,
-  "post/tonemap/chroma-retention": 0.6,
+  "post/tonemap/chroma-retention": 0.8,
   "post/output/vignette": 0.28,
   "post/grade/contrast": 1.08,
   "post/grade/saturation": 1.05,
   "camera/exposure/mode": 0,
   "camera/mode": 2,
   "sources/driftA/rate": 0.031,
-  "sources/driftC/rate": 0.047
+  "sources/driftC/rate": 0.047,
+  "scene/volumeSteps": 16,
+  "scene/volumeNoise": 0.0
  },
  "sources": [
   {
@@ -118,9 +120,9 @@
   },
   {
    "source": "macro.flight",
-   "target": "field/wakeFront/position",
+   "target": "field/kickFront/position",
    "op": "add",
-   "amount": 20.0,
+   "amount": 19.32898165980221,
    "chain": {
     "integrate": true
    },
@@ -128,19 +130,19 @@
   },
   {
    "source": "macro.energy",
-   "target": "field/wakeFront/position",
+   "target": "field/kickFront/position",
    "op": "add",
-   "amount": 3.0,
+   "amount": 2.8993472489703316,
    "chain": {
     "integrate": true
    },
    "component": 2
   },
   {
-   "source": "audio.bassLevel",
+   "source": "audio.bass",
    "target": "grid/prop/injectRate",
    "op": "add",
-   "amount": 0.8,
+   "amount": 0.6,
    "chain": {
     "attackMs": 60,
     "decayMs": 400
@@ -251,10 +253,17 @@
     "grid/prop/injectRate": [
      0.0
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1260.0
+    "grid/prop/waveSpeed": [
+     10.0
+    ],
+    "grid/prop/threshold": [
+     0.95
+    ],
+    "field/kickFront/onsetDecay": [
+     4.0
+    ],
+    "field/kickFront/audioSpeed": [
+     30.0
     ],
     "material/rock/emissionIntensity": [
      0.0
@@ -266,6 +275,321 @@
      250.0
     ],
     "particles/swarm/spawnRate": [
+     0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     3.75
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     3.0
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     2.625
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     2.25
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     2.25
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     5.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     1.875
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crust/intensity": [
+     0.45
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.2625
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/embers/intensity": [
+     1.05
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     0.9
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     3.0
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.45
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.6
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     7.0
+    ],
+    "lights/crown2/intensity": [
+     180.0
+    ],
+    "lights/crown3/intensity": [
+     180.0
+    ],
+    "lights/crown5/intensity": [
+     180.0
+    ],
+    "lights/crown6/intensity": [
+     180.0
+    ],
+    "lights/crown8/intensity": [
+     180.0
+    ],
+    "lights/crown9/intensity": [
+     180.0
+    ],
+    "lights/crown10/intensity": [
+     180.0
+    ],
+    "lights/crown11/intensity": [
+     180.0
+    ],
+    "lights/crown13/intensity": [
+     180.0
+    ],
+    "lights/crown14/intensity": [
+     180.0
+    ],
+    "lights/crown19/intensity": [
+     180.0
+    ],
+    "lights/crown20/intensity": [
+     180.0
+    ],
+    "lights/crown21/intensity": [
+     180.0
+    ],
+    "lights/crown22/intensity": [
+     180.0
+    ],
+    "lights/crown28/intensity": [
+     180.0
+    ],
+    "lights/crown33/intensity": [
+     180.0
+    ],
+    "lights/crown34/intensity": [
+     180.0
+    ],
+    "lights/crown37/intensity": [
+     180.0
+    ],
+    "lights/crown39/intensity": [
+     180.0
+    ],
+    "lights/crown40/intensity": [
+     180.0
+    ],
+    "lights/crown43/intensity": [
+     180.0
+    ],
+    "lights/crown44/intensity": [
+     180.0
+    ],
+    "lights/crown46/intensity": [
+     180.0
+    ],
+    "lights/crown48/intensity": [
+     180.0
+    ],
+    "lights/crown49/intensity": [
+     180.0
+    ],
+    "lights/crown50/intensity": [
+     180.0
+    ],
+    "lights/crown53/intensity": [
+     180.0
+    ],
+    "lights/crown56/intensity": [
+     180.0
+    ],
+    "lights/crown58/intensity": [
+     180.0
+    ],
+    "lights/crown59/intensity": [
+     180.0
+    ],
+    "lights/crown62/intensity": [
+     180.0
+    ],
+    "lights/crown63/intensity": [
+     180.0
+    ],
+    "lights/crown66/intensity": [
+     180.0
+    ],
+    "lights/crown67/intensity": [
+     180.0
+    ],
+    "lights/crown68/intensity": [
+     180.0
+    ],
+    "lights/crown69/intensity": [
+     180.0
+    ],
+    "lights/crown71/intensity": [
+     180.0
+    ],
+    "lights/crown72/intensity": [
+     180.0
+    ],
+    "lights/crown76/intensity": [
+     180.0
+    ],
+    "lights/crown78/intensity": [
+     180.0
+    ],
+    "lights/crown81/intensity": [
+     180.0
+    ],
+    "lights/crown85/intensity": [
+     180.0
+    ],
+    "lights/crown86/intensity": [
+     180.0
+    ],
+    "lights/crown88/intensity": [
+     180.0
+    ],
+    "lights/crown91/intensity": [
+     180.0
+    ],
+    "lights/crown92/intensity": [
+     180.0
+    ],
+    "lights/crown95/intensity": [
+     180.0
+    ],
+    "lights/crown96/intensity": [
+     180.0
+    ],
+    "lights/crown97/intensity": [
+     180.0
+    ],
+    "lights/crown99/intensity": [
+     180.0
+    ],
+    "lights/crown102/intensity": [
+     180.0
+    ],
+    "lights/crown103/intensity": [
+     180.0
+    ],
+    "lights/crown108/intensity": [
+     180.0
+    ],
+    "lights/crown109/intensity": [
+     180.0
+    ],
+    "lights/crown111/intensity": [
+     180.0
+    ],
+    "lights/crown112/intensity": [
+     180.0
+    ],
+    "lights/crown114/intensity": [
+     180.0
+    ],
+    "lights/crown118/intensity": [
+     180.0
+    ],
+    "lights/crown121/intensity": [
+     180.0
+    ],
+    "lights/crown122/intensity": [
+     180.0
+    ],
+    "lights/crown123/intensity": [
+     180.0
+    ],
+    "lights/crown125/intensity": [
+     180.0
+    ],
+    "lights/crown126/intensity": [
+     180.0
+    ],
+    "lights/crown127/intensity": [
+     180.0
+    ],
+    "lights/crown128/intensity": [
+     180.0
+    ],
+    "lights/crown129/intensity": [
+     180.0
+    ],
+    "lights/crown130/intensity": [
+     180.0
+    ],
+    "lights/crown131/intensity": [
+     180.0
+    ],
+    "lights/crown132/intensity": [
+     180.0
+    ],
+    "lights/crown134/intensity": [
+     180.0
+    ],
+    "lights/crown135/intensity": [
+     180.0
+    ],
+    "lights/crown136/intensity": [
+     180.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
      0.0
     ]
    }
@@ -291,12 +615,19 @@
      6.0
     ],
     "grid/prop/injectRate": [
-     1.1
+     1.0
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1210.0
+    "grid/prop/waveSpeed": [
+     10.0
+    ],
+    "grid/prop/threshold": [
+     0.9
+    ],
+    "field/kickFront/onsetDecay": [
+     4.0
+    ],
+    "field/kickFront/audioSpeed": [
+     30.0
     ],
     "material/rock/emissionIntensity": [
      0.0
@@ -308,6 +639,321 @@
      400.0
     ],
     "particles/swarm/spawnRate": [
+     0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     5.0
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     4.0
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     3.5
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     3.0
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     3.0
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     5.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     2.5
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crust/intensity": [
+     0.6
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.35
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/embers/intensity": [
+     1.4
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.2
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     3.0
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.6
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.8
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     7.0
+    ],
+    "lights/crown2/intensity": [
+     220.0
+    ],
+    "lights/crown3/intensity": [
+     220.0
+    ],
+    "lights/crown5/intensity": [
+     220.0
+    ],
+    "lights/crown6/intensity": [
+     220.0
+    ],
+    "lights/crown8/intensity": [
+     220.0
+    ],
+    "lights/crown9/intensity": [
+     220.0
+    ],
+    "lights/crown10/intensity": [
+     220.0
+    ],
+    "lights/crown11/intensity": [
+     220.0
+    ],
+    "lights/crown13/intensity": [
+     220.0
+    ],
+    "lights/crown14/intensity": [
+     220.0
+    ],
+    "lights/crown19/intensity": [
+     220.0
+    ],
+    "lights/crown20/intensity": [
+     220.0
+    ],
+    "lights/crown21/intensity": [
+     220.0
+    ],
+    "lights/crown22/intensity": [
+     220.0
+    ],
+    "lights/crown28/intensity": [
+     220.0
+    ],
+    "lights/crown33/intensity": [
+     220.0
+    ],
+    "lights/crown34/intensity": [
+     220.0
+    ],
+    "lights/crown37/intensity": [
+     220.0
+    ],
+    "lights/crown39/intensity": [
+     220.0
+    ],
+    "lights/crown40/intensity": [
+     220.0
+    ],
+    "lights/crown43/intensity": [
+     220.0
+    ],
+    "lights/crown44/intensity": [
+     220.0
+    ],
+    "lights/crown46/intensity": [
+     220.0
+    ],
+    "lights/crown48/intensity": [
+     220.0
+    ],
+    "lights/crown49/intensity": [
+     220.0
+    ],
+    "lights/crown50/intensity": [
+     220.0
+    ],
+    "lights/crown53/intensity": [
+     220.0
+    ],
+    "lights/crown56/intensity": [
+     220.0
+    ],
+    "lights/crown58/intensity": [
+     220.0
+    ],
+    "lights/crown59/intensity": [
+     220.0
+    ],
+    "lights/crown62/intensity": [
+     220.0
+    ],
+    "lights/crown63/intensity": [
+     220.0
+    ],
+    "lights/crown66/intensity": [
+     220.0
+    ],
+    "lights/crown67/intensity": [
+     220.0
+    ],
+    "lights/crown68/intensity": [
+     220.0
+    ],
+    "lights/crown69/intensity": [
+     220.0
+    ],
+    "lights/crown71/intensity": [
+     220.0
+    ],
+    "lights/crown72/intensity": [
+     220.0
+    ],
+    "lights/crown76/intensity": [
+     220.0
+    ],
+    "lights/crown78/intensity": [
+     220.0
+    ],
+    "lights/crown81/intensity": [
+     220.0
+    ],
+    "lights/crown85/intensity": [
+     220.0
+    ],
+    "lights/crown86/intensity": [
+     220.0
+    ],
+    "lights/crown88/intensity": [
+     220.0
+    ],
+    "lights/crown91/intensity": [
+     220.0
+    ],
+    "lights/crown92/intensity": [
+     220.0
+    ],
+    "lights/crown95/intensity": [
+     220.0
+    ],
+    "lights/crown96/intensity": [
+     220.0
+    ],
+    "lights/crown97/intensity": [
+     220.0
+    ],
+    "lights/crown99/intensity": [
+     220.0
+    ],
+    "lights/crown102/intensity": [
+     220.0
+    ],
+    "lights/crown103/intensity": [
+     220.0
+    ],
+    "lights/crown108/intensity": [
+     220.0
+    ],
+    "lights/crown109/intensity": [
+     220.0
+    ],
+    "lights/crown111/intensity": [
+     220.0
+    ],
+    "lights/crown112/intensity": [
+     220.0
+    ],
+    "lights/crown114/intensity": [
+     220.0
+    ],
+    "lights/crown118/intensity": [
+     220.0
+    ],
+    "lights/crown121/intensity": [
+     220.0
+    ],
+    "lights/crown122/intensity": [
+     220.0
+    ],
+    "lights/crown123/intensity": [
+     220.0
+    ],
+    "lights/crown125/intensity": [
+     220.0
+    ],
+    "lights/crown126/intensity": [
+     220.0
+    ],
+    "lights/crown127/intensity": [
+     220.0
+    ],
+    "lights/crown128/intensity": [
+     220.0
+    ],
+    "lights/crown129/intensity": [
+     220.0
+    ],
+    "lights/crown130/intensity": [
+     220.0
+    ],
+    "lights/crown131/intensity": [
+     220.0
+    ],
+    "lights/crown132/intensity": [
+     220.0
+    ],
+    "lights/crown134/intensity": [
+     220.0
+    ],
+    "lights/crown135/intensity": [
+     220.0
+    ],
+    "lights/crown136/intensity": [
+     220.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
      0.0
     ]
    }
@@ -335,10 +981,17 @@
     "grid/prop/injectRate": [
      0.0
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1210.0
+    "grid/prop/waveSpeed": [
+     10.0
+    ],
+    "grid/prop/threshold": [
+     0.95
+    ],
+    "field/kickFront/onsetDecay": [
+     4.0
+    ],
+    "field/kickFront/audioSpeed": [
+     30.0
     ],
     "material/rock/emissionIntensity": [
      0.0
@@ -351,6 +1004,321 @@
     ],
     "particles/swarm/spawnRate": [
      0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     3.0
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     2.4
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     2.1
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     1.8
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     1.8
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     5.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     1.5
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crust/intensity": [
+     0.36
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.21
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     10.0
+    ],
+    "ecosystem/embers/intensity": [
+     0.84
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     0.72
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     3.0
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.36
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.48
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     7.0
+    ],
+    "lights/crown2/intensity": [
+     120.0
+    ],
+    "lights/crown3/intensity": [
+     120.0
+    ],
+    "lights/crown5/intensity": [
+     120.0
+    ],
+    "lights/crown6/intensity": [
+     120.0
+    ],
+    "lights/crown8/intensity": [
+     120.0
+    ],
+    "lights/crown9/intensity": [
+     120.0
+    ],
+    "lights/crown10/intensity": [
+     120.0
+    ],
+    "lights/crown11/intensity": [
+     120.0
+    ],
+    "lights/crown13/intensity": [
+     120.0
+    ],
+    "lights/crown14/intensity": [
+     120.0
+    ],
+    "lights/crown19/intensity": [
+     120.0
+    ],
+    "lights/crown20/intensity": [
+     120.0
+    ],
+    "lights/crown21/intensity": [
+     120.0
+    ],
+    "lights/crown22/intensity": [
+     120.0
+    ],
+    "lights/crown28/intensity": [
+     120.0
+    ],
+    "lights/crown33/intensity": [
+     120.0
+    ],
+    "lights/crown34/intensity": [
+     120.0
+    ],
+    "lights/crown37/intensity": [
+     120.0
+    ],
+    "lights/crown39/intensity": [
+     120.0
+    ],
+    "lights/crown40/intensity": [
+     120.0
+    ],
+    "lights/crown43/intensity": [
+     120.0
+    ],
+    "lights/crown44/intensity": [
+     120.0
+    ],
+    "lights/crown46/intensity": [
+     120.0
+    ],
+    "lights/crown48/intensity": [
+     120.0
+    ],
+    "lights/crown49/intensity": [
+     120.0
+    ],
+    "lights/crown50/intensity": [
+     120.0
+    ],
+    "lights/crown53/intensity": [
+     120.0
+    ],
+    "lights/crown56/intensity": [
+     120.0
+    ],
+    "lights/crown58/intensity": [
+     120.0
+    ],
+    "lights/crown59/intensity": [
+     120.0
+    ],
+    "lights/crown62/intensity": [
+     120.0
+    ],
+    "lights/crown63/intensity": [
+     120.0
+    ],
+    "lights/crown66/intensity": [
+     120.0
+    ],
+    "lights/crown67/intensity": [
+     120.0
+    ],
+    "lights/crown68/intensity": [
+     120.0
+    ],
+    "lights/crown69/intensity": [
+     120.0
+    ],
+    "lights/crown71/intensity": [
+     120.0
+    ],
+    "lights/crown72/intensity": [
+     120.0
+    ],
+    "lights/crown76/intensity": [
+     120.0
+    ],
+    "lights/crown78/intensity": [
+     120.0
+    ],
+    "lights/crown81/intensity": [
+     120.0
+    ],
+    "lights/crown85/intensity": [
+     120.0
+    ],
+    "lights/crown86/intensity": [
+     120.0
+    ],
+    "lights/crown88/intensity": [
+     120.0
+    ],
+    "lights/crown91/intensity": [
+     120.0
+    ],
+    "lights/crown92/intensity": [
+     120.0
+    ],
+    "lights/crown95/intensity": [
+     120.0
+    ],
+    "lights/crown96/intensity": [
+     120.0
+    ],
+    "lights/crown97/intensity": [
+     120.0
+    ],
+    "lights/crown99/intensity": [
+     120.0
+    ],
+    "lights/crown102/intensity": [
+     120.0
+    ],
+    "lights/crown103/intensity": [
+     120.0
+    ],
+    "lights/crown108/intensity": [
+     120.0
+    ],
+    "lights/crown109/intensity": [
+     120.0
+    ],
+    "lights/crown111/intensity": [
+     120.0
+    ],
+    "lights/crown112/intensity": [
+     120.0
+    ],
+    "lights/crown114/intensity": [
+     120.0
+    ],
+    "lights/crown118/intensity": [
+     120.0
+    ],
+    "lights/crown121/intensity": [
+     120.0
+    ],
+    "lights/crown122/intensity": [
+     120.0
+    ],
+    "lights/crown123/intensity": [
+     120.0
+    ],
+    "lights/crown125/intensity": [
+     120.0
+    ],
+    "lights/crown126/intensity": [
+     120.0
+    ],
+    "lights/crown127/intensity": [
+     120.0
+    ],
+    "lights/crown128/intensity": [
+     120.0
+    ],
+    "lights/crown129/intensity": [
+     120.0
+    ],
+    "lights/crown130/intensity": [
+     120.0
+    ],
+    "lights/crown131/intensity": [
+     120.0
+    ],
+    "lights/crown132/intensity": [
+     120.0
+    ],
+    "lights/crown134/intensity": [
+     120.0
+    ],
+    "lights/crown135/intensity": [
+     120.0
+    ],
+    "lights/crown136/intensity": [
+     120.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
+     0.0
     ]
    }
   },
@@ -361,7 +1329,7 @@
      0.4
     ],
     "camera/splineOffset": [
-     2.0,
+     -6.0,
      27.0,
      0.0
     ],
@@ -375,15 +1343,22 @@
      10.0
     ],
     "grid/prop/injectRate": [
-     1.4
+     1.3
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1040.0
+    "grid/prop/waveSpeed": [
+     14.0
+    ],
+    "grid/prop/threshold": [
+     0.75
+    ],
+    "field/kickFront/onsetDecay": [
+     3.0
+    ],
+    "field/kickFront/audioSpeed": [
+     34.0
     ],
     "material/rock/emissionIntensity": [
-     0.3
+     0.12
     ],
     "scene/volumeEmission": [
      0.0
@@ -392,6 +1367,321 @@
      600.0
     ],
     "particles/swarm/spawnRate": [
+     0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     5.75
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     4.6
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     6.6
+    ],
+    "ecosystem/matPolyps/intensity": [
+     4.025
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     3.45
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     8.8
+    ],
+    "ecosystem/whipsTips/intensity": [
+     3.45
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     5.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     2.875
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     9.9
+    ],
+    "ecosystem/crust/intensity": [
+     0.69
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     9.9
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.4025
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/embers/intensity": [
+     1.61
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.38
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     3.3
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.69
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.92
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     7.7
+    ],
+    "lights/crown2/intensity": [
+     240.0
+    ],
+    "lights/crown3/intensity": [
+     240.0
+    ],
+    "lights/crown5/intensity": [
+     240.0
+    ],
+    "lights/crown6/intensity": [
+     240.0
+    ],
+    "lights/crown8/intensity": [
+     240.0
+    ],
+    "lights/crown9/intensity": [
+     240.0
+    ],
+    "lights/crown10/intensity": [
+     240.0
+    ],
+    "lights/crown11/intensity": [
+     240.0
+    ],
+    "lights/crown13/intensity": [
+     240.0
+    ],
+    "lights/crown14/intensity": [
+     240.0
+    ],
+    "lights/crown19/intensity": [
+     240.0
+    ],
+    "lights/crown20/intensity": [
+     240.0
+    ],
+    "lights/crown21/intensity": [
+     240.0
+    ],
+    "lights/crown22/intensity": [
+     240.0
+    ],
+    "lights/crown28/intensity": [
+     240.0
+    ],
+    "lights/crown33/intensity": [
+     240.0
+    ],
+    "lights/crown34/intensity": [
+     240.0
+    ],
+    "lights/crown37/intensity": [
+     240.0
+    ],
+    "lights/crown39/intensity": [
+     240.0
+    ],
+    "lights/crown40/intensity": [
+     240.0
+    ],
+    "lights/crown43/intensity": [
+     240.0
+    ],
+    "lights/crown44/intensity": [
+     240.0
+    ],
+    "lights/crown46/intensity": [
+     240.0
+    ],
+    "lights/crown48/intensity": [
+     240.0
+    ],
+    "lights/crown49/intensity": [
+     240.0
+    ],
+    "lights/crown50/intensity": [
+     240.0
+    ],
+    "lights/crown53/intensity": [
+     240.0
+    ],
+    "lights/crown56/intensity": [
+     240.0
+    ],
+    "lights/crown58/intensity": [
+     240.0
+    ],
+    "lights/crown59/intensity": [
+     240.0
+    ],
+    "lights/crown62/intensity": [
+     240.0
+    ],
+    "lights/crown63/intensity": [
+     240.0
+    ],
+    "lights/crown66/intensity": [
+     240.0
+    ],
+    "lights/crown67/intensity": [
+     240.0
+    ],
+    "lights/crown68/intensity": [
+     240.0
+    ],
+    "lights/crown69/intensity": [
+     240.0
+    ],
+    "lights/crown71/intensity": [
+     240.0
+    ],
+    "lights/crown72/intensity": [
+     240.0
+    ],
+    "lights/crown76/intensity": [
+     240.0
+    ],
+    "lights/crown78/intensity": [
+     240.0
+    ],
+    "lights/crown81/intensity": [
+     240.0
+    ],
+    "lights/crown85/intensity": [
+     240.0
+    ],
+    "lights/crown86/intensity": [
+     240.0
+    ],
+    "lights/crown88/intensity": [
+     240.0
+    ],
+    "lights/crown91/intensity": [
+     240.0
+    ],
+    "lights/crown92/intensity": [
+     240.0
+    ],
+    "lights/crown95/intensity": [
+     240.0
+    ],
+    "lights/crown96/intensity": [
+     240.0
+    ],
+    "lights/crown97/intensity": [
+     240.0
+    ],
+    "lights/crown99/intensity": [
+     240.0
+    ],
+    "lights/crown102/intensity": [
+     240.0
+    ],
+    "lights/crown103/intensity": [
+     240.0
+    ],
+    "lights/crown108/intensity": [
+     240.0
+    ],
+    "lights/crown109/intensity": [
+     240.0
+    ],
+    "lights/crown111/intensity": [
+     240.0
+    ],
+    "lights/crown112/intensity": [
+     240.0
+    ],
+    "lights/crown114/intensity": [
+     240.0
+    ],
+    "lights/crown118/intensity": [
+     240.0
+    ],
+    "lights/crown121/intensity": [
+     240.0
+    ],
+    "lights/crown122/intensity": [
+     240.0
+    ],
+    "lights/crown123/intensity": [
+     240.0
+    ],
+    "lights/crown125/intensity": [
+     240.0
+    ],
+    "lights/crown126/intensity": [
+     240.0
+    ],
+    "lights/crown127/intensity": [
+     240.0
+    ],
+    "lights/crown128/intensity": [
+     240.0
+    ],
+    "lights/crown129/intensity": [
+     240.0
+    ],
+    "lights/crown130/intensity": [
+     240.0
+    ],
+    "lights/crown131/intensity": [
+     240.0
+    ],
+    "lights/crown132/intensity": [
+     240.0
+    ],
+    "lights/crown134/intensity": [
+     240.0
+    ],
+    "lights/crown135/intensity": [
+     240.0
+    ],
+    "lights/crown136/intensity": [
+     240.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
      0.0
     ]
    }
@@ -403,29 +1693,36 @@
      0.4
     ],
     "camera/splineOffset": [
-     24.0,
-     14.0,
+     10.0,
+     11.0,
      0.0
     ],
     "camera/lookAhead": [
-     35.0
+     28.0
     ],
     "camera/fov": [
-     50.0
+     46.0
     ],
     "camera/splineBank": [
-     8.0
+     -6.0
     ],
     "grid/prop/injectRate": [
-     1.5
+     1.4
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1000.0
+    "grid/prop/waveSpeed": [
+     14.0
+    ],
+    "grid/prop/threshold": [
+     0.75
+    ],
+    "field/kickFront/onsetDecay": [
+     3.0
+    ],
+    "field/kickFront/audioSpeed": [
+     34.0
     ],
     "material/rock/emissionIntensity": [
-     0.4
+     0.15
     ],
     "scene/volumeEmission": [
      0.0
@@ -434,6 +1731,321 @@
      600.0
     ],
     "particles/swarm/spawnRate": [
+     0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     5.75
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     4.6
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     6.6
+    ],
+    "ecosystem/matPolyps/intensity": [
+     4.025
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     3.45
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     8.8
+    ],
+    "ecosystem/whipsTips/intensity": [
+     3.45
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     5.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     2.875
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     9.9
+    ],
+    "ecosystem/crust/intensity": [
+     0.69
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     9.9
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.4025
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     11.0
+    ],
+    "ecosystem/embers/intensity": [
+     1.61
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.38
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     3.3
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.69
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.92
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     7.7
+    ],
+    "lights/crown2/intensity": [
+     240.0
+    ],
+    "lights/crown3/intensity": [
+     240.0
+    ],
+    "lights/crown5/intensity": [
+     240.0
+    ],
+    "lights/crown6/intensity": [
+     240.0
+    ],
+    "lights/crown8/intensity": [
+     240.0
+    ],
+    "lights/crown9/intensity": [
+     240.0
+    ],
+    "lights/crown10/intensity": [
+     240.0
+    ],
+    "lights/crown11/intensity": [
+     240.0
+    ],
+    "lights/crown13/intensity": [
+     240.0
+    ],
+    "lights/crown14/intensity": [
+     240.0
+    ],
+    "lights/crown19/intensity": [
+     240.0
+    ],
+    "lights/crown20/intensity": [
+     240.0
+    ],
+    "lights/crown21/intensity": [
+     240.0
+    ],
+    "lights/crown22/intensity": [
+     240.0
+    ],
+    "lights/crown28/intensity": [
+     240.0
+    ],
+    "lights/crown33/intensity": [
+     240.0
+    ],
+    "lights/crown34/intensity": [
+     240.0
+    ],
+    "lights/crown37/intensity": [
+     240.0
+    ],
+    "lights/crown39/intensity": [
+     240.0
+    ],
+    "lights/crown40/intensity": [
+     240.0
+    ],
+    "lights/crown43/intensity": [
+     240.0
+    ],
+    "lights/crown44/intensity": [
+     240.0
+    ],
+    "lights/crown46/intensity": [
+     240.0
+    ],
+    "lights/crown48/intensity": [
+     240.0
+    ],
+    "lights/crown49/intensity": [
+     240.0
+    ],
+    "lights/crown50/intensity": [
+     240.0
+    ],
+    "lights/crown53/intensity": [
+     240.0
+    ],
+    "lights/crown56/intensity": [
+     240.0
+    ],
+    "lights/crown58/intensity": [
+     240.0
+    ],
+    "lights/crown59/intensity": [
+     240.0
+    ],
+    "lights/crown62/intensity": [
+     240.0
+    ],
+    "lights/crown63/intensity": [
+     240.0
+    ],
+    "lights/crown66/intensity": [
+     240.0
+    ],
+    "lights/crown67/intensity": [
+     240.0
+    ],
+    "lights/crown68/intensity": [
+     240.0
+    ],
+    "lights/crown69/intensity": [
+     240.0
+    ],
+    "lights/crown71/intensity": [
+     240.0
+    ],
+    "lights/crown72/intensity": [
+     240.0
+    ],
+    "lights/crown76/intensity": [
+     240.0
+    ],
+    "lights/crown78/intensity": [
+     240.0
+    ],
+    "lights/crown81/intensity": [
+     240.0
+    ],
+    "lights/crown85/intensity": [
+     240.0
+    ],
+    "lights/crown86/intensity": [
+     240.0
+    ],
+    "lights/crown88/intensity": [
+     240.0
+    ],
+    "lights/crown91/intensity": [
+     240.0
+    ],
+    "lights/crown92/intensity": [
+     240.0
+    ],
+    "lights/crown95/intensity": [
+     240.0
+    ],
+    "lights/crown96/intensity": [
+     240.0
+    ],
+    "lights/crown97/intensity": [
+     240.0
+    ],
+    "lights/crown99/intensity": [
+     240.0
+    ],
+    "lights/crown102/intensity": [
+     240.0
+    ],
+    "lights/crown103/intensity": [
+     240.0
+    ],
+    "lights/crown108/intensity": [
+     240.0
+    ],
+    "lights/crown109/intensity": [
+     240.0
+    ],
+    "lights/crown111/intensity": [
+     240.0
+    ],
+    "lights/crown112/intensity": [
+     240.0
+    ],
+    "lights/crown114/intensity": [
+     240.0
+    ],
+    "lights/crown118/intensity": [
+     240.0
+    ],
+    "lights/crown121/intensity": [
+     240.0
+    ],
+    "lights/crown122/intensity": [
+     240.0
+    ],
+    "lights/crown123/intensity": [
+     240.0
+    ],
+    "lights/crown125/intensity": [
+     240.0
+    ],
+    "lights/crown126/intensity": [
+     240.0
+    ],
+    "lights/crown127/intensity": [
+     240.0
+    ],
+    "lights/crown128/intensity": [
+     240.0
+    ],
+    "lights/crown129/intensity": [
+     240.0
+    ],
+    "lights/crown130/intensity": [
+     240.0
+    ],
+    "lights/crown131/intensity": [
+     240.0
+    ],
+    "lights/crown132/intensity": [
+     240.0
+    ],
+    "lights/crown134/intensity": [
+     240.0
+    ],
+    "lights/crown135/intensity": [
+     240.0
+    ],
+    "lights/crown136/intensity": [
+     240.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
      0.0
     ]
    }
@@ -459,15 +2071,22 @@
      4.0
     ],
     "grid/prop/injectRate": [
-     0.6
+     0.5
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     -1000.0
+    "grid/prop/waveSpeed": [
+     16.0
+    ],
+    "grid/prop/threshold": [
+     0.95
+    ],
+    "field/kickFront/onsetDecay": [
+     4.0
+    ],
+    "field/kickFront/audioSpeed": [
+     30.0
     ],
     "material/rock/emissionIntensity": [
-     0.2
+     0.0
     ],
     "scene/volumeEmission": [
      0.0
@@ -477,6 +2096,321 @@
     ],
     "particles/swarm/spawnRate": [
      0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     1.75
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     1.4
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     3.6
+    ],
+    "ecosystem/matPolyps/intensity": [
+     1.225
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     1.05
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     4.8
+    ],
+    "ecosystem/whipsTips/intensity": [
+     1.05
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     3.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     0.875
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     5.4
+    ],
+    "ecosystem/crust/intensity": [
+     0.21
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     5.4
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.1225
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     6.0
+    ],
+    "ecosystem/embers/intensity": [
+     0.49
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     0.42
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     1.8
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.21
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.28
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     4.2
+    ],
+    "lights/crown2/intensity": [
+     60.0
+    ],
+    "lights/crown3/intensity": [
+     60.0
+    ],
+    "lights/crown5/intensity": [
+     60.0
+    ],
+    "lights/crown6/intensity": [
+     60.0
+    ],
+    "lights/crown8/intensity": [
+     60.0
+    ],
+    "lights/crown9/intensity": [
+     60.0
+    ],
+    "lights/crown10/intensity": [
+     60.0
+    ],
+    "lights/crown11/intensity": [
+     60.0
+    ],
+    "lights/crown13/intensity": [
+     60.0
+    ],
+    "lights/crown14/intensity": [
+     60.0
+    ],
+    "lights/crown19/intensity": [
+     60.0
+    ],
+    "lights/crown20/intensity": [
+     60.0
+    ],
+    "lights/crown21/intensity": [
+     60.0
+    ],
+    "lights/crown22/intensity": [
+     60.0
+    ],
+    "lights/crown28/intensity": [
+     60.0
+    ],
+    "lights/crown33/intensity": [
+     60.0
+    ],
+    "lights/crown34/intensity": [
+     60.0
+    ],
+    "lights/crown37/intensity": [
+     60.0
+    ],
+    "lights/crown39/intensity": [
+     60.0
+    ],
+    "lights/crown40/intensity": [
+     60.0
+    ],
+    "lights/crown43/intensity": [
+     60.0
+    ],
+    "lights/crown44/intensity": [
+     60.0
+    ],
+    "lights/crown46/intensity": [
+     60.0
+    ],
+    "lights/crown48/intensity": [
+     60.0
+    ],
+    "lights/crown49/intensity": [
+     60.0
+    ],
+    "lights/crown50/intensity": [
+     60.0
+    ],
+    "lights/crown53/intensity": [
+     60.0
+    ],
+    "lights/crown56/intensity": [
+     60.0
+    ],
+    "lights/crown58/intensity": [
+     60.0
+    ],
+    "lights/crown59/intensity": [
+     60.0
+    ],
+    "lights/crown62/intensity": [
+     60.0
+    ],
+    "lights/crown63/intensity": [
+     60.0
+    ],
+    "lights/crown66/intensity": [
+     60.0
+    ],
+    "lights/crown67/intensity": [
+     60.0
+    ],
+    "lights/crown68/intensity": [
+     60.0
+    ],
+    "lights/crown69/intensity": [
+     60.0
+    ],
+    "lights/crown71/intensity": [
+     60.0
+    ],
+    "lights/crown72/intensity": [
+     60.0
+    ],
+    "lights/crown76/intensity": [
+     60.0
+    ],
+    "lights/crown78/intensity": [
+     60.0
+    ],
+    "lights/crown81/intensity": [
+     60.0
+    ],
+    "lights/crown85/intensity": [
+     60.0
+    ],
+    "lights/crown86/intensity": [
+     60.0
+    ],
+    "lights/crown88/intensity": [
+     60.0
+    ],
+    "lights/crown91/intensity": [
+     60.0
+    ],
+    "lights/crown92/intensity": [
+     60.0
+    ],
+    "lights/crown95/intensity": [
+     60.0
+    ],
+    "lights/crown96/intensity": [
+     60.0
+    ],
+    "lights/crown97/intensity": [
+     60.0
+    ],
+    "lights/crown99/intensity": [
+     60.0
+    ],
+    "lights/crown102/intensity": [
+     60.0
+    ],
+    "lights/crown103/intensity": [
+     60.0
+    ],
+    "lights/crown108/intensity": [
+     60.0
+    ],
+    "lights/crown109/intensity": [
+     60.0
+    ],
+    "lights/crown111/intensity": [
+     60.0
+    ],
+    "lights/crown112/intensity": [
+     60.0
+    ],
+    "lights/crown114/intensity": [
+     60.0
+    ],
+    "lights/crown118/intensity": [
+     60.0
+    ],
+    "lights/crown121/intensity": [
+     60.0
+    ],
+    "lights/crown122/intensity": [
+     60.0
+    ],
+    "lights/crown123/intensity": [
+     60.0
+    ],
+    "lights/crown125/intensity": [
+     60.0
+    ],
+    "lights/crown126/intensity": [
+     60.0
+    ],
+    "lights/crown127/intensity": [
+     60.0
+    ],
+    "lights/crown128/intensity": [
+     60.0
+    ],
+    "lights/crown129/intensity": [
+     60.0
+    ],
+    "lights/crown130/intensity": [
+     60.0
+    ],
+    "lights/crown131/intensity": [
+     60.0
+    ],
+    "lights/crown132/intensity": [
+     60.0
+    ],
+    "lights/crown134/intensity": [
+     60.0
+    ],
+    "lights/crown135/intensity": [
+     60.0
+    ],
+    "lights/crown136/intensity": [
+     60.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
+     0.0
     ]
    }
   },
@@ -484,7 +2418,735 @@
    "name": "drop",
    "values": {
     "macros/flight": [
-     1.2
+     1.3
+    ],
+    "camera/splineOffset": [
+     0.0,
+     21.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     70.0
+    ],
+    "camera/fov": [
+     72.0
+    ],
+    "camera/splineBank": [
+     12.0
+    ],
+    "grid/prop/injectRate": [
+     3.0
+    ],
+    "grid/prop/waveSpeed": [
+     28.0
+    ],
+    "grid/prop/threshold": [
+     0.35
+    ],
+    "field/kickFront/onsetDecay": [
+     0.25
+    ],
+    "field/kickFront/audioSpeed": [
+     28.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.35
+    ],
+    "scene/volumeEmission": [
+     0.025
+    ],
+    "particles/spores/spawnRate": [
+     2500.0
+    ],
+    "particles/swarm/spawnRate": [
+     9000.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     12.0
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     21.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     9.6
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     12.6
+    ],
+    "ecosystem/matPolyps/intensity": [
+     8.4
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     21.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     7.2
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     16.8
+    ],
+    "ecosystem/whipsTips/intensity": [
+     7.2
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     10.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     6.0
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     18.9
+    ],
+    "ecosystem/crust/intensity": [
+     1.44
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     18.9
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.84
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     21.0
+    ],
+    "ecosystem/embers/intensity": [
+     3.36
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     2.88
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     6.3
+    ],
+    "ecosystem/combGlow/intensity": [
+     1.44
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     1.92
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     14.7
+    ],
+    "lights/crown2/intensity": [
+     560.0
+    ],
+    "lights/crown3/intensity": [
+     560.0
+    ],
+    "lights/crown5/intensity": [
+     560.0
+    ],
+    "lights/crown6/intensity": [
+     560.0
+    ],
+    "lights/crown8/intensity": [
+     560.0
+    ],
+    "lights/crown9/intensity": [
+     560.0
+    ],
+    "lights/crown10/intensity": [
+     560.0
+    ],
+    "lights/crown11/intensity": [
+     560.0
+    ],
+    "lights/crown13/intensity": [
+     560.0
+    ],
+    "lights/crown14/intensity": [
+     560.0
+    ],
+    "lights/crown19/intensity": [
+     560.0
+    ],
+    "lights/crown20/intensity": [
+     560.0
+    ],
+    "lights/crown21/intensity": [
+     560.0
+    ],
+    "lights/crown22/intensity": [
+     560.0
+    ],
+    "lights/crown28/intensity": [
+     560.0
+    ],
+    "lights/crown33/intensity": [
+     560.0
+    ],
+    "lights/crown34/intensity": [
+     560.0
+    ],
+    "lights/crown37/intensity": [
+     560.0
+    ],
+    "lights/crown39/intensity": [
+     560.0
+    ],
+    "lights/crown40/intensity": [
+     560.0
+    ],
+    "lights/crown43/intensity": [
+     560.0
+    ],
+    "lights/crown44/intensity": [
+     560.0
+    ],
+    "lights/crown46/intensity": [
+     560.0
+    ],
+    "lights/crown48/intensity": [
+     560.0
+    ],
+    "lights/crown49/intensity": [
+     560.0
+    ],
+    "lights/crown50/intensity": [
+     560.0
+    ],
+    "lights/crown53/intensity": [
+     560.0
+    ],
+    "lights/crown56/intensity": [
+     560.0
+    ],
+    "lights/crown58/intensity": [
+     560.0
+    ],
+    "lights/crown59/intensity": [
+     560.0
+    ],
+    "lights/crown62/intensity": [
+     560.0
+    ],
+    "lights/crown63/intensity": [
+     560.0
+    ],
+    "lights/crown66/intensity": [
+     560.0
+    ],
+    "lights/crown67/intensity": [
+     560.0
+    ],
+    "lights/crown68/intensity": [
+     560.0
+    ],
+    "lights/crown69/intensity": [
+     560.0
+    ],
+    "lights/crown71/intensity": [
+     560.0
+    ],
+    "lights/crown72/intensity": [
+     560.0
+    ],
+    "lights/crown76/intensity": [
+     560.0
+    ],
+    "lights/crown78/intensity": [
+     560.0
+    ],
+    "lights/crown81/intensity": [
+     560.0
+    ],
+    "lights/crown85/intensity": [
+     560.0
+    ],
+    "lights/crown86/intensity": [
+     560.0
+    ],
+    "lights/crown88/intensity": [
+     560.0
+    ],
+    "lights/crown91/intensity": [
+     560.0
+    ],
+    "lights/crown92/intensity": [
+     560.0
+    ],
+    "lights/crown95/intensity": [
+     560.0
+    ],
+    "lights/crown96/intensity": [
+     560.0
+    ],
+    "lights/crown97/intensity": [
+     560.0
+    ],
+    "lights/crown99/intensity": [
+     560.0
+    ],
+    "lights/crown102/intensity": [
+     560.0
+    ],
+    "lights/crown103/intensity": [
+     560.0
+    ],
+    "lights/crown108/intensity": [
+     560.0
+    ],
+    "lights/crown109/intensity": [
+     560.0
+    ],
+    "lights/crown111/intensity": [
+     560.0
+    ],
+    "lights/crown112/intensity": [
+     560.0
+    ],
+    "lights/crown114/intensity": [
+     560.0
+    ],
+    "lights/crown118/intensity": [
+     560.0
+    ],
+    "lights/crown121/intensity": [
+     560.0
+    ],
+    "lights/crown122/intensity": [
+     560.0
+    ],
+    "lights/crown123/intensity": [
+     560.0
+    ],
+    "lights/crown125/intensity": [
+     560.0
+    ],
+    "lights/crown126/intensity": [
+     560.0
+    ],
+    "lights/crown127/intensity": [
+     560.0
+    ],
+    "lights/crown128/intensity": [
+     560.0
+    ],
+    "lights/crown129/intensity": [
+     560.0
+    ],
+    "lights/crown130/intensity": [
+     560.0
+    ],
+    "lights/crown131/intensity": [
+     560.0
+    ],
+    "lights/crown132/intensity": [
+     560.0
+    ],
+    "lights/crown134/intensity": [
+     560.0
+    ],
+    "lights/crown135/intensity": [
+     560.0
+    ],
+    "lights/crown136/intensity": [
+     560.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/crust/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     -0.25
+    ],
+    "ecosystem/crust/sparsity": [
+     0.4
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.45
+    ],
+    "camera/exposure/compensation": [
+     -0.4
+    ]
+   }
+  },
+  {
+   "name": "body",
+   "values": {
+    "macros/flight": [
+     0.85
+    ],
+    "camera/splineOffset": [
+     -6.0,
+     27.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     45.0
+    ],
+    "camera/fov": [
+     56.0
+    ],
+    "camera/splineBank": [
+     10.0
+    ],
+    "grid/prop/injectRate": [
+     2.0
+    ],
+    "grid/prop/waveSpeed": [
+     22.0
+    ],
+    "grid/prop/threshold": [
+     0.62
+    ],
+    "field/kickFront/onsetDecay": [
+     1.5
+    ],
+    "field/kickFront/audioSpeed": [
+     40.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.25
+    ],
+    "scene/volumeEmission": [
+     0.06
+    ],
+    "particles/spores/spawnRate": [
+     1500.0
+    ],
+    "particles/swarm/spawnRate": [
+     3000.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     7.25
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     5.8
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     5.075
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     4.35
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     12.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     4.35
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     7.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     3.625
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crust/intensity": [
+     0.87
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.5075
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/embers/intensity": [
+     2.03
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.74
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     4.5
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.87
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     1.16
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     10.5
+    ],
+    "lights/crown2/intensity": [
+     340.0
+    ],
+    "lights/crown3/intensity": [
+     340.0
+    ],
+    "lights/crown5/intensity": [
+     340.0
+    ],
+    "lights/crown6/intensity": [
+     340.0
+    ],
+    "lights/crown8/intensity": [
+     340.0
+    ],
+    "lights/crown9/intensity": [
+     340.0
+    ],
+    "lights/crown10/intensity": [
+     340.0
+    ],
+    "lights/crown11/intensity": [
+     340.0
+    ],
+    "lights/crown13/intensity": [
+     340.0
+    ],
+    "lights/crown14/intensity": [
+     340.0
+    ],
+    "lights/crown19/intensity": [
+     340.0
+    ],
+    "lights/crown20/intensity": [
+     340.0
+    ],
+    "lights/crown21/intensity": [
+     340.0
+    ],
+    "lights/crown22/intensity": [
+     340.0
+    ],
+    "lights/crown28/intensity": [
+     340.0
+    ],
+    "lights/crown33/intensity": [
+     340.0
+    ],
+    "lights/crown34/intensity": [
+     340.0
+    ],
+    "lights/crown37/intensity": [
+     340.0
+    ],
+    "lights/crown39/intensity": [
+     340.0
+    ],
+    "lights/crown40/intensity": [
+     340.0
+    ],
+    "lights/crown43/intensity": [
+     340.0
+    ],
+    "lights/crown44/intensity": [
+     340.0
+    ],
+    "lights/crown46/intensity": [
+     340.0
+    ],
+    "lights/crown48/intensity": [
+     340.0
+    ],
+    "lights/crown49/intensity": [
+     340.0
+    ],
+    "lights/crown50/intensity": [
+     340.0
+    ],
+    "lights/crown53/intensity": [
+     340.0
+    ],
+    "lights/crown56/intensity": [
+     340.0
+    ],
+    "lights/crown58/intensity": [
+     340.0
+    ],
+    "lights/crown59/intensity": [
+     340.0
+    ],
+    "lights/crown62/intensity": [
+     340.0
+    ],
+    "lights/crown63/intensity": [
+     340.0
+    ],
+    "lights/crown66/intensity": [
+     340.0
+    ],
+    "lights/crown67/intensity": [
+     340.0
+    ],
+    "lights/crown68/intensity": [
+     340.0
+    ],
+    "lights/crown69/intensity": [
+     340.0
+    ],
+    "lights/crown71/intensity": [
+     340.0
+    ],
+    "lights/crown72/intensity": [
+     340.0
+    ],
+    "lights/crown76/intensity": [
+     340.0
+    ],
+    "lights/crown78/intensity": [
+     340.0
+    ],
+    "lights/crown81/intensity": [
+     340.0
+    ],
+    "lights/crown85/intensity": [
+     340.0
+    ],
+    "lights/crown86/intensity": [
+     340.0
+    ],
+    "lights/crown88/intensity": [
+     340.0
+    ],
+    "lights/crown91/intensity": [
+     340.0
+    ],
+    "lights/crown92/intensity": [
+     340.0
+    ],
+    "lights/crown95/intensity": [
+     340.0
+    ],
+    "lights/crown96/intensity": [
+     340.0
+    ],
+    "lights/crown97/intensity": [
+     340.0
+    ],
+    "lights/crown99/intensity": [
+     340.0
+    ],
+    "lights/crown102/intensity": [
+     340.0
+    ],
+    "lights/crown103/intensity": [
+     340.0
+    ],
+    "lights/crown108/intensity": [
+     340.0
+    ],
+    "lights/crown109/intensity": [
+     340.0
+    ],
+    "lights/crown111/intensity": [
+     340.0
+    ],
+    "lights/crown112/intensity": [
+     340.0
+    ],
+    "lights/crown114/intensity": [
+     340.0
+    ],
+    "lights/crown118/intensity": [
+     340.0
+    ],
+    "lights/crown121/intensity": [
+     340.0
+    ],
+    "lights/crown122/intensity": [
+     340.0
+    ],
+    "lights/crown123/intensity": [
+     340.0
+    ],
+    "lights/crown125/intensity": [
+     340.0
+    ],
+    "lights/crown126/intensity": [
+     340.0
+    ],
+    "lights/crown127/intensity": [
+     340.0
+    ],
+    "lights/crown128/intensity": [
+     340.0
+    ],
+    "lights/crown129/intensity": [
+     340.0
+    ],
+    "lights/crown130/intensity": [
+     340.0
+    ],
+    "lights/crown131/intensity": [
+     340.0
+    ],
+    "lights/crown132/intensity": [
+     340.0
+    ],
+    "lights/crown134/intensity": [
+     340.0
+    ],
+    "lights/crown135/intensity": [
+     340.0
+    ],
+    "lights/crown136/intensity": [
+     340.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/sparsity": [
+     0.5
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     -0.4
+    ]
+   }
+  },
+  {
+   "name": "body 2",
+   "values": {
+    "macros/flight": [
+     1.0
     ],
     "camera/splineOffset": [
      0.0,
@@ -501,108 +3163,346 @@
      16.0
     ],
     "grid/prop/injectRate": [
-     3.2
-    ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     500.0
-    ],
-    "material/rock/emissionIntensity": [
-     5.0
-    ],
-    "scene/volumeEmission": [
-     0.1
-    ],
-    "particles/spores/spawnRate": [
-     2500.0
-    ],
-    "particles/swarm/spawnRate": [
-     9000.0
-    ]
-   }
-  },
-  {
-   "name": "body",
-   "values": {
-    "macros/flight": [
-     0.85
-    ],
-    "camera/splineOffset": [
-     2.0,
-     27.0,
-     0.0
-    ],
-    "camera/lookAhead": [
-     45.0
-    ],
-    "camera/fov": [
-     56.0
-    ],
-    "camera/splineBank": [
-     10.0
-    ],
-    "grid/prop/injectRate": [
      2.2
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     1100.0
+    "grid/prop/waveSpeed": [
+     24.0
+    ],
+    "grid/prop/threshold": [
+     0.6
+    ],
+    "field/kickFront/onsetDecay": [
+     1.5
+    ],
+    "field/kickFront/audioSpeed": [
+     40.0
     ],
     "material/rock/emissionIntensity": [
-     1.6
+     0.3
     ],
     "scene/volumeEmission": [
-     0.04
-    ],
-    "particles/spores/spawnRate": [
-     1500.0
-    ],
-    "particles/swarm/spawnRate": [
-     3000.0
-    ]
-   }
-  },
-  {
-   "name": "body 2",
-   "values": {
-    "macros/flight": [
-     1.0
-    ],
-    "camera/splineOffset": [
-     0.0,
-     2.6,
-     0.0
-    ],
-    "camera/lookAhead": [
-     30.0
-    ],
-    "camera/fov": [
-     42.0
-    ],
-    "camera/splineBank": [
-     6.0
-    ],
-    "grid/prop/injectRate": [
-     2.4
-    ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     1100.0
-    ],
-    "material/rock/emissionIntensity": [
-     1.8
-    ],
-    "scene/volumeEmission": [
-     0.05
+     0.06
     ],
     "particles/spores/spawnRate": [
      1500.0
     ],
     "particles/swarm/spawnRate": [
      4000.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     7.5
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     6.0
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     5.25
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     4.5
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     12.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     4.5
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     7.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     3.75
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crust/intensity": [
+     0.9
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.525
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/embers/intensity": [
+     2.1
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.8
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     4.5
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.9
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     1.2
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     10.5
+    ],
+    "lights/crown2/intensity": [
+     340.0
+    ],
+    "lights/crown3/intensity": [
+     340.0
+    ],
+    "lights/crown5/intensity": [
+     340.0
+    ],
+    "lights/crown6/intensity": [
+     340.0
+    ],
+    "lights/crown8/intensity": [
+     340.0
+    ],
+    "lights/crown9/intensity": [
+     340.0
+    ],
+    "lights/crown10/intensity": [
+     340.0
+    ],
+    "lights/crown11/intensity": [
+     340.0
+    ],
+    "lights/crown13/intensity": [
+     340.0
+    ],
+    "lights/crown14/intensity": [
+     340.0
+    ],
+    "lights/crown19/intensity": [
+     340.0
+    ],
+    "lights/crown20/intensity": [
+     340.0
+    ],
+    "lights/crown21/intensity": [
+     340.0
+    ],
+    "lights/crown22/intensity": [
+     340.0
+    ],
+    "lights/crown28/intensity": [
+     340.0
+    ],
+    "lights/crown33/intensity": [
+     340.0
+    ],
+    "lights/crown34/intensity": [
+     340.0
+    ],
+    "lights/crown37/intensity": [
+     340.0
+    ],
+    "lights/crown39/intensity": [
+     340.0
+    ],
+    "lights/crown40/intensity": [
+     340.0
+    ],
+    "lights/crown43/intensity": [
+     340.0
+    ],
+    "lights/crown44/intensity": [
+     340.0
+    ],
+    "lights/crown46/intensity": [
+     340.0
+    ],
+    "lights/crown48/intensity": [
+     340.0
+    ],
+    "lights/crown49/intensity": [
+     340.0
+    ],
+    "lights/crown50/intensity": [
+     340.0
+    ],
+    "lights/crown53/intensity": [
+     340.0
+    ],
+    "lights/crown56/intensity": [
+     340.0
+    ],
+    "lights/crown58/intensity": [
+     340.0
+    ],
+    "lights/crown59/intensity": [
+     340.0
+    ],
+    "lights/crown62/intensity": [
+     340.0
+    ],
+    "lights/crown63/intensity": [
+     340.0
+    ],
+    "lights/crown66/intensity": [
+     340.0
+    ],
+    "lights/crown67/intensity": [
+     340.0
+    ],
+    "lights/crown68/intensity": [
+     340.0
+    ],
+    "lights/crown69/intensity": [
+     340.0
+    ],
+    "lights/crown71/intensity": [
+     340.0
+    ],
+    "lights/crown72/intensity": [
+     340.0
+    ],
+    "lights/crown76/intensity": [
+     340.0
+    ],
+    "lights/crown78/intensity": [
+     340.0
+    ],
+    "lights/crown81/intensity": [
+     340.0
+    ],
+    "lights/crown85/intensity": [
+     340.0
+    ],
+    "lights/crown86/intensity": [
+     340.0
+    ],
+    "lights/crown88/intensity": [
+     340.0
+    ],
+    "lights/crown91/intensity": [
+     340.0
+    ],
+    "lights/crown92/intensity": [
+     340.0
+    ],
+    "lights/crown95/intensity": [
+     340.0
+    ],
+    "lights/crown96/intensity": [
+     340.0
+    ],
+    "lights/crown97/intensity": [
+     340.0
+    ],
+    "lights/crown99/intensity": [
+     340.0
+    ],
+    "lights/crown102/intensity": [
+     340.0
+    ],
+    "lights/crown103/intensity": [
+     340.0
+    ],
+    "lights/crown108/intensity": [
+     340.0
+    ],
+    "lights/crown109/intensity": [
+     340.0
+    ],
+    "lights/crown111/intensity": [
+     340.0
+    ],
+    "lights/crown112/intensity": [
+     340.0
+    ],
+    "lights/crown114/intensity": [
+     340.0
+    ],
+    "lights/crown118/intensity": [
+     340.0
+    ],
+    "lights/crown121/intensity": [
+     340.0
+    ],
+    "lights/crown122/intensity": [
+     340.0
+    ],
+    "lights/crown123/intensity": [
+     340.0
+    ],
+    "lights/crown125/intensity": [
+     340.0
+    ],
+    "lights/crown126/intensity": [
+     340.0
+    ],
+    "lights/crown127/intensity": [
+     340.0
+    ],
+    "lights/crown128/intensity": [
+     340.0
+    ],
+    "lights/crown129/intensity": [
+     340.0
+    ],
+    "lights/crown130/intensity": [
+     340.0
+    ],
+    "lights/crown131/intensity": [
+     340.0
+    ],
+    "lights/crown132/intensity": [
+     340.0
+    ],
+    "lights/crown134/intensity": [
+     340.0
+    ],
+    "lights/crown135/intensity": [
+     340.0
+    ],
+    "lights/crown136/intensity": [
+     340.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/sparsity": [
+     0.5
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     -0.4
     ]
    }
   },
@@ -613,38 +3513,360 @@
      0.75
     ],
     "camera/splineOffset": [
-     24.0,
-     14.0,
+     10.0,
+     11.0,
      0.0
     ],
     "camera/lookAhead": [
-     35.0
+     28.0
     ],
     "camera/fov": [
-     50.0
+     46.0
     ],
     "camera/splineBank": [
-     8.0
+     -6.0
     ],
     "grid/prop/injectRate": [
-     2.2
+     2.0
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     1100.0
+    "grid/prop/waveSpeed": [
+     22.0
+    ],
+    "grid/prop/threshold": [
+     0.62
+    ],
+    "field/kickFront/onsetDecay": [
+     1.5
+    ],
+    "field/kickFront/audioSpeed": [
+     40.0
     ],
     "material/rock/emissionIntensity": [
-     1.6
+     0.25
     ],
     "scene/volumeEmission": [
-     0.04
+     0.05
     ],
     "particles/spores/spawnRate": [
      1500.0
     ],
     "particles/swarm/spawnRate": [
      3000.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     7.25
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     5.8
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     9.0
+    ],
+    "ecosystem/matPolyps/intensity": [
+     5.075
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     4.35
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     12.0
+    ],
+    "ecosystem/whipsTips/intensity": [
+     4.35
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     7.5
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     3.625
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crust/intensity": [
+     0.87
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     13.5
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.5075
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     15.0
+    ],
+    "ecosystem/embers/intensity": [
+     2.03
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.74
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     4.5
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.87
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     1.16
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     10.5
+    ],
+    "lights/crown2/intensity": [
+     340.0
+    ],
+    "lights/crown3/intensity": [
+     340.0
+    ],
+    "lights/crown5/intensity": [
+     340.0
+    ],
+    "lights/crown6/intensity": [
+     340.0
+    ],
+    "lights/crown8/intensity": [
+     340.0
+    ],
+    "lights/crown9/intensity": [
+     340.0
+    ],
+    "lights/crown10/intensity": [
+     340.0
+    ],
+    "lights/crown11/intensity": [
+     340.0
+    ],
+    "lights/crown13/intensity": [
+     340.0
+    ],
+    "lights/crown14/intensity": [
+     340.0
+    ],
+    "lights/crown19/intensity": [
+     340.0
+    ],
+    "lights/crown20/intensity": [
+     340.0
+    ],
+    "lights/crown21/intensity": [
+     340.0
+    ],
+    "lights/crown22/intensity": [
+     340.0
+    ],
+    "lights/crown28/intensity": [
+     340.0
+    ],
+    "lights/crown33/intensity": [
+     340.0
+    ],
+    "lights/crown34/intensity": [
+     340.0
+    ],
+    "lights/crown37/intensity": [
+     340.0
+    ],
+    "lights/crown39/intensity": [
+     340.0
+    ],
+    "lights/crown40/intensity": [
+     340.0
+    ],
+    "lights/crown43/intensity": [
+     340.0
+    ],
+    "lights/crown44/intensity": [
+     340.0
+    ],
+    "lights/crown46/intensity": [
+     340.0
+    ],
+    "lights/crown48/intensity": [
+     340.0
+    ],
+    "lights/crown49/intensity": [
+     340.0
+    ],
+    "lights/crown50/intensity": [
+     340.0
+    ],
+    "lights/crown53/intensity": [
+     340.0
+    ],
+    "lights/crown56/intensity": [
+     340.0
+    ],
+    "lights/crown58/intensity": [
+     340.0
+    ],
+    "lights/crown59/intensity": [
+     340.0
+    ],
+    "lights/crown62/intensity": [
+     340.0
+    ],
+    "lights/crown63/intensity": [
+     340.0
+    ],
+    "lights/crown66/intensity": [
+     340.0
+    ],
+    "lights/crown67/intensity": [
+     340.0
+    ],
+    "lights/crown68/intensity": [
+     340.0
+    ],
+    "lights/crown69/intensity": [
+     340.0
+    ],
+    "lights/crown71/intensity": [
+     340.0
+    ],
+    "lights/crown72/intensity": [
+     340.0
+    ],
+    "lights/crown76/intensity": [
+     340.0
+    ],
+    "lights/crown78/intensity": [
+     340.0
+    ],
+    "lights/crown81/intensity": [
+     340.0
+    ],
+    "lights/crown85/intensity": [
+     340.0
+    ],
+    "lights/crown86/intensity": [
+     340.0
+    ],
+    "lights/crown88/intensity": [
+     340.0
+    ],
+    "lights/crown91/intensity": [
+     340.0
+    ],
+    "lights/crown92/intensity": [
+     340.0
+    ],
+    "lights/crown95/intensity": [
+     340.0
+    ],
+    "lights/crown96/intensity": [
+     340.0
+    ],
+    "lights/crown97/intensity": [
+     340.0
+    ],
+    "lights/crown99/intensity": [
+     340.0
+    ],
+    "lights/crown102/intensity": [
+     340.0
+    ],
+    "lights/crown103/intensity": [
+     340.0
+    ],
+    "lights/crown108/intensity": [
+     340.0
+    ],
+    "lights/crown109/intensity": [
+     340.0
+    ],
+    "lights/crown111/intensity": [
+     340.0
+    ],
+    "lights/crown112/intensity": [
+     340.0
+    ],
+    "lights/crown114/intensity": [
+     340.0
+    ],
+    "lights/crown118/intensity": [
+     340.0
+    ],
+    "lights/crown121/intensity": [
+     340.0
+    ],
+    "lights/crown122/intensity": [
+     340.0
+    ],
+    "lights/crown123/intensity": [
+     340.0
+    ],
+    "lights/crown125/intensity": [
+     340.0
+    ],
+    "lights/crown126/intensity": [
+     340.0
+    ],
+    "lights/crown127/intensity": [
+     340.0
+    ],
+    "lights/crown128/intensity": [
+     340.0
+    ],
+    "lights/crown129/intensity": [
+     340.0
+    ],
+    "lights/crown130/intensity": [
+     340.0
+    ],
+    "lights/crown131/intensity": [
+     340.0
+    ],
+    "lights/crown132/intensity": [
+     340.0
+    ],
+    "lights/crown134/intensity": [
+     340.0
+    ],
+    "lights/crown135/intensity": [
+     340.0
+    ],
+    "lights/crown136/intensity": [
+     340.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     -0.06
+    ],
+    "ecosystem/crust/sparsity": [
+     0.5
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     -0.4
     ]
    }
   },
@@ -669,24 +3891,346 @@
      4.0
     ],
     "grid/prop/injectRate": [
-     2.6
+     2.4
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     1100.0
+    "grid/prop/waveSpeed": [
+     24.0
+    ],
+    "grid/prop/threshold": [
+     0.55
+    ],
+    "field/kickFront/onsetDecay": [
+     1.2
+    ],
+    "field/kickFront/audioSpeed": [
+     45.0
     ],
     "material/rock/emissionIntensity": [
-     2.2
+     0.3
     ],
     "scene/volumeEmission": [
-     0.06
+     0.07
     ],
     "particles/spores/spawnRate": [
      1500.0
     ],
     "particles/swarm/spawnRate": [
      2000.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     7.5
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     16.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     6.0
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     9.6
+    ],
+    "ecosystem/matPolyps/intensity": [
+     5.25
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     16.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     4.5
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     12.8
+    ],
+    "ecosystem/whipsTips/intensity": [
+     4.5
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     3.75
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     14.4
+    ],
+    "ecosystem/crust/intensity": [
+     0.9
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     14.4
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.525
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     16.0
+    ],
+    "ecosystem/embers/intensity": [
+     2.1
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     1.8
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     4.8
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.9
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     1.2
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     11.2
+    ],
+    "lights/crown2/intensity": [
+     360.0
+    ],
+    "lights/crown3/intensity": [
+     360.0
+    ],
+    "lights/crown5/intensity": [
+     360.0
+    ],
+    "lights/crown6/intensity": [
+     360.0
+    ],
+    "lights/crown8/intensity": [
+     360.0
+    ],
+    "lights/crown9/intensity": [
+     360.0
+    ],
+    "lights/crown10/intensity": [
+     360.0
+    ],
+    "lights/crown11/intensity": [
+     360.0
+    ],
+    "lights/crown13/intensity": [
+     360.0
+    ],
+    "lights/crown14/intensity": [
+     360.0
+    ],
+    "lights/crown19/intensity": [
+     360.0
+    ],
+    "lights/crown20/intensity": [
+     360.0
+    ],
+    "lights/crown21/intensity": [
+     360.0
+    ],
+    "lights/crown22/intensity": [
+     360.0
+    ],
+    "lights/crown28/intensity": [
+     360.0
+    ],
+    "lights/crown33/intensity": [
+     360.0
+    ],
+    "lights/crown34/intensity": [
+     360.0
+    ],
+    "lights/crown37/intensity": [
+     360.0
+    ],
+    "lights/crown39/intensity": [
+     360.0
+    ],
+    "lights/crown40/intensity": [
+     360.0
+    ],
+    "lights/crown43/intensity": [
+     360.0
+    ],
+    "lights/crown44/intensity": [
+     360.0
+    ],
+    "lights/crown46/intensity": [
+     360.0
+    ],
+    "lights/crown48/intensity": [
+     360.0
+    ],
+    "lights/crown49/intensity": [
+     360.0
+    ],
+    "lights/crown50/intensity": [
+     360.0
+    ],
+    "lights/crown53/intensity": [
+     360.0
+    ],
+    "lights/crown56/intensity": [
+     360.0
+    ],
+    "lights/crown58/intensity": [
+     360.0
+    ],
+    "lights/crown59/intensity": [
+     360.0
+    ],
+    "lights/crown62/intensity": [
+     360.0
+    ],
+    "lights/crown63/intensity": [
+     360.0
+    ],
+    "lights/crown66/intensity": [
+     360.0
+    ],
+    "lights/crown67/intensity": [
+     360.0
+    ],
+    "lights/crown68/intensity": [
+     360.0
+    ],
+    "lights/crown69/intensity": [
+     360.0
+    ],
+    "lights/crown71/intensity": [
+     360.0
+    ],
+    "lights/crown72/intensity": [
+     360.0
+    ],
+    "lights/crown76/intensity": [
+     360.0
+    ],
+    "lights/crown78/intensity": [
+     360.0
+    ],
+    "lights/crown81/intensity": [
+     360.0
+    ],
+    "lights/crown85/intensity": [
+     360.0
+    ],
+    "lights/crown86/intensity": [
+     360.0
+    ],
+    "lights/crown88/intensity": [
+     360.0
+    ],
+    "lights/crown91/intensity": [
+     360.0
+    ],
+    "lights/crown92/intensity": [
+     360.0
+    ],
+    "lights/crown95/intensity": [
+     360.0
+    ],
+    "lights/crown96/intensity": [
+     360.0
+    ],
+    "lights/crown97/intensity": [
+     360.0
+    ],
+    "lights/crown99/intensity": [
+     360.0
+    ],
+    "lights/crown102/intensity": [
+     360.0
+    ],
+    "lights/crown103/intensity": [
+     360.0
+    ],
+    "lights/crown108/intensity": [
+     360.0
+    ],
+    "lights/crown109/intensity": [
+     360.0
+    ],
+    "lights/crown111/intensity": [
+     360.0
+    ],
+    "lights/crown112/intensity": [
+     360.0
+    ],
+    "lights/crown114/intensity": [
+     360.0
+    ],
+    "lights/crown118/intensity": [
+     360.0
+    ],
+    "lights/crown121/intensity": [
+     360.0
+    ],
+    "lights/crown122/intensity": [
+     360.0
+    ],
+    "lights/crown123/intensity": [
+     360.0
+    ],
+    "lights/crown125/intensity": [
+     360.0
+    ],
+    "lights/crown126/intensity": [
+     360.0
+    ],
+    "lights/crown127/intensity": [
+     360.0
+    ],
+    "lights/crown128/intensity": [
+     360.0
+    ],
+    "lights/crown129/intensity": [
+     360.0
+    ],
+    "lights/crown130/intensity": [
+     360.0
+    ],
+    "lights/crown131/intensity": [
+     360.0
+    ],
+    "lights/crown132/intensity": [
+     360.0
+    ],
+    "lights/crown134/intensity": [
+     360.0
+    ],
+    "lights/crown135/intensity": [
+     360.0
+    ],
+    "lights/crown136/intensity": [
+     360.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/crust/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     -0.08
+    ],
+    "ecosystem/crust/sparsity": [
+     0.5
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.6
+    ],
+    "camera/exposure/compensation": [
+     -0.4
     ]
    }
   },
@@ -713,10 +4257,17 @@
     "grid/prop/injectRate": [
      0.0
     ],
-    "field/wakeFront/position": [
-     0.0,
-     0.0,
-     1100.0
+    "grid/prop/waveSpeed": [
+     12.0
+    ],
+    "grid/prop/threshold": [
+     0.95
+    ],
+    "field/kickFront/onsetDecay": [
+     4.0
+    ],
+    "field/kickFront/audioSpeed": [
+     30.0
     ],
     "material/rock/emissionIntensity": [
      0.0
@@ -728,6 +4279,321 @@
      600.0
     ],
     "particles/swarm/spawnRate": [
+     0.0
+    ],
+    "ecosystem/crinoidBeads/intensity": [
+     3.0
+    ],
+    "ecosystem/crinoidBeads/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/crinoidChains/intensity": [
+     2.4
+    ],
+    "ecosystem/crinoidChains/excitedIntensity": [
+     4.8
+    ],
+    "ecosystem/matPolyps/intensity": [
+     2.1
+    ],
+    "ecosystem/matPolyps/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/fanPolyps/intensity": [
+     1.8
+    ],
+    "ecosystem/fanPolyps/excitedIntensity": [
+     6.4
+    ],
+    "ecosystem/whipsTips/intensity": [
+     1.8
+    ],
+    "ecosystem/whipsTips/excitedIntensity": [
+     4.0
+    ],
+    "ecosystem/seapenPolyps/intensity": [
+     1.5
+    ],
+    "ecosystem/seapenPolyps/excitedIntensity": [
+     7.2
+    ],
+    "ecosystem/crust/intensity": [
+     0.36
+    ],
+    "ecosystem/crust/excitedIntensity": [
+     7.2
+    ],
+    "ecosystem/crustViolet/intensity": [
+     0.21
+    ],
+    "ecosystem/crustViolet/excitedIntensity": [
+     8.0
+    ],
+    "ecosystem/embers/intensity": [
+     0.84
+    ],
+    "ecosystem/embers/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/combRows/intensity": [
+     0.72
+    ],
+    "ecosystem/combRows/excitedIntensity": [
+     2.4
+    ],
+    "ecosystem/combGlow/intensity": [
+     0.36
+    ],
+    "ecosystem/combGlow/excitedIntensity": [
+     0.0
+    ],
+    "ecosystem/plankton/intensity": [
+     0.48
+    ],
+    "ecosystem/plankton/excitedIntensity": [
+     5.6
+    ],
+    "lights/crown2/intensity": [
+     150.0
+    ],
+    "lights/crown3/intensity": [
+     150.0
+    ],
+    "lights/crown5/intensity": [
+     150.0
+    ],
+    "lights/crown6/intensity": [
+     150.0
+    ],
+    "lights/crown8/intensity": [
+     150.0
+    ],
+    "lights/crown9/intensity": [
+     150.0
+    ],
+    "lights/crown10/intensity": [
+     150.0
+    ],
+    "lights/crown11/intensity": [
+     150.0
+    ],
+    "lights/crown13/intensity": [
+     150.0
+    ],
+    "lights/crown14/intensity": [
+     150.0
+    ],
+    "lights/crown19/intensity": [
+     150.0
+    ],
+    "lights/crown20/intensity": [
+     150.0
+    ],
+    "lights/crown21/intensity": [
+     150.0
+    ],
+    "lights/crown22/intensity": [
+     150.0
+    ],
+    "lights/crown28/intensity": [
+     150.0
+    ],
+    "lights/crown33/intensity": [
+     150.0
+    ],
+    "lights/crown34/intensity": [
+     150.0
+    ],
+    "lights/crown37/intensity": [
+     150.0
+    ],
+    "lights/crown39/intensity": [
+     150.0
+    ],
+    "lights/crown40/intensity": [
+     150.0
+    ],
+    "lights/crown43/intensity": [
+     150.0
+    ],
+    "lights/crown44/intensity": [
+     150.0
+    ],
+    "lights/crown46/intensity": [
+     150.0
+    ],
+    "lights/crown48/intensity": [
+     150.0
+    ],
+    "lights/crown49/intensity": [
+     150.0
+    ],
+    "lights/crown50/intensity": [
+     150.0
+    ],
+    "lights/crown53/intensity": [
+     150.0
+    ],
+    "lights/crown56/intensity": [
+     150.0
+    ],
+    "lights/crown58/intensity": [
+     150.0
+    ],
+    "lights/crown59/intensity": [
+     150.0
+    ],
+    "lights/crown62/intensity": [
+     150.0
+    ],
+    "lights/crown63/intensity": [
+     150.0
+    ],
+    "lights/crown66/intensity": [
+     150.0
+    ],
+    "lights/crown67/intensity": [
+     150.0
+    ],
+    "lights/crown68/intensity": [
+     150.0
+    ],
+    "lights/crown69/intensity": [
+     150.0
+    ],
+    "lights/crown71/intensity": [
+     150.0
+    ],
+    "lights/crown72/intensity": [
+     150.0
+    ],
+    "lights/crown76/intensity": [
+     150.0
+    ],
+    "lights/crown78/intensity": [
+     150.0
+    ],
+    "lights/crown81/intensity": [
+     150.0
+    ],
+    "lights/crown85/intensity": [
+     150.0
+    ],
+    "lights/crown86/intensity": [
+     150.0
+    ],
+    "lights/crown88/intensity": [
+     150.0
+    ],
+    "lights/crown91/intensity": [
+     150.0
+    ],
+    "lights/crown92/intensity": [
+     150.0
+    ],
+    "lights/crown95/intensity": [
+     150.0
+    ],
+    "lights/crown96/intensity": [
+     150.0
+    ],
+    "lights/crown97/intensity": [
+     150.0
+    ],
+    "lights/crown99/intensity": [
+     150.0
+    ],
+    "lights/crown102/intensity": [
+     150.0
+    ],
+    "lights/crown103/intensity": [
+     150.0
+    ],
+    "lights/crown108/intensity": [
+     150.0
+    ],
+    "lights/crown109/intensity": [
+     150.0
+    ],
+    "lights/crown111/intensity": [
+     150.0
+    ],
+    "lights/crown112/intensity": [
+     150.0
+    ],
+    "lights/crown114/intensity": [
+     150.0
+    ],
+    "lights/crown118/intensity": [
+     150.0
+    ],
+    "lights/crown121/intensity": [
+     150.0
+    ],
+    "lights/crown122/intensity": [
+     150.0
+    ],
+    "lights/crown123/intensity": [
+     150.0
+    ],
+    "lights/crown125/intensity": [
+     150.0
+    ],
+    "lights/crown126/intensity": [
+     150.0
+    ],
+    "lights/crown127/intensity": [
+     150.0
+    ],
+    "lights/crown128/intensity": [
+     150.0
+    ],
+    "lights/crown129/intensity": [
+     150.0
+    ],
+    "lights/crown130/intensity": [
+     150.0
+    ],
+    "lights/crown131/intensity": [
+     150.0
+    ],
+    "lights/crown132/intensity": [
+     150.0
+    ],
+    "lights/crown134/intensity": [
+     150.0
+    ],
+    "lights/crown135/intensity": [
+     150.0
+    ],
+    "lights/crown136/intensity": [
+     150.0
+    ],
+    "ecosystem/matPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/seapenPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crustViolet/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/fanPolyps/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/plankton/responseThreshold": [
+     0.0
+    ],
+    "ecosystem/crust/sparsity": [
+     0.65
+    ],
+    "ecosystem/crustViolet/sparsity": [
+     0.75
+    ],
+    "camera/exposure/compensation": [
      0.0
     ]
    }
@@ -756,7 +4622,8 @@
     "preset": "stirring",
     "transition": {
      "seconds": 6.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -810,7 +4677,8 @@
     "preset": "awake",
     "transition": {
      "seconds": 6.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {
@@ -982,7 +4850,8 @@
     "preset": "aftermath",
     "transition": {
      "seconds": 4.0,
-     "easing": "smooth"
+     "easing": "smooth",
+     "quantize": "beat"
     },
     "triggers": [
      {

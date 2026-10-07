@@ -27,6 +27,9 @@ import land  # noqa: E402
 import organisms  # noqa: E402
 
 OUT = HERE / "cp2"
+VIOLET_DIM = [0.32, 0.12, 1.0]
+PEN = [0.05, 0.62, 1.0]
+DEEP_BLUE = [0.03, 0.22, 1.0]
 EMITTER_PARTS = ("crinoidBeads", "crinoidChains", "matPolyps", "fanPolyps", "whipsTips")
 
 
@@ -43,13 +46,13 @@ def invisible_host(name, pts):
 
 def crust_points(g):
     """Wall crust patches: on the walls (steep), oriented to the rock, clumped along ledges."""
-    X, Z = cp1.candidates(g, 0.05, 801)
+    X, Z = cp1.candidates(g, 0.09, 801)
     sl = g.slope(X, Z)
     d = np.abs(X - np.array([land.centre_x(z) for z in Z]))
     cl = cp1.value_noise(X, Z, 18.0, 13) * 0.6 + cp1.value_noise(X, Z, 5.0, 14) * 0.4
     keep = (sl > 0.6) & (d > 15) & (d < 140) & (cl > 0.45)
     X, Z = X[keep], Z[keep]
-    return cp1.records(g, X, Z, np.random.default_rng(802).uniform(0.7, 1.6, len(X)), 0.95, 803, sink=0.0)
+    return cp1.records(g, X, Z, np.random.default_rng(802).uniform(1.0, 2.6, len(X)), 0.95, 803, sink=0.0)
 
 
 def plankton_points(g):
@@ -76,7 +79,8 @@ def layer(name, hosts, template, color, intensity, excited, field="", gain=1.0, 
     return d
 
 
-def ecosystem_scene(sc, P, W, g):
+def ecosystem_scene(sc, P, W, g, Wr=None):
+    Wr = W if Wr is None else Wr
     """CP1's scene with the emitting mesh parts replaced by ecosystem layers."""
     sc = copy.deepcopy(sc)
     sc["nodes"] = [n for n in sc["nodes"] if not n["name"].startswith(EMITTER_PARTS)]
@@ -90,34 +94,43 @@ def ecosystem_scene(sc, P, W, g):
     sc["nodes"].append(invisible_host("planktonHost", plankton_points(g)))
     mats = hosts_for(sc, "matCushion")
     pens = hosts_for(sc, "seapen")
+    E = W  # response scale for this still
     sc["ecosystem"] = {"spriteRadius": 1.5, "maxSprites": 65536, "layers": [
-        layer("crinoidBeads", ["crinoidStalk"], "crinoid_beads", cp1.CYAN, 9.0 * W, 6.0 * W, "kick",
-              sparsity=0.25, flicker=0.15, flickerRate=2.0, breath=0.35, breathRate=0.05, maxDistance=900),
-        layer("crinoidChains", ["crinoidStalk"], "crinoid_chains", cp1.PALE, 7.0 * W, 2.5 * W, "bands",
-              breath=0.3, breathRate=0.11, maxDistance=900),
-        layer("matPolyps", mats, "mat_polyps", cp1.BLUE, 7.0 * W, 6.0 * W, "kick", sparsity=0.35,
+        layer("crinoidBeads", ["crinoidStalk"], "crinoid_beads", cp1.CYAN, 2.2 * Wr, 9.0 * E, "kick",
+              sparsity=0.3, flicker=0.1, flickerRate=1.5, breath=0.5, breathRate=0.04, maxDistance=900),
+        layer("crinoidChains", ["crinoidStalk"], "crinoid_chains", cp1.PALE, 1.4 * Wr, 5.0 * E, "bands",
+              breath=0.4, breathRate=0.09, maxDistance=900),
+        layer("matPolyps", mats, "mat_polyps", cp1.BLUE, 1.0 * Wr, 9.0 * E, "kick", sparsity=0.55,
               pulseRate=1.5, pulseDecay=0.8, maxDistance=320),
-        layer("fanPolyps", ["fanBody"], "fan_polyps", cp1.MAGENTA, 6.0 * W, 2.5 * W, "bands", maxDistance=700),
-        layer("whipsTips", ["whipsBody"], "whips_tips", cp1.PALE, 12.0 * W, 2.5 * W, "bands", sparsity=0.3,
-              flicker=0.5, flickerRate=7.0, maxDistance=260),
-        layer("seapenPolyps", pens, "seapen", cp1.TURQ, 3.0 * W, 6.0 * W, "kick", sparsity=0.15,
+        layer("fanPolyps", ["fanBody"], "fan_polyps", VIOLET_DIM, 0.5 * Wr, 7.0 * E, "kick",
+              excited_color=cp1.MAGENTA, sparsity=0.2, maxDistance=700),
+        layer("whipsTips", ["whipsBody"], "whips_tips", cp1.PALE, 2.0 * Wr, 4.0 * E, "bands", sparsity=0.3,
+              flicker=0.6, flickerRate=7.0, maxDistance=260),
+        layer("seapenPolyps", pens, "seapen", PEN, 0.7 * Wr, 8.0 * E, "kick", sparsity=0.3,
               pulseRate=0.8, pulseDecay=1.0, maxDistance=300),
-        layer("crust", ["crustHost"], "crust", cp1.BLUE, 2.0 * W, 6.0 * W, "kick", sparsity=0.5,
-              pulseRate=2.0, pulseDecay=1.5, breath=0.4, breathRate=0.03, maxDistance=600),
-        layer("plankton", ["planktonHost"], "plankton", cp1.BLUE, 1.5 * W, 8.0 * W, "kick", sparsity=0.6,
+        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 0.5 * Wr, 6.0 * E, "kick", sparsity=0.6,
+              pulseRate=2.0, pulseDecay=1.5, breath=0.4, breathRate=0.03, size=0.8, maxDistance=600),
+        layer("plankton", ["planktonHost"], "plankton", cp1.BLUE, 0.3 * Wr, 12.0 * E, "kick", sparsity=0.7,
               pulseRate=4.0, pulseDecay=0.6, flicker=0.3, flickerRate=3.0, maxDistance=300),
     ]}
     return sc
 
 
+# per still: (rest scale, response scale)
+STATES = {"01-rest": (0.25, 0.3), "02-dense": (1.0, 1.0), "03-wave": (0.6, 1.5), "04-river": (0.8, 1.2),
+          "05-canopy": (1.0, 1.0), "06-flight": (1.0, 1.2), "07-drop": (1.6, 3.0), "08-aftermath": (0.35, 0.4)}
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--lights", default="pools", choices=("pools", "none"))
+    ap.add_argument("--lights", default="none", choices=("pools", "none"))
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     organisms.build_all()
     g = land.Ground(land.world(), *cp1.REGION, step=2.0)
     P = cp1.place(g)
+    # the walls belong to the crust now: mat cushions only where the ground is gentle
+    P["mat"] = [r for r in P["mat"] if float(g.slope(np.array([r[0]]), np.array([r[2]]))[0]) < 1.1]
     routes = [{"source": s, "target": t, "op": "add", "amount": 0.0} for s, t in
               (("audio.bass", "root/scale"), ("audio.mid", "root/rotationSpeed"), ("audio.rms", "scene/brightness"),
                ("audio.onset", "root/impulse"))]
@@ -125,10 +138,11 @@ def main():
             "post/bloom/emissionWeight": 0.75, "post/tonemap/chroma-retention": 0.6, "post/output/vignette": 0.28,
             "post/grade/contrast": 1.08, "post/grade/saturation": 1.05}
     for name, (eye, tgt, fov, wake, t) in cp1.STILLS.items():
+        wr, we = STATES[name]
         sc = cp1.scene(P, wake=wake)
         sc["camera"] = {"mode": 1, "position": cp1.resolve(g, eye), "target": cp1.resolve(g, tgt), "fov": fov,
                         "orbitSpeed": 0}
-        sc = ecosystem_scene(sc, P, wake, g)
+        sc = ecosystem_scene(sc, P, we, g, Wr=wr)
         if args.lights == "none":
             sc["lights"] = sc["lights"][:1]
         sc["name"] = "The Rift (CP2, ecosystem emitters)"
