@@ -17,7 +17,7 @@ An honest evaluation against brief §16 (quality bar) and §19 (success criteria
 | 1 | Reference board (45 sources, a light and lesson note each) and eight stills from the general renderer alone | the owner: "looks cool". The coordinator: teal haze everywhere, neon magenta, river blobs, square artifacts. It cost 76 ms a frame |
 | 2/3 | ADR-1200 emitters, ADR-1201 medium, the arc, the drop clip | darker and denser, but it had lost CP1's colour, and the drop was weaker than CP1's 07 |
 | 4 | Colour back at rest; the drop made big (a synchronised ignition, magenta fluorescence, a surge through the canopy) | beat CP1 at its own cameras; the Critic scored 0.975 (washed-out drop, clipped flash, moves off the beat, all fixed). The owner: move on |
-| 5 | Live optimisation, a live-input session, the full Trench run, suites | this document |
+| 5 | Live optimisation, a live-input session, the full Trench run, suites | the Critic on the full run caught a real defect (below); after the fix, 0.98 with 2 medium findings |
 
 ## §16, the quality bar
 
@@ -56,6 +56,29 @@ Its weakest resemblance is to "a music visualizer" during the body, when everyth
 | **Architecture:** a credible foundation for Environment mode | strong | the `EnvironmentRenderer` seam is already reused by production Astral Forge (on main); WORLD/ENVIRONMENT/HYBRID as content, not a switch |
 | **"Holy shit"** | adequate to strong | the drop is a real regime change: a darkened held breath, then the canyon ignites in fluorescent violet, magenta and cyan as the camera surges through the canopy. It is not yet the jaw-drop: the wave's leading edge is not legible enough, and the colour leans pastel |
 
+## The Critic on the full run
+
+Run on the full 207.6 s Trench render, 20 shots, one per committed state (`critic_inputs.py`).
+
+**The first run** (`job_1a11631baefe1a137`, 0.98) scored motion at 0.92 and flagged "camera shake" at 201-207 s,
+moving 7-14% of the frame per frame. Single frames showed it was not shake: the camera pointed somewhere else for
+one frame and then came back.
+- **The cause:** the flight ran off the end of its open spline at 197 s. Parked on the end point, the look-ahead
+  target coincided with the camera, so the aim became float rounding.
+- **The fix (b72866dd):**
+  - in the engine, the look-ahead continues along the end tangent;
+  - in the Rift, the body's paces are about 3 m/s lower, so the flight ends at 95% of the path.
+  - There is a test for each.
+- The full run was re-rendered.
+
+**The second run** (`job_1a1166133fd10a696`, 0.98) has motion at 0.97 and no findings at the end. What remains:
+- **Pale for a night scene (the drop, 96-116 s, medium):** luma 0.29 with saturation 0.55. The drop is meant to be
+  the one bright regime, but the pastel lean is real (see §16, colour).
+- **A small wobble on the dive into the drop (93.9-95.9 s, medium):** 0.36% of the frame per frame.
+- **Repeated composition in 10 of 20 shots (low):** true. The flight always looks down the canyon's one axis, so
+  shots resemble their neighbours even when the behaviour changes. This is a limit of a single river spline; see the
+  next-iteration list.
+
 ## Known limits and the next iteration
 
 1. **Live at 60 fps** needs the general renderer's lit pass cut further. Bodies and terrain are geometry-bound
@@ -67,5 +90,11 @@ Its weakest resemblance is to "a music visualizer" during the body, when everyth
 4. **Placement is CPU `points`** (14 MB of scene JSON). A generator distribution standing on the terrain's height
    would make the world unbounded and the file small. That is an engine gap (`scene/generator.hpp`'s value-noise
    ground).
-5. **No body sway:** emitters follow static host instances (ADR-1200's stated limit). Vegetation wind on both would
+5. **Compositional variety:** a second path family (cross-canyon traverses, a climb up a wall face, a crown-level
+   orbit) so that consecutive phrases do not share the down-canyon axis.
+6. **The two full renders differ before the pace change could act** (mean abs difference 2/255 at 60 s, 8/255 at
+   97 s: the same shot, with the camera a little displaced). They straddle the origin/main merge, so the cause is
+   not established: it may be engine changes from main or render nondeterminism. I did not chase it. The drop clip
+   (`rift-the-drop-84-112.mp4`) is the earlier build's render of the same drop.
+7. **No body sway:** emitters follow static host instances (ADR-1200's stated limit). Vegetation wind on both would
    be one shared function.

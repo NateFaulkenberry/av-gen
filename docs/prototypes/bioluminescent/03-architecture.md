@@ -127,6 +127,13 @@ Commits to cherry-pick for the seam alone:
 - the `environments_` list and the `EnvironmentFrame` call in `scene_renderer.{hpp,cpp}`;
 - (optionally) `src/scene/ecosystem.*` and `src/rendering/ecosystem_renderer.*` as the worked example.
 
+**State after merging origin/main (9f2ed05d):**
+- Production Astral Forge took the seam (it is on main);
+- this branch registers both environments, in run order:
+  `environments_ = {ecosystem_.get(), astral_.get()}`.
+- Each environment keeps its own scene block (`ecosystem`, `astral`), its own Composition parameters, and its own
+  init and reload, in SceneRenderer.
+
 ## 3. CP1: the general renderer at the Rift's first density (measured)
 
 `examples/bioluminescent/cp1.py` builds the Rift with only existing systems:
@@ -208,7 +215,7 @@ Scene variants of `06-flight` (`cp1/ab-*.json`, built from the still's scene by 
 | Can a glow field replace the lights? | Prototype: a low-res emission map (the propagation field's own output) sampled by ground, walls, water and haze, against 139 point lights, for cost and look side by side |
 | Does unlit/emissive shading of pure emitters cost what lit shading does? | `unlit` material on the emitter parts |
 
-## 5. The running assessment (brief §18), as of CP4
+## 5. The running assessment (brief §18), final (unchanged since CP4)
 
 **What the generalized renderer does well, and keeps doing in the Rift.**
 - **Terrain and water:** the canyon is three authored features, and its walls frame every shot.

@@ -1,7 +1,7 @@
 # THE RIFT: how the music becomes the world
 
-The scene source is `examples/bioluminescent/build.py`. The generated `rift.scene.json` is gitignored; regenerate it
-with `python3 examples/bioluminescent/build.py`. Brief §8-§12.
+The scene source is `examples/bioluminescent/build.py`. The generated `rift.scene.json` and `meshes/` are committed
+(regenerate them with `python3 examples/bioluminescent/build.py`). Brief §8-§12.
 
 ## 1. The principle
 
@@ -92,7 +92,7 @@ Two slow listeners:
 | Breath | bass presence < 0.2 | river, 1.5 m/s: the camera hangs | no ignition | |
 | Build | 2 s of Breath (a lull that lasts is a breakdown) | climb to 34 m, 4 m/s | 0.6 | spores 3,500/s |
 | **Drop** | bass presence > 0.42 out of a Build (a 1.2 s ease-out: most of it lands at once) | **dive** to 5 m over the water at 24 m/s, 66°, banking | **3.2, the whole canyon ahead (1.8 km)** | **rock 5, haze 0.10, swarm 9,000/s** |
-| Body 1-4 | 14 s after the Drop, then on phrases | canopy / river / wall / reveal (70 m) | 2.2-2.6 | rock 1.6-2.2, haze 0.04-0.06 |
+| Body 1-4 | 14 s after the Drop, then on phrases | canopy / dive / wall / reveal (70 m); 14 / 17 / 12 / 9.5 m/s | 2.2-2.6 | rock 1.6-2.2, haze 0.04-0.06 |
 | Aftermath | energy < 0.62 from the body | after: 9 m, 2.5 m/s, pulling up | no ignition | the wake drains over its 30 s |
 
 On Trench, through the engine (`--sonic-trace` on a probe copy, no GPU):
@@ -134,7 +134,8 @@ Pace:
 - **Quiet passages** drift at 3-5 m/s on long lenses.
 - **The build** slows and climbs.
 - **The drop** dives at 24 m/s.
-- **The body** flies at 12-20 m/s.
+- **The body** flies at 9.5-17 m/s, plus the energy. The paces are sized so that the flight fits its 2.69 km
+  path over the whole track (it ends at 95%); a test plays the song and checks it.
 
 Moves land on phrases (with `quantize: beat`), never on kicks. Two incommensurate LFOs float the camera off its path,
 more with energy.
