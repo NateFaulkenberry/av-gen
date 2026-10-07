@@ -430,6 +430,30 @@ def crust(seed):
     return {"crust": m}
 
 
+def comb_jelly(seed):
+    """A comb jelly as light alone: eight meridian rows of comb plates (diffraction, travelling spectrum) and a sparse
+    glow of the clear body. 0.7 m tall; emitter templates only (the body has no mesh -- a mesh here reads as a ball)."""
+    rng = np.random.default_rng(seed)
+    rows, body = Mesh(), Mesh()
+    for r in range(8):
+        a = r * 2 * math.pi / 8
+        for k in range(36):
+            t = 0.3 + (math.pi - 0.6) * k / 35
+            x, y, z = 0.25 * math.sin(t) * math.cos(a), 0.36 * math.cos(t), 0.25 * math.sin(t) * math.sin(a)
+            rows.emit.append([x * 1.04, y, z * 1.04, k / 35, r / 8, 0.009])
+    for q in range(160):
+        t = math.acos(rng.uniform(-1, 1))
+        a = rng.uniform(0, 2 * math.pi)
+        x, y, z = 0.24 * math.sin(t) * math.cos(a), 0.35 * math.cos(t), 0.24 * math.sin(t) * math.sin(a)
+        body.emit.append([x, y, z, rng.random(), rng.random(), 0.006])
+    # two trailing tentacles of faint beads
+    for side in (-1, 1):
+        for k in range(30):
+            body.emit.append([side * 0.05 + 0.02 * math.sin(k * 0.5), -0.36 - k * 0.04, 0.02 * math.cos(k * 0.4),
+                              k / 29, rng.random(), 0.004])
+    return {"comb_rows": rows, "comb_glow": body}
+
+
 def plankton(seed):
     """River plankton: ~900 points within 0.4 m of the surface over an 8 m patch (points only)."""
     rng = np.random.default_rng(seed)
@@ -448,7 +472,7 @@ def build_all():
     for fn, seed in ((crinoid, 3), (seapen, 5), (fan, 7), (whips, 11), (mat, 13), (lanterns, 17), (comb, 19)):
         for name, mesh in fn(seed).items():
             total[name] = mesh.write(name)
-    for fn, seed in ((crust, 23), (plankton, 29)):
+    for fn, seed in ((crust, 23), (plankton, 29), (comb_jelly, 31)):
         for name, mesh in fn(seed).items():
             mesh.write_emit(name)
     return total

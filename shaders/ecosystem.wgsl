@@ -25,6 +25,8 @@ struct Layer {
     slots: vec4<i32>,       // x = response field slot (-1 none), y = lag field slot, z = point count, w = host count
     bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), y = wake field slot
                             // (-1 none), z = wake gain, w = near fade (m, 0 = off)
+    optics: vec4<f32>,      // x = iridescence, y = spectral cycles along v, z = cycles per second, w = bob (m)
+    motion: vec4<f32>,      // x = bob rate (Hz)
 };
 
 struct Host {
@@ -101,7 +103,13 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
 
     let pt = points[pointIndex];
     let local = vec4<f32>(pt.px, pt.py, pt.pz, 1.0);
-    let p = vec3<f32>(dot(host.row0, local), dot(host.row1, local), dot(host.row2, local));
+    var p = vec3<f32>(dot(host.row0, local), dot(host.row1, local), dot(host.row2, local));
+    if (layer.optics.w > 0.0) {
+        // a floating organism drifts on its own phase (a pure function of time and the host)
+        let ph = ecoUnit(hostIndex * 7919u + 3u) * 6.2831853;
+        let w = 6.2831853 * layer.motion.x * eco.misc.x;
+        p = p + layer.optics.w * vec3<f32>(sin(w * 0.73 + ph), 0.6 * sin(w + ph * 1.7), cos(w * 0.61 + ph * 0.5));
+    }
     let toP = p - frame.cameraPos.xyz;
     let dist = length(toP);
     let viewDepth = dot(toP, frame.cameraForward.xyz);
@@ -168,7 +176,13 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
         }
         response = layer.response.x * max(f - layer.response.y, 0.0);
     }
-    let colour = mix(layer.color.rgb, layer.excited.rgb, saturate(response));
+    var colour = mix(layer.color.rgb, layer.excited.rgb, saturate(response));
+    if (layer.optics.x > 0.0) {
+        // diffraction: a spectral hue travelling along the organism (a comb jelly's plates)
+        let hue = fract(pt.v * layer.optics.y - eco.misc.x * layer.optics.z + pt.u * 0.15);
+        let spectral = saturate(abs(fract(vec3<f32>(hue) + vec3<f32>(0.0, 0.6667, 0.3333)) * 6.0 - 3.0) - 1.0);
+        colour = mix(colour, spectral * max(max(colour.r, colour.g), colour.b), layer.optics.x);
+    }
     var fade = 1.0 - smoothstep(0.75 * maxDistance, maxDistance, dist);
     if (layer.bound.w > 0.0) {
         fade = fade * smoothstep(0.4 * layer.bound.w, layer.bound.w, dist);

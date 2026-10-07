@@ -44,7 +44,9 @@ nlohmann::json layerJson(const std::string& templatePath) {
                           {"pulseRate", 2.0},
                           {"sparsity", 0.25},
                           {"maxDistance", 250.0},
-                          {"nearFade", 3.0}};
+                          {"nearFade", 3.0},
+                          {"iridescence", 0.8},
+                          {"bob", 1.5}};
 }
 
 fs::path writeTemplate(const std::string& name, const nlohmann::json& points) {
@@ -70,6 +72,8 @@ TEST_CASE("an ecosystem block round-trips through JSON, and refuses what it does
     CHECK(l.wakeField == "wake");
     CHECK(l.wakeGain == 2.0f);
     CHECK(l.nearFade == 3.0f);
+    CHECK(l.iridescence == 0.8f);
+    CHECK(l.bob == 1.5f);
     CHECK(eco->spriteRadius == 2.0f);
 
     auto again = scene::Ecosystem::fromJson(eco->toJson());
@@ -100,6 +104,14 @@ TEST_CASE("an ecosystem block round-trips through JSON, and refuses what it does
         CHECK_FALSE(scene::Ecosystem::fromJson(bad));
         bad = block;
         bad["spriteRadius"] = 0.1;
+        CHECK_FALSE(scene::Ecosystem::fromJson(bad));
+    }
+    SECTION("iridescence is 0..1 and a drift is not negative") {
+        nlohmann::json bad = block;
+        bad["layers"][0]["iridescence"] = 1.5;
+        CHECK_FALSE(scene::Ecosystem::fromJson(bad));
+        bad = block;
+        bad["layers"][0]["bob"] = -1.0;
         CHECK_FALSE(scene::Ecosystem::fromJson(bad));
     }
     SECTION("two layers of one name are refused (a name is half a parameter path)") {

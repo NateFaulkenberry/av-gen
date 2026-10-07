@@ -33,7 +33,8 @@ constexpr std::string_view kLayerKeys[] = {
     "name",       "enabled",      "hosts",       "template",    "color",       "excitedColor",
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
     "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
-    "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade"};
+    "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade",
+    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
 template <std::size_t N>
@@ -117,7 +118,8 @@ Result<void> EmitterLayer::validate() const {
         return fail("ecosystem layer '{}': needs a template", name);
     }
     const float scalars[] = {intensity, excitedIntensity, size, responseGain, responseThreshold, travel, wakeGain, breath,
-                             breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance, nearFade};
+                             breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance, nearFade,
+                             iridescence, iridescenceScale, iridescenceSpeed, bob, bobRate};
     for (float s : scalars) {
         if (!finite(s)) {
             return fail("ecosystem layer '{}': a value is not finite", name);
@@ -133,8 +135,10 @@ Result<void> EmitterLayer::validate() const {
                     name);
     }
     if (travel < 0.0f || travel > 1.0f || breath < 0.0f || breath > 1.0f || flicker < 0.0f || flicker > 1.0f ||
-        sparsity < 0.0f || sparsity > 1.0f) {
-        return fail("ecosystem layer '{}': travel, breath, flicker and sparsity are 0..1", name);
+        sparsity < 0.0f || sparsity > 1.0f || iridescence < 0.0f || iridescence > 1.0f || bob < 0.0f ||
+        bobRate < 0.0f) {
+        return fail("ecosystem layer '{}': travel, breath, flicker, sparsity and iridescence are 0..1; bob and bobRate"
+                    " >= 0", name);
     }
     return {};
 }
@@ -202,6 +206,11 @@ json Ecosystem::toJson() const {
         e["sparsity"] = l.sparsity;
         e["maxDistance"] = l.maxDistance;
         e["nearFade"] = l.nearFade;
+        e["iridescence"] = l.iridescence;
+        e["iridescenceScale"] = l.iridescenceScale;
+        e["iridescenceSpeed"] = l.iridescenceSpeed;
+        e["bob"] = l.bob;
+        e["bobRate"] = l.bobRate;
         arr.push_back(std::move(e));
     }
     j["layers"] = std::move(arr);
@@ -281,6 +290,11 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.sparsity = e.value("sparsity", l.sparsity);
                 l.maxDistance = e.value("maxDistance", l.maxDistance);
                 l.nearFade = e.value("nearFade", l.nearFade);
+                l.iridescence = e.value("iridescence", l.iridescence);
+                l.iridescenceScale = e.value("iridescenceScale", l.iridescenceScale);
+                l.iridescenceSpeed = e.value("iridescenceSpeed", l.iridescenceSpeed);
+                l.bob = e.value("bob", l.bob);
+                l.bobRate = e.value("bobRate", l.bobRate);
                 eco.layers.push_back(std::move(l));
             }
         }
@@ -400,6 +414,11 @@ EcosystemParameters registerEcosystemParameters(params::ParameterSet& params, co
         r.f("sparsity", "dark at rest", l.sparsity, 0.0f, 1.0f, 0.0f, 1.0f);
         r.f("maxDistance", "visible to (m)", l.maxDistance, 1.0f, 100000.0f, 10.0f, 2000.0f);
         r.f("nearFade", "fades out nearer than (m)", l.nearFade, 0.0f, 1000.0f, 0.0f, 20.0f);
+        r.f("iridescence", "diffraction (travelling spectrum)", l.iridescence, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("iridescenceScale", "spectral cycles along the organism", l.iridescenceScale, 0.0f, 100.0f, 0.0f, 8.0f);
+        r.f("iridescenceSpeed", "spectrum travel (cycles/s)", l.iridescenceSpeed, -100.0f, 100.0f, -4.0f, 4.0f);
+        r.f("bob", "drift (m)", l.bob, 0.0f, 100.0f, 0.0f, 4.0f);
+        r.f("bobRate", "drift rate (Hz)", l.bobRate, 0.0f, 10.0f, 0.0f, 1.0f);
         p.layers.push_back(std::move(layer));
     }
     return p;
@@ -428,6 +447,11 @@ void applyEcosystemParameters(const EcosystemParameters& p, const Ecosystem& res
         copy(lp, "sparsity", l.sparsity);
         copy(lp, "maxDistance", l.maxDistance);
         copy(lp, "nearFade", l.nearFade);
+        copy(lp, "iridescence", l.iridescence);
+        copy(lp, "iridescenceScale", l.iridescenceScale);
+        copy(lp, "iridescenceSpeed", l.iridescenceSpeed);
+        copy(lp, "bob", l.bob);
+        copy(lp, "bobRate", l.bobRate);
     }
 }
 

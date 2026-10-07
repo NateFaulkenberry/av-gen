@@ -98,6 +98,14 @@ struct EmitterLayer {
     float sparsity = 0.0f;           // fraction of points dark at rest (they still answer the field)
     float maxDistance = 300.0f;      // metres; fades out over the last quarter
     float nearFade = 0.0f;           // metres; a point closer to the lens fades out (no orbs on the lens); 0 = off
+    // Diffraction (a comb jelly's plates): the colour is mixed toward a spectral hue that travels along the organism,
+    // hue = fract(v x iridescenceScale - t x iridescenceSpeed + u x 0.15). 0 = off.
+    float iridescence = 0.0f;
+    float iridescenceScale = 2.0f;   // spectral cycles along v
+    float iridescenceSpeed = 0.5f;   // cycles per second
+    // Floating organisms drift: each host instance bobs on its own phase. 0 = still.
+    float bob = 0.0f;                // metres
+    float bobRate = 0.1f;            // Hz
 
     [[nodiscard]] Result<void> validate() const;
 };

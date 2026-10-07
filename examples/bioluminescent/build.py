@@ -170,6 +170,20 @@ def place(g):
                 out.append([round(x, 3), round(wl, 3), round(zz, 3), 0, round(math.sin(a / 2), 5), 0,
                             round(math.cos(a / 2), 5), 1, 1, 1])
     P["plankton"] = out
+
+    # comb jellies drifting over the river and up into the canopy
+    r = np.random.default_rng(951)
+    out = []
+    for _ in range(900):
+        z = r.uniform(R[2], R[3])
+        x = land.river_x(z) + r.normal(0, 12)
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        y = max(y, land.FLOOR - 1.0) + r.uniform(2.0, 30.0)
+        a = r.uniform(0, 6.28)
+        q = cp1.quat_from_matrix(cp1.basis([math.sin(a) * 0.4, 1, math.cos(a) * 0.4], [1, 0, 0]))
+        s = r.uniform(0.6, 1.6)
+        out.append([round(x, 3), round(y, 3), round(z, 3), *[round(v, 5) for v in q], s, s, s])
+    P["comb"] = out
     return P
 
 
@@ -233,6 +247,7 @@ def bodies(P):
     N.append(host_node("crustHost", P["crust"]))
     N.append(host_node("emberHost", P["ember"]))
     N.append(host_node("planktonHost", P["plankton"]))
+    N.append(host_node("combHost", P["comb"]))
     return N
 
 
@@ -249,26 +264,31 @@ def ecosystem(P, sc_nodes):
     mats = [n["name"] for n in sc_nodes if n["name"].startswith("mat")]
     return {"spriteRadius": 1.5, "maxSprites": 65536, "layers": [
         # the canopy answers late: energy, not excitation; light runs out along the arms behind it
-        layer("crinoidBeads", ["crinoidStalk"], "crinoid_beads", CYAN, 1.2, 10.0, "propE", sparsity=0.3,
+        layer("crinoidBeads", ["crinoidStalk"], "crinoid_beads", CYAN, 5.0, 10.0, "propE", sparsity=0.3,
               flicker=0.1, flickerRate=1.5, breath=0.5, breathRate=0.04, wakeGain=1.5, maxDistance=1000,
               responseGain=1.6, nearFade=5.0),
-        layer("crinoidChains", ["crinoidStalk"], "crinoid_chains", PALE, 0.8, 6.0, "highs", breath=0.4,
+        layer("crinoidChains", ["crinoidStalk"], "crinoid_chains", PALE, 4.0, 6.0, "highs", breath=0.4,
               breathRate=0.09, wakeGain=1.5, maxDistance=1000, responseThreshold=0.15, responseGain=1.4,
               nearFade=7.0),
-        layer("matPolyps", mats, "mat_polyps", BLUE, 0.5, 10.0, "propU", sparsity=0.55, pulseRate=1.5,
+        layer("matPolyps", mats, "mat_polyps", BLUE, 3.5, 10.0, "propU", sparsity=0.45, pulseRate=1.5,
               pulseDecay=0.8, wakeGain=2.0, maxDistance=320),
-        layer("fanPolyps", ["fanBody"], "fan_polyps", VIOLET_DIM, 0.15, 4.0, "propU", excited_color=MAGENTA,
+        layer("fanPolyps", ["fanBody"], "fan_polyps", VIOLET_DIM, 0.4, 4.0, "propU", excited_color=MAGENTA,
               sparsity=0.45, wakeGain=1.0, maxDistance=700, nearFade=2.0),
-        layer("whipsTips", ["whipsBody"], "whips_tips", PALE, 1.2, 5.0, "highs", sparsity=0.3, flicker=0.6,
+        layer("whipsTips", ["whipsBody"], "whips_tips", PALE, 4.0, 5.0, "highs", sparsity=0.3, flicker=0.6,
               flickerRate=7.0, wakeGain=1.0, maxDistance=260, responseThreshold=0.15, responseGain=1.4,
               nearFade=1.5),
-        layer("seapenPolyps", pens, "seapen", PEN, 0.4, 9.0, "propU", sparsity=0.3, pulseRate=0.8, pulseDecay=1.0,
+        layer("seapenPolyps", pens, "seapen", PEN, 2.5, 9.0, "propU", sparsity=0.3, pulseRate=0.8, pulseDecay=1.0,
               wakeGain=2.0, maxDistance=300),
-        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 0.25, 6.0, "propU", sparsity=0.6, pulseRate=2.0,
+        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 1.2, 6.0, "propU", sparsity=0.5, pulseRate=2.0,
               pulseDecay=1.5, breath=0.4, breathRate=0.03, size=0.8, wakeGain=3.0, maxDistance=700),
         layer("embers", ["emberHost"], "crust", EMBER, 0.6, 0.0, "", sparsity=0.85, breath=0.6, breathRate=0.02,
               size=0.7, maxDistance=400, wakeField=""),
-        layer("plankton", ["planktonHost"], "plankton", BLUE, 0.15, 14.0, "propU", sparsity=0.7, pulseRate=4.0,
+        layer("combRows", ["combHost"], "comb_rows", PALE, 2.5, 3.0, "highs", iridescence=0.9, iridescenceScale=1.5,
+              iridescenceSpeed=0.8, bob=1.2, bobRate=0.05, flicker=0.2, flickerRate=4.0, nearFade=1.5,
+              maxDistance=260, responseThreshold=0.2),
+        layer("combGlow", ["combHost"], "comb_glow", [0.35, 0.3, 1.0], 0.6, 0.0, "", bob=1.2, bobRate=0.05,
+              sparsity=0.2, nearFade=1.5, maxDistance=200),
+        layer("plankton", ["planktonHost"], "plankton", BLUE, 0.8, 14.0, "propU", sparsity=0.7, pulseRate=4.0,
               pulseDecay=0.6, flicker=0.3, flickerRate=3.0, wakeGain=2.0, maxDistance=320),
     ]}
 
