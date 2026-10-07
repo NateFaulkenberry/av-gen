@@ -174,3 +174,44 @@ TEST_CASE("the cost of a seek that replays the control layer", "[.bench][seek][s
                                          << e.stats().controlReplays << ")");
     }
 }
+
+// Found by THE RIFT (proto/bioluminescent): a second seek to the same second -- a render job always seeks twice, once for
+// its warm-up frame and once for the range -- landed in the initial state. StateMachine::reset re-entered the initial
+// state at the machine's last updated second (the previous target), so the replay from zero could fire no `elapsed`
+// trigger before that target. reset now restarts the machine's clock.
+TEST_CASE("A second seek to the same second lands the elapsed-driven states where play does", "[adr1168][states]") {
+    const auto dir = testsupport::processTempDir() / "control_seek_twice";
+    std::filesystem::create_directories(dir);
+    {
+        const std::size_t frames = 12 * kRate;
+        auto tone = testsupport::sine(110.0f, kRate, frames, 0.4f);
+        auto file = audio::AudioFile::fromInterleaved(testsupport::interleave(tone, 2), 2, kRate);
+        REQUIRE(file.writeWav(dir / "music.wav").has_value());
+    }
+    std::ofstream(dir / "scene.json") << R"({ "format": "avgen-scene", "version": 1, "name": "seek-twice",
+  "camera": { "mode": 1, "position": [0, 2, 10], "target": [0, 1, 0], "fov": 45 },
+  "nodes": [ { "name": "box", "kind": "procedural", "procedural": {
+    "source": { "kind": "box", "size": [1, 1, 1] }, "distribution": { "kind": "single" } } } ] })";
+    std::ofstream(dir / "project.json") << R"({ "format": "avgen-project", "version": 4,
+  "assets": { "scene": { "kind": "composition", "path": "scene.json" }, "audio": { "path": "music.wav" } },
+  "parameters": {}, "routes": [],
+  "presets": [ { "name": "a", "values": { "camera/fov": [40] } }, { "name": "b", "values": { "camera/fov": [50] } },
+               { "name": "c", "values": { "camera/fov": [60] } } ],
+  "states": { "initial": "A", "states": [
+      { "name": "A", "preset": "a", "transition": { "seconds": 0.0 }, "triggers": [] },
+      { "name": "B", "preset": "b", "transition": { "seconds": 0.0 },
+        "triggers": [ { "kind": "elapsed", "threshold": 2.0, "from": "A" } ] },
+      { "name": "C", "preset": "c", "transition": { "seconds": 0.0 },
+        "triggers": [ { "kind": "elapsed", "threshold": 3.0, "from": "B" } ] } ] },
+  "render": { "width": 64, "height": 36, "fps": 30 } })";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(dir / "project.json").has_value());
+    for (int pass = 0; pass < 3; ++pass) {
+        engine.seekSeconds(8.0);
+        FrameTime t{};
+        t.renderTime = 8.0;
+        engine.update(t);
+        INFO("seek " << pass + 1 << " to 8 s lands in '" << engine.states().current() << "'");
+        CHECK(engine.states().current() == "C"); // A until 2 s, B until 5 s, then C
+    }
+}

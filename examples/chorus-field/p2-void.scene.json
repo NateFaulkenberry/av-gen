@@ -1,0 +1,465 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Chorus Field p2 void",
+ "camera": {
+  "mode": 1,
+  "position": [
+   30,
+   10,
+   80
+  ],
+  "target": [
+   0,
+   -2,
+   0
+  ],
+  "fov": 40,
+  "orbitSpeed": 0
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "role": "key",
+   "direction": [
+    -0.45,
+    -0.55,
+    -0.7
+   ],
+   "color": [
+    1.0,
+    0.94,
+    0.86
+   ],
+   "intensity": 6.0,
+   "castsShadow": true,
+   "shadowStrength": 0.92,
+   "softness": 1.2
+  },
+  {
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "direction": [
+    0.55,
+    -0.2,
+    0.8
+   ],
+   "color": [
+    0.55,
+    0.7,
+    1.0
+   ],
+   "intensity": 4.0,
+   "castsShadow": false,
+   "shadowStrength": 0.0,
+   "softness": 2.0
+  },
+  {
+   "name": "under",
+   "type": "directional",
+   "role": "fill",
+   "direction": [
+    0.1,
+    0.9,
+    0.3
+   ],
+   "color": [
+    0.9,
+    0.55,
+    0.35
+   ],
+   "intensity": 0.35,
+   "castsShadow": false,
+   "shadowStrength": 0.0,
+   "softness": 3.0
+  }
+ ],
+ "environment": {
+  "background": [
+   0.004,
+   0.0045,
+   0.006
+  ],
+  "intensity": 0.6,
+  "sky": {
+   "enabled": true,
+   "background": false,
+   "useKeyLight": false,
+   "sunDirection": [
+    0.3,
+    0.6,
+    -0.5
+   ],
+   "zenithColor": [
+    0.05,
+    0.055,
+    0.07
+   ],
+   "horizonColor": [
+    0.16,
+    0.16,
+    0.17
+   ],
+   "groundColor": [
+    0.012,
+    0.011,
+    0.012
+   ],
+   "haze": 0.3,
+   "sunColor": [
+    1.0,
+    0.95,
+    0.9
+   ],
+   "sunIntensity": 6.0,
+   "sunSize": 0.02,
+   "sunGlow": 0.05,
+   "intensity": 1.0
+  }
+ },
+ "post": {
+  "tonemap": 1,
+  "chromaRetention": 0.6,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.08,
+  "bloomThreshold": 1.2,
+  "bloomKnee": 0.5,
+  "bloomRadius": 1.0,
+  "bloomLevels": 6,
+  "bloomEmissionWeight": 0.75,
+  "antialias": 0.85
+ },
+ "nodes": [
+  {
+   "name": "wind",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "direction",
+    "falloff": {
+     "kind": "none"
+    },
+    "axis": [
+     0,
+     -1,
+     0.15
+    ],
+    "strength": 0.8
+   }
+  },
+  {
+   "name": "voidA",
+   "kind": "field",
+   "position": [
+    -7,
+    4,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 5,
+     "outer": 11
+    },
+    "axis": [
+     0.3,
+     0.2,
+     1
+    ],
+    "strength": 2.4
+   }
+  },
+  {
+   "name": "voidB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 4,
+     "outer": 10
+    },
+    "axis": [
+     -0.2,
+     0.4,
+     -1
+    ],
+    "strength": 2.2
+   }
+  },
+  {
+   "name": "voidC",
+   "kind": "field",
+   "position": [
+    -1,
+    -13,
+    2
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 3,
+     "outer": 8
+    },
+    "axis": [
+     1,
+     0.1,
+     0.3
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "flow",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "wind",
+     "voidA",
+     "voidB",
+     "voidC"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "pushA",
+   "kind": "field",
+   "position": [
+    -7,
+    4,
+    0
+   ],
+   "field": {
+    "kind": "repulsor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 5,
+     "outer": 6.5
+    },
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "pushB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "repulsor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 4,
+     "outer": 5.5
+    },
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "push",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "pushA",
+     "pushB"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "holeA",
+   "kind": "field",
+   "position": [
+    -7,
+    4,
+    0
+   ],
+   "field": {
+    "kind": "sphere",
+    "falloff": {
+     "kind": "none"
+    },
+    "radius": 5.5,
+    "softness": 0.6,
+    "invert": true
+   }
+  },
+  {
+   "name": "holeB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "sphere",
+    "falloff": {
+     "kind": "none"
+    },
+    "radius": 4.5,
+    "softness": 0.6,
+    "invert": true
+   }
+  },
+  {
+   "name": "fibers",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "fiber",
+     "fiberLength": 14.0,
+     "fiberWidth": 0.008,
+     "fiberTaper": 0.3,
+     "fiberSegments": 24,
+     "fiberMinPixels": 0.8
+    },
+    "variation": {
+     "seed": 11,
+     "position": [
+      0.18,
+      0.8,
+      0.18
+     ],
+     "rotation": [
+      0.3,
+      3.14,
+      0.3
+     ],
+     "uniformScale": 0.3
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      110,
+      22,
+      110
+     ],
+     "gridSpacing": [
+      0.36,
+      1.6,
+      0.36
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "deformers": [
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "flow",
+      "amount": 5.0,
+      "falloff": 0.0,
+      "tension": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "push",
+      "amount": 4.0,
+      "falloff": 0.0,
+      "tension": 0.0
+     }
+    ],
+    "effectors": [
+     {
+      "field": "holeA",
+      "op": "scale",
+      "blend": "multiply",
+      "strength": 1.0,
+      "scaleAxis": [
+       1,
+       1,
+       1
+      ]
+     },
+     {
+      "field": "holeB",
+      "op": "scale",
+      "blend": "multiply",
+      "strength": 1.0,
+      "scaleAxis": [
+       1,
+       1,
+       1
+      ]
+     }
+    ],
+    "lod": {
+     "cull": true,
+     "maxDistance": 0.0,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.62,
+      0.63,
+      0.66
+     ],
+     "roughness": 0.28,
+     "metallic": 1.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  }
+ ]
+}

@@ -128,6 +128,7 @@ const DEFORM_NOISE: i32 = 3;
 const DEFORM_DISPLACEMENT: i32 = 4;
 const DEFORM_FIELD: i32 = 5;
 const DEFORM_PATH: i32 = 6;
+const DEFORM_STREAMLINE: i32 = 7; // ADR-1181: only the fiber path reads it; the chain passes it through
 const DEFORM_WORLD: i32 = 8;
 
 // ---- transforms ------------------------------------------------------------------------------
@@ -361,6 +362,214 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
     return deformWorld(p, nWorld, t);
 }
 
+// ---- ADR-1180/1181: fibers ---------------------------------------------------------------------
+// A Fiber source is a strip whose vertex pair k sits at arc length in.position.y; the normal lane
+// carries (segment length ds, min pixels at 1080 lines, root half-width). The centre line is
+// r_0 = the instance root, d_0 = the instance rotation of +Y, and per segment
+//   d_{k+1} = normalize(d_k + v(r_k) * amount * ramp(k ds) * ds),  r_{k+1} = r_k + d_{k+1} * ds
+// summed over every Streamline deformer of the stack (none: straight). Vertex k integrates k steps and
+// one more for its tangent, so every vertex of a fiber agrees on the shared points exactly, with no
+// buffer between the passes. Mirrors scene::fiberCentreLine.
+
+// Whether this draw has any Streamline deformer (uniform per draw).
+fn fiberHasStreamline() -> bool {
+    let count = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let code = deformerCode(proc.deformers[i]);
+        if (code == DEFORM_STREAMLINE || code == DEFORM_STREAMLINE + DEFORM_WORLD) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The summed pull of every Streamline deformer of the stack at r for arc length a (each with its own field,
+// steering, stiffness ramp and tension -- extra.x). The fallback twin of fiber_strands.wgsl `strandPull`.
+fn fiberPull(r: vec3<f32>, arc: f32) -> vec3<f32> {
+    let count = u32(proc.timeInfo.y + 0.5);
+    var pull = vec3<f32>(0.0);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let def = proc.deformers[i];
+        let code = deformerCode(def);
+        if (code != DEFORM_STREAMLINE && code != DEFORM_STREAMLINE + DEFORM_WORLD) { continue; }
+        let slot = i32(floor(def.params.x + 0.5));
+        var ramp = 1.0;
+        if (def.params.w > 0.0) {
+            ramp = clamp(arc / def.params.w, 0.0, 1.0);
+        }
+        var v = fieldVector(slot, r) * (def.centerAmount.w * ramp);
+        if (def.extra.x > 0.0) {
+            let m = length(v);
+            v = select(vec3<f32>(0.0), v * (max(m - def.extra.x, 0.0) / m), m > 1e-8);
+        }
+        pull = pull + v;
+    }
+    return pull;
+}
+
+fn fiberTurnBy(d: vec3<f32>, pull: vec3<f32>, h: f32) -> vec3<f32> {
+    let turned = d + pull * h;
+    let len = length(turned);
+    if (len > 1e-6) {
+        return turned / len;
+    }
+    return d;
+}
+
+// One midpoint (RK2) step's new direction from (d, r) at arc length `arc`.
+fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
+    let half = fiberTurnBy(d, fiberPull(r, arc), 0.5 * ds);
+    let mid = r + half * (0.5 * ds);
+    return fiberTurnBy(d, fiberPull(mid, arc + 0.5 * ds), ds);
+}
+
+struct FiberPoint {
+    centre: vec3<f32>,
+    tangent: vec3<f32>,
+};
+
+fn fiberPoint(root: vec3<f32>, axis: vec3<f32>, k: u32, ds: f32) -> FiberPoint {
+    var r = root;
+    var d = axis;
+    var out: FiberPoint;
+    if (!fiberHasStreamline()) {
+        out.centre = r + d * (ds * f32(k));
+        out.tangent = d;
+        return out;
+    }
+    for (var i = 0u; i < 64u; i = i + 1u) {
+        if (i >= k) { break; }
+        d = fiberTurn(d, r, ds * f32(i), ds);
+        r = r + d * ds;
+    }
+    out.centre = r;
+    out.tangent = fiberTurn(d, r, ds * f32(k), ds);
+    return out;
+}
+
+// Screen pixels per metre across the fiber at c (0 behind the camera).
+fn pixelsPerMetreAt(c: vec3<f32>, across: vec3<f32>, half: f32) -> f32 {
+    let probe = max(half, 1e-4);
+    let c0 = frame.viewProj * vec4<f32>(c, 1.0);
+    let c1 = frame.viewProj * vec4<f32>(c + across * probe, 1.0);
+    if (c0.w <= 1e-4 || c1.w <= 1e-4) {
+        return 0.0;
+    }
+    return length((c1.xy / c1.w - c0.xy / c0.w) * 0.5 * frame.targetSize.xy) / probe;
+}
+
+// ADR-1181: the strand pass's centre line, when it is bound: the first Streamline deformer carries
+// (params.y = segments per fiber in the buffer, params.z = 1 when bound). Binding 7 holds the strands
+// for a fiber draw (it is ADR-056's bend array on a simulated plant layer, which a fiber never is).
+// Returns w = 0 when unbound, and the vertex stage integrates the line itself.
+fn fiberStrandInfo() -> vec2<f32> {
+    let count = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let def = proc.deformers[i];
+        let code = deformerCode(def);
+        if (code == DEFORM_STREAMLINE || code == DEFORM_STREAMLINE + DEFORM_WORLD) {
+            return vec2<f32>(def.params.y, def.params.z);
+        }
+    }
+    return vec2<f32>(0.0);
+}
+
+fn fiberStrandPoint(recordIndex: u32, segments: u32, k: u32) -> FiberPoint {
+    let base = recordIndex * (segments + 1u);
+    let kk = min(k, segments);
+    let p = plantBend[base + kk].xyz;
+    let a = plantBend[base + select(kk - 1u, 0u, kk == 0u)].xyz;
+    let b = plantBend[base + min(kk + 1u, segments)].xyz;
+    var out: FiberPoint;
+    out.centre = p;
+    let dt = b - a;
+    out.tangent = select(vec3<f32>(0.0, 1.0, 0.0), normalize(dt), dot(dt, dt) > 1e-14);
+    return out;
+}
+
+fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut, recordIndex: u32) -> ProcVertexOut {
+    var out = outIn;
+    let s = inst.scale.xyz;
+    let lengthScale = s.y;
+    let widthScale = s.x;
+    let ds = in.normal.x * lengthScale;
+    let k = u32(floor(in.position.y / max(in.normal.x, 1e-9) + 0.5));
+    let rootHalf = max(in.normal.z, 1e-9);
+    let side = select(-1.0, 1.0, in.position.x > 0.0);
+    var half = abs(in.position.x) * widthScale;
+    let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+    let axis = normalize((object.model * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0)), 0.0)).xyz);
+    let strand = fiberStrandInfo();
+    var fp: FiberPoint;
+    if (strand.y > 0.5) {
+        let segments = u32(strand.x + 0.5);
+        // This mesh may be a coarser LOD level: its vertex at arc fraction uv.y is the buffer's nearest point.
+        fp = fiberStrandPoint(recordIndex, segments, u32(floor(in.uv.y * f32(segments) + 0.5)));
+    } else {
+        fp = fiberPoint(root, axis, k, ds);
+    }
+    let now = proc.timeInfo.x;
+    let c = deformWorld(fp.centre, fp.tangent, now);
+    let t = fp.tangent;
+    let toCamera = frame.cameraPos.xyz - c;
+    let dist = max(length(toCamera), 1e-6);
+    let view = toCamera / dist;
+    var across = cross(t, view);
+    let acrossLength = length(across);
+    if (acrossLength < 1e-5) {
+        across = frame.cameraRight.xyz;
+    } else {
+        across = across / acrossLength;
+    }
+    // The floor on the on-screen width, held at the cost of coverage (darkening: the fiber field is
+    // drawn on black, so a fiber that covers a third of its pixel gives a third of its light).
+    var coverage = 1.0;
+    let minPixels = in.normal.y * frame.targetSize.y / 1080.0;
+    let pixelsPerMetre = pixelsPerMetreAt(c, across, half);
+    let trueHalf = half;
+    if (minPixels > 0.0 && pixelsPerMetre > 0.0) {
+        let halfPixels = half * pixelsPerMetre;
+        let minHalf = 0.5 * minPixels;
+        if (halfPixels < minHalf) {
+            coverage = halfPixels / minHalf;
+            half = minHalf / pixelsPerMetre;
+        }
+    }
+    let p = c + across * (half * side);
+    // A round thread: the normal turns across the strip from the side to the viewer (the two edges at
+    // +-70 degrees, so the interpolated middle faces the camera and the rims catch grazing light --
+    // nearly the whole half-cylinder, so a highlight exists for almost any light, as on real wire).
+    let facing = normalize(view - t * dot(view, t) + vec3<f32>(0.0, 0.0, 1e-7));
+    var normal = normalize(facing * 0.342 + across * (0.94 * side));
+    // A thread narrower than a few pixels cannot show its own cross-section, and sampling one point of
+    // it per pixel turns its highlight into glitter. There it is shaded as the whole thread would be
+    // (Kajiya-Kay): with the normal of the cylinder that best reflects the key light (light 0) to the
+    // viewer -- the half vector with its component along the tangent removed -- so a highlight runs
+    // continuously along every fiber whose tangent is near perpendicular to it, and bundles of
+    // aligned fibers light up together as one band.
+    let pixelsAcross = 2.0 * trueHalf * pixelsPerMetre;
+    let thin = clamp(1.0 - pixelsAcross / 4.0, 0.0, 1.0);
+    if (thin > 0.0 && frame.lightCounts.y > 0.5) {
+        let toLight = -frame.lights[0].directionRange.xyz;
+        let h = normalize(toLight + view);
+        let hPerp = h - t * dot(h, t);
+        if (dot(hPerp, hPerp) > 1e-8) {
+            normal = normalize(mix(normal, normalize(hPerp), thin));
+        }
+    }
+    out.normal = normal;
+    out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+    out.worldPos = p;
+    out.prevClip = frame.prevViewProj * vec4<f32>(p, 1.0);
+    out.instColor = vec4<f32>(out.instColor.rgb * coverage, out.instColor.a);
+    out.instEmissive = vec4<f32>(out.instEmissive.rgb * coverage, out.instEmissive.w);
+    out.localPos = vec3<f32>(side, f32(k) * in.normal.x, 0.0);
+    return out;
+}
+
 // ---- vertex / fragment -------------------------------------------------------------------------
 
 struct ProcVertexOut {
@@ -413,6 +622,9 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
 
+    if (proc.fieldInfo.z > 1.5) {
+        return fiberVertex(in, inst, out, recordIndex); // ADR-1180
+    }
     if (proc.fieldInfo.z > 0.5) {
         // Point source: a camera-facing quad around the instance centre. The centre goes through
         // the object matrix and the world deformers; the quad offsets skip the deformer stack.

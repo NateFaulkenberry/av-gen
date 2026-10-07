@@ -1,0 +1,382 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Chorus Field p3 roll",
+ "camera": {
+  "mode": 1,
+  "position": [
+   4,
+   -2,
+   46
+  ],
+  "target": [
+   3,
+   1,
+   0
+  ],
+  "fov": 50,
+  "orbitSpeed": 0
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "role": "key",
+   "direction": [
+    -0.45,
+    -0.55,
+    -0.7
+   ],
+   "color": [
+    1.0,
+    0.94,
+    0.86
+   ],
+   "intensity": 6.0,
+   "castsShadow": true,
+   "shadowStrength": 0.92,
+   "softness": 1.2
+  },
+  {
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "direction": [
+    0.55,
+    -0.2,
+    0.8
+   ],
+   "color": [
+    0.55,
+    0.7,
+    1.0
+   ],
+   "intensity": 4.0,
+   "castsShadow": false,
+   "shadowStrength": 0.0,
+   "softness": 2.0
+  },
+  {
+   "name": "under",
+   "type": "directional",
+   "role": "fill",
+   "direction": [
+    -0.2,
+    0.75,
+    -0.6
+   ],
+   "color": [
+    0.75,
+    0.82,
+    1.0
+   ],
+   "intensity": 3.0,
+   "castsShadow": false,
+   "shadowStrength": 0.0,
+   "softness": 3.0
+  }
+ ],
+ "environment": {
+  "background": [
+   0.004,
+   0.0045,
+   0.006
+  ],
+  "intensity": 0.6,
+  "sky": {
+   "enabled": true,
+   "background": false,
+   "useKeyLight": false,
+   "sunDirection": [
+    0.3,
+    0.6,
+    -0.5
+   ],
+   "zenithColor": [
+    0.05,
+    0.055,
+    0.07
+   ],
+   "horizonColor": [
+    0.16,
+    0.16,
+    0.17
+   ],
+   "groundColor": [
+    0.012,
+    0.011,
+    0.012
+   ],
+   "haze": 0.3,
+   "sunColor": [
+    1.0,
+    0.95,
+    0.9
+   ],
+   "sunIntensity": 6.0,
+   "sunSize": 0.02,
+   "sunGlow": 0.05,
+   "intensity": 1.0
+  }
+ },
+ "post": {
+  "tonemap": 1,
+  "chromaRetention": 0.6,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.08,
+  "bloomThreshold": 1.2,
+  "bloomKnee": 0.5,
+  "bloomRadius": 1.0,
+  "bloomLevels": 6,
+  "bloomEmissionWeight": 0.75,
+  "antialias": 0.85
+ },
+ "nodes": [
+  {
+   "name": "wind",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "direction",
+    "falloff": {
+     "kind": "none"
+    },
+    "axis": [
+     1,
+     0,
+     0
+    ],
+    "strength": 0.45
+   }
+  },
+  {
+   "name": "roll",
+   "kind": "field",
+   "position": [
+    2,
+    2,
+    0
+   ],
+   "field": {
+    "kind": "spiral",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 9,
+     "outer": 22
+    },
+    "axis": [
+     0.15,
+     0,
+     -1
+    ],
+    "spiralBias": -0.35,
+    "strength": 3.0
+   }
+  },
+  {
+   "name": "roll2",
+   "kind": "field",
+   "position": [
+    20,
+    4,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 8
+    },
+    "axis": [
+     0,
+     0.3,
+     -1
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "flow",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "wind",
+     "roll",
+     "roll2"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "curl",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "curlNoise",
+    "falloff": {
+     "kind": "none"
+    },
+    "frequency": 0.06,
+    "strength": 1.0,
+    "seed": 8
+   }
+  },
+  {
+   "name": "band",
+   "kind": "field",
+   "position": [
+    -24,
+    6,
+    0
+   ],
+   "field": {
+    "kind": "box",
+    "falloff": {
+     "kind": "noiseModulated",
+     "inner": 2,
+     "outer": 40,
+     "noiseAmount": 2.0,
+     "noiseScale": 0.15
+    },
+    "size": [
+     1,
+     3,
+     20
+    ],
+    "softness": 2.5
+   }
+  },
+  {
+   "name": "fibers",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "fiber",
+     "fiberLength": 70.0,
+     "fiberWidth": 0.008,
+     "fiberTaper": 0.3,
+     "fiberSegments": 32,
+     "fiberMinPixels": 0.8
+    },
+    "variation": {
+     "seed": 11,
+     "position": [
+      0.4,
+      0.08,
+      0.1
+     ],
+     "rotation": [
+      0.05,
+      0.05,
+      0.05
+     ],
+     "uniformScale": 0.3
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      3,
+      50,
+      220
+     ],
+     "gridSpacing": [
+      0.5,
+      0.16,
+      0.2
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      -24,
+      6,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      -90
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "deformers": [
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "flow",
+      "amount": 5.0,
+      "falloff": 0.0,
+      "tension": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "curl",
+      "amount": 0.5,
+      "falloff": 0.0,
+      "tension": 0.0
+     }
+    ],
+    "effectors": [
+     {
+      "field": "band",
+      "op": "scale",
+      "blend": "multiply",
+      "strength": 1.0,
+      "scaleAxis": [
+       1,
+       1,
+       1
+      ]
+     }
+    ],
+    "lod": {
+     "cull": true,
+     "maxDistance": 0.0,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.62,
+      0.63,
+      0.66
+     ],
+     "roughness": 0.28,
+     "metallic": 1.0,
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   }
+  }
+ ]
+}

@@ -903,7 +903,8 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
             }
             break;
         }
-        case scene::DeformerKind::Field: {
+        case scene::DeformerKind::Field:
+        case scene::DeformerKind::Streamline: { // ADR-1181: a streamline names its vector field the same way
             // The field name is a name, so it is a combo over what exists rather than a text box --
             // the same refusal ADR-420 makes for a subscription. A typo and a field nobody has made
             // yet look identical in a text box.
@@ -938,6 +939,13 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
             if (!dead.empty()) {
                 ImGui::TextColored(kPanelWarning, "'%s' is not a field in this scene -- it displaces nothing.",
                                    d.field.c_str());
+            }
+            if (d.kind == scene::DeformerKind::Streamline) {
+                if (object.source.kind != scene::PrimitiveKind::Fiber) {
+                    ImGui::TextColored(kPanelWarning, "A streamline bends a fiber source; this object's source "
+                                                 "is not one, so it is refused at load.");
+                }
+                break;
             }
             bool alongNormal = d.alongNormal;
             if (ImGui::Checkbox("scalar fields push along the normal", &alongNormal)) {
@@ -1033,6 +1041,7 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
             case scene::DeformerKind::Displacement: add.amount = 0.1f; add.scale = 0.5f; break;
             case scene::DeformerKind::Field: add.amount = 1.0f; break;
             case scene::DeformerKind::Path: add.amount = 1.0f; break;
+            case scene::DeformerKind::Streamline: add.amount = 2.0f; add.space = scene::DeformSpace::World; break;
             }
             next.push_back(add);
             commit(std::move(next));

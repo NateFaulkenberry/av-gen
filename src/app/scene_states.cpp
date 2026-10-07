@@ -145,7 +145,11 @@ bool StateMachine::go(std::string_view name, params::ParameterSet& params, const
     return true;
 }
 
-void StateMachine::reset(params::ParameterSet& params, const params::PresetBank& presets) {
+void StateMachine::reset(params::ParameterSet& params, const params::PresetBank& presets, double seconds) {
+    lastSeconds_ = seconds;
+    startSeconds_ = seconds;
+    enteredSeconds_ = seconds;
+    waitUntil_ = -1.0;
     current_.clear();
     pending_.clear();
     pendingQuantized_.clear();
