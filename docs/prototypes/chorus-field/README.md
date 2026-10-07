@@ -115,3 +115,56 @@ The test applied to every piece: would a second scene (Storm Field, Void Field, 
   if an unbounded fiber world is wanted).
 
 Each is a candidate once a second scene needs it, which is ADR-1117's "two use cases before a shared abstraction".
+
+## Phase 6: the cost of a fiber (M2 Max, Dawn on Metal, `--live-profile`, Ultra, 3 s measured)
+
+The scene measured is the directed god (`p7-god-front`) re-seeded at other densities: `examples/chorus-field/p6-*`.
+"Visible" is what survives the frustum cull and the ceiling's noise thinning.
+
+| Look | Fibers visible | Segments | Triangles | GPU median | Scene pass | Shadows | Strand pass |
+|---|---|---|---|---|---|---|---|
+| 1080p g006k-s48 | 5.1k | 48 | 486k | 31.7 ms | 22.2 | 3.8 | 4.9 |
+| 1080p g006k-s24 | 5.1k | 24 | 243k | 25.4 ms | 19.7 | 2.3 | 2.5 |
+| 1080p g006k-s12 | 5.1k | 12 | 122k | 21.4 ms | 17.7 | 1.5 | 1.4 |
+| 1080p g025k-s24 | 19.5k | 24 | 934k | 42.9 ms | 27.5 | 8.0 | 6.2 |
+| 1080p g050k-s24 | 38.9k | 24 | 1.86M | 60.2 ms | 31.1 | 15.4 | 12.1 |
+| 1080p g100k-s16 | 46.2k | 16 | 1.48M | 50.9 ms | 26.3 | 14.7 | 8.1 |
+| 1080p g400k-s12 | 89.6k | 12 | 2.15M | 57.5 ms | 27.2 | 16.4 | 10.6 |
+| 1080p g800k-s08 | 89.6k | 8 | 1.43M | 42.8 ms | 16.9 | 14.6 | 6.9 |
+| 1080p g006k-s24, **no material program** | 5.1k | 24 | 243k | **17.0 ms** | 11.3 | 2.4 | 2.6 |
+| 1080p g006k-s24, **no shadows** | 5.1k | 24 | 243k | 22.4 ms | 18.4 | 0.1 | 2.6 |
+| 720p g006k-s24 | 5.1k | 24 | 243k | 20.7 ms | 15.3 | 2.2 | 2.6 |
+| 720p g006k-s12 | 5.1k | 12 | 122k | 16.3 ms | 13.0 | 1.4 | 1.4 |
+| 720p g025k-s24 | 19.5k | 24 | 934k | 36.6 ms | 22.0 | 7.5 | 6.2 |
+| 720p g006k-s24, no shadows | 5.1k | 24 | 243k | 18.4 ms | 14.8 | 0.1 | 2.6 |
+
+CPU work is flat at about 2 ms in every row. No frame reads the GPU back.
+
+**What the numbers say:**
+- **The look does not need many fibers.** The god is 5k long wires. Past about 20k visible, the image does not
+  gain structure: the streams are already continuous, and more fibers only thicken them. It does pay in shadows
+  (linear in fibers) and in the strand pass.
+- **The material program is the largest single cost:** 8.4 ms at 1080p. It reads three fields per fragment
+  (the face compound of four vortices, the eyes, and a gradient) over heavy overdraw. Shadows cost 2-4 ms, and
+  segments cost ~0.2 ms per segment per 5k fibers across the strand pass and raster.
+- **The scene pass barely scales with resolution** (19.7 ms at 1080p, 15.3 ms at 720p). Long one-pixel strips
+  are raster-bound: thin triangles shade whole 2×2 quads at every edge.
+- **The strand pass is not free with rich fields:** 2.5 ms for 5k × 24 segments with five pulls (two of them
+  compounds) at two samples a step (RK2). Integrating only *visible* records (after the cull) would cut it in
+  proportion, and is the first optimisation to make (below).
+
+**The operating point:**
+- **Offline (the stills and the clips):** 5k fibers × 48 segments at 1080p supersample 2. It is about 32 ms a
+  frame, so rendering runs near real time.
+- **Live at 60 Hz:**
+  - 5k × 12 segments at a 720p canvas, program on, is 16 ms (≈60 fps).
+  - Without the program and the shadows, 5k × 24 fits in about 12 ms.
+- **120 Hz** is not reachable with the program as authored. It needs the program's field reads moved out of
+  the fragment (next item) or the plain material.
+
+**Next optimisations, in order of gain per effort:**
+1. **Evaluate the program's field reads per vertex**, a program flag. The shear varies slowly along a wire, so
+   fragment precision is wasted. This would recover most of the 8 ms.
+2. **Integrate strands for visible records only:** dispatch over the cull's compacted list. This cuts the
+   strand pass in proportion to the cull.
+3. **Cast fiber shadows from a coarser LOD level** (fewer segments): shadows are linear in triangles.
