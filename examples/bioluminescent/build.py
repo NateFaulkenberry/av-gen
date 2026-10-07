@@ -44,7 +44,9 @@ FLIGHT_Z = (-1300.0, 1300.0)
 BLUE = [0.04, 0.38, 1.0]           # dinoflagellate, ~475 nm
 DEEP_BLUE = [0.03, 0.22, 1.0]
 CYAN = [0.0, 0.85, 1.0]
-PEN = [0.05, 0.62, 1.0]
+PEN = [0.0, 0.9, 0.85]            # turquoise-emerald: the meadows by the river (species separate by hue)
+FIREFLY = [1.0, 0.82, 0.5]         # the whip tips: warm gold-white twinkles (firefly ~560 nm, softened)
+VIOLET = [0.38, 0.14, 1.0]
 PALE = [0.72, 0.92, 1.0]
 VIOLET_DIM = [0.30, 0.14, 1.0]     # fans at rest
 MAGENTA = [1.0, 0.08, 0.62]        # fans fluorescing under the wave
@@ -117,10 +119,10 @@ def place(g):
     P["mat"] = cp1.records(g, X, Z, np.random.default_rng(303).uniform(0.7, 1.8, len(X)), 0.85, 304, sink=0.03)
 
     # sea fans on the walls, face-on to the canyon's axis; fewer than CP2 (their violet must not own the walls)
-    X, Z = cp1.candidates(g, 0.018, 401, R)
+    X, Z = cp1.candidates(g, 0.032, 401, R)
     sl = g.slope(X, Z)
     d = np.abs(dxc(X, Z))
-    keep = (sl > 0.35) & (sl < 3.0) & (d > 18) & (d < 120) & (cp1.value_noise(X, Z, 30.0, 10) > 0.42)
+    keep = (sl > 0.35) & (sl < 3.0) & (d > 16) & (d < 120) & (cp1.value_noise(X, Z, 30.0, 10) > 0.38)
     X, Z = X[keep], Z[keep]
     P["fan"] = cp1.records(g, X, Z, np.random.default_rng(402).uniform(0.6, 1.9, len(X)), 0.35, 403,
                            facing=cp1.toward_centre, sink=0.05)
@@ -134,7 +136,7 @@ def place(g):
     P["whips"] = cp1.records(g, X, Z, np.random.default_rng(502).uniform(0.7, 1.4, len(X)), 0.2, 503)
 
     # lanterns: rare clusters in hollows
-    X, Z = cp1.candidates(g, 0.05, 601, R)
+    X, Z = cp1.candidates(g, 0.09, 601, R)
     keep = (~g.wet(X, Z)) & (g.slope(X, Z) < 1.0) & (np.abs(dxc(X, Z)) < 70) & \
         (cp1.value_noise(X, Z, 9.0, 12) > 0.64)
     X, Z = X[keep], Z[keep]
@@ -270,18 +272,21 @@ def ecosystem(P, sc_nodes):
         layer("crinoidChains", ["crinoidStalk"], "crinoid_chains", PALE, 4.0, 6.0, "highs", breath=0.4,
               breathRate=0.09, wakeGain=1.5, maxDistance=1000, responseThreshold=0.15, responseGain=1.4,
               nearFade=7.0),
-        layer("matPolyps", mats, "mat_polyps", BLUE, 3.5, 10.0, "propU", sparsity=0.45, pulseRate=1.5,
+        layer("matPolyps", mats, "mat_polyps", BLUE, 3.5, 10.0, "propU", excited_color=PALE, sparsity=0.45, pulseRate=1.5,
               pulseDecay=0.8, wakeGain=2.0, maxDistance=320),
-        layer("fanPolyps", ["fanBody"], "fan_polyps", VIOLET_DIM, 0.4, 4.0, "propU", excited_color=MAGENTA,
-              sparsity=0.45, wakeGain=1.0, maxDistance=700, nearFade=2.0),
-        layer("whipsTips", ["whipsBody"], "whips_tips", PALE, 4.0, 5.0, "highs", sparsity=0.3, flicker=0.6,
+        layer("fanPolyps", ["fanBody"], "fan_polyps", VIOLET, 1.8, 8.0, "propU", excited_color=MAGENTA,
+              sparsity=0.35, wakeGain=1.0, maxDistance=700, nearFade=2.0),
+        layer("whipsTips", ["whipsBody"], "whips_tips", FIREFLY, 3.0, 5.0, "highs", sparsity=0.3, flicker=0.6,
               flickerRate=7.0, wakeGain=1.0, maxDistance=260, responseThreshold=0.15, responseGain=1.4,
               nearFade=1.5),
         layer("seapenPolyps", pens, "seapen", PEN, 2.5, 9.0, "propU", sparsity=0.3, pulseRate=0.8, pulseDecay=1.0,
               wakeGain=2.0, maxDistance=300),
-        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 0.6, 6.0, "propU", sparsity=0.65, pulseRate=2.0,
+        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 0.6, 9.0, "propU", excited_color=CYAN, sparsity=0.65, pulseRate=2.0,
               pulseDecay=1.5, breath=0.4, breathRate=0.03, size=0.8, wakeGain=1.5, maxDistance=700),
-        layer("embers", ["emberHost"], "crust", EMBER, 0.6, 0.0, "", sparsity=0.85, breath=0.6, breathRate=0.02,
+        layer("crustViolet", ["crustHost"], "crust_b", VIOLET, 0.35, 10.0, "propU", excited_color=MAGENTA,
+              sparsity=0.75, pulseRate=1.0, pulseDecay=1.5, breath=0.5, breathRate=0.02, size=0.8, wakeGain=1.5,
+              maxDistance=700),
+        layer("embers", ["emberHost"], "crust", EMBER, 1.4, 0.0, "", sparsity=0.75, breath=0.6, breathRate=0.02,
               size=0.7, maxDistance=400, wakeField=""),
         layer("combRows", ["combHost"], "comb_rows", PALE, 1.2, 3.0, "highs", iridescence=0.55, size=0.8, iridescenceScale=1.5,
               iridescenceSpeed=0.8, bob=1.2, bobRate=0.05, flicker=0.2, flickerRate=4.0, nearFade=1.5,
@@ -467,7 +472,7 @@ STAGES = {
     "Awake":     ("canopy", 8.0, 1.3, 14.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth"), 0.75, 3.0, 34.0),
     "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
     "Build":     ("climb",  4.0, 0.5, 16.0, 0.0, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
-    "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.08, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
+    "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
     "Body":      ("canopy", 17.0, 2.0, 22.0, 0.25, 0.06, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
     "Body 2":    ("dive",   20.0, 2.2, 24.0, 0.3, 0.06, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
     "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.25, 0.05, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
@@ -478,7 +483,7 @@ STAGES = {
 # once; the body settles above the rest state; the aftermath drains below it.
 GLOWS = {"Dark": (0.75, 1.0, 180.0), "Stirring": (1.0, 1.0, 220.0), "Breath": (0.6, 1.0, 120.0),
          "Awake": (1.15, 1.1, 240.0), "Awake 2": (1.15, 1.1, 240.0), "Build": (0.35, 0.6, 60.0),
-         "Drop": (2.2, 2.0, 520.0), "Body": (1.45, 1.5, 340.0), "Body 2": (1.5, 1.5, 340.0),
+         "Drop": (2.5, 2.5, 620.0), "Body": (1.45, 1.5, 340.0), "Body 2": (1.5, 1.5, 340.0),
          "Body 3": (1.45, 1.5, 340.0), "Body 4": (1.5, 1.6, 360.0), "Aftermath": (0.6, 0.8, 150.0)}
 LAYER_BASE = {}   # filled by ecosystem(): name -> (intensity, excitedIntensity)
 CROWN_IDS = []    # filled by crown_lights()
@@ -515,6 +520,9 @@ def glow_values(name):
         v[f"ecosystem/{layer}/excitedIntensity"] = [round(e * excited, 4)]
     for lid in CROWN_IDS:
         v[f"lights/{lid}/intensity"] = [crown]
+    dense = name in ("Drop", "Body", "Body 2", "Body 3", "Body 4")
+    v["ecosystem/crust/sparsity"] = [0.4 if name == "Drop" else (0.5 if dense else 0.65)]
+    v["ecosystem/crustViolet/sparsity"] = [0.45 if name == "Drop" else (0.6 if dense else 0.75)]
     return v
 
 
@@ -613,7 +621,7 @@ def routes(length):
 
 POST = {
     "post/bloom/enabled": True, "post/bloom/threshold": 0.9, "post/bloom/intensity": 0.32,
-    "post/bloom/emissionWeight": 0.75, "post/tonemap/chroma-retention": 0.6, "post/output/vignette": 0.28,
+    "post/bloom/emissionWeight": 0.75, "post/tonemap/chroma-retention": 0.8, "post/output/vignette": 0.28,
     "post/grade/contrast": 1.08, "post/grade/saturation": 1.05,
     "camera/exposure/mode": 0, "camera/mode": 2,
     "sources/driftA/rate": 0.031, "sources/driftC/rate": 0.047,

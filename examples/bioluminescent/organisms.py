@@ -328,7 +328,7 @@ def fan(seed, height=2.6):
                     blob(polyps, pts[k] + rng.normal(0, 0.012, 3), [0.016, 0.016, 0.016],
                          v=v + (v1 - v) * k / nseg, u=rng.random())
         end = p + d * length
-        if depth < 3 and radius > 0.006:
+        if depth < 4 and radius > 0.006:
             spread = rng.uniform(0.25, 0.5)
             for sgn in (-1, 1):
                 branch(end, ang + sgn * spread + rng.normal(0, 0.08), length * rng.uniform(0.62, 0.8),
@@ -471,6 +471,11 @@ def build_all():
         for name, mesh in fn(seed).items():
             total[name] = mesh.write(name)
     for fn, seed in ((crust, 23), (plankton, 29), (comb_jelly, 31)):
+        for name, mesh in fn(seed).items():
+            mesh.write_emit(name)
+    for name, mesh in crust(24).items():
+        mesh.write_emit('crust_b')
+    for fn, seed in ():
         for name, mesh in fn(seed).items():
             mesh.write_emit(name)
     return total
