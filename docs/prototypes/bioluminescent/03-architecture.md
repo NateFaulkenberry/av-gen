@@ -277,12 +277,62 @@ Scene variants of `06-flight` (`cp1/ab-*.json`, built from the still's scene by 
 
 All of that is data in `examples/bioluminescent/build.py`, not engine code.
 
-## 6. Performance (1080p, realtime tier, M2 Max)
+## 6. Performance (M2 Max, Dawn/Metal, under the GPU lock)
 
-| Measurement | Value |
-|---|---|
-| CP1 baseline (general renderer only) | 76 ms |
-| CP2 (ecosystem) | 56 ms; the ecosystem itself about 1 ms |
-| The Rift at CP4, the opening | 52 ms: lit pass 23.5, volume march 23.6 (the crown lights' volumetric halos), depth 3, medium 0.4, ecosystem 0.1-0.2 |
+### 6.1 Where the time goes (1080p output, realtime tier, at the drop, before the live optimisations)
 
-The arc-point table and the halo A/B follow in this section.
+A/B attribution of the CP4 scene at 97 s (GPU p50, one change at a time; `build/biolum/ab3`):
+
+| Variant | Frame | Lit pass | Volume march |
+|---|---|---|---|
+| base | 74.1 ms | 35.2 | 34.1 |
+| volume steps 32 → 16 | 57.2 | 35.2 | 17.3 |
+| volume steps 20 | 61.3 | 35.1 | 21.3 |
+| volume noise off | 71.2 | 35.1 | 31.2 |
+| volume max distance 400 | 74.0 | 35.1 | 34.1 |
+| no volumetric local lights | 70.0 | 35.2 | 29.9 |
+| no crown lights | 59.2 | 31.7 | 22.7 |
+| no rock material program | 67.2 | 28.6 | 33.8 |
+| no swarm / no particles | 73.7 / 73.9 | 35.3 | 33.7 |
+| no bodies (emitters only) | 62.0 | 26.1 | 33.7 |
+
+**Readings:**
+- **The medium costs about 1 ms per march step.**
+  - Noise is about 3 ms of it.
+  - The crown lights' halos about 11 ms.
+  - Particles are free.
+- **The Environment's own parts are about 1 ms each:** the ecosystem (19 M candidate emitters) and the propagation
+  medium (0.39 ms a step at 256×1024).
+- **Everything else is the general renderer's lit pass:** bodies, terrain, water, 120 lights and the rock's program.
+  - At the arc points (realtime tier, 1080p): Dark 59.5, Awake 63.2, Drop 76.6, Body 70.4, Aftermath 31.4 ms.
+
+### 6.2 What was done for live, and what it bought
+
+| Step | Change | Effect |
+|---|---|---|
+| 1 | live medium: 16 steps, no noise (offline keeps 32, with noise) | halves the march |
+| 2 | terrain chunks 40 → 80 m (64 quads), view 1.6 → 1 km, LOD from 100 m | draws 2,224 → 599; CPU work 12.5 → 6.2 ms |
+| 3 | crown lights 120 → 72 (the largest crinoids) | the CPU lights stage 5.5 → 3.7 ms |
+| 4 | leaner crinoids (stalk 5.4k → 3.1k triangles, arms 13.5k → 8.7k: pinnules on every other segment); fans drawn to 140 m, sea pens to 80 m | 7.7M → 6.0M triangles; GPU at Emergency 23.2 → 18.7 ms |
+
+### 6.3 Live, measured with the engine's own profiler (`--live-profile`)
+
+All at 1920×1080 output, LIVE AUTO (`effects_first`), on the Trench file.
+
+| Target | Mode | Where | Level / scale | Frame median | GPU median | Status |
+|---|---|---|---|---|---|---|
+| 30 fps | **live** (real loop, Fifo) | the drop (96 s) | Medium / 0.85 | 33.3 | 26.7 | **achieved, 0 deadline misses** |
+| 30 fps | headless | the drop | High / 1.00 | 36.9 | 29.3 | achieved |
+| 30 fps | headless | 40 s | High / 1.00 | 37.5 | 29.7 | at risk |
+| 30 fps | headless | 150 s | High / 1.00 | 37.5 | 30.0 | achieved |
+| 60 fps | headless | 40 s, the drop | Emergency / 0.50 | 27 | 18.6-18.7 | over budget |
+
+**60 fps is not reached on an M2 Max.** What remains is the general renderer's lit pass (bodies, terrain, lights),
+about 15 ms of the 18.7 at half resolution.
+
+The Environment-specific way past it (§5's "what needs specialized treatment") would be a cheap shading model for
+the bodies: they are dark silhouettes lit by the glow, and do not need full clustered PBR with 72 lights. Shading
+them like the emitters, from the medium's own light, is the next step if 60 fps is required.
+
+Offline renders the same world with more steps and noise in the medium, the full render scale, and live render
+limits. 1080p30 renders at 7.1 fps.

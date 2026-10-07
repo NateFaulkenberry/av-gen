@@ -235,12 +235,12 @@ def bodies(P):
                        m([0.05, 0.04, 0.08], VIOLET_DIM, 0.06, 0.5, double=True), max_distance=450.0))
     for i, part in enumerate(chunks(P["seapen"])):
         N.append(mesh_node(f"seapen{i}", "seapen", part, m([0.03, 0.05, 0.07], PEN, 0.04, 0.45, double=True),
-                           max_distance=110.0))
+                           max_distance=80.0))
     for i, part in enumerate(chunks(P["mat"])):
         N.append(mesh_node(f"mat{i}", "mat_cushion", part, m([0.006, 0.008, 0.012], None, 0.0, 0.95),
                            max_distance=70.0))
     N.append(mesh_node("fanBody", "fan_body", P["fan"], m([0.03, 0.025, 0.05], VIOLET_DIM, 0.01, 0.6),
-                       max_distance=220.0))
+                       max_distance=140.0))
     N.append(mesh_node("whipsBody", "whips_body", P["whips"], m([0.03, 0.04, 0.05], CYAN, 0.05, 0.5),
                        max_distance=150.0))
     N.append(mesh_node("lanternStalks", "lantern_stalks", P["lanterns"], m([0.05, 0.03, 0.02]), max_distance=120.0))
@@ -376,7 +376,7 @@ def crown_lights(P):
     out = []
     for k, c in enumerate(P["crinoid"]):
         s = c[7]
-        if s < 1.0 or len(out) >= 120:
+        if s < 1.15 or len(out) >= 72:
             continue
         x, y, z = c[:3]
         CROWN_IDS.append(f"crown{k}")
@@ -389,8 +389,8 @@ def crown_lights(P):
 def scene(P):
     nodes = list(fields())
     nodes.append({"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
-                  "terrain": {"chunkSize": 40.0, "resolution": 40, "lodLevels": 4, "lodDistance": 140.0,
-                              "viewDistance": 1600.0, "shadowDistance": 150.0, "skirtDepth": 2.0,
+                  "terrain": {"chunkSize": 80.0, "resolution": 64, "lodLevels": 4, "lodDistance": 100.0,
+                              "viewDistance": 1000.0, "shadowDistance": 150.0, "skirtDepth": 2.0,
                               "groundMottle": False,
                               "water": {"shallowColor": [0.004, 0.008, 0.014], "deepColor": [0.001, 0.003, 0.008],
                                         "reflection": 0.7, "reflectionTint": [0.3, 0.45, 0.8], "specular": 0.6,
@@ -636,6 +636,9 @@ POST = {
 }
 
 
+LIVE_PARAMETERS = {"scene/volumeSteps": 16, "scene/volumeNoise": 0.0}
+
+
 def project(name, audio, length, live=False):
     p = {
         "format": "avgen-project", "version": 4,
@@ -654,6 +657,9 @@ def project(name, audio, length, live=False):
     if audio:
         p["assets"]["audio"] = {"path": audio}
     if live:
+        # Live: the same world, cheaper medium. The march costs ~1 ms per step at 1080p (03-architecture.md §6);
+        # 16 steps halve it. LIVE AUTO's render scale takes the pixel-bound rest. Offline keeps 32.
+        p["parameters"].update(LIVE_PARAMETERS)
         p["sonic"] = {"live": True}
         bindings = [
             {"source": "*", "channel": -1, "kind": "cc", "number": 1, "parameter": "macros/sensitivity",
@@ -703,6 +709,10 @@ def main():
     trace_dir = HERE.parents[1] / "build" / "biolum"
     trace_dir.mkdir(parents=True, exist_ok=True)
     (trace_dir / "rift-trace.json").write_text(json.dumps(probe_project(projects["rift.json"]), indent=1))
+    # the live project's settings on the Trench file, for profiling live cost without a live input
+    lp = project("THE RIFT LIVE (Trench file)", "../../assets/audio/trench.wav", length)
+    lp["parameters"].update(LIVE_PARAMETERS)
+    (HERE / "diag-live-trench.json").write_text(json.dumps(lp, indent=1))
     print(f"wrote rift.scene.json ({(HERE / 'rift.scene.json').stat().st_size / 1e6:.1f} MB), {', '.join(projects)};"
           f" flight {length:.0f} m")
 

@@ -214,7 +214,7 @@ def crinoid(seed, height=26.0):
     rng = np.random.default_rng(seed)
     stalk, arms, beads, chains = Mesh(), Mesh(), Mesh(), Mesh()
     # stalk: a gentle S, ribbed by its columnals
-    n = 120
+    n = 64
     s = np.linspace(0, 1, n)
     lean = rng.uniform(1.5, 3.5) * np.array([math.cos(seed), 0, math.sin(seed)])
     pts = np.stack([lean[0] * (s ** 2) + 0.6 * np.sin(s * 3.1 + seed),
@@ -223,12 +223,12 @@ def crinoid(seed, height=26.0):
     base_r = 0.5 * height / 26.0
     radii = base_r * (1.0 - 0.45 * s) * (1.0 + 0.10 * np.abs(np.sin(s * height / 0.55 * math.pi)))
     radii[:4] *= np.array([2.2, 1.7, 1.35, 1.12])  # holdfast flare
-    tube(stalk, pts, radii, 12, 0.0, 0.25)
+    tube(stalk, pts, radii, 9, 0.0, 0.25)
     top = pts[-1]
     # calyx: a cup of plates
     blob(stalk, top + [0, 0.5, 0], [1.1, 0.9, 1.1], v=0.27, rings=6)
     # cirri: whorls of small hooked side-arms down the stalk (real crinoids carry them)
-    for k in range(10, n - 8, 9):
+    for k in range(6, n - 5, 6):
         for a in range(5):
             ang = a * 2 * math.pi / 5 + k * 0.7
             d = np.array([math.cos(ang), -0.15, math.sin(ang)])
@@ -248,13 +248,13 @@ def crinoid(seed, height=26.0):
             d = out * 0.9 + [0, 0.55, 0] + side * 0.35
             L = rng.uniform(7.0, 10.0)
             c2 = curve(c1[-1], d, L, 26, bend=np.array([0, -0.33, 0]) + out * 0.02, wobble=0.04, rng=rng, freq=0.8)
-            tube(arms, c2, np.linspace(0.12, 0.035, 26), 5, 0.4, 1.0, u=(a + 0.5 * (fork + 1) * 0.5) / na)
+            tube(arms, c2, np.linspace(0.12, 0.035, 26), 4, 0.4, 1.0, u=(a + 0.5 * (fork + 1) * 0.5) / na)
             arm_tips.append(c2[-1])
             t, ns_, bs_ = _frames(c2)
             for k in range(1, 25):
                 frac = k / 25
                 plen = 0.75 * (1 - 0.6 * frac)
-                for sgn in (1, -1):
+                for sgn in ((1, -1) if k % 2 == 0 else ()):
                     pd = bs_[k] * sgn * 0.8 + t[k] * 0.45 + np.array([0, -0.25, 0])
                     pc = curve(c2[k], pd, plen, 3, bend=np.array([0, -0.6, 0]))
                     v = 0.4 + 0.6 * frac
