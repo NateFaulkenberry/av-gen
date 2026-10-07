@@ -451,8 +451,8 @@ def scene(P):
 CAM = {
     "river":   (2.6, 0.0, 30.0, 42.0, 6.0),     # low over the water, under the canopy
     "drift":   (4.0, -3.0, 40.0, 36.0, 3.0),    # slow, long lens
-    "canopy":  (27.0, 2.0, 45.0, 56.0, 10.0),   # through the crinoid crowns
-    "wall":    (16.0, 9.0, 35.0, 50.0, 8.0),    # along the wall of fans and crust
+    "canopy":  (27.0, -6.0, 45.0, 56.0, 10.0),  # through the crinoid crowns
+    "wall":    (11.0, 10.0, 28.0, 46.0, -6.0),  # along the wall of fans and crust, banking the other way
     "climb":   (34.0, 0.0, 60.0, 48.0, 4.0),    # the build: rising into the crowns, anticipation
     "dive":    (5.0, 0.0, 40.0, 66.0, 16.0),    # down to the water, fast
     "surge":   (21.0, 0.0, 70.0, 72.0, 12.0),   # the drop: level through the crowns, fast and wide
@@ -472,7 +472,7 @@ STAGES = {
     "Awake":     ("canopy", 8.0, 1.3, 14.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth"), 0.75, 3.0, 34.0),
     "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
     "Build":     ("climb",  4.0, 0.5, 16.0, 0.0, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
-    "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
+    "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.025, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
     "Body":      ("canopy", 17.0, 2.0, 22.0, 0.25, 0.06, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
     "Body 2":    ("dive",   20.0, 2.2, 24.0, 0.3, 0.06, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
     "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.25, 0.05, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
@@ -483,7 +483,7 @@ STAGES = {
 # once; the body settles above the rest state; the aftermath drains below it.
 GLOWS = {"Dark": (0.75, 1.0, 180.0), "Stirring": (1.0, 1.0, 220.0), "Breath": (0.6, 1.0, 120.0),
          "Awake": (1.15, 1.1, 240.0), "Awake 2": (1.15, 1.1, 240.0), "Build": (0.35, 0.6, 60.0),
-         "Drop": (2.5, 2.5, 620.0), "Body": (1.45, 1.5, 340.0), "Body 2": (1.5, 1.5, 340.0),
+         "Drop": (2.4, 2.1, 560.0), "Body": (1.45, 1.5, 340.0), "Body 2": (1.5, 1.5, 340.0),
          "Body 3": (1.45, 1.5, 340.0), "Body 4": (1.5, 1.6, 360.0), "Aftermath": (0.6, 0.8, 150.0)}
 LAYER_BASE = {}   # filled by ecosystem(): name -> (intensity, excitedIntensity)
 CROWN_IDS = []    # filled by crown_lights()
@@ -509,6 +509,8 @@ def preset(name, length):
         "particles/spores/spawnRate": [spores],
         "particles/swarm/spawnRate": [swarm],
         **glow_values(name),
+        # the body is the brightest stretch of the piece: expose for it (the Critic: clipped, washed out at the drop)
+        "camera/exposure/compensation": [-0.4 if name in ("Drop", "Body", "Body 2", "Body 3", "Body 4") else 0.0],
     }}
 
 
@@ -524,7 +526,7 @@ def glow_values(name):
     # The drop is also a synchronised ignition ("thousands of organisms illuminate"): every organism that answers the
     # medium answers as if a front were on it, landing with the drop's ease-out and easing back over the body's
     # transition while the real fronts keep travelling. Negative thresholds = a standing response.
-    flash = {"Drop": -0.32, "Body": -0.06, "Body 2": -0.06, "Body 3": -0.06, "Body 4": -0.08}.get(name, 0.0)
+    flash = {"Drop": -0.25, "Body": -0.06, "Body 2": -0.06, "Body 3": -0.06, "Body 4": -0.08}.get(name, 0.0)
     for layer in ("matPolyps", "seapenPolyps", "crust", "crustViolet", "fanPolyps", "plankton"):
         v[f"ecosystem/{layer}/responseThreshold"] = [flash]
     v["ecosystem/crust/sparsity"] = [0.4 if name == "Drop" else (0.5 if dense else 0.65)]
@@ -574,8 +576,8 @@ def states():
             trig += [held("macro.energy", 0.62, f, falling=True) for f in BODY_CYCLE]
         trig += pad(name)
         transition = {"seconds": secs, "easing": easing}
-        if name in BODY_CYCLE or name in ("Awake 2",):
-            transition["quantize"] = "beat"
+        if name in BODY_CYCLE or name in ("Stirring", "Awake", "Awake 2", "Aftermath"):
+            transition["quantize"] = "beat"   # a camera move starts on the beat (the Critic: cuts off the beat)
         S.append({"name": name, "preset": name.lower(), "transition": transition, "triggers": trig})
     return {"initial": "Dark", "states": S}
 
