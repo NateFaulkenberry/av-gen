@@ -60,4 +60,7 @@ lookup is one lerp between two records.
   onto the nearest point and streaming from there (no stored target), the curves do not curl with time, and
   tendon matter does not splat into the surface's density (it is a separate system; the prototype weighted it 0.22,
   below the iso level, so in both it reads as streams of flakes rather than surface).
-- [TBD measured cost]
+- Measured: 18 face curves for 1 M particles, the particle compute pass 0.79-1.7 ms against the latent sphere
+  control's 1.1-1.6 ms: following a curve costs no more than a one-record latent. The T01 scene's 320 k tendon
+  flakes cost 7.6 ms of the formed-face frame (110.5 against 102.9 ms GPU p50 without the system, 1440x900),
+  almost all of it drawing the flakes (`scene` pass +6.9 ms).

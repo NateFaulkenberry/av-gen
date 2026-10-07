@@ -45,4 +45,6 @@ in its film (+160 nm at heat 1) and sparks the same way.
 - Without the block nothing is dispatched and `vs_flake`'s spark term is behind a uniform that is 0.
 - The heat does not reach the density volume (the prototype also put it in the surface's grooves through a second
   density channel; ADR-1141's volume has one), so a collapse's heat is in the flying matter only.
-- [TBD measured cost]
+- Measured: `cs_heat` over the T01 scene's 2 M matter adds 0.6 ms to the particle compute pass at the collapse
+  (10.1 against 9.5 ms); the frame is unchanged within run-to-run spread (54.3 against 54.2 ms GPU p50, 1440x900).
+  At 1 M in `[.perf][astral4]` it is below the timer's resolution (6.49-6.62 against 6.49 ms).

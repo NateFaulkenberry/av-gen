@@ -38,9 +38,35 @@ is the reference: the same formulas over `SdfTree::evaluate`.
 
 - Interpreted latents are unchanged (`cs_latent` is the same entry of the same module); ADR-1140's parity and
   determinism tests still pass.
-- The first frame of a new tree structure builds a pipeline synchronously ([TBD] ms for the face): a live editor
-  that loads such a scene hitches once, as ADR-1142's density variant does.
-- [TBD measured cost table]
+- The first frame of a new tree structure builds a pipeline synchronously (183-253 ms for the 90-node face, 161 ms
+  for the 64-node eyes-and-mouth): a live editor that loads such a scene hitches once, as ADR-1142's density
+  variant does. The latent's SDF object is `compile: true`, so ADR-1102's pre-warm also compiles its raymarch
+  pipelines although it is never drawn (4.5 s on the main thread at load for the face, the interpreter being unable
+  to draw it); a latent object could skip the pre-warm, which is left for when a live scene needs it.
+
+### Byte-identity
+
+The pre-change binary (`17008758`, with its own shaders) against this branch, 1280x720 at `--range 2:2`, nine
+reference scenes, after every step of iteration 4 (ADR-1144..1149, 1154..1156): `ferrofluid-crown` (two compiled
+trees), `stellar-nursery`, `particle-vfx-lab`, `tempered-metal` (film and anisotropy), `fungi`, `organic`, `hero`
+(meshes through `pbr_shade`), and iteration 3's own `compare-t02-metal` and `latent-entity` (an interpreted latent,
+a density surface, an engraving, flakes): **0 differing channels** each.
+
+### Measured cost (M2 Max, under the GPU lock)
+
+`[.perf][astral4]`, the particle compute pass alone for 1 M particles bound at coherence 0.93, p50:
+
+| Latent | Particle compute pass |
+|---|---|
+| a sphere, interpreted (the control) | 1.1-1.6 ms |
+| ADR-1140's crude 7-record mask, interpreted | 6.55 ms |
+| the authored 90-node face, compiled | 6.49 ms |
+| the face, compiled, staggered 3 (ADR-1155) | 2.82 ms |
+
+The THE ASTRAL FORGE T01 comparison scene at the formed face (10.8-11.5 s, headless 1440x900, GPU p50, two runs):
+iteration 3's scene (the 41-node capsule tree, interpreted, 2 M) spends **182 ms** in the particle compute pass
+(447 ms a frame); this one, with the compiled face, 360 k features, 320 k tendons and 250 k dust, **24 ms** (49.8 ms
+unstaggered).
 
 ## Rejected alternatives
 

@@ -82,6 +82,13 @@ tapered horns, and blade fins as thin ellipsoids behind far-field guides.
   variant for exactly this.
 - The node limit (96 per tree) binds the face at 90: a second face in one tree would need ADR-1001's limit raised
   for compiled trees, which have no stacks.
+- Fidelity, measured on the CPU (`~/Desktop/av-gen-review/37-astral-forge/iter4/dev/latent-cpu-prototype-vs-authored-tree.png`):
+  the prototype's MASK and the authored tree, both raymarched at the T01 camera, cover the same pixels with an IoU
+  of 0.98 (the prototype's torn rim and small inner face excepted).
+- Cost of drawing it: the density surface (ADR-1142) sharpened toward the compiled face costs **16.3 ms** (the `sdf`
+  pass) at the T01 formed face, frame-filling at 1440x900; the frame is 21 ms dearer than with iteration 3's capsule
+  tree on the surface (110.9 against 89.7 ms). The prototype marches a 128^3 cache of its latent and takes the exact
+  latent only near the surface; production evaluates the compiled tree at every step inside the matter.
 
 ## Rejected alternatives
 

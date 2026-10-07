@@ -49,6 +49,9 @@ the packed `home.w`). A staggered latent is refused with tendons (which do not p
 
 ## Consequences
 
-- [TBD measured]
+- Measured, the T01 scene's 2 M matter alone (the compiled face, flow 0, no heat, headless 1440x900, the particle
+  compute pass): unstaggered 9.6 ms; one kernel with a per-block branch (the first version) 9.1 ms at stagger 3;
+  split, **4.4 ms at stagger 3, 3.7 ms at 4**. The whole T01 scene at the formed face: particle compute 49.8 ms
+  unstaggered, 24.1 ms at stagger 3 (frame 117.5 -> 110.5 ms). `[.perf][astral4]`, 1 M bound: 6.49 -> 2.82 ms.
 - A stored point is up to `stagger - 1` steps old: under a fast-moving latent the matter lags the anatomy by that
   much (the prototype's trade too), and a changed tree is seen by a third of the matter per step.

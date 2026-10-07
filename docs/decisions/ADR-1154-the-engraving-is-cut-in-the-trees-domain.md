@@ -36,3 +36,6 @@ contour centres, the region points (ADR-1149) and the frequencies are authored i
 - Displacements and ADR-1144's `fray` and `farField` pass through the chain unchanged (they move no point the
   shader's `sdfWarp` knows); a `fray` is a local radius scale, which the prototype's engraving does not follow
   either.
+- Cost: a tree with a chain of N ops walks it four times per engraved pixel (the point and the three Jacobian
+  columns), N sdfWarp calls each; the T01 face has no chain (its root is a smooth union) and pays nothing. Not
+  measured separately: `latent-entity` (a chain of one `scale`) renders in the same budget as before.

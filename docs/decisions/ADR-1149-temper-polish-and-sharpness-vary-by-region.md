@@ -51,6 +51,10 @@ density variant's field only. Parameter `density/spread`.
 
 - Without the blocks, nothing changes: no variant is asked for, and the code they add sits behind a constant zero
   record, a zero count or a zero uniform. Measured: ADR-1145's byte-identity table.
+- Measured at the T01 formed face (1440x900, GPU p50, two runs): 110.5 ms with regions and a 0.6 spread, 113.8 ms
+  without either: the spread makes the periphery cheaper to march (less of it is pulled onto the tree) by more than
+  the regions cost. The colour: the T01 comparison's colourfulness is 17.8 against the prototype's 16.9 (iteration 3:
+  11.3).
 - Not ported: the prototype's chroma retention near features (production's film is ADR-1143's full-chroma Airy
   film, so a thicker film is the colour) and its spectral rim (`look.rimIntensity` exists, ADR-1052, but is not
   weighted by region).

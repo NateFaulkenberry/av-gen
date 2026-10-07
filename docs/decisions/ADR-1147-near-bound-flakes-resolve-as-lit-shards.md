@@ -50,5 +50,7 @@ a plate is a shard or a flake, never both.
   issued, and `vs_flake`'s hand-off multiplies by 1). With `fraction` 0 the image is byte-identical to no shards
   (the GPU test).
 - The vertex cost is `3 x capacity` invocations whether or not any shard is near (a candidate that fails is culled
-  in the vertex stage). [TBD measured]
+  in the vertex stage), and `vs_flake` evaluates the hand-off for every vertex of a candidate. Measured at the T01
+  formed face (1440x900, GPU p50, two runs): 110.5 ms with shards, 106.4 ms without: **+4.1 ms** for 2 M
+  particles; +1.8 ms over the collapse that follows.
 - Shards need the linear depth: a scene with a shard system now encodes the depth prepass.
