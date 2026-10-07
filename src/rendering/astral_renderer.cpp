@@ -818,7 +818,9 @@ void AstralRenderer::encode(const EnvironmentFrame& frame) {
     }
     lastFrameTime_ = t;
     if (std::getenv("AVGEN_ASTRAL_TRACE") != nullptr) { // diagnostics: the steps each frame took
-        log::info("astral t={:.4f} steps={} reset={} tier={} N={}", t, stats_.steps, stats_.reset, stats_.tier, stats_.particlesActive);
+        log::info("astral t={:.4f} steps={} reset={} tier={} N={} C={:.2f} arch={} summon={:.2f} god={} strobe={:.2f}", t, stats_.steps,
+                  stats_.reset, stats_.tier, stats_.particlesActive, stats_.coherence, stats_.arch, a.live.summon, a.live.god,
+                  s.strobe);
     }
 }
 
