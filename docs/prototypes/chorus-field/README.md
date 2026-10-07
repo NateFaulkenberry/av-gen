@@ -244,3 +244,13 @@ CPU work is flat at about 2 ms in every row. No frame reads the GPU back.
 2. **Integrate strands for visible records only:** dispatch over the cull's compacted list. This cuts the
    strand pass in proportion to the cull.
 3. **Cast fiber shadows from a coarser LOD level** (fewer segments): shadows are linear in triangles.
+
+## Suites (end of the spike)
+
+Run at `ba9a1667`, after a reconfigure and a full build, one after the other under `tools/gpu-lock.sh`, with each binary's
+exit code captured in the same shell:
+- `avgen_tests`: **exit 0**. 4,183 cases: 4,163 passed, 19 skipped, **1 failed as expected** (the one
+  `[!shouldfail]`, `test_character_lab_slopes.cpp:187`). 10,338,443 assertions.
+- `avgen_render_tests`: **exit 0**. 626 cases: 625 passed, 1 skipped. 643,408 assertions.
+
+Not merged, not pushed.
