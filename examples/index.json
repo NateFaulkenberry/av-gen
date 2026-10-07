@@ -479,6 +479,18 @@
       "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure, and a big friendly fish circling over the lane swims the melody. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
       "name": "Sonic Abstract - 8-Bit Ocean",
       "project": "sonic-abstract/bit-ocean.json"
+    },
+    {
+      "category": "Showcase",
+      "description": "THE RIFT: a drained abyssal trench alive with bioluminescent life on Trench. The music travels through it as waves of light, the canopy answers late, and the drop ignites the whole canyon. Needs assets/audio/trench.wav; run examples/bioluminescent/build.py first. See docs/prototypes/bioluminescent/.",
+      "name": "THE RIFT (Bioluminescent Environment)",
+      "project": "bioluminescent/rift.json"
+    },
+    {
+      "category": "Live projects",
+      "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath).",
+      "name": "THE RIFT LIVE",
+      "project": "bioluminescent/rift-live.json"
     }
   ]
 }
