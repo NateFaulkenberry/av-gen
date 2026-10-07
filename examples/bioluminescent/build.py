@@ -389,7 +389,7 @@ def crown_lights(P):
 def scene(P):
     nodes = list(fields())
     nodes.append({"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
-                  "terrain": {"chunkSize": 80.0, "resolution": 64, "lodLevels": 4, "lodDistance": 100.0,
+                  "terrain": {"chunkSize": 80.0, "resolution": 40, "lodLevels": 4, "lodDistance": 70.0,
                               "viewDistance": 1000.0, "shadowDistance": 150.0, "skirtDepth": 2.0,
                               "groundMottle": False,
                               "water": {"shallowColor": [0.004, 0.008, 0.014], "deepColor": [0.001, 0.003, 0.008],
