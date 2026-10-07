@@ -208,35 +208,81 @@ Scene variants of `06-flight` (`cp1/ab-*.json`, built from the still's scene by 
 | Can a glow field replace the lights? | Prototype: a low-res emission map (the propagation field's own output) sampled by ground, walls, water and haze, against 139 point lights, for cost and look side by side |
 | Does unlit/emissive shading of pure emitters cost what lit shading does? | `unlit` material on the emitter parts |
 
-## 5. The running assessment (brief §18)
+## 5. The running assessment (brief §18), as of CP4
 
-Updated at every checkpoint.
+**What the generalized renderer does well, and keeps doing in the Rift.**
+- **Terrain and water:** the canyon is three authored features, and its walls frame every shot.
+- **Instanced, culled bodies:** crinoids, sea pens, fans, mats, whips, lanterns. Lean meshes; no decimated LODs
+  (vertex clustering turned feathery organisms into blocks).
+- **Clustered lights.** The hero crown lights are about 120, and only the nearest matter.
+- **The volumetric medium.**
+- **Particles:** spores and swarms emitted along the flight spline.
+- **Material programs:** the rock reads the medium as a field.
+- **The rest of the control and output stack, unchanged:**
+  - bloom with chroma retention, post and tonemap;
+  - scene states, presets, routes and MIDI;
+  - the spline camera with banking;
+  - every output path.
 
-**What the generalized renderer does well.**
-- Instanced, culled, LOD'd generated meshes, at any density the triangle budget allows.
-- Terrain with authored features (the canyon is 3 features).
-- Water.
-- Bloom with chroma retention.
-- Audio fields (travelling onset fronts, per-element bands) on emission.
-- Clustered lights.
-- Every output path (stills, video, EXR) for free.
+**What it does poorly for this Environment (measured, §3.1).**
+- **Micro-emitters as geometry:** about 22 ms at CP1 density, raster-bound (unlit saved nothing).
+- **Light from many small sources:** only point lights (a 224 cap, and cost by light volume in the lit pass and the
+  medium).
+- **No propagation medium with memory or refractoriness.**
+- **A generator layer cannot stand on sculpted terrain:** its ground is its own value noise. The Rift places CPU
+  `points` (a 65,536 cap per node, about 14 MB of scene JSON).
+- **Offline renders lift distance culls by policy.** Lean bodies matter more than LOD ladders.
 
-**What it does poorly for this Environment** (CP1, to be confirmed by section 4's experiments).
-- Micro-scale emitters cost full lit shading.
-- Emitters can light their surroundings only through point lights, and the medium's cost grows with them.
-- No propagation medium with refractory state (a scalar grid has 1 channel; Gray-Scott is not excitable).
-- The generator distribution's ground is its own value noise, not the terrain, so GPU-generated layers cannot stand
-  on sculpted land. CP1 used CPU-placed `points` (65,536 cap per object).
+**What needed specialized GPU treatment, and got it.**
+- **ADR-1200 (the ecosystem).**
+  - Emitters are points attached to host instances and accumulated in compute.
+  - It covers photophores, polyps, chain beads, crust, plankton, comb plates and embers.
+  - About 1 ms for about 19 M candidate points.
+  - The light model: rest, response, wake, travel, iridescence, bob, near fade.
+- **ADR-1201 (the medium).** An excitable grid: calibrated wave speed, refractory, energy, wake and conductivity,
+  with exact seek.
 
-**What needs specialized GPU treatment.** Hypotheses until measured:
-- micro emitters as points;
-- a propagation field;
-- a glow field instead of light pools.
+**What could remain conventional.**
+- the bodies, terrain, water, haze, particles, camera and post;
+- the hero lights. The giants pool their light in the haze, which the owner liked in CP1. The micro scale never
+  does: real small emitters do not light their surroundings.
 
-**What can remain conventional.** Terrain, water, post, camera, output, controls (expected).
+**What visual compromises specialization avoided.**
+- **Micro-scale density:** 19 M candidate emitters a frame, where CP1 had a few hundred thousand beads.
+  - A plankton carpet on the river.
+  - Walls alive with two crust populations (blue and violet, 600 points per 3 m patch).
+  - Sea pens with polyp leaves.
+  - Comb jellies as pure light (a mesh read as a beach ball).
+- **Music that travels.** Fronts at a speed, branching, refractory: "music traveling through a living ecosystem" in
+  place of "bass → emission".
+- **Per-species behaviour on the same medium:**
+  - flash (u);
+  - canopy lag (e);
+  - an awakened reach (w);
+  - fluorescence (`excitedColor`: fans and the violet crust turn magenta under a front).
 
-**Visual compromises avoided by specialization.** (Pending.)
+**New reusable Environment infrastructure.**
+- **The seam** (§2.1): `EnvironmentRenderer` and `EnvironmentFrame`. Production Astral Forge is its second user.
+- **The excitable grid mode and grid channel selection.** These are general: any scene can propagate anything.
+- **Emitter layers on host instances.** General enough for any instanced organism, city windows, stars on a
+  structure...
+- **Engine fixes found here:**
+  - a second seek landing in the initial state (`StateMachine::reset`);
+  - the headless benchmark's `--range` not seeking.
 
-**New reusable Environment infrastructure.** (Pending.)
+**What should remain specific to Bioluminescence (the Rift).**
+- the species, their templates and palettes;
+- the arc's stage table (camera behaviour, the medium's character, glow and flash per stage);
+- the kick-front-from-the-camera ignition.
 
-**What should remain specific to Bioluminescence.** (Pending.)
+All of that is data in `examples/bioluminescent/build.py`, not engine code.
+
+## 6. Performance (1080p, realtime tier, M2 Max)
+
+| Measurement | Value |
+|---|---|
+| CP1 baseline (general renderer only) | 76 ms |
+| CP2 (ecosystem) | 56 ms; the ecosystem itself about 1 ms |
+| The Rift at CP4, the opening | 52 ms: lit pass 23.5, volume march 23.6 (the crown lights' volumetric halos), depth 3, medium 0.4, ecosystem 0.1-0.2 |
+
+The arc-point table and the halo A/B follow in this section.

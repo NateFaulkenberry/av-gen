@@ -230,9 +230,9 @@ def bodies(P):
     into blocky blobs (seen in v1). Bodies are culled by distance instead; past it the emitters carry the far field."""
     N = []
     N.append(mesh_node("crinoidStalk", "crinoid_stalk", P["crinoid"], m(BODY, VIOLET_DIM, 0.01, 0.6),
-                       max_distance=1200.0))
+                       max_distance=600.0))
     N.append(mesh_node("crinoidArms", "crinoid_arms", P["crinoid"],
-                       m([0.05, 0.04, 0.08], VIOLET_DIM, 0.06, 0.5, double=True), max_distance=900.0))
+                       m([0.05, 0.04, 0.08], VIOLET_DIM, 0.06, 0.5, double=True), max_distance=450.0))
     for i, part in enumerate(chunks(P["seapen"])):
         N.append(mesh_node(f"seapen{i}", "seapen", part, m([0.03, 0.05, 0.07], PEN, 0.04, 0.45, double=True),
                            max_distance=110.0))

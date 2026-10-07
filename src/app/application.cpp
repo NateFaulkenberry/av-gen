@@ -6468,6 +6468,11 @@ int Application::runHeadless() {
         // about rather than whatever the timeline opens on -- the multicam opens fifty metres up,
         // where nothing near the ground is in reach. Still one start for every block.
         clock.restartAt(options_.rangeStart.value_or(0.0));
+        // ...and the engine with it. Restarting only the clock started the control layer -- scene states, the
+        // macros their presets set, every integrating route (a flying camera's path position) -- from scratch at
+        // the range's start, so `--range 130:` measured the opening's camera at second 130 (found by THE RIFT's arc
+        // benchmark: seven arc points, one camera). A seek replays them (ADR-870/1168), as a render's does.
+        engine_->seekSeconds(options_.rangeStart.value_or(0.0));
         renderer_->resetTemporalHistory();
         if (schedule.size() > 1) {
             log::info("--- block {}/{}: arm '{}' ---", blockIndex + 1, schedule.size(), block.arm);
