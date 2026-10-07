@@ -2,7 +2,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdlib>
+#include <iterator>
 #include <fstream>
 
 namespace avgen::app {
@@ -42,6 +44,10 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
         info.name = e["name"].get<std::string>();
         info.description = e.value("description", std::string());
         info.category = e.value("category", std::string("Examples"));
+        if (e.contains("live") && !e["live"].is_boolean()) {
+            return fail("examples index: '{}': 'live' must be true or false", info.name);
+        }
+        info.live = e.value("live", false);
         // Three kinds of entry, opened the same way: `Application::openAny` sniffs a recipe from a
         // project by content, so the key is documentation rather than routing. A recipe says so
         // rather than calling itself a project, since what it opens is a world that gets generated.
@@ -59,6 +65,23 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
         out.push_back(std::move(info));
     }
     return out;
+}
+
+std::vector<ExampleSection> exampleSections(const std::vector<ExampleInfo>& examples, bool live) {
+    std::vector<ExampleSection> sections;
+    for (std::size_t i = 0; i < examples.size(); ++i) {
+        if (examples[i].live != live) {
+            continue;
+        }
+        auto it = std::find_if(sections.begin(), sections.end(),
+                               [&](const ExampleSection& s) { return s.category == examples[i].category; });
+        if (it == sections.end()) {
+            sections.push_back(ExampleSection{examples[i].category, {}});
+            it = std::prev(sections.end());
+        }
+        it->entries.push_back(i);
+    }
+    return sections;
 }
 
 Result<std::vector<ExampleInfo>> loadExamples(const std::vector<std::filesystem::path>& searchDirs) {

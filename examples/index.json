@@ -1,6 +1,209 @@
 {
   "examples": [
     {
+      "category": "Astral Forge",
+      "description": "Play live audio with a strong kick (a mix or a drum bus) plus a MIDI controller: CC 1-13 summon, hold and shape the god, pad 36 collapses it, pads 37-44 pick a god. A god of dust forms from the music and collapses on the drop. MIDI map: docs/prototypes/astral-forge/09-production.md.",
+      "live": true,
+      "name": "Astral Forge Live",
+      "project": "astral-forge/astral-forge-live.json"
+    },
+    {
+      "category": "Digital Mosh",
+      "description": "Play live audio (a full mix) plus a MIDI controller: CC 1 sets the sensitivity, drum pads 36-43 force a stage (Dream to Recovery). A painted Dali/Tanguy dream that the music corrupts like a datamosh, then restores. See docs/prototypes/digital-mosh/03-implementation.md.",
+      "live": true,
+      "name": "Digital Mosh Live",
+      "project": "digital-mosh/digital-mosh-live.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. Fly through a sacred-geometry passage; chords light their polygon of rails, the kick sends a wave of light ahead. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Sacred Geometry Flight",
+      "project": "sonic-abstract/sacred-flight.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. A flat neon poster you fly through; ridgelines ripple and the drums build blocks of colour. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Neon Vector World",
+      "project": "sonic-abstract/neon-vector.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. A cel-shaded candy island whose creatures sing the notes and hop on the kick. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Cel-Shaded Dream World",
+      "project": "sonic-abstract/cel-dream.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. An endless corridor of colour portals the music spaces, twists and recolours. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Infinite Color Geometry",
+      "project": "sonic-abstract/color-geometry.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. A twilight reef of translucent organisms; notes open flowers, held sound makes them grow. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Organic Digital Garden",
+      "project": "sonic-abstract/organic-garden.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. Faceted mountains round a mirror lake; the music rolls waves of topography, onsets drop rings of light. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Digital Alpine",
+      "project": "sonic-abstract/digital-alpine.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. Skim a glowing river through contour-banded hills; the bass raises the river. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Chromatic Topography",
+      "project": "sonic-abstract/chromatic-topography.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. A canyon of broken signal; a strong event shatters it and it rebuilds recoloured. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - Glitch Signal",
+      "project": "sonic-abstract/glitch-signal.json"
+    },
+    {
+      "category": "Sonic Abstract",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard; CC 1 (mod wheel) is mapped. An 8-bit water level in 3D; the bass bends the kelp, melodies ring bell flowers, drums burst bubbles. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set.",
+      "live": true,
+      "name": "Sonic Abstract - 8-Bit Ocean",
+      "project": "sonic-abstract/bit-ocean.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A salt flat at dusk; chords paint the sky, melodies fall as meteors. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Salt Flat Mirage",
+      "project": "sonic-vfx/salt-flat-mirage.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note releases a paper lantern from a still lake. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Lantern Lake",
+      "project": "sonic-vfx/lantern-lake.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords hang aurora curtains, hats glitter as diamond dust, the snare cracks the ice. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Aurora Tundra",
+      "project": "sonic-vfx/aurora-tundra.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A colossal fungal organism breathes with the bass. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - The Breathing Deep",
+      "project": "sonic-vfx/breathing-deep.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Deep-sea siphonophores pulse with the melody. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Abyssal Bloom",
+      "project": "sonic-vfx/abyssal-bloom.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Every note sings its own standing-wave figure into black sand. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Cymatic Plate",
+      "project": "sonic-vfx/cymatic-plate.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Silk ribbons draw the melody; the kick cracks them like whips. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Silk Theatre",
+      "project": "sonic-vfx/silk-theatre.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note pulls a spike from a magnetic liquid. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Ferrofluid Crown",
+      "project": "sonic-vfx/ferrofluid-crown.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A glyph inside a video feedback loop the music turns and recolours. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Feedback Mirror",
+      "project": "sonic-vfx/feedback-mirror.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Twelve Tesla towers, one per pitch class, draw every chord in lightning. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Tesla Choir",
+      "project": "sonic-vfx/tesla-choir.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A landscape of barcode ridges written and erased by the music. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Datascape",
+      "project": "sonic-vfx/datascape.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The bass breathes on the embers of a burnt forest, the snare flares. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Ember Forest",
+      "project": "sonic-vfx/ember-forest.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A cathedral of light decays under the drums and rebuilds on held chords. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - The Corrupted Cathedral",
+      "project": "sonic-vfx/corrupted-cathedral.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The bass winds a supercell's funnel, the snare strikes. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Storm Cell",
+      "project": "sonic-vfx/storm-cell.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords ignite newborn stars coloured by pitch. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Stellar Nursery",
+      "project": "sonic-vfx/stellar-nursery.json"
+    },
+    {
+      "category": "Sonic VFX",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Every note is a star falling into a black hole. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "live": true,
+      "name": "Sonic VFX - Event Horizon",
+      "project": "sonic-vfx/event-horizon.json"
+    },
+    {
+      "category": "Sonic Garden",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard (pad, bell, bass or percussion). The Sonic Garden played live: the same Sonic Character and worlds as the file version. Opening it turns live input on; pick devices in View > Live. See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
+      "live": true,
+      "name": "Sonic Live",
+      "project": "sonic-garden/sonic-live.json"
+    },
+    {
+      "category": "The Rift",
+      "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath). Run examples/bioluminescent/build.py first (it writes the 14 MB scene).",
+      "live": true,
+      "name": "THE RIFT LIVE",
+      "project": "bioluminescent/rift-live.json"
+    },
+    {
       "category": "Benchmark",
       "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
       "name": "Procedural Benchmark",
@@ -325,172 +528,10 @@
       "project": "sonic-garden/sonic-garden.json"
     },
     {
-      "category": "Lab",
-      "description": "Play the Sonic Garden live (ADR-1025): a MIDI keyboard and a synth's audio input drive the same Sonic Character, musical context and worlds as the file version. Opening it turns live input on; pick the devices in the Live panel (View > Live). See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
-      "name": "Sonic Live",
-      "project": "sonic-garden/sonic-live.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as meteors, the bass makes the horizon shimmer, and a black monolith answers the drums. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Salt Flat Mirage",
-      "project": "sonic-vfx/salt-flat-mirage.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Each note releases a paper lantern from the surface of a still lake at dusk; the melody becomes a drifting constellation, and the bass a slow swell beneath it. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Lantern Lake",
-      "project": "sonic-vfx/lantern-lake.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Over a frozen lake the aurora is the pad: chords hang curtains of light, the melody ripples them, the hats are diamond dust glittering in the air, and the snare cracks the ice with light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Aurora Tundra",
-      "project": "sonic-vfx/aurora-tundra.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies climb its hanging threads as light. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - The Breathing Deep",
-      "project": "sonic-vfx/breathing-deep.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Two kilometres down, a colony of siphonophores answers the melody in pulses of cold light while marine snow falls through the hats. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Abyssal Bloom",
-      "project": "sonic-vfx/abyssal-bloom.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a chord is two figures at war. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Cymatic Plate",
-      "project": "sonic-vfx/cymatic-plate.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Silk ribbons draw the melody in the air of an empty theatre: pitch is height, legato is one unbroken stroke, and the kick cracks the ribbons like whips. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Silk Theatre",
-      "project": "sonic-vfx/silk-theatre.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Ferrofluid Crown",
-      "project": "sonic-vfx/ferrofluid-crown.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A single glyph of light inside a video feedback loop: the music turns, zooms and recolours the loop, so the world is the instrument's own echo. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Feedback Mirror",
-      "project": "sonic-vfx/feedback-mirror.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn in lightning, so harmony has a shape. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Tesla Choir",
-      "project": "sonic-vfx/tesla-choir.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A landscape of pure measurement, barcode ridges and numerals to the horizon, written and erased by the music. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Datascape",
-      "project": "sonic-vfx/datascape.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "The morning after the fire: the bass is the wind breathing on the embers, the snare a flare-up in the black trunks, the melody one ember dancing through the smoke. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Ember Forest",
-      "project": "sonic-vfx/ember-forest.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held chords. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - The Corrupted Cathedral",
-      "project": "sonic-vfx/corrupted-cathedral.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A supercell walks across the night prairie: the bass winds its funnel, the snare strikes, and the melody crawls as light inside the cloud. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Storm Cell",
-      "project": "sonic-vfx/storm-cell.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Inside a pillar of gas, chords ignite newborn stars: their number is the polyphony, their colour the pitch, and the bass is the density of the cloud. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Stellar Nursery",
-      "project": "sonic-vfx/stellar-nursery.json"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "A black hole drinks a disk of light: every note is a star that falls into it, and the bass is the hole's own mass bending the sky. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
-      "name": "Sonic VFX - Event Horizon",
-      "project": "sonic-vfx/event-horizon.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "The Golden Passage: you fly through an endless luminous sculpture of sacred geometry, rose-window gates strung on twelve helical rails; a chord lights its own polygon of rails down the whole passage, the kick sends a wave of light ahead of you, the bass widens the passage. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Sacred Geometry Flight",
-      "project": "sonic-abstract/sacred-flight.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Pulsar Plain: a poster you can fly through. Hidden-line ridgelines ripple to the horizon under a colossal outline circle; the drums build flat blocks of one bold colour. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Neon Vector World",
-      "project": "sonic-abstract/neon-vector.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Candy Archipelago: a toy island floating in a candy sky, inked and cel-shaded, where three round creatures sing the notes, hop on the kick and the giant flower blooms when the sound is held. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Cel-Shaded Dream World",
-      "project": "sonic-abstract/cel-dream.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Chromatic Corridor: monumental portals of pure colour flow toward you forever through coloured haze, each a step further round the colour wheel, toward a blinding light. The music breathes the corridor's spacing, winds its twist and recolours the space itself. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Infinite Color Geometry",
-      "project": "sonic-abstract/color-geometry.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Lantern Reef: a macro view into a twilight meadow of translucent organisms that breathe, bloom and sway with the music; the notes open flowers, the kick blooms the lantern, held sound makes it grow. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Organic Digital Garden",
-      "project": "sonic-abstract/organic-garden.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Glass Caldera: a digital painting of faceted mountains round a mirror lake, flown through at dusk. The music raises slow waves of topography that roll out from the island through every range; onsets drop rings of light on the water and send light out through the ranges. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Digital Alpine",
-      "project": "sonic-abstract/digital-alpine.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Contour Valley: a landscape as a sculptural colour field. You skim a glowing river down a winding valley between smooth hills coloured by their height in hard bands, ruled with contour lines that flow up the slopes with the music; the river rises and brightens with the bass. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Chromatic Topography",
-      "project": "sonic-abstract/chromatic-topography.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Pixel Canyon: you fly down a canyon built of a broken signal, walls and floor of blocks lit in a data pattern, towards a white-hot horizon. A strong event collapses it (RGB parts, rows drift, the walls shatter into blocks, a wave of colour passes through you) and it rebuilds turned a quarter turn, recoloured and re-patterned. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - Glitch Signal",
-      "project": "sonic-abstract/glitch-signal.json"
-    },
-    {
-      "category": "Sonic Abstract",
-      "description": "Bubble Reef: a lost 8-bit water level grown into 3D and swum through for ever -- three areas with their own palettes round a deep basin -- that plays along with the music: the bass bends the kelp, a melody rings a row of bell flowers, a chord blooms the coral, drums burst bubbles and flash the treasure, and a big friendly fish circling over the lane swims the melody. Live: opening it turns live input on (View > Live). See docs/prototypes/sonic-garden/ABSTRACT-PLAN.md.",
-      "name": "Sonic Abstract - 8-Bit Ocean",
-      "project": "sonic-abstract/bit-ocean.json"
-    },
-    {
       "category": "Showcase",
       "description": "THE RIFT: a drained abyssal trench alive with bioluminescent life on Trench. The music travels through it as waves of light, the canopy answers late, and the drop ignites the whole canyon. Needs assets/audio/trench.wav; run examples/bioluminescent/build.py first (it writes the 14 MB scene). See docs/prototypes/bioluminescent/.",
       "name": "THE RIFT (Bioluminescent Environment)",
       "project": "bioluminescent/rift.json"
-    },
-    {
-      "category": "Live projects",
-      "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath).",
-      "name": "THE RIFT LIVE",
-      "project": "bioluminescent/rift-live.json"
     }
   ]
 }
