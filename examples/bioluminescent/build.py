@@ -262,7 +262,7 @@ def layer(name, hosts, template, color, intensity, excited, field_="", excited_c
 def ecosystem(P, sc_nodes):
     pens = [n["name"] for n in sc_nodes if n["name"].startswith("seapen")]
     mats = [n["name"] for n in sc_nodes if n["name"].startswith("mat")]
-    return {"spriteRadius": 1.5, "maxSprites": 65536, "layers": [
+    eco = {"spriteRadius": 1.5, "maxSprites": 65536, "layers": [
         # the canopy answers late: energy, not excitation; light runs out along the arms behind it
         layer("crinoidBeads", ["crinoidStalk"], "crinoid_beads", CYAN, 5.0, 10.0, "propE", sparsity=0.3,
               flicker=0.1, flickerRate=1.5, breath=0.5, breathRate=0.04, wakeGain=1.5, maxDistance=1000,
@@ -291,6 +291,9 @@ def ecosystem(P, sc_nodes):
         layer("plankton", ["planktonHost"], "plankton", BLUE, 0.8, 14.0, "propU", sparsity=0.7, pulseRate=4.0,
               pulseDecay=0.6, flicker=0.3, flickerRate=3.0, wakeGain=2.0, maxDistance=320),
     ]}
+    for l in eco["layers"]:
+        LAYER_BASE[l["name"]] = (l["intensity"], l["excitedIntensity"])
+    return eco
 
 
 # ============================================================================================ fields & the medium
@@ -371,6 +374,7 @@ def crown_lights(P):
         if s < 1.0 or len(out) >= 120:
             continue
         x, y, z = c[:3]
+        CROWN_IDS.append(f"crown{k}")
         out.append({"name": f"crown{k}", "id": f"crown{k}", "type": "point", "position": [x, y + 21.0 * s, z],
                     "color": CROWN, "intensity": 220.0, "range": 26.0 * s, "radius": 2.0, "castsShadow": False,
                     "volumetric": 0.4})
@@ -445,7 +449,8 @@ CAM = {
     "canopy":  (27.0, 2.0, 45.0, 56.0, 10.0),   # through the crinoid crowns
     "wall":    (16.0, 9.0, 35.0, 50.0, 8.0),    # along the wall of fans and crust
     "climb":   (34.0, 0.0, 60.0, 48.0, 4.0),    # the build: rising into the crowns, anticipation
-    "dive":    (5.0, 0.0, 40.0, 66.0, 16.0),    # the drop: down to the water, fast
+    "dive":    (5.0, 0.0, 40.0, 66.0, 16.0),    # down to the water, fast
+    "surge":   (21.0, 0.0, 70.0, 72.0, 12.0),   # the drop: level through the crowns, fast and wide
     "reveal":  (70.0, -10.0, 120.0, 58.0, 4.0), # high: the canyon's length
     "after":   (9.0, 4.0, 50.0, 40.0, 2.0),     # the aftermath: slow, pulling up
 }
@@ -461,14 +466,23 @@ STAGES = {
     "Breath":    ("river",  1.5, 0.0, 10.0, 0.0, 0.0, 300.0, 0.0, (1.0, "smooth"), 0.95, 4.0, 30.0),
     "Awake":     ("canopy", 8.0, 1.3, 14.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth"), 0.75, 3.0, 34.0),
     "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
-    "Build":     ("climb",  4.0, 0.5, 16.0, 0.05, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
-    "Drop":      ("dive",  24.0, 3.0, 28.0, 1.4, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
-    "Body":      ("canopy", 17.0, 2.0, 22.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
-    "Body 2":    ("river",  20.0, 2.2, 24.0, 0.7, 0.025, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
-    "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
-    "Body 4":    ("reveal", 12.0, 2.4, 24.0, 0.8, 0.03, 1500.0, 2000.0, (8.0, "smooth"), 0.55, 1.2, 45.0),
+    "Build":     ("climb",  4.0, 0.5, 16.0, 0.0, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
+    "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.08, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
+    "Body":      ("canopy", 17.0, 2.0, 22.0, 0.25, 0.06, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 2":    ("dive",   20.0, 2.2, 24.0, 0.3, 0.06, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
+    "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.25, 0.05, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 4":    ("reveal", 12.0, 2.4, 24.0, 0.3, 0.07, 1500.0, 2000.0, (8.0, "smooth"), 0.55, 1.2, 45.0),
     "Aftermath": ("after",  2.5, 0.0, 12.0, 0.0, 0.0, 600.0, 0.0, (4.0, "smooth"), 0.95, 4.0, 30.0),
 }
+# How brightly the whole ecosystem burns, per stage: (rest x, excited x, crown light cd). The drop surges every layer at
+# once; the body settles above the rest state; the aftermath drains below it.
+GLOWS = {"Dark": (0.75, 1.0, 180.0), "Stirring": (1.0, 1.0, 220.0), "Breath": (0.6, 1.0, 120.0),
+         "Awake": (1.15, 1.1, 240.0), "Awake 2": (1.15, 1.1, 240.0), "Build": (0.35, 0.6, 60.0),
+         "Drop": (2.2, 2.0, 520.0), "Body": (1.45, 1.5, 340.0), "Body 2": (1.5, 1.5, 340.0),
+         "Body 3": (1.45, 1.5, 340.0), "Body 4": (1.5, 1.6, 360.0), "Aftermath": (0.6, 0.8, 150.0)}
+LAYER_BASE = {}   # filled by ecosystem(): name -> (intensity, excitedIntensity)
+CROWN_IDS = []    # filled by crown_lights()
+
 BODY_CYCLE = ["Body", "Body 2", "Body 3", "Body 4"]
 PADS = {"Dark": 36, "Stirring": 37, "Awake": 38, "Build": 39, "Drop": 40, "Body": 41, "Aftermath": 42}
 
@@ -489,7 +503,19 @@ def preset(name, length):
         "scene/volumeEmission": [haze],
         "particles/spores/spawnRate": [spores],
         "particles/swarm/spawnRate": [swarm],
+        **glow_values(name),
     }}
+
+
+def glow_values(name):
+    rest, excited, crown = GLOWS[name]
+    v = {}
+    for layer, (i, e) in LAYER_BASE.items():
+        v[f"ecosystem/{layer}/intensity"] = [round(i * rest, 4)]
+        v[f"ecosystem/{layer}/excitedIntensity"] = [round(e * excited, 4)]
+    for lid in CROWN_IDS:
+        v[f"lights/{lid}/intensity"] = [crown]
+    return v
 
 
 def states():
