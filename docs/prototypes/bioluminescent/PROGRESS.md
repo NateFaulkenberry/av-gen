@@ -20,9 +20,21 @@ Branch `proto/bioluminescent`, worktree `../av-gen-biolum`, from main f56eaab0.
 | Architecture inspected; the seam chosen (03 §2) | done |
 | Reference board (45 sources), synthesis, research and art direction | done |
 | CP1: reference board plus eight stills from the general renderer only, measured | done |
-| Section 4 experiments: what costs, what a specialised path buys | next |
+| A/B attribution of the general renderer's cost (03 §3.1) | done, a1101882 |
+| ADR-1200: the ecosystem block + EcosystemRenderer (emitters as compute-accumulated points), tests | done, 17f81a95, d640f052 |
+| ADR-1201: the excitable propagation grid (helper agent, `../av-gen-biolum-prop`, merged) | done, 4e52fe8d |
+| CP2: the same world with ecosystem emitters (56 vs 77.6 ms; the ecosystem itself ~1 ms) | done |
+| The scene generator `build.py`: the medium, species on its channels, the arc traced on Trench | done, 4e8520af |
+| CP3: the propagation and the rest state, from a continuous run | in progress |
 
 ## How to work on it
+
+- **The scene:** `python3 examples/bioluminescent/build.py` writes `rift.scene.json` (gitignored, 13 MB), `rift.json`
+  (Trench) and `rift-live.json`, and a probe copy `build/biolum/rift-trace.json` for `--sonic-trace` (the arc
+  without the GPU: `visual.pState` = state index / 20).
+- **Stills of a time-varying medium must come from continuous play from 0**: a seek replays a grid's backlog with
+  the landing parameters (ADR-1168's known limitation). Render the song to video at low resolution and pull the
+  frames.
 
 - `python3 examples/bioluminescent/cp1.py` regenerates the organisms (`meshes/`, gitignored) and the CP1 scenes
   (`cp1/`, gitignored).
