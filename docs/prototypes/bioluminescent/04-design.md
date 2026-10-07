@@ -1,7 +1,7 @@
 # THE RIFT: how the music becomes the world
 
-The scene source is `examples/bioluminescent/build.py`. The generated `rift.scene.json` and `meshes/` are committed
-(regenerate them with `python3 examples/bioluminescent/build.py`). Brief §8-§12.
+The scene source is `examples/bioluminescent/build.py`. The generated `meshes/` are committed. `rift.scene.json` (14 MB of CPU placement) is not:
+write it with `python3 examples/bioluminescent/build.py`. Brief §8-§12.
 
 ## 1. The principle
 

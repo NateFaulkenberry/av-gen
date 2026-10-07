@@ -482,7 +482,7 @@
     },
     {
       "category": "Showcase",
-      "description": "THE RIFT: a drained abyssal trench alive with bioluminescent life on Trench. The music travels through it as waves of light, the canopy answers late, and the drop ignites the whole canyon. Needs assets/audio/trench.wav. See docs/prototypes/bioluminescent/.",
+      "description": "THE RIFT: a drained abyssal trench alive with bioluminescent life on Trench. The music travels through it as waves of light, the canopy answers late, and the drop ignites the whole canyon. Needs assets/audio/trench.wav; run examples/bioluminescent/build.py first (it writes the 14 MB scene). See docs/prototypes/bioluminescent/.",
       "name": "THE RIFT (Bioluminescent Environment)",
       "project": "bioluminescent/rift.json"
     },

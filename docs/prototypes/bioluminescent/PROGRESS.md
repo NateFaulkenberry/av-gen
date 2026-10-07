@@ -35,12 +35,12 @@ Branch `proto/bioluminescent`, worktree `../av-gen-biolum`, from main f56eaab0.
 | Final full Trench render, final drop video, the Critic on the full run | done (0.98; it caught the end-of-spline aim defect, which is now fixed, and the run re-rendered) |
 | Engine fix: a spline camera parked at an open spline's end lost its aim; the Rift's body flight now fits its path | done, b72866dd |
 | Merge origin/main (the seam runs `{ecosystem, astral}`) | done, 9f2ed05d |
-| The generated scene and meshes committed (the examples index opens THE RIFT from a clean checkout) | done, 77db67c8 |
+| The generated meshes committed (each at most 400 KB); the 14 MB scene stays generated (`build.py`) | done |
 | Both full suites | see the final report |
 
 ## How to work on it
 
-- **The scene:** `python3 examples/bioluminescent/build.py` writes `rift.scene.json` (committed, 13 MB), `rift.json`
+- **The scene:** `python3 examples/bioluminescent/build.py` writes `rift.scene.json` (gitignored, 14 MB: run it after a checkout), `rift.json`
   (Trench) and `rift-live.json`, and a probe copy `build/biolum/rift-trace.json` for `--sonic-trace` (the arc
   without the GPU: `visual.pState` = state index / 20).
 - **Stills of a time-varying medium must come from continuous play from 0**: a seek replays a grid's backlog with
