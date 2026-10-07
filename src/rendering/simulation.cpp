@@ -655,7 +655,13 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         for (std::uint32_t k = 0; k < count; ++k) {
             offsets[1] = static_cast<std::uint32_t>((firstBlock + k) * kStepBlockStride);
             if (grid.excitable()) {
-                dispatch(im.excitePipeline); // ADR-1201: one gather kernel is the whole step
+                // ADR-1201: one gather kernel is the whole step, one workgroup per 8 x 8 tile of the plane.
+                cp.SetPipeline(im.excitePipeline);
+                cp.SetBindGroup(0, state.currentIsA ? im.groupToB : im.groupToA, offsets.size(), offsets.data());
+                cp.DispatchWorkgroups(static_cast<std::uint32_t>((grid.resolution.x + 7) / 8) *
+                                      static_cast<std::uint32_t>((grid.resolution.z + 7) / 8));
+                state.currentIsA = !state.currentIsA;
+                ++encoded;
             } else if (agents) {
                 // Move and deposit (reads the current trail, writes only the deposits), then resolve.
                 if (grid.agentCount > 0) {

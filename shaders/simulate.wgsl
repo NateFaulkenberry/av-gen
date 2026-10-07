@@ -448,13 +448,42 @@ fn exciteFlush(v: f32) -> f32 {
     return select(v, 0.0, v < EXCITE_FLUSH);
 }
 
+// The neighbours' r over an 8 x 8 tile and its 2-cell halo, loaded once per workgroup: each cell then reads its
+// 20 neighbours from workgroup memory instead of 20 strided global loads (measured: ADR-1201, cost). A cell
+// outside a clamp grid holds 0, which reads as "never fired" -- exactly what the CPU's skip means.
+const EXCITE_TILE: i32 = 8;
+const EXCITE_SPAN: i32 = 12; // the tile and its halo of 2 on each side
+var<workgroup> exciteR: array<f32, 144>;
+
+// One workgroup per 8 x 8 tile (rendering::Simulation dispatches ceil(x / 8) * ceil(z / 8) of them).
 @compute @workgroup_size(64)
-fn cs_excite(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let cellIndex = gid.x;
-    if (cellIndex >= simCells()) {
+fn cs_excite(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+    let nx = i32(sim.res.x);
+    let nz = i32(sim.res.z);
+    let tilesX = (sim.res.x + 7u) / 8u;
+    let tx = i32(wg.x % tilesX) * EXCITE_TILE;
+    let tz = i32(wg.x / tilesX) * EXCITE_TILE;
+    let wraps = sim.layout0.z == 1u;
+    for (var t = li; t < 144u; t = t + 64u) {
+        var ii = tx + i32(t % 12u) - 2;
+        var kk = tz + i32(t / 12u) - 2;
+        var v = 0.0;
+        if (wraps) {
+            ii = simWrapAxis(ii, nx);
+            kk = simWrapAxis(kk, nz);
+            v = src[sim.layout0.x + u32(kk * nx + ii) * 4u + 1u];
+        } else if (ii >= 0 && ii < nx && kk >= 0 && kk < nz) {
+            v = src[sim.layout0.x + u32(kk * nx + ii) * 4u + 1u];
+        }
+        exciteR[t] = v;
+    }
+    workgroupBarrier();
+    let lx = i32(li % 8u);
+    let lz = i32(li / 8u);
+    let c = vec3<i32>(tx + lx, 0, tz + lz);
+    if (c.x >= nx || c.z >= nz) {
         return;
     }
-    let c = simCoords(cellIndex);
     let base = simBase(c);
     let u = src[base];
     let r = src[base + 1u];
@@ -480,9 +509,6 @@ fn cs_excite(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cell = u32(c.z) * sim.res.x + u32(c.x);
     let jitter = 1.0 + sim.excite2.y * (simUnit(simHash(cell, epoch, sim.exciteSlots.z)) * 2.0 - 1.0);
     let h = simCellSize();
-    let nx = i32(sim.res.x);
-    let nz = i32(sim.res.z);
-    let wraps = sim.layout0.z == 1u;
     var best = -1.0;
     for (var dz = -2; dz <= 2; dz = dz + 1) {
         for (var dx = -2; dx <= 2; dx = dx + 1) {
@@ -490,15 +516,7 @@ fn cs_excite(@builtin(global_invocation_id) gid: vec3<u32>) {
             if (d2 == 0 || d2 > 5) {
                 continue;
             }
-            var ii = c.x + dx;
-            var kk = c.z + dz;
-            if (wraps) {
-                ii = simWrapAxis(ii, nx);
-                kk = simWrapAxis(kk, nz);
-            } else if (ii < 0 || ii >= nx || kk < 0 || kk >= nz) {
-                continue;
-            }
-            let rj = src[simBase(vec3<i32>(ii, 0, kk)) + 1u];
+            let rj = exciteR[u32((lz + 2 + dz) * EXCITE_SPAN + lx + 2 + dx)];
             if (rj <= 0.0) {
                 continue;
             }

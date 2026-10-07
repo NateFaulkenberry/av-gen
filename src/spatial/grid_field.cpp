@@ -471,8 +471,9 @@ Result<void> GridField::validate() const {
         return fail("grid '{}': resolution must be >= 1 on every axis", name);
     }
     if (mode == GridMode::Excitable) {
-        if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
-            return fail("grid '{}': an excitable grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
+        if (resolution.y != 1 || resolution.x < 2 || resolution.z < 2 || resolution.x > kMaxAgentGridResolution ||
+            resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': an excitable grid is a plane: resolution [x, 1, z] with 2 <= x, z <= {}", name,
                         kMaxAgentGridResolution);
         }
         if (!(threshold > 0.0f) || coupling < 0.0f || refractoryStrength < 0.0f) {

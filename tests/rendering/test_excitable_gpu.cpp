@@ -6,6 +6,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/field_uniforms.hpp"
@@ -17,7 +18,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -422,5 +425,85 @@ TEST_CASE("A grid field's channel reads u, r, e and w of a simulated excitable g
     CHECK(spread[1] != spread[2]);
     CHECK(spread[2] != spread[3]);
     CHECK(spread[3] != spread[4]);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1201's cost table. Hidden (a measurement, not a verdict): run it by name under tools/gpu-lock.sh.
+// GPU time of the frame's simulate pass (gpu::FrameTimeline, "sim") over frames of 8 steps, median of 60,
+// for a quiet medium, a busy one (a pacing stimulus and noise: fronts everywhere), and the busy one with an fbm
+// noise field as its conductivity (the field's own evaluation, per cell per step).
+TEST_CASE("Excitable grid cost per step", "[.][perf][excitable-perf]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    for (const glm::ivec2 res : {glm::ivec2(512, 1024), glm::ivec2(1024, 1024)}) {
+        for (const int variant : {0, 1, 2}) {
+            const bool busy = variant > 0;
+            scene::Scene s;
+            spatial::FieldSpec pace;
+            pace.name = "pace";
+            pace.kind = spatial::FieldKind::Sphere;
+            pace.radius = 2.0f;
+            pace.softness = 0.5f;
+            pace.falloff.kind = spatial::FalloffKind::None;
+            s.fields.fields.push_back(pace);
+            spatial::FieldSpec rock;
+            rock.name = "rock";
+            rock.kind = spatial::FieldKind::Noise;
+            rock.frequency = 0.05f;
+            rock.falloff.kind = spatial::FalloffKind::None;
+            s.fields.fields.push_back(rock);
+            spatial::GridField g;
+            g.name = "prop";
+            g.mode = spatial::GridMode::Excitable;
+            g.wrap = spatial::GridWrap::Wrap;
+            g.resolution = {res.x, 1, res.y};
+            g.boundsMin = {-0.125f * static_cast<float>(res.x), -1.0f, -128.0f};
+            g.boundsMax = {0.125f * static_cast<float>(res.x), 1.0f, 128.0f};
+            g.simRate = 60.0f;
+            g.maxSubSteps = 8;
+            g.checkpointInterval = 0.0f; // a checkpoint would split the timed pass
+            g.waveSpeed = 12.0f;
+            g.refractoryTime = 0.6f;
+            if (busy) {
+                g.injectField = "pace";
+                g.injectRate = 1.5f;
+                g.conductivityField = variant == 2 ? "rock" : "";
+                g.coupling = 2.0f;
+                g.noise = 0.3f;
+            }
+            REQUIRE(g.validate().has_value());
+            s.fields.grids.push_back(g);
+            Sim sim(*ctx, shaders);
+            gpu::FrameTimeline timeline(*ctx);
+            sim.sim.setTimeline(&timeline);
+            std::vector<double> ms;
+            for (int f = 1; f <= 100; ++f) {
+                const double t = f * 8.0 / 60.0; // 8 steps a frame
+                sim.fields.update(s.fields, t);
+                timeline.beginFrame();
+                wgpu::CommandEncoder e = ctx->device().CreateCommandEncoder();
+                sim.sim.update(e, s, FrameTime{t, 8.0 / 60.0, static_cast<std::uint64_t>(f)}, &sim.fields);
+                timeline.resolve(e);
+                wgpu::CommandBuffer c = e.Finish();
+                ctx->queue().Submit(1, &c);
+                ctx->waitForQueue();
+                timeline.collect();
+                ctx->waitForQueue();
+                timeline.collect();
+                const double m = timeline.msFor("sim");
+                if (f > 40 && m > 0.0 && sim.sim.stats().steps == 8) {
+                    ms.push_back(m);
+                }
+            }
+            REQUIRE(ms.size() >= 30);
+            std::sort(ms.begin(), ms.end());
+            const double median = ms[ms.size() / 2];
+            const std::vector<float> cells = sim.cells(s);
+            std::printf("excitable %d x 1 x %d %s: %.4f ms per 8 steps = %.4f ms/step (min %.4f, max %.4f per 8; "
+                        "%zu frames; %zu of %zu cells fired)\n",
+                        res.x, res.y, variant == 0 ? "quiet" : variant == 1 ? "busy" : "busy + fbm conductivity", median, median / 8.0, ms.front(), ms.back(), ms.size(),
+                        fired(cells), cells.size() / 4);
+        }
+    }
     CHECK(ctx->errorCount() == 0);
 }
